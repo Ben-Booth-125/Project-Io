@@ -322,6 +322,21 @@ group — land tiles only, and only a group holding one of its provinces (Ben, 2
 core is fixed before the first cession: ground a nation receives never becomes its core. `strait_tiles` is **3** (≈ 380 km at
 `body_km_per_tile`), a calibration inside "a few sea tiles" (Ben, 2026-10-16).
 
+**No capital on a speck (Ben, 2026-10-25).** A capital moved to its nearest province must not land
+on a speck. Where the core chosen above stands on a land group under **10 tiles**
+(`capital_speck_tiles`) while a larger group of the nation's own holds one of its provinces, the
+nation is seated on its **largest** such group instead — groups measured as the strait rule
+measures them, land tiles only — at the province in it nearest the old seat, ties to the lower tile
+index. A capital moved to its nearest province — the seat had no ground of its own — may take any
+such group. Every other seat on a speck takes the largest such group **within its own territory**,
+the groups joined to it by land or straits: the capital moves, the territory does not, so no
+cession changes and a realm at or over the floor still keeps its seat's group. The rule covers
+every nation, realm or not, is read with the rest of the core before the first cession, again for
+an absorber after the size floor, and once more on the finished map — where a province the nation
+received may now be its largest group — moving the capital tile alone. A larger group with no province on it — a seedless
+landmass Pass 2b hung on the seat's own cell — gives the capital nowhere to stand, so the seat stays
+put.
+
 **An exclave is ceded, not kept.** A group that does not reach the core is an **exclave**, and it is
 **split among the nations that border it** (Ben, 2026-10-18): each part goes to the bordering
 nation nearest to it — province by province on a settled world, where a province never splits,

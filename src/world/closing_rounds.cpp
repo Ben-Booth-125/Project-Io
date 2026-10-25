@@ -230,12 +230,14 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
             // grid distance, ties to the lower tile). Ground no realm holds:
             // its own anchor.
             int ct = anchor_of(order[static_cast<std::size_t>(k)]);
+            bool fell_back = false; // the seat has no cell: the capital moved to its nearest province
             if (k < KP)
             {
                 const int s = seat_of(k);
                 if (s >= 0 && live_cell(s)) ct = anchor_of(s);
                 else if (s >= 0)
                 {
+                    fell_back = true;
                     const region& sr = regions[static_cast<std::size_t>(s)];
                     const int target = sr.anchor >= 0 ? sr.anchor : sr.row * gw + sr.col;
                     std::vector<int> provinces;
@@ -247,6 +249,34 @@ closing_plan plan_closing_rounds(const std::vector<region>& regions,
                 }
             }
             ct = under_floor_core(k, ct);
+            // NO CAPITAL ON A SPECK (NR-1080; § Pass 2e, Ben 2026-10-25): a
+            // core group under `capital_speck_tiles` with a larger group of
+            // the key's own holding a province seats on its LARGEST such
+            // group, at the province nearest the old seat (ties to the lower
+            // tile). Every key, realm or not; frozen with the rest. A capital
+            // moved to its nearest province may seat on any such group; a
+            // seat on its own cell keeps its group's TERRITORY (§ Pass 2e: a
+            // realm at or over the floor keeps its seat's group), so only
+            // groups joined to it are candidates, and no cession changes.
+            {
+                std::vector<int> provinces;
+                for (std::size_t r = 0; r < R; ++r)
+                    if (live_cell(static_cast<int>(r)) && key_of(static_cast<int>(r)) == k)
+                        provinces.push_back(anchor_of(static_cast<int>(r)));
+                int target = ct;
+                if (k < KP)
+                {
+                    const int s = seat_of(k);
+                    if (s >= 0)
+                    {
+                        const region& sr = regions[static_cast<std::size_t>(s)];
+                        target = sr.anchor >= 0 ? sr.anchor : sr.row * gw + sr.col;
+                    }
+                }
+                const int moved = seat_off_speck(own, gw, gh, k, ct, provinces, target, fell_back ? nullptr : &water);
+                if (moved != ct) ++plan.cores_speck_moved;
+                ct = moved;
+            }
             core_tile[static_cast<std::size_t>(k)] = ct;
             frozen = ct;
         }

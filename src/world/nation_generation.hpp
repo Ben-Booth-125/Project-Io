@@ -302,6 +302,29 @@ std::vector<carried_islet> islets_carried_by_cession(const std::vector<int>& own
 /// islet hung on another cell. -1 when @p tiles is empty.
 int nearest_tile_among(const std::vector<int>& tiles, int target, int gw);
 
+/// NR-1080 (§ Pass 2e, Ben 2026-10-25: "a capital moved to its nearest province
+/// must not land on a speck; seat it on the nation's largest group") — a land
+/// group under this many tiles is a SPECK, never a capital's group while a
+/// larger group of the nation's own holds a province.
+inline constexpr int capital_speck_tiles = 10;
+
+/// NR-1080 — where @p key's capital/core tile @p core stands on a land group
+/// (cardinal, column-wrapped, @p owner's land keys as the strait rule reads
+/// them) under `capital_speck_tiles`, and a LARGER group of @p key holds one of
+/// @p provinces (anchor tiles of its provinces), return the province in its
+/// LARGEST such group nearest @p target (the old seat; `nearest_tile_among`,
+/// ties to the lower tile). Otherwise @p core unchanged. PURE.
+///
+/// @p water given: only groups in the core's own TERRITORY (joined to it by
+/// land or chained straits) are candidates -- the move then changes no
+/// cession, so a realm's own seat keeps its group under § Pass 2e's floor rule
+/// and only its capital tile moves. Null: any group -- the case where the
+/// seat had no group of its own and the capital was moved to its nearest
+/// province.
+int seat_off_speck(const std::vector<int>& owner, int gw, int gh, int key, int core,
+                   const std::vector<int>& provinces, int target,
+                   const std::vector<char>* water = nullptr);
+
 /// BL-1310 — the floor's island case (§ Pass 2c, § Pass 2e): the key whose land
 /// is fewest water tiles from @p from's land, among keys @p eligible admits
 /// (ties: lower @p order, then lower tile). -1 when the water reaches none.
@@ -369,6 +392,9 @@ struct nation_fold_record
     /// cell outside the exclave (the Pass 2b islets hung on it) that the
     /// tail's cessions carried to the province's receiver.
     int32_t islet_tiles_carried = 0;
+    /// NR-1080 (§ Pass 2e, Ben 2026-10-25): cores the tail moved off a speck
+    /// onto the nation's largest seed-holding group.
+    int32_t cores_speck_moved = 0;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.

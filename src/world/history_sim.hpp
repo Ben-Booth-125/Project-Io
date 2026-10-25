@@ -5219,7 +5219,8 @@ struct history_sim_state
     int32_t closing_parts_detached     = 0; ///< BL-1310 round 4 review: ceded parts that did not join their receiver (0 expected)
     int32_t closing_provinces_split    = 0; ///< BL-1310 round 4 review: provinces split across parts (0 expected)
     int32_t closing_cores_floor_moved  = 0; ///< BL-1310: realms under the floor that kept a larger piece than the seat's group
-    int32_t closing_islet_tiles_carried = 0; ///< NR-1077 (Ben 2026-10-25): Pass 2b islet tiles a cession carried with their province
+    int32_t closing_islet_tiles_carried = 0;
+    int32_t closing_cores_speck_moved   = 0; ///< NR-1080 (Ben 2026-10-25): cores moved off a speck onto the largest province-holding group ///< NR-1077 (Ben 2026-10-25): Pass 2b islet tiles a cession carried with their province
     /// The carve as the cessions left it (`closing_plan::cell_overrides`):
     /// per pair a land tile and the REGION whose cell now holds it. The tail
     /// hands these to `generate_nations` by the region's anchor tile.

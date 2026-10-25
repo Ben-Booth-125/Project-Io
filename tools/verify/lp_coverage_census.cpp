@@ -648,7 +648,17 @@ int main(int argc, char** argv)
                 ++uncovered;
                 if (std::binary_search(rep.unconnectable_ids.begin(), rep.unconnectable_ids.end(),
                                        row.building))
+                {
+                    // Who it is and where, so an unconnectable consumer can be traced.
+                    const auto bit = w.buildings.find(row.building);
+                    const auto tit = bit == w.buildings.end() ? w.tiles.end() : w.tiles.find(bit->second.tile);
+                    const auto nit = w.nations.find(row.nation);
+                    std::printf("U seed=%u building=%u nation=%s col=%d row=%d\n", seed,
+                                static_cast<unsigned>(row.building),
+                                nit == w.nations.end() ? "-" : nit->second.name.c_str(),
+                                tit == w.tiles.end() ? -1 : tit->second.grid_x, tit == w.tiles.end() ? -1 : tit->second.grid_y);
                     continue;
+                }
                 if (dark_nations.count(row.nation) != 0)
                     ++dark_consumers;
                 else
