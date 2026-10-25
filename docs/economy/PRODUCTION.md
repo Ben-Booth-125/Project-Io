@@ -856,15 +856,14 @@ materials are absent. Under a lump-sum model that is a missed opportunity. Under
 pool it becomes a correctness problem**, because capacity is contended: a scorer that cannot see it
 will propose builds the pool cannot serve, every evaluation, for as long as the pool is short.
 
-Construction is a **market-gated, pay-as-you-build** process, not an instant purchase (BL-095,
-construction pacing). Placing a building gates only on affordability (the nation's treasury must
-afford the whole build to commit to it) and does **not** debit up front. Each economy tick a
-building under construction:
+Construction is a **market-gated** process, not an instant purchase (BL-095, construction pacing).
+Placing a building gates on affordability (the nation's treasury must afford the whole build to
+commit to it) and pays the whole flat `build_cost` then; the materials follow as the site builds
+(§ Construction is measured in days). Each economy tick a building under construction:
 
-- draws a quarter's share of its materials — `resource_build_cost` over the build's duration in
-  quarters, less in the last quarter when fewer than 90 days of work remain — as **real market
-  demand** (competing with population and other builds, bidding the local price up) and pays
-  the resolved price for them, plus the same fraction of the flat `build_cost`;
+- draws its materials for the days it built since the last tick — `resource_build_cost` over the
+  build's duration in quarters, per quarter of work — as **real market demand** (competing with
+  population and other builds, bidding the local price up) and pays the resolved price for them;
 - progresses at a **rate set by how much of that per-tick material need the local market can
   supply** — read from, and drained from, the real stock of the market whose catchment holds the
   site (`market_component.inventory`, MARKETS.md § Real market inventory) — the only stock there
@@ -873,8 +872,8 @@ building under construction:
   → **stretched** (up to `max_stretch ≈ 10×` the base duration); supplies less than
   `1/max_stretch` → **paused** until supply recovers.
 
-So a build in a thin market slows or stalls rather than completing instantly, and its cost is
-spread across the build. The front door shows the analog rate/ETA/paused status rather than a
+So a build in a thin market slows or stalls rather than completing instantly, and its materials
+are paid for across the build. The front door shows the analog rate/ETA/paused status rather than a
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A build stalled for want
 of an input registers that want as demand, so the stall is visible to the price signal.
 
@@ -885,14 +884,41 @@ duration is authored in days (`build_duration_days`; a two-quarter build is 180 
 placement's site multiplier (§ Construction site time), rounded to a whole day.
 
 - **Construction starts on the placement day (Ben, 2026-10-25).** A site begins building the day it
-  is placed, at the rate its market's shelf allows then. A 180-day build placed on day 10 of a
-  quarter completes on day 190 — no later than the quarter model it replaced.
-- **Materials and payment stay quarterly.** At each quarter's clearing a site draws materials and
-  pays the flat cost for the days already built since placement, in arrears, plus the quarter
-  ahead. That clearing's supply rate — full, stretched or paused — sets how many days of progress
-  the site makes over the quarter ahead: rate × days. A paused quarter adds no days. Whatever part
-  of the arrears the shelf cannot cover stays owed to the next clearing. In its last quarter a site
-  needing fewer than 90 days draws and pays only for the days it needs.
+  is placed. A 180-day build placed on day 10 of a quarter completes on day 190.
+- **Credits are paid up front, once (Ben, 2026-10-25).** The whole flat build cost — `build_cost`
+  times the site multiplier, the credit part of the capex — leaves the builder's treasury when the
+  site is placed. No economy tick pays construction credits after that. The build door admits a site
+  only when the treasury's uncommitted part covers the whole capex, so the payment never overdraws
+  it; a site the treasury cannot afford is refused, never placed in debt. A founding site, which
+  generation stands complete, is priced by generation instead.
+- **Materials are drawn in arrears, at the tick (Ben, 2026-10-25).** Each day built is owed its
+  materials, construction capacity included. Each economy tick draws, off the market's shelf, the
+  materials for the days built since the last tick, and pays the market for them then. A tick draws
+  at most one quarter's materials plus any shortfall carried from before. Whatever part the shelf
+  cannot cover stays owed and is drawn first at the next tick. A building that completes still owing
+  materials pays them at the ticks after. Capacity never holds a debt: a short yard stretches a build
+  and its missing part is not billed, as construction capacity always stretches rather than pauses.
+- **The rate for the quarter ahead is a claim on the shelf.** At each tick, after the draw, a site's
+  supply rate — full, stretched or paused — is set from the shelf that is left, less the materials
+  still owed by every site there. That rate times the quarter's days is the progress it makes: a
+  paused quarter adds no days, and in its last quarter a site needing fewer than 90 days claims only
+  them. The rate **claims** its share of the shelf; nothing is drawn until the next tick. Sites claim
+  in ascending building id, a short shelf shared pro-rata as every shelf draw is (MARKETS.md § Price
+  resolution). A site placed between ticks builds for the rest of the quarter at the rate the shelf
+  allows less every claim already on it, so a later site reads what earlier ones left. A quarter's
+  claims on one shelf never exceed what it held when they were made.
+- **A site that owes materials waits for them.** A debt is carried only when the shelf ran short of
+  it, and the quarter ahead reads the shelf less every debt. So a site carrying a debt in a material
+  builds nothing ahead on that material until the debt is paid; it resumes at the tick that pays it.
+  The debt comes first because it is work already done.
+- **A cancelled site is refunded its credits in full (Ben, 2026-10-25).** A site demolished or
+  cancelled before it completes returns the whole credit cost it paid at placement to the payer — a
+  nation's treasury, booked on its quarterly return as a refund. The materials it drew are not
+  returned: they were spent on the site. Any it still owed are cleared, not drawn. A standing
+  building refunds nothing.
+- **The state's funding gate prices this money.** A state site costs nothing in credits at the tick.
+  Its bill at a tick is the materials it owes, at the shelf's posted price, which the gate knows
+  exactly when it runs (NATIONS.md § What a nation owns, "A losing building idles").
 - **Progress is daily, and a site completes on a day.** Between clearings a site advances day by
   day, as surveys do. Completion fires that day: the building is operational, and a port or
   logistics hub joins the network then.
@@ -914,9 +940,10 @@ nearest supply anchor, up to `1 + site_time_reach_scale` at the reach budget's e
 (an established site builds faster — one discount step per building of the same type already on
 the tile, floored at `site_time_stack_min`).
 
-**The multiplier stretches materials and cash as well as time.** The per-tick draw is the build's
-materials and flat cost over the *authored* duration, and a hard site simply draws it for more
-ticks, so a site at ×1.5 consumes one and a half times the authored basket. That is the ruling, not
+**The multiplier stretches materials and cash as well as time.** The draw is the build's materials
+over the *authored* duration per quarter of work, and a hard site simply draws it for more days, so a
+site at ×1.5 consumes one and a half times the authored basket; its flat cost, paid at placement, is
+the authored `build_cost` times the same multiplier. That is the ruling, not
 an accident of arithmetic: a mountain build hauls more stone and keeps a crew longer.
 
 **So it is priced at placement.** Every reader of a build's cost — the affordability gate, the

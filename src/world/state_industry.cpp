@@ -554,23 +554,25 @@ float state_building_cost_bound(const world& w, const recipe_registry& reg,
 
     if (b.ticks_remaining > 0 || b.build_arrears_milli > 0)
     {
-        // A full-rate construction tick (run_construction: flat build cost over
-        // the authored duration, and the per-tick need row, capacity included).
-        // Ben, 2026-10-25: a clearing that also pays days built on credit pays
-        // more than a quarter (construction_clearing_fraction); never priced
-        // below one quarter, as before.
+        // CONSTRUCTION'S MONEY THIS TICK (Ben, 2026-10-25; PRODUCTION.md
+        // § Construction is measured in days): the flat build cost was paid once, at
+        // placement, so no credits fall due here. What this tick's draw bills is
+        // the materials OWED in arrears — the days built since the last tick plus
+        // any shortfall carried (run_construction's row, capacity included) — at
+        // the shelf's posted price. Exact: the debt is known when the gate runs
+        // (the quarter is closed first). The quarter ahead draws nothing now.
         const float duration = e.build_duration_ticks;
-        const float qf = std::max(1.0f, construction_clearing_fraction(b));
-        if (duration > 0.0f)
+        if (duration > 0.0f && b.build_arrears_milli > 0)
         {
-            bound += e.build_cost / duration * qf;
+            const float share = static_cast<float>(b.build_arrears_milli)
+                              / (1000.0f * static_cast<float>(k_construction_quarter_days));
             const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
             std::array<float, resource_count> need{};
             for (std::size_t r = 0; r < resource_count; ++r)
-                need[r] = row[r] / duration * qf;
+                need[r] = row[r] / duration * share;
             const float cap_rate = reg.construction().capacity_per_build_tick;
             if (cap_rate > 0.0f)
-                need[static_cast<std::size_t>(resource_type::construction_capacity)] += cap_rate * qf;
+                need[static_cast<std::size_t>(resource_type::construction_capacity)] += cap_rate * share;
             bound += shelf_cost(need);
         }
         if (b.ticks_remaining > 0)

@@ -238,9 +238,9 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         return construction_result::invalid_tile; // Port not coastal
     }
 
-    // Affordability is a commitment gate only (BL-095): the corp must be able to
-    // afford the whole build to start it, but is not debited here — payment is
-    // spread across construction by run_construction (pay-as-you-build). BL-1066
+    // Affordability (BL-095): the nation must be able to afford the whole build to
+    // start it. The flat build cost is debited AT PLACEMENT, once (Ben, 2026-10-25,
+    // below); the materials are drawn in arrears by run_construction. BL-1066
     // (Ben, 2026-09-23): "the whole build" is what the build will DRAW — flat cost
     // plus materials, times the site multiplier (PRODUCTION.md § Construction site
     // time). Pricing the authored cost admitted builds the corp could not finish.
@@ -286,9 +286,13 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         bc.recipe = (recipe != no_recipe) ? recipe : reg.default_recipe_id_at(w, tile); // BL-429
     }
 
-    // Construction STARTS ON THE PLACEMENT DAY (Ben, 2026-10-25): the site builds
-    // from today on credit at the rate its shelf allows; the next clearing pays.
-    begin_construction_on_placement(w, reg, bc);
+    // CREDITS UP FRONT, MATERIALS IN ARREARS (Ben, 2026-10-25): the site pays its
+    // whole flat build cost now (the gate above admitted it), and builds from today
+    // at the rate its shelf allows less what other sites have claimed; each day's
+    // materials are drawn at the next economy tick. A founding site (unpriced
+    // `funds`) is priced by generation and pays nothing here.
+    begin_construction_on_placement(w, reg, corp, bc,
+                                    /*founding=*/funds == std::numeric_limits<float>::max());
 
     w.buildings[bld_id]  = bc;
     w.stockpiles[bld_id] = stockpile_component{};
@@ -308,8 +312,8 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         maybe_spawn_market(w, reg, tile_it->second.body, tile);
 
     assets.push_back(bld_id);
-    // BL-095: no up-front debit — run_construction charges build_cost + materials
-    // incrementally as the build progresses (pay-as-you-build).
+    // Ben, 2026-10-25: the flat build cost was debited above, once; the materials
+    // are drawn in arrears by run_construction as the build progresses.
 
     // Before this clear existed, a newly placed port/hub extended the reach
     // field only when something unrelated (a road) happened to clear the cache —
@@ -499,6 +503,21 @@ bool demolish_state_building(world& w, entity_id nation, entity_id building)
     if (it == sa.end())
         return false;
     const building_type demolished_type = bld_it->second.type;
+    // A SITE CANCELLED BEFORE IT COMPLETES REFUNDS ITS CREDITS IN FULL (Ben,
+    // 2026-10-25): the whole flat cost it paid at placement goes back to the
+    // treasury, booked on the next quarterly return as a refund. The materials it
+    // drew are not returned — they were spent on the site — and any it still owed
+    // are cleared, not drawn (the building and its debt go together). A standing
+    // building refunds nothing.
+    if (bld_it->second.ticks_remaining > 0 && bld_it->second.build_credit_paid > 0.0f)
+    {
+        nation_component& nc = nit->second;
+        const float back = bld_it->second.build_credit_paid;
+        if (nc.refund_unbooked == 0.0f)
+            nc.refund_opening = nc.treasury;
+        nc.treasury        += back;
+        nc.refund_unbooked += back;
+    }
     sa.erase(it);
     w.buildings.erase(bld_it);
     w.stockpiles.erase(building);

@@ -508,17 +508,38 @@ void t6_save(const app_start_world& out)
         // records, of which the verification writer writes none.
         nc.is_major = false;
     }
+    // ...and the v57 CONSTRUCTION DAYS (Ben, 2026-10-24/25): a pre-days stream reads
+    // with the cursor at 0 and each site's days derived from its ticks
+    // (`sync_construction_days`), every other day field at its default.
+    base.construction_quarter_day = 0;
+    for (auto& [bid, b] : base.buildings)
+    {
+        (void)bid;
+        b.days_remaining = 0; b.build_rate_permille = 0; b.build_paid_days = 0;
+        b.build_day_milli = 0; b.completion_day = 0; b.output_share_permille = 1000;
+        b.build_arrears_milli = 0; b.build_credit_paid = 0.0f;
+        if (b.ticks_remaining > 0)
+            sync_construction_days(b);
+    }
     check(ok51 && r51.state_hash(0) == base.state_hash(0), "T6",
-          "...and hashes as the default world less the v56 books and the majors (the fold is sparse)");
+          "...and hashes as the default world less the v56 books, the majors and the v57 day state (the fold is sparse)");
 
     // Bad values refuse whole and leave the target untouched. The FIRST row of
     // the section is ids.front(): id (4) then tier (1) then discontent (4).
     // BL-1407 (v56): the tax section carries the nation rows only (its
     // corporation half is gone, so the helper's pre-v56 count of 4 is not
     // written), and the v55 majors and v56 nation-books sections follow it.
+    // v57 (Ben, 2026-10-24): the CONSTRUCTION-DAYS section follows the books and
+    // ends the stream — its size is the current stream less the pre-days one.
+    std::size_t days_tail = 0;
+    {
+        std::ostringstream o(std::ios::binary);
+        write_world_snapshot_pre_days(c, o);
+        days_tail = b52.size() - o.str().size();
+    }
     const std::size_t tail56   = tail - 4;
     const std::size_t books    = world_save_books_section_bytes(c);
-    const std::size_t net_tail = world_save_major_section_bytes(c) + books;
+    const std::size_t net_tail = world_save_major_section_bytes(c) + books + days_tail;
     const std::size_t row0 = b52.size() - tail56 - net_tail + 4;
     const auto refuse = [&](const char* what, auto patch) {
         std::string bad = b52;
@@ -537,7 +558,8 @@ void t6_save(const app_start_world& out)
     // BL-1407 (v56): a return's tax is in the NATION BOOKS, the last section:
     // per nation (ascending) id (4), four floats (16), the returns (u32 n, n
     // rows), then n f32 taxes, then n f64 exact nets. The LAST nation's last
-    // tax therefore sits just before its n nets at the stream's end.
+    // tax therefore sits just before its n nets at the books' end (the v57 days
+    // section follows them).
     (void)moved_nations(c);
     entity_id last = null_entity;
     for (const auto& [nid, nc] : c.nations)
@@ -547,8 +569,8 @@ void t6_save(const app_start_world& out)
     const std::size_t n_last = last != null_entity ? c.nations.at(last).returns.size() : 0;
     check(n_last > 0, "T6", "the last nation in the books section carries returns (the tax rows below are not vacuous)");
     if (n_last > 0)
-        refuse("a negative return tax", [&](std::string& s) { const float f = -1.0f; std::memcpy(&s[s.size() - 8 * n_last - 4], &f, 4); });
-    const std::size_t books0 = b52.size() - books; // u32 count, then the first nation
+        refuse("a negative return tax", [&](std::string& s) { const float f = -1.0f; std::memcpy(&s[s.size() - days_tail - 8 * n_last - 4], &f, 4); });
+    const std::size_t books0 = b52.size() - days_tail - books; // u32 count, then the first nation
     refuse("a return count that is not the rows that follow", [&](std::string& s) {
         std::uint32_t n = 0; std::memcpy(&n, &s[books0 + 4 + 4 + 16], 4); n += 1; std::memcpy(&s[books0 + 4 + 4 + 16], &n, 4); });
 }

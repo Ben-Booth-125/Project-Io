@@ -1,7 +1,8 @@
 // Headless harness (BL-095): the market-gated construction rate. A building under
 // construction progresses each tick at a rate set by how much of its per-tick
 // material need the local market can supply — full when ample, stretched when tight,
-// paused when starved — and pays for its materials as it builds (pay-as-you-build).
+// paused when starved — and draws its materials in arrears as it builds, its whole
+// flat build cost paid once at placement (Ben, 2026-10-25, ruling NR-1073).
 // Hand-builds a minimal world (no Lua / SDL / ImGui); kept outside src/ so the CMake
 // glob ignores it.
 
@@ -107,13 +108,19 @@ int main()
     std::printf("BL-095 construction-gate harness (per-tick steel need = %.1f)\n", per_tick_need);
 
     // --- Case A: AMPLE supply -> full rate (one whole tick of progress). ---
+    // Ben, 2026-10-25 (ruling NR-1073): placed on day 0, the site pays its WHOLE flat
+    // build cost at placement and builds the quarter's 90 days; the tick then draws
+    // those 90 days' materials in arrears and pays no credits.
     {
         scene s = make_scene(reg, /*steel_supply=*/1000.0f);
         const float bal0 = s.w.nations[s.corp].treasury;
-        const economy_report rep = run_economy_step(s.w, reg);
-        // Construction is measured in days (Ben, 2026-10-24): the clearing pays for
-        // the quarter ahead; the site makes that quarter's progress day by day.
-        advance_construction_to(s.w, reg, k_construction_quarter_days);
+        s.w.buildings[s.bld].days_remaining = 270;
+        begin_construction_on_placement(s.w, reg, s.corp, s.w.buildings[s.bld], /*founding=*/false);
+        const float placed = bal0 - s.w.nations[s.corp].treasury;
+        check(std::fabs(placed - 300.0f) < 1e-3f,
+              "A: placement charges the WHOLE build_cost, once", placed, 300.0f);
+        const float bal1 = s.w.nations[s.corp].treasury;
+        const economy_report rep = run_economy_step(s.w, reg); // closes the quarter: 90 days built
         const building_component& b = s.w.buildings[s.bld];
         check(b.ticks_remaining == 2 && b.days_remaining == 180,
               "A: ample supply advances a whole quarter over its 90 days (270 -> 180 days, 3 -> 2 qtrs)",
@@ -123,10 +130,10 @@ int main()
         const float drawn = rep.purchases.count({s.corp, s.market})
             ? rep.purchases.at({s.corp, s.market})[ri(resource_type::steel)] : 0.0f;
         check(std::fabs(drawn - per_tick_need) < 1e-3f,
-              "A: draws one tick of materials as market demand (pay-as-you-build)", drawn, per_tick_need);
-        const float spent = bal0 - s.w.nations[s.corp].treasury;
-        check(std::fabs(spent - 300.0f / 3.0f) < 1e-3f,
-              "A: charges one tick of build_cost incrementally", spent, 100.0f);
+              "A: the tick draws the quarter's materials built, in arrears, as market demand", drawn, per_tick_need);
+        const float spent = bal1 - s.w.nations[s.corp].treasury;
+        check(std::fabs(spent) < 1e-3f,
+              "A: the tick charges no build_cost credits", spent, 0.0f);
     }
 
     // --- Case B: TIGHT supply (60% of need) -> stretched (partial progress, no tick). ---
@@ -185,6 +192,8 @@ int main()
         s.w.buildings.at(s.bld).days_remaining  = days;
 
         const float bal0 = s.w.nations[s.corp].treasury;
+        // Ben, 2026-10-25: the flat cash is paid at placement, the rest in arrears.
+        begin_construction_on_placement(s.w, reg_d, s.corp, s.w.buildings.at(s.bld), /*founding=*/false);
         float steel = 0.0f, capacity = 0.0f;
         for (int t = 0; t < 20 && s.w.buildings.at(s.bld).ticks_remaining > 0; ++t)
         {

@@ -439,11 +439,11 @@ int main()
             building_component& site = wd.buildings.at(bids[0]);
             site.ticks_remaining = 2; site.days_remaining = 150; site.build_rate_permille = 600;
             site.build_paid_days = 40; site.build_day_milli = 321; site.construction_progress = 0.0f;
-            site.build_on_credit = true; site.build_arrears_milli = 12345; // Ben, 2026-10-25
+            site.build_credit_paid = 1234.5f; site.build_arrears_milli = 12345; // Ben, 2026-10-25
             building_component& done = wd.buildings.at(bids[1]);
             done.ticks_remaining = 0; done.days_remaining = 0; done.completion_day = 12;
             done.output_share_permille = 500;
-            done.build_arrears_milli = 700; // completed on credit: still owed
+            done.build_arrears_milli = 700; // completed owing materials: still owed
             wd.construction_quarter_day = 37;
         }
         const std::string b57 = to_bytes(wd);
@@ -456,11 +456,11 @@ int main()
             ok = s2.ticks_remaining == 2 && s2.days_remaining == 150 && s2.build_rate_permille == 600
               && s2.build_paid_days == 40 && s2.build_day_milli == 321
               && d2.completion_day == 12 && d2.output_share_permille == 500
-              && s2.build_on_credit && s2.build_arrears_milli == 12345 && d2.build_arrears_milli == 700
+              && s2.build_credit_paid == 1234.5f && s2.build_arrears_milli == 12345 && d2.build_arrears_milli == 700
               && back.state_hash(7) == wd.state_hash(7) && to_bytes(back) == b57;
         }
         check(ok, "P23 v57: a site's days, rate, paid days, sub-day progress, a completion day, "
-                  "an output share, credit and arrears and the day cursor round-trip by value (hash and bytes equal)");
+                  "an output share, credits paid at placement, materials owed and the day cursor round-trip by value (hash and bytes equal)");
 
         // A v56 stream: the same world less the section. Days derived from ticks.
         world w56 = wd;
@@ -469,7 +469,7 @@ int main()
             building_component& site = w56.buildings.at(bids[0]);
             site.days_remaining = 0; site.build_rate_permille = 0; site.build_paid_days = 0;
             site.build_day_milli = 0; site.construction_progress = 0.25f; // a quarter of a quarter done
-            site.build_on_credit = false; site.build_arrears_milli = 0;
+            site.build_credit_paid = 0.0f; site.build_arrears_milli = 0;
             building_component& done = w56.buildings.at(bids[1]);
             done.completion_day = 0; done.output_share_permille = 1000; done.build_arrears_milli = 0;
             w56.construction_quarter_day = 0;
