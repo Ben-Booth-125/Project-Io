@@ -287,11 +287,47 @@ verify.construction_view(0)
 verify.frames(3)
 verify.capture("construction_tabs_01_construction_no_tile")
 
--- With a tile selected the build bar itself draws. The tile under one of the
--- player's own buildings is a tile that certainly exists and is certainly reached.
-if map_pick then
+-- With a tile selected the build bar itself draws, and C9's door needs a tile
+-- where the Construct button is ENABLED - something must be placeable there.
+--
+-- THE AIM (2026-10-25). This used to be the tile under `map_pick`, on the premise
+-- that a tile under one of the player's own buildings "is certainly reached". On
+-- the current world that premise is false: map_pick is an Electronics plant whose
+-- tile carries no road edge, so every row of its door is refused `needs_road` and
+-- the Construct button is (correctly) disabled - C9 failed on the aim, and C8's tab
+-- probe, which reads the ledger C9's press opens, failed with it. So the aim asks
+-- the surface that answers "where may the player build?": the site finder's first
+-- row for the first building that has any. Every row is a tile the door's own gates
+-- accept (own ground, tech, road, stack, treasury), so the button there must be
+-- enabled - and if it is not, C9 fails, as it should.
+local door_tile = nil
+do
+    close_column()
+    verify.clear_selection()
+    verify.show_panel("construction", true)
+    verify.construction_view(0)
+    verify.frames(2)
+    for _, o in ipairs(verify.site_options()) do
+        verify.site_pick(o.name)
+        verify.frames(2)
+        local s = verify.site_finder()
+        if s.n_rows > 0 then
+            door_tile = { x = s.rows[1].x, y = s.rows[1].y, building = o.name }
+            break
+        end
+    end
+    verify.site_clear()
+    close_column()
+end
+verify.expect(door_tile ~= nil, "C8 the site finder names a tile the player can build on")
+if door_tile then
+    print(string.format("  door aim: (%d,%d), a site for '%s'", door_tile.x, door_tile.y,
+                        door_tile.building))
+end
+
+if door_tile then
     verify.goto_surface("home")
-    verify.select_tile(map_pick.x, map_pick.y)
+    verify.select_tile(door_tile.x, door_tile.y)
     verify.show_panel("construction", true)
     verify.construction_view(0)
     verify.frames(3)
@@ -306,10 +342,10 @@ end
 -- bars would photograph exactly like two doors onto one. So the door is PRESSED,
 -- from a column with nothing open, and where it lands is read back.
 -- ===========================================================================
-if map_pick then
+if door_tile then
     close_column()
     verify.goto_surface("home")
-    verify.select_tile(map_pick.x, map_pick.y)
+    verify.select_tile(door_tile.x, door_tile.y)
     verify.frames(3)
 
     local d = verify.construction_controls()
