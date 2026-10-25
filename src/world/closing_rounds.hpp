@@ -125,6 +125,8 @@ struct closing_plan
     /// islets hung on the ceded province with it"): land tiles of a moved
     /// province's cell lying outside the exclave, carried to its receiver.
     int islet_tiles_carried = 0;
+    /// NR-1080 (Ben 2026-10-25): cores moved off a speck onto the key's largest province-holding group.
+    int cores_speck_moved = 0;
     /// Realms whose representative (the lowest region they hold, which the
     /// tail reads as the nation's capital tile) is NOT in the territory of
     /// their capital's group after the rounds -- the two readings of "capital"

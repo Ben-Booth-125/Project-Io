@@ -50,7 +50,9 @@ int nb4(int t, int gw, int gh, int out[4])
 
 static int  g_polity = -1;
 static std::vector<int> g_at; ///< `--at T`: raster tiles to report
-static const char* g_dump = nullptr; ///< `--dump FILE`: per land tile "tile owner-name", for diffing two builds' maps
+static int g_launch = 0; ///< `--launch N`: 1 an Empires-round launch, 2 an Exploration-round launch (world_audit's)
+static const char* g_dump = nullptr;
+static const char* g_nation = nullptr; ///< `--nation NAME`: trace this nation whatever its shape ///< `--dump FILE`: per land tile "tile owner-name", for diffing two builds' maps
 
 int main(int argc, char** argv)
 {
@@ -63,6 +65,8 @@ int main(int argc, char** argv)
         else if (std::strcmp(argv[i], "--polity") == 0 && i + 1 < argc) g_polity = std::atoi(argv[++i]);
         else if (std::strcmp(argv[i], "--at") == 0 && i + 1 < argc) g_at.push_back(std::atoi(argv[++i]));
         else if (std::strcmp(argv[i], "--dump") == 0 && i + 1 < argc) g_dump = argv[++i];
+        else if (std::strcmp(argv[i], "--launch") == 0 && i + 1 < argc) g_launch = std::atoi(argv[++i]);
+        else if (std::strcmp(argv[i], "--nation") == 0 && i + 1 < argc) g_nation = argv[++i];
     }
     lua_state        lua;
     world_gen_config cfg{};
@@ -76,6 +80,8 @@ int main(int argc, char** argv)
     p.seed                = seed;
     p.nation_total_target = tt;
     p.major_target        = mt;
+    if (g_launch == 1) p.exploration_sim_enabled = false;
+    if (g_launch >= 1) p.industrialisation_span_enabled = false;
     generation_report     rep{};
     era_minus_one_fixture fx{};
     world w = make_hard_coded_world(p, &rep, cfg, nullptr, &works, &fx);
@@ -189,7 +195,8 @@ int main(int argc, char** argv)
         }
         const bool speck = land > 0 && cg < 10 && largest_other > cg;
         specks += speck ? 1 : 0;
-        if (land <= 0 || (cg * 10 >= land && !speck)) continue;
+        const bool named = g_nation != nullptr && n.name == g_nation;
+        if (land <= 0 || (cg * 10 >= land && !speck && !named)) continue;
         enclaves += cg * 10 < land ? 1 : 0;
         int polity = -1;
         if (be) for (std::size_t i = 0; i < be->nation_ids.size() && i < be->nation_polity.size(); ++i)

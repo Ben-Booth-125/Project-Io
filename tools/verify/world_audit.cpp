@@ -453,18 +453,20 @@ static int count_cessions(const generation_report& rep)
 
 // NR-1077 (Ben, 2026-10-25) — A CAPITAL ON A SPECK. Per nation: the land
 // group (cardinal, column-wrapped, same owner) holding its capital tile, and
-// its largest other group. A nation whose capital group is under
-// `k_speck_tiles` while another of its groups is larger is seated on a speck
-// with its main ground elsewhere. A READING of the finished world.
+// its largest other group holding a province. A nation whose capital group is
+// under `k_speck_tiles` while such a group is larger is seated on a speck with
+// its main ground elsewhere -- § Pass 2e (NR-1080, Ben 2026-10-25) seats it on
+// its largest group, so the row fails on any nation, major or minor.
 static constexpr int k_speck_tiles = 10;
 struct capital_speck_stats
 {
-    int         all    = 0; ///< nations of any rank seated on a speck
-    int         majors = 0; ///< of those, majors (the row fails on these)
+    int         all      = 0; ///< nations of any rank seated on a speck (the row fails on these)
+    int         majors   = 0; ///< of those, majors
+    int         seedless = 0; ///< reading only: on a speck beside a larger group that holds no province
     std::string detail;     ///< " | <name> capital group G of L land" per speck
 };
 
-static capital_speck_stats audit_capital_specks(const world& w, const std::set<entity_id>& majors)
+static capital_speck_stats audit_capital_specks(const world& w, const generation_report& rep, const std::set<entity_id>& majors)
 {
     capital_speck_stats cs;
     const entity_id body = w.home_body;
@@ -509,6 +511,12 @@ static capital_speck_stats audit_capital_specks(const world& w, const std::set<e
                 }
         }
     }
+    std::vector<char> anchored(csize.size(), 0);
+    for (const auto& be : rep.bodies)
+        if (be.id == body)
+            for (const region& p : be.settlement.regions)
+                if (p.anchor >= 0 && p.anchor < total && comp[static_cast<std::size_t>(p.anchor)] >= 0)
+                    anchored[static_cast<std::size_t>(comp[static_cast<std::size_t>(p.anchor)])] = 1;
     std::map<entity_id, int> land;
     for (const entity_id o : owner)
         if (o != null_entity) ++land[o];
@@ -520,21 +528,40 @@ static capital_speck_stats audit_capital_specks(const world& w, const std::set<e
         if (ct < 0 || ct >= total || owner[static_cast<std::size_t>(ct)] != nid) continue; // capital_off: another row
         const int cc    = comp[static_cast<std::size_t>(ct)];
         const int group = csize[static_cast<std::size_t>(cc)];
-        // "Its main ground elsewhere": a group of its own larger than the
-        // capital's. A nation whose every group is a speck (a city state on a
-        // chain of one-tile islets) is seated on its ground, not off it.
-        int largest_other = 0;
+        // "Its main ground elsewhere" (NR-1080, Ben 2026-10-25: "seat it on
+        // the nation's largest group"): a group of its own larger than the
+        // capital's that holds a province -- a region anchor -- so a capital
+        // could stand there. A larger group with no province (a seedless
+        // landmass Pass 2b hung on the seat's own cell) is counted apart: no
+        // province stands on it to seat. A nation whose every group is a
+        // speck (a city state on a chain of one-tile islets) is seated on its
+        // ground, not off it.
+        int largest_other = 0, largest_seedless = 0;
         for (std::size_t c = 0; c < csize.size(); ++c)
-            if (cown[c] == nid && static_cast<int>(c) != cc) largest_other = std::max(largest_other, csize[c]);
+            if (cown[c] == nid && static_cast<int>(c) != cc)
+            {
+                if (anchored[c]) largest_other = std::max(largest_other, csize[c]);
+                else             largest_seedless = std::max(largest_seedless, csize[c]);
+            }
         const int all_land = land[nid];
-        if (group >= k_speck_tiles || largest_other <= group) continue;
-        ++cs.all;
+        if (group >= k_speck_tiles) continue;
         const bool major = majors.count(nid) > 0;
-        cs.majors += major ? 1 : 0;
-        char buf[160];
-        std::snprintf(buf, sizeof(buf), " | %s%s capital group %d of %d land", n.name.c_str(), major ? " (MAJOR)" : "",
-                      group, all_land);
-        cs.detail += buf;
+        char buf[200];
+        if (largest_other > group)
+        {
+            ++cs.all;
+            cs.majors += major ? 1 : 0;
+            std::snprintf(buf, sizeof(buf), " | %s%s capital group %d of %d land (a province group of %d)", n.name.c_str(),
+                          major ? " (MAJOR)" : "", group, all_land, largest_other);
+            cs.detail += buf;
+        }
+        else if (largest_seedless > group)
+        {
+            ++cs.seedless;
+            std::snprintf(buf, sizeof(buf), " | seedless: %s%s capital group %d, a provinceless group of %d", n.name.c_str(),
+                          major ? " (MAJOR)" : "", group, largest_seedless);
+            cs.detail += buf;
+        }
     }
     return cs;
 }
@@ -683,11 +710,20 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                         parts_detached, provinces_split, hs.closing_cessions_split, fx.tail_cessions_split);
             std::printf("        under the floor, a larger piece kept as the core: %d (rounds) + %d (tail)\n",
                         hs.closing_cores_floor_moved, fx.tail_cores_floor_moved);
-            std::printf("        core tiles lost %d\n", hs.closing_core_tiles_lost);
+            std::printf("        core tiles lost %d | cores moved off a speck %d (rounds) + %d (tail)\n", hs.closing_core_tiles_lost,
+                        hs.closing_cores_speck_moved, fx.tail_cores_speck_moved);
             ++checks;
             fails += ok ? 0 : 1;
             std::printf("%s", ok ? "PASS" : "FAIL");
             print_strait(tag, seed, s, ce);
+            // NR-1080: no capital on a speck, on every launch (§ Pass 2e).
+            {
+                const capital_speck_stats cs = audit_capital_specks(sw, rep, std::set<entity_id>{});
+                ++checks;
+                fails += cs.all == 0 ? 0 : 1;
+                std::printf("%s  SPECK %s seed %u: nations seated on a <%d-tile group with a larger province group elsewhere %d | seedless %d%s\n",
+                            cs.all == 0 ? "PASS" : "FAIL", tag, seed, k_speck_tiles, cs.all, cs.seedless, cs.detail.c_str());
+            }
             std::printf("        plan: cessions %d (islet %d, to unheld %d, late %d), split secessions %d, "
                         "reps off core %d, overrides %zu, nations %d%s%s\n",
                         hs.closing_cessions, hs.closing_cessions_islet, hs.closing_cessions_to_unheld,
@@ -730,19 +766,20 @@ static int run_library_mode(const std::vector<uint32_t>& seeds, const std::vecto
                     else minor_sizes.push_back(sz);
                     if (sz < 80) ++under_floor;
                 }
-                // NR-1077 (Ben, 2026-10-25) — NO MAJOR SEATED ON A SPECK. A
-                // major whose capital's land group is under 10 tiles while a
-                // larger group of its own lies elsewhere is the defect class a
-                // cession that left a Pass 2b islet with its cedent produced
-                // (seed 1: a 3-tile landlocked enclave, the economy on the
-                // islet). Every nation is read; majors fail the row.
+                // NR-1077 / NR-1080 (Ben, 2026-10-25) — NO CAPITAL ON A SPECK,
+                // read again after the finish (the majors are known here). A
+                // capital on a group under 10 tiles while a larger province
+                // group of its own lies elsewhere is the class a cession that
+                // left a Pass 2b islet with its cedent produced (seed 1), and a
+                // seat moved to a speck province (seed 38). Any nation fails.
                 {
-                    const capital_speck_stats cs = audit_capital_specks(sw, majors);
+                    const capital_speck_stats cs = audit_capital_specks(sw, rep, majors);
                     ++checks;
-                    const bool speck_ok = cs.majors == 0;
+                    const bool speck_ok = cs.all == 0;
                     fails += speck_ok ? 0 : 1;
-                    std::printf("%s  SPECK seed %u 20:4: majors (%zu) seated on a <%d-tile group with a larger group elsewhere %d | all nations %d%s\n",
-                                speck_ok ? "PASS" : "FAIL", seed, majors.size(), k_speck_tiles, cs.majors, cs.all, cs.detail.c_str());
+                    std::printf("%s  SPECK seed %u 20:4 (finished): nations seated on a <%d-tile group with a larger province group elsewhere %d (majors %d of %zu) | seedless %d%s\n",
+                                speck_ok ? "PASS" : "FAIL", seed, k_speck_tiles, cs.all, cs.majors, majors.size(), cs.seedless,
+                                cs.detail.c_str());
                 }
                 std::sort(minor_sizes.begin(), minor_sizes.end(), [](int a, int b) { return a > b; });
                 const int    median = minor_sizes.empty() ? 0 : minor_sizes[minor_sizes.size() / 2];

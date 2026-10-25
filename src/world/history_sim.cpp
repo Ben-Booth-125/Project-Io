@@ -12647,6 +12647,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
         out.closing_provinces_split     = plan.provinces_split;
         out.closing_cores_floor_moved   = plan.cores_floor_moved;
         out.closing_islet_tiles_carried = plan.islet_tiles_carried;
+        out.closing_cores_speck_moved   = plan.cores_speck_moved;
         out.closing_cell_overrides.assign(plan.cell_overrides.begin(), plan.cell_overrides.end());
         out.closing_polity_core_tiles.assign(plan.polity_core_tiles.begin(), plan.polity_core_tiles.end());
         out.closing_core_tiles_lost = plan.core_tiles_lost;

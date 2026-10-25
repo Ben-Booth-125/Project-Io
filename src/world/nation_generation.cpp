@@ -1215,6 +1215,8 @@ std::vector<entity_id> generate_nations(
     // very tile.
     const bool strait_rule_here = true;
     std::vector<int> seed_core(static_cast<std::size_t>(seed_count), -1); // per representative seed
+    std::vector<char> core_off_speck(static_cast<std::size_t>(seed_count), 0); // NR-1080: the core moved off a speck
+    std::vector<char> seat_fell_back(static_cast<std::size_t>(seed_count), 0); // NR-1080: seated on its nearest province, not its seat
     const auto polity_of_seed_early = [&](int si) {
         return (si >= 0 && si < static_cast<int>(seed_polity.size())) ? seed_polity[static_cast<std::size_t>(si)] : -1;
     };
@@ -1252,6 +1254,7 @@ std::vector<entity_id> generate_nations(
                 }
                 const int near = nearest_tile_among(provinces, st, gw);
                 if (near >= 0) seed_core[static_cast<std::size_t>(si)] = near;
+                if (near >= 0 && near != st) seat_fell_back[static_cast<std::size_t>(si)] = 1;
             }
         }
         // A REALM UNDER THE SIZE FLOOR KEEPS THE LARGER PIECE (§ Pass 2e, Ben
@@ -1323,6 +1326,41 @@ std::vector<entity_id> generate_nations(
                     if (fold_out) ++fold_out->cores_floor_moved;
                 }
             }
+        // NO CAPITAL ON A SPECK (NR-1080; § Pass 2e, Ben 2026-10-25), on the
+        // same map, before the first cession: a core group under
+        // `capital_speck_tiles` with a larger group of the nation's own
+        // holding one of its seeds seats on its LARGEST such group, at the
+        // seed nearest the old seat (ties to the lower tile). Every nation,
+        // realm or not; the closing rounds already read it where they ran.
+        for (int si = 0; si < seed_count; ++si)
+        {
+            const int p = polity_of_seed_early(si);
+            if (p >= 0 && static_cast<std::size_t>(p) < params.polity_core_tiles.size()
+                && params.polity_core_tiles[static_cast<std::size_t>(p)] == seed_core[static_cast<std::size_t>(si)])
+                continue;
+            const int seat = seed_core[static_cast<std::size_t>(si)];
+            if (seat < 0 || seat >= total || land_owner[static_cast<std::size_t>(seat)] != si) continue;
+            std::vector<int> provinces;
+            for (int sj = 0; sj < seed_count; ++sj)
+            {
+                const int t = seeds[static_cast<std::size_t>(sj)];
+                if (land_owner[static_cast<std::size_t>(t)] == si && !ceded[static_cast<std::size_t>(t)]) provinces.push_back(t);
+            }
+            int target = seat;
+            if (p >= 0 && static_cast<std::size_t>(p) < params.polity_seat_tiles.size()
+                && params.polity_seat_tiles[static_cast<std::size_t>(p)] >= 0)
+                target = params.polity_seat_tiles[static_cast<std::size_t>(p)];
+            // A capital moved to its nearest province may seat on any larger
+            // group; a seat on its own ground only on one in its territory.
+            const int moved = seat_off_speck(land_owner, gw, gh, si, seat, provinces, target,
+                                             seat_fell_back[static_cast<std::size_t>(si)] ? nullptr : &water);
+            if (moved != seat)
+            {
+                seed_core[static_cast<std::size_t>(si)]     = moved;
+                core_off_speck[static_cast<std::size_t>(si)] = 1;
+                if (fold_out) ++fold_out->cores_speck_moved;
+            }
+        }
     }
     const auto polity_of_seed = [&](int si) {
         return (si >= 0 && si < static_cast<int>(seed_polity.size())) ? seed_polity[static_cast<std::size_t>(si)] : -1;
@@ -1495,6 +1533,28 @@ std::vector<entity_id> generate_nations(
                 core_tile[static_cast<std::size_t>(ni)] = seed_core[static_cast<std::size_t>(si)];
             }
         }
+        // NO CAPITAL ON A SPECK, after the floor too (NR-1080; § Pass 2e, Ben
+        // 2026-10-25): an absorber seated on a speck that took a larger
+        // province group with the realm it absorbed seats on its largest
+        // group, at the seed nearest its old seat (ties to the lower tile).
+        for (int ni = 0; ni < nation_count; ++ni)
+        {
+            const int si = survivor[static_cast<std::size_t>(ni)];
+            const int ct = core_tile[static_cast<std::size_t>(ni)];
+            if (si < 0 || ct < 0 || ct >= total || land_owner[static_cast<std::size_t>(ct)] != ni) continue;
+            std::vector<int> provinces;
+            for (int sj = 0; sj < seed_count; ++sj)
+            {
+                const int t = seeds[static_cast<std::size_t>(sj)];
+                if (land_owner[static_cast<std::size_t>(t)] == ni && !ceded[static_cast<std::size_t>(t)]) provinces.push_back(t);
+            }
+            const int moved = seat_off_speck(land_owner, gw, gh, ni, ct, provinces, ct, &water);
+            if (moved == ct) continue;
+            core_tile[static_cast<std::size_t>(ni)]      = moved;
+            seed_core[static_cast<std::size_t>(si)]      = moved;
+            core_off_speck[static_cast<std::size_t>(si)] = 1;
+            if (fold_out) ++fold_out->cores_speck_moved;
+        }
         exclave_cession ex;
         int repaired = 0;
         for (int guard = 0; guard < total; ++guard)
@@ -1635,7 +1695,10 @@ std::vector<entity_id> generate_nations(
             const int ct = seed_core[static_cast<std::size_t>(rep)];
             if (ct >= 0 && ct < total && land_owner[static_cast<std::size_t>(ct)] == ni)
                 core_tile[static_cast<std::size_t>(ni)] = ct;
-            if (seed_polity_of(rep) >= 0)
+            // A realm's nation sits on its core; so does a nation with no
+            // realm whose core moved off a speck (NR-1080), else the walk
+            // below would seat it back on its lowest seed.
+            if (seed_polity_of(rep) >= 0 || core_off_speck[static_cast<std::size_t>(rep)])
             {
                 const entity_id tid = tile_ids[static_cast<std::size_t>(core_tile[static_cast<std::size_t>(ni)])];
                 if (tid != null_entity) nation_data[static_cast<std::size_t>(ni)].capital_tile = tid;
@@ -1678,6 +1741,39 @@ std::vector<entity_id> generate_nations(
             if (si < seed_speech.size() && seed_speech[si].usable() && !nation_speech[static_cast<std::size_t>(ni)].usable())
                 nation_speech[static_cast<std::size_t>(ni)] = seed_speech[si];
         }
+    // NO CAPITAL ON A SPECK, on the finished map (NR-1080; § Pass 2e, Ben
+    // 2026-10-25). The cores above were read before the cessions and the
+    // floor; ground received since may be the nation's largest province
+    // group, joined to the capital's speck by a strait. The capital TILE moves
+    // to the province nearest it in the largest such group within its own
+    // territory (ties to the lower tile) -- territory, name and tongue are
+    // unchanged, so no cession is reopened.
+    if (strait_rule_here)
+    {
+        std::vector<int> land_owner(owner_map);
+        for (int idx = 0; idx < total; ++idx)
+            if (water[static_cast<std::size_t>(idx)]) land_owner[static_cast<std::size_t>(idx)] = -1;
+        std::unordered_map<entity_id, int> raster_of;
+        for (int idx = 0; idx < total; ++idx)
+            if (tile_ids[static_cast<std::size_t>(idx)] != null_entity) raster_of[tile_ids[static_cast<std::size_t>(idx)]] = idx;
+        for (int ni = 0; ni < nation_count; ++ni)
+        {
+            const auto it = raster_of.find(nation_data[static_cast<std::size_t>(ni)].capital_tile);
+            if (it == raster_of.end()) continue;
+            const int cap = it->second;
+            if (land_owner[static_cast<std::size_t>(cap)] != ni) continue;
+            std::vector<int> provinces;
+            for (int sj = 0; sj < seed_count; ++sj)
+            {
+                const int t = seeds[static_cast<std::size_t>(sj)];
+                if (land_owner[static_cast<std::size_t>(t)] == ni) provinces.push_back(t);
+            }
+            const int moved = seat_off_speck(land_owner, gw, gh, ni, cap, provinces, cap, &water);
+            if (moved == cap || tile_ids[static_cast<std::size_t>(moved)] == null_entity) continue;
+            nation_data[static_cast<std::size_t>(ni)].capital_tile = tile_ids[static_cast<std::size_t>(moved)];
+            if (fold_out) ++fold_out->cores_speck_moved;
+        }
+    }
 
     // A body with no culture layer (no settlement pass, or a caller that
     // supplied bare seed tiles) still gets ONE coherent tongue rather than a
@@ -2795,6 +2891,49 @@ int nearest_tile_among(const std::vector<int>& tiles, int target, int gw)
         if (best < 0 || d < best_d || (d == best_d && t < best)) { best = t; best_d = d; }
     }
     return best;
+}
+
+int seat_off_speck(const std::vector<int>& owner, int gw, int gh, int key, int core,
+                   const std::vector<int>& provinces, int target, const std::vector<char>* water)
+{
+    const int total = gw * gh;
+    if (total <= 0 || core < 0 || core >= total || static_cast<int>(owner.size()) < total
+        || owner[static_cast<std::size_t>(core)] != key)
+        return core;
+    const land_groups g = find_land_groups(owner, gw, gh, key);
+    const int cc = g.comp[static_cast<std::size_t>(core)];
+    if (cc < 0) return core;
+    const int core_size = static_cast<int>(g.tiles[static_cast<std::size_t>(cc)].size());
+    if (core_size >= capital_speck_tiles) return core;
+    // Within the core's own territory only, where @p water is given: the
+    // groups joined to the core by land or chained straits.
+    std::vector<char> in_terr;
+    if (water != nullptr)
+    {
+        std::vector<int> cores(static_cast<std::size_t>(key + 1), -1);
+        cores[static_cast<std::size_t>(key)] = core;
+        in_terr = territory_tiles(owner, *water, gw, gh, cores);
+    }
+    // The largest group holding one of the key's provinces.
+    int best_size = core_size;
+    for (const int t : provinces)
+    {
+        if (t < 0 || t >= total || owner[static_cast<std::size_t>(t)] != key) continue;
+        if (!in_terr.empty() && !in_terr[static_cast<std::size_t>(t)]) continue;
+        const int c = g.comp[static_cast<std::size_t>(t)];
+        if (c >= 0) best_size = std::max(best_size, static_cast<int>(g.tiles[static_cast<std::size_t>(c)].size()));
+    }
+    if (best_size <= core_size) return core; // no larger group to seat on
+    std::vector<int> in_best;
+    for (const int t : provinces)
+    {
+        if (t < 0 || t >= total || owner[static_cast<std::size_t>(t)] != key) continue;
+        if (!in_terr.empty() && !in_terr[static_cast<std::size_t>(t)]) continue;
+        const int c = g.comp[static_cast<std::size_t>(t)];
+        if (c >= 0 && static_cast<int>(g.tiles[static_cast<std::size_t>(c)].size()) == best_size) in_best.push_back(t);
+    }
+    const int near = nearest_tile_among(in_best, target >= 0 ? target : core, gw);
+    return near >= 0 ? near : core;
 }
 
 std::vector<char> territory_tiles(const std::vector<int>& owner, const std::vector<char>& water, int gw, int gh,
