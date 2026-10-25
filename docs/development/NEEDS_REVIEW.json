@@ -782,6 +782,44 @@
     "src/world/logistic_points.cpp"
    ],
    "resolution": "Ben, 2026-10-25: generate port links for nations akin to the seed 28 example. The bridge cap stays at 2; an overseas building group joins its capital chain by a port link."
+  },
+  {
+   "id": "NR-1075",
+   "title": "The seat clean slate still refunds a cancelled site's materials; the new rule refunds credits only",
+   "raised": "2026-10-25",
+   "kind": "question",
+   "status": "open",
+   "source": "Construction payment lane (92f99bf3, merged 3dc6f34a)",
+   "what": "A site cancelled before completion now refunds its credit cost in full; materials drawn stay spent (Ben, 2026-10-25). The seat clean slate (BL-1206: taking a seat clears the nation's unfinished sites) used to refund everything charged, materials included. The lane kept that total for the seat: the door refunds the credits and seat_clean_slate refunds the materials on top, so the seat's returned sum is unchanged.",
+   "why_it_matters": "The seat clearing is not the player's choice, so a full refund keeps them whole for something done to them. But it is an exception to the rule you just set.",
+   "options": [
+    "A) Keep the exception: the seat clean slate refunds credits and materials (as built).",
+    "B) The seat follows the rule: credits only, drawn materials stay spent."
+   ],
+   "recommendation": "A. The player did not cancel those sites; the seat did.",
+   "files": [
+    "src/world/construction.cpp",
+    "tools/verify/seat_clean_slate.cpp",
+    "docs/economy/PRODUCTION.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1076",
+   "title": "The placement credit cost includes the site multiplier; forward claims share a short shelf pro-rata",
+   "raised": "2026-10-25",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Construction payment lane (92f99bf3, merged 3dc6f34a)",
+   "what": "(1) The credit cost paid once at placement is build_cost x site days / (authored quarters x 90): a mountain site that takes longer also costs more credits, as PRODUCTION.md's site-time rule already stretches cash. (2) The quarter-ahead rate reads the shelf less every site's owed materials; on a contended shelf the sites share it pro-rata through the BL-1209 solver (MARKETS.md requires pro-rata on a short shelf). The claim reserves against other construction only: a processor can still buy claimed stock that tick, and the gap shows as a carried shortfall.",
+   "why_it_matters": "Both shape what a build costs and how fast it runs. They follow existing rules, so they were taken rather than raised.",
+   "options": [],
+   "recommendation": "Keep both.",
+   "files": [
+    "src/world/economy_system.cpp",
+    "docs/economy/PRODUCTION.md"
+   ],
+   "resolution": null
   }
  ]
 }

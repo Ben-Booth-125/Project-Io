@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*52 entries — 32 open, 20 resolved.*
+*54 entries — 34 open, 20 resolved.*
 
 ---
 
@@ -299,6 +299,31 @@ On the folded world (BL-1402), seed 46's 4 majors place NO production building i
 > **Recommendation:** Keep it off and fold the question into BL-1409, whose measurement (treasury trajectory and seed 46) is the same question of how a nation that owns every plant spends.
 
 *Files: `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`, `src/world/spawn_seat.cpp`*
+
+### NR-1075 — The seat clean slate still refunds a cancelled site's materials; the new rule refunds credits only
+*question · raised 2026-10-25 · from Construction payment lane (92f99bf3, merged 3dc6f34a)*
+
+A site cancelled before completion now refunds its credit cost in full; materials drawn stay spent (Ben, 2026-10-25). The seat clean slate (BL-1206: taking a seat clears the nation's unfinished sites) used to refund everything charged, materials included. The lane kept that total for the seat: the door refunds the credits and seat_clean_slate refunds the materials on top, so the seat's returned sum is unchanged.
+
+**Why it matters.** The seat clearing is not the player's choice, so a full refund keeps them whole for something done to them. But it is an exception to the rule you just set.
+
+- A) Keep the exception: the seat clean slate refunds credits and materials (as built).
+- B) The seat follows the rule: credits only, drawn materials stay spent.
+
+> **Recommendation:** A. The player did not cancel those sites; the seat did.
+
+*Files: `src/world/construction.cpp`, `tools/verify/seat_clean_slate.cpp`, `docs/economy/PRODUCTION.md`*
+
+### NR-1076 — The placement credit cost includes the site multiplier; forward claims share a short shelf pro-rata
+*decision taken on your behalf · raised 2026-10-25 · from Construction payment lane (92f99bf3, merged 3dc6f34a)*
+
+(1) The credit cost paid once at placement is build_cost x site days / (authored quarters x 90): a mountain site that takes longer also costs more credits, as PRODUCTION.md's site-time rule already stretches cash. (2) The quarter-ahead rate reads the shelf less every site's owed materials; on a contended shelf the sites share it pro-rata through the BL-1209 solver (MARKETS.md requires pro-rata on a short shelf). The claim reserves against other construction only: a processor can still buy claimed stock that tick, and the gap shows as a carried shortfall.
+
+**Why it matters.** Both shape what a build costs and how fast it runs. They follow existing rules, so they were taken rather than raised.
+
+> **Recommendation:** Keep both.
+
+*Files: `src/world/economy_system.cpp`, `docs/economy/PRODUCTION.md`*
 
 ---
 
