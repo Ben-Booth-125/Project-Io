@@ -331,6 +331,12 @@ struct bake_source
     std::vector<std::int32_t> route_first;   ///< Per tile: its first piece in route_pieces.
     std::vector<std::uint8_t> route_count;   ///< Per tile: its piece count.
     std::vector<route_piece>  route_pieces;
+    /// THE LOGISTICS LENS'S GROUND (Ben, 2026-10-25; route_paint.hpp
+    /// strip_painted_routes): the routes are derived as ever - trees and a town's
+    /// blocks keep off them, a cluster still steps toward its road - but the route
+    /// pass paints no surface. Folded into route_hash, so flipping it re-bakes
+    /// exactly the windows a route reaches.
+    bool routes_unpainted = false;
 };
 
 /// The border sets (BL-1251; RENDERING.md § Tiles hold their own ground) —

@@ -501,6 +501,10 @@ struct ground_request
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     float draw_r = 0;                ///< Drawn hex circumradius, screen px.
     bool  valid = false;
+    /// The Logistics lens is up (Ben, 2026-10-25): bake the ground with no route
+    /// surface painted, because the canvas draws the network itself in the lens's
+    /// colours (RENDERING.md § Roads and sea lanes).
+    bool  hide_routes = false;
 };
 
 /// Shared selection and view state for the three primary canvases.
@@ -1347,8 +1351,36 @@ struct ui_state
     // on any other tile they are the points reaching it and its own buildings' need.
     std::vector<float> lp_supplied;
     std::vector<float> lp_requested;
-    std::vector<std::uint8_t> lp_on_road; ///< 1 where the cell is the player's ROAD tile
-    std::vector<float> lp_granted; ///< on a road: what its routed requests were granted (-1 elsewhere)
+    /// What LINK of the player's chain the cell is (Ben, 2026-10-25: "a lens that shows
+    /// each chain link"): 0 none, 1 the player's ROAD tile, 2 a RAIL leg's track, 3 a
+    /// SEA leg's water (LENSES.md § Logistics lens, "Every link of the chain").
+    std::vector<std::uint8_t> lp_on_road;
+    std::vector<float> lp_granted; ///< on a link: what its routed requests were granted (-1 elsewhere)
+    /// REACH, KEPT APART FROM TRAFFIC (Ben, 2026-10-25): per cell, 0 = off the chain (no
+    /// connected source reaches it - `lp_route_to`'s `reached`), 1 = CONNECTED, IDLE (on
+    /// the chain, no routed request crosses it), 2 = carrying a routed request. Read
+    /// only where `lp_on_road` names a link.
+    std::vector<std::uint8_t> lp_chain;
+    /// Every rail-track cell of the active body (1), so the lens can draw the line the
+    /// bake no longer paints under it (RENDERING.md § Roads and sea lanes).
+    std::vector<std::uint8_t> lp_track;
+    /// One rail or sea LEG of the player's chain, as raster cells, for the lens's stroke
+    /// along it (the per-cell figures above carry its numbers). Plain fields so this
+    /// header does not pull in the resolver.
+    struct lp_leg_view
+    {
+        std::uint8_t     network = 1;  ///< 1 rail, 2 sea (lp_network as an int)
+        std::uint8_t     chain   = 1;  ///< 1 connected idle, 2 carrying
+        std::vector<int> cells;        ///< raster indices, end to end
+        float            requested = 0.0f, granted = 0.0f, available = 0.0f;
+    };
+    std::vector<lp_leg_view> lp_legs;
+
+    /// THE CAPITAL STAR (Ben, 2026-10-25): how many stars the Planetary canvas drew
+    /// last frame (one per visible wrap copy), and whether the player's own was among
+    /// them - "the mark was drawn", for the verify hook, not a second copy of the list.
+    int  capital_stars_drawn  = 0;
+    bool capital_star_player  = false;
 
     /// The player nation's own figures for the key, all in LP/tick: what its connected
     /// sources GENERATED (the pool), how many sources made it, and what its buildings
@@ -1383,8 +1415,10 @@ struct ui_state
     bool      lp_hover_blocked  = false; ///< BL-1356: a source reaches here but has no chain to the capital
     float     lp_hover_supplied  = 0.0f;  ///< the tile's SUPPLIED figure (lp_supplied's cell)
     float     lp_hover_requested = 0.0f;  ///< the tile's REQUESTED figure (lp_requested's cell)
-    bool      lp_hover_road      = false; ///< the pair is a road's routed flow, not the tile's own
-    float     lp_hover_granted   = 0.0f;  ///< on a road: what the routed requests were granted
+    bool      lp_hover_road      = false; ///< the pair is a link's routed flow, not the tile's own
+    float     lp_hover_granted   = 0.0f;  ///< on a link: what the routed requests were granted
+    int       lp_hover_link      = 0;     ///< lp_on_road's kind under the pointer (0 none, 1 road, 2 rail, 3 sea)
+    int       lp_hover_chain     = 0;     ///< lp_chain's state under the pointer (0 off, 1 idle, 2 carrying)
 
     double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 

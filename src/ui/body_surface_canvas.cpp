@@ -7,6 +7,7 @@
 #include "hover_content.hpp"
 #include "hex_render.hpp"
 #include "icons.hpp"
+#include "logistics_chain.hpp" // the Logistics lens's rail and sea legs (Ben, 2026-10-25)
 #include "tile_inspector.hpp"   // history_view_tectonics (BL-660 routing)
 #include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
@@ -1329,6 +1330,24 @@ ImU32 logistics_road_colour(float supplied, float requested)
                        logistics_road_t(supplied, requested));
 }
 
+/// REACH, KEPT APART FROM TRAFFIC (Ben, 2026-10-25: "an unused road between them
+/// reads 0,0"; LENSES.md § Logistics lens). A link of the player's chain that no routed
+/// request crosses is CONNECTED, IDLE - a pale steel, neither end of the traffic ramp,
+/// so it never reads as a short road nor as a cut one. A road of the player's nation no
+/// connected source reaches is OFF THE CHAIN - a dull umber, darker than the plain
+/// canvas's sand, so it recedes rather than claiming a colour of the ramp.
+constexpr ImU32 k_logistics_idle = IM_COL32(204, 214, 230, 255);
+constexpr ImU32 k_logistics_off  = IM_COL32(118, 104,  92, 255);
+
+/// A link's colour by its chain state (ui_state::lp_chain): 2 the traffic ramp over
+/// supplied / requested, 1 connected-idle, 0 off the chain.
+ImU32 logistics_link_colour(std::uint8_t chain, float supplied, float requested)
+{
+    if (chain >= 2)
+        return logistics_road_colour(supplied, requested);
+    return chain == 1 ? k_logistics_idle : k_logistics_off;
+}
+
 /// The Throughput lens's ANCHOR ramp: a distinctly HOTTER, near-white cyan over
 /// an anchor's share of the body's largest pool. Deliberately a different ramp
 /// from the field's — an anchor mark drawn in the field's own colours vanishes
@@ -1364,6 +1383,7 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     // "Generated 0" beside what production needs is the answer, not a blank key.
     const float body_h = state.lp_player_known
         ? pad + line_h + 4.0f + bar_h + 2.0f + line_h + 6.0f
+              + 2.0f * (line_h + 2.0f) + 4.0f // the idle and off-chain swatches
               + (have ? std::max(line_h, mark_d) : line_h) + 4.0f
               + 4.0f * (line_h + 2.0f) + pad
         : pad + line_h + 6.0f + line_h + 4.0f + line_h + pad;
@@ -1408,6 +1428,20 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     const ImVec2 nts = ImGui::CalcTextSize(top);
     dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), top); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 6.0f;
+
+    // REACH APART FROM TRAFFIC (Ben, 2026-10-25): the two states off the ramp - a link
+    // on the chain that nothing is routed across, and a road no connected source
+    // reaches - each a swatch drawn as the map draws it.
+    const auto swatch_row = [&](ImU32 c, const char* label) {
+        const float sw = 18.0f, sh = 4.0f, sy = y + (line_h - sh) * 0.5f;
+        dl->AddRectFilled({ x, sy - 1.0f }, { x + sw, sy + sh + 1.0f }, IM_COL32(12, 16, 24, 200));
+        dl->AddRectFilled({ x + 1.0f, sy }, { x + sw - 1.0f, sy + sh }, c);
+        dl->AddText({ x + sw + 6.0f, y }, IM_COL32(200, 205, 214, 255), label); // fit-exempt: legend box sized to its measured entries (container 2)
+        y += line_h + 2.0f;
+    };
+    swatch_row(k_logistics_idle, "connected, idle");
+    swatch_row(k_logistics_off, "not tied to the capital");
+    y += 4.0f;
 
     // Row 2 - the SOURCE MARK, carrying the points that source makes. BL-1352: these
     // are hubs, stations and ports, never cities; BL-1353: and only your nation's.
@@ -1935,6 +1969,11 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_requested.clear();
     state.lp_on_road.clear();
     state.lp_granted.clear();
+    state.lp_chain.clear();
+    state.lp_track.clear();
+    state.lp_legs.clear();
+    state.lp_hover_link      = 0;
+    state.lp_hover_chain     = 0;
     state.lp_hover_granted   = 0.0f;
     state.lp_hover_supplied  = 0.0f;
     state.lp_hover_requested = 0.0f;
@@ -2078,17 +2117,48 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             // Held across frames on the body's stamp (tick, buildings, logistics
             // generation): the walks back are a read of this tick's routing, so the
             // answer only moves when one of those does.
+            // The rail and sea LEGS, each road tile's REACH, and the body's track ride the
+            // same stamp (Ben, 2026-10-25; LENSES.md § Logistics lens, "Every link of the
+            // chain"): all three are reads of this tick's routing and of the network it
+            // ran on, so they move only when the flow does - plus the track count, which
+            // a line laid between ticks moves without a building.
             static body_frame_stamp                       s_flow_stamp;
             static entity_id                              s_flow_nation = null_entity;
+            static std::size_t                            s_flow_track  = ~std::size_t{0};
             static std::unordered_map<entity_id, lp_flow> s_flow;
+            static std::vector<ui::lp_leg>                s_legs;
+            static std::vector<std::uint8_t>              s_reached; // per raster cell: a connected source reaches it
+            static std::vector<std::uint8_t>              s_track;   // per raster cell: rail track
             const body_frame_stamp fstamp = make_body_frame_stamp(w, state.active_body);
-            if (fstamp != s_flow_stamp || pn != s_flow_nation)
+            if (fstamp != s_flow_stamp || pn != s_flow_nation || w.rail_track.size() != s_flow_track)
             {
                 s_flow_stamp  = fstamp;
                 s_flow_nation = pn;
+                s_flow_track  = w.rail_track.size();
                 s_flow        = lp_route_flow(w, memo, lp, pn, state.active_body);
+                s_legs        = ui::lp_chain_legs(w, memo, lp, pn, state.active_body);
+                // REACH, KEPT APART FROM TRAFFIC: `lp_route_to`'s `reached` - some
+                // source of the nation reaches the tile and is tied to the capital.
+                // Asked of the player's road tiles only, the tiles the lens colours.
+                s_reached.assign(n, 0);
+                s_track.assign(n, 0);
+                for (std::size_t i = 0; i < raster.size() && i < n; ++i)
+                {
+                    const entity_id tid = raster[i];
+                    if (tid == null_entity)
+                        continue;
+                    if (w.rail_track.count(tid) != 0)
+                        s_track[i] = 1;
+                    if (state.lp_reaching[i] < 0.0f)
+                        continue;
+                    const auto tc = w.tiles.find(tid);
+                    if (tc != w.tiles.end() && tile_has_road(tc->second))
+                        s_reached[i] = lp_route_to(w, memo, pn, state.active_body, tid).reached ? 1 : 0;
+                }
             }
             const std::unordered_map<entity_id, lp_flow>& flow = s_flow;
+            state.lp_chain.assign(n, 0);
+            state.lp_track = s_track;
             for (std::size_t i = 0; i < raster.size() && i < n; ++i)
             {
                 if (state.lp_reaching[i] < 0.0f)
@@ -2105,11 +2175,63 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                     state.lp_supplied[i]  = fit != flow.end() ? fit->second.available : 0.0f;
                     state.lp_granted[i]   = fit != flow.end() ? fit->second.granted   : 0.0f;
                     state.lp_requested[i] = fit != flow.end() ? fit->second.requested : 0.0f;
+                    // CARRYING, CONNECTED-IDLE, OR OFF THE CHAIN (Ben, 2026-10-25: "an
+                    // unused road between them reads 0,0"). A road no routed request
+                    // crosses but a connected source reaches is on the chain: it reads
+                    // IDLE, and what it could carry is the points reaching it.
+                    if (state.lp_requested[i] > 0.0f)
+                        state.lp_chain[i] = 2;
+                    else if (i < s_reached.size() && s_reached[i] != 0)
+                    {
+                        state.lp_chain[i]    = 1;
+                        state.lp_supplied[i] = std::max(state.lp_supplied[i], state.lp_reaching[i]);
+                    }
                 }
-                // Ben, 2026-10-24: POINTS ARE SHOWN ON ROAD TILES ONLY - the network is
-                // the roads (and the rail), so a tile off them carries no numbers;
-                // its hover card still explains it.
+                // Ben, 2026-10-24: POINTS ARE SHOWN ON THE NETWORK ONLY - the roads, and
+                // (2026-10-25) the rail and sea legs below - so a tile off it carries no
+                // numbers; its hover card still explains it.
                 (void)own_need;
+            }
+            // THE RAIL AND SEA LEGS onto the same cells: a leg's run carries its routed
+            // flow along its whole length, so track and water between two stations or a
+            // port and its landing read as one link, not as a gap. A road tile keeps its
+            // own figures where it carries traffic (a station's tile is both); where legs
+            // share a tile their shares add, because they are different shares.
+            const int lgw = state.lp_reaching_gw;
+            state.lp_legs.reserve(s_legs.size());
+            for (const ui::lp_leg& leg : s_legs)
+            {
+                ui_state::lp_leg_view lv;
+                lv.network   = static_cast<std::uint8_t>(leg.network);
+                lv.chain     = leg.requested > 0.0f ? 2 : 1;
+                lv.requested = leg.requested;
+                lv.granted   = leg.granted;
+                lv.available = leg.available;
+                for (const entity_id tid : leg.tiles)
+                {
+                    const auto tc = w.tiles.find(tid);
+                    if (tc == w.tiles.end() || tc->second.body != state.active_body || lgw <= 0)
+                        continue;
+                    const std::size_t i = static_cast<std::size_t>(tc->second.grid_y)
+                                        * static_cast<std::size_t>(lgw)
+                                        + static_cast<std::size_t>(tc->second.grid_x);
+                    if (i >= n)
+                        continue;
+                    lv.cells.push_back(static_cast<int>(i));
+                    if (state.lp_on_road[i] == 1 && state.lp_chain[i] == 2)
+                        continue; // a carrying road keeps its own pair
+                    const bool fresh = state.lp_on_road[i] != 2 && state.lp_on_road[i] != 3;
+                    state.lp_on_road[i] = leg.network == lp_network::rail ? 2 : 3;
+                    if (fresh)
+                    {
+                        state.lp_supplied[i] = state.lp_requested[i] = state.lp_granted[i] = 0.0f;
+                    }
+                    state.lp_supplied[i]  += leg.available;
+                    state.lp_requested[i] += leg.requested;
+                    state.lp_granted[i]   += leg.granted;
+                    state.lp_chain[i] = std::max<std::uint8_t>(state.lp_chain[i], lv.chain);
+                }
+                state.lp_legs.push_back(std::move(lv));
             }
             // BL-1353: the ground card's WHY for the tile under the pointer. The card
             // holds a const world, so it is read here, off the memo the loop above
@@ -2152,6 +2274,8 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                         state.lp_hover_requested = state.lp_requested[hi];
                         state.lp_hover_road      = state.lp_on_road[hi] != 0;
                         state.lp_hover_granted   = std::max(0.0f, state.lp_granted[hi]);
+                        state.lp_hover_link      = state.lp_on_road[hi];
+                        state.lp_hover_chain     = hi < state.lp_chain.size() ? state.lp_chain[hi] : 0;
                     }
                 }
             }
@@ -3267,6 +3391,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // radius in (T, T+1] pick tier T and draw it magnified (BL-1244).
         state.ground_req.draw_r = hit_r; ///< Picks the master's level (RENDERING.md § Level of detail).
         state.ground_req.valid  = raster_ok;
+        // Ben, 2026-10-25: under the Logistics lens the roads were drawn twice - the
+        // painted surface and this canvas's coloured stroke. The bake drops its route
+        // surface while the lens is up; this canvas draws the whole network
+        // (RENDERING.md § Roads and sea lanes, "The Logistics lens takes the routes
+        // off the ground").
+        state.ground_req.hide_routes = state.overlay == overlay_mode::throughput;
     }
     // BL-737: everything from here to the camera squash at the end of the map
     // passes draws in FLAT ground space; the squash over this vertex range IS
@@ -3960,8 +4090,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // bit moved clear of it (review of 0831de6d: at 16 the lane and the survey bit
         // overlapped, and a lane tile's signature stopped moving when its visibility
         // flipped — the stroke cache then never invalidated).
+        // Bit 21: rail track, which the Logistics lens draws itself (lp_track is empty
+        // under every other lens, so the bit is 0 there and nothing re-keys).
         route_levels[ci] = static_cast<std::uint32_t>(
-            ct.road_edges | (static_cast<std::uint32_t>(ct.lane_level) << 12));
+            ct.road_edges | (static_cast<std::uint32_t>(ct.lane_level) << 12)
+            | ((ci < state.lp_track.size() && state.lp_track[ci] != 0) ? (1u << 21) : 0u));
         if (cache_nations)
             nation_cache[ci] = nation_of(cid);
         tile_shade& sh = shade_cache[ci];
@@ -4065,9 +4198,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const std::size_t i = static_cast<std::size_t>(row)
                             * static_cast<std::size_t>(state.lp_reaching_gw)
                             + static_cast<std::size_t>(col);
+        // A rail or sea leg is stroked along its own run (the leg pass); a road tile a
+        // leg also crosses (a station's, a landing's) takes the link's state.
         if (i >= state.lp_on_road.size() || state.lp_on_road[i] == 0)
             return 0u;
-        return logistics_road_colour(state.lp_supplied[i], state.lp_requested[i]);
+        const std::uint8_t chain = i < state.lp_chain.size() ? state.lp_chain[i] : 2;
+        return logistics_link_colour(chain, state.lp_supplied[i], state.lp_requested[i]);
+    };
+    // Rail track on cell (col, row), for the lens's own drawing of the line (the bake
+    // paints none under it). Columns wrap; rows do not.
+    const auto track_rc = [&](int col, int row) -> bool {
+        if (state.lp_track.empty() || row < 0 || row >= gh || gw <= 0)
+            return false;
+        col = ((col % gw) + gw) % gw;
+        const std::size_t i = static_cast<std::size_t>(row) * static_cast<std::size_t>(gw)
+                            + static_cast<std::size_t>(col);
+        return i < state.lp_track.size() && state.lp_track[i] != 0;
     };
     const auto emit_routes = [&](ImDrawList* out, int t_col, int t_row, const tile_component& tile,
                                  float cx, float cy, ImVec2 vo, int k, bool on_bake, float vision,
@@ -4415,6 +4561,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          [](int, ImU32 fallback) { return fallback; },
                          [](int, float fallback) { return fallback; });
 
+        // RAIL UNDER THE LOGISTICS LENS (Ben, 2026-10-25). The bake paints no route
+        // surface under this lens (strip_painted_routes), the rail bed included, so the
+        // line is drawn here - every track tile, on the four-cardinal grid the rail walk
+        // steps on, in a dark ballast tone at a Road's weight. A leg of the player's
+        // chain is stroked over it in the lens's colours by the leg pass.
+        if (route_lens && track_rc(t_col, t_row))
+            draw_network([&](const tile_component& t) { return track_rc(t.grid_x, t.grid_y) ? 1 : 0; },
+                         [](const tile_component&, int, int) { return 1; }, // track is a tile field
+                         IM_COL32(92, 86, 80, 230), route_r * k_road_width_road, false,
+                         [](int, ImU32 fallback) { return fallback; },
+                         [](int, float fallback) { return fallback; });
+
         if (metered)
             pm.mark(canvas_pass_meter::lanes, dl);
         // Rivers draw nothing here: they bake into the ground as carved courses along
@@ -4712,7 +4870,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 else
                 {
                     const tile_component* t = tile_rc(cc, rr);
-                    v = t ? (std::uint64_t{ t->road_edges } | (std::uint64_t{ t->lane_level } << 12))
+                    v = t ? (std::uint64_t{ t->road_edges } | (std::uint64_t{ t->lane_level } << 12)
+                             | ((ci < state.lp_track.size() && state.lp_track[ci] != 0)
+                                    ? (std::uint64_t{1} << 21) : 0u))
                           : 0xFFFFFFu;
                 }
                 // Bit 20: clear of the road mask (0-11) and the lane (12-19). See the
@@ -5823,6 +5983,67 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // --- EVERY LINK OF THE CHAIN: the rail and sea legs (Ben, 2026-10-25) ------
+    //
+    // "A lens that shows each chain link": a station's points run station to station
+    // and a port's across water, so before this the two groups of the nation a line or
+    // a crossing joins read as cut apart. Each leg is stroked along its own run -
+    // track centre to track centre, or down the port field's water - in the link's
+    // state: the traffic ramp where a routed request crosses it, connected-idle steel
+    // where none does (LENSES.md § Logistics lens, "Every link of the chain"). A dark
+    // casing under it so it holds on the sea's blue and the ballast's grey alike. Per
+    // frame and not cached: a few legs of a few dozen tiles each.
+    if (state.overlay == overlay_mode::throughput && !state.lp_legs.empty() && raster_ok
+        && state.lp_reaching_gw == gw)
+    {
+        const float leg_r  = std::max(10.0f, draw_r) * state.dbg_route_width_scale;
+        static std::vector<ImVec2> pts;
+        for (const ui_state::lp_leg_view& leg : state.lp_legs)
+        {
+            if (leg.cells.size() < 2)
+                continue;
+            const float thick = leg_r * (leg.network == 2 ? k_lane_width : k_road_width_highway);
+            const ImU32 col = logistics_link_colour(leg.chain, leg.available, leg.requested);
+            pts.clear();
+            float min_x = std::numeric_limits<float>::max(), max_x = -min_x;
+            bool  shown = true;
+            for (const int ci : leg.cells)
+            {
+                const int col_i = ci % gw, row_i = ci / gw;
+                if (!(survey_tile_visible(body.survey, gw, gh, col_i, row_i) || god_view_lift))
+                {
+                    shown = false; // the survey mask owns it: no leg through unseen ground
+                    break;
+                }
+                ImVec2 p = to_screen(hex_local_centre(col_i, row_i, hex_size));
+                // Unwrap across the cylinder seam so the run stays one stroke.
+                if (!pts.empty() && period_px > 0.0f)
+                {
+                    while (p.x - pts.back().x >  0.5f * period_px) p.x -= period_px;
+                    while (pts.back().x - p.x >  0.5f * period_px) p.x += period_px;
+                }
+                pts.push_back(p);
+                min_x = std::min(min_x, p.x);
+                max_x = std::max(max_x, p.x);
+            }
+            if (!shown)
+                continue;
+            const int k_lo = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - max_x) / period_px)) : 0;
+            const int k_hi = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - min_x) / period_px)) : 0;
+            for (int k = k_lo; k <= k_hi; ++k)
+            {
+                const float off = static_cast<float>(k) * period_px;
+                for (ImVec2& p : pts) p.x += off;
+                dl->AddPolyline(pts.data(), static_cast<int>(pts.size()), IM_COL32(12, 16, 24, 170),
+                                ImDrawFlags_None, thick + 2.0f);
+                dl->AddPolyline(pts.data(), static_cast<int>(pts.size()), col, ImDrawFlags_None, thick);
+                for (ImVec2& p : pts) p.x -= off;
+            }
+        }
+    }
+
     // --- BL-1353: NUMBERS ON EVERY TILE, under the Logistics lens -------------
     //
     // Ben, 2026-10-16: "give a number to each tile, so we can see exactly how many
@@ -5858,10 +6079,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const float sup = state.lp_supplied[ci];
                 if (sup < 0.0f)
                     continue; // not the player's ground: not this lens's subject
+                // REACH APART FROM TRAFFIC (Ben, 2026-10-25): a link carrying a routed
+                // request reads its PAIR, supplied over requested; a CONNECTED, IDLE
+                // link reads ONE number, what it could carry, so it never reads 0 over
+                // 0; a road off the chain reads none - its colour says why.
+                const std::uint8_t chain = ci < state.lp_chain.size() ? state.lp_chain[ci] : 2;
+                if (chain == 0)
+                    continue;
+                const bool pair = chain >= 2;
                 const float req = state.lp_requested[ci];
                 const ImVec2 sc = to_screen(hex_local_centre(col, row, hex_size));
                 if (sc.y < visible_top || sc.y > visible_bottom)
                     continue;
+                if (!(survey_tile_visible(body.survey, gw, gh, col, row) || god_view_lift))
+                    continue; // a sea leg's water can lie past the survey: the mask owns it
                 char top[12], bot[12];
                 std::snprintf(top, sizeof top, "%d",
                               static_cast<int>(std::lround(std::clamp(sup, 0.0f, 99999.0f))));
@@ -5876,6 +6107,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 for (int k = k_min; k <= k_max; ++k)
                 {
                     const float x = sc.x + static_cast<float>(k) * period_px;
+                    if (!pair)
+                    {
+                        // One centred figure, in the idle steel.
+                        const ImVec2 op{ x - ts.x * 0.5f, sc.y - line_h * 0.5f };
+                        dl->AddText({ op.x + 1.0f, op.y + 1.0f }, IM_COL32(12, 16, 24, 210), top); // shadow // fit-exempt: a per-tile figure, sized against the hex it sits in
+                        dl->AddText(op, k_logistics_idle, top); // fit-exempt: a per-tile figure, sized against the hex it sits in
+                        continue;
+                    }
                     const ImVec2 tp{ x - ts.x * 0.5f, sc.y - line_h };
                     const ImVec2 bp{ x - bs.x * 0.5f, sc.y };
                     dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(12, 16, 24, 210), top); // shadow // fit-exempt: a per-tile figure, sized against the hex it sits in
@@ -5887,9 +6126,84 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     }
 
     // No HQ star, the player's or anyone's, plain or under a lens (Ben,
-    // 2026-10-10: "We should remove the HQ glyph"). The Corporation and Company
-    // lenses carry an owner by its tile tint alone; the picked set (BL-1240)
-    // drives the tint and nothing else on this canvas.
+    // 2026-10-10: "We should remove the HQ glyph"); the HQ retired with the
+    // corporation.
+    //
+    // --- THE CAPITAL STAR (Ben, 2026-10-25: "render the capital with a star for
+    // most lenses") ------------------------------------------------------------
+    //
+    // Every nation's capital (`nation_component::capital_tile`), not only the
+    // player's: a capital is public, as the border band already is. The star is the
+    // nation's identity colour, the player's drawn larger and ringed in pale so the
+    // seat reads first (PLANETARY.md § The capital star). Shown on the plain canvas
+    // and under every lens whose subject is not the ground itself - hidden under
+    // Resource, Continent and Population, where a political mark competes with the
+    // field the lens is about. Sized to the drawn hex but floored, so it stays a star
+    // at the widest rung, and capped, so it never swallows the city it marks.
+    // Not vision-fogged (a public mark, the source ring's convention); the survey
+    // mask owns it.
+    state.capital_stars_drawn = 0;
+    state.capital_star_player = false;
+    if (raster_ok && state.overlay != overlay_mode::resource
+        && state.overlay != overlay_mode::continent && state.overlay != overlay_mode::population)
+    {
+        const entity_id pn_star = player_nation(w);
+        const float visible_top    = grid_area_origin.y - hit_r;
+        const float visible_bottom = grid_area_origin.y + grid_area_size.y + hit_r;
+        const float base_r = std::clamp(hit_r * 0.42f, 7.0f, 14.0f);
+        // Sorted (ascending nation id, the player's last so it draws on top), so
+        // overlapping stars overdraw in one order for the capture harness.
+        struct capital_mark { entity_id nation; int col, row; };
+        std::vector<capital_mark> caps;
+        for (const auto& [nid, nc] : w.nations)
+        {
+            if (nc.capital_tile == null_entity)
+                continue;
+            const auto ct = w.tiles.find(nc.capital_tile);
+            if (ct == w.tiles.end() || ct->second.body != state.active_body)
+                continue;
+            if (!(survey_tile_visible(body.survey, gw, gh, ct->second.grid_x, ct->second.grid_y)
+                  || god_view_lift))
+                continue;
+            caps.push_back({ nid, ct->second.grid_x, ct->second.grid_y });
+        }
+        std::sort(caps.begin(), caps.end(), [&](const capital_mark& a, const capital_mark& b) {
+            // The player's last, so it draws on top.
+            const bool ap = a.nation == pn_star, bp = b.nation == pn_star;
+            return ap != bp ? bp : a.nation < b.nation;
+        });
+        for (const capital_mark& cm : caps)
+        {
+            const ImVec2 sc = to_screen(hex_local_centre(cm.col, cm.row, hex_size));
+            if (sc.y < visible_top || sc.y > visible_bottom)
+                continue;
+            const bool  mine = cm.nation == pn_star;
+            const float sr   = mine ? base_r * 1.3f : base_r;
+            const ImU32 col  = palette::nation_colour(cm.nation);
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - sc.x - sr) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - sc.x + sr) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const ImVec2 c{ sc.x + static_cast<float>(k) * period_px, sc.y };
+                if (mine)
+                {
+                    // The seat's ring: a pale halo over a dark casing, outside the star.
+                    dl->AddCircle(c, sr * 1.32f, IM_COL32(12, 16, 24, 200), 24, 3.5f);
+                    dl->AddCircle(c, sr * 1.32f, IM_COL32(246, 240, 222, 255), 24, 1.8f);
+                }
+                // A PALE CASING, star-shaped, under the coloured one: many identity
+                // colours are dark, and the glyph's dark outline alone vanished on dark
+                // ground at the widest rung (measured in the first capture). The casing
+                // is the outline rule's second ring, not a plate - it follows the star.
+                icons::capital(dl, c, sr * 1.22f, IM_COL32(246, 240, 222, 235));
+                icons::capital(dl, c, sr, col);
+                ++state.capital_stars_drawn;
+                state.capital_star_player = state.capital_star_player || mine;
+            }
+        }
+    }
 
     // Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens). Reads only the
     // player's own dispatcher record (`w.player_trade_flow`, written by

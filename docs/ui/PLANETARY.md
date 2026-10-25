@@ -395,6 +395,30 @@ the plain label and its scale rule. Without this the only place a
 market's name could be read was the Market ledger's combo, which says nothing about where the
 market is.
 
+## The capital star
+
+**Every nation's capital carries a star** (Ben, 2026-10-25: *"render the capital with a star for
+most lenses"*). The mark sits on the nation's capital tile (`nation_component::capital_tile`), on
+the centre of the city the bake stands there, in the **nation's identity colour**
+(`palette::nation_colour`, the colour its border band and Nations-lens fill use). Every nation's,
+not only the player's: a capital is public, as the border band is. The glyph is `icons::capital`,
+a filled five-point star with the family's dark outline ([ICONS.md](ICONS.md) § 1).
+
+- **The player's own is emphatic**: drawn **1.3×** the size and ringed in a pale halo over a dark
+  casing, so the seat reads first among the stars around it.
+- **A pale casing:** the star is drawn over a pale star 1.22× its size, so a dark identity
+  colour still reads on dark ground — a second outline that follows the shape, not a plate
+  ([ICONS.md](ICONS.md) § Settled collisions, rule 5).
+- **Size:** **0.42** of the drawn hex radius, floored at **7 px** so it is still a star at the
+  widest rung and capped at **14 px** (the player's at 1.3× that) so it never swallows the city it
+  marks at the close rungs.
+- **Which views:** the plain canvas, and every lens whose subject is not the ground itself —
+  Logistics, Market, Scarcity, Industry, Trade-flow, Supply-routes, Nations (and Supply and Reach,
+  which keep the plain canvas's chrome). **Hidden** under **Resource, Continent and Population**,
+  where a political mark competes with the field the lens is about.
+- **Fogs:** the survey mask owns it (no star on unsurveyed ground); it is not vision-fogged — a
+  public mark, as the Logistics lens's source ring is.
+
 ## Layers — what draws on this canvas
 
 Beyond the base grid and the chrome in the table above, the draw pass
@@ -410,6 +434,8 @@ Beyond the base grid and the chrome in the table above, the draw pass
   settlements are **not** a layer here: they are baked into the ground
   ([§ Building markers](#building-markers); RENDERING.md § Installations).
 - **No HQ or market-centre markers** — both retired from this canvas (Ben, 2026-10-10: "We should remove the HQ glyph and market center glyphs").
+- **The capital star** — every nation's capital, on the settlement-label layer
+  ([§ The capital star](#the-capital-star)).
 - **Activity fog + convoy beams** — the intra-body vision layers
   (`permanent_vision`, `convoy_beams` in `ui_state`) and the
   survey region mask. Model authority: [DISCOVERY.md](DISCOVERY.md).

@@ -1312,6 +1312,30 @@ void hq(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircleFilled(centre, std::max(1.0f, r * 0.18f), outline, 8);
 }
 
+void capital(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Five points, point up; the inner vertices at 0.45 r. A star is concave, so it
+    // fills as its convex inner pentagon plus one triangle per point - AA-fringed
+    // pieces whose seams lie inside the shape - then one closed outline over the ten
+    // vertices, which is what carries it on any ground (the outline rule).
+    constexpr float k_two_pi = 6.2831853f;
+    const float ri = r * 0.45f;
+    ImVec2 outer[5], inner[5], ring[10];
+    for (int k = 0; k < 5; ++k)
+    {
+        const float ao = -k_two_pi * 0.25f + k_two_pi * static_cast<float>(k) / 5.0f;
+        const float ai = ao + k_two_pi / 10.0f;
+        outer[k] = { centre.x + r * std::cos(ao),  centre.y + r * std::sin(ao) };
+        inner[k] = { centre.x + ri * std::cos(ai), centre.y + ri * std::sin(ai) };
+        ring[2 * k]     = outer[k];
+        ring[2 * k + 1] = inner[k];
+    }
+    dl->AddConvexPolyFilled(inner, 5, colour);
+    for (int k = 0; k < 5; ++k)
+        dl->AddTriangleFilled(inner[(k + 4) % 5], outer[k], inner[k], colour);
+    dl->AddPolyline(ring, 10, outline, ImDrawFlags_Closed, std::max(1.0f, r * 0.12f));
+}
+
 void corp_emblem(ImDrawList* dl, ImVec2 centre, float r, int shape, ImU32 fill)
 {
     // Simple, legible geometric primitives so the emblem reads at portrait size on
