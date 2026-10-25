@@ -571,6 +571,44 @@ ground on the other.
 That second effect is wider than a market preference and it is intended: a tie only prices could
 see would be invisible to the landscape search, which reads reach cost (BL-812, phase 6 sees roads).
 
+**Every port lays lanes (Ben, 2026-10-25: "when a new port is built, it should be able to spawn
+new sea lanes … new ports form connections as sea lanes to each other port within 50 tiles").** The
+colonial record is not the only writer of a lane. A standing port is joined by a lane to **every other
+standing port within fifty water tiles** — a port's full-strength reach (§ Logistic Points) is the
+limit, so a port lays no lane to a port it could not reach at full strength. The fifty is measured
+as the port's own water distance — the walk a port's reach was measured by before lanes carried it:
+from the port tile onto water, across any water on all six hex sides, a landing on the far shore,
+one per step — never as a straight line, so a headland between two ports is walked round. Each pair
+is walked with the lane walk above: the sea only, the four cardinal steps, the current at the
+colonial spans' own weight, and **reuse of every lane already on the water**, so lanes between
+neighbouring ports share trunks with each other and with the colonial lanes. A lane starts on the
+sea beside its port (any of the six hex sides) and ends on the sea beside the other.
+
+**Ports lay lanes over lakes too (Ben, 2026-10-25, NR-1061: "ports on a lake lay lanes over the
+lake to other ports within 50, as NR-1061 ruled ports cover lakes").** A pair of ports within fifty
+that the sea does not join, but one lake both touch, is laned **over that lake** by the same walk on
+the lake's own water — the four cardinal steps, reuse of the lanes already on it, and still water,
+since a lake carries no ocean current. A lake lane is the same tile field as a sea lane, saved,
+drawn and ridden alike. Each walk keeps to its own water: a lane never passes from a lake into the
+sea where the two happen to touch. **The distinction from the colonial stamp is deliberate:** the
+"never a lake" rule above is the colonial record's — the history's fleets sailed the ocean — and it
+is unchanged; only a port lays a lane on a lake. A pair no water joins lays nothing.
+
+- **Who is joined: every port, whoever holds it** (a delegated reading, 2026-10-25). The rule says
+  "each other port", and a lane is geography — water a convoy can follow, read by every traveller
+  through § 1 — so it joins a nation's port to a neighbour's as readily as to its own. What a lane
+  does *not* do is put a foreign port on anyone's chain: Logistic Points still flow only along the
+  chain to one nation's own capital (§ How a tile's points get to it), and a source counts there only
+  on its own nation's ground.
+- **When.** A port standing at the fold lays its lanes as the Logistic Point seeding opens, every
+  port in ascending id and each pair once, lower id first; a port the seeding lands (a bridge, a port
+  link) lays its lanes as it is placed. In play, a port lays its lanes **the day it completes**.
+  Order is ascending port id, and each new port joins its pairs in ascending id of the other port —
+  so the water a lane takes, which depends on the lanes before it, is a pure function of the world.
+  A laid lane moves traversal cost on the water, so every logistics cache is stale the moment it lands.
+- **A lane is never unlaid** — not when a port is idled, decommissioned or demolished, as a road is
+  not unlaid when the town it served empties (the paragraph below).
+
 **A lane outlives the polity that made it**, as a road outlives the empire that paved it. Whether
 a lane *decays* when its traffic stops is open in `../generation/EXPLORATION.md` § Open questions;
 roads do not (§ 4a), but the sea is not a roadbed.
@@ -730,13 +768,23 @@ into passive and active. What follows replaces the bifold model, the city genera
 - **A port stretches fifty tiles over water (Ben, 2026-10-21).** A port's points reach **full
   strength across 50 water tiles** and fade to zero at double, 100 — the road's rule, at sea's
   scale. Water is where points travel furthest: a port carries the chain to a coast a road could
-  never reach, which is what lets an island nation's network be one network. **Over water only
-  (Ben, 2026-10-21):** a port's points cross water and land on the coastal tiles they reach — no
-  further inland; inland ground is a hub's. So a port joins the chain through the coast (its sea
-  reach landing on the capital or a connected source) or through a connected hub whose reach
-  covers it. **Lakes too (Ben, 2026-10-21):** a port's points cross a lake as they cross the sea
-  and land on its shore — though a port still stands only on a sea coast. Owned by BL-1396 (port
-  reach over water).
+  never reach, which is what lets an island nation's network be one network. **Points ride the
+  lanes (Ben, 2026-10-25: the network is the roads and the rail, and every port lays a lane to every
+  port within fifty — § 4b).** A port's points travel only along **lanes** — on the sea, and on a
+  lake where ports lay one (Ben, 2026-10-25, NR-1061) — from the port tile
+  onto a lane beside it, along laned water a tile at a time (all six hex sides, one per step), and
+  they **land only on a port tile** where a lane ends beside it — the coastal road that port stands
+  on. The fifty and the hundred are counted along the lanes. Open water no lane crosses carries
+  nothing, and a coast with no port on it is not landed on, so a port's points reach another port
+  and nothing else at sea; the ground behind each port is the hubs'. Because every pair of ports
+  within fifty is laned, a port still reaches every port it reached across open water, at about the
+  same distance. The port itself remains the landing: a port joins the chain through a connected
+  hub whose road reach covers its tile, or through a connected port its lanes land on. *Delegated
+  reading (2026-10-25) of the two rulings together:* points live on network tiles, and on the
+  water the lane is the network tile, so the port's reach is the lane network rather than the any-water
+  walk it replaces. Superseded: the any-water walk that landed on every shore (BL-1396, Ben
+  2026-10-21); a port still covers a lake (NR-1061), now by the lanes it lays over it. It survives only as the **measure** of the fifty that decides
+  which ports are laned, and of the reach generation's port link reads.
 - **Rail reaches twenty tiles and supplies only what it connects to (Ben, 2026-10-16).** A station's
   points carry **20 tiles** along the line at full strength and fade to zero at double, **40** — the
   road's rule (Ben, 2026-10-23, NR-1056) — and they are delivered at **the tile the line connects
@@ -813,7 +861,9 @@ heads for ground it could not reach.
 cut off from the capital by water, generation lands a **port** on that ground's coast where the
 chain's sea reach covers it — from a connected port already in reach, or else from a new port on
 the capital's shore nearest the island by sea, with the road chain laid out to it first — and lays
-the road chain on from the island port. A bridge is measured over water only — a route that would
+the road chain on from the island port. Each port it lands lays its lanes as it stands (§ 4b), so
+the two ports of a bridge are joined by a lane, and a bridge is placed only across water within a
+port's **full** reach of fifty: beyond that no lane is laid, and a port there would deliver nothing. A bridge is measured over water only — a route that would
 cross land between its ends is not a strait — and an island already bridged is a home shore for
 the next one out. One bridge per island serves every consumer on it. Where no water route within
 a port's reach joins the ground to the chain, the consumer is left uncovered and the seeding counts

@@ -863,8 +863,11 @@ struct world
     /// so no answer ever depends on what was cached. std::map: ordered, so a copy
     /// or a load cannot reorder it (and it is never iterated by the sim).
     std::map<entity_id, lp_anchor_field> lp_anchor_fields;
-    /// BL-1396: a port's sea field (lp_sea_walk from its tile), by port TILE. It reads
-    /// only which tiles are sea, so it outlives a tick: without it every port's flood -
+    /// BL-1396: a port's sea field, by port TILE - along the lanes since Ben's 2026-10-25
+    /// ruling (lp_lane_walk). It reads which tiles carry a lane and which hold a standing
+    /// port, and both move only on events that clear it (a lane laid; a port completing,
+    /// idling or demolished: building_affects_logistics), so it outlives a tick: without
+    /// it every port's flood -
     /// up to ~15,000 tiles at a reach of 100 - was rebuilt every economy tick and every
     /// Throughput-lens frame (cold review). A derived cache like the fields above:
     /// cleared with them by invalidate_logistics_caches and on load, never serialised.

@@ -810,11 +810,13 @@ struct tile_component
 
     /// Sea-lane tier on this tile (BL-1098; LOGISTICS.md § 4b, EXPLORATION.md § The colonial
     /// tie is a sea lane). 0 = no lane; 1 = a lane -- the ONE rung a sea leg earns by traffic
-    /// (`history_sim_params::sea_lane_tier1_uses`), never bought. Only ever set on SEA tiles
-    /// (ocean or coast; a lake is not part of the ocean), by `stamp_sea_lanes` after the
-    /// history spans, along the water-only path each earned lane takes. Read by exactly one
-    /// line in `tile_traversal_cost` (`sea_lane_traversal_multiplier`), so a lane discounts
-    /// the sea leg for every consumer of traversal cost. 0 everywhere a world ran no spans.
+    /// (`history_sim_params::sea_lane_tier1_uses`), never bought. Set by `stamp_sea_lanes`
+    /// after the history spans, on SEA tiles only (ocean or coast), along the water-only path
+    /// each earned lane takes; and by `lay_port_lanes` / `lay_all_port_lanes` (Ben,
+    /// 2026-10-25) between ports within fifty - on the sea, or over a LAKE two ports touch
+    /// (NR-1061). Never on land. Read by `tile_traversal_cost` (`sea_lane_traversal_multiplier`),
+    /// so a lane discounts the water leg for every consumer of traversal cost, and by a port's
+    /// Logistic Point field (`lp_lane_walk`). 0 everywhere no lane was laid.
     std::uint8_t lane_level = 0;
 };
 

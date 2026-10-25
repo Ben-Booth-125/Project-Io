@@ -337,12 +337,15 @@ namespace
 /// The walk's Dijkstra, shared by `sea_walk` (one source, stop at @p to) and
 /// `sea_cost_field` (many sources, no stop: @p to = -1). Fills @p dist and,
 /// when given, @p prev.
-void sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
-                  const ocean_current_field* currents, int weight_q,
-                  const std::vector<int>& sources, int to,
-                  std::vector<int64_t>& dist, std::vector<int>* prev,
-                  const std::vector<std::uint8_t>* laned = nullptr, int laned_cost_q = 1000)
+int sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                 const ocean_current_field* currents, int weight_q,
+                 const std::vector<int>& sources, int to,
+                 std::vector<int64_t>& dist, std::vector<int>* prev,
+                 const std::vector<std::uint8_t>* laned = nullptr, int laned_cost_q = 1000,
+                 const std::vector<std::uint8_t>* stop = nullptr)
 {
+    // Returns the tile the walk STOPPED on -- @p to, or the first tile of @p stop it
+    // settles (Ben, 2026-10-25: the port lanes' many-to-many walk) -- or -1.
     const int n = gw * gh;
     constexpr int64_t kInf = std::numeric_limits<int64_t>::max();
     dist.assign(static_cast<std::size_t>(n), kInf);
@@ -370,7 +373,9 @@ void sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
         if (top.first > dist[static_cast<std::size_t>(u)])
             continue; // a superseded entry
         if (u == to)
-            break;
+            return u;
+        if (stop != nullptr && stop->size() == static_cast<std::size_t>(n) && (*stop)[static_cast<std::size_t>(u)])
+            return u;
         const int uc = u % gw, ur = u / gw;
         // FOUR CARDINAL STEPS, columns wrapping and rows not -- the pathfinder's own
         // grid (logistics.cpp, LOGISTICS.md sec 2). A lane walked eight ways leaves
@@ -428,9 +433,48 @@ void sea_dijkstra(const std::vector<std::uint8_t>& sea, int gw, int gh,
             }
         }
     }
+    return -1;
 }
 
 } // namespace
+
+std::vector<int> sea_walk_laned_between(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                        const ocean_current_field* currents, int weight_q,
+                                        const std::vector<std::uint8_t>* laned, int laned_cost_q,
+                                        const std::vector<int>& from, const std::vector<int>& to)
+{
+    std::vector<int> path;
+    const int n = gw * gh;
+    if (gw <= 0 || gh <= 0 || sea.size() != static_cast<std::size_t>(n))
+        return path;
+    std::vector<int> sources;
+    for (const int f : from)
+        if (f >= 0 && f < n && sea[static_cast<std::size_t>(f)])
+            sources.push_back(f);
+    std::sort(sources.begin(), sources.end());
+    sources.erase(std::unique(sources.begin(), sources.end()), sources.end());
+    std::vector<std::uint8_t> stop(static_cast<std::size_t>(n), 0);
+    bool any = false;
+    for (const int t : to)
+        if (t >= 0 && t < n && sea[static_cast<std::size_t>(t)])
+        {
+            stop[static_cast<std::size_t>(t)] = 1;
+            any = true;
+        }
+    if (sources.empty() || !any)
+        return path;
+    std::vector<int64_t> dist;
+    std::vector<int>     prev;
+    const int end = sea_dijkstra(sea, gw, gh, currents, weight_q, sources, -1, dist, &prev, laned,
+                                 laned_cost_q, &stop);
+    if (end < 0)
+        return path;
+    // Back to the source it started from: a source has no predecessor (-1).
+    for (int t = end; t >= 0; t = prev[static_cast<std::size_t>(t)])
+        path.push_back(t);
+    std::reverse(path.begin(), path.end());
+    return path;
+}
 
 std::vector<int> sea_walk(const std::vector<std::uint8_t>& sea, int gw, int gh,
                           const ocean_current_field* currents, int weight_q, int from, int to)

@@ -276,6 +276,18 @@ int main(int argc, char** argv)
             if (b.type == building_type::inland_logistics_hub)
                 pre_hubs.insert(bid);
 
+        // Ben, 2026-10-25: every port lays a sea lane to every other port within 50 water
+        // tiles. The lane tiles and the standing ports, before and after the seeding.
+        const auto lane_census = [&](int& lanes, int& ports) {
+            lanes = 0;
+            ports = 0;
+            for (const auto& [tid, tc] : w.tiles)
+                if (tc.lane_level > 0) ++lanes;
+            for (const auto& [bid, b] : w.buildings)
+                if (b.type == building_type::port && b.ticks_remaining <= 0) ++ports;
+        };
+        int lanes_before = 0, ports_before = 0;
+        lane_census(lanes_before, ports_before);
         const auto t0 = std::chrono::steady_clock::now();
         const lp_seed_report rep = seed_logistics_sources(w);
         const auto t1 = std::chrono::steady_clock::now();
@@ -560,6 +572,12 @@ int main(int argc, char** argv)
 
         // --- print ------------------------------------------------------------
         std::printf("=== seed %u ===\n", seed);
+        {
+            int lanes_after = 0, ports_after = 0;
+            lane_census(lanes_after, ports_after);
+            std::printf("L seed=%u lane_tiles_before=%d lane_tiles_after=%d ports_before=%d ports_after=%d\n",
+                        seed, lanes_before, lanes_after, ports_before, ports_after);
+        }
         std::printf("K seed=%u markets=%zu centres_on_land=%d\n", seed, w.markets.size(),
                     centres_on_land);
         std::printf("W seed=%u nations=%d hubs_placed=%d of_max=%.1f%% gen_hubs=%zu "
