@@ -491,7 +491,7 @@ Per your ruling, a site builds on credit from its placement day, and its first c
 
 > **Recommendation:** A, then measure. It removes the throttle on forward work without changing what is owed. B fixes only the over-promise. Each is a small change in run_construction.
 
-> **RESOLVED.** Ben, 2026-10-25: paying and receiving income both happen at the next economy tick. Credits are paid up front; the materials draw resolves at the economy tick. Confirmed model: at placement, pay credits for the days left in the quarter and build at the rate the shelf allows; each tick draws the materials for the days built since the last tick (in arrears; a shortfall stays owed to the next tick), pays credits for the quarter ahead, and sets the quarter-ahead rate from the shelf left. A tick never draws two quarters.
+> **RESOLVED.** Ben, 2026-10-25: the entire build cost in credits is taken when the building is placed, once; no payment each quarter. Only the material cost to the market happens over time: each economy tick draws the materials for the days built since the last tick (in arrears; a shortfall stays owed to the next tick) and sets the quarter-ahead rate from the shelf left. A tick never draws two quarters of materials.
 
 *Files: `src/world/economy_system.cpp`, `tools/verify/construction_stall.cpp`, `docs/economy/PRODUCTION.md`*
 
