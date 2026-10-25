@@ -583,6 +583,16 @@ economy_report run_economy_step(world& w, const recipe_registry& reg,
 /// world stepped by quarters completes every site on the same day.
 int advance_construction_to(world& w, const recipe_registry& reg, int day_in_quarter);
 
+/// Construction STARTS ON THE PLACEMENT DAY (Ben, 2026-10-25; PRODUCTION.md
+/// § Construction is measured in days): a freshly placed site @p b (its days set)
+/// builds from the day after the world's cursor — the placement day — on CREDIT, at
+/// the rate its shelf allows now, for the days left in this quarter. The next
+/// clearing pays those days in arrears with the quarter ahead. The build door
+/// (construction.cpp) calls this; a path with no day loop places at the cursor it
+/// holds, so it completes the site on the day the app's daily loop does.
+void begin_construction_on_placement(const world& w, const recipe_registry& reg,
+                                     building_component& b);
+
 /// THE ECONOMY STEP'S PHASE CLOCK (BL-1117, settle tick one) -- REPORTED ONLY.
 /// One settle tick of the twelve cost 30-40x the others, and the lap clock
 /// (campaign_settle.hpp) put all of it inside lap 1. These stamps split

@@ -149,6 +149,8 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_i32(h, cd.milli);
                 fnv1a_i32(h, cd.completion_day);
                 fnv1a_i32(h, cd.share);
+                fnv1a_i32(h, cd.credit);  // Ben, 2026-10-25
+                fnv1a_i32(h, cd.arrears);
             }
         }
     }

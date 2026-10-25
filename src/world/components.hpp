@@ -1092,6 +1092,18 @@ struct building_component
     /// quarter (every building but one that completed mid-quarter).
     int  output_share_permille = 1000;
 
+    /// Construction STARTS ON THE PLACEMENT DAY (Ben, 2026-10-25): a site placed
+    /// between clearings builds from that day on CREDIT, at the rate its shelf
+    /// allows, and the next clearing pays for those days in arrears. True while the
+    /// site's current days are unpaid (placement to its first clearing).
+    bool build_on_credit = false;
+
+    /// The milli-days built on credit and not yet paid for. The next clearing pays
+    /// them with the quarter ahead (as far as the shelf covers both); a part the
+    /// shelf could not cover stays owed to the clearing after. Can outlive the
+    /// site: a short build completing on credit still pays at the next clearing.
+    int  build_arrears_milli = 0;
+
     /// BL-079: consecutive economy ticks this building has been estimated
     /// loss-making. Read only by the scoped background-corp agency (a non-player corp
     /// idles a building whose streak passes a threshold); reset to 0 on any
@@ -1214,6 +1226,7 @@ inline void sync_construction_days(building_component& b)
         b.build_rate_permille = 0;
         b.build_paid_days = 0;
         b.build_day_milli = 0;
+        b.build_on_credit = false; // arrears, if any, stay owed
         return;
     }
     const int d = construction_days_left(b);
@@ -1234,10 +1247,11 @@ inline void sync_construction_days(building_component& b)
 struct construction_day_state
 {
     int days = 0, rate = 0, paid = 0, milli = 0, completion_day = 0, share = 1000;
+    int credit = 0, arrears = 0; ///< Ben, 2026-10-25: on credit (0/1), milli-days owed
     bool any() const
     {
         return days != 0 || rate != 0 || paid != 0 || milli != 0 || completion_day != 0
-            || share != 1000;
+            || share != 1000 || credit != 0 || arrears != 0;
     }
 };
 inline construction_day_state canonical_construction_days(const building_component& b)
@@ -1245,14 +1259,31 @@ inline construction_day_state canonical_construction_days(const building_compone
     construction_day_state s;
     s.completion_day = b.completion_day;
     s.share          = b.output_share_permille;
+    s.arrears        = b.build_arrears_milli > 0 ? b.build_arrears_milli : 0; // owed, built or not
     if (b.ticks_remaining > 0)
     {
-        s.days  = construction_days_left(b);
-        s.rate  = b.build_rate_permille;
-        s.paid  = b.build_paid_days;
-        s.milli = (s.days == b.days_remaining) ? b.build_day_milli : 0;
+        s.days   = construction_days_left(b);
+        s.rate   = b.build_rate_permille;
+        s.paid   = b.build_paid_days;
+        s.milli  = (s.days == b.days_remaining) ? b.build_day_milli : 0;
+        s.credit = b.build_on_credit ? 1 : 0;
     }
     return s;
+}
+
+/// The share of a full quarter's work a CLEARING pays for (Ben, 2026-10-25): the
+/// days owed in arrears (built on credit since placement) plus the days ahead
+/// (a quarter, or the days left in a site's last quarter). Exactly 1.0f for a
+/// site with a quarter or more to go and nothing owed.
+inline float construction_clearing_fraction(const building_component& b)
+{
+    const int q     = k_construction_quarter_days;
+    const int ahead = (b.ticks_remaining > 0)
+                          ? std::min(construction_days_left(b), q) : 0;
+    const int owed  = b.build_arrears_milli > 0 ? b.build_arrears_milli : 0;
+    if (owed == 0 && ahead == q)
+        return 1.0f;
+    return (static_cast<float>(owed) / 1000.0f + static_cast<float>(ahead)) / static_cast<float>(q);
 }
 
 /// The share of a full quarter's work a site with @p days_left needs: 1 with a

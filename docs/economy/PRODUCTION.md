@@ -884,11 +884,15 @@ of an input registers that want as demand, so the stall is visible to the price 
 duration is authored in days (`build_duration_days`; a two-quarter build is 180 days), times the
 placement's site multiplier (§ Construction site time), rounded to a whole day.
 
-- **Materials and payment stay quarterly.** At each quarter's clearing a site draws the quarter's
-  materials and pays the flat cost for the quarter ahead. That quarter's supply rate — full,
-  stretched or paused — sets how many days of progress the site makes over it: rate × days. A
-  paused quarter adds no days. In its last quarter a site needing fewer than 90 days draws and
-  pays only for the days it needs.
+- **Construction starts on the placement day (Ben, 2026-10-25).** A site begins building the day it
+  is placed, at the rate its market's shelf allows then. A 180-day build placed on day 10 of a
+  quarter completes on day 190 — no later than the quarter model it replaced.
+- **Materials and payment stay quarterly.** At each quarter's clearing a site draws materials and
+  pays the flat cost for the days already built since placement, in arrears, plus the quarter
+  ahead. That clearing's supply rate — full, stretched or paused — sets how many days of progress
+  the site makes over the quarter ahead: rate × days. A paused quarter adds no days. Whatever part
+  of the arrears the shelf cannot cover stays owed to the next clearing. In its last quarter a site
+  needing fewer than 90 days draws and pays only for the days it needs.
 - **Progress is daily, and a site completes on a day.** Between clearings a site advances day by
   day, as surveys do. Completion fires that day: the building is operational, and a port or
   logistics hub joins the network then.
@@ -898,7 +902,8 @@ placement's site multiplier (§ Construction site time), rounded to a whole day.
   it runs whole quarters.
 - **Every path counts the same days.** A path that steps whole quarters with no day loop (the
   settle, a headless run) catches up the quarter's unadvanced days at the clearing, from one
-  cursor, so it completes each site on the same day the live day loop would.
+  cursor, so it completes each site on the same day the live day loop would. A site placed on
+  such a path starts on the cursor's day, as it would in the live loop.
 
 ### Construction site time — a hard site costs more, and the price says so (Ben, 2026-09-23)
 

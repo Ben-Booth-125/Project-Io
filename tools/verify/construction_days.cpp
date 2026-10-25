@@ -251,6 +251,53 @@ int main()
         check(same, "R4 the two worlds hash identically after every quarter", same ? 1 : 0, 1);
     }
 
+    // R6 (Ben, 2026-10-25): construction STARTS ON THE PLACEMENT DAY. A 180-day site
+    // placed on day 10 of a quarter builds from that day on credit and completes on
+    // day 190 (day 10 of the quarter after next); the first clearing pays the 80 days
+    // built since placement plus the quarter ahead (17 steel), the next the last 10
+    // days (1 steel) — the whole 18. A quarters-only world placing on the same day
+    // completes it on the same day and hashes identically.
+    {
+        scene a = make_scene(1000.0f, 180); // day by day
+        scene h = make_scene(1000.0f, 180); // headless: quarters only
+        for (scene* sc : {&a, &h})
+        {
+            building_component& b = sc->w.buildings.at(sc->site);
+            b.build_rate_permille = 0; b.build_paid_days = 0;
+            advance_construction_to(sc->w, reg, 10);           // today is day 10
+            begin_construction_on_placement(sc->w, reg, b);    // placed today
+        }
+        check(a.w.buildings.at(a.site).build_on_credit && a.w.buildings.at(a.site).build_rate_permille == 1000
+                  && a.w.buildings.at(a.site).build_paid_days == 80,
+              "R6 a placed site builds on credit at once, for the 80 days left in its quarter",
+              a.w.buildings.at(a.site).build_paid_days, 80);
+        int done = -1;
+        float steel = 0.0f;
+        bool same = true;
+        for (int q = 0; q < 4; ++q)
+        {
+            const bool open = a.w.buildings.at(a.site).ticks_remaining > 0;
+            for (int d = (q == 0 ? 11 : 1); d <= Q; ++d)
+            {
+                advance_construction_to(a.w, reg, d);
+                if (open && done < 0 && a.w.buildings.at(a.site).ticks_remaining == 0)
+                    done = q * Q + d;
+            }
+            const economy_report rep = run_economy_step(a.w, reg);
+            if (const auto it = rep.purchases.find({a.nation, a.market}); it != rep.purchases.end())
+                steel += it->second[ri(resource_type::steel)];
+            run_economy_step(h.w, reg);
+            same = same && a.w.state_hash(q) == h.w.state_hash(q);
+        }
+        check(done == 190, "R6 placed on day 10, a 180-day site completes on day 190 (placement + duration)",
+              done, 190);
+        check(std::fabs(steel - 18.0f) < 1e-3f,
+              "R6 the clearings pay every day built, arrears included (18 steel in all)", steel, 18.0);
+        check(same && h.w.buildings.at(h.site).ticks_remaining == 0
+                  && h.w.buildings.at(h.site).output_share_permille == a.w.buildings.at(a.site).output_share_permille,
+              "R6 a quarters-only world completes it on the same day and hashes identically", same ? 1 : 0, 1);
+    }
+
     // R5: the last quarter draws only the days it needs. 150 days at full supply:
     // a full quarter (9 steel), then 60 days (6 steel) — 15 = 18 x 150 / 180.
     {

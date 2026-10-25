@@ -2,6 +2,7 @@
 
 #include "logistics.hpp"
 
+#include "economy_system.hpp"  // begin_construction_on_placement (Ben, 2026-10-25)
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
 #include "nation_tech.hpp"     // recipe_unlocked (BL-1273: the nation's tree; BL-588 before it)
@@ -284,6 +285,10 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         // path seeds a route the wrong_air gate above would refuse.
         bc.recipe = (recipe != no_recipe) ? recipe : reg.default_recipe_id_at(w, tile); // BL-429
     }
+
+    // Construction STARTS ON THE PLACEMENT DAY (Ben, 2026-10-25): the site builds
+    // from today on credit at the rate its shelf allows; the next clearing pays.
+    begin_construction_on_placement(w, reg, bc);
 
     w.buildings[bld_id]  = bc;
     w.stockpiles[bld_id] = stockpile_component{};

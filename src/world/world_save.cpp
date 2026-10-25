@@ -1446,7 +1446,8 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // measured in days): THE CONSTRUCTION DAYS, the last section. The world's one
     // cursor, then every building holding any construction-day state, ascending
     // id, as (id, days_remaining, build_rate_permille, build_paid_days,
-    // build_day_milli, completion_day, output_share_permille). A v56 stream ends
+    // build_day_milli, completion_day, output_share_permille, on credit, arrears
+    // milli-days — Ben, 2026-10-25). A v56 stream ends
     // before it and is read with its days derived from its ticks.
     if (version == world_save_version)
     {
@@ -1471,6 +1472,8 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, cd.milli);
             w_i32(out, cd.completion_day);
             w_i32(out, cd.share);
+            w_i32(out, cd.credit);  // Ben, 2026-10-25: built on credit since placement
+            w_i32(out, cd.arrears); // milli-days owed to the next clearing
         }
     }
 }
@@ -2181,9 +2184,14 @@ bool read_world_snapshot(world& w, std::istream& in)
             if (bit == s.buildings.end())
                 return false;
             building_component& b = bit->second;
-            int32_t days = 0, rate = 0, paid = 0, milli = 0, cday = 0, share = 0;
+            int32_t days = 0, rate = 0, paid = 0, milli = 0, cday = 0, share = 0, credit = 0, owed = 0;
             if (!(r_i32(in, days) && r_i32(in, rate) && r_i32(in, paid) && r_i32(in, milli)
-                  && r_i32(in, cday) && r_i32(in, share)))
+                  && r_i32(in, cday) && r_i32(in, share) && r_i32(in, credit) && r_i32(in, owed)))
+                return false;
+            // Ben, 2026-10-25: on credit only while building; arrears non-negative
+            // and bounded (a year of milli-days is far past any reachable figure).
+            if (credit < 0 || credit > 1 || (credit == 1 && b.ticks_remaining <= 0)
+                || owed < 0 || owed > 4 * qd * 1000)
                 return false;
             const bool site_ok = (b.ticks_remaining > 0)
                 ? (days > 0 && days <= b.ticks_remaining * qd && (days + qd - 1) / qd == b.ticks_remaining)
@@ -2197,6 +2205,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             b.build_day_milli       = milli;
             b.completion_day        = cday;
             b.output_share_permille = share;
+            b.build_on_credit       = (credit == 1);
+            b.build_arrears_milli   = owed;
         }
     }
     else
