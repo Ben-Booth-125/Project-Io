@@ -243,7 +243,12 @@ struct shelf_ration_plan
     std::vector<std::array<bool, resource_count>>  on_contended;   ///< claims good r on a contended shelf
     bool any = false; ///< some shelf is contended (else every row is zero: the old draw)
 };
-shelf_ration_plan plan_short_shelves(const world& w, const std::vector<shelf_claimant>& claimants);
+/// @p held_back (Ben, 2026-10-25), when given, is stock per market already
+/// CLAIMED and not yet drawn — construction's materials owed in arrears — and is
+/// read as off the shelf. nullptr (every caller but construction's forward claims)
+/// reads the shelf as it stands.
+shelf_ration_plan plan_short_shelves(const world& w, const std::vector<shelf_claimant>& claimants,
+                                     const std::map<entity_id, std::array<float, resource_count>>* held_back = nullptr);
 
 /// BL-1209 — one draw off a CONTENDED shelf, for the verify surface (report
 /// only; nothing in the sim reads it). `phase` 'c' construction, 'p'
@@ -583,15 +588,29 @@ economy_report run_economy_step(world& w, const recipe_registry& reg,
 /// world stepped by quarters completes every site on the same day.
 int advance_construction_to(world& w, const recipe_registry& reg, int day_in_quarter);
 
-/// Construction STARTS ON THE PLACEMENT DAY (Ben, 2026-10-25; PRODUCTION.md
-/// § Construction is measured in days): a freshly placed site @p b (its days set)
-/// builds from the day after the world's cursor — the placement day — on CREDIT, at
-/// the rate its shelf allows now, for the days left in this quarter. The next
-/// clearing pays those days in arrears with the quarter ahead. The build door
-/// (construction.cpp) calls this; a path with no day loop places at the cursor it
-/// holds, so it completes the site on the day the app's daily loop does.
-void begin_construction_on_placement(const world& w, const recipe_registry& reg,
-                                     building_component& b);
+/// CREDITS UP FRONT, MATERIALS IN ARREARS (Ben, 2026-10-25, ruling NR-1073;
+/// PRODUCTION.md § Construction is measured in days). A freshly placed site @p b
+/// (its days set, not yet in the world) PAYS ITS WHOLE FLAT BUILD COST now, from
+/// @p payer's treasury (`construction_credit_cost`; a @p founding site is priced by
+/// its generation caller and pays nothing here), and builds from the day after the
+/// world's cursor — the placement day — for the days left in this quarter, at the
+/// rate the shelf allows LESS every claim already on it (`construction_claims_on`).
+/// Nothing is drawn: each day built is owed its materials, drawn at the next tick.
+/// The build door (construction.cpp) calls this, after its affordability gate.
+void begin_construction_on_placement(world& w, const recipe_registry& reg, entity_id payer,
+                                     building_component& b, bool founding);
+
+/// The flat credits a site pays at placement: `build_cost` x its days over the
+/// authored quarters x 90 — the flat part of `construction_capex`.
+float construction_credit_cost(const recipe_registry& reg, const building_component& b);
+
+/// What construction has CLAIMED on @p market's shelf and not yet drawn (Ben,
+/// 2026-10-25): every site's materials owed in arrears, and the materials and
+/// capacity for the days it will still build this quarter at its set rate. Derived
+/// from saved state (ascending id), never stored; zero for a good over the
+/// fair-price ceiling (nothing would be drawn of it).
+std::array<float, resource_count> construction_claims_on(const world& w, const recipe_registry& reg,
+                                                         entity_id market);
 
 /// THE ECONOMY STEP'S PHASE CLOCK (BL-1117, settle tick one) -- REPORTED ONLY.
 /// One settle tick of the twelve cost 30-40x the others, and the lap clock

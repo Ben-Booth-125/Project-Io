@@ -2713,14 +2713,23 @@ float seat_clean_slate(world& w, entity_id nation)
         if (const auto b = w.buildings.find(bid); b != w.buildings.end() && b->second.ticks_remaining > 0)
             sites.push_back(bid);
     std::sort(sites.begin(), sites.end());
-    float refund = 0.0f;
+    float refund = 0.0f; // the materials part, booked here
+    float total  = 0.0f; // everything returned, the demolition door's credits included
     for (const entity_id bid : sites)
     {
-        // What run_construction charged this site and nothing else: never an
-        // estimate, so the refund cannot exceed what the nation paid in.
-        const float paid = std::max(0.0f, w.buildings.at(bid).construction_paid);
+        // What this site was charged and nothing else: never an estimate, so the
+        // refund cannot exceed what the nation paid in. Ben, 2026-10-25: the
+        // demolition door already refunds the credits paid at placement (and books
+        // them); this refunds the rest — the materials — so the seat's total is
+        // unchanged, booked the same way below.
+        const building_component& sb = w.buildings.at(bid);
+        const float paid   = std::max(0.0f, sb.construction_paid);
+        const float credit = std::max(0.0f, sb.build_credit_paid);
         if (demolish_building(w, nation, bid))
-            refund += paid;
+        {
+            refund += std::max(0.0f, paid - credit);
+            total  += paid;
+        }
     }
     if (refund > 0.0f)
     {
@@ -2732,7 +2741,7 @@ float seat_clean_slate(world& w, entity_id nation)
         nc.treasury        += refund;
         nc.refund_unbooked += refund;
     }
-    return refund;
+    return total;
 }
 
 int seat_release_dial_idled(world& w, entity_id nation)

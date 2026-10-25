@@ -164,7 +164,8 @@ float extraction_nominal(const world& w, const recipe_registry& reg,
 // Ben 2026-10-07). Contract in economy_system.hpp. The rule this replaces is
 // first-come by id: a dip under the ceiling let the lowest-numbered plants
 // empty the shelf while the rest starved (BL-1207, handoff starvation).
-shelf_ration_plan plan_short_shelves(const world& w, const std::vector<shelf_claimant>& cl)
+shelf_ration_plan plan_short_shelves(const world& w, const std::vector<shelf_claimant>& cl,
+                                     const std::map<entity_id, std::array<float, resource_count>>* held_back)
 {
     using row = std::array<float, resource_count>;
     const std::size_t n = cl.size();
@@ -180,7 +181,13 @@ shelf_ration_plan plan_short_shelves(const world& w, const std::vector<shelf_cla
     // The shelf as the phase opens. Lookups only; nothing iterates a hash map.
     auto shelf_of = [&](entity_id m, std::size_t r) -> float {
         const auto it = w.markets.find(m);
-        return it == w.markets.end() ? 0.0f : std::max(0.0f, it->second.inventory[r]);
+        if (it == w.markets.end())
+            return 0.0f;
+        float held = 0.0f;
+        if (held_back != nullptr)
+            if (const auto hb = held_back->find(m); hb != held_back->end())
+                held = hb->second[r];
+        return std::max(0.0f, it->second.inventory[r] - held);
     };
 
     // Total admitted want per (shelf, good), summed in visit order (a fixed
@@ -1189,9 +1196,9 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
 
 namespace {
 
-// BL-095: pace each under-construction building against the local market's recent
-// supply of its materials, drawing + paying for them as it builds (pay-as-you-build).
-// Runs at the very top of the economy step, before production, so a building that
+// BL-095: pace each under-construction building against its local market's shelf,
+// drawing its materials in arrears as it builds (credits are paid once, at
+// placement — Ben, 2026-10-25). Runs at the very top of the economy step, before production, so a building that
 // completes this tick is immediately eligible below. Visits buildings in ascending
 // id order (deterministic) because it mutates the shared want/fill registers
 // (report.wants / report.purchases) and corp balances.
@@ -1208,57 +1215,71 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
     const std::size_t cap_index =
         static_cast<std::size_t>(resource_type::construction_capacity);
 
-    // Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md § Construction
-    // is measured in days). This pass is the quarter's CLEARING: it draws the
-    // quarter's materials, pays the flat cost for the quarter ahead and sets the
-    // quarter's rate. It advances NO day itself — progress is daily
-    // (`advance_construction_to`), and completion fires on its day there.
+    // CREDITS UP FRONT, MATERIALS IN ARREARS (Ben, 2026-10-25, ruling NR-1073;
+    // PRODUCTION.md § Construction is measured in days). The whole flat build cost
+    // was paid once, at placement (`begin_construction_on_placement`); no tick pays
+    // credits. This pass, at each economy tick:
+    //   A. draws the materials (construction capacity included) for the days built
+    //      since the last tick, IN ARREARS — `build_arrears_milli`, which also holds
+    //      any shortfall carried from the tick before, so that is drawn first: a
+    //      tick draws at most one quarter of work plus what was carried;
+    //   B. sets the quarter-ahead rate from the shelf LEFT after A, less the
+    //      materials still owed (they are claimed first), each site CLAIMING its
+    //      share in ascending id — nothing is drawn for the quarter ahead until the
+    //      tick after, and a quarter's claims on one shelf never exceed it.
+    // It advances NO day itself — progress is daily (`advance_construction_to`).
+    const float res_mult = reg.price_band().reservation_mult;
+    const int   q        = k_construction_quarter_days;
     std::vector<entity_id> ids;
-    // Ben, 2026-10-25: construction STARTS ON THE PLACEMENT DAY — a site's days built
-    // on credit since then are owed (`build_arrears_milli`) and paid here, with the
-    // quarter ahead; a building that completed on credit still pays them.
     for (auto& [bid, b] : w.buildings)
         if (b.ticks_remaining > 0 || b.build_arrears_milli > 0)
         {
             sync_construction_days(b); // a writer that set ticks only (fixture, v56 save)
-            b.build_rate_permille = 0; // until this clearing sets it
+            b.build_rate_permille = 0; // until this tick sets it
             b.build_paid_days     = 0;
-            b.build_on_credit     = false; // from here the days are paid ahead
             ids.push_back(bid);
         }
     std::sort(ids.begin(), ids.end());
 
-    // The per-tick need row of one site (BL-709, below) — ONE expression, read by
-    // the draw and by BL-1209's pre-pass alike, so the two cannot disagree.
-    // Ben, 2026-10-24: a site in its LAST quarter (fewer than 90 days of work
-    // left) needs only that share of a quarter's row — materials and capacity
-    // alike — so a build draws exactly its days, never a whole final quarter.
-    // Ben, 2026-10-25: plus the days it built on credit since placement (arrears).
-    auto need_row_for = [&](const building_component& b, float duration) {
-        // BL-590: the material cost specific to THIS named building.
+    // A site's row for @p share of a quarter's work — ONE expression, read by the
+    // arrears draw, the forward claim and the want alike, so they cannot disagree.
+    // BL-590: the material cost of THIS named building, over its duration in
+    // quarters. BL-709: construction capacity, flat per quarter of work, not
+    // divided by `duration` — a build that takes twice as long occupies the sector
+    // for twice as long.
+    auto row_for = [&](const building_component& b, float duration, float share) {
         const auto& material_cost_row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
-        const float qf = construction_clearing_fraction(b);
         std::array<float, resource_count> row{};
         for (std::size_t r = 0; r < resource_count; ++r)
-            row[r] = material_cost_row[r] / duration * qf;
-        // Flat per TICK, not per unit of material: it is the yard's throughput
-        // the site is consuming, and a site consumes it for as long as it is
-        // open regardless of what it is made of. Not divided by `duration` for
-        // the same reason — a build that takes twice as long occupies the sector
-        // for twice as long, and should pay for twice as much of it.
+            row[r] = material_cost_row[r] / duration * share;
         if (capacity_rate > 0.0f)
-            row[cap_index] += capacity_rate * qf;
+            row[cap_index] += capacity_rate * share;
         return row;
     };
+    // The materials owed (A's need): the milli-days built and not yet drawn.
+    auto owed_share = [&](const building_component& b) {
+        return b.build_arrears_milli > 0
+                   ? static_cast<float>(b.build_arrears_milli) / (1000.0f * static_cast<float>(q))
+                   : 0.0f;
+    };
+    // The quarter ahead (B's need): a quarter, or the days left in the last one.
+    auto ahead_share = [&](const building_component& b) {
+        return b.ticks_remaining > 0 ? construction_quarter_fraction(b.days_remaining) : 0.0f;
+    };
 
-    // A site's rate from what each good offers it (`avail_of`) — ONE rule, read
-    // by the draw below and by BL-1209's allocation alike. Comments at the draw.
+    // A site's FORWARD rate from what each good offers it (`avail_of`). The
+    // scarcest MATERIAL sets it and below 1/max_stretch it pauses. BL-709 —
+    // CAPACITY STRETCHES A BUILD; IT NEVER STOPS ONE: its coverage is floored at
+    // `pause_below` (a crew of one, not no crew), so a market with no yard slows
+    // a build 10x rather than deadlocking the yards that would supply it
+    // (measured: folding capacity into the minimum collapsed operating firms
+    // 198 of 328 -> 6 of 315 on the ancient band).
     auto site_rate = [&](const std::array<float, resource_count>& need_row, auto&& avail_of) {
         float rate = 1.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             if (r == cap_index)
-                continue; // BL-709 — capacity STRETCHES rather than pauses
+                continue;
             const float need = need_row[r];
             if (need <= 0.0f)
                 continue;
@@ -1276,348 +1297,340 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             rate = 0.0f; // paused: market can't supply even the max-stretched rate
         return rate;
     };
-
-    // BL-1209 (MARKETS.md § Price resolution, "A short shelf is shared
-    // pro-rata", Ben 2026-10-07): every site's draw, listed in this pass's visit
-    // order before any is made. A site draws the shelf only, so its claim is its
-    // whole need of each admitted good; materials gate the run (pause_below),
-    // capacity is shared but never gates (it stretches). On a CONTENDED shelf
-    // (`plan_short_shelves`) each site has a floor reserved; in visit order a
-    // site takes its rate from what the shelf holds beyond the floors of the
-    // sites after it, then sites left short top up from what is left. A site
-    // draws only the shelf, so the whole allocation is EXACT before anything
-    // moves: it is solved here on a copy of the shelves and the pass below draws
-    // it. With no shelf contended nothing is solved and the pass is unchanged.
-    struct site_alloc { std::size_t claimant; float rate; std::array<float, resource_count> drawn; std::array<float, resource_count> real; std::array<float, resource_count> first; };
-    std::unordered_map<entity_id, site_alloc> site_plan;
-    std::vector<shelf_claimant> claimants;
-    shelf_ration_plan plan;
-    {
-        const float res_mult = reg.price_band().reservation_mult;
-        for (const entity_id bid : ids)
+    // The share of a DEBT the shelf settles: the scarcest owed material sets it,
+    // with no pause (any part of a debt is worth paying). Capacity never holds a
+    // debt back — it is labour already spent; its draw is capped by the shelf and
+    // a short yard's part is not billed (BL-709's asymmetry, applied to arrears).
+    auto debt_cover = [&](const std::array<float, resource_count>& need_row, auto&& avail_of) {
+        float f = 1.0f;
+        for (std::size_t r = 0; r < resource_count; ++r)
         {
-            const building_component& b = w.buildings.at(bid);
-            const float duration = reg.economics(b.type).build_duration_ticks;
-            if (duration <= 0.0f)
+            if (r == cap_index || !(need_row[r] > 0.0f))
                 continue;
-            const entity_id mid = market_for_tile(w, b.tile);
-            if (b.state_idle) // BL-1296: the treasury could not pay — paused, draws nothing
-                continue;
-            if (mid == null_entity || building_owner_of(w, bid).id == null_entity
-                || building_body(w, b) == null_entity)
-                continue; // no draw is made (the pass below draws only for these)
-            const market_component& m = w.markets.at(mid);
-            const std::array<float, resource_count> need_row = need_row_for(b, duration);
-            shelf_claimant c;
-            c.building  = bid;
-            c.market    = mid;
-            c.threshold = pause_below;
-            bool claims = false;
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                if (!(need_row[r] > 0.0f))
-                    continue;
-                c.need[r]  = need_row[r];
-                c.gates[r] = (r != cap_index);
-                if (shelf_admits(m, r, res_mult, /*off_buys=*/true))
-                {
-                    c.claim[r] = need_row[r];
-                    claims = true;
-                }
-            }
-            if (claims)
-                claimants.push_back(c);
+            f = std::min(f, avail_of(r) / need_row[r]);
         }
-        plan = plan_short_shelves(w, claimants);
-        if (plan.any)
+        return std::clamp(f, 0.0f, 1.0f);
+    };
+
+    // Each site's market, owner and body, read once.
+    struct site_ref
+    {
+        entity_id mid = null_entity, corp = null_entity, body = null_entity;
+        market_component* m = nullptr;
+        float duration = 0.0f;
+        bool  live  = false; // durationed and not idled by the state gate
+        bool  draws = false; // live, with a market, an owner and a body
+    };
+    std::map<entity_id, site_ref> refs;
+    for (const entity_id bid : ids)
+    {
+        building_component& b = w.buildings.at(bid);
+        site_ref s;
+        s.duration = reg.economics(b.type).build_duration_ticks;
+        if (s.duration <= 0.0f) { b.ticks_remaining = 0; sync_construction_days(b); b.build_arrears_milli = 0; } // instant safety
+        s.mid  = market_for_tile(w, b.tile);
+        s.m    = (s.mid != null_entity) ? &w.markets.at(s.mid) : nullptr;
+        s.corp = building_owner_of(w, bid).id;
+        s.body = building_body(w, b);
+        // BL-1296: a state site its treasury could not fund this tick waits — it
+        // draws nothing, claims nothing, and registers no want. Its debt stays owed.
+        s.live  = s.duration > 0.0f && !b.state_idle;
+        s.draws = s.live && s.m != nullptr && s.corp != null_entity && s.body != null_entity;
+        refs.emplace(bid, s);
+    }
+    auto admitted_at = [&](const site_ref& s, std::size_t r) {
+        return s.m != nullptr && shelf_admits(*s.m, r, res_mult, /*off_buys=*/true);
+    };
+
+    // BL-1209 (MARKETS.md § Price resolution, "A short shelf is shared pro-rata",
+    // Ben 2026-10-07) — THE SOLVER, used by both halves: on a CONTENDED shelf
+    // (`plan_short_shelves`) each claimant has a floor reserved; in visit order it
+    // takes its rate from what the shelf holds beyond the floors of the claimants
+    // after it, then claimants left short top up from what is left. Solved whole on
+    // a copy of the shelves (less @p held), so it is EXACT before anything moves.
+    struct site_alloc { std::size_t claimant; float rate; std::array<float, resource_count> drawn; std::array<float, resource_count> real; std::array<float, resource_count> first; };
+    using held_map = std::map<entity_id, std::array<float, resource_count>>;
+    auto solve = [&](const std::vector<shelf_claimant>& claimants, const shelf_ration_plan& plan,
+                     const held_map* held, auto&& rate_fn) {
+        std::unordered_map<entity_id, site_alloc> out;
+        if (!plan.any)
+            return out;
+        std::unordered_map<entity_id, std::array<float, resource_count>> sim;
+        auto sim_of = [&](entity_id mid) -> std::array<float, resource_count>& {
+            auto it = sim.find(mid);
+            if (it == sim.end())
+            {
+                std::array<float, resource_count> sh{};
+                const market_component& m = w.markets.at(mid);
+                const std::array<float, resource_count>* hb = nullptr;
+                if (held != nullptr)
+                    if (const auto h = held->find(mid); h != held->end())
+                        hb = &h->second;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    sh[r] = std::max(0.0f, m.inventory[r] - (hb ? (*hb)[r] : 0.0f));
+                it = sim.emplace(mid, sh).first;
+            }
+            return it->second;
+        };
+        for (std::size_t i = 0; i < claimants.size(); ++i)
         {
-            // The shelves as the pass opens, copied for the contending sites.
-            std::unordered_map<entity_id, std::array<float, resource_count>> sim;
-            auto sim_of = [&](entity_id mid) -> std::array<float, resource_count>& {
-                auto it = sim.find(mid);
-                if (it == sim.end())
-                {
-                    std::array<float, resource_count> q{};
-                    const market_component& m = w.markets.at(mid);
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                        q[r] = std::max(0.0f, m.inventory[r]);
-                    it = sim.emplace(mid, q).first;
-                }
-                return it->second;
-            };
-            // First turn: the shelf beyond the later sites' floors.
+            if (!plan.contends[i])
+                continue;
+            const shelf_claimant& c = claimants[i];
+            auto& inv = sim_of(c.market);
+            std::array<float, resource_count> offer{};
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (c.claim[r] > 0.0f)
+                    offer[r] = std::max(0.0f, inv[r] - plan.reserved_after[i][r]);
+            site_alloc a{i, rate_fn(c.need, [&](std::size_t r) { return offer[r]; }), {}, {}, offer};
+            if (a.rate > 0.0f)
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (c.claim[r] > 0.0f)
+                    {
+                        a.drawn[r] = std::min(c.need[r] * a.rate, offer[r]);
+                        inv[r]    -= a.drawn[r];
+                    }
+            out.emplace(c.building, a);
+        }
+        for (int sweep = 0; sweep < 8; ++sweep)
+        {
+            int moved = 0;
             for (std::size_t i = 0; i < claimants.size(); ++i)
             {
                 if (!plan.contends[i])
                     continue;
                 const shelf_claimant& c = claimants[i];
+                site_alloc& a = out.at(c.building);
+                if (a.rate >= 1.0f)
+                    continue;
                 auto& inv = sim_of(c.market);
                 std::array<float, resource_count> offer{};
                 for (std::size_t r = 0; r < resource_count; ++r)
                     if (c.claim[r] > 0.0f)
-                        offer[r] = std::max(0.0f, inv[r] - plan.reserved_after[i][r]);
-                site_alloc a{i, site_rate(c.need, [&](std::size_t r) { return offer[r]; }), {}, {}, offer};
-                if (a.rate > 0.0f)
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                        if (c.claim[r] > 0.0f)
-                        {
-                            a.drawn[r] = std::min(c.need[r] * a.rate, offer[r]);
-                            inv[r]    -= a.drawn[r];
-                        }
-                site_plan.emplace(c.building, a);
+                        offer[r] = a.drawn[r] + std::max(0.0f, inv[r]);
+                const float rate2 = rate_fn(c.need, [&](std::size_t r) { return offer[r]; });
+                if (!(rate2 - a.rate > 1e-5f))
+                    continue;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (c.claim[r] > 0.0f)
+                    {
+                        const float d2 = std::min(c.need[r] * rate2, offer[r]);
+                        inv[r]    -= (d2 - a.drawn[r]);
+                        a.drawn[r] = d2;
+                    }
+                a.rate = rate2;
+                ++moved;
             }
-            // Top-up: a site left short takes more of what is left, in visit
-            // order, sweeping while any sweep moves.
-            for (int sweep = 0; sweep < 8; ++sweep)
+            report.shelf_audit[0].topups += moved;
+            if (moved == 0)
+                break;
+        }
+        return out;
+    };
+    auto claimant_of = [&](entity_id bid, const site_ref& s, const std::array<float, resource_count>& need,
+                           float threshold, shelf_claimant& c) {
+        c.building  = bid;
+        c.market    = s.mid;
+        c.threshold = threshold;
+        bool claims = false;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!(need[r] > 0.0f))
+                continue;
+            c.need[r]  = need[r];
+            c.gates[r] = (r != cap_index);
+            if (admitted_at(s, r))
             {
-                int moved = 0;
-                for (std::size_t i = 0; i < claimants.size(); ++i)
-                {
-                    if (!plan.contends[i])
-                        continue;
-                    const shelf_claimant& c = claimants[i];
-                    site_alloc& a = site_plan.at(c.building);
-                    if (a.rate >= 1.0f)
-                        continue;
-                    auto& inv = sim_of(c.market);
-                    std::array<float, resource_count> offer{};
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                        if (c.claim[r] > 0.0f)
-                            offer[r] = a.drawn[r] + std::max(0.0f, inv[r]);
-                    const float rate2 = site_rate(c.need, [&](std::size_t r) { return offer[r]; });
-                    if (!(rate2 - a.rate > 1e-5f))
-                        continue;
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                        if (c.claim[r] > 0.0f)
-                        {
-                            const float d2 = std::min(c.need[r] * rate2, offer[r]);
-                            inv[r]    -= (d2 - a.drawn[r]);
-                            a.drawn[r] = d2;
-                        }
-                    a.rate = rate2;
-                    ++moved;
-                }
-                report.shelf_audit[0].topups += moved;
-                if (moved == 0)
-                    break;
+                c.claim[r] = need[r];
+                claims = true;
             }
+        }
+        return claims;
+    };
+
+    // ---- A. THE ARREARS DRAW: the days built since the last tick, plus any
+    // shortfall carried, off the shelf as it stands. Ascending id; a short shelf is
+    // shared pro-rata (BL-1209) with no pause threshold.
+    std::map<entity_id, std::array<float, resource_count>> owed_before; // the want's debt half
+    {
+        std::vector<shelf_claimant> claimants;
+        for (const entity_id bid : ids)
+        {
+            const site_ref& s = refs.at(bid);
+            const building_component& b = w.buildings.at(bid);
+            if (!s.draws || b.build_arrears_milli <= 0)
+                continue;
+            shelf_claimant c;
+            if (claimant_of(bid, s, row_for(b, s.duration, owed_share(b)), 0.0f, c))
+                claimants.push_back(c);
+        }
+        const shelf_ration_plan plan_a = plan_short_shelves(w, claimants);
+        std::unordered_map<entity_id, site_alloc> alloc_a = solve(claimants, plan_a, nullptr, debt_cover);
+
+        for (const entity_id bid : ids)
+        {
+            const site_ref& s = refs.at(bid);
+            building_component& b = w.buildings.at(bid);
+            if (!s.live || b.build_arrears_milli <= 0)
+                continue;
+            const std::array<float, resource_count> owed = row_for(b, s.duration, owed_share(b));
+            owed_before.emplace(bid, owed);
+            if (s.corp == null_entity || s.body == null_entity)
+                continue; // no owner to bill: the debt waits
+            const auto ap = alloc_a.find(bid);
+            site_alloc* alloc = (ap != alloc_a.end()) ? &ap->second : nullptr;
+            auto avail = [&](std::size_t r) {
+                return admitted_at(s, r) ? std::max(0.0f, s.m->inventory[r]) : 0.0f;
+            };
+            const float f = alloc ? alloc->rate : debt_cover(owed, avail);
+            if (f > 0.0f && s.m != nullptr)
+            {
+                auto& bought = report.purchases[std::make_pair(s.corp, s.mid)];
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    if (!(owed[r] > 0.0f) || !admitted_at(s, r))
+                        continue; // BL-1172: over the ceiling — not drawn, not billed
+                    // Bill only what the shelf gives (capacity can be short of its
+                    // share; materials are covered by `f`).
+                    float drawn = std::min(owed[r] * f, std::max(0.0f, s.m->inventory[r]));
+                    if (alloc != nullptr)
+                    {
+                        drawn = std::min(drawn, alloc->drawn[r]);
+                        alloc->real[r] = drawn;
+                    }
+                    if (!(drawn > 0.0f))
+                        continue;
+                    bought[r]           += drawn;
+                    s.m->inventory[r]   -= drawn;
+                    // BL-1206: the site's record of what it cost, at the posted price
+                    // the clearing bills the draw at.
+                    b.construction_paid += drawn * posted_price(*s.m, r);
+                }
+            }
+            // What the shelf could not cover stays owed, and is drawn first next tick.
+            b.build_arrears_milli = (f >= 1.0f) ? 0
+                : static_cast<int>(std::lround(static_cast<float>(b.build_arrears_milli) * (1.0f - f)));
         }
     }
 
+    // What is still OWED is claimed first: the quarter ahead reads the shelf less
+    // it (materials only — capacity never holds a debt back).
+    held_map held;
     for (const entity_id bid : ids)
     {
-        building_component& b          = w.buildings.at(bid);
-        const building_economics& econ = reg.economics(b.type);
-        const float duration           = econ.build_duration_ticks;
-        if (duration <= 0.0f) { b.ticks_remaining = 0; sync_construction_days(b); continue; } // instant safety
-        // BL-1296: a state site its treasury could not fund this tick waits —
-        // it draws nothing, pays nothing, and registers no want.
-        if (b.state_idle)
+        const building_component& b = w.buildings.at(bid);
+        const site_ref& s = refs.at(bid);
+        if (b.build_arrears_milli <= 0 || s.mid == null_entity || s.duration <= 0.0f)
             continue;
-        // BL-1209: this site's allocation where it draws a contended shelf.
+        const std::array<float, resource_count> owed = row_for(b, s.duration, owed_share(b));
+        auto& h = held[s.mid];
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (r != cap_index && owed[r] > 0.0f && admitted_at(s, r))
+                h[r] += owed[r];
+    }
+
+    // ---- B. THE QUARTER AHEAD: each site claims its share of what is left, in
+    // ascending id (pro-rata on a contended shelf, BL-1209). Nothing is drawn.
+    std::vector<shelf_claimant> claimants;
+    for (const entity_id bid : ids)
+    {
+        const site_ref& s = refs.at(bid);
+        const building_component& b = w.buildings.at(bid);
+        if (!s.draws || b.ticks_remaining <= 0)
+            continue;
+        shelf_claimant c;
+        if (claimant_of(bid, s, row_for(b, s.duration, ahead_share(b)), pause_below, c))
+            claimants.push_back(c);
+    }
+    const shelf_ration_plan plan = plan_short_shelves(w, claimants, &held);
+    std::unordered_map<entity_id, site_alloc> site_plan = solve(claimants, plan, &held, site_rate);
+    held_map tally = held; // owed + this phase's claims so far, per market
+
+    for (const entity_id bid : ids)
+    {
+        building_component& b = w.buildings.at(bid);
+        const site_ref& s     = refs.at(bid);
+        if (!s.live)
+            continue;
+        const std::array<float, resource_count> need_row =
+            (b.ticks_remaining > 0) ? row_for(b, s.duration, ahead_share(b)) : std::array<float, resource_count>{};
         const auto sp = site_plan.find(bid);
         site_alloc* alloc = (sp != site_plan.end()) ? &sp->second : nullptr;
-
-        // BL-709 — THE PER-TICK NEED ROW, materialised ONCE rather than
-        // recomputed by each of the three loops below (rate, want, draw). That
-        // is not tidying: those three loops MUST agree about what this tick
-        // needs, and re-deriving the expression three times is exactly how a
-        // preview comes to disagree with what the tick charges — the argument
-        // BL-590 makes about `resource_build_cost_for` being the single lookup.
-        //
-        // Construction capacity joins the row as ONE MORE MATERIAL, deliberately
-        // and with no branch of its own. It is therefore stretched, paused,
-        // wanted, drawn from the shelf and billed by the same rules steel is:
-        // a market with no capacity slows a build exactly as a market with no
-        // steel does, and a build slowed for want of capacity REGISTERS that
-        // want — which is what prices capacity and induces the yard that answers
-        // it (MARKETS.md property 3). A second code path for the sector's own
-        // good would have severed precisely that loop.
-        const std::array<float, resource_count> need_row = need_row_for(b, duration);
-
-        // BL-130: read the market's REAL persistent inventory — what is actually
-        // on hand from prior ticks' sales — rather than last tick's cleared
-        // throughput. Mutable: a build that draws on it actually consumes it
-        // (below), same as any other consumer competing for the same stock.
-        const entity_id mid = market_for_tile(w, b.tile);
-        market_component* m = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
-        // BL-1172 — THE FAIR-PRICE CEILING. A material whose posted price is over
-        // reservation_mult x base is not on offer to this site: its availability
-        // reads 0, so a material over the ceiling PAUSES the build exactly as an
-        // empty shelf does, and capacity over the ceiling stretches it (BL-709).
-        // Either way nothing over the ceiling is drawn or billed below.
-        const float res_mult = reg.price_band().reservation_mult;
-        auto admitted = [&](std::size_t r) {
-            return m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/true);
+        auto avail = [&](std::size_t r) {
+            if (!admitted_at(s, r))
+                return 0.0f;
+            float t = 0.0f;
+            if (const auto it = tally.find(s.mid); it != tally.end())
+                t = it->second[r];
+            return std::max(0.0f, s.m->inventory[r] - t);
         };
 
-        // BL-1003 — want and fill book under the SITE's market key (the
-        // body-level key on a market-less body), so the site's demand prices ITS
-        // shelf, not the corp's lowest-id building's. A site draws the SHELF
-        // only, never the owner's pool (cold review 2026-09-23): by construction
-        // time the last clearing has sold the pool down to its processor
-        // reservation, so a pool-first draw would raid the stock the corp's own
-        // processors hold back, and the affordability gate prices every unit at
-        // the market (construction_capex). The corp's surplus reaches its own
-        // site the way any seller's does — listed, then bought off the shelf.
-        // BL-1296: the OWNER — a corporation, or a nation for a state site
-        // (its draws book under the nation's id, its flat cost leaves the
-        // treasury below).
-        const building_owner own = building_owner_of(w, bid);
-        const entity_id corp     = own.id;
-        const entity_id body     = building_body(w, b);
-        const entity_id pool_key = (mid != null_entity) ? mid : body;
-
-        // Rate = the fraction of this tick's material need the market can
-        // supply, set by the scarcest required material; below 1/max_stretch it
-        // pauses (`site_rate`, above).
-        // BL-709 — CAPACITY STRETCHES A BUILD; IT NEVER STOPS ONE, and that
-        // asymmetry against the materials above is the whole of what this item
-        // learned the hard way.
-        //
-        // MEASURED. Folding capacity into the minimum above like any other
-        // material collapsed operating firms 198 of 328 -> 6 of 315 on the
-        // ancient band: a market with NO capacity on the shelf gives coverage
-        // 0, coverage 0 pauses the build, and nothing completes — including the
-        // yards that would have made the capacity. A deadlock, not a shortage:
-        // you cannot build a construction yard without construction capacity.
-        //
-        // The rule that resolves it is BL-641's, unchanged and applied one level
-        // up: a shortfall SCALES A RATE DOWN, it never switches a thing off.
-        // Materials keep the pause because they are physical — no stone, no
-        // wall, at any speed. Capacity is LABOUR THROUGHPUT, and its absence
-        // means a crew of one instead of a crew of fifty: slow, not impossible.
-        // So its coverage is floored at `pause_below` == 1/max_stretch, which is
-        // exactly the "longest a starved build stretches to" the authored
-        // `max_stretch` already names — no new tunable, and the floor is the
-        // ceiling that was already there.
-        //
-        // A capacity-starved build therefore takes up to 10x as long, keeps
-        // REGISTERING its want every tick (the want loop below is unfloored, so
-        // the price signal is the full need), and so induces the yard that
-        // answers it. That loop is MARKETS.md property 3, and pausing severed it.
-        // BL-1209: a site drawing a contended shelf takes the rate its
-        // allocation solved; every other site reads the shelf as it stands.
-        const float rate = alloc ? alloc->rate
-                                 : site_rate(need_row, [&](std::size_t r) {
-                                       return admitted(r) ? std::max(0.0f, m->inventory[r]) : 0.0f;
-                                   });
-
-        // BL-441: register the WANT before the pause check, not after. The want
-        // is this tick's full-rate material need — unreduced by `rate`, which is
-        // how much of that want the shelf could actually meet. A site draws
-        // only the shelf, so the whole need is a bid on it (BL-1003 books it at
-        // the site's own market). Previously a site paused for want of steel registered NO demand
-        // for steel, which is the same defect as the starved processor's and
-        // arguably starker: the shortage silenced the one voice that would have
-        // priced it. NR-282 records why construction is in scope.
-        if (corp != null_entity && body != null_entity)
+        // BL-441: register the WANT whether or not the shelf can meet it — the
+        // number a price answers. Per good, the larger of the debt this tick drew
+        // against and the quarter ahead at full rate: one quarter's want in the
+        // steady state, the debt for a building finishing, the whole quarter for a
+        // paused site. BL-1003 books it at the site's own market (the body key on a
+        // market-less body).
+        if (s.corp != null_entity && s.body != null_entity)
         {
-            auto& want = report.wants[std::make_pair(corp, pool_key)];
+            const entity_id pool_key = (s.mid != null_entity) ? s.mid : s.body;
+            const auto ob = owed_before.find(bid);
+            std::array<float, resource_count> want_row = need_row;
+            if (ob != owed_before.end())
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    want_row[r] = std::max(want_row[r], ob->second[r]);
+            auto& want = report.wants[std::make_pair(s.corp, pool_key)];
             for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                const float need = need_row[r];
-                // BL-1172: a material over the ceiling does not bid either.
-                if (need > 0.0f && (m == nullptr || admitted(r)))
-                    want[r] += need;
-            }
+                if (want_row[r] > 0.0f && (s.m == nullptr || admitted_at(s, r)))
+                    want[r] += want_row[r]; // BL-1172: a material over the ceiling does not bid
             // BL-1203: the material the ceiling silenced goes to the hauler-only
-            // register instead (never `wants`, never the price).
-            if (m != nullptr)
+            // register instead (never `wants`, never the price). Capacity is a grid
+            // good, never cargo.
+            if (s.m != nullptr)
             {
                 std::map<std::pair<entity_id, entity_id>,
                          std::array<float, resource_count>>::iterator hw = report.hauler_wants.end();
                 for (std::size_t r = 0; r < resource_count; ++r)
                 {
-                    const float need = need_row[r];
-                    // Cold review fix 3: construction CAPACITY is a grid good,
-                    // never cargo — the ruling names materials only.
-                    if (r == cap_index || !(need > 0.0f) || admitted(r))
+                    if (r == cap_index || !(want_row[r] > 0.0f) || admitted_at(s, r))
                         continue;
                     if (hw == report.hauler_wants.end())
-                        hw = report.hauler_wants.try_emplace(std::make_pair(corp, pool_key)).first;
-                    hw->second[r] += need;
+                        hw = report.hauler_wants.try_emplace(std::make_pair(s.corp, pool_key)).first;
+                    hw->second[r] += want_row[r];
                 }
             }
         }
 
-        if (rate <= 0.0f)
-            continue;
+        if (b.ticks_remaining <= 0)
+            continue; // a completed building paying its debt builds nothing ahead
 
-        // Draw this tick's materials from the market's real inventory (BL-130)
-        // and charge the flat build_cost portion incrementally to the owning
-        // corp. `bought` records the DRAWN quantity — the FILL, what the site
-        // actually received and is billed for. Since BL-441 the pricing signal
-        // comes from `report.wants` above; this is the receipt only.
-        if (corp != null_entity && body != null_entity)
+        // The rate: a site on a contended shelf takes its solved share; every other
+        // reads the shelf less what is owed and claimed before it.
+        const float rate = alloc ? alloc->rate : site_rate(need_row, avail);
+        if (rate <= 0.0f)
+            continue; // paused: claims nothing, builds nothing this quarter
+        if (s.m != nullptr)
         {
-            auto& bought = report.purchases[std::make_pair(corp, pool_key)];
+            auto& t = tally[s.mid];
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                const float need = need_row[r];
-                if (need <= 0.0f)
+                if (!(need_row[r] > 0.0f) || !admitted_at(s, r))
                     continue;
-                if (m != nullptr && !admitted(r))
-                    continue; // BL-1172: over the ceiling — not bought, not billed
-                // BL-1172: bill only what the shelf actually gave. Materials are
-                // covered by construction (rate <= avail / need); capacity is
-                // not — it stretches at a floored rate past an empty yard — so
-                // its draw is capped by the shelf rather than billing goods
-                // that were never there.
-                float drawn = m ? std::min(need * rate, std::max(0.0f, m->inventory[r]))
-                                : need * rate;
-                if (alloc != nullptr) // BL-1209: no more than its allocation
-                {
-                    drawn = std::min(drawn, alloc->drawn[r]);
-                    alloc->real[r] = drawn;
-                }
-                bought[r] += drawn;
-                if (m)
-                {
-                    m->inventory[r] -= drawn;
-                    // BL-1206: the site's record of what it cost. A drawn unit is
-                    // billed at the posted price (clear_markets' auto-buy loop),
-                    // and `price` is not written until the end of that clear, so
-                    // this is the price the bill will use. A market-less draw is
-                    // never billed (clearing skips the body key), so it costs 0.
-                    b.construction_paid += drawn * posted_price(*m, r);
-                }
-            }
-            if (own.kind == owner_kind::nation) // BL-1407: every owner is a nation
-            {
-                // BL-1296: a state site's flat cost leaves its treasury — funded
-                // by this tick's gate, so it cannot overdraw it.
-                // Ben, 2026-10-24: the same share of a quarter as the need row.
-                // Ben, 2026-10-25: plus the days owed in arrears.
-                const float flat = (econ.build_cost / duration) * rate
-                                 * construction_clearing_fraction(b);
-                w.nations.at(corp).treasury -= flat;
-                b.construction_paid += flat;
-                w.state_ledger[corp].construction += flat;
+                const float claim = alloc ? alloc->drawn[r] : std::min(need_row[r] * rate, avail(r));
+                if (alloc != nullptr)
+                    alloc->real[r] = claim;
+                t[r] += claim;
             }
         }
-
-        // Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
-        // § Construction is measured in days): this clearing paid for the
-        // quarter's work at `rate`, so over the quarter the site makes rate x days
-        // of progress — daily, in `advance_construction_to` — on at most the days
-        // this payment covers (90, or the days left in its last quarter). It
-        // completes there, on its day; nothing completes in this pass.
-        // Ben, 2026-10-25: the payment covered the arrears as far as the rate did;
-        // what the shelf could not cover stays owed to the next clearing.
-        if (b.build_arrears_milli > 0)
-            b.build_arrears_milli = (rate >= 1.0f) ? 0
-                : static_cast<int>(std::lround(static_cast<float>(b.build_arrears_milli) * (1.0f - rate)));
-        if (b.ticks_remaining <= 0)
-            continue; // a completed building paying its arrears builds nothing ahead
-        const int q_days = std::min(b.days_remaining, k_construction_quarter_days);
+        // Over the quarter the site makes rate x days of progress — daily, in
+        // `advance_construction_to` — on at most 90 days (or the days left in its
+        // last quarter); each day built is owed to the next tick's draw.
         b.build_rate_permille = std::clamp(static_cast<int>(std::lround(rate * 1000.0f)), 1, 1000);
-        b.build_paid_days     = q_days;
+        b.build_paid_days     = std::min(b.days_remaining, q);
     }
 
-    // BL-1209 — the invariant audit (report-only): after the pass, could any
-    // site on a contended shelf still have built faster off what the shelves
-    // now hold? Read off the REAL shelves, not the allocation's copy.
+    // BL-1209 — the report rows (report-only) for the quarter ahead's contended
+    // shelves: each claim against its floor.
     if (plan.any)
     {
         shelf_phase_audit& audit = report.shelf_audit[0];
@@ -1628,15 +1641,6 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             const shelf_claimant& c = claimants[i];
             const site_alloc& a = site_plan.at(c.building);
             ++audit.claimants;
-            const market_component& m = w.markets.at(c.market);
-            if (a.rate < 1.0f)
-            {
-                const float rate2 = site_rate(c.need, [&](std::size_t r) {
-                    return c.claim[r] > 0.0f ? a.real[r] + std::max(0.0f, m.inventory[r]) : 0.0f;
-                });
-                if (rate2 - a.rate > 1e-5f)
-                    ++audit.stranded;
-            }
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (plan.on_contended[i][r])
                     report.shelf_rations.push_back({c.market, c.building, static_cast<std::uint16_t>(r), 'c',
@@ -1648,24 +1652,108 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
 
 } // namespace
 
-// Construction STARTS ON THE PLACEMENT DAY (Ben, 2026-10-25) — see the declaration.
-// The rate is `site_rate`'s rule read off the shelf as it stands (nothing drawn):
-// the scarcest admitted material sets it, capacity only stretches it (floored at
-// 1/max_stretch), and below 1/max_stretch it pauses. Against the need of the days
-// left in THIS quarter, which is what the credit covers.
-void begin_construction_on_placement(const world& w, const recipe_registry& reg,
-                                     building_component& b)
+// CREDITS UP FRONT, MATERIALS IN ARREARS (Ben, 2026-10-25) — see the declaration.
+std::array<float, resource_count> construction_claims_on(const world& w, const recipe_registry& reg,
+                                                         entity_id market)
+{
+    std::array<float, resource_count> out{};
+    if (market == null_entity)
+        return out;
+    const auto mit = w.markets.find(market);
+    if (mit == w.markets.end())
+        return out;
+    const market_component& m = mit->second;
+    const int q = k_construction_quarter_days;
+    const float cap_rate  = reg.construction().capacity_per_build_tick;
+    const std::size_t cap = static_cast<std::size_t>(resource_type::construction_capacity);
+    const float res_mult  = reg.price_band().reservation_mult;
+    // Ascending id: the float sum replays (buildings is a hash map).
+    std::vector<entity_id> ids;
+    for (const auto& [bid, b] : w.buildings)
+        if ((b.ticks_remaining > 0 || b.build_arrears_milli > 0) && market_for_tile(w, b.tile) == market)
+            ids.push_back(bid);
+    std::sort(ids.begin(), ids.end());
+    for (const entity_id bid : ids)
+    {
+        const building_component& b = w.buildings.at(bid);
+        const float duration = reg.economics(b.type).build_duration_ticks;
+        if (duration <= 0.0f)
+            continue;
+        // Owed (materials only — capacity never holds a debt back), and the days
+        // still to build this quarter at the rate the tick set.
+        const float owed  = static_cast<float>(std::max(0, b.build_arrears_milli))
+                          / (1000.0f * static_cast<float>(q));
+        const float ahead = (b.ticks_remaining > 0 && !b.state_idle)
+            ? static_cast<float>(std::max(0, b.build_paid_days)) * static_cast<float>(std::clamp(b.build_rate_permille, 0, 1000))
+                  / (1000.0f * static_cast<float>(q))
+            : 0.0f;
+        const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (!shelf_admits(m, r, res_mult, /*off_buys=*/true))
+                continue;
+            const float per_q = (r == cap) ? 0.0f : row[r] / duration;
+            out[r] += per_q * owed + per_q * ahead;
+        }
+        if (cap_rate > 0.0f && shelf_admits(m, cap, res_mult, /*off_buys=*/true))
+            out[cap] += cap_rate * ahead;
+    }
+    return out;
+}
+
+float construction_credit_cost(const recipe_registry& reg, const building_component& b)
+{
+    // The flat build cost over the site's WHOLE days: build_cost x days / (the
+    // authored quarters x 90) — the site multiplier stretches cash as well as time
+    // (PRODUCTION.md § Construction site time), and this is the flat part of
+    // construction_capex exactly.
+    const float duration = reg.economics(b.type).build_duration_ticks;
+    if (duration <= 0.0f || b.days_remaining <= 0)
+        return 0.0f;
+    return reg.economics(b.type).build_cost * static_cast<float>(b.days_remaining)
+         / (duration * static_cast<float>(k_construction_quarter_days));
+}
+
+void begin_construction_on_placement(world& w, const recipe_registry& reg, entity_id payer,
+                                     building_component& b, bool founding)
 {
     if (b.ticks_remaining <= 0 || b.days_remaining <= 0)
         return;
     const int q        = k_construction_quarter_days;
     const int left_q   = q - std::clamp(w.construction_quarter_day, 0, q);
     const int days     = std::min(b.days_remaining, left_q);
-    b.build_on_credit     = true;
     b.build_rate_permille = 0;
     b.build_paid_days     = 0;
+    b.build_arrears_milli = 0;
+    b.build_credit_paid   = 0.0f;
     const float duration = reg.economics(b.type).build_duration_ticks;
-    if (days <= 0 || duration <= 0.0f)
+    if (duration <= 0.0f)
+        return;
+
+    // 1. THE CREDITS, ONCE (Ben, 2026-10-25): the whole flat build cost leaves the
+    // payer's treasury now. The build door admitted the site only if the treasury's
+    // uncommitted part covers the whole capex, so this never overdraws it. A
+    // founding site (generation's) is priced by its caller, never here.
+    if (!founding)
+    {
+        const auto nit = w.nations.find(payer);
+        const float credit = construction_credit_cost(reg, b);
+        if (nit != w.nations.end() && credit > 0.0f)
+        {
+            nit->second.treasury -= credit;
+            b.construction_paid  += credit;
+            b.build_credit_paid   = credit;
+            w.state_ledger[payer].construction += credit;
+        }
+    }
+
+    // 2. THE RATE for the days left in this quarter: `site_rate`'s rule (the
+    // scarcest admitted material sets it, capacity only stretches it, below
+    // 1/max_stretch it pauses), read off the shelf LESS every claim already on it
+    // — the materials other sites owe and the days they will build before the tick
+    // (`construction_claims_on`). So a later site in the same quarter reads what
+    // earlier claims left, and nothing is drawn until the tick.
+    if (days <= 0)
         return;
     const float qf = static_cast<float>(days) / static_cast<float>(q);
     const float max_stretch = reg.construction().max_stretch;
@@ -1677,10 +1765,11 @@ void begin_construction_on_placement(const world& w, const recipe_registry& reg,
     if (mid != null_entity)
         if (const auto mit = w.markets.find(mid); mit != w.markets.end())
             m = &mit->second;
+    const std::array<float, resource_count> claimed = construction_claims_on(w, reg, mid);
     const float res_mult = reg.price_band().reservation_mult;
     auto avail = [&](std::size_t r) {
         return (m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/true))
-                   ? std::max(0.0f, m->inventory[r]) : 0.0f;
+                   ? std::max(0.0f, m->inventory[r] - claimed[r]) : 0.0f;
     };
     const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
     float rate = 1.0f;
@@ -1699,7 +1788,7 @@ void begin_construction_on_placement(const world& w, const recipe_registry& reg,
     }
     rate = std::clamp(rate, 0.0f, 1.0f);
     if (rate < pause_below || rate <= 0.0f)
-        return; // paused: it waits for its first clearing, owing nothing
+        return; // paused: it waits for the tick, owing nothing
     b.build_rate_permille = std::clamp(static_cast<int>(std::lround(rate * 1000.0f)), 1, 1000);
     b.build_paid_days     = days;
 }
@@ -1740,10 +1829,9 @@ int advance_construction_to(world& w, const recipe_registry& reg, int day_in_qua
                 continue;
             --b.build_paid_days;
             b.build_day_milli += std::clamp(b.build_rate_permille, 0, 1000);
-            // Ben, 2026-10-25: a day built on credit (placement to first clearing)
-            // is owed, and the next clearing pays it.
-            if (b.build_on_credit)
-                b.build_arrears_milli += std::clamp(b.build_rate_permille, 0, 1000);
+            // Ben, 2026-10-25: every day built is owed its materials, drawn in
+            // arrears at the next economy tick.
+            b.build_arrears_milli += std::clamp(b.build_rate_permille, 0, 1000);
             while (b.build_day_milli >= 1000 && b.days_remaining > 0)
             {
                 b.build_day_milli -= 1000;
@@ -1763,7 +1851,7 @@ int advance_construction_to(world& w, const recipe_registry& reg, int day_in_qua
             b.build_day_milli       = 0;
             b.build_rate_permille   = 0;
             b.build_paid_days       = 0;
-            b.build_on_credit       = false; // its arrears, if any, stay owed
+            b.build_credit_paid     = 0.0f;  // standing: no refund is owed; materials owed stay owed
             b.construction_progress = 0.0f;
             b.completion_day        = d;
             const building_type   type = b.type;

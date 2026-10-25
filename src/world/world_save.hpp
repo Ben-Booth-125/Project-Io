@@ -495,8 +495,9 @@ inline constexpr uint32_t world_save_magic =
 /// nation books carries the world's one cursor (`construction_quarter_day`, i32) and,
 /// for every building holding any construction-day state, ascending id, (id,
 /// days_remaining, build_rate_permille, build_paid_days, build_day_milli,
-/// completion_day, output_share_permille, on credit, arrears milli-days — the last two
-/// Ben, 2026-10-25: construction starts on the placement day) as i32s. v56 is a STRICT PREFIX of v57 and
+/// completion_day, output_share_permille, milli-days of materials owed) as i32s, then
+/// the credits paid at placement as an f32 — the last two Ben, 2026-10-25: credits up
+/// front, materials in arrears. v56 is a STRICT PREFIX of v57 and
 /// is read too (`k_world_save_version_pre_days`): its cursor reads 0 and each site's
 /// days are derived from its ticks_remaining (x 90, less its construction_progress
 /// fraction of a quarter) — `sync_construction_days`.
