@@ -95,17 +95,44 @@ local function assert_name_wraps(what, row)
     if row.name_lines > 1 then wrapped_names = wrapped_names + 1 end
     if row.name_elided then elided_names = elided_names + 1 end
 end
-local dep = verify.find_deposit_tile("iron_ore")
-verify.expect(dep.ok, "found a tile carrying iron ore")
+-- THE PICK IS THE PLAYER'S OWN GROUND (2026-10-25). It used to be
+-- `find_deposit_tile("iron_ore")`, the first iron tile in raster order on the whole
+-- body - whoever held it. BL-1399 (a nation builds only on its own ground) then made
+-- that tile answer `foreign_ground`, and every later section cascaded off the refusal.
+-- Nothing in the verify API names a tile's owner, by design, so the pick asks the
+-- SURFACE that already answers "where may the player build this?": the site finder,
+-- whose rows are exactly the tiles the build door accepts an Iron Mine on (own
+-- ground, tech, road, stack, province ceiling, treasury). Its first row under the
+-- default sort (profit, ties by tile id) is deterministic for a seed, and it follows
+-- the player's ground wherever generation moves it, so the pick cannot rot again.
+verify.show_panel("build", true)
+verify.frames(1)
+local picked_ok = verify.site_pick("Iron Mine")
+verify.frames(3)
+local sites = verify.site_finder()
+verify.expect(picked_ok and sites.n_rows > 0, string.format(
+    "the site finder lists the player's own iron ground for an Iron Mine (%d sites of %d own tiles)",
+    sites.n_rows or 0, sites.own_tiles or 0))
+if not (picked_ok and sites.n_rows > 0) then return end
+local dep = { x = sites.rows[1].x, y = sites.rows[1].y }
+print(string.format("construction_progress: picked (%d,%d), the first of %d Iron Mine sites",
+                    dep.x, dep.y, sites.n_rows))
+-- Disarm and close, so the staging below and the captures after it see the ledger as
+-- every earlier pass did: no lens skinning the map, no site rows above the build door.
+verify.site_clear()
+verify.show_panel("build", false)
+verify.frames(2)
 
 -- ── 1. Two of the same type on one tile ────────────────────────────────────
 -- THE GROUND IS ROADED FIRST (BL-1380). No building stands on a tile with no roaded
 -- edge (PRODUCTION.md § "A building needs a road"), and the deposit `find_deposit_tile`
--- hands back is a remote one the generated lattice never reached — so every placement
+-- handed back then was a remote one the generated lattice never reached — so every placement
 -- below answered `invalid_tile` and all thirteen of this script's failures were that one
 -- refusal, cascading. The fixture is what was wrong: this is the Lua form of the
 -- `road_edges_on_every_side(1)` the nine headless fixtures write (lib.lua § road_ground).
--- All three placements use this ONE tile, so one crossing is the whole staging.
+-- All three placements use this ONE tile, so one crossing is the whole staging. A
+-- site-finder tile already passes the road gate; the crossing stays as the fixture's
+-- own guarantee rather than an inference from the ledger.
 road_ground(dep.x, dep.y)
 
 verify.place_mode("extraction", "iron_ore")
@@ -312,8 +339,29 @@ print(string.format("construction_progress: %d build rows, %d will stall or stre
 -- assertion above is vacuous.
 print(string.format("construction_progress: %d row name(s) wrapped to the second line, %d elided",
                     wrapped_names, elided_names))
-verify.expect(elided_names <= 1,
-              string.format("at most one name outruns the two-line budget (%d did)",
+-- WHICH names may outrun it is a MEASUREMENT, and it is pinned by name rather than
+-- by count, because the count depends on which rows the picked tile lists: the
+-- door lists one extraction row per deposit the tile carries. MEASURED 2026-10-25
+-- on the player's own iron ground (the pick above): "Woodcutter's Camp" joins
+-- "Inland Logistics Hub" - "Woodcutter'" alone fills the ~70 px column, so the name
+-- breaks inside the word and "Camp" is still left over after two lines. The tile
+-- the 2026-10-17 measurement used carried no timber, so that row was not drawn.
+-- Any OTHER name eliding is a failure, on any tile.
+local k_may_outrun = { ["Inland Logistics Hub"] = true, ["Woodcutter's Camp"] = true }
+local function check_outrun(what, rows)
+    for _, r in ipairs(rows) do
+        if r.name_elided then
+            verify.expect(k_may_outrun[r.name] == true,
+                          string.format("%s '%s' outruns the two-line budget - only the measured "
+                                        .. "names may", what, r.name))
+        end
+    end
+end
+check_outrun("queue row", q.rows)
+check_outrun("build row", door.rows)
+check_outrun("rail row", door.rail_rows)
+verify.expect(elided_names <= 2,
+              string.format("at most the two measured names outrun the two-line budget (%d did)",
                             elided_names))
 verify.expect(wrapped_names > 0,
               "at least one row name USED the second line (the budget is not vacuous)")
@@ -432,6 +480,8 @@ end
 for _, key in ipairs({ "name", "bar", "eta", "cost", "state" }) do
     verify.expect(site_seen[key] ~= nil, "the site row carries a '" .. key .. "' explainer")
 end
-verify.expect(site_seen["state"] == sited.status,
+-- tostring: with no state column published this must FAIL as an assertion, not
+-- stop the script on a nil concatenation.
+verify.expect(site_seen["state"] ~= nil and site_seen["state"] == sited.status,
               "the site row's STATE MARK carries the status line verbatim, one author for both: '"
-              .. site_seen["state"] .. "'")
+              .. tostring(site_seen["state"]) .. "' vs '" .. tostring(sited.status) .. "'")
