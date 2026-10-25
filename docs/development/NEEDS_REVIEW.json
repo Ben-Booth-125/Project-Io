@@ -749,7 +749,7 @@
    "title": "Construction from placement: the first clearing pays two quarters at once, and more sites stall",
    "raised": "2026-10-25",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Construction-in-days lane (c7e2b818, merged 6322792b), construction_stall vs main 2967c7cf",
    "what": "Per your ruling, a site builds on credit from its placement day, and its first clearing pays the credit days plus the quarter ahead. Every gate passes (market_viability FULL: G1 92.0, G1t50 85.0 - at target for the first time, G1b 2.6, G2 147.8 against 165.8 before, G3 100). But construction_stall reads fewer completions per seed: 721/410/227 against 753/458/324 (seeds 0/43/10). Sites stalled 10+ ticks: 51/81/78 against 32/23/72, and the stall verdicts move from short to contended. Two mechanisms in the code, neither yet isolated by measurement: (1) the credit rate reads the shelf as it stands and reserves nothing, so every site placed in one tick reads the same stock and all get full rate; (2) at the next clearing each owes 90 days in arrears plus 90 ahead, and one rate throttles both, so a short shelf slows the work ahead as well as the debt.",
    "why_it_matters": "A build that should finish a quarter sooner can finish later, because the lumped first draw meets a contended shelf. The ruling is honoured as written; the open question is how the debt competes with the work ahead.",
@@ -764,14 +764,14 @@
     "tools/verify/construction_stall.cpp",
     "docs/economy/PRODUCTION.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-25: paying and receiving income both happen at the next economy tick. Credits are paid up front; the materials draw resolves at the economy tick. Confirmed model: at placement, pay credits for the days left in the quarter and build at the rate the shelf allows; each tick draws the materials for the days built since the last tick (in arrears; a shortfall stays owed to the next tick), pays credits for the quarter ahead, and sets the quarter-ahead rate from the shelf left. A tick never draws two quarters."
   },
   {
    "id": "NR-1074",
    "title": "A site road may bridge at most 2 water tiles; seed 28 keeps 97 overseas sites unconnectable",
    "raised": "2026-10-25",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "Site-join lane (483fc8ab), lp_coverage_census",
    "what": "The generation site-join (every building joined to its nation's capital road network) may cross a strait as a bridge of at most 2 water tiles (kMaxCrossingTiles = 2; 3 was tried). With it, seeds 0 and 46 have no unconnectable consumer; seed 28 keeps 97, on ground 8-9 water tiles from the capital. Those need a sea link (the port seeding), not a longer bridge.",
    "why_it_matters": "A longer bridge cap would join more sites but lays roads across open sea, which reads wrong. The 97 sites on seed 28 get no Logistic Points until a sea bridge carries them.",
@@ -781,7 +781,7 @@
     "src/world/road_generation.cpp",
     "src/world/logistic_points.cpp"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-25: generate port links for nations akin to the seed 28 example. The bridge cap stays at 2; an overseas building group joins its capital chain by a port link."
   }
  ]
 }
