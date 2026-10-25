@@ -679,6 +679,74 @@ void stamp_sea_lanes(world& w, entity_id body,
                      int reuse_cost_q = kSeaLaneReuseCostQ);
 
 // ---------------------------------------------------------------------------
+// EVERY PORT LAYS LANES (Ben, 2026-10-25; LOGISTICS.md § 4b, "Every port lays lanes")
+// ---------------------------------------------------------------------------
+//
+// "When a new port is built, it should be able to spawn new sea lanes ... new ports
+// form connections as sea lanes to each other port within 50 tiles." A STANDING port
+// (complete, not decommissioned) is joined by a lane to every other standing port on
+// its body within `port_lane_limit()` -- a port's full-strength sea reach, 50 -- by the
+// port reach's own water measure (`lp_sea_walk`: port tile onto water, any water on
+// all six hex sides, a landing on the far shore, 1 a step), never straight-line.
+// EVERY PORT, WHOEVER HOLDS IT (a delegated reading, 2026-10-25): a lane is geography,
+// read by every traveller; Logistic Points still flow only along one nation's chain.
+//
+// Each pair is the colonial stamp's lane walk: the sea only, four cardinal steps,
+// priced with the current at the spans' own weight (`kPortLaneCurrentWeightQ`), and
+// entering water an earlier lane already carries at `kSeaLaneReuseCostQ` -- so lanes
+// share trunks with each other and with the colonial lanes. It runs from the sea
+// tiles on the lower-id port's six hex sides to the first of the higher-id port's it
+// settles (`sea_walk_laned_between`). LAKES TOO (Ben, 2026-10-25, NR-1061: "ports on a
+// lake lay lanes over the lake to other ports within 50"): a pair the sea does not join
+// but one lake both touch is laned over that lake by the same walk on the lake's own
+// water, as still water. The colonial stamp stays sea-only. A pair no water joins is
+// counted and lays nothing. Purely additive: no lane is ever unlaid.
+//
+// ORDER: ascending port id, pairs (lo, hi). `lay_all_port_lanes` walks every body in
+// ascending id, lo outer and hi inner; `lay_port_lanes` joins ONE port to every other
+// in ascending id of the other. A lane laid invalidates the logistics caches.
+
+/// The colonial spans' current weight and rotation (`exploration_sim_params`:
+/// `sea_current_weight_q` 500, prograde), restated so play can lay a lane without the
+/// history's params: the lane walk a port lays is the one the record's lanes took.
+inline constexpr int kPortLaneCurrentWeightQ = 500;
+inline constexpr int kPortLaneRotationSense  = 1;
+
+/// What one port-lane call did. WRITE-ONLY.
+struct port_lane_stats
+{
+    int       ports       = 0; ///< standing ports read
+    int       pairs       = 0; ///< pairs within the limit
+    int       laid        = 0; ///< of them, walked and stamped
+    int       unreachable = 0; ///< within the limit by the measure, but no sea or lake the lane walk crosses
+    int       lake_laid   = 0; ///< of `laid`, lanes laid over a lake (NR-1061)
+    long long path_tiles  = 0; ///< tiles over every laid path (a shared tile counts per lane)
+    int       tiles_added = 0; ///< tiles that carried no lane before the call
+};
+
+/// Every lane one call laid, for a harness. WRITE-ONLY.
+struct port_lane_trace
+{
+    struct lane
+    {
+        entity_id        lo = null_entity, hi = null_entity; ///< the two port buildings, lo < hi
+        std::vector<int> path;                               ///< raster indices, lo's sea -> hi's
+    };
+    std::vector<lane> lanes;
+};
+
+/// The water distance within which two ports are laned: the sea's full reach (50).
+float port_lane_limit();
+
+/// Join standing port building @p port to every other standing port on its body within
+/// the limit. No-op for a building that is not a standing port.
+port_lane_stats lay_port_lanes(world& w, entity_id port, port_lane_trace* trace = nullptr);
+
+/// Every pair of standing ports within the limit, on every body (generation: the
+/// Logistic Point seeding opens with it).
+port_lane_stats lay_all_port_lanes(world& w, port_lane_trace* trace = nullptr);
+
+// ---------------------------------------------------------------------------
 // The rail record, carried to the fold (BL-1255)
 // ---------------------------------------------------------------------------
 //

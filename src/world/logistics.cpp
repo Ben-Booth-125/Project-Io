@@ -143,8 +143,9 @@ float tile_traversal_cost(const tile_component& tc)
     const float base = is_water(tc.substrate) // BL-516: water of any kind is the sea-mode leg
                            ? sea_leg_cost
                            : landform_logistics_cost(tc.landform);
-    // BL-1098: a sea lane discounts the water it lies on (only ever stamped on sea tiles;
-    // a land tile's lane_level is always 0, so this factor is 1 there).
+    // BL-1098: a sea lane discounts the water it lies on (only ever stamped on water - the
+    // sea, or a lake a port lays one over, NR-1061; a land tile's lane_level is always 0,
+    // so this factor is 1 there).
     return base * sea_lane_traversal_multiplier(tc.lane_level);
 }
 

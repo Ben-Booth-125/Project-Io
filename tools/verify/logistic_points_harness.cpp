@@ -42,6 +42,7 @@
 #include "world/logistic_points.hpp"
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/road_generation.hpp" // L10: every port lays lanes (Ben, 2026-10-25)
 #include "world/river_generation.hpp" // hex_side_for_offset - L7 lays its roads by side
 #include "world/stance.hpp"
 #include "world/supply_system.hpp" // BL-1361: commit_trade_shipment, convoy_leg
@@ -646,6 +647,9 @@ void l7_reach_by_tier_and_rail()
     // SEA (BL-1396, Ben 2026-10-21): a port stretches 50 water tiles at full strength,
     // gone at 100, and over water only - its points land on the coast they reach and go
     // no further inland. A port at column 0, sea 1-120, land 121-130, sea after.
+    // Ben, 2026-10-25: a port's FIELD now rides the lanes (L10 below); this any-water walk
+    // (lp_sea_walk) survives as the MEASURE of the fifty within which two ports are laned,
+    // so these rows read the measure itself, unchanged in what they assert.
     {
         world ws;
         const entity_id bs = make_row_body(ws, 300);
@@ -653,16 +657,16 @@ void l7_reach_by_tier_and_rail()
             ws.tiles.at(tile_at(ws, bs, col)).substrate = terrain_substrate::coast;
         for (int col = 131; col <= 299; ++col)
             ws.tiles.at(tile_at(ws, bs, col)).substrate = terrain_substrate::coast;
-        const auto f = lp_distance_field(ws, bs, lp_network::sea, {tile_at(ws, bs, 0)});
+        const auto f = lp_sea_walk(ws, bs, {tile_at(ws, bs, 0)});
         const auto reach_at = [&](int col) {
             const auto it = f.find(tile_at(ws, bs, col));
             return it == f.end() ? 0.0f : lp_reach(lp_network::sea, it->second);
         };
-        check(reach_at(50) >= 1.0f, "sea: full strength 50 water tiles out");
-        check(approx(reach_at(75), 0.5f, 1e-3f), "sea: half strength 75 out, midway through the fade");
+        check(reach_at(50) >= 1.0f, "sea measure: full strength 50 water tiles out");
+        check(approx(reach_at(75), 0.5f, 1e-3f), "sea measure: half strength 75 out, midway through the fade");
         check(f.count(tile_at(ws, bs, 100)) == 1 && approx(f.at(tile_at(ws, bs, 100)), 100.0f)
                   && approx(reach_at(100), 0.0f, 1e-3f),
-              "sea: the walk reaches 100 and nothing is left there, double the full reach");
+              "sea measure: the walk reaches 100 and nothing is left there, double the full reach");
         // A short strait: water 1-9, land 10-20 (coast at 10, inland behind it).
         world wc;
         const entity_id bc = make_row_body(wc, 300);
@@ -670,8 +674,8 @@ void l7_reach_by_tier_and_rail()
             wc.tiles.at(tile_at(wc, bc, col)).substrate = terrain_substrate::coast;
         for (int col = 21; col <= 299; ++col)
             wc.tiles.at(tile_at(wc, bc, col)).substrate = terrain_substrate::coast;
-        const auto fc2 = lp_distance_field(wc, bc, lp_network::sea, {tile_at(wc, bc, 0)});
-        check(fc2.count(tile_at(wc, bc, 10)) == 1, "sea: a port's points land on the coast across the water");
+        const auto fc2 = lp_sea_walk(wc, bc, {tile_at(wc, bc, 0)});
+        check(fc2.count(tile_at(wc, bc, 10)) == 1, "sea measure: the walk lands on the coast across the water");
 
         // Two dimensions, 5 x 5, all land but ONE sea tile. Odd-r hexes: on an even row,
         // (x-1, y-1) is a diagonal (NW) side a four-way walk never crosses.
@@ -690,16 +694,16 @@ void l7_reach_by_tier_and_rail()
             }
         const auto at2 = [&](int x, int y) { return g2[static_cast<std::size_t>(y * 5 + x)]; };
         wd.tiles.at(at2(1, 1)).substrate = terrain_substrate::coast; // NW of (2,2), an even row
-        const auto fd = lp_distance_field(wd, bd, lp_network::sea, {at2(2, 2)});
+        const auto fd = lp_sea_walk(wd, bd, {at2(2, 2)});
         check(fd.count(at2(1, 1)) == 1,
-              "sea: a port with sea only on a diagonal hex side still reaches it (all six sides)");
+              "sea measure: a port with sea only on a diagonal hex side still reaches it (all six sides)");
         // (1,2) sits beside that sea tile on the odd row, so it is a coast the points land
         // on; (3,2) and (2,3) are the port's own land neighbours, touching no sea.
-        check(fd.count(at2(1, 2)) == 1, "sea: a coast beside the sea tile is landed on");
+        check(fd.count(at2(1, 2)) == 1, "sea measure: a coast beside the sea tile is landed on");
         check(fd.count(at2(3, 2)) == 0 && fd.count(at2(2, 3)) == 0,
-              "sea: a port's own land neighbours that touch no sea are never reached - land to land is no sea step");
+              "sea measure: a port's own land neighbours that touch no sea are never reached - land to land is no sea step");
         check(fc2.count(tile_at(wc, bc, 11)) == 0 && fc2.count(tile_at(wc, bc, 15)) == 0,
-              "sea: and go no further inland - that ground is a hub's");
+              "sea measure: and goes no further inland - that ground is a hub's");
         // LAKES TOO (Ben, 2026-10-21, NR-1061): the same strait as a lake is crossed.
         world wl;
         const entity_id bl = make_row_body(wl, 300);
@@ -707,8 +711,8 @@ void l7_reach_by_tier_and_rail()
             wl.tiles.at(tile_at(wl, bl, col)).substrate = terrain_substrate::lake;
         for (int col = 21; col <= 299; ++col)
             wl.tiles.at(tile_at(wl, bl, col)).substrate = terrain_substrate::coast;
-        const auto fl = lp_distance_field(wl, bl, lp_network::sea, {tile_at(wl, bl, 0)});
-        check(fl.count(tile_at(wl, bl, 10)) == 1, "sea: a port's points cross a lake and land on its far shore");
+        const auto fl = lp_sea_walk(wl, bl, {tile_at(wl, bl, 0)});
+        check(fl.count(tile_at(wl, bl, 10)) == 1, "sea measure: the walk crosses a lake and lands on its far shore");
     }
 
     // What the line does NOT carry, read off the same rail network the router uses
@@ -902,21 +906,22 @@ void l8_routed_requests()
     // on the chain and fails; the second pass, after I1 is bridged, bridges I2 from it.
     {
         world w;
-        // A port reaches 100 (BL-1396), so the gaps are wide: I1 sits 60 sea tiles off the
-        // capital's coast (in reach), I2 another 60 beyond I1 (in reach of I1, 120+ from
-        // the capital's shore), and 110 tiles of sea round the wrap back to column 0.
+        // Two ports are laned only within fifty (Ben, 2026-10-25; BL-1396's reach of 100
+        // set the old gaps at 60, which no lane now crosses). I1 sits 40 sea tiles off the
+        // capital's coast (in reach), I2 another 40 beyond I1 (in reach of I1, 95 from the
+        // capital's shore: no lane), and 170 tiles of sea round the wrap back to column 0.
         const entity_id body = make_row_body(w, 300);
-        for (int col = 20; col <= 79; ++col)
+        for (int col = 20; col <= 59; ++col)
             w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
-        for (int col = 95; col <= 154; ++col)
+        for (int col = 75; col <= 114; ++col)
             w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
-        for (int col = 170; col <= 299; ++col)
+        for (int col = 130; col <= 299; ++col)
             w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
         const entity_id nation = add_nation(w, body, 0, 299);
         set_capital(w, nation, tile_at(w, body, 0));
         const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
-        const entity_id far  = add_consumer(w, tile_at(w, body, 162), corp, 10.0f, 100.0f); // I2, first
-        const entity_id near = add_consumer(w, tile_at(w, body, 87), corp, 10.0f, 100.0f);  // I1
+        const entity_id far  = add_consumer(w, tile_at(w, body, 122), corp, 10.0f, 100.0f); // I2, first
+        const entity_id near = add_consumer(w, tile_at(w, body, 67), corp, 10.0f, 100.0f);  // I1
         const lp_seed_report rep = seed_logistics_sources(w);
         const lp_tick t = resolve_logistic_points(w);
         const lp_building_row* rf = row_of(t, far);
@@ -1259,6 +1264,248 @@ void l9_shipment_draws()
     }
 }
 
+// L10 -- EVERY PORT LAYS LANES, AND A PORT'S POINTS RIDE THEM (Ben, 2026-10-25;
+// LOGISTICS.md § 4b "Every port lays lanes", § One pool "Points ride the lanes"). A
+// standing port is joined by a sea lane to every other standing port within fifty water
+// tiles (the any-water measure, lp_sea_walk), and its field is the lane network: laned
+// water, landing only on a port's tile.
+namespace l10 {
+
+/// A 300-wide row: P1 land at 0, sea 1-39, P2 land at 40, sea 41-99, P3 land at 100,
+/// sea 101-299 (round the wrap back to P1). P1-P2 are 40 apart (laned); P2-P3 60 (not);
+/// P1-P3 199 round the wrap (not). @p p4: also a land tile at 70 (sea either side).
+struct row_world
+{
+    world w;
+    entity_id body = null_entity, p1 = null_entity, p2 = null_entity, p3 = null_entity;
+};
+
+void make(row_world& r, bool land_at_70)
+{
+    r.body = make_row_body(r.w, 300);
+    for (int col = 0; col < 300; ++col)
+        if (col != 0 && col != 40 && col != 100 && !(land_at_70 && col == 70))
+            r.w.tiles.at(tile_at(r.w, r.body, col)).substrate = terrain_substrate::coast;
+    r.p1 = add_building(r.w, tile_at(r.w, r.body, 0), building_type::port);
+    r.p2 = add_building(r.w, tile_at(r.w, r.body, 40), building_type::port);
+    r.p3 = add_building(r.w, tile_at(r.w, r.body, 100), building_type::port);
+}
+
+bool laned(world& w, entity_id body, int from, int to)
+{
+    for (int c = from; c <= to; ++c)
+        if (w.tiles.at(tile_at(w, body, c)).lane_level == 0)
+            return false;
+    return true;
+}
+
+bool unlaned(world& w, entity_id body, int from, int to)
+{
+    for (int c = from; c <= to; ++c)
+        if (w.tiles.at(tile_at(w, body, c)).lane_level != 0)
+            return false;
+    return true;
+}
+
+std::vector<std::uint8_t> lanes_of(world& w, entity_id body)
+{
+    std::vector<std::uint8_t> out;
+    for (const entity_id t : body_tile_grid(w, body))
+        out.push_back(w.tiles.at(t).lane_level);
+    return out;
+}
+
+} // namespace l10
+
+void l10_port_lanes()
+{
+    std::printf("\n--- L10 every port lays lanes; a port's points ride them ---\n");
+    using namespace l10;
+
+    // 1. Pairs within fifty are laned; beyond fifty are not.
+    row_world a;
+    make(a, false);
+    const port_lane_stats st = lay_all_port_lanes(a.w);
+    std::printf("        (row: ports %d, pairs %d, laid %d, unreachable %d, tiles added %d)\n",
+                st.ports, st.pairs, st.laid, st.unreachable, st.tiles_added);
+    check(laned(a.w, a.body, 1, 39) && st.laid == 1 && st.pairs == 1,
+          "two ports 40 water tiles apart are joined by a sea lane over every tile between");
+    check(unlaned(a.w, a.body, 41, 99) && unlaned(a.w, a.body, 101, 299),
+          "ports 60 apart, and 199 round the wrap, are beyond fifty: no lane");
+
+    // 2. A port's field lies on lanes only, and lands only on a port's tile.
+    {
+        const auto f = lp_distance_field(a.w, a.body, lp_network::sea, {tile_at(a.w, a.body, 0)});
+        bool on_lanes = true;
+        for (const auto& [t, d] : f)
+        {
+            (void)d;
+            const tile_component& tc = a.w.tiles.at(t);
+            const bool port_tile = t == tile_at(a.w, a.body, 0) || t == tile_at(a.w, a.body, 40)
+                                || t == tile_at(a.w, a.body, 100);
+            if (is_water(tc.substrate) ? tc.lane_level == 0 : !port_tile)
+                on_lanes = false;
+        }
+        const auto it2 = f.find(tile_at(a.w, a.body, 40));
+        check(on_lanes && !f.empty(), "a port's field lies on laned water and port tiles only");
+        check(it2 != f.end() && approx(it2->second, 40.0f) && lp_reach(lp_network::sea, it2->second) >= 1.0f,
+              "the port reaches the other port along the lane, at full strength (40)");
+        check(f.count(tile_at(a.w, a.body, 299)) == 0 && f.count(tile_at(a.w, a.body, 100)) == 0,
+              "open water no lane crosses, and the port beyond fifty, are not in its field");
+        const auto f2 = lp_distance_field(a.w, a.body, lp_network::sea, {tile_at(a.w, a.body, 40)});
+        check(f2.count(tile_at(a.w, a.body, 41)) == 0 && f2.count(tile_at(a.w, a.body, 0)) == 1,
+              "from P2 too: the lane west to P1, nothing on the unlaned sea east");
+    }
+
+    // 3. A port COMPLETED IN PLAY lays its lanes (advance_construction_to, completion day).
+    row_world b;
+    make(b, true);
+    lay_all_port_lanes(b.w);
+    const entity_id p4 = add_building(b.w, tile_at(b.w, b.body, 70), building_type::port);
+    {
+        building_component& pb = b.w.buildings.at(p4);
+        pb.ticks_remaining     = 1;
+        pb.days_remaining      = 10;
+        pb.build_rate_permille = 1000;
+        pb.build_paid_days     = 10;
+        b.w.construction_quarter_day = 0;
+    }
+    check(unlaned(b.w, b.body, 41, 69) && unlaned(b.w, b.body, 71, 99),
+          "a port under construction lays no lane");
+    b.w.lp_sea_fields[tile_at(b.w, b.body, 40)] = {}; // a cached port field, stale after a lane
+    const recipe_registry reg = make_registry(1.0f, 0.1f);
+    advance_construction_to(b.w, reg, 10);
+    check(b.w.buildings.at(p4).ticks_remaining == 0, "the port completes on day 10");
+    check(laned(b.w, b.body, 41, 69) && laned(b.w, b.body, 71, 99),
+          "on completion it is laned to both ports within fifty (P2 30 west, P3 30 east)");
+    {
+        const auto f = lp_distance_field(b.w, b.body, lp_network::sea, {tile_at(b.w, b.body, 40)});
+        const auto i4 = f.find(tile_at(b.w, b.body, 70));
+        check(i4 != f.end() && approx(i4->second, 30.0f) && f.count(tile_at(b.w, b.body, 100)) == 0,
+              "P2's field reaches the new port along its lane (30); a landing ends the walk, so P3 "
+              "is the new port's to reach (the chain joins them)");
+        check(b.w.lp_sea_fields.empty(), "and the cached port fields went stale with the lane");
+    }
+
+    // 4. Every lane, and the in-play completion, repeat run to run.
+    {
+        row_world a2;
+        make(a2, false);
+        lay_all_port_lanes(a2.w);
+        row_world b2;
+        make(b2, true);
+        lay_all_port_lanes(b2.w);
+        const entity_id q4 = add_building(b2.w, tile_at(b2.w, b2.body, 70), building_type::port);
+        building_component& qb = b2.w.buildings.at(q4);
+        qb.ticks_remaining = 1; qb.days_remaining = 10; qb.build_rate_permille = 1000; qb.build_paid_days = 10;
+        b2.w.construction_quarter_day = 0;
+        advance_construction_to(b2.w, reg, 10);
+        check(lanes_of(a.w, a.body) == lanes_of(a2.w, a2.body) && lanes_of(b.w, b.body) == lanes_of(b2.w, b2.body),
+              "the same lanes, tile for tile, run to run");
+    }
+
+    // 5. A two-dimensional sea: two ports about 17 tiles apart across open water, with a
+    //    current-priced cardinal walk. Laned, and the field on lanes only.
+    {
+        world w;
+        const entity_id bd = w.create_entity();
+        { body_component bc{}; bc.grid_width = 40; bc.grid_height = 20; w.bodies[bd] = bc; }
+        std::vector<entity_id> g(800);
+        for (int y = 0; y < 20; ++y)
+            for (int x = 0; x < 40; ++x)
+            {
+                const entity_id t = w.create_entity();
+                tile_component tc{}; tc.body = bd; tc.grid_x = x; tc.grid_y = y;
+                const bool land = x < 3 || x > 36;
+                tc.substrate = land ? terrain_substrate::sedimentary : terrain_substrate::ocean;
+                tc.cover = terrain_cover::grass;
+                w.tiles[t] = tc;
+                g[static_cast<std::size_t>(y * 40 + x)] = t;
+            }
+        // P1 on the west shore at (2, 4); P2 on a one-tile islet at (14, 14).
+        w.tiles.at(g[14 * 40 + 14]).substrate = terrain_substrate::sedimentary;
+        const entity_id q1 = add_building(w, g[4 * 40 + 2], building_type::port);
+        const entity_id q2 = add_building(w, g[14 * 40 + 14], building_type::port);
+        (void)q1; (void)q2;
+        port_lane_trace tr;
+        const port_lane_stats s2 = lay_all_port_lanes(w, &tr);
+        bool path_sea = !tr.lanes.empty();
+        for (const auto& ln : tr.lanes)
+            for (const int idx : ln.path)
+                if (!is_sea(w.tiles.at(g[static_cast<std::size_t>(idx)]).substrate))
+                    path_sea = false;
+        check(s2.laid == 1 && path_sea, "2-D: the pair is laned, over the sea only");
+        const auto f = lp_distance_field(w, bd, lp_network::sea, {g[4 * 40 + 2]});
+        bool on_lanes = true;
+        for (const auto& [t, d] : f)
+        {
+            (void)d;
+            const tile_component& tc = w.tiles.at(t);
+            if (is_water(tc.substrate) ? tc.lane_level == 0 : (t != g[4 * 40 + 2] && t != g[14 * 40 + 14]))
+                on_lanes = false;
+        }
+        check(on_lanes && f.count(g[14 * 40 + 14]) == 1,
+              "2-D: the field reaches the islet's port along the lane, and lies on lanes only");
+    }
+
+    // 6. The routed flow is painted on the LANE TILES between two ports of one chain: the
+    //    capital on P1's tile, a consumer on P2's tile across 30 tiles of laned water.
+    {
+        world w;
+        const entity_id body = make_row_body(w, 120);
+        for (int col = 11; col <= 40; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        for (int col = 62; col <= 119; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::coast;
+        const entity_id nation = add_nation(w, body, 0, 119);
+        set_capital(w, nation, tile_at(w, body, 10));
+        add_building(w, tile_at(w, body, 10), building_type::port);
+        add_building(w, tile_at(w, body, 41), building_type::port);
+        const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
+        const entity_id c = add_consumer(w, tile_at(w, body, 41), corp, 10.0f, 100.0f);
+        lay_all_port_lanes(w);
+        const lp_tick t = resolve_logistic_points(w);
+        const lp_building_row* r = row_of(t, c);
+        check(r != nullptr && approx(r->coverage, 1.0f), "a consumer on a laned port's tile is covered through the chain");
+        lp_reach_memo memo;
+        const auto flow = lp_route_flow(w, memo, t, nation, body);
+        bool painted = true;
+        for (int col = 11; col <= 40; ++col)
+        {
+            const auto it = flow.find(tile_at(w, body, col));
+            if (it == flow.end() || !(it->second.requested > 0.0f))
+                painted = false;
+        }
+        check(painted, "its routed flow lies on every lane tile between the two ports (field_walk_back over the lane)");
+    }
+
+    // 7. LAKES (Ben, 2026-10-25, NR-1061): two ports on one lake, 30 lake tiles apart, no
+    //    sea anywhere. They are laned over the lake, and each one's field covers the other.
+    //    A third lake, 60 lake tiles off the second port, is beyond fifty: no lane.
+    {
+        world w;
+        const entity_id body = make_row_body(w, 200);
+        for (int col = 1; col <= 30; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::lake;
+        for (int col = 32; col <= 91; ++col)
+            w.tiles.at(tile_at(w, body, col)).substrate = terrain_substrate::lake;
+        add_building(w, tile_at(w, body, 0), building_type::port);
+        add_building(w, tile_at(w, body, 31), building_type::port);
+        add_building(w, tile_at(w, body, 92), building_type::port);
+        const port_lane_stats ls = lay_all_port_lanes(w);
+        std::printf("        (lake: pairs %d, laid %d, over a lake %d, unreachable %d)\n",
+                    ls.pairs, ls.laid, ls.lake_laid, ls.unreachable);
+        check(laned(w, body, 1, 30) && ls.lake_laid == 1 && ls.laid == 1,
+              "two lake ports 30 apart are laned over the lake");
+        check(unlaned(w, body, 32, 91), "a lake port 61 water tiles off is beyond fifty: no lane");
+        const auto f = lp_distance_field(w, body, lp_network::sea, {tile_at(w, body, 0)});
+        const auto it = f.find(tile_at(w, body, 31));
+        check(it != f.end() && approx(it->second, 31.0f) && lp_reach(lp_network::sea, it->second) >= 1.0f,
+              "a lake port's field rides the lake lane and covers the other lake port at full strength");
+        check(f.count(tile_at(w, body, 92)) == 0, "and not the lake port beyond fifty");
+    }
+}
+
 int main()
 {
     std::printf("=== logistic_points_harness (BL-1352, LP_ONE_SYSTEM) ===\n");
@@ -1272,6 +1519,7 @@ int main()
     l7_reach_by_tier_and_rail();
     l8_routed_requests();
     l9_shipment_draws();
+    l10_port_lanes();
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

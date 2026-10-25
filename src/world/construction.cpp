@@ -5,6 +5,7 @@
 #include "economy_system.hpp"  // begin_construction_on_placement (Ben, 2026-10-25)
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
+#include "road_generation.hpp" // lay_port_lanes: an instant port lays its lanes (Ben, 2026-10-25)
 #include "nation_tech.hpp"     // recipe_unlocked (BL-1273: the nation's tree; BL-588 before it)
 #include "recipe_registry.hpp" // recipe_runs_at_tile (defined at the foot of this file)
 #include "state_industry.hpp"  // BL-1296: state_runs, state_uncommitted_treasury
@@ -325,6 +326,11 @@ construction_result construct_for(world& w, const recipe_registry& reg,
     // (2026-08-12 — see invalidate_logistics_caches' narrowing note).
     if (building_affects_logistics(type) && bc.ticks_remaining <= 0)
         invalidate_logistics_caches(w);
+    // EVERY PORT LAYS LANES (Ben, 2026-10-25; LOGISTICS.md § 4b): placement IS completion
+    // for an instant port, so it joins every standing port within fifty here; a durative
+    // one lays them on its completion day (advance_construction_to).
+    if (type == building_type::port && bc.ticks_remaining <= 0)
+        lay_port_lanes(w, bld_id);
 
     out_building = bld_id;
     return construction_result::placed;
