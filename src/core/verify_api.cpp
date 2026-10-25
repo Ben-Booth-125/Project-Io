@@ -6692,10 +6692,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             pos("port_a", p1);
             if (p2 != null_entity)
             {
-                stage_one(p2, "port", "", false, false);
+                const entity_id port_b = stage_one(p2, "port", "", false, false);
                 stage_one(p2, "processing", "", false, false);
                 pos("port_b", p2);
-                sea = true;
+                // A port's points ride the LANES (lp_lane_walk), and a standing port lays
+                // lanes to every port within 50 when it is built (LOGISTICS.md § 4b) - a
+                // step staging bypasses, so it is taken here, as construction takes it.
+                const port_lane_stats ls = lay_port_lanes(m_world, port_b);
+                out["lanes_laid"] = ls.laid;
+                sea = ls.laid > 0;
             }
         }
         out["sea"] = sea;

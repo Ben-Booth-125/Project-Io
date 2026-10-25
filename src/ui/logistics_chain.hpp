@@ -26,8 +26,7 @@ struct world;
 //   - THE LEG'S TILES: a rail link runs along the track (`rail_leg_path`, station to
 //     station); a sea link runs down the port's own field from the far end to the port
 //     (each step to the six-neighbour holding the least distance, the lowest tile id on
-//     a tie) - whatever the field crosses, which is the lanes once the port field runs
-//     on them.
+//     a tie) - the LANE tiles, sea or lake, since a port's field is `lp_lane_walk`.
 //   - THE LEG'S TRAFFIC: every producing building's request routed as the resolver
 //     routes it (its qualifying sources nearest first, a tie to the lower id, topped up
 //     until covered), each source it draws on carrying its share up its path to the

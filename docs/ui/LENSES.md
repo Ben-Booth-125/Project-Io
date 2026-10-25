@@ -947,9 +947,10 @@ resolver routes on (`LOGISTICS.md` § How a tile's points get to it):
 - **Road walks** are the roads themselves, as above.
 - **A rail leg** runs along the **track**, station to station (`rail_leg_path`), and every track
   tile on it carries the leg's colour and numbers.
-- **A sea leg** runs down the port's own field, from the far end to the port — the water tiles the
-  field's walk back crosses (the lanes, once the port field runs on them) — and every water tile on
-  it carries the leg's colour and numbers.
+- **A sea leg** runs down the port's own field, from the far end to the port — a port's points
+  ride the **lanes** (`lp_lane_walk`, `LOGISTICS.md` § One pool), so the leg is the run of lane
+  tiles between the two ports, on the sea or a lake alike — and every lane tile on it carries the
+  leg's colour and numbers.
 - A leg's figures are its own: **requested** and **granted** are the routed shares whose path to the
   capital runs through that link (each request routed as the resolver routes it, its shares laid up
   its sources' paths), and **supplied** is the carrying source's points × its reach across the leg.

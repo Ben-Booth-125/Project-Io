@@ -551,10 +551,14 @@ takes the light, the grade and the lens wash like the ground does:
   re-bakes **80** chunks, about **25 s of worker time**; at a mid rung (18 px) **311** chunks,
   about **54 s**; on the whole grid **none**; the whole home master, before the view rule,
   was **2,992** chunks and **~540 s**. On the play path that work runs on the pool behind
-  the frame — the main thread pays only the snapshot it already takes on its cadence — so
-  the frame holds its budget, and a chunk shows its previous pixels until it lands
-  (`scripts/verify/logistics_unpaint_perf.lua`, the `UNPAINT_PERF` lines, times the frame
-  on that path). **Why not a second, road-free master:** a second master per body would
+  the frame — the main thread pays only the snapshot it already takes on its cadence — and
+  a chunk shows its previous pixels until it lands. `scripts/verify/logistics_unpaint_perf.lua`
+  (the `UNPAINT_PERF` lines, pool path, a Market toggle as the control) measured on a Debug
+  build with the software renderer: at a close rung (77 px) arming re-bakes **42** chunks and
+  the view settles in **~2.2 s**, its frames no slower than the control's (p95 212 ms against
+  242 ms — that build's frames are the renderer's, not 60 fps figures); at a mid rung (28 px)
+  **311** chunks settle in **~5.5 s** (p95 291 ms against 220 ms), and disarming there took
+  **~39 s** behind the frame with one 2 s frame — the cost a Release measure should confirm. **Why not a second, road-free master:** a second master per body would
   double the ground's resident set against the fixed budget (§ Resident set); and a
   ground-coloured underlay cannot hide a road it does not lie on — the painted route and
   the drawn stroke do not share a line, and the paint rides the oblique lift.
