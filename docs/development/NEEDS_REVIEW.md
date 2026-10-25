@@ -491,7 +491,7 @@ Per your ruling, a site builds on credit from its placement day, and its first c
 
 > **Recommendation:** A, then measure. It removes the throttle on forward work without changing what is owed. B fixes only the over-promise. Each is a small change in run_construction.
 
-> **RESOLVED.** Ben, 2026-10-25: the entire build cost in credits is taken when the building is placed, once; no payment each quarter. Only the material cost to the market happens over time: each economy tick draws the materials for the days built since the last tick (in arrears; a shortfall stays owed to the next tick) and sets the quarter-ahead rate from the shelf left. A tick never draws two quarters of materials.
+> **RESOLVED.** Ben, 2026-10-25: the entire build cost in credits is taken when the building is placed, once; no payment each quarter. Only the material cost to the market happens over time: each economy tick draws the materials for the days built since the last tick (in arrears; a shortfall stays owed to the next tick) and sets the quarter-ahead rate from the shelf left. A tick never draws two quarters of materials. A site cancelled before completion refunds its credit cost in full (Ben, 2026-10-25); materials already drawn stay spent.
 
 *Files: `src/world/economy_system.cpp`, `tools/verify/construction_stall.cpp`, `docs/economy/PRODUCTION.md`*
 
