@@ -279,13 +279,16 @@ opening world the one place the rule does not hold.
 **A site's road joins its own nation's network, before the sources are seeded (Ben, 2026-10-24).**
 Logistic Points travel only along roaded edges (§ Logistic Points), so a road that touches a site
 serves it only if it belongs to the network the nation's points are laid out on: the road
-component, over the nation's own dry ground, that holds its capital. Generation joins each site to
-the nearest tile of that component by a Track laid over the nation's own dry ground — never across
-a neighbour's tiles, never over water, and reusing the roads that already shorten the way. A site
+component, over the nation's own ground and the bridges its roads carry, that holds its capital.
+Generation joins each site to the nearest land tile of that component by a Track laid over the
+nation's own ground — never across a neighbour's tiles, and reusing the roads that already shorten
+the way. Water is crossed only as a bridge within the bridge cap, landing on the nation's own land:
+a nation is one territory across a short strait (`../generation/NATION_GENERATION.md` § Pass 2e),
+and where that strait is wider than a bridge may span, the bridge cap holds. A site
 already roaded but stranded on a fragment the capital's network does not reach is joined the same
 way. The join runs after the last stamper and before the Logistic Point seeding, because the
-seeding covers only what a road reaches. A site with no own dry-ground route to its capital —
-ground the sea or a neighbour cuts off — is counted, not forced: it keeps the nearest-road rule
+seeding covers only what a road reaches. A site with no such route to its capital — ground open
+sea, a strait wider than the cap, or a neighbour cuts off — is counted, not forced: it keeps the nearest-road rule
 above, and the seeding's sea bridge or a later road serves it.
 
 **Pathfinding is unchanged in shape.** A* still walks 4-cardinal neighbours over the body grid and
