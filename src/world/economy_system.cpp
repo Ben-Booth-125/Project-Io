@@ -10,6 +10,7 @@
 #include "logistics.hpp"       // invalidate_logistics_caches, tile_traversal_cost, intra_body_path (BL-470)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
+#include "road_generation.hpp"  // lay_port_lanes: a port lays its lanes on completion (Ben, 2026-10-25)
 #include "river_generation.hpp" // BL-1340: hex_side_for_offset — a march pays the edge's road tier
 #include "population_generation.hpp" // k_population_for_scale (BL-616 promotion/decline rungs)
 #include "stance.hpp"          // is_hostile (BL-470's NR-344 march queue; BL-617 migration gate)
@@ -1864,6 +1865,12 @@ int advance_construction_to(world& w, const recipe_registry& reg, int day_in_qua
             // cached answer — see invalidate_logistics_caches' narrowing note.
             if (building_affects_logistics(type))
                 invalidate_logistics_caches(w);
+            // EVERY PORT LAYS LANES (Ben, 2026-10-25; LOGISTICS.md § 4b): a port joins
+            // every standing port within fifty water tiles the day it completes. Sites
+            // complete in ascending id within a day, and each joins its pairs in
+            // ascending id of the other port, so the water taken is a pure function.
+            if (type == building_type::port)
+                lay_port_lanes(w, bid);
             // BL-263: COMPLETION is also the spontaneous-market-emergence
             // trigger. No-op if the body already has a market (including an
             // instant build that already spawned one at placement, construction.cpp).

@@ -287,16 +287,29 @@ inline bool lp_full_strength(lp_network n, float d)
 /// Reach in [0,1] of a source on network @p n at network distance @p d.
 float lp_reach(lp_network n, float d);
 
-/// BL-1396: the sea field from @p seeds - water (sea or lake, NR-1061) crossed on all
+/// BL-1396: the any-water walk from @p seeds - water (sea or lake, NR-1061) crossed on all
 /// six hex sides, a landing on the shore ending the walk, every step 1, bounded at the
-/// sea's reach. What
-/// lp_distance_field returns for lp_network::sea, and what generation's bridge reads.
+/// sea's reach (or @p bound). No longer a port's field (Ben, 2026-10-25: points ride the
+/// lanes, `lp_lane_walk`): it is the MEASURE of the fifty within which two ports are
+/// laned (`lay_port_lanes`), and what generation's bridge reads.
 std::unordered_map<entity_id, float> lp_sea_walk(world& w, entity_id body,
                                                  const std::vector<entity_id>& seeds);
+std::unordered_map<entity_id, float> lp_sea_walk(world& w, entity_id body,
+                                                 const std::vector<entity_id>& seeds, float bound);
+
+/// A PORT'S FIELD (Ben, 2026-10-25; LOGISTICS.md § One pool, "Points ride the lanes"):
+/// from @p seeds (a port's tile) onto a laned sea tile beside it, along laned water on all
+/// six hex sides, LANDING only on a standing port's tile beside a lane - every step 1, a
+/// landing ending the walk, bounded at the sea's full reach plus fade. Open water no lane
+/// crosses, a lake, and a shore with no port are never reached. What lp_distance_field
+/// returns for lp_network::sea.
+std::unordered_map<entity_id, float> lp_lane_walk(world& w, entity_id body,
+                                                  const std::vector<entity_id>& seeds);
 
 /// Network distance field from @p seeds on @p body for network @p n, bounded at
 /// that network's full + fade: tile -> distance, only tiles within the bound.
-/// Road and sea: every tile the walk reaches. RAIL (BL-1360): point to point - the
+/// Road: every tile the walk reaches. Sea: the lanes and the port tiles they land on
+/// (`lp_lane_walk`, Ben 2026-10-25). RAIL (BL-1360): point to point - the
 /// seed station tiles themselves (0) and the OTHER station tiles the rail network
 /// joins them to (track steps), and no other tile at all.
 std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body, lp_network n,
@@ -488,6 +501,12 @@ struct lp_seed_report
     /// The port link (Ben, 2026-10-25): road crossings laid to join each link's ports to
     /// the network on their own coasts, and a linked island's stray fragments to its port.
     int   link_crossings  = 0;
+    /// Every port lays lanes (Ben, 2026-10-25): lanes the seeding laid between ports
+    /// (its opening pass over the standing ports, and each port it landed), the tiles they
+    /// added to the water, and pairs within fifty no sea walk joins.
+    int   port_lanes_laid        = 0;
+    int   port_lane_tiles        = 0;
+    int   port_lanes_unreachable = 0;
 };
 
 /// Place logistics sources at the fold so every producing building on a nation's ground is

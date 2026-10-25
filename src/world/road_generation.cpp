@@ -4,6 +4,8 @@
 #include "hard_coded_world.hpp" // generation_progress -- the BL-1072 loading-bar tap
 #include "logistics.hpp"
 #include "market_clearing.hpp" // BL-1138: market_for_tile, a town's market
+#include "hex_neighbors.hpp"   // port lanes: a port's mouths on its six hex sides
+#include "logistic_points.hpp" // port lanes: lp_sea_walk measures the 50 (Ben, 2026-10-25)
 #include "ocean_currents.hpp" // BL-1098: the current field a lane's walk is priced with
 #include "river_generation.hpp" // BL-1252: the snap prices its re-walk as the flood does
 
@@ -17,6 +19,7 @@
 #include <map>
 #include <queue>
 #include <set>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -2823,6 +2826,226 @@ void stamp_sea_lanes(world& w, entity_id body,
     // lane_level moved traversal cost on the water: every cache keyed on it is stale.
     if (st.laid > 0)
         invalidate_logistics_caches(w);
+}
+
+// ---------------------------------------------------------------------------
+// Every port lays lanes (Ben, 2026-10-25; LOGISTICS.md § 4b) -- see the header
+// ---------------------------------------------------------------------------
+
+namespace {
+
+bool port_lane_standing(const building_component& b)
+{
+    return b.type == building_type::port && b.ticks_remaining <= 0 && !b.decommissioned;
+}
+
+/// One body's water as the lane walk reads it, built once per call.
+struct port_lane_body
+{
+    bool                      ok = false;
+    int                       gw = 0, gh = 0;
+    std::vector<std::uint8_t> sea;
+    std::vector<std::uint8_t> laned;
+    ocean_current_field       currents;
+};
+
+port_lane_body read_port_lane_body(world& w, entity_id body)
+{
+    port_lane_body pb;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return pb;
+    pb.gw = bit->second.grid_width;
+    pb.gh = bit->second.grid_height;
+    if (pb.gw <= 0 || pb.gh <= 0)
+        return pb;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    const int n = pb.gw * pb.gh;
+    if (static_cast<int>(grid.size()) < n)
+        return pb;
+    std::vector<terrain_substrate> substrate(static_cast<std::size_t>(n), terrain_substrate::sedimentary);
+    pb.sea.assign(static_cast<std::size_t>(n), 0);
+    pb.laned.assign(static_cast<std::size_t>(n), 0);
+    for (int i = 0; i < n; ++i)
+    {
+        const auto it = w.tiles.find(grid[static_cast<std::size_t>(i)]);
+        if (it == w.tiles.end())
+            continue;
+        substrate[static_cast<std::size_t>(i)] = it->second.substrate;
+        const bool s = is_sea(it->second.substrate);
+        pb.sea[static_cast<std::size_t>(i)]   = s ? 1 : 0;
+        pb.laned[static_cast<std::size_t>(i)] = (s && it->second.lane_level > 0) ? 1 : 0;
+    }
+    if (ocean_current_weight_valid(kPortLaneCurrentWeightQ) && kPortLaneCurrentWeightQ > 0)
+        pb.currents = build_ocean_currents(substrate, pb.gw, pb.gh, kPortLaneRotationSense);
+    pb.ok = true;
+    return pb;
+}
+
+/// A port's mouths: the SEA tiles on its six hex sides, raster indices ascending --
+/// where a lane from it may start or end.
+std::vector<int> port_lane_mouths(const world& w, const port_lane_body& pb, entity_id tile)
+{
+    std::vector<int> out;
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return out;
+    for (int side = 0; side < 6; ++side)
+    {
+        const hex_neighbors::coord nb = hex_neighbors::neighbour(tit->second.grid_x, tit->second.grid_y, side);
+        if (nb.gy < 0 || nb.gy >= pb.gh)
+            continue;
+        const int idx = nb.gy * pb.gw + ((nb.gx % pb.gw) + pb.gw) % pb.gw;
+        if (pb.sea[static_cast<std::size_t>(idx)])
+            out.push_back(idx);
+    }
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
+}
+
+/// The standing ports on @p body, ascending building id, with their tiles.
+std::vector<std::pair<entity_id, entity_id>> standing_ports(const world& w, entity_id body)
+{
+    std::vector<std::pair<entity_id, entity_id>> out;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        if (!port_lane_standing(b))
+            continue;
+        const auto tit = w.tiles.find(b.tile);
+        if (tit != w.tiles.end() && tit->second.body == body)
+            out.push_back({bid, b.tile});
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+/// Lay the lane from port @p lo (its tile) to port @p hi: the lane walk from any of
+/// lo's mouths to the first of hi's it reaches, entering laned water at the reuse
+/// discount, then stamped. Writes the tiles and @p pb.laned; counts into @p st.
+void lay_one_port_lane(world& w, entity_id body, port_lane_body& pb, entity_id lo_tile,
+                       entity_id hi_tile, port_lane_stats& st, port_lane_trace* trace,
+                       entity_id lo, entity_id hi)
+{
+    const std::vector<int> from = port_lane_mouths(w, pb, lo_tile);
+    const std::vector<int> to   = port_lane_mouths(w, pb, hi_tile);
+    const std::vector<int> path =
+        (from.empty() || to.empty())
+            ? std::vector<int>{}
+            : sea_walk_laned_between(pb.sea, pb.gw, pb.gh, pb.currents.empty() ? nullptr : &pb.currents,
+                                     kPortLaneCurrentWeightQ, &pb.laned, kSeaLaneReuseCostQ, from, to);
+    if (path.empty())
+    {
+        ++st.unreachable;
+        return;
+    }
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    for (const int idx : path)
+    {
+        const auto it = w.tiles.find(grid[static_cast<std::size_t>(idx)]);
+        if (it == w.tiles.end() || !is_sea(it->second.substrate))
+            continue; // the walk is sea-only; belt and braces
+        if (it->second.lane_level == 0)
+            ++st.tiles_added;
+        it->second.lane_level = std::max<std::uint8_t>(it->second.lane_level, 1);
+        pb.laned[static_cast<std::size_t>(idx)] = 1;
+    }
+    ++st.laid;
+    st.path_tiles += static_cast<long long>(path.size());
+    if (trace != nullptr)
+        trace->lanes.push_back({lo, hi, path});
+}
+
+/// Every other standing port within the lane limit of @p tile, by the port reach's
+/// own water measure (`lp_sea_walk`, bounded at the limit).
+std::unordered_map<entity_id, float> port_lane_measure(world& w, entity_id body, entity_id tile)
+{
+    return lp_sea_walk(w, body, {tile}, port_lane_limit());
+}
+
+bool within_port_lane_limit(const std::unordered_map<entity_id, float>& f, entity_id tile)
+{
+    const auto it = f.find(tile);
+    return it != f.end() && it->second > 0.0f && it->second <= port_lane_limit() + lp_full_eps;
+}
+
+} // namespace
+
+float port_lane_limit()
+{
+    return lp_full_reach[static_cast<std::size_t>(lp_network::sea)];
+}
+
+port_lane_stats lay_port_lanes(world& w, entity_id port, port_lane_trace* trace)
+{
+    port_lane_stats st;
+    const auto pit = w.buildings.find(port);
+    if (pit == w.buildings.end() || !port_lane_standing(pit->second))
+        return st;
+    const entity_id tile = pit->second.tile;
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return st;
+    const entity_id body = tit->second.body;
+    port_lane_body pb = read_port_lane_body(w, body);
+    if (!pb.ok)
+        return st;
+    st.ports = 1;
+    const auto f = port_lane_measure(w, body, tile);
+    // Ascending id of the other port; each pair walked from its LOWER id.
+    for (const auto& [other, otile] : standing_ports(w, body))
+    {
+        if (other == port || !within_port_lane_limit(f, otile))
+            continue;
+        ++st.pairs;
+        const bool port_lo = port < other;
+        lay_one_port_lane(w, body, pb, port_lo ? tile : otile, port_lo ? otile : tile, st, trace,
+                          port_lo ? port : other, port_lo ? other : port);
+    }
+    if (st.tiles_added > 0)
+        invalidate_logistics_caches(w); // lane_level moved traversal cost on the water
+    return st;
+}
+
+port_lane_stats lay_all_port_lanes(world& w, port_lane_trace* trace)
+{
+    port_lane_stats st;
+    std::vector<entity_id> bodies;
+    for (const auto& [bid, bc] : w.bodies)
+    {
+        (void)bc;
+        bodies.push_back(bid);
+    }
+    std::sort(bodies.begin(), bodies.end()); // deterministic: bodies is unordered
+    for (const entity_id body : bodies)
+    {
+        const std::vector<std::pair<entity_id, entity_id>> ports = standing_ports(w, body);
+        if (ports.size() < 2)
+        {
+            st.ports += static_cast<int>(ports.size());
+            continue;
+        }
+        port_lane_body pb = read_port_lane_body(w, body);
+        if (!pb.ok)
+            continue;
+        st.ports += static_cast<int>(ports.size());
+        // Pairs (lo, hi) in ascending order: lo outer, hi inner, both by building id.
+        for (std::size_t i = 0; i < ports.size(); ++i)
+        {
+            const auto f = port_lane_measure(w, body, ports[i].second);
+            for (std::size_t j = i + 1; j < ports.size(); ++j)
+            {
+                if (!within_port_lane_limit(f, ports[j].second))
+                    continue;
+                ++st.pairs;
+                lay_one_port_lane(w, body, pb, ports[i].second, ports[j].second, st, trace,
+                                  ports[i].first, ports[j].first);
+            }
+        }
+    }
+    if (st.tiles_added > 0)
+        invalidate_logistics_caches(w);
+    return st;
 }
 
 // ---------------------------------------------------------------------------

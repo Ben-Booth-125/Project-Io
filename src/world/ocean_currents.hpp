@@ -195,6 +195,16 @@ std::vector<int> sea_walk_laned(const std::vector<std::uint8_t>& sea, int gw, in
                                 const ocean_current_field* currents, int weight_q,
                                 const std::vector<std::uint8_t>* laned, int laned_cost_q, int from, int to);
 
+/// `sea_walk_laned` from ANY of @p from to the FIRST of @p to it settles (Ben,
+/// 2026-10-25: a port lane runs from the sea beside one port to the sea beside the
+/// other, on whichever of their hex sides the water joins). Both are raster indices;
+/// tiles off the sea are skipped. The path in walk order, its source first; empty
+/// when no water joins them. Ties resolve on (cost, raster index), as every walk here.
+std::vector<int> sea_walk_laned_between(const std::vector<std::uint8_t>& sea, int gw, int gh,
+                                        const ocean_current_field* currents, int weight_q,
+                                        const std::vector<std::uint8_t>* laned, int laned_cost_q,
+                                        const std::vector<int>& from, const std::vector<int>& to);
+
 /// The cost of the cheapest walk from any of @p sources to every tile, by the
 /// same steps (a multi-source Dijkstra); INT64_MAX where no water reaches.
 /// Sources off the sea, or out of range, are skipped.
