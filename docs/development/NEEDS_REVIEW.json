@@ -843,6 +843,41 @@
     "docs/economy/LOGISTICS.md"
    ],
    "resolution": "Ben, 2026-10-25: D. A cession takes the Pass 2b islets hung on the ceded province with it. The conquest cut-off experiment (be2b1287) is dropped."
+  },
+  {
+   "id": "NR-1078",
+   "title": "Port lanes: the calls taken laying lanes between ports",
+   "raised": "2026-10-25",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Port-lane lane (bde425bc, 6d290d3c; merged c2c2a34a)",
+   "what": "Laying a lane from every port to every port within 50 (Ben, 2026-10-25) took these calls: (1) lanes join every port whoever holds it, while points flow only along one nation's chain; (2) a port's points ride lanes only and land only on a port tile, so a coastal building with no port beside it needs a road hub (seeding added 5/3/0/2 hubs on seeds 0/1/28/46); (3) bridges are placed only within 50, since no lane spans further; (4) a pair the sea and a lake both join is laned on the sea; (5) lanes are never unlaid when a port idles or goes.",
+   "why_it_matters": "Each shapes where points reach. All follow the ruling; none was raised before building.",
+   "options": [],
+   "recommendation": "Keep all five.",
+   "files": [
+    "src/world/road_generation.cpp",
+    "src/world/logistic_points.cpp",
+    "docs/economy/LOGISTICS.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1079",
+   "title": "Novelty: lanes laid from ports in play had no owning code path",
+   "raised": "2026-10-25",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "Port-lane lane",
+   "what": "Before this, sea lanes came only from the colonial record at generation. Ports now lay lanes at seeding and on completion in play (economy_system.cpp completion day, construction.cpp for an instant port). LOGISTICS.md § 4b owns the rule; no backlog item owned the work.",
+   "why_it_matters": "A lane is now a thing the campaign creates, not only history. Flagged so the growth is chosen.",
+   "options": [],
+   "recommendation": "Accept; LOGISTICS.md § 4b owns it.",
+   "files": [
+    "src/world/road_generation.cpp",
+    "docs/economy/LOGISTICS.md"
+   ],
+   "resolution": null
   }
  ]
 }

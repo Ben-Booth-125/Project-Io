@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*55 entries — 34 open, 21 resolved.*
+*57 entries — 36 open, 21 resolved.*
 
 ---
 
@@ -324,6 +324,28 @@ A site cancelled before completion now refunds its credit cost in full; material
 > **Recommendation:** Keep both.
 
 *Files: `src/world/economy_system.cpp`, `docs/economy/PRODUCTION.md`*
+
+### NR-1078 — Port lanes: the calls taken laying lanes between ports
+*decision taken on your behalf · raised 2026-10-25 · from Port-lane lane (bde425bc, 6d290d3c; merged c2c2a34a)*
+
+Laying a lane from every port to every port within 50 (Ben, 2026-10-25) took these calls: (1) lanes join every port whoever holds it, while points flow only along one nation's chain; (2) a port's points ride lanes only and land only on a port tile, so a coastal building with no port beside it needs a road hub (seeding added 5/3/0/2 hubs on seeds 0/1/28/46); (3) bridges are placed only within 50, since no lane spans further; (4) a pair the sea and a lake both join is laned on the sea; (5) lanes are never unlaid when a port idles or goes.
+
+**Why it matters.** Each shapes where points reach. All follow the ruling; none was raised before building.
+
+> **Recommendation:** Keep all five.
+
+*Files: `src/world/road_generation.cpp`, `src/world/logistic_points.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-1079 — Novelty: lanes laid from ports in play had no owning code path
+*novel-work · raised 2026-10-25 · from Port-lane lane*
+
+Before this, sea lanes came only from the colonial record at generation. Ports now lay lanes at seeding and on completion in play (economy_system.cpp completion day, construction.cpp for an instant port). LOGISTICS.md § 4b owns the rule; no backlog item owned the work.
+
+**Why it matters.** A lane is now a thing the campaign creates, not only history. Flagged so the growth is chosen.
+
+> **Recommendation:** Accept; LOGISTICS.md § 4b owns it.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
 
 ---
 
