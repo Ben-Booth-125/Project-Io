@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*54 entries — 34 open, 20 resolved.*
+*55 entries — 35 open, 20 resolved.*
 
 ---
 
@@ -324,6 +324,21 @@ A site cancelled before completion now refunds its credit cost in full; material
 > **Recommendation:** Keep both.
 
 *Files: `src/world/economy_system.cpp`, `docs/economy/PRODUCTION.md`*
+
+### NR-1077 — A major nation's capital on a 3-tile landlocked enclave leaves its whole economy off the chain (seed 1)
+*question · raised 2026-10-25 · from Port-link lane, seed 1 census on main 3361ccf9*
+
+Seed 1's 12 unconnectable consumers all belong to one major nation. Its capital stands on a 3-tile enclave of its own ground, wholly surrounded by a neighbour's land and touching no coast. The nation's other 1837 dry tiles form one coastal landmass about 46 tiles away, where all 12 consumers stand. The chain never crosses a neighbour's land and a port needs a coast joined to the capital, so the port link cannot serve them. Its Logistic Point pool is the capital hub alone (120); 1837 of 1840 dry tiles get nothing.
+
+**Why it matters.** A major nation the player may pick opens with its economy dark. LOGISTICS.md already counts ground a neighbour cuts off rather than forcing it, so this is lawful, but it reads as a generation defect.
+
+- A) Nation generation seats the capital on the nation's largest landmass when the seat ground is a tiny enclave (NATION_GENERATION.md).
+- B) A nation gets a second chain anchor on its main ground (a new logistics rule; today the capital anchors all, Ben 2026-10-21).
+- C) Accept it as geography and keep counting it.
+
+> **Recommendation:** A. It fixes the cause, keeps one anchor per nation, and keeps the capital where the nation actually is.
+
+*Files: `src/world/nation_generation.cpp`, `docs/generation/NATION_GENERATION.md`, `docs/economy/LOGISTICS.md`*
 
 ---
 
