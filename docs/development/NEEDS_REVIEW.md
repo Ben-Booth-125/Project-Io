@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*50 entries — 32 open, 18 resolved.*
+*52 entries — 34 open, 18 resolved.*
 
 ---
 
@@ -299,6 +299,32 @@ On the folded world (BL-1402), seed 46's 4 majors place NO production building i
 > **Recommendation:** Keep it off and fold the question into BL-1409, whose measurement (treasury trajectory and seed 46) is the same question of how a nation that owns every plant spends.
 
 *Files: `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`, `src/world/spawn_seat.cpp`*
+
+### NR-1073 — Construction from placement: the first clearing pays two quarters at once, and more sites stall
+*question · raised 2026-10-25 · from Construction-in-days lane (c7e2b818, merged 6322792b), construction_stall vs main 2967c7cf*
+
+Per your ruling, a site builds on credit from its placement day, and its first clearing pays the credit days plus the quarter ahead. Every gate passes (market_viability FULL: G1 92.0, G1t50 85.0 - at target for the first time, G1b 2.6, G2 147.8 against 165.8 before, G3 100). But construction_stall reads fewer completions per seed: 721/410/227 against 753/458/324 (seeds 0/43/10). Sites stalled 10+ ticks: 51/81/78 against 32/23/72, and the stall verdicts move from short to contended. Two mechanisms in the code, neither yet isolated by measurement: (1) the credit rate reads the shelf as it stands and reserves nothing, so every site placed in one tick reads the same stock and all get full rate; (2) at the next clearing each owes 90 days in arrears plus 90 ahead, and one rate throttles both, so a short shelf slows the work ahead as well as the debt.
+
+**Why it matters.** A build that should finish a quarter sooner can finish later, because the lumped first draw meets a contended shelf. The ruling is honoured as written; the open question is how the debt competes with the work ahead.
+
+- A) Ahead first: the clearing sets the rate on the quarter ahead alone, and pays arrears only from what is left. The debt carries forward until paid; a building may complete still owing it.
+- B) Reserve on credit: a credit site claims its share of the shelf, so later placements in the same tick read what is left. This keeps the lumped draw but stops the over-promise.
+- C) Keep as built, and record the stall figures as the cost of the ruling.
+
+> **Recommendation:** A, then measure. It removes the throttle on forward work without changing what is owed. B fixes only the over-promise. Each is a small change in run_construction.
+
+*Files: `src/world/economy_system.cpp`, `tools/verify/construction_stall.cpp`, `docs/economy/PRODUCTION.md`*
+
+### NR-1074 — A site road may bridge at most 2 water tiles; seed 28 keeps 97 overseas sites unconnectable
+*decision taken on your behalf · raised 2026-10-25 · from Site-join lane (483fc8ab), lp_coverage_census*
+
+The generation site-join (every building joined to its nation's capital road network) may cross a strait as a bridge of at most 2 water tiles (kMaxCrossingTiles = 2; 3 was tried). With it, seeds 0 and 46 have no unconnectable consumer; seed 28 keeps 97, on ground 8-9 water tiles from the capital. Those need a sea link (the port seeding), not a longer bridge.
+
+**Why it matters.** A longer bridge cap would join more sites but lays roads across open sea, which reads wrong. The 97 sites on seed 28 get no Logistic Points until a sea bridge carries them.
+
+> **Recommendation:** Keep 2. Carry seed 28 as follow-up work: the port seeding bridges an overseas site group to its capital by sea.
+
+*Files: `src/world/road_generation.cpp`, `src/world/logistic_points.cpp`*
 
 ---
 
