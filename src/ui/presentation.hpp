@@ -103,6 +103,14 @@ inline constexpr ImU32 positive = IM_COL32(110, 200, 120, 255); ///< Profit, sur
 inline constexpr ImU32 negative = IM_COL32(216, 100,  96, 255); ///< Loss, deficit, drop.
 inline constexpr ImU32 neutral  = IM_COL32(170, 175, 185, 255); ///< No change / not applicable.
 
+// --- the placement lens (Ben, 2026-10-25; LENSES.md § The placement lens) ---
+// A site the chosen building may take, a site with no Logistic Points operating
+// (amber: it will build, but it will not run until a source reaches it), and the
+// dimming of every tile that is neither.
+inline constexpr ImU32 site_valid        = IM_COL32( 96, 210, 120, 255); ///< A tile the Build door accepts.
+inline constexpr ImU32 site_no_logistics = IM_COL32(236, 168,  56, 255); ///< Accepted, but no Logistic Points reach it.
+inline constexpr ImU32 site_dim          = IM_COL32(  0,   0,   0, 255); ///< Every other tile, darkened toward this.
+
 // --- interaction states (the shared selection / hover / pinned convention) ---
 inline constexpr ImU32 selection = IM_COL32(255, 255, 255, 255); ///< The selected entity.
 inline constexpr ImU32 hover     = IM_COL32(120, 190, 255, 255); ///< The entity under the cursor.

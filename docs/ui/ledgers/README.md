@@ -39,7 +39,7 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
 | [acquisitions.md](acquisitions.md) | **Retired** with the buyout (Ben, 2026-10-23) — the doc is a record | — | — |
 | [market.md](market.md) | Goods | Goods (the flattened price table) / Trades | `market`, fixed |
 | [convoys.md](convoys.md) | Convoys in flight | one flat view (Routes and History proposed, neither backed by a store) | `supply_routes` |
-| [construction.md](construction.md) | Buildings | Buildings (estate by type) / Construction (queue + build bar) | **none** — `opportunity` is refused, see below |
+| [construction.md](construction.md) | Buildings | Buildings (estate by type) / Construction (queue + site ledger + build bar) | **the placement lens** while a building is chosen on the Construction view — a mode of the build flow, not an `overlay_mode` |
 | [selection.md](selection.md) | — (polymorphic by kind) | tile / province / body / building / unit / battle / market / nation | contextual (none) |
 | [tile_ledger.md](tile_ledger.md) | last-left view | Story / Chain / Ages / Tectonics | none |
 
@@ -51,11 +51,12 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
   ledger of its own.
 - **`overlay_mode::industry` is not a sector lens**: it paints the AI-owned nation substrate, not the
   player's sector mix, so it is the wrong pairing for any surface asking "what am I in".
-- **`overlay_mode::opportunity` is refused as a ledger pairing** (Ben, 2026-08-29). A per-tile
-  best-margin field answers "where should I build next" outright, and a player who follows it has
-  stopped choosing. `CONCEPT.md` § Player identity holds the rule and the qualification that
-  followed it the same day: rank where the top row is one input among several, never where the top
-  row simply IS the move. Market prices rank; build sites do not.
+- **Build sites rank by estimated profit** (Ben, 2026-10-25, overturning the 2026-08-29 refusal of a
+  best-margin build-opportunity surface). The Construction view's site ledger lists every tile that takes
+  a chosen building, sorted by profit, and the placement lens marks them on the map. `CONCEPT.md`
+  § Player identity holds the rule that stands: the interface may rank and compare, and never acts for
+  the player. The retired `overlay_mode::opportunity` stays retired — the placement lens is keyed to a
+  chosen building, not a per-tile best-of-everything field.
 - Clean, well-surfaced overlaps: standing orders belong to the Market ledger (where they live), not
   Construction; the History ledger carries no market section. **Convoys belonged to neither** — it
   is cargo in transit, `SUPPLY.md`'s subject rather than `MARKETS.md`'s, and it is a rail ledger of

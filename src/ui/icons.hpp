@@ -266,6 +266,18 @@ void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of the body and wheels; hubs take the dark outline.
 void throughput(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the **no-logistics flag** (Ben, 2026-10-25): the Logistics lens's truck
+/// (`throughput`) at 0.8 r with ONE diagonal strike across it, lower-left to
+/// upper-right, drawn dark-then-colour like `convoy`'s strokes. Says "no Logistic
+/// Points operate here": a building would stand but not run. A single strike, never
+/// an X — the X is the chrome's close affordance (ICONS.md § Settled collisions).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill of the truck and the strike (`palette::site_no_logistics`).
+void no_logistics(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the **Company** lens glyph (BL-1225) — a **briefcase**: a filled case,
 /// wider than tall, with a stroked carry handle above and a dark clasp band across
 /// it. The lens reads background firms, the Corporation lens's mirror, and the two

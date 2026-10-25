@@ -827,6 +827,19 @@ void throughput(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircleFilled({ centre.x + bw * 0.62f, bed }, wr * 0.42f, outline);
 }
 
+void no_logistics(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // The Logistics lens's own truck, so the flag reads as "logistics" with no
+    // decoding, struck once. Smaller than the box so the strike has room to show
+    // past both ends of the vehicle.
+    throughput(dl, centre, r * 0.80f, colour);
+    const ImVec2 a{ centre.x - r * 0.95f, centre.y + r * 0.85f };
+    const ImVec2 b{ centre.x + r * 0.95f, centre.y - r * 0.85f };
+    const float  t = std::max(1.0f, r * 0.20f);
+    dl->AddLine(a, b, outline, t + 2.0f); // the dark under-stroke carries it on any ground
+    dl->AddLine(a, b, colour, t);
+}
+
 void company(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // A briefcase. Landscape case + handle, so it cannot be read as a variant of

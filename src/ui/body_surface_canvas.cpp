@@ -2875,6 +2875,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const bool          suitability_affine_kind =
         (suitability_btype == building_type::extraction_site);
 
+    // THE PLACEMENT LENS (Ben, 2026-10-25; LENSES.md § The placement lens). While the
+    // Construction view's site finder has a building chosen, every tile is classed by
+    // the finder's own evaluation (construction_sites.cpp, cached off the frame stamp)
+    // - a site the Build door accepts, a site no Logistic Points reach, or neither -
+    // so the map and the site ledger beside it are one answer in two registers. A
+    // mode of the build flow, not an `overlay_mode`: it composites over whatever lens
+    // is up, exactly as the suitability wash above does, and a saved view binding
+    // never holds it. The canvas only READS the class field; it decides nothing.
+    const site_finder_state& site_f = state.site_finder;
+    const bool site_active = site_f.live && site_f.body == state.active_body
+        && site_f.gw == gw && site_f.gh == body.grid_height
+        && site_f.cls.size() == static_cast<std::size_t>(gw) * static_cast<std::size_t>(body.grid_height);
+    const auto site_class = [&](int x, int y) -> std::uint8_t {
+        return site_f.cls[static_cast<std::size_t>(y) * static_cast<std::size_t>(gw)
+                          + static_cast<std::size_t>(x)];
+    };
+    state.site_finder.map_marks = 0;
+
     // ARMED ROAD TARGETING (BL-1370; construction.md § "A road is built from a road
     // to a tile, in two presses"). The road row's press armed a TILE and a TIER; the
     // crossings it may legally reach are resolved here, once, from the rules
@@ -3857,6 +3875,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (any_dep && best == suitability_target)
                     fill = lerp_colour(fill, IM_COL32(100, 200, 100, 255), 0.24f);
             }
+        }
+        // The placement lens (Ben, 2026-10-25): the site finder's class, the same
+        // strengths as the wash over the bake below.
+        if (site_active && !selected)
+        {
+            const std::uint8_t sc = site_class(tile.grid_x, tile.grid_y);
+            fill = (sc == 0) ? lerp_colour(fill, palette::site_dim, 0.45f)
+                 : (sc == 1) ? lerp_colour(fill, palette::site_valid, 0.30f)
+                             : lerp_colour(fill, palette::site_no_logistics, 0.40f);
         }
 
         // Landform relief (BL-231). Composited HERE — after every lens tint and the
@@ -5357,6 +5384,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             wash(IM_COL32(100, 200, 100, 61)); // 0.24
                     }
                 }
+                // The placement lens (Ben, 2026-10-25): compute_tile_fill's
+                // strengths as alpha washes over the bake.
+                if (site_active && !selected)
+                {
+                    const std::uint8_t sc = site_class(t_col, t_row);
+                    wash(sc == 0 ? with_alpha(palette::site_dim, 0.45f)
+                         : sc == 1 ? with_alpha(palette::site_valid, 0.30f)
+                                   : with_alpha(palette::site_no_logistics, 0.40f));
+                }
                 if (vision < 1.0f)
                 {
                     // fog_dim's wash (lerp toward (8,10,16) by k_fog_strength*(1-vision)),
@@ -5761,6 +5797,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                     ImDrawFlags_Closed, 2.5f);
                     ++state.construction_ui.road_drawn;
                 }
+            }
+
+            // THE NO-LOGISTICS FLAG (Ben, 2026-10-25): a site the chosen building
+            // could take but no Logistic Point source reaches carries the struck
+            // truck, so the amber wash is never the only channel saying it. Only
+            // where the glyph has room to read; below that the wash carries it.
+            if (site_active && revealed && draw_r >= 8.0f && site_class(t_col, t_row) == 2)
+            {
+                icons::no_logistics(dl, {cx, cy}, std::min(draw_r * 0.42f, 11.0f),
+                                    palette::site_no_logistics);
+                ++state.site_finder.map_marks;
             }
 
             // Province outline (BL-511). The OUTER boundary of the cell, drawn

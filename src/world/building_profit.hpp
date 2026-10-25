@@ -118,9 +118,23 @@ building_profit estimate_building_reading(const world& w, const recipe_registry&
 ///                  are still valued at the posted price. Pass `nullptr` (the
 ///                  default) to price inputs at the posted price, as the
 ///                  construction ledger does.
+///
+/// @param lp_cover  Optional (Ben, 2026-10-25; LOGISTICS.md § Logistic Points, "half
+///                  the points, half the output"). The share of the building's point
+///                  need its tile's routed cover lets the pool grant (`lp_route_to(...)
+///                  .cover`, in [0,1]). The economy step folds the granted fraction into
+///                  the building's labour, so its OUTPUT and the inputs that output
+///                  takes fall with it while maintenance and wages do not; this applies
+///                  exactly that to the run term. Infrastructure (no run) is unaffected.
+///                  It assumes the pool itself is not short, which is the only per-tile
+///                  part of the grant. The default 1 is "not modelled" and leaves every
+///                  existing caller - the rival scorer above all, whose LP read is a
+///                  separate gate - byte-identical; the Build door and the site ledger
+///                  pass the tile's real cover, so the two surfaces quote one figure.
 building_profit estimate_prospective_profit(const world& w, const recipe_registry& reg,
                                             entity_id tile_id, building_type type,
                                             resource_type target,
                                             std::uint16_t recipe_id = no_recipe,
                                             const building_component* existing = nullptr,
-                                            const std::array<float, resource_count>* input_unit_cost = nullptr);
+                                            const std::array<float, resource_count>* input_unit_cost = nullptr,
+                                            float lp_cover = 1.0f);

@@ -52,6 +52,11 @@ by the cycle without a literal being kept in step by hand.
 
 Identity colours live in `presentation.hpp`.
 
+Two build-flow surfaces mark the map without being `overlay_mode` values, so they are on neither
+the strip nor the cycle: the **placement lens** (§ The placement lens), armed by choosing a
+building in the Construction view's site finder, and the **placement-suitability surface**
+(§ Placement-suitability surface), armed by placement mode.
+
 ---
 
 ## Rung applicability
@@ -1068,3 +1073,52 @@ composited 24% toward green. Affinity applies to **extraction only** — a tile 
 extractable resource is the armed target reads as optimal; other building types carry no
 terrain-affinity signal, so a valid tile stays uncoloured. The armed-from tile is skipped (it is
 already outlined as the selection).
+
+## The placement lens *(not a strip lens)*
+
+**Intent.** *Where on my ground could this building go, and which of those tiles have no logistics?*
+The map half of the Construction view's site ledger (`ledgers/construction.md` § The site ledger;
+Ben, 2026-10-25: *"we should use a lens to show which tiles are valid … and flag tiles which do not
+currently have logistics operating"*). Building first: the player picks a building in the view's
+site finder, and the lens marks exactly the tiles the ledger beside it lists.
+
+**A mode of the build flow, not an `overlay_mode`.** It is armed by choosing a building, not from
+the strip; it composites over whatever strip lens is up, as the suitability surface above does; and
+no saved view binding ever holds it, so the enum and the save are untouched. It carries no key: the
+ledger beside it is its legend, and its caption counts the flagged tiles under the same glyph.
+
+**Trigger.** Live while the Construction ledger draws its **Construction** view with a building
+chosen, on the Planetary rung, for the active body. Switching to the Buildings view or another rung
+leaves the map plain the same frame; choosing the chosen building again, or **None**, clears it; and
+closing the ledger clears the choice (§ The other direction: a ledger's lens disarms on its close
+edge). A press on the map under it **selects** as it would without it — the lens never claims the
+click, unlike armed placement mode — so a tile picked off the map reaches its Build door exactly as
+a ledger row does.
+
+**What is marked.** Each tile is one of three classes, read off the site finder's own evaluation
+(`construction_sites.cpp`), never re-derived by the canvas:
+
+- **A site** — the player's own ground, and the Build door would accept the chosen building there:
+  `placement_rules::can_place_in_world` with the player's actor, the recipe's air, and the treasury
+  against `construction_capex`. Composited 30 % toward `palette::site_valid` (green).
+- **A site with no Logistic Points operating** — a site whose routed cover is zero
+  (`lp_route_to(...).cover == 0`: no source reaches it, or one does and is not tied to the capital).
+  Composited 40 % toward `palette::site_no_logistics` (amber), and, where the tile is drawn at 8 px
+  radius or more, the **no-logistics flag** (`icons::no_logistics`, the struck truck) at its centre,
+  so colour is never the only channel. Below that size the wash carries it alone.
+- **Everything else** — not the player's ground, or the door would refuse it there (including a
+  site the treasury cannot cover). Darkened 45 % toward black.
+
+The selected tile is skipped, as the suitability surface skips it: it is already outlined.
+
+**Cost.** The canvas reads one byte per tile from a class field the finder rebuilds only when its
+key moves (the chosen building, the body, the treasury, the reach budget, and the frame stamp: the
+economy tick, the building count, the ground's owners, the logistics generation). The wash rides the
+existing wash channel — the fill path's lerp, or a translucent wash over the bake — so the lens adds
+no draw pass of its own.
+
+**Determinism.** A derived read for the interface. It is never serialised and the simulation reads
+none of it.
+
+**Interaction notes.** Planetary only; no selector of its own (the site finder's picker is the
+selector). Verified by `scripts/verify/construction_sites.lua`.
