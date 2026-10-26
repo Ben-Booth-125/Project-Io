@@ -110,8 +110,9 @@ small and thematically tight — a foothold in one slice of one chain.
   `corporation_generation.cpp`) are **extraction 3–4**, **processing 2–3**, **trade 1–2**. Ground
   too cramped or deposit-poor yields fewer — the count is a ceiling, not a guarantee.
 - **Industry gathers where logistics is cheap (Ben, 2026-10-26).** A processing or trade charter
-  anchors at its nation's **capital**, where the Logistic Point chain is rooted and points are
-  cheapest. Ties go to the lower tile index. The anchor tile is
+  anchors at its nation's **capital** first, where the Logistic Point chain is rooted and points
+  are cheapest; then at the nation's **market centres** in order of chain distance to the capital,
+  nearest first, where stacked points pay. Ties go to the lower tile index. The anchor tile is
   searched in a window around that anchor, then its region; "inside a region" is
   `nearest_region`: regions are anchor points, not stored tile sets. The window and region search
   are BL-283 (region-anchored holdings); what changed is which place a charter anchors at.
@@ -183,9 +184,10 @@ small and thematically tight — a foothold in one slice of one chain.
     `chain_infeasible` (the windows held ground, none of it within reach of a chain), distinct from
     `window_exhausted` (no ground at all).
 
-**Buildings stack on population centres (Ben, 2026-10-26).** A population centre's tile is where
-labour, demand and the rail stations gather, so on such a tile a charter may place buildings up to
-the tile's stack cap. Every other tile begins with at most one building. The one-site-per-tile limit on construction in play is a separate
+**Buildings stack only on station cities (Ben, 2026-10-26).** Rail delivers points station to
+station, so a city tile holding a railway station is where stacked buildings draw the most from
+the line. On such a tile a charter may place buildings up to the tile's stack cap. Every other tile
+begins with at most one building. The one-site-per-tile limit on construction in play is a separate
 rule (`../economy/PRODUCTION.md`); generation's opening buildings stand complete.
 
 ### Pass 3b — HQ designation & border range
