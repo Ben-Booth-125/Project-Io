@@ -221,9 +221,10 @@ charter spreads and a deposit-poor one stacks. A window with no deposit room lef
 deposit beyond it, as any other slot does. The cap is the
 placement rules' own, on two axes that never share a slot: extraction sites of one target up to the
 deposit's richness-bound stack capacity, and every other building together up to the ground's
-non-extraction cap (`../economy/PRODUCTION.md` § Building stacks). A stacked site yields its rank's
-share, as it does in play, and every generation reading of nominal output counts it at that share,
-so the spare-input rule never credits supply the stack will not make. The one-site-per-tile limit on construction in play is a separate
+non-extraction cap (`../economy/PRODUCTION.md` § Building stacks). A stacked site yields in full,
+as it does in play (Ben, 2026-10-26: the stack debuff is retired), and every generation reading of
+nominal output counts it so, through the same rank reading play uses, so the spare-input rule never
+credits supply the stack will not make. The one-site-per-tile limit on construction in play is a separate
 rule (`../economy/PRODUCTION.md`); generation's opening buildings stand complete.
 
 ### Pass 3b — HQ designation & border range
