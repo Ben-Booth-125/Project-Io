@@ -119,7 +119,7 @@ lens is asking:
 | **Ground** | Logistics | the tile's two numbers stacked — *Supplied N LP/tick* over *Requested M LP/tick* (on a road, the routed flow through it; elsewhere the points reaching the tile over its buildings' need; Ben, 2026-10-24) — then what its buildings consumed; then the network that reaches it best with its traversal cost to the nearest source, and a full-reach / fade why-line — the why behind the drawn number |
 | **Tile** | *(default)* | header, habitability, and the landform's movement-cost multiplier (`landform_logistics_cost`) when not plains |
 | **Building** (player) | any | type, target/recipe line, workforce, an operational why-line (idle / understaffed / active) |
-| **Building** (rival) | any | type + owner emblem only — production/stockpile stay private (the competitor-visibility rule, DISCOVERY.md) |
+| **Building** (rival) | any | type + owner nation only — production/stockpile stay private (the competitor-visibility rule, DISCOVERY.md) |
 
 Every tile variant shares the **terrain header** — `composition · landform`,
 with plains left unnamed as the baseline — so the baked landform forms are

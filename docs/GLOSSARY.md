@@ -186,6 +186,9 @@ The navigation **anchor** — the body or tile the canvas zoom ladder is current
 **Focus (state)**
 The entity **under the pointer** in the current frame — the transient hover target that drives the tooltip / hover card. Distinct from both Active and Selection. See `docs/ui/SELECTION.md`.
 
+**Economic focus**
+A **nation's** character field — extraction, processing or trade — derived from the regions it settled during industrialisation (`docs/generation/NATION_GENERATION.md`). The build scorer's focus weight reads it (Ben, 2026-10-26; `docs/ai/AI_OPPONENT.md` § 5, Scoring). It replaces the retired corporation's *industrial focus*. Never shortened to "focus", which is the hover state above.
+
 **Sticky card (glance-then-stick)**
 The hover-card model (BL-230, glance-then-stick; `src/ui/hover_card.hpp`). A stable hover first shows a **glance** card that tracks the live cursor (0.5 s of stable hover before it appears); the card then **sticks** — its anchor freezes so the pointer can travel onto it — while never capturing the pointer, so canvas hover and click still resolve to whatever lies beneath. Hovering never opens the Selection band; that is the click's job alone.
 

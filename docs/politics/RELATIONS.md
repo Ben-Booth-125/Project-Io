@@ -29,7 +29,7 @@ This table is the reason the document exists. Read it before touching any of the
 | **Stance** | *How does A feel about B?* | hostile (directed) / friend (symmetric) | **declared** | interdiction, battle, march; passage and immunity |
 | **Sentiment** | *What has B's conduct earned with A?* | two floats (Access, Trust) per (observer nation, subject nation) | **derived** | informs a declaration; never makes one |
 | **Reputation** | *Will B do business with A again?* | **a VIEW of sentiment's Trust**, not a store | **earned** | nothing — its procurement-quote consumer retired (§ 2) |
-| **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per actor | **authored** | its procurement-quote consumer retired (§ 3) |
+| **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per actor | **authored** | B's goods entering A's markets (§ 3) |
 | **Standing** | *How strong is A?* | five bands on three axes | **derived** | nothing — it is a readout |
 
 **Settled 2026-08-22 (Ben, ruling on NR-520): sentiment is the substrate.** The model is **two
@@ -311,9 +311,13 @@ read-back).
 
 `world::corp_embargo_conditions` — a `condition_set` per actor, serialised in the world snapshot.
 When the predicate fires the embargoing party refuses the other outright, and the refusal is
-conduct: `embargo_imposed` is its sentiment factor. Its one consumer was `request_quote`, the
-named-supplier quote, which retired with the corporations (Ben, 2026-10-23); what an embargo
-between nations gates on the shelf is open (§ Open questions).
+conduct: `embargo_imposed` is its sentiment factor. Its first consumer was `request_quote`, the
+named-supplier quote, which retired with the corporations (Ben, 2026-10-23).
+
+**An embargo bars a nation's goods from entering your markets (Ben, 2026-10-26).** When A embargoes
+B, no cargo B owns lands in a market on A's ground. It is a one-way bar: it does not stop A's goods
+entering B's markets, which would be B's embargo to author. It reads at the same border the import
+tariff reads (`../economy/MARKETS.md` § Tariffs) — a tariff prices B's goods in; an embargo refuses them.
 
 An embargo's **author** is a law — it is the relationship family of BL-155's four-family taxonomy.
 
@@ -331,9 +335,9 @@ not how coarse the number is but **whether there is one at all**:
   observable — buildings are visible on canvas, market supply/demand aggregates are the deliberate
   public signal (`DISCOVERY.md` § Competitor visibility). Nothing was ever hidden about them
   except by the banding, so nothing is lost by printing them.
-- **Capital is exact for your own nation.** Its disclosure for every other actor followed the
-  ownership class, which retired with the firms (Ben, 2026-10-23); whether another nation's
-  treasury is shown is open (§ Open questions).
+- **Capital is exact for your own nation, and absent for every other.** A rival nation's treasury
+  is private; its GDP is public (Ben, 2026-10-26; `../economy/FINANCE.md` § Disclosure). The capital
+  axis reads a figure only for the reader's own nation.
 
 **It is still deliberately NOT unified with the build scorer** (`corp_ai.cpp`). The AI optimises an internal
 ground-truth quantity; this is a published read. Unifying them would make every rival directly
@@ -363,12 +367,6 @@ It retired with the corporations; no actor is left for a nation to read at that 
 3. **Are rival-vs-rival declarations visible to the player?** A BL-068 (competitor-visibility)
    question the signalling ruling leaves open.
 
-4. **What does an embargo between nations gate?** Its procurement-quote consumer retired with the
-   named supplier (Ben, 2026-10-23).
-
-5. **Is another nation's treasury shown on Standing's capital axis?** The ownership-class
-   disclosure it followed retired with the firms (Ben, 2026-10-23).
-
 ---
 
 ## Where the parts live
@@ -380,7 +378,7 @@ It retired with the corporations; no actor is left for a nation to read at that 
 | The relational substrate | `src/world/sentiment.{hpp,cpp}`; the table on `world.hpp` § `sentiment` |
 | Reputation (a **view**) | `src/world/world.hpp` § `procurement_reputation` / `note_conduct`; written from `economy_system.cpp` (completion) and `corp_command.cpp` (cancellation) |
 | The authored factor weights and decay | `src/world/recipe_registry.hpp` § `seed_procurement_sentiment`, `sentiment()`; loaded from `economy.sentiment` in `scripts/economy.lua` |
-| Embargo | `src/world/world.hpp` § `corp_embargo_conditions`; read in `corp_command.cpp` § `request_quote` |
+| Embargo | `src/world/world.hpp` § `corp_embargo_conditions`; the bar reads at a market's arrival border (`../economy/MARKETS.md` § Tariffs) |
 | Standing bands | `src/world/standing.{hpp,cpp}` |
 | Interdiction gate | `src/world/supply_system.cpp` |
 | Battle engagement gate | `src/world/battle_system.cpp` |

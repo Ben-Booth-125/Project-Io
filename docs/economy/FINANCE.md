@@ -347,6 +347,11 @@ not part of the design.
 could be bought, and no firm remains. A nation always reads its own return. The banded standing read
 stays retired (Ben, 2026-08-26).
 
+**A rival nation's treasury is private; its GDP is public (Ben, 2026-10-26).** The treasury is what
+the state holds, and only the state reads it. GDP is what the nation's ground makes
+(`docs/politics/NATIONS.md` § GDP), and it is the public measure of a nation's weight. Every surface
+that names another nation may read its GDP, and never its treasury.
+
 ## Whole-firm acquisition — the buyout
 
 **Retired (Ben, 2026-10-23).** A buyout acquired a firm whole, priced from its filed returns. With

@@ -786,16 +786,18 @@ linear median 0.106, max 2.81.
 **A road tracks the build curve by construction** and moves with it: it is priced *under* the curve
 (`0.3 × net / build_cost`) because a road earns no revenue itself, it unlocks a future build's.
 
-The `strategy_weight` biases toward the actor's generated **industrial focus**, giving
-distinct-but-legible personalities for free. The focus was a corporation's specialist premise,
-retired with the corporations (Ben, 2026-10-23); whether a nation carries one is open. A **solvency
+The `strategy_weight` biases toward the actor's **economic focus**, giving distinct-but-legible
+personalities for free. The focus was once a corporation's specialist premise, the industrial
+focus; with the corporations retired (Ben, 2026-10-23) the build scorer keeps its focus weight,
+and the focus it reads is now the nation's economic focus (Ben, 2026-10-26) — the character field
+`NATION_GENERATION.md` derives (extraction / processing / trade). A **solvency
 gate** (cash − committed spend > reserve floor, `corp_reserve_floor`) vetoes any spend that breaks
 the floor; stage B layers priority buckets and predictive spending over it (§ 2B).
 
 ### 2B. Stage B — strategy, priority buckets, predictive spending
 
 - **Strategy layer.** `corp_strategy` is a named alias of `industrial_focus` — the actor's
-  generated focus (extraction / processing / trade) IS its strategy, kept as its
+  economic focus (extraction / processing / trade), read onto the same three values, IS its strategy, kept as its
   own concept so the bias is legible and can diverge from the generation-time focus later
   without a signature break. `focus_weight` biases build/survey scores by this strategy.
 - **Priority buckets** (`corp_priority_bucket`: `must_have` / `should_have` / `nice_to_have`),

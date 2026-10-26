@@ -684,6 +684,10 @@ build already stands — distinct from where people live (the population-centre 
 where labour is efficient (Population). One of a three-layer read: Settlements (discrete
 markers) · Industry (this lens) · You (identity chrome).
 
+**Kept, re-subjected (Ben, 2026-10-26).** The lens survives the corporation's retirement. Its
+subject is the plants of nations other than the player's, and nothing else: the player's own
+plant never tints it.
+
 **Data definition (re-subjected, Ben, 2026-10-23).** The lens reads the **buildings owned by
 nations other than the player's** standing on each tile of the active body, taken from the
 economy report's `building_report` rows. A building's owner is always its ground's nation

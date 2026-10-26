@@ -190,7 +190,7 @@ has no business here.
 | 3 | Some conflicts are ongoing, mostly proxy wars in polities left behind or decolonised | A standing war condition on provinces | Beat 3, and the price gap it builds between great powers |
 | 4 | A culture lens: primary culture per province, a secondary as a checkered fill when close | Culture shares read onto provinces | Beat 2 moves culture into cities |
 | 5 | Wealth inequality, a tangible market cap per market, GDP per nation | Derived readings over the seeded economy | Beats 1 and 2 concentrating output |
-| 6 | Political systems and armies — simple stubs; no nation opens ahead in technology (Ben, 2026-10-10) | A regime field, garrison strength | The works lean, carried force |
+| 6 | Political systems and armies — simple stubs; no nation opens ahead in technology (Ben, 2026-10-10) | A regime field, garrison strength | Charter reach, carried force |
 | 7 | Working international markets: shipping far, over sea or land, often beats the nearest market | Price gaps with visible causes, and inherited trade relationships | Specialisation, preference, depletion, tariffs, colonial ties |
 
 ### 1. A dense industrial web, and markets that stock what their people want
@@ -415,7 +415,7 @@ already produces, so the campaign has a place to grow them later.
 | Stub | PROPOSED source | Lands in |
 |---|---|---|
 | **Technology** | None: the history runs no tree and spends no research, so every nation opens holding nothing (Ben, 2026-10-10; `trees/TREES.md`) | The nation, which holds technology from a common start (`../economy/RESEARCH.md` § Who holds technology) |
-| **Political system** | The works lean (§ Beat 1), charter reach, whether the polity was ever a subject, and whether it fought a world war | One regime field per nation, beside the three character enums in `NATION_GENERATION.md` |
+| **Political system** | Charter reach, whether the polity was ever a subject, and whether it fought a world war | One regime field per nation, beside the three character enums in `NATION_GENERATION.md` |
 | **Armies** | Carried `army_stock` and navy, and beat 1's mechanised force | Nation garrison strength, which otherwise sizes from a treasury seeded at zero |
 
 Regime names are invented, never Earth labels (the standing names rule).
@@ -546,13 +546,12 @@ busiest road corridors, and a major's line may reach a minor's market city, so r
 trade actually flows between. Track on another nation's ground belongs to that nation, as ownership
 always follows ground (`../politics/NATIONS.md` § Own ground).
 
-**The works lean: some polities spend into rail and force, others stockpile and charter.** That is
-a derived disposition, not a flag, and it is why two equally industrial powers open the campaign
-with different industrial webs. **As ruled it was derived from charter reach (Ben, 2026-10-10,
-NR-1032):** the share of the realm's processing plant held by chartered firms at the fold, a realm
-whose firms held most of it leaning *Private Works* and one whose state held it leaning *State
-Arsenal*. Every building is now its nation's (Ben, 2026-10-23), so that share has no subject; what
-the lean is derived from is an open question (§ Open questions).
+**The works lean is retired (Ben, 2026-10-26).** It was a derived disposition: the share of a
+realm's processing plant held by chartered firms at the fold, a realm whose firms held most of it
+leaning *Private Works* and one whose state held it leaning *State Arsenal* (Ben, 2026-10-10,
+NR-1032). There are no corporations, and every building is its ground's nation's (Ben, 2026-10-23),
+so the share is always the whole plant and the fork has nothing to split. Two equally industrial
+powers still open on different webs: each city's spend-or-stockpile choice above is what differs.
 
 **An industry point is a second currency beside the treasury, and that cost is accepted.** It
 earns its place because it is located and the treasury is not spread to cities; the alternative —
@@ -878,7 +877,7 @@ prices. Every property in Part I needs a stated rule for crossing that gap.
 | Corridor throughput and rail | Road tiers on tiles; rail track and stations owned by the nation whose ground they stand on | The existing road stamp; rail as its own network (`../economy/LOGISTICS.md` § 4c) |
 | Held-and-worked duration, class, throughput | `tile_component::resource_remaining` | The depletion formula (§ Spend is estimated at the end) |
 | Standing wars and patron links | A war condition on provinces | Property 3 |
-| Works lean, army stock | Regime, garrisons | Property 6's stubs; no technology crosses (Ben, 2026-10-10) |
+| Army stock | Regime, garrisons | Property 6's stubs; no technology crosses (Ben, 2026-10-10) |
 | War grudges, standing force, severed flows | Per-nation Alarm at the epoch | § A world war leaves the campaign closer to its catastrophe |
 
 ### This phase sets budgets; the search spends them
@@ -1034,8 +1033,6 @@ Measured rather than argued:
   (the rule's form, the price's derivation and the density ceiling are settled in § 1).
 - **What a world whose spend is refused opens on** — the no-budget world it fell back to retired
   with the legacy path (Ben, 2026-10-23), and nothing has replaced it.
-- **What the works lean is derived from** — its 2026-10-10 reading, the share of plant held by
-  chartered firms, has no subject now every building is its nation's (Ben, 2026-10-23).
 - **The works-note fraction *f*** — the share of the running charter price a region's stock must
   cross to note a works chartered, read on the seed spread as notes against 1960 charter count,
   starting at 1 (§ Beat 1).
@@ -1048,5 +1045,5 @@ Owed from Ben when they bite, not before:
 - **Whether a standing war condition ever becomes a live nation war** — that is a new widening of
   `../ai/AI_OPPONENT.md` § 11, raised when the campaign wants it.
 - **The PROPOSED readings above that the form did not ask about** — computing as electronics,
-  located industry points, the works lean, the migration streams, colony loss by rising cost,
+  located industry points, the migration streams, colony loss by rising cost,
   proxy war as a patron link, the three war-death mechanisms, and the stub sources.

@@ -925,6 +925,10 @@ payer without inventing one. A sale has no foreign party to charge: every exchan
 market (§ The exchange record). Charging the shipper at arrival reaches every import, auto or
 manual, and it is **the one** point of charge, so no good pays twice.
 
+**An embargo refuses at the same border (Ben, 2026-10-26).** A nation's embargo bars the embargoed
+nation's goods from entering its markets: that cargo does not land, so it pays no duty and is
+never sold there (`../politics/RELATIONS.md` § 3. Embargo).
+
 - **The base is the cargo's value at the destination** — quantity × the destination market's last
   resolved price at the arrival tick. The goods are priced where they will be sold.
 - **A market with no nation charges nothing.** An off-world market emerges outside any

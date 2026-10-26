@@ -464,7 +464,7 @@ interactions (`docs/politics/RELATIONS.md` owns sentiment; BL-545, sentiment sub
 |---|---|---|
 | `ideology` | `authoritarian`, `technocratic`, `mercantile`, `isolationist` | Shapes starting sentiment toward other nation types |
 | `expansionism` | `passive`, `moderate`, `aggressive` | Modulates early military posture |
-| `economic_focus` | `extraction`, `processing`, `trade` | Biases nation investment behaviour (see § Open items) |
+| `economic_focus` | `extraction`, `processing`, `trade` | Biases the nation's build scorer through its focus weight (Ben, 2026-10-26; `../ai/AI_OPPONENT.md` § 5, Scoring) |
 
 Sentiment between any two nations at generation time is a function of ideology compatibility,
 territory adjacency, and resource overlap. High-overlap neighbours start with lower sentiment

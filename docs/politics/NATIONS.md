@@ -146,8 +146,8 @@ trailing window in play and over output capacity at the seeded price field at th
 within one. Neither is a household measure, and neither feeds the treasury — the nation's
 own buildings' sales do (§ 2). GDP says how much a nation makes; the treasury says how much the state holds.
 
-**A regime field sits beside the three character fields** as a stub, derived at the epoch from the
-Works fork, charter reach, subject history and whether the polity fought a world war
+**A regime field sits beside the three character fields** as a stub, derived at the epoch from
+charter reach, subject history and whether the polity fought a world war
 (`../generation/INDUSTRIALISATION.md` § 6. Stubs). Its names are invented, never Earth labels.
 
 ### 2. The treasury — *a balance with both halves*

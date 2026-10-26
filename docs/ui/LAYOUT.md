@@ -120,7 +120,7 @@ The 380 px floor keeps the one-question-per-view panel splits load-bearing.
 The **identity tile**: a panel pinned to the top-left corner that caps the shell column,
 taking its full width `W`. Shows the player's nation at a glance:
 
-- **Emblem** — a geometric emblem (deterministic shape + the nation's identity colour) on a portrait plate.
+- **No emblem** — a nation carries none until one is designed (Ben, 2026-10-26; `PROFILE.md`).
 - **Nation name**, read live from the nation table.
 
 This is a static identity readout in the prototype — no interaction beyond, eventually, opening a fuller nation screen. Implemented in `src/ui/profile_panel.cpp`; see `PROFILE.md`.
