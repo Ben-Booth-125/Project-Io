@@ -399,9 +399,11 @@ through retires (Ben, 2026-10-23); a major is read through its own buildings.
    The same world and the same pick seat the same nation in the same state.
 5. **The seat opens with a clean slate of construction (Ben, 2026-10-07; BL-1206, seat day-1
    profit).** During the settle the seated nation's scorer started builds the player never chose.
-   At the seat, every building of the seated nation still under construction is cancelled and
-   everything paid into it — materials, flat build cost and the construction capacity it drew — is
-   refunded to its treasury, as the recorded sum of those charges. Finished buildings stay.
+   At the seat, every building of the seated nation still under construction is cancelled, and
+   each refunds exactly what any cancelled site does (Ben, 2026-10-26, NR-1075): its credit cost
+   in full, booked on the nation's quarterly return as a refund. The materials it drew stay spent
+   (`economy/PRODUCTION.md`, "A cancelled site is refunded its credits in full"). Finished
+   buildings stay.
 
 **Spectate is the machine this needs, and it already exists.** BL-409 settled that under spectate
 the no-auto-act prohibition has *no subject*: every actor evaluates on the same staggered cadence,
