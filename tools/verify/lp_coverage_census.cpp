@@ -277,8 +277,10 @@ int main(int argc, char** argv)
         colonial_port_report cp;
         if (colonial_ports)
             cp = place_colonial_ports(w); // ports in history, finish_campaign_world's order
-        std::printf("CP seed=%u ends=%d placed=%d at_port=%d open=%d unheld=%d no_room=%d\n", seed,
-                    cp.ends, cp.placed, cp.at_port, cp.open, cp.unheld, cp.no_room);
+        std::printf("CP seed=%u ends=%d groups=%d placed=%d at_port=%d open=%d unheld=%d no_room=%d "
+                    "ext=%d ext_tiles=%d ext_failed=%d\n", seed, cp.ends, cp.groups, cp.placed,
+                    cp.at_port, cp.open, cp.unheld, cp.no_room, cp.extensions, cp.extension_tiles,
+                    cp.extensions_failed);
         // finish_campaign_world's site roads, before the seeding (Ben, 2026-10-24: the
         // network is the roads and the rail; every site joined to its capital's network).
         const site_road_stats sr = lay_site_roads_every_body(w);

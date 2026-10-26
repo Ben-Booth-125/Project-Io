@@ -3133,59 +3133,200 @@ colonial_port_report place_colonial_ports(world& w)
         }
     };
 
-    // Every standing port's mouths, and the tiles holding a network source: read once,
-    // then kept current as ports stand.
-    std::set<entity_id> mouths, source_tiles;
+    // Every standing port's mouths (mouth tile -> the lowest-id port it serves), and the
+    // tiles holding a network source: read once, then kept current as ports stand.
+    std::map<entity_id, entity_id> mouth_port;
+    std::set<entity_id> source_tiles;
     std::array<entity_id, 6> nb{};
-    const auto add_mouths = [&](entity_id port_tile) {
+    const auto add_mouths = [&](entity_id port_tile, entity_id port) {
         sides(port_tile, nb);
         for (const entity_id m : nb)
-            if (m != null_entity && is_water(w.tiles.at(m).substrate))
-                mouths.insert(m);
+        {
+            if (m == null_entity || !is_water(w.tiles.at(m).substrate))
+                continue;
+            auto it = mouth_port.find(m);
+            if (it == mouth_port.end())
+                mouth_port.emplace(m, port);
+            else if (port < it->second)
+                it->second = port;
+        }
     };
-    for (const auto& [bid, b] : w.buildings)
     {
-        (void)bid;
-        if (w.tiles.count(b.tile) == 0)
-            continue;
-        lp_network net;
-        if (lp_source_network(b.type, net))
-            source_tiles.insert(b.tile);
-        if (port_lane_standing(b))
-            add_mouths(b.tile);
+        std::vector<entity_id> bids;
+        for (const auto& [bid, b] : w.buildings)
+        {
+            (void)b;
+            bids.push_back(bid);
+        }
+        std::sort(bids.begin(), bids.end());
+        for (const entity_id bid : bids)
+        {
+            const building_component& b = w.buildings.at(bid);
+            if (w.tiles.count(b.tile) == 0)
+                continue;
+            lp_network net;
+            if (lp_source_network(b.type, net))
+                source_tiles.insert(b.tile);
+            if (port_lane_standing(b))
+                add_mouths(b.tile, bid);
+        }
     }
 
-    bool placed_any = false;
+    // HARBOURS SHARED WITHIN TWO TILES (Ben, 2026-10-26, NR-1081): lane ends within two
+    // HEX STEPS OVER THE SEA of each other share one harbour, and groups chain (A-B and
+    // B-C make one group). Hex steps because a port's mouths are its six hex sides and
+    // its reach is walked on them (`lp_sea_walk`); over the sea because a lane is laid
+    // only on the sea, so two ends a headland parts are two harbours. Union-find over the
+    // ends in ascending tile id; the group's key is its lowest end.
+    std::vector<entity_id> ends;
     for (const auto& [end, seat] : seat_of)
     {
-        const auto eit = w.tiles.find(end);
-        if (eit == w.tiles.end())
-            continue;
-        ++rep.ends;
-        if (mouths.count(end) != 0)
+        (void)seat;
+        if (w.tiles.count(end) != 0)
+            ends.push_back(end);
+    }
+    rep.ends = static_cast<int>(ends.size());
+    std::map<entity_id, std::size_t> end_index;
+    for (std::size_t i = 0; i < ends.size(); ++i)
+        end_index.emplace(ends[i], i);
+    std::vector<std::size_t> parent(ends.size());
+    for (std::size_t i = 0; i < parent.size(); ++i)
+        parent[i] = i;
+    const std::function<std::size_t(std::size_t)> root = [&](std::size_t i) {
+        while (parent[i] != i)
+        {
+            parent[i] = parent[parent[i]];
+            i = parent[i];
+        }
+        return i;
+    };
+    constexpr int k_harbour_share_steps = 2;
+    std::array<entity_id, 6> hb{};
+    for (std::size_t i = 0; i < ends.size(); ++i)
+    {
+        // Breadth-first over sea tiles, six hex sides, to depth two.
+        std::vector<std::pair<entity_id, int>> q{{ends[i], 0}};
+        std::set<entity_id> seen{ends[i]};
+        for (std::size_t head = 0; head < q.size(); ++head)
+        {
+            const auto [t, d] = q[head];
+            if (d > 0)
+                if (const auto ei = end_index.find(t); ei != end_index.end())
+                {
+                    const std::size_t a = root(i), b = root(ei->second);
+                    if (a != b)
+                        parent[std::max(a, b)] = std::min(a, b); // the lower end roots
+                }
+            if (d >= k_harbour_share_steps)
+                continue;
+            sides(t, hb);
+            for (const entity_id n : hb)
+                if (n != null_entity && seen.insert(n).second && is_sea(w.tiles.at(n).substrate))
+                    q.push_back({n, d + 1});
+        }
+    }
+    std::map<std::size_t, std::vector<entity_id>> groups; // root -> member ends, ascending
+    for (std::size_t i = 0; i < ends.size(); ++i)
+        groups[root(i)].push_back(ends[i]);
+    rep.groups = static_cast<int>(groups.size());
+
+    // The lane walk's water per body, built once and kept current as extensions land.
+    std::map<entity_id, port_lane_body> bodies;
+    const auto body_of = [&](entity_id body) -> port_lane_body& {
+        auto it = bodies.find(body);
+        if (it == bodies.end())
+            it = bodies.emplace(body, read_port_lane_body(w, body)).first;
+        return it->second;
+    };
+    bool changed = false;
+    // EACH MEMBER LANE REACHES ITS PORT: a member end that is not the port's own mouth is
+    // walked on over the sea to the nearest of the port's sea mouths, by the lane walk
+    // (four cardinal steps, the current, reuse of laid lanes), and stamped - so the map
+    // shows the lane running into the harbour.
+    const auto extend_to = [&](const std::vector<entity_id>& members, entity_id port) {
+        const entity_id ptile = w.buildings.at(port).tile;
+        const tile_component& pc = w.tiles.at(ptile);
+        port_lane_body& pb = body_of(pc.body);
+        if (!pb.ok)
+            return;
+        const std::vector<int> to = port_lane_mouths(w, pb, pb.sea, ptile);
+        const std::set<int> to_set(to.begin(), to.end());
+        const std::vector<entity_id>& grid = body_tile_grid(w, pc.body);
+        for (const entity_id e : members)
+        {
+            const tile_component& ec = w.tiles.at(e);
+            if (ec.body != pc.body)
+                continue;
+            const int ei = ec.grid_y * pb.gw + ec.grid_x;
+            if (to_set.count(ei) != 0)
+                continue; // the end is the port's own mouth
+            const std::vector<int> path = to.empty() ? std::vector<int>{}
+                : sea_walk_laned_between(pb.sea, pb.gw, pb.gh, pb.currents.empty() ? nullptr : &pb.currents,
+                                         kPortLaneCurrentWeightQ, &pb.laned, kSeaLaneReuseCostQ, {ei}, to);
+            if (path.empty())
+            {
+                ++rep.extensions_failed;
+                continue;
+            }
+            for (const int idx : path)
+            {
+                const auto it = w.tiles.find(grid[static_cast<std::size_t>(idx)]);
+                if (it == w.tiles.end() || !is_sea(it->second.substrate))
+                    continue;
+                if (it->second.lane_level == 0)
+                {
+                    ++rep.extension_tiles;
+                    changed = true;
+                }
+                it->second.lane_level = std::max<std::uint8_t>(it->second.lane_level, 1);
+                pb.laned[static_cast<std::size_t>(idx)] = 1;
+            }
+            ++rep.extensions;
+        }
+    };
+
+    for (const auto& [key, members] : groups)
+    {
+        (void)key;
+        // A group already served: the lowest-id port one of its ends is a mouth of.
+        entity_id serving = null_entity;
+        for (const entity_id e : members)
+            if (const auto mp = mouth_port.find(e); mp != mouth_port.end())
+                if (serving == null_entity || mp->second < serving)
+                    serving = mp->second;
+        if (serving != null_entity)
         {
             ++rep.at_port;
+            extend_to(members, serving);
             continue;
         }
-        const tile_component& ec = eit->second;
-        const int gw = w.bodies.at(ec.body).grid_width;
-        // The land beside the end, nearest the seat first (ties to the lower tile id).
+        // THE HARBOUR: the land beside any member end nearest the group's seats (the least
+        // Chebyshev distance to any of them, columns wrapping; ties to the lower tile id).
+        const int gw = w.bodies.at(w.tiles.at(members.front()).body).grid_width;
+        std::vector<entity_id> seats;
+        for (const entity_id e : members)
+            if (const entity_id st = seat_of.at(e); st != null_entity && w.tiles.count(st) != 0)
+                seats.push_back(st);
         std::vector<std::pair<int, entity_id>> land;
-        sides(end, nb);
-        for (const entity_id t : nb)
+        for (const entity_id e : members)
         {
-            if (t == null_entity || is_water(w.tiles.at(t).substrate))
-                continue;
-            int d = 0;
-            if (const auto sit = w.tiles.find(seat); sit != w.tiles.end())
+            sides(e, nb);
+            for (const entity_id t : nb)
             {
+                if (t == null_entity || is_water(w.tiles.at(t).substrate))
+                    continue;
                 const tile_component& tc = w.tiles.at(t);
-                int dc = std::abs(tc.grid_x - sit->second.grid_x);
-                if (gw > 0 && dc > gw / 2) dc = gw - dc;
-                const int dr = std::abs(tc.grid_y - sit->second.grid_y);
-                d = std::max(dc, dr);
+                int d = seats.empty() ? 0 : std::numeric_limits<int>::max();
+                for (const entity_id st : seats)
+                {
+                    const tile_component& sc = w.tiles.at(st);
+                    int dc = std::abs(tc.grid_x - sc.grid_x);
+                    if (gw > 0 && dc > gw / 2) dc = gw - dc;
+                    const int dr = std::abs(tc.grid_y - sc.grid_y);
+                    d = std::min(d, std::max(dc, dr));
+                }
+                land.push_back({d, t});
             }
-            land.push_back({d, t});
         }
         if (land.empty())
         {
@@ -3228,20 +3369,23 @@ colonial_port_report place_colonial_ports(world& w)
         w.stockpiles[bid] = stockpile_component{};
         w.nations.at(tn->second).state_assets.push_back(bid);
         source_tiles.insert(harbour);
-        add_mouths(harbour);
+        add_mouths(harbour, bid);
         ++rep.placed;
-        placed_any = true;
+        changed = true;
+        extend_to(members, bid);
     }
-    if (placed_any)
+    if (changed)
         invalidate_logistics_caches(w);
     return rep;
 }
 
 void print_colonial_ports(const colonial_port_report& r)
 {
-    std::printf("[colonial ports] %d lane end(s): %d ports stood in history, %d already at a "
-                "port, %d open sea, %d on unheld ground, %d with no room\n",
-                r.ends, r.placed, r.at_port, r.open, r.unheld, r.no_room);
+    std::printf("[colonial ports] %d lane end(s) in %d harbour group(s): %d ports stood in "
+                "history, %d groups already at a port, %d open sea, %d on unheld ground, %d with "
+                "no room; %d lanes walked on to their port (%d sea tiles, %d failed)\n",
+                r.ends, r.groups, r.placed, r.at_port, r.open, r.unheld, r.no_room, r.extensions,
+                r.extension_tiles, r.extensions_failed);
     std::fflush(stdout);
 }
 
