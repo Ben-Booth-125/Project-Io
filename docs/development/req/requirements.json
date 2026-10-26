@@ -7685,20 +7685,20 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "pending",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1408 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-26",
+   "resolution": "Re-blessed once on Ben's go (2026-10-26) against the shape description: shipped digests re-pinned at 71e32545, the legacy arc retired, both icon_silhouettes goldens re-blessed. Five defects and two missing checks carried to sprint 58 by the main session.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: player_seed_sweep"
      ],
      "requirement": "Digests and floors re-pinned once on Ben's go, every mover attributed.",
-     "notes": "PREPARED 2026-10-26 on main 71e32545 (BL-1408 lane), awaiting Ben's go at merge; flip to complete then. Before side 95796940 (v0.2.0): shipped and legacy digest pins 16/16 PASS. Main: shipped arc 16/16 rows FAIL on all four digests, each row seating one player; re-pinned to main's reading, recheck 16/16 rows PASS. Legacy arc NOT re-pinned: every row seats 0 players since BL-1404 retired the legacy roster (Ben's call). Unpinned/unmoved: world_determinism ALL PASS, save_roundtrip OK, exploration_sim_harness ALL PASS both sides (R3b pins unmoved), history span counters identical on 16 seeds (rebless_shape_probe), history_sweep carries no pinned counters. market_viability FULL G1 93.4 G1t50 86.6 G1b 3.7 G2 144.4 G3 100.0, all pass (targets, not pins). icon_silhouettes_overview golden re-blessed once (NR-1070), recompare 0.0000%; icon_silhouettes_supply_lens still red at 63.3% (not granted). Claim checks on 16 seeds: lp_coverage_census P 16/16 every capital on a city, unconnectable 0 on 16/16, RULES PASS; world_audit SPECK 16/16 PASS; logistic_points_harness L10 passes (harness 110/22 overall, the 22 outside L10); port_lane_probe PORT_LANES FAIL 2 defects (seeds 40, 12: a port with a partner in 50 and no laned mouth) plus 3 portless colonial ends (seeds 13, 10) it lists but does not count. ruling_check sprint-57.json 21/0."
+     "notes": "AUTHORISED by Ben 2026-10-26 against the shape (commit 25c60c06). Before side 95796940 (v0.2.0): shipped and legacy digest pins 16/16 PASS. Main: shipped arc 16/16 rows FAIL on all four digests, each row seating one player; re-pinned to main's reading, recheck 16/16 rows PASS. Legacy arc RETIRED (Ben, 2026-10-26): every row seated 0 players since BL-1404 retired its roster; its table, --arc legacy and the charter-budget digest instruments checked against it are removed; shipped arc 16/16 after. Unpinned/unmoved: world_determinism ALL PASS, save_roundtrip OK, exploration_sim_harness ALL PASS both sides (R3b pins unmoved), history span counters identical on 16 seeds (rebless_shape_probe), history_sweep carries no pinned counters. market_viability FULL G1 93.4 G1t50 86.6 G1b 3.7 G2 144.4 G3 100.0, all pass (targets, not pins). icon_silhouettes_overview golden re-blessed once (NR-1070), recompare 0.0000%; icon_silhouettes_supply_lens re-blessed once (Ben, 2026-10-26), recompare 0.0000%. Claim checks on 16 seeds: lp_coverage_census P 16/16 every capital on a city, unconnectable 0 on 16/16, RULES PASS; world_audit SPECK 16/16 PASS; logistic_points_harness L10 passes (harness 110/22 overall, the 22 outside L10); port_lane_probe PORT_LANES FAIL 2 defects (seeds 40, 12: a port with a partner in 50 and no laned mouth) plus 3 portless colonial ends (seeds 13, 10) it lists but does not count. ruling_check sprint-57.json 21/0."
     }
    ]
   }

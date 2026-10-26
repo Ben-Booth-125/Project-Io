@@ -213,11 +213,11 @@
       "batch": "sprint-57-rebless"
     },
     "icon_silhouettes_supply_lens.png": {
-      "blessed_date": "2026-06-17",
-      "commit": "44b0228",
-      "reason_tag": "unknown",
-      "reason": "",
-      "batch": ""
+      "blessed_date": "2026-10-26",
+      "commit": "BL-1408",
+      "reason_tag": "world-moved",
+      "reason": "Re-blessed once (Ben, 2026-10-26, the same retired-lens grant as the overview): the Corporation lens retired (BL-1406); sprint 57 world. Software renderer, main 71e32545 + BL-1408; was 63.3% off, recompare 0.0000%.",
+      "batch": "sprint-57-rebless"
     },
     "lens_strip_corporation.png": {
       "blessed_date": "2026-06-17",

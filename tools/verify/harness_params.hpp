@@ -34,8 +34,9 @@ inline world_params no_prehistory(world_params p = {})
 // default, so `world_params{}` is the SHIPPED world: the 1960 close, and the
 // charter web the world's own stockpile buys. The world before it — span off,
 // tier off — is the LEGACY arc: the world BL-1031's digest pins were taken on,
-// kept buildable so those pins stay a live check rather than a record (Ben,
-// 2026-09-18: "the BL-1031 pins stay as legacy rows and are never overwritten").
+// kept buildable for the harnesses that still name it as a control. Its digest
+// pins in player_seed_sweep retired with the legacy roster (Ben, 2026-10-26,
+// BL-1408); they had stood since 2026-09-18.
 // A harness names its arc here instead of flipping the two switches itself, so
 // "legacy" means one world everywhere.
 enum class world_arc

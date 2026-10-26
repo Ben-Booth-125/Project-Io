@@ -41,12 +41,8 @@
 //      .\build\player_seed_sweep.exe --guard --seeds 46,17,11 [--reproduce N] [--fast]
 //      .\build\player_seed_sweep.exe --digest       [--seeds 46,17,11]   (BL-1031)
 //      .\build\player_seed_sweep.exe --digest-check [--seeds 46,17,11]   (BL-1031)
-//      ... --digest / --digest-check [--arc shipped|legacy]                 (BL-1044: the shipped
-//                                     world, or the pre-BL-1044 one the BL-1031 pins name)
-//                                    [--charter-budget none|empty|zero|synthetic|refused|stockpile]
-//                                    [--charter-scale X]                    (BL-1032)
-//                                    [--resource-cap on|off]                (BL-1039: the two
-//                                     legacy cap rules on a synthetic budget, for their digests)
+//      (the digest modes check the shipped arc only; `--arc legacy` and the
+//       non-none `--charter-budget` instruments retired with the legacy arc, BL-1408)
 //      .\build\player_seed_sweep.exe --charter-cost [--seeds 0,28,46] [--budget-scales 1,2,4]
 //                                    [--resource-cap on|off|both|sqrt|<list>]
 //                                    [--density-ceilings 120,160]           (BL-1039, sqrt only)
@@ -623,153 +619,13 @@ struct world_digest_pin
     std::uint64_t search, land, settle, seat;
 };
 
-// THE LEGACY ARC'S PINS (BL-1044) — the sixteen seed-library worlds
-// (docs/generation/seed_library.json, `node tools/session/seed_library.js
-// --seed-list`), in library order, on the world BL-1031 pinned: the span off and
-// the corridor tier off (`world_arc::legacy`). They are NEVER OVERWRITTEN by the
-// shipped arc (Ben, 2026-09-18); `--arc legacy` keeps them a live check. The
-// shipped arc's rows are `k_shipped_digest_pins` below.
-//
-// PROVENANCE. Taken 2026-09-17 by `player_seed_sweep --digest --seeds
-// 46,28,11,31,40,12,37,13,41,43,32,10,25,38,9,0` (2638 s), built on commit
-// 0133ee2b (BL-1030, the app-order helpers) with this item's digest code on top
-// and nothing else: src/ is byte-identical to 03c50ee4 (Sprint 44 cut), the
-// tree BEFORE the charter-budget seam. TOOLCHAIN: MSVC cl 14.44.35207 (VS 2022
-// BuildTools), Windows SDK 10.0.26100.0, Release /O2 /MD /DNDEBUG via
-// `bash tools/verify/build_lua_harness.sh player_seed_sweep`. The pins bind to
-// that toolchain; a different compiler or optimisation level is a different
-// floating-point program and may legitimately differ.
-//
-// NEVER RE-PINNED by the change a pin exists to check (BL-1032, the charter
-// budget seam). A row that fails is reported with its digest and its cause.
-//
-// D_settle AND D_seat RE-PINNED 2026-09-22 by BL-1044's re-bless (Ben authorised
-// it at Gate 2): BL-1050's order-independent reads move the legacy world's
-// ticks and nothing before them (NR-894) — the 16-seed --digest-check --arc
-// legacy held D_search and D_land on every row and moved D_settle and D_seat on
-// every row. Taken from that run on the integrated tree (a build of 49a6deb1,
-// same toolchain; nothing after it reaches a span-off world) and re-checked on
-// the tree the shipped pins were taken on; the old values are recorded in the
-// DEVLOG entry of that day.
-// D_search and D_land are the 2026-09-17 values, untouched.
-//
-// RE-PINNED 2026-09-25 (Ben, sprint 47's one re-bless, authorised in principle
-// 2026-09-24): taken by player_seed_sweep --digest --arc legacy over the
-// sixteen library seeds on a build of the final sprint-47 tree (d6558647, the
-// riders merged; exe built 10:22), same toolchain; every row seated exactly
-// one player. All sixteen rows moved from D_search on. THE MOVER on a span-off
-// world is BL-1089 (a nation inherits its founding realm's coined name at
-// nation generation, which runs on every arc): lane I1's A/B on the harness
-// world -- the one inheritance line switched off returns the previous digests
-// exactly -- is the attribution, not a per-row re-measure on this arc;
-// BL-1096's purchases (an Exploration-span verb, which this arc still runs)
-// may also reach D_search on the five seeds they moved on the shipped arc. The
-// riders (BL-1082 the seat in the state hash, BL-1049 the tables across the
-// 1200 resume) then moved D_land and D_seat on fifteen seeds (all but 32) and
-// D_settle on all sixteen, D_search on none. The charter budget seam (BL-1032)
-// is untouched: this table is not re-pinned by the change it checks. The
-// 2026-09-17/22 values are one commit back in git history.
-//
-// RE-PINNED 2026-10-03 (sprint 48's one re-bless; PREPARED for Ben's
-// authorisation, docs/development/drafts/sprint-48-rebless.md carries the
-// shape and the old -> new rows): taken by player_seed_sweep --digest-check
-// --arc legacy over the sixteen library seeds on a build of main a899bb2a,
-// same toolchain; every row seated exactly one player. All sixteen rows moved
-// from D_search on. The legacy arc runs generation through the Exploration
-// close, so every sprint-48 mover upstream of the Industrialisation span
-// reaches it: centres consolidate, settle spacing, a province is its centre's
-// ground, one centre a region, the fill crosses the settled line, rivers divide
-// banks (BL-1130/1132/1133/1141/1150/1156), markets die and the column wrap
-// (BL-1125/1127), market roads and the roads tree (BL-1138/1119), garrison posts
-// (BL-1145), the culture ground profile (BL-1107), the sea chain before 1660
-// (BL-1120/1140/1147/1152/1153) and rivals armed (BL-1154; MILITARY.md arms
-// them on this arc too). BL-1086 and BL-1146's Pass 6 were measured
-// byte-identical on this arc in their own lanes. The 2026-09-25 values are one
-// commit back in git history.
-// RE-PINNED 2026-10-04 (sprint 48's second re-bless; PREPARED for Ben's
-// authorisation, docs/development/drafts/sprint-48-rebless-2.md carries the
-// shape, the old -> new rows and every named cause): taken by
-// player_seed_sweep --digest-check --arc legacy over the sixteen library seeds
-// on a build of main 9171c2ef, same toolchain; every row seated exactly one
-// player. All sixteen rows moved. Attributed by the same check run on a build
-// of every intermediate main: the sea-lane trunks (314e972b) move four rows
-// from D_search, the two-tile bridge cap (5c18bf8c) all sixteen from D_search,
-// far trade (BL-1171) twelve (eleven from D_search, one from D_land), and the
-// fair-price army with working capital (BL-1172/1173) all sixteen from D_land;
-// a knockout of working capital alone on 9171c2ef holds D_search and moves
-// D_land on every row. The charter priced by
-// reach (BL-1168) and the crowding brake (BL-1169) move no row on this arc.
-// The 2026-10-03 values are one commit back in git history.
-// RE-PINNED 2026-10-07 (sprint 49's one re-bless; PREPARED for Ben's
-// authorisation, docs/development/drafts/sprint-49-rebless.md carries the
-// shape, the old -> new rows and every named cause): taken by
-// player_seed_sweep --digest-check --arc legacy over the sixteen library seeds
-// on a build of main c77f2d5a, same toolchain; every row seated exactly one
-// player. All sixteen rows moved from D_search on. THE ONE GENERATION MOVER is
-// the lake size cap (BL-1200: enclosed water of 150+ tiles is sea), which
-// reaches every span; rebless_shape_probe (shipped arc) on every intermediate
-// main shows no other sprint-49 merge moving a generation reading, and the
-// legacy arc's generation is a prefix of the shipped one's (inferred for this
-// arc, not re-measured per merge on it). Everything from the
-// landscape on also carries the sprint's campaign-economy movers (chain-feasible
-// placement BL-1185, build only what runs BL-1187, gap firms dig BL-1197,
-// households BL-1196/1163/1179, density per good BL-1204, the seat's clean
-// slate BL-1206, shelf k = 1 BL-1209, no unobtainable sites BL-1183).
-// The 2026-10-04 values are one commit back in git history.
-// RE-PINNED 2026-10-10 (sprint 50's one re-bless, with the shelf economy and
-// trade; Ben's go 2026-10-10, PREPARED for his authorisation against the shape
-// in docs/development/drafts/sprint-50-shelf-rebless.md, which carries the old ->
-// new rows and every named cause): taken by player_seed_sweep --digest --arc legacy
-// over the sixteen library seeds on a build of c8752b8a (claude/shelf-economy-
-// trade-42f8f4), same toolchain. Every row seated exactly one player. All
-// sixteen rows moved from D_search on. Generation through the spans is
-// unchanged (rebless_shape_probe: every span counter, region, centre and market
-// identical to sprint 49's tree); road length -3% from no parallel roads
-// (BL-1252). D_search on carries the landscape search's economy, so every
-// campaign-economy mover reaches it: sprint 50's supply-judged plants (BL-1217
-// D5/D6, R1-R3; BL-1227, BL-1233, BL-1234, BL-1235), power per grid
-// (BL-1230/1232), the lane follows its legs (BL-1195), and the shelf economy
-// and trade (BL-1265..1270, the rulings of 2026-10-10, the rival Marketplace
-// scored as any build). The 2026-10-07 values are one commit back in git
-// history.
-// RE-PINNED 2026-10-23 (the v0.2.0 re-bless, BL-1338 (digest pins stale); Ben
-// authorised it in principle 2026-10-17 and gave the go 2026-10-23 against the
-// shape in docs/development/drafts/v0.2.0-rebless.md, which with
-// docs/development/drafts/sprint-56-digest-attribution.md names every mover since
-// the 2026-10-10 pins): taken by player_seed_sweep --digest --arc legacy over the
-// sixteen library seeds on a build of main bd33e496, same toolchain. Every row
-// seated exactly one player. Every row moved from D_search on: sprints 53-56
-// (sprint 56 attributed 24 movers to aa3c6304) and sprint 55's 13 - roads as
-// edges and bridges (BL-1340, BL-1376, BL-1347/1348/1357), market attraction
-// (BL-1346), the sprint 56 merge, and the logistics arc (BL-1360, BL-1356,
-// BL-1395, BL-1396, BL-1397, BL-1361, BL-1398, BL-1367). None unexplained. The
-// 2026-10-10 values are one commit back in git history.
-// NOT RE-PINNED at sprint 57's re-bless (BL-1408, 2026-10-26), and deliberately.
-// On main 71e32545 every legacy row seats ZERO players: generation logs "no charter
-// budget: nothing chartered, nobody seated (BL-1404, the legacy roster retired)",
-// so the ONE-is_player invariant fails every row whatever its digests read. A
-// re-pin cannot make a row pass, and pinning a seatless world would turn a broken
-// arc into a contract. These rows still held on 95796940 (16/16 PASS). Whether
-// the legacy arc retires with its roster or gets a charter budget is Ben's call.
-const std::vector<world_digest_pin> k_world_digest_pins = {
-    //  seed  D_search               D_land                 D_settle               D_seat
-    { 46u, 0x276C6BBC74F03C11ull, 0xD49A771ED98586DAull, 0xACC9905E625E45B8ull, 0x5DEECE562E8D786Aull },
-    { 28u, 0xAD61CC83C05F7044ull, 0xAB48B1A45A84BD6Bull, 0x54C059247ABE5B9Dull, 0x78902F9150C59D70ull },
-    { 11u, 0x22149E7DBDC0DA15ull, 0x100B0D86D31C86C4ull, 0xD8D4600202CC4E2Aull, 0x81883E7FDBF3D7AAull },
-    { 31u, 0x0AE0644FBB8ABFEFull, 0x9F5626A72333F129ull, 0x1B1CCA6AF10C4D66ull, 0x4D84C4BCA19F881Bull },
-    { 40u, 0x671CB5C5281BCBFBull, 0x087FC772F9E9CD7Dull, 0x82596C54280BDE68ull, 0xF79FDEFA753F6C9Cull },
-    { 12u, 0xAC98F2AD6D615DACull, 0x570239D58F1236CDull, 0xE1C0E47D9B15ED18ull, 0xC1969D0FA700134Full },
-    { 37u, 0x046401B98C965F4Eull, 0x35B52E5D7F32066Bull, 0x732D9C96FE4E841Bull, 0x92B9C628A88FCCE4ull },
-    { 13u, 0xF3576D11CC78C8CBull, 0xDEC89C9E5BA7B066ull, 0x0FA7023FAE62030Eull, 0x2796F89C84C91163ull },
-    { 41u, 0x8A838BA9B2311C02ull, 0x853AC12562E2C48Full, 0xF14F1500F6F4B09Eull, 0x2C99B5E06914D04Full },
-    { 43u, 0x2AF33A4E5C9B574Eull, 0xC627442E6719E023ull, 0x9BB3926B9F550786ull, 0xB0CB0F2DE21BF062ull },
-    { 32u, 0x121D1AFA37B181C9ull, 0x64AC1EBA2B9A3B70ull, 0x58F615FEA3A1E33Cull, 0xD9CC0AA30618184Aull },
-    { 10u, 0x658C6ED2B9183B0Full, 0x7F798F882E459208ull, 0x3DA9E2C03430A79Full, 0x7D9F2BFF3D065154ull },
-    { 25u, 0xC6A04AB99CBCA67Full, 0x2E5186F1FD27B040ull, 0x536C297A102DB9BFull, 0xC02B2E73E31F9D6Full },
-    { 38u, 0xFD8A9B2A1D9DC8A9ull, 0x8E12E85AD975C323ull, 0x5207BDDD13B7E94Aull, 0xADCC4B1B787B4C56ull },
-    {  9u, 0xD9AE7D5601D13458ull, 0x64C46999AA25B269ull, 0x5CB33511DCDAD3A4ull, 0xAD131E223C7328BEull },
-    {  0u, 0xA6D3C5AD1E3BB8A9ull, 0x5EBFCFAB83D74D60ull, 0x8F6CA676C8851245ull, 0xA5AAEA4D6E06847Bull },
-};
+// THE LEGACY ARC IS RETIRED (Ben, 2026-10-26, at sprint 57's re-bless, BL-1408).
+// Its table pinned the pre-BL-1044 world (span off, tier off). Since BL-1404
+// retired the legacy roster that world charters nothing and seats nobody, so
+// every row failed the one-player invariant whatever its digests read. The
+// table, its `--arc legacy` mode and the charter-budget instruments checked
+// against it went together; the last legacy rows are in git history (they held
+// 16/16 on 95796940). The digest modes check the shipped arc only.
 
 // THE SHIPPED ARC'S PINS (BL-1044) — the same sixteen library worlds on the
 // world the player is handed since BL-1044: the Industrialisation span and BL-1037's
@@ -781,11 +637,11 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 // PROVENANCE. Taken 2026-09-22 by `player_seed_sweep --digest` (shipped arc,
 // the library seeds, 3383 s), re-bless authorised by Ben at BL-1044's Gate 2,
 // on a build of 9810fc62 (src/ as of the 650 pin). Every row seated exactly one
-// player and none fell back. TOOLCHAIN as the legacy table's: MSVC cl
+// player and none fell back. TOOLCHAIN: MSVC cl
 // 14.44.35207, Windows SDK 10.0.26100.0, Release /O2 /MD /DNDEBUG via
 // `bash tools/verify/build_lua_harness.sh player_seed_sweep`.
 //
-// NEVER RE-PINNED by the change a pin exists to check, as the legacy table.
+// NEVER RE-PINNED by the change a pin exists to check.
 //
 // RE-PINNED 2026-09-25 (Ben, sprint 47's one re-bless, authorised in principle
 // 2026-09-24): taken by player_seed_sweep --digest --seeds
@@ -910,9 +766,9 @@ const std::vector<world_digest_pin> k_shipped_digest_pins = {
     {  0u, 0x28E270DB61925241ull, 0x823E32E4D578A77Aull, 0xA744EA0552EFABCCull, 0xE9F1641A9649EEEEull },
 };
 
-const std::vector<world_digest_pin>& digest_pins(world_arc arc)
+const std::vector<world_digest_pin>& digest_pins()
 {
-    return arc == world_arc::legacy ? k_world_digest_pins : k_shipped_digest_pins;
+    return k_shipped_digest_pins;
 }
 
 // --- BL-1032: the charter-budget seam, driven through the digest modes -------
@@ -1821,9 +1677,11 @@ void print_stockpile_account(const world& w, const stockpile_budget& sb,
 
 int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                charter_mode mode = charter_mode::none, double charter_scale = 1.0,
-               bool resource_cap = true, world_arc arc = world_arc::shipped)
+               bool resource_cap = true)
 {
-    const std::vector<world_digest_pin>& pins = digest_pins(arc);
+    // The shipped arc only: the legacy arc retired (BL-1408, 2026-10-26).
+    constexpr world_arc arc = world_arc::shipped;
+    const std::vector<world_digest_pin>& pins = digest_pins();
     std::printf("player_seed_sweep %s — %zu seeds, the shipped spawn built, settled (%d ticks) "
                 "and seated in app order (BL-1030)\n",
                 check ? "--digest-check" : "--digest", seeds.size(), k_settle_ticks);
@@ -1839,12 +1697,8 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                     ? " — the Industrialisation span ON and the shipped path's own stockpile budget "
                       "(BL-1042); its digests are EXPECTED to differ from the pins"
                     : " (an empty budget reaches the seam; the digests must equal the pins)");
-    std::printf("BL-1044. --arc %s: %s\n", world_arc_name(arc),
-                arc == world_arc::legacy
-                    ? "the pre-BL-1044 world (span off, tier off) BL-1031 pinned; its pins are never "
-                      "overwritten"
-                    : "the world the player is handed (the span and the tier on, the stockpile's "
-                      "charter web at the ruled prices)");
+    std::printf("BL-1044. The %s arc: the world the player is handed (the span and the tier on, "
+                "the stockpile's charter web at the ruled prices)\n", world_arc_name(arc));
     std::printf("BL-1031. FNV-1a 64: D_search the walk; D_land the snapshot as the landscape "
                 "lands; D_settle the snapshot + state_hash after the validation run; D_seat the "
                 "seat + the snapshot after it. Every row also counts the corporations carrying "
@@ -1948,11 +1802,7 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
         if (start->land.stockpile_path)
         {
             unbalanced += stockpile_account_failure(start->land.stockpile, report);
-            if (mode == charter_mode::none && arc == world_arc::legacy
-                && start->land.stockpile.points_total != 0)
-                unbalanced += " the span is off but the stockpile holds points;";
-            if ((mode == charter_mode::stockpile
-                 || (mode == charter_mode::none && arc == world_arc::shipped))
+            if ((mode == charter_mode::stockpile || mode == charter_mode::none)
                 && budget.empty())
                 unbalanced += " the span is on but the stockpile budget is EMPTY (a span world "
                               "needs a non-empty budget);";
@@ -2039,12 +1889,8 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
                                          || !report.charters.empty();
                 if (mode == charter_mode::refused && !(search_refused && report.refused))
                     diffs += " REFUSAL-FLAG (the search or the apply did not report the refusal)";
-                // BL-1042 fix round: `none` too ON THE LEGACY ARC — its worlds
-                // are span off, so the shipped path's stockpile budget is empty
-                // there and must raise no flag and write no report either. On
-                // the shipped arc `none` IS the stockpile world, and reports.
-                if ((mode == charter_mode::empty || mode == charter_mode::zero
-                     || (mode == charter_mode::none && arc == world_arc::legacy))
+                // On the shipped arc `none` IS the stockpile world, and reports.
+                if ((mode == charter_mode::empty || mode == charter_mode::zero)
                     && (search_refused || report_written))
                     diffs += " EMPTY-FLAG (an empty budget raised the refusal or wrote a report)";
                 if (!unbalanced.empty())
@@ -2068,17 +1914,16 @@ int run_digest(const std::vector<uint32_t>& seeds, lua_state& lua, bool check,
         if (start->land.stockpile_path)
             print_stockpile_account(start->w, start->land.stockpile, report,
                                     start->land.stockpile_spend.firm_price_points);
-        if (mode != charter_mode::none || arc == world_arc::shipped)
-            print_charter_report(start->w, mode, budget,
-                                 start->land.stockpile_path ? start->land.stockpile_spend : charter.spend,
-                                 report, start->land.search,
-                                 legacy_specialists, legacy_firms, charter_scale);
+        print_charter_report(start->w, mode, budget,
+                             start->land.stockpile_path ? start->land.stockpile_spend : charter.spend,
+                             report, start->land.search,
+                             legacy_specialists, legacy_firms, charter_scale);
         std::fflush(stdout);
     }
 
     if (!check)
     {
-        // Paste-ready: exactly the row shape of k_world_digest_pins.
+        // Paste-ready: exactly the row shape of k_shipped_digest_pins.
         std::printf("\n// pin rows\n");
         for (std::size_t i = 0; i < seeds.size(); ++i)
             if (ok[i])
@@ -4111,25 +3956,12 @@ forced_pick pick_sparse_province_centre(const world& w, int radius)
     return best;
 }
 
-/// The none row against the BL-1031 pins: sets `pinned`, `digest_match` and
-/// `digest_diff`, and returns true when a PINNED row differs (the run fails).
-/// A build-only none row stops at the landscape, so only D_search and D_land
-/// are compared.
-bool check_none_row_pins(cost_row& none, uint32_t seed)
+/// The none row against the BL-1031 pins. Those pins were the LEGACY arc's, and
+/// that arc retired (BL-1408, 2026-10-26): no row is pinned, so the row reports
+/// "no pinned row" and never fails the run on its digests.
+bool check_none_row_pins(cost_row& none, uint32_t /*seed*/)
 {
-    for (const world_digest_pin& pin : k_world_digest_pins)
-        if (pin.seed == seed)
-        {
-            none.pinned = true;
-            std::string d;
-            if (pin.search != none.dig.search) d += " D_search";
-            if (pin.land   != none.dig.land)   d += " D_land";
-            if (!none.build_only && pin.settle != none.dig.settle) d += " D_settle";
-            if (!none.build_only && pin.seat   != none.dig.seat)   d += " D_seat";
-            none.digest_match = d.empty();
-            none.digest_diff  = d;
-            return !d.empty();
-        }
+    none.pinned = false;
     return false;
 }
 
@@ -5113,8 +4945,7 @@ int main(int argc, char** argv)
                     "       %s --guard [seed_count] [--fast] (assert what the seat holds)\n"
                     "       %s --digest       [--seeds a,b,c]  (print the BL-1031 world digests)\n"
                     "       %s --digest-check [--seeds a,b,c]  (fail on any row differing from the pin)\n"
-                    "           both digest modes: [--arc shipped|legacy] (BL-1044; none defaults to shipped, every other mode is legacy)\n"
-                    "                              [--charter-budget none|empty|zero|synthetic|refused|stockpile] [--charter-scale X]\n"
+                    "           both digest modes check the shipped arc only (the legacy arc retired, BL-1408)\n"
                     "       %s --charter-cost [--seeds a,b,c] [--budget-scales 1,2,4] [--resource-cap on|off|both]\n"
                     "                         [--province-cap on|off|both] [--specialist-prices 4,8]\n"
                     "                         [--ladder-scales 2|all] [--no-extra] [--no-forced]\n"
@@ -5192,7 +5023,7 @@ int main(int argc, char** argv)
         }
         std::vector<uint32_t> seeds = seeds_arg();
         if (seeds.empty())
-            for (const world_digest_pin& p : k_world_digest_pins)
+            for (const world_digest_pin& p : k_shipped_digest_pins)
                 seeds.push_back(p.seed);
         if (seeds.empty())
         {
@@ -5200,26 +5031,17 @@ int main(int argc, char** argv)
             return 2;
         }
         // BL-1032: `--charter-budget none|empty|zero|synthetic|refused|stockpile`, `--charter-scale X`.
-        // BL-1044: `--arc shipped|legacy`.
         charter_mode mode  = charter_mode::none;
         double       scale = 1.0;
         bool         rcap  = true;
-        bool         arc_given = false;
-        world_arc    arc   = world_arc::shipped;
         for (int a = 2; a < argc; ++a)
         {
             const std::string arg = argv[a];
             if (arg == "--arc")
             {
-                const std::string v = (a + 1 < argc) ? argv[++a] : "";
-                if (v != "shipped" && v != "legacy")
-                {
-                    std::printf("--arc: needs shipped|legacy\n");
-                    return 2;
-                }
-                arc       = v == "legacy" ? world_arc::legacy : world_arc::shipped;
-                arc_given = true;
-                continue;
+                std::printf("--arc is retired: the digest modes check the shipped arc only "
+                            "(the legacy arc retired with its roster, BL-1408)\n");
+                return 2;
             }
             if (arg == "--resource-cap")
             {
@@ -5267,22 +5089,18 @@ int main(int argc, char** argv)
                 }
             }
         }
-        // BL-1044 — THE ARC. `none` checks the world the player is handed (the
-        // shipped arc) unless told otherwise. Every other mode hands the seam a
-        // budget of its own and is checked against the LEGACY pins, so it runs
-        // the legacy arc — on the shipped arc an instrument budget would replace
-        // the stockpile and build a world nobody pins.
+        // Every mode but `none` handed the seam a budget of its own and was
+        // checked against the LEGACY pins, on the legacy arc. That arc retired
+        // (BL-1408, 2026-10-26), and on the shipped arc an instrument budget
+        // would replace the stockpile and build a world nobody pins.
         if (mode != charter_mode::none)
         {
-            if (arc_given && arc == world_arc::shipped)
-            {
-                std::printf("--charter-budget %s checks the budget seam against the LEGACY pins: "
-                            "run it with --arc legacy (or omit --arc)\n", charter_mode_name(mode));
-                return 2;
-            }
-            arc = world_arc::legacy;
+            std::printf("--charter-budget %s is retired in the digest modes: it was checked against "
+                        "the legacy arc's pins, which retired with the legacy roster (BL-1408)\n",
+                        charter_mode_name(mode));
+            return 2;
         }
-        return run_digest(seeds, lua, check_mode, mode, scale, rcap, arc);
+        return run_digest(seeds, lua, check_mode, mode, scale, rcap);
     }
 
     // BL-1033 cost mode. The shipped spawn only, like the digest modes, and for
