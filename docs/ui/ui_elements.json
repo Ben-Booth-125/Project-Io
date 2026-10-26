@@ -1567,11 +1567,12 @@
     "docs/economy/LOGISTICS.md",
     "src/ui/ui_state.hpp"
    ],
-   "summary": "The player nation's Logistic Points (named Logistics, Ben 2026-10-24): its roads coloured green to yellow by supplied over requested along the routed chains, two numbers stacked on every tile (supplied over requested), a ring on every source, and the nation's generated / consumed key. No ground tint.",
+   "summary": "The player nation's Logistic Points (named Logistics, Ben 2026-10-24): its roads coloured red to yellow to green by supplied over requested along the routed chains (red at half or less, Ben 2026-10-26), a press selecting the tile, two numbers stacked on every tile (supplied over requested), a ring on every source, and the nation's generated / consumed key. No ground tint.",
    "interesting_question": "Every lens costs a bar slot, a key, three doc rows and a selection rule permanently. Two lenses were retired the same week this one landed - what makes this one worth the slot?",
    "resolution": "It answers a question no other lens can: whether a place is REACHABLE, not what is at it. LENSES.md gives it its own section and ui_state.hpp its own enum value (BL-598). The two retired the same week - Opportunity and Production (BL-604) - were per-tile value surfaces whose read Scarcity and Industry already carried between them, which is exactly the test this one passes.",
    "checks": [
     "logistics_lens",
+    "logistics_chain",
     "lens_strip_and_fields"
    ]
   },

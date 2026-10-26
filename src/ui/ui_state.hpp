@@ -654,6 +654,27 @@ struct ui_state
     int trade_flow_arrows  = 0;
     int trade_flow_markers = 0;
     int trade_flow_passes  = 0;
+    /// What the Trade-flow lens's ROUTED paths drew last frame (Ben, 2026-10-26): the
+    /// flows drawn along a network route, and those with no route known (drawn as
+    /// the straight arrow, the fallback).
+    int trade_flow_routed   = 0;
+    /// THE ROUTE EACH FLOW RIDES (Ben, 2026-10-26; LENSES.md § Trade-flow lens): per
+    /// (source market, destination market, good) of the window, the tiles of the newest
+    /// shipment's priced route (`convoy_route_tiles` over its recorded waypoints), source
+    /// to destination. Rebuilt by `update_trade_flow_routes` (it needs a mutable world for
+    /// the path cache); empty off the lens. Sorted by (src, dest, good). View state only.
+    struct trade_flow_route
+    {
+        entity_id              src  = null_entity;
+        entity_id              dest = null_entity;
+        std::uint16_t          good = 0;
+        std::vector<entity_id> tiles;
+    };
+    std::vector<trade_flow_route> tf_routes;
+    int trade_flow_unrouted = 0;
+    /// Lane-to-port joins on the active body the Planetary canvas draws (a lane tile's
+    /// curve running on into a standing port's tile centre; Ben, 2026-10-26).
+    int lane_port_joins = 0;
     /// The time panel's measured height, published each frame by time_panel so
     /// the rest of the right chrome column knows where its own ceiling is.
     /// It is computed from font metrics inside time_panel and was previously

@@ -76,6 +76,13 @@ float planetary_tilt_sy(float zoom);
 /// @param now_days Current continuous sim time in elapsed days (stored as the beam clock).
 void update_body_vision(world& w, ui_state& state, double now_days);
 
+/// Refresh the Trade-flow lens's ROUTES for state.active_body (Ben, 2026-10-26; LENSES.md
+/// § Trade-flow lens): per flow of the player's trailing window, the tiles its newest
+/// shipment was priced on (`convoy_route_tiles` over the recorded waypoints), cached on
+/// those waypoints and the logistics generation. A no-op (and cleared) off the lens.
+/// Non-const for the reason update_body_vision is: the pathfinder fills its cache.
+void update_trade_flow_routes(world& w, ui_state& state);
+
 /// Refresh the Throughput lens's Logistic Point sources for state.active_body
 /// (BL-606; LOGISTICS.md § Logistic Points). A no-op unless that lens is active.
 ///

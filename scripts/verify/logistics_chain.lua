@@ -170,4 +170,83 @@ if fx.sea then
   shot("logistics_chain_sea_close")
 end
 verify.expect(r.idle > 0, "L1: some road on the chain is connected but idle (" .. r.idle .. ")")
+
+-- K1 - THE RED END (Ben, 2026-10-26: "use red for the extreme"). The ramp is red at 0.5x
+-- or less, yellow at 1x, green at 2x or more, log2 between. The census reads the canvas's
+-- own ramp positions; the key is captured with the three stops on it.
+-- The chain fixture's links all run at 2x or more, so a SHORTAGE is staged: one works on
+-- a road of the nation no connected source reaches (C++ picks it, position back), whose
+-- request lays on its own road with nothing supplied - 0 over its need, the red end.
+local function ramp_line(rr, label)
+  print(string.format("[logistics_chain] ramp %s: green %d (routed %d), between %d, red %d (routed %d), "
+        .. "near 1x %d, of %d link cells", label, rr.green, rr.routed_green, rr.between, rr.red,
+        rr.routed_red, rr.near_one, rr.roads))
+end
+ramp_line(r, "on the chain fixture")
+verify.expect(r.green + r.between + r.red == r.roads, "K1: every link cell lands in one ramp class")
+local sf = verify.logistics_shortage_fixture()
+print("[logistics_chain] shortage fixture: " .. tostring(sf.ok)
+      .. (sf.ok and (" at " .. sf.x .. "," .. sf.y) or ""))
+verify.expect(sf.ok, "K1: a works stages on a road no connected source reaches")
+verify.econ_step(1)
+verify.frames(3)
+local rk = verify.logistics_roads()
+ramp_line(rk, "with the shortage")
+verify.expect(rk.green + rk.between + rk.red == rk.roads, "K1: every link cell lands in one ramp class")
+verify.expect(rk.routed_red > 0, "K1: a carrying link supplied at half its request or less reads RED ("
+              .. rk.routed_red .. ")")
+if sf.ok then
+  frame_tile(sf.x, sf.y, 14)
+  shot("logistics_red_road_close")
+  frame_tile(sf.x, sf.y, 6)
+  shot("logistics_red_road_mid")
+end
+-- The key, red 0.5x -> yellow 1x -> green 2x+ (the key draws at every framing).
+if cap_x then frame_tile(cap_x, cap_y, 6) end
+shot("logistics_key_red_end")
+
+-- S1 - A PRESS UNDER THE LENS SELECTS THE TILE (Ben, 2026-10-26). It used to answer
+-- nothing and clear the band to resting, which is the player's own nation - so a click
+-- "selected the nation". The capital tile, then a road tile of the chain beside it.
+if cap_x then
+  frame_tile(cap_x, cap_y, 8)
+  -- From a cleared band, so the press is what selects (not a selection left standing).
+  verify.clear_selection()
+  verify.frames(2)
+  local pt0 = verify.pointer_target()
+  verify.expect(not pt0.has_selection, "S1: the band starts cleared (" .. tostring(pt0.selection_kind) .. ")")
+  verify.click_tile(cap_x, cap_y)
+  verify.frames(3)
+  local pt = verify.pointer_target()
+  print("[logistics_chain] press on the capital under the lens: " .. tostring(pt.selection_kind))
+  verify.expect(pt.has_selection and pt.selection_kind == "tile",
+                "S1: a press under the Logistics lens selects the tile (" .. tostring(pt.selection_kind) .. ")")
+  shot("logistics_press_selects_tile")
+  verify.click_tile(cap_x, cap_y)
+  verify.frames(3)
+  local pt2 = verify.pointer_target()
+  verify.expect(pt2.selection_kind == "tile", "S1: a repeat press re-selects the tile (one tier, no cycle)")
+  verify.clear_selection()
+end
+
+-- P1 - A SEA LANE'S END GOES INTO ITS PORT (Ben, 2026-10-26). The census says how many
+-- lane-to-port joins the canvas draws and, for the diagnosis, how lane ends and ports
+-- sit on this body (counts; the positions go to the log from C++).
+local lc = verify.lane_port_census()
+print(string.format("[logistics_chain] lanes: %d tiles, %d ends - %d beside a standing port, %d beside an "
+      .. "unfinished one, %d beside none (%d on a coast, %d with a port within 3); ports: %d standing, %d "
+      .. "laned, %d dry, %d unlaned with a lane within 3; joins drawn %d",
+      lc.lane_tiles, lc.ends, lc.ends_at_port, lc.ends_at_unstanding, lc.orphan_ends, lc.orphan_coastal,
+      lc.orphan_port_near, lc.ports, lc.ports_laned, lc.ports_dry, lc.ports_unlaned_lane_near, lc.joins))
+verify.expect(lc.joins > 0, "P1: the canvas joins some lane to its port (" .. lc.joins .. ")")
+verify.expect(lc.joins >= lc.ports_laned, "P1: every laned port is joined (" .. lc.joins .. " joins, "
+              .. lc.ports_laned .. " laned ports)")
+if fx.sea then
+  frame_tile(fx.port_a_x, fx.port_a_y, 14)
+  shot("logistics_port_lane_end_close")
+  frame_tile(fx.port_b_x, fx.port_b_y, 14)
+  shot("logistics_port_lane_end_far_close")
+  frame_tile(fx.port_a_x, fx.port_a_y, 6)
+  shot("logistics_port_lane_end_mid")
+end
 verify.set_overlay("none")

@@ -46,9 +46,9 @@ by the cycle without a literal being kept in step by hand.
 | `supply` | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
 | `reach` | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
-| `throughput` — the **Logistics** lens | Planetary: every link of the player nation's chain — roads, rail legs, sea legs — coloured green → yellow by supplied over requested where traffic crosses it, steel where it is connected but idle, umber where a road is not tied to the capital + a ring on every source + numbers on every link (supplied over requested; one figure on an idle link) + key. No ground tint; the painted routes leave the ground while it is up. |
+| `throughput` — the **Logistics** lens | Planetary: every link of the player nation's chain — roads, rail legs, sea legs — coloured red → yellow → green by supplied over requested where traffic crosses it, steel where it is connected but idle, umber where a road is not tied to the capital + a ring on every source + numbers on every link (supplied over requested; one figure on an idle link) + key. No ground tint; the painted routes leave the ground while it is up. |
 | `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
-| `trade_flow` | Planetary market-to-market arrows of the player's shipments + a marker on each short market coloured by why the player's surplus did not go there + class key |
+| `trade_flow` | Planetary paths of the player's shipments along the routes they ride (roads, sea lanes, rail), with direction chevrons and a head at the destination + a marker on each short market coloured by why the player's surplus did not go there + class key |
 
 Identity colours live in `presentation.hpp`.
 
@@ -449,7 +449,8 @@ arming rule; Ben took the second rule (2026-08-30), stated here rather than left
 inferred from the code, which is what NR-722 exists to prevent.
 
 **One lens has no ledger to pair with, and that is not an omission.**
-`Logistics` is **inert** in that routing table and has no ledger at all: it is
+`Logistics` routes a press to the **tile** (SELECTION.md § A lens collapses selection to ONE
+TIER) and has no ledger of its own: it is
 the surface half of `LOGISTICS.md` § Logistic Points, and no ledger surfaces LP.
 Logistics is the road and Supply is the traffic; the Convoys ledger is the traffic's, so
 the lens's twin would be a **Logistics ledger that does not exist**. (The Corporation and
@@ -844,9 +845,18 @@ surplus. No rival's shipments, shelves or refusals appear. A market's own shelf 
 no nation's shipments and do not appear either.
 
 **Surface (Planetary).**
-- **Flows** — one arrow per (source market, destination market, good) the player shipped,
+- **Flows** — one path per (source market, destination market, good) the player shipped,
   width from units over a short trailing window, in the neutral logistics hue. Hover: good,
   units, landed price (the destination price the dispatcher netted against its haul).
+- **A flow rides the network** (Ben, 2026-10-26: *"render the paths from one market to another
+  over the actual network"*). The path is drawn along the tiles the newest shipment of that flow
+  was **priced on** — the overland road path, or land → port → sea lane → port → land, or road →
+  rail → road — the route the dispatcher recorded with the shipment and the one a convoy of it
+  rides (`SUPPLY.md` § Logistical cost: the lane is the legs). It is never the chord between the
+  two market centres. It sits a few pixels to the right of the route, so A → B and B → A read as
+  two paths; dark **chevrons** down its length give the direction, the **head** sits at the
+  destination, and its **width** is the volume. A flow whose route can no longer be walked (a road
+  cut since it was priced) falls back to the straight arrow between the centres.
 - **Refusals** — a marker on each market of the active body that is short of a good the
   player holds in surplus, coloured by the **best** class over the player's sources of
   that good. Hover lists the classes by good.
@@ -869,11 +879,14 @@ different dispatcher with its own order; its labels are the tool's
 (`body / noroute / gate / costly / noroom / room`), not these.
 
 **Data.** The dispatcher records, for the player's nation only, each pass's
-shipments and its best class per (good, destination market) as a transient output,
+shipments — with each shipment's priced route waypoints (its origin tile, its two ports, its two
+stations) — and its best class per (good, destination market) as a transient output,
 tagged with the nation it was taken for. The lens draws only passes taken for the
 nation the player holds now, so a seat change shows nothing of the nation
 left behind. The simulation never reads the record and it is not saved, so a loaded
-game shows the lens from its first pass on.
+game shows the lens from its first pass on. A flow's tiles are read from those waypoints by the
+one route reader every convoy surface uses, and held per flow until its waypoints or the network
+move, so a frame re-derives no path.
 
 **Legend.** A class key (colour → class) and a flow-width key (units per tick), in the
 shared legend home.
@@ -931,7 +944,9 @@ it along the chains of `LOGISTICS.md` § How a tile's points get to it:
   capital, once per share. A building no source qualifies for lays its request
   on its own tile, with nothing supplied.
 - **The colour is the ratio supplied / requested on a log2 scale**: **2 or more is full
-  green**, **0.5 or less is full yellow**, interpolated between, so 1 sits at the midpoint.
+  green**, **1 is yellow**, **0.5 or less is full red** (Ben, 2026-10-26: *"use red for the
+  extreme"*), interpolated on log2 between the three stops — so a link short by half or more
+  reads as the alarm it is, and a link exactly covered reads amber, not as a shortfall.
   The ramp is for links that **carry** a routed request; a link no request crosses is not on
   it at all (Reach is kept apart from traffic, below).
 - The road keeps its **tier** — width and the 1 : 1.5 : 2 weights, and the tier's opacity
@@ -996,7 +1011,8 @@ and port with the points it actually makes, upkeep folded in, read off the econo
 own resolve. **A city is not a source** (`LOGISTICS.md` § Logistic Points, "Cities make
 none"), nor is one on ground no nation holds, nor one on a neighbour's.
 
-**The key** carries the road ramp (yellow *0.5x* → green *2x+*, "supplied / requested"),
+**The key** carries the road ramp (red *0.5x* → yellow *1x* → green *2x+*, captioned "supplied /
+requested"),
 the source ring drawn exactly as the map draws it beside the largest source's rate, and the
 nation's arithmetic, absolute: what its connected sources **generated** this tick and how
 many; what its buildings **consumed** — production's grants, the marches' grants and what
@@ -1032,8 +1048,9 @@ its measured cost. The capital star shows under this lens (PLANETARY.md § The c
 
 **Colour.**
 
-- **Link carrying traffic:** yellow `(236, 206, 60)` → green `(84, 214, 104)` on `t =
-  (log2(supplied / requested) + 1) / 2`, clamped to [0, 1]; a road keeps its tier's alpha.
+- **Link carrying traffic:** red `(226, 72, 58)` at `t = 0` → yellow `(236, 206, 60)` at
+  `t = 0.5` → green `(84, 214, 104)` at `t = 1`, on `t = (log2(supplied / requested) + 1) / 2`,
+  clamped to [0, 1]; a road keeps its tier's alpha.
 - **Connected, idle:** steel `(204, 214, 230)`. **Not tied to the capital:** umber `(118, 104, 92)`.
 - **Rail track** (every track tile; the lens draws it): ballast `(92, 86, 80)`.
 - **Source:** a **ring** on the source tile, its thickness carrying that source's share of

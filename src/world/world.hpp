@@ -65,6 +65,16 @@ struct trade_flow_shipment
     std::uint16_t good   = 0;           ///< resource_type index.
     float         units  = 0.0f;        ///< What was actually sent (after any LP trim).
     float         price_d = 0.0f;       ///< The destination price the dispatcher netted against its haul.
+    /// THE ROUTE IT WAS PRICED ON (Ben, 2026-10-26: the lens draws a flow over the network
+    /// it actually rides). The priced leg's waypoints, exactly as `commit_trade_shipment`
+    /// copies them onto the convoy (`convoy_leg`), so `convoy_route_tiles` reads this
+    /// shipment's tiles as it reads the convoy's. Write-only for the sim, like the rest.
+    convoy_mode   mode        = convoy_mode::land;
+    entity_id     origin_tile = null_entity;
+    entity_id     port_a      = null_entity;
+    entity_id     port_b      = null_entity;
+    entity_id     station_a   = null_entity;
+    entity_id     station_b   = null_entity;
 };
 
 /// One dispatcher pass's player record: shipments, and the best class per

@@ -1585,7 +1585,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // rule on tile data is untouched. Zeros off the lens.
     v.set_function("logistics_roads", [this]() {
         sol::table out = m_lua.state().create_table();
-        int roads = 0, routed = 0, green = 0, yellow = 0, between = 0, ground = 0, routed_green = 0;
+        int roads = 0, routed = 0, green = 0, red = 0, between = 0, ground = 0, routed_green = 0;
+        int routed_red = 0, mid_yellow = 0; // Ben, 2026-10-26: red at 0.5x, yellow at 1x
         // Ben, 2026-10-25: every link of the chain, and reach apart from traffic.
         int rail = 0, sea = 0, idle = 0, off_chain = 0, carrying = 0;
         double sup = 0.0, req = 0.0;
@@ -1612,14 +1613,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 ++routed;
             sup += s;
             req += r;
-            // The canvas's own ramp (logistics_road_t): log2 of the ratio, 2x and 0.5x
-            // the ends, an unrequested road green.
+            // The canvas's own ramp (logistics_road_t): log2 of the ratio, 2x green,
+            // 1x yellow, 0.5x red (Ben, 2026-10-26), an unrequested road green.
             const float t = !(r > 0.0f) ? 1.0f
                           : !(s > 0.0f) ? 0.0f
                           : std::clamp((std::log2(s / r) + 1.0f) * 0.5f, 0.0f, 1.0f);
             if (t >= 0.999f && r > 0.0f) ++routed_green;
+            if (t <= 0.001f && r > 0.0f && chain >= 2) ++routed_red;
+            if (std::fabs(t - 0.5f) <= 0.125f && r > 0.0f) ++mid_yellow; // 0.84x .. 1.19x
             if (t >= 0.999f)      ++green;
-            else if (t <= 0.001f) ++yellow;
+            else if (t <= 0.001f) ++red;
             else                  ++between;
         }
         out["roads"]     = roads;   // the player nation's road tiles here
@@ -1627,7 +1630,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["green"]     = green;   // ratio >= 2, or nothing requested
         out["routed_green"] = routed_green; // ratio >= 2 with a request routed through
         // `supplied` below is what the chain could deliver (available), not the grant.
-        out["yellow"]    = yellow;  // ratio <= 0.5
+        out["red"]       = red;     // ratio <= 0.5: the ramp's RED end (Ben, 2026-10-26)
+        out["routed_red"] = routed_red; // of them, carrying a routed request (drawn red)
+        out["near_one"]  = mid_yellow;  // routed, ratio within a quarter-octave of 1: yellow
         out["between"]   = between;
         out["ground"]    = ground;  // the nation's other (non-road) tiles
         out["supplied"]  = sup;     // summed over the roads, LP/tick
@@ -3780,6 +3785,228 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     v.set_function("trade_flow_counts", [this]() {
         return std::make_tuple(m_ui.trade_flow_arrows, m_ui.trade_flow_markers,
                                m_ui.trade_flow_passes);
+    });
+
+    // The Trade-flow lens's ROUTED paths (Ben, 2026-10-26): of the flows drawn last frame,
+    // how many rode a network route and how many fell back to the straight arrow, and
+    // how many routes the lens holds with their total tile count. Counts only.
+    v.set_function("trade_flow_routes", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["routed"]   = m_ui.trade_flow_routed;
+        out["unrouted"] = m_ui.trade_flow_unrouted;
+        out["routes"]   = static_cast<int>(m_ui.tf_routes.size());
+        long long tiles = 0;
+        int over_water = 0, over_rail = 0;
+        for (const auto& r : m_ui.tf_routes)
+        {
+            tiles += static_cast<long long>(r.tiles.size());
+            bool wet = false, rail = false;
+            for (const entity_id t : r.tiles)
+            {
+                const auto it = m_world.tiles.find(t);
+                if (it != m_world.tiles.end() && is_water(it->second.substrate)) wet = true;
+                if (m_world.rail_track.count(t) != 0) rail = true;
+            }
+            over_water += wet ? 1 : 0;
+            over_rail  += rail ? 1 : 0;
+        }
+        out["tiles"]      = tiles;
+        // The record under the lens, for a check that finds nothing drawn: how many
+        // shipments the player's window holds, and the player's convoys in flight.
+        int shipments = 0;
+        for (const trade_flow_pass& tp : m_world.player_trade_flow)
+            shipments += static_cast<int>(tp.shipments.size());
+        int convoys = 0;
+        for (const auto& cv : m_world.convoys)
+            if (cv.corp == m_world.player_entity || cv.corp == player_actor(m_world))
+                ++convoys;
+        out["shipments"]  = shipments;
+        out["convoys"]    = convoys;
+        out["over_water"] = over_water; // routes with a sea or lake leg
+        out["over_rail"]  = over_rail;  // routes riding a railway
+        // Where the first route's source market centre is, so a capture can frame it:
+        // a market centre is public (the Market lens draws it), a position only.
+        out["has_first"] = false;
+        if (!m_ui.tf_routes.empty())
+        {
+            const auto mit = m_world.markets.find(m_ui.tf_routes.front().src);
+            if (mit != m_world.markets.end())
+                if (const auto ct = m_world.tiles.find(mit->second.centre_tile); ct != m_world.tiles.end())
+                {
+                    out["has_first"] = true;
+                    out["first_x"] = ct->second.grid_x;
+                    out["first_y"] = ct->second.grid_y;
+                    out["first_len"] = static_cast<int>(m_ui.tf_routes.front().tiles.size());
+                }
+        }
+        return out;
+    });
+
+    // STAGE ONE TRADE-FLOW RECORD (Ben, 2026-10-26: the lens draws a flow over the network
+    // it rides). Verify-only: the trade pass refuses the player's shipments on the verify
+    // world (its nation's Logistic Point pool is empty, BL-1361), so the lens had nothing
+    // to route. This prices the leg with the DISPATCHER'S OWN call (`price_trade_leg`) and
+    // appends to the newest player pass exactly the shipment `run_trades` records - the
+    // same waypoints - without moving a good, a credit or a point. The record is a
+    // write-only view record the simulation never reads and never saves. Returns whether
+    // the leg was viable and its shape (mode, ports, stations), nothing else.
+    v.set_function("stage_trade_flow", [this](unsigned src, unsigned dst, const std::string& res,
+                                              double units) {
+        sol::table out = m_lua.state().create_table();
+        out["ok"] = false;
+        bool rok = false;
+        const resource_type r = resource_names::resource_from_name(res, rok);
+        if (!rok || !std::isfinite(units) || !(units > 0.0))
+            return out;
+        const entity_id a = static_cast<entity_id>(src), b = static_cast<entity_id>(dst);
+        if (m_world.markets.find(a) == m_world.markets.end() || m_world.markets.find(b) == m_world.markets.end())
+            return out;
+        const logistics_nodes nodes = collect_logistics_nodes(m_world);
+        const convoy_leg leg = price_trade_leg(m_world, m_registry, nodes, m_world.player_entity, a, b,
+                                               static_cast<std::size_t>(r), static_cast<float>(units));
+        if (!leg.viable)
+            return out;
+        if (m_world.player_trade_flow.empty() || m_world.player_trade_flow.back().corp != m_world.player_entity)
+        {
+            trade_flow_pass tp;
+            tp.corp = m_world.player_entity;
+            m_world.player_trade_flow.push_back(std::move(tp));
+        }
+        m_world.player_trade_flow.back().shipments.push_back(
+            { a, b, static_cast<std::uint16_t>(r), static_cast<float>(units), 0.0f, leg.mode,
+              leg.origin_tile, leg.port_a, leg.port_b, leg.station_a, leg.station_b });
+        out["ok"]       = true;
+        out["sea"]      = leg.mode == convoy_mode::sea;
+        out["ports"]    = leg.port_a != null_entity && leg.port_b != null_entity;
+        out["stations"] = leg.station_a != null_entity && leg.station_b != null_entity;
+        return out;
+    });
+
+    // SEA LANES AND PORTS (Ben, 2026-10-26: "lanes that are not connected to ports"). A
+    // census on the active body, COUNTS ONLY to Lua - never a tile's position or figure,
+    // so the standing rule on tile data is untouched. The diagnosis's positions go to
+    // the log (stdout) from C++, for the report, and never cross the seam.
+    //   joins: lane-to-port joins the canvas draws (its own plan, ui_state).
+    v.set_function("lane_port_census", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["joins"] = m_ui.lane_port_joins;
+        const entity_id body = m_ui.active_body;
+        const auto bit = m_world.bodies.find(body);
+        if (bit == m_world.bodies.end())
+            return out;
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        const std::vector<entity_id>& grid = body_tile_grid(m_world, body);
+        const auto at = [&](int x, int y) -> const tile_component* {
+            if (y < 0 || y >= gh || gw <= 0) return nullptr;
+            const std::size_t i = static_cast<std::size_t>(y) * gw + static_cast<std::size_t>(((x % gw) + gw) % gw);
+            if (i >= grid.size()) return nullptr;
+            const auto it = m_world.tiles.find(grid[i]);
+            return it != m_world.tiles.end() ? &it->second : nullptr;
+        };
+        const auto laned = [&](int x, int y) { const tile_component* t = at(x, y); return t && t->lane_level > 0; };
+        // Port tiles: standing, and any port building at all (building or decommissioned).
+        std::map<std::pair<int, int>, int> port_state; // 2 standing, 1 not standing
+        for (const auto& [bid, b] : m_world.buildings)
+        {
+            (void)bid;
+            if (b.type != building_type::port) continue;
+            const auto tit = m_world.tiles.find(b.tile);
+            if (tit == m_world.tiles.end() || tit->second.body != body) continue;
+            const int st = (b.ticks_remaining <= 0 && !b.decommissioned) ? 2 : 1;
+            int& v2 = port_state[{tit->second.grid_x, tit->second.grid_y}];
+            v2 = std::max(v2, st);
+        }
+        const auto port_beside = [&](int x, int y, int need) {
+            for (int side = 0; side < 6; ++side)
+            {
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(x, y, side);
+                const auto f = port_state.find({((nb.gx % gw) + gw) % gw, nb.gy});
+                if (f != port_state.end() && f->second >= need) return true;
+            }
+            return false;
+        };
+        const auto port_within = [&](int x, int y, int rad) {
+            for (const auto& [pos, st] : port_state)
+            {
+                int dx = std::abs(pos.first - x); dx = std::min(dx, gw - dx);
+                if (dx <= rad && std::abs(pos.second - y) <= rad) return true;
+            }
+            return false;
+        };
+        const auto coastal = [&](int x, int y) {
+            for (int side = 0; side < 6; ++side)
+            {
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(x, y, side);
+                const tile_component* t = at(nb.gx, nb.gy);
+                if (t && !is_water(t->substrate)) return true;
+            }
+            return false;
+        };
+        int ports = 0, ports_laned = 0, ports_unlaned_lane_near = 0, ports_dry = 0;
+        for (const auto& [pos, st] : port_state)
+        {
+            if (st < 2) continue;
+            ++ports;
+            bool wet = false, ln = false;
+            for (int side = 0; side < 6; ++side)
+            {
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(pos.first, pos.second, side);
+                const tile_component* t = at(nb.gx, nb.gy);
+                if (t && is_water(t->substrate)) wet = true;
+                if (t && t->lane_level > 0) ln = true;
+            }
+            if (!wet) ++ports_dry;
+            if (ln) { ++ports_laned; continue; }
+            bool lane_close = false;
+            for (int dy = -3; dy <= 3 && !lane_close; ++dy)
+                for (int dx = -3; dx <= 3 && !lane_close; ++dx)
+                    lane_close = laned(pos.first + dx, pos.second + dy);
+            if (lane_close)
+            {
+                ++ports_unlaned_lane_near;
+                std::printf("[lane_port_census] port at %d,%d: no lane on its sides, a lane within 3\n",
+                            pos.first, pos.second);
+            }
+        }
+        int lane_tiles = 0, ends = 0, ends_at_port = 0, ends_at_unstanding = 0, orphan = 0;
+        int orphan_coastal = 0, orphan_port_near = 0, printed = 0;
+        for (int y = 0; y < gh; ++y)
+            for (int x = 0; x < gw; ++x)
+            {
+                if (!laned(x, y)) continue;
+                ++lane_tiles;
+                const int deg = (laned(x + 1, y) ? 1 : 0) + (laned(x - 1, y) ? 1 : 0)
+                              + (laned(x, y + 1) ? 1 : 0) + (laned(x, y - 1) ? 1 : 0);
+                if (deg > 1) continue;
+                ++ends;
+                if (port_beside(x, y, 2)) { ++ends_at_port; continue; }
+                if (port_beside(x, y, 1)) { ++ends_at_unstanding; continue; }
+                ++orphan;
+                const bool c = coastal(x, y);
+                const bool pn = port_within(x, y, 3);
+                orphan_coastal += c ? 1 : 0;
+                orphan_port_near += pn ? 1 : 0;
+                if (printed < 16)
+                {
+                    ++printed;
+                    std::printf("[lane_port_census] lane end at %d,%d (deg %d): no port beside; %s; %s\n",
+                                x, y, deg, c ? "on a coast" : "open water",
+                                pn ? "a port within 3" : "no port within 3");
+                }
+            }
+        std::fflush(stdout);
+        out["ports"]        = ports;          // standing ports on the body
+        out["ports_laned"]  = ports_laned;    // with a lane tile on one of its six sides
+        out["ports_dry"]    = ports_dry;      // with no water on any side
+        out["ports_unlaned_lane_near"] = ports_unlaned_lane_near; // no lane beside, one within 3
+        out["lane_tiles"]   = lane_tiles;
+        out["ends"]         = ends;           // lane tiles with at most one cardinal lane neighbour
+        out["ends_at_port"] = ends_at_port;   // beside a standing port
+        out["ends_at_unstanding"] = ends_at_unstanding; // beside a port still building / decommissioned
+        out["orphan_ends"]  = orphan;         // beside no port at all
+        out["orphan_coastal"]   = orphan_coastal;
+        out["orphan_port_near"] = orphan_port_near;
+        return out;
     });
 
     // Drill one row into the expanded Corporation-dashboard roll-up (BL-248), or
@@ -6831,6 +7058,42 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         invalidate_logistics_caches(m_world);
         m_ground.touch();
         out["ok"] = true;
+        return out;
+    });
+
+    // THE LOGISTICS LENS'S SHORTAGE FIXTURE (Ben, 2026-10-26: "use red for the extreme").
+    // The chain fixture's links all run at 2x or more, so nothing on it is short. This
+    // stages ONE processing works on a road tile of the player nation that NO connected
+    // source reaches (the lens's own off-chain state, lp_chain 0 - read off the lens, so
+    // it must be armed and drawn first): a building no source qualifies for lays its
+    // request on its own tile with nothing supplied (LENSES.md § Logistics lens), so after
+    // the next resolve that road reads supplied 0 over its need - the ramp's red end.
+    // C++ picks the tile, the lowest raster index; the script gets back its POSITION only,
+    // as the chain fixture returns its pieces'. Verify-only staging, behind --verify.
+    v.set_function("logistics_shortage_fixture", [this, stage_one]() {
+        sol::table out = m_lua.state().create_table();
+        out["ok"] = false;
+        const int gw = m_ui.lp_reaching_gw;
+        const std::size_t n = std::min(m_ui.lp_on_road.size(), m_ui.lp_chain.size());
+        if (gw <= 0 || m_ui.active_body == null_entity)
+            return out;
+        const std::vector<entity_id>& grid = body_tile_grid(m_world, m_ui.active_body);
+        for (std::size_t i = 0; i < n && i < grid.size(); ++i)
+        {
+            if (m_ui.lp_on_road[i] != 1 || m_ui.lp_chain[i] != 0)
+                continue;
+            const auto tit = m_world.tiles.find(grid[i]);
+            if (tit == m_world.tiles.end() || is_water(tit->second.substrate))
+                continue;
+            if (stage_one(grid[i], "processing", "", false, false) == null_entity)
+                continue;
+            invalidate_logistics_caches(m_world);
+            m_ground.touch();
+            out["ok"] = true;
+            out["x"]  = tit->second.grid_x;
+            out["y"]  = tit->second.grid_y;
+            return out;
+        }
         return out;
     });
 
