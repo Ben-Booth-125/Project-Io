@@ -320,8 +320,9 @@ The money loop is not the only thing that moves a treasury in a quarter. A retur
 one refund it books (above). Every other debit or credit lands elsewhere in the tick and appears in
 **no** return:
 
-- **Construction** — the build press's charge, and the flat per-tick build charge while a site
-  rises. (The site's materials are bought at the clear, so they *are* in `expenditure`.)
+- **Construction** — the build press's charge: the site's whole flat credit cost, paid once at
+  placement (Ben, 2026-10-25). (The site's materials are bought at the clear, at the shelf's posted
+  price, so they *are* in `expenditure` — Ben, 2026-10-26: costs depend on market prices.)
 - **Retooling** — the charge for switching a building's recipe.
 - **Hiring** — a unit's hire cost and the kit it buys off the shelves — and a unit's
   **movement credits**, priced per Logistic Point drawn.

@@ -21,6 +21,7 @@ enum class construction_result : uint8_t
     wrong_air,           ///< The recipe cannot run on this body's air (propellant routes, Ben 2026-10-09).
     needs_road,          ///< BL-1347: no road reaches the tile (a building), or the named tile carries none to lay from (BL-1348, a road).
     foreign_ground,      ///< BL-1357: a road may cross a border and no further -- the named tile is another nation's.
+    site_busy,           ///< One site per tile (Ben, 2026-10-26): a building is already under construction on the tile.
     // BL-692 removed `depth_locked` (BL-428): chain depth no longer gates a
     // build, so the value became unreachable. Tech is the only method lock now.
 };

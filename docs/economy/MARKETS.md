@@ -34,7 +34,9 @@ and buyer at a market is a nation's building (Ben, 2026-10-23: there are no corp
   the named-supplier contract retired with the corporations (Ben, 2026-10-23; `CONTRACTS.md`).
 - **Everyone buys from the shelf.** A processor's inputs, a construction site's materials,
   building upkeep, procurement, the space programme and a launch's propellant are all bought on
-  the shelf at the posted price, under the fair-price ceiling. A nation buys even its own
+  the shelf at the posted price, under the fair-price ceiling. A build's cost therefore depends
+  on market prices: its flat credits are paid at placement, its materials bought here as it draws
+  them (Ben, 2026-10-26: costs depend on market prices). A nation buys even its own
   buildings' output back: vertical integration is a location, not a free transfer.
 - **Goods leave a market only by trade** (`TRADE.md`), which buys on one shelf and lands on
   another.

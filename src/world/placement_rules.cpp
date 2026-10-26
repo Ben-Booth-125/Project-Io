@@ -37,6 +37,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::no_road_to_extend: return "A road is laid from a road - this tile carries none to build out of";
         case placement_reason::foreign_ground: return "A road may cross a border, but not run on past it - this ground is not your nation's";
         case placement_reason::not_own_ground: return "A nation builds only on its own ground - this tile is not your nation's";
+        case placement_reason::site_under_construction: return "A building is already under construction on this tile - one site at a time";
     }
     return "Cannot build here";
 }
@@ -636,6 +637,16 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     if (!tile_has_road(tc_it->second))
         return placement_reason::needs_road;
 
+    // ONE SITE PER TILE (Ben, 2026-10-26: "To slow the pace of the game down, we need
+    // to add a limit so that tiles can only construct one building at a time";
+    // PRODUCTION.md § One site under construction per tile). A tile holding a building
+    // under construction takes no second building of any type until it completes. Here,
+    // in the one world-level placement check, so the build door, the scorer's
+    // candidates and every preview refuse it alike. Generation is not touched: every
+    // generated building stands complete, so no generated tile holds a site.
+    if (tile_has_site_under_construction(w, tile_id))
+        return placement_reason::site_under_construction;
+
     // Stack ceiling: a tile carries several sites working one deposit, but not
     // without limit. Checked last — a full stack is the least interesting reason
     // to refuse, and the terrain reasons above teach the player more.
@@ -816,6 +827,20 @@ bool maybe_transform_to_urban(world& w, entity_id tile_id)
         // up to urban should not be stuck at its pre-transform ceiling.
         tc.habitability = std::max(tc.habitability, 0.80f);
         return true;
+    }
+    return false;
+}
+
+bool tile_has_site_under_construction(const world& w, entity_id tile_id)
+{
+    // Inside a province_ceiling_scope, the scope's one building walk.
+    if (const int scoped = scoped_sites_on_tile(w, tile_id); scoped >= 0)
+        return scoped > 0;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        (void)bid;
+        if (bc.tile == tile_id && bc.ticks_remaining > 0)
+            return true;
     }
     return false;
 }
