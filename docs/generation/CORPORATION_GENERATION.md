@@ -109,15 +109,22 @@ small and thematically tight — a foothold in one slice of one chain.
 - **Count — lean and focus-shaped.** The ranges (inclusive, `holdings_range` in
   `corporation_generation.cpp`) are **extraction 3–4**, **processing 2–3**, **trade 1–2**. Ground
   too cramped or deposit-poor yields fewer — the count is a ceiling, not a guarantee.
-- **Anchored near its centre** (BL-283, region-anchored holdings). The anchor tile is searched in a
-  window around the centre, then the centre's region (`INDUSTRIALISATION.md` § 1, *a charter stays
-  near its centre*). "Inside a region" is `nearest_region`: regions are anchor points, not stored
-  tile sets.
+- **Industry gathers where logistics is cheap (Ben, 2026-10-26).** A processing or trade charter
+  anchors at its nation's **capital** first, where the Logistic Point chain is rooted and points
+  are cheapest; then at the nation's **market centres** in order of chain distance to the capital,
+  nearest first, where stacked points pay. Ties go to the lower tile index. The anchor tile is
+  searched in a window around that anchor, then its region; "inside a region" is
+  `nearest_region`: regions are anchor points, not stored tile sets. The window and region search
+  are BL-283 (region-anchored holdings); what changed is which place a charter anchors at.
+- **An extractor takes the deposit that is rich and served (Ben, 2026-10-26).** Extraction must
+  stand on its deposit, so it cannot move to the capital. Among a charter's candidate deposits it
+  ranks each by **richness × Logistic Point cover** at that tile, so that of two equally rich
+  deposits the one the chain reaches wins. Ties go to the lower tile index.
 - **Cluster around the anchor.** The remaining slots fill the nearest valid unoccupied tiles of the
   same nation by grid distance.
 - **On own ground, every rung.** No anchor rung and no cluster slot leaves the nation's tiles (§ Design
   principles). A charter that finds no ground there is counted unspent, never scattered.
-- **Mix follows focus.** An extraction charter places extractors on its richest deposits, a
+- **Mix follows focus.** An extraction charter places extractors on its best-served rich deposits (above), a
   processing charter pairs processors with feed, a trade charter a depot. The patterns themselves
   are an open item to ground in post-war industrial history (§ Open items).
 - **Validity-gated.** Every placement is gated by `placement_rules::can_place` (the shared
@@ -177,7 +184,11 @@ small and thematically tight — a foothold in one slice of one chain.
     `chain_infeasible` (the windows held ground, none of it within reach of a chain), distinct from
     `window_exhausted` (no ground at all).
 
-No two buildings begin on the same tile.
+**Buildings stack only on station cities (Ben, 2026-10-26).** Rail delivers points station to
+station, so a city tile holding a railway station is where stacked buildings draw the most from
+the line. On such a tile a charter may place buildings up to the tile's stack cap. Every other tile
+begins with at most one building. The one-site-per-tile limit on construction in play is a separate
+rule (`../economy/PRODUCTION.md`); generation's opening buildings stand complete.
 
 ### Pass 3b — HQ designation & border range
 
