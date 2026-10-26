@@ -184,10 +184,8 @@ small and thematically tight — a foothold in one slice of one chain.
     `chain_infeasible` (the windows held ground, none of it within reach of a chain), distinct from
     `window_exhausted` (no ground at all).
 
-**Buildings stack only on station cities (Ben, 2026-10-26).** Rail delivers points station to
-station, so a city tile holding a railway station is where stacked buildings draw the most from
-the line. On such a tile a charter may place buildings up to the tile's stack cap. Every other tile
-begins with at most one building. The one-site-per-tile limit on construction in play is a separate
+**Buildings stack on every tile (Ben, 2026-10-26).** A charter may place buildings on any tile up
+to that tile's stack cap; the cluster fills a tile before it spreads to the next. The one-site-per-tile limit on construction in play is a separate
 rule (`../economy/PRODUCTION.md`); generation's opening buildings stand complete.
 
 ### Pass 3b — HQ designation & border range
