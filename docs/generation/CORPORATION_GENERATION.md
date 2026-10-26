@@ -109,15 +109,49 @@ small and thematically tight — a foothold in one slice of one chain.
 - **Count — lean and focus-shaped.** The ranges (inclusive, `holdings_range` in
   `corporation_generation.cpp`) are **extraction 3–4**, **processing 2–3**, **trade 1–2**. Ground
   too cramped or deposit-poor yields fewer — the count is a ceiling, not a guarantee.
-- **Anchored near its centre** (BL-283, region-anchored holdings). The anchor tile is searched in a
-  window around the centre, then the centre's region (`INDUSTRIALISATION.md` § 1, *a charter stays
-  near its centre*). "Inside a region" is `nearest_region`: regions are anchor points, not stored
-  tile sets.
-- **Cluster around the anchor.** The remaining slots fill the nearest valid unoccupied tiles of the
-  same nation by grid distance.
+- **Industry gathers where logistics is cheap (Ben, 2026-10-26).** A processing or trade charter
+  anchors at its nation's **capital** first, where the Logistic Point chain is rooted and points
+  are cheapest; then at the nation's **market centres** in order of chain distance to the capital,
+  nearest first, where stacked points pay. Ties go to the lower tile index. The anchor tile is
+  searched in a window around that anchor, then its region; "inside a region" is
+  `nearest_region`: regions are anchor points, not stored tile sets. The window and region search
+  are BL-283 (region-anchored holdings); what changed is which place a charter anchors at.
+  **Chain distance** is the road-network cost from the capital — each step priced by the road tier
+  on the edge it crosses, as the Logistic Point road field prices it — because the seeding lays the
+  chain out from the capital along exactly that network (`../economy/LOGISTICS.md` § Where
+  generation puts the sources). A market centre the capital's roads do not reach comes after every
+  reached one. Only the capital's body counts. A nation with neither a capital nor a market centre
+  on its ground anchors at its own centre, the one place it has. An extraction charter keeps its own
+  centre: it stands on its deposits.
+- **An extractor takes the deposit that is rich and served (Ben, 2026-10-26).** Extraction must
+  stand on its deposit, so it cannot move to the capital. Among a charter's candidate deposits it
+  ranks each by **richness × Logistic Point cover** at that tile, so that of two equally rich
+  deposits the one the chain reaches wins. Where neither is reached the richer wins; then the lower
+  tile index. The anchor is ranked, not drawn. A Well or Wharf site has no deposit to rank and keeps
+  its draw (§ Pass 6, the dig ladder).
+- **What cover means at placement (decided 2026-10-26; the reading delegated to the implementer).**
+  No Logistic Point source stands yet when a charter is placed: the fold seeds them after every
+  charter, and the site roads join each building to its network after that. So the cover read at
+  placement is the cover the seeding is **bound** to give before it reaches for any consumer — a
+  source on the nation's **capital**, and every one of its **market centres** covered at full
+  strength by the chain laid out from it (`../economy/LOGISTICS.md` § Where generation puts the
+  sources, the order it seeds in). A tile's cover is the road reach at its distance from the nearest
+  of those points: full strength to 6, nothing by 12. The distance is walked as the road field walks
+  it, each step priced by the road tier on the edge it crosses. Off the road, a step over the
+  nation's own dry ground costs a Track's, the crossing the site-road join will lay to the building
+  (`../economy/LOGISTICS.md` § 4, *A site's road joins its own nation's network*). Roads do not
+  move during the walk, so a nation's field is read once.
+  It is honest and conservative. It never credits a point the seeding may not place. It does not
+  foresee the hubs a chain lays between the capital and a far centre, nor those laid outward to a
+  consumer. Generation covers every consumer in the end, so the finished world's cover cannot rank
+  deposits: measured, every extractor opens at full cover.
+- **Cluster around the anchor.** The remaining slots fill the nearest valid tiles of the same nation
+  that still have room, by grid distance, the anchor's own tile first — so the cluster fills a tile
+  before it spreads to the next. Extraction sites are the exception: they spread across the window's
+  ranked deposits before they stack (below).
 - **On own ground, every rung.** No anchor rung and no cluster slot leaves the nation's tiles (§ Design
   principles). A charter that finds no ground there is counted unspent, never scattered.
-- **Mix follows focus.** An extraction charter places extractors on its richest deposits, a
+- **Mix follows focus.** An extraction charter places extractors on its best-served rich deposits (above), a
   processing charter pairs processors with feed, a trade charter a depot. The patterns themselves
   are an open item to ground in post-war industrial history (§ Open items).
 - **Validity-gated.** Every placement is gated by `placement_rules::can_place` (the shared
@@ -177,7 +211,20 @@ small and thematically tight — a foothold in one slice of one chain.
     `chain_infeasible` (the windows held ground, none of it within reach of a chain), distinct from
     `window_exhausted` (no ground at all).
 
-No two buildings begin on the same tile.
+**Buildings stack on every tile (Ben, 2026-10-26).** A charter may place buildings on any tile up
+to that tile's stack cap; a non-extraction building fills a tile before it spreads to the next.
+**Extraction spreads, then stacks (Ben, 2026-10-26: "we should be doing both, so we have stacking and
+spread extraction").** An extraction site goes first to the best-ranked deposit of its charter's
+window (richness × cover) that no site of its target works yet, one site per deposit tile; it stacks
+only once every such deposit holds one, on the best-ranked deposit with room. So a deposit-rich
+charter spreads and a deposit-poor one stacks. A window with no deposit room left takes the nearest
+deposit beyond it, as any other slot does. The cap is the
+placement rules' own, on two axes that never share a slot: extraction sites of one target up to the
+deposit's richness-bound stack capacity, and every other building together up to the ground's
+non-extraction cap (`../economy/PRODUCTION.md` § Building stacks). A stacked site yields its rank's
+share, as it does in play, and every generation reading of nominal output counts it at that share,
+so the spare-input rule never credits supply the stack will not make. The one-site-per-tile limit on construction in play is a separate
+rule (`../economy/PRODUCTION.md`); generation's opening buildings stand complete.
 
 ### Pass 3b — HQ designation & border range
 
@@ -272,7 +319,7 @@ charter for either gap stands only on that ladder's ground:
   **Fishing Wharf** site (coastal, no produce deposit).
 
 A depositless site is drawn at random with each site weighted by its habitability plus 0.05; a
-deposit by the deposit. Each tier is tried across every window the charter may anchor in before the
+deposit is ranked by richness × cover (§ Pass 3). Each tier is tried across every window the charter may anchor in before the
 next. Where its windows hold no ground for the good at all it places **nothing** — no fallback to
 another deposit, which would spend the slot on a good nobody chose. The good is passed over for the
 rest of that centre and the next good is taken. Every other gap good keeps the richest-deposit rule.

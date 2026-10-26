@@ -179,11 +179,12 @@ struct input_reach
         float         assigned, supply;
         int           wt, ticks;
         bool          decom;
+        int           rank = 1; ///< its place in its tile's extraction stack (BL-193)
         bool operator==(const building_sig& o) const
         {
             return type == o.type && recipe == o.recipe && tile == o.tile && target == o.target
                 && assigned == o.assigned && supply == o.supply && wt == o.wt
-                && ticks == o.ticks && decom == o.decom;
+                && ticks == o.ticks && decom == o.decom && rank == o.rank;
         }
     };
     struct indexed_building
@@ -221,10 +222,13 @@ void input_reach_invalidate(input_reach& ir);
 void input_reach_refresh(const world& w, const recipe_registry& reg, input_reach& ir);
 
 /// Output of resource @p r by building @p b per tick (see PRODUCER): actual when
-/// @p report carries rows, nominal otherwise; 0 for a non-producer.
+/// @p report carries rows, nominal otherwise; 0 for a non-producer. A NOMINAL
+/// extraction reading is diminished by the site's rank in its tile's stack,
+/// @p stack_rank (BL-193, `placement_rules::stack_output_scalar`) — the rank the
+/// economy runs it at; 1, the default, is a lone site and changes nothing.
 float building_output(const world& w, const recipe_registry& reg, entity_id bid,
                       const building_component& b, std::size_t r,
-                      const economy_report* report);
+                      const economy_report* report, int stack_rank = 1);
 
 /// True when @p b yields resource @p r at its nominal rate (the generation
 /// reading: no report).
