@@ -794,6 +794,95 @@
    ],
    "title": "A generated player building stands on a tile with no road",
    "design": "Found re-aiming construction_ledger_tabs.lua on main 2203345c: in the --verify world, after the fixture's 12 economy steps, the player's Electronics plant at (257,85) stands on a tile with no road edge - every Build door row reads \"No road reaches this tile\". placement_rules.cpp says roads are laid to every generated site, so the 1960 world should hold no such building. Candidates: the islet cession (0f5b214e) or capital reseat (7c5eb0b4) moving ground after the site join, or a building placed after lay_site_roads_every_body. THE WORK: trace where it comes from; fix in that mechanism; add a census row that every generated building stands on a roaded tile. CANCELLED 2026-10-26 (Ben, at the sprint 57 close: drop the carried items)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 57 close review, 2026-10-26)",
+   "requires": [],
+   "difficulty": 3,
+   "priority": "B",
+   "id": "BL-1413",
+   "short_name": "RECURATE_SIX_SEEDS",
+   "category": "Generation",
+   "authority_doc": "docs/generation/seed_library.json",
+   "files": [
+    "docs/generation/seed_library.json",
+    "tools/session/seed_library.js"
+   ],
+   "title": "Re-curate the six library seeds that no longer serve their purpose",
+   "design": "Ben, 2026-10-26 (NR-979 A): re-curate all six. Seeds 41, 43, 38, 32, 9 and one more no longer answer the question they were chosen for. THE WORK: sweep a seed pool for replacements that serve each lost purpose, measured with the harness each tag names; rewrite seed_library.json; seed_library.js --check passes."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 57 close review, 2026-10-26)",
+   "requires": [],
+   "difficulty": 2,
+   "priority": "B",
+   "id": "BL-1414",
+   "short_name": "TRADE_FLOW_ROOM_WITHOUT_RIVALS",
+   "category": "UI",
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/LENSES.md",
+    "docs/ui/DISCOVERY.md"
+   ],
+   "title": "The Trade-flow lens computes no-room without rivals' cargo in flight",
+   "design": "Ben, 2026-10-26 (NR-980 B): the lens computes a market's room without other nations' cargo in flight to it, so no-room never reveals a rival's shipments. The dispatcher keeps its own room figure; write in LENSES.md that the lens figure is the player's own view and may differ."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 57 close review, 2026-10-26)",
+   "requires": [],
+   "difficulty": 1,
+   "priority": "B",
+   "id": "BL-1415",
+   "short_name": "HEADER_NET_EXCLUDES_REFUNDS",
+   "category": "UI",
+   "authority_doc": "docs/ui/HEADER.md",
+   "files": [
+    "src/ui/header_panel.cpp",
+    "docs/ui/HEADER.md"
+   ],
+   "title": "The header NET shows operating net, excluding refunds",
+   "design": "Ben, 2026-10-26 (NR-1002 B): the header NET shows the operating net, excluding refunds, so it agrees with the Balance card. Refunds stay a separate line on the card."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 57 close review, 2026-10-26)",
+   "requires": [],
+   "difficulty": 1,
+   "priority": "B",
+   "id": "BL-1416",
+   "short_name": "DROP_PLAYER_IDENTITY_WASH",
+   "category": "UI",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/RENDERING.md"
+   ],
+   "title": "Drop the player-identity wash; keep the outline",
+   "design": "Ben, 2026-10-26 (NR-1004 A): drop the always-on player-identity wash on the plain canvas, which tints the player's baked structures; keep the always-on player outline."
   }
  ]
 }

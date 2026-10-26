@@ -24,11 +24,29 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*59 entries — 36 open, 23 resolved.*
+*59 entries — 1 open, 58 resolved.*
 
 ---
 
 ## Open
+
+### NR-1066 — Six questions the sweep could not settle once corporations retired
+*question · raised 2026-10-23 · from sprint 57 doc sweep*
+
+(1) EMBLEMS: PROFILE.md and ICONS.md now key the player's emblem by nation id, which sits against ICONS' own 'no nation flags' rule - keep a corporate-style emblem for the nation, or no emblem. (2) EMBARGO: what an embargo between nations gates, now there is no procurement between firms (RELATIONS.md open question 4). (3) DISCLOSURE: may the player read a rival nation's quarterly return or treasury (FINANCE.md § Disclosure; RELATIONS open question 5). (4) WORKS LEAN: INDUSTRIALISATION's Private Works vs State Arsenal fork has no subject - derive it some other way, or retire it. (5) INDUSTRIAL FOCUS: whether a nation's build scorer keeps a focus weight (AI_OPPONENT ~789) or it retires with the specialist. (6) INDUSTRY LENS: re-subjected to 'plants of nations other than the player's' - keep, or retire.
+
+**Why it matters.** Each is a design hole the removal opened; none blocks BL-1399..BL-1404, but (3) and (5) shape the AI and UI lanes.
+
+> **Recommendation:** (1) no emblem until designed; (2) an embargo bars a nation's goods from entering your markets; (3) a rival's treasury is private, its GDP public; (4) retire; (5) keep focus as the nation's economic_focus; (6) keep.
+
+*Files: `docs/ui/PROFILE.md`, `docs/politics/RELATIONS.md`, `docs/economy/FINANCE.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ai/AI_OPPONENT.md`, `docs/ui/LENSES.md`*
+
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
 
 ### NR-966 — NOVEL WORK: a both-trees shape probe for re-blesses (rebless_shape_probe)
 *novel-work · raised 2026-10-03 · from the sprint 48 re-bless lane*
@@ -42,6 +60,8 @@ tools/verify/rebless_shape_probe.cpp measures the world's shape (centres, scales
 - C: other
 
 > **Recommendation:** A for rebless_shape_probe; B for the rest.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): A - wrap rebless_shape_probe as a skill; the other probes stay ad hoc.
 
 *Files: `tools/verify/rebless_shape_probe.cpp`*
 
@@ -59,6 +79,8 @@ Settled in MARKETS.md sec The shelf spoils: every good on a market shelf loses a
 
 > **Recommendation:** A.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
 *Files: `docs/economy/MARKETS.md`, `scripts/economy.lua`, `src/world/market_clearing.cpp`*
 
 ### NR-975 — DECISION TAKEN: the lake size cap is 150 tiles (BL-1200)
@@ -75,6 +97,8 @@ lake_census (dff0abc1) measured 360 enclosed water bodies on the 16 curated seed
 
 > **Recommendation:** A.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
 *Files: `src/world/tile_generation.cpp`, `docs/economy/TILES.md`, `tools/verify/lake_census.cpp`*
 
 ### NR-977 — DECISION TAKEN: a short shelf is shared within each phase of the tick, construction first (BL-1209)
@@ -90,6 +114,8 @@ Your pro-rata ruling says every draw admitted against a short shelf in a tick sh
 
 > **Recommendation:** A for sprint 49; revisit in sprint 50 (logistics) if the trade-flow lens shows sites starving plants.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
 *Files: `src/world/economy_system.cpp`, `docs/economy/MARKETS.md`*
 
 ### NR-978 — DECISION TAKEN: the seat clean slate refunds everything a site was charged, not only materials (BL-1206)
@@ -103,6 +129,8 @@ Your ruling read "materials paid so far refunded". The build refunds the recorde
 - B: materials only (needs a field separating the flat slice and capacity)
 
 > **Recommendation:** A.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): closed as superseded by later work.
 
 *Files: `src/world/economy_system.cpp`, `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
 
@@ -119,6 +147,8 @@ After the sprint 49 re-bless (the lake cap moved every seed's history), the libr
 
 > **Recommendation:** C - check which tags a harness or skill queries (--for), replace those seeds, and let the rest go.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): A - re-curate all six seeds (backlog).
+
 *Files: `docs/generation/seed_library.json`*
 
 ### NR-980 — Trade-flow lens: may "no room" reflect rivals' cargo in flight to a market?
@@ -126,85 +156,119 @@ After the sprint 49 re-bless (the lake cap moved every seed's history), the libr
 
 The lens marks a short market "no room" when the destination cannot absorb more at the landed price. That room subtracts EVERY corporation's convoys in flight to it and stock pooled there, so "no room" tells the player, in aggregate, that someone is already filling that market. It names no rival and no quantity. DISCOVERY.md § Competitor visibility makes market supply/demand aggregates public but does not say whether goods in flight count. Options: (A) accept it as a public market signal (cargo on the road is observable) and say so in DISCOVERY.md; (B) compute the player's room without rivals' in-flight cargo for the lens only (a second room figure the dispatcher does not use, so the lens and the decision could disagree).
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): B - the Trade-flow lens computes room without rivals' cargo in flight (backlog).
+
 ### NR-982 — Decisions taken on your behalf building "an order is a floor, not a hold" (BL-1229)
 *decision · raised 2026-10-07 · from the BL-1229 (steel stays home) build lane, 2026-10-07*
 
 Four readings of the ruling, taken as the lane built them (reversible): (1) the dispatch margin applies ON TOP of the floor - a haul from an ordered pool must beat the floor by the same margin it must beat home by (the floor acts as that pool's home price when it is higher); (2) several orders on one (corp, body, good): the HIGHEST floor binds; (3) a quantity cap limits only what is listed at home per tick, not what may be hauled; (4) REVERSED by the cold review (2026-10-07): a pool hauled empty must NOT close its order, or the haul then ships below the floor and the ruling breaks - a pool hauled from this tick counts as not empty. Floors almost never bind today (0.25-0.31x base, 3 of 782 surplus-ticks), so (1) and (2) rarely matter in play.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
 
 ### NR-983 — Decision taken on your behalf: spare supply stays a conservative estimate where several markets share one producer (BL-1233)
 *decision · raised 2026-10-08 · from the BL-1233 (processors to inputs) round 2 re-review, 2026-10-08*
 
 The sized test's spare (input_reach.cpp reachable_supply) charges each consumer market min(its draw, the output of the markets that reach it), split among those markets by output. Where one producer is reached by several hungry consumers it can still be charged past its output (P2 making 10, reached by C, Q1, Q2 each drawing 10 -> spare 0, true 10). This only ever REFUSES a plant that could stand, never admits one that cannot; the exact answer needs a small max-flow per input. TAKEN: accepted as a conservative estimate, with a code comment naming it. Reversible; say if you want the exact (max-flow) reading.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
 ### NR-984 — Decision taken on your behalf: a nation's want for a good nobody holds yet is recorded at its capital market
 *decision · raised 2026-10-08 · from the BL-1227 (idle mines) round 4 build and re-review*
 
 Your ruling: the space programme's / network upkeep's want counts as a bid "there", filled or not. When no pool or shelf anywhere holds the good, there is no "there" to read, so the build records the want at the nation's CAPITAL market. Effect: one such chain (propellant, spacecraft components) can start per nation, at its capital; once a plant exists the want follows the good. In play this took spacecraft-components plants from 0 to 22 on 5 seeds. TAKEN as built and written into AI_OPPONENT.md § 2B. Alternatives: every market of the nation (more starts, more idle risk), or the market nearest the nation's space infrastructure.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
 
 ### NR-985 — Decision taken on your behalf: an unpowered grid that no window can feed does not hold up the others (BL-1232)
 *decision · raised 2026-10-08 · from the BL-1232 (power plants per grid) re-review, 2026-10-08*
 
 Your ruling: unpowered grids first - every short grid gets a plant before any gets a second. The re-review found that a short grid NO chartering centre's window can feed (no market centre on it, or its feeding markets outside every window) would hold the rule forever: every power firm narrowed to it, found no ground, and the core stopped getting plants. TAKEN: such a grid is dropped from the unpowered set for that centre, so an unreachable grid never holds up the others; if nothing unpowered is reachable, every short grid is served. Reversible: the strict reading (the rule holds even for an unreachable grid) starves the body's core.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
 ### NR-987 — Decision taken on your behalf: 'never cleared' is read from the market's current state, not a stored first-clear tick (BL-1217 D3b)
 *decision · raised 2026-10-09 · from cold re-review of the BL-1217 D3 round 3 (a37f2099), sprint 50*
 
 Your ruling: the dial forecasts at base 'only on a market that has never cleared'; the build veto takes the same 'no clear yet: no signal' reading. Both now read market_has_cleared from fields only the clear writes (supply, demand, hauler_want) - fixing a real hole where a market spawned mid-step read as cleared. TAKEN: kept the state proxy. Gap: a market that HAS cleared but is wholly dead (no supply, demand or silenced want on any good) reads 'never cleared' again, so the veto gives no signal and the dial forecasts at base there - the old test had the same gap. Practically unreachable today (off-world markets get interbody demand; home markets carry people). Reversible: a set-once first-clear tick on the market would close it exactly, at the cost of a saved field (another save bump).
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
 
 ### NR-988 — Decision taken on your behalf: a non-player roster corporation left with no holdings stays on legacy and no-budget worlds (BL-1217 D6)
 *decision · raised 2026-10-09 · from the BL-1217 D5/D6 harness audit, sprint 50*
 
 Your rulings bound every processor by want and unplace a recipe-less processor whose default output is unwanted. On the LEGACY landscape apply (no budget, refused budget or no specialists) that leaves 1 non-player roster corporation with no holdings (2 in two cases); the budget path - every shipped campaign - removes the roster right after, and the player is never left holdless. TAKEN: leave the holdless corporation as is (it holds cash and a seat in the roster, acts on nothing). Reversible: remove a non-player roster corporation that ends generation with no holdings.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): closed as superseded by later work.
+
 ### NR-989 — Novel work: road generation SNAPS a new road onto an existing one beside it (BL-1252, no parallel roads)
 *novel-work · raised 2026-10-09 · from the BL-1252 lane, sprint 50*
 
 To remove the parallel roads the ruled stale-flood reuse leaves, the lane added a new mechanism rather than re-pricing: before stamp_edge lays a route, any stretch that would lay 2+ consecutive new land tiles within one cell of an existing road is re-walked over that road, kept only if it lays fewer new tiles. Pricing and flood reuse are unchanged. Long parallels 235 -> 47 at 1.04x the time; road tiles -4.4%. LOGISTICS.md section 4 owns it. Flagged because it reshapes what is laid after pricing - a new kind of rule in generation. An income cost on the 5 tuning seeds is being re-measured on the current tip before the merge call.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
 
 ### NR-990 — Novel work: verify fixtures that fabricate world state (sea_route_fixture lays Ports; air_gate inserts an unreachable airless works)
 *novel-work · raised 2026-10-09 · from the sprint 50 scripted visual checks lane*
 
 To verify the air gate and the sea-route lane headlessly, the verify API gained accessors that build world state no game path would: sea_route_fixture lays two Ports to make a sea pair with real land legs, and air_gate inserts an electrolysis works on an airless body the player cannot reach. Verify-only (bound behind --verify), deterministic, nothing in play changes. No doc owns the rule for when a verify fixture may fabricate state rather than find it; flagged so the precedent is chosen, not accreted. Also new: verify corp_command reads recipe_name/target_name/quantity, validated.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
 ### NR-992 — Novel work: retire corporation pools - all production lands on market shelves (Ben, 2026-10-10)
 *novel-work · raised 2026-10-09 · from Ben, sprint 50 close, the market stock form*
 
 Ben (2026-10-10): remove corporation stockpiles - all of them, production lands on the shelf - and push initial goods to markets (the same total, redistributed to the markets the corporations sit in), to simplify the model and fix construction at game start; build now in sprint 50. Flagged as large scope growth mid-close: pools carry production, own-input draws, sell orders, corporation convoys, the launch fuel reservation, procurement, upkeep and the space programme, and several of this sprint’s rulings read pools (opening stock held, the dial’s stock-fed draws, R2’s spare charge). Paused for Ben’s design calls (who owns shelf goods; what replaces corporation hauling; extend 50 or own sprint) before any build. Owning docs to rewrite: MARKETS, PRODUCTION, SUPPLY, FINANCE, CORPORATION_GENERATION, AI_OPPONENT.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): closed as superseded by later work.
 
 ### NR-1001 — Sprint 51 write-up: five calls taken on Ben's behalf beyond the design form
 *decision taken on your behalf · raised 2026-10-08 · from the sprint 51 design write-up, 2026-10-08 (RENDERING.md, SELECTION.md, LENSES.md, PLANETARY.md; BL-1239..BL-1244)*
 
 The form settled the shape; writing it into the docs needed five smaller calls, each now in its owning doc and reversible there. (a) COMPANY LENS DEFAULT - no firm picked, so every firm's ground opens owned-grey: the player owns no company, so "the player only" has no counterpart (LENSES.md § Company lens). Alternative: every firm picked (the old look). (b) RIVAL ROWS IN THE PRODUCTION SECTION show type, count and owner; output and running state read "private", matching the rival building card (SELECTION.md). Alternative: running state public, since a working plant is observable. (c) SCAFFOLDING - "the art is static" has one exception, a construction site bakes as scaffolding, because start and completion are events rather than ticks and so cost no per-tick re-bake (RENDERING.md § Installations). (d) A FOURTH STACK adds nothing to the ground (the cluster caps at three), and a small settlement may vanish at the far page where the density dot stood; a scale >= 3 centre must still read as a city at every rung. (e) NEVER-MAGNIFY shifts every rung up one tier (13 px rung -> 24 px tier, top rung -> 192), and supersampling bakes the 192 tier at 384 px per hex - four times the bake pixels on the worker. BL-1244 measures bake time and memory before and after; if the 192 x 2 bake is too slow, the lever is to supersample only the tiers below it.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): closed as superseded by later work.
+
 ### NR-1002 — After a refund, the header NET and the Balance card net disagree: should the header exclude the refund?
 *question · raised 2026-10-08 · from lane L6, BL-1215 (refunds flow shown), sprint 51*
 
 On a seat that received a refund the header reads NET +332/qtr (the quarterly return net, which includes the 190.3 refund) while the Balance card reads +142.1 (operating net) with a new line "Refunds: +190.3 (not earnings)". The line makes the gap readable but the two headline numbers still differ. Options: (A) leave both, the card explains the gap; (B) the header shows the operating net, excluding refunds, so the two agree; (C) the header keeps the return net and gains a refund marker on hover.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): B - the header shows operating net, excluding refunds (backlog).
 
 ### NR-1003 — Structures, settlements, landforms and rivers vanish wherever the bake is not drawn: under every lens, and on unsurveyed ground in spectator god view
 *question · raised 2026-10-08 · from lane L4, BL-1241 (structures baked), sprint 51*
 
 RENDERING.md § Installations says a structure is ground and takes the lens wash. As built, every lens draws through the old vector fill path, which never shows the bake, so with the canvas glyphs retired a lens shows no buildings at all. That is the gap the cancelled BL-734 (ground/chrome layer contract) was to settle. Options: (A) new sprint 51 work - lenses composite their tint over the baked ground (one item, touches the lens fill path BL-1240 just changed); (B) accept for now - a lens is an analytic read and the Selection element names what stands there; file the bake-under-lens work for a later sprint; (C) under a lens, draw a minimal structure footprint mark in the vector path (a glyph by another name, against the design). WIDER THAN FIRST RECORDED (the integrated cold review, 2026-10-08): the same cause hides them (1) under the Corporation and Company lenses, where BL-1240 asks the player to pick owners by colour and none of their buildings show; (2) in spectator god view on unsurveyed ground, where the retired glyph paths used to lift rival works, rivers and landforms into view and the bake masks those tiles; (3) briefly on a body switch before the far page is ready. Rivers and landforms are lost the same way as structures, since their canvas strokes and glyphs are also retired. RULED (Ben, 2026-10-09): build lens over the bake now - LENSES.md § A lens washes the rendered ground. STILL OPEN from this entry: the spectator god-view case (unsurveyed ground hides rival works, rivers and landforms in god view, because the master masks those tiles).
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): the god-view case is accepted for now; god view is spectator-only.
+
 ### NR-1004 — The player-identity wash tints the player's own baked structures blue
 *question · raised 2026-10-08 · from lane L4, BL-1241 (structures baked), sprint 51*
 
 The always-on player-identity wash (about 30% on the player's tiles on the plain canvas) is applied over the bake, so the player's structures come out tinted, against RENDERING.md "a structure carries no owner colour". Ben kept the always-on player OUTLINE (the sprint 51 form) but did not rule on the wash. Options: (A) drop the wash, keep the outline only; (B) keep the wash but mask it off structure pixels; (C) keep as is and amend the doc.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): A - drop the player-identity wash, keep the outline (backlog).
 
 ### NR-1005 — Sprint 51 lane calls taken: the market-state band, non-producing buildings read Running, and verify staging that writes world state
 *decision taken on your behalf · raised 2026-10-08 · from lanes L1 (BL-1239) and L4 (BL-1241), sprint 51*
 
 (a) The Production section's short / balanced / surplus reads supply against demand with a +-10% band, borrowed from the Scarcity lens; no doc fixed a threshold. (b) Ports, hubs, launchpads, military bases and other non-producing types now read "Running" in the hover card and the Production section: they staff at zero by design, so "labour short" described a shortage that cannot exist. (c) "No producer in reach" is not derived as an input-shortage cause (it needs the input_reach logistics walk, too heavy per frame); the line falls back to "input short: <good>". (d) NOVEL: L4 added verify-only functions (stage_gallery, stage_building, stage_centre) that insert buildings and restep centres directly, bypassing placement rules, and stage_gallery returns the tile positions it staged to. C++ picks the ground, but positions reach Lua - compare the scoped NR-698 grant (verify.find_deposit_tile). Options for (d): accept as a verify-only staging grant recorded beside NR-698; or require scripts to stage through the real placement seam. (e) RIVER WIDTH IS MASK-BLIND (cold review): a revealed river's width reads accumulated flow including unsurveyed upstream tiles, so width hints at the size of an unsurveyed catchment; courses and forms never draw from masked ground. Taken as acceptable; confirm or require flow to stop at the mask.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
 ### NR-1007 — BL-1246 ground one master: four calls from the build
 *decision taken on your behalf · raised 2026-10-09 · from the BL-1246 (ground one master) lane, sprint 51*
 
 (a) NOVEL, taken: unsurveyed ground is a FILL, not a bake - a master chunk whose every tile in reach is unsurveyed is filled with the lock colour directly, byte-identical to the full bake (ground_bake_check P23). It is what lets a first visit to an unsurveyed body be sharp in 0.77 s. (b) A Debug --verify run that frames a whole body now pays minutes of synchronous master bake (Debug bakes ~10x slower). Option: compile the bake TUs optimised in Debug (a CMake change), or accept. (c) --autostart-windowed smoke runs now wait 35-55 s on the painting step (until the Life-round pre-bake lands). Option: skip the wait under autostart (the ground fills in live), or accept. (d) The Selection band's neighbourhood page is still its own flat 48 px bake, not a crop of the master - so it does not match the 22.5 deg canvas. Work for a later item unless you want it now.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
 ### NR-1008 — Lens wash and partial re-bake: four calls and two novel pieces
 *decision taken on your behalf · raised 2026-10-09 · from the BL-1250 (lens washes ground) and BL-1246 partial re-bake lanes, sprint 51*
 
 (a) Wash strengths taken: categorical lenses 0.46, sequential 0.54 (LENSES.md). (b) Resource lens: ground with no deposit keeps the WHITE wash Ben ruled 2026-10-04 (0.50) rather than "no wash" - LENSES.md says an unanswered tile takes no wash, so one of the two needs your word. (c) CALL: at the close rungs the Company lens draws the unpicked owners' dark rim on nearly every tile (firms hold most ground), which reads as a heavy hex grid. Options: thin/fade the rim at close zoom; drop the rim where the close-zoom seam already marks edges; accept. (d) NOVEL, fixed: a lit structure's hover wash drew at the inset radius and left a 1 px grid of unlit gaps over the bake; now drawn at full radius. (e) NOVEL, scope grew: the partial re-bake needed a bounds mode in the structure pass (rasterise a tile's parts writing nothing) and a shared build_tile, because a conservative reach only saved ~50%; plus a 1/256 px rounding fix in four structure forms caught by the new window-invariance row. (f) Rung 0 frame time read ~20 ms in the lens lane under heavy machine load (11.5 ms clean in the 60 fps lane); a clean re-measure is owed.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
 
 ### NR-1035 — Sprint 50 onto main: G3 (firms alive at tick 400) moved 99.8% -> 95.8%; every other gate digit identical
 *question · raised 2026-10-10 · from Main-session gates on the sprint 50 merge (a560c5d7 + d8d2a04c), 2026-10-10*
@@ -218,141 +282,9 @@ market_viability on merged main: G1 93.3, G1 t50 87.5, G1b 5.7, G2 113.4 - ident
 
 > **Recommendation:** Accept, and let the next re-bless attribute it - every G1/G2 digit held.
 
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): closed as superseded by later work.
+
 *Files: `tools/verify/market_viability.cpp`, `src/world/placement_rules.cpp`*
-
-### NR-1064 — Sprint 57 doc sweep: readings taken on your behalf re-subjecting ~60 docs to nations
-*decision · raised 2026-10-23 · from sprint 57 doc sweep (four lanes, main session review)*
-
-Taken in band while re-subjecting the corpus to 'nations own everything'. ECONOMY: FINANCE drops the '<5% of a median firm's income' anchor and the [in debt] flag; glut clearing rests on idling (no building-exit rule); the tariff triggers on the convoy's OWNING nation; MARKETS' listed value retires with no replacement; generated Marketplaces may now land on the player's ground; opening stock falls back to the capital's market where it used the HQ's; POPULATION's labour share stays the share of building count; CONTRACTS keeps no live form between nations. GENERATION: CORPORATION_GENERATION retitled Industry Generation; a charter is a priced set of buildings owned by the centre's nation; per-firm capital no longer sizes opening stock; focus is kept per charter, region-derived; INDUSTRIALISATION's listed value sums building book value. UI: slot 1 renamed 'Nation overview'; the stance ledger (slot 8) retires rather than re-subjecting; the Selection band rests on the player's nation; acquisitions.md keeps its body under a retirement banner. AI/MISC: PEOPLE's company head becomes the nation's Head; RELATIONS keeps only nation-nation stance and retires reputation and the equity_taken / levy_charged / lobbied_against factors; a garrison is drawn into battle by declared nation stance; MILITARY's base is the nation's own build. Main session: 'no capital starts dark' stands, paid from the nation's whole treasury (LOGISTICS).
-
-**Why it matters.** Each is a faithful reading, but together they re-shape a lot of prose at once; any one you would rule differently is cheap to change before the code lanes build against it.
-
-*Files: `docs/economy/FINANCE.md`, `docs/economy/MARKETS.md`, `docs/generation/CORPORATION_GENERATION.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ui/ledgers/corporation.md`, `docs/politics/RELATIONS.md`, `docs/PEOPLE.md`, `docs/military/MILITARY.md`*
-
-### NR-1065 — Too many majors: the poorest surplus major is DEMOTED to a minor, not folded into another
-*decision · raised 2026-10-23 · from sprint 57 doc sweep, main session correction*
-
-The 2026-10-11 reconciliation folded the poorest major's SPECIALISTS into the richest major's champion; ground never moved. With no corporations there is nothing to move, so the faithful reading is a demotion: the poorest surplus major becomes a minor and keeps its ground and buildings, and the nation total is untouched. A lane had written it as a territorial fold, which would have cut the nation count by one outside the total's reconciliation; corrected in NATION_GENERATION.md and NATIONS.md § Own ground. BL-1404 (generation buys for nations) builds it.
-
-**Why it matters.** It decides whether reconciling the major count can ever change the map.
-
-*Files: `docs/generation/NATION_GENERATION.md`*
-
-### NR-1066 — Six questions the sweep could not settle once corporations retired
-*question · raised 2026-10-23 · from sprint 57 doc sweep*
-
-(1) EMBLEMS: PROFILE.md and ICONS.md now key the player's emblem by nation id, which sits against ICONS' own 'no nation flags' rule - keep a corporate-style emblem for the nation, or no emblem. (2) EMBARGO: what an embargo between nations gates, now there is no procurement between firms (RELATIONS.md open question 4). (3) DISCLOSURE: may the player read a rival nation's quarterly return or treasury (FINANCE.md § Disclosure; RELATIONS open question 5). (4) WORKS LEAN: INDUSTRIALISATION's Private Works vs State Arsenal fork has no subject - derive it some other way, or retire it. (5) INDUSTRIAL FOCUS: whether a nation's build scorer keeps a focus weight (AI_OPPONENT ~789) or it retires with the specialist. (6) INDUSTRY LENS: re-subjected to 'plants of nations other than the player's' - keep, or retire.
-
-**Why it matters.** Each is a design hole the removal opened; none blocks BL-1399..BL-1404, but (3) and (5) shape the AI and UI lanes.
-
-> **Recommendation:** (1) no emblem until designed; (2) an embargo bars a nation's goods from entering your markets; (3) a rival's treasury is private, its GDP public; (4) retire; (5) keep focus as the nation's economic_focus; (6) keep.
-
-*Files: `docs/ui/PROFILE.md`, `docs/politics/RELATIONS.md`, `docs/economy/FINANCE.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ai/AI_OPPONENT.md`, `docs/ui/LENSES.md`*
-
-### NR-1067 — BL-1403 (nation money flows): the tax rates now bite on wages, and a nation's import duty is capped at its treasury
-*decision · raised 2026-10-24 · from BL-1403 build, main session*
-
-(1) WAGE TAX RATES: the tier rates I..V (0 / 5 / 10 / 15 / 20 %) were calibrated as shares of a firm's operating PROFIT; under your ruling they are now shares of the WAGES a nation pays, which is a much larger base, so tier V returns a fifth of the whole wage bill. Kept unchanged in band; the post-fold measurement will say whether the tiers still read as a trade-off against Discontent. (2) DUTY CAP: a nation never runs into debt, so when a nation (not a corporation) owes import duty on goods entering a foreign market, the duty is capped at what its treasury holds; the cargo still lands. The alternative is refusing the shipment at dispatch when the importer cannot pay, which is a larger change to the trade pass.
-
-**Why it matters.** (1) decides whether a high tax tier is a strong lever or a free one; (2) decides whether a broke nation can keep importing.
-
-*Files: `src/world/budget_system.cpp`, `src/world/supply_system.cpp`, `src/world/nation_tax.hpp`*
-
-### NR-1068 — BL-1402 (fold to ground): market_viability's G2/G3 re-pointed, and the seat's clean slate now covers its whole nation
-*decision · raised 2026-10-24 · from BL-1402 build + cold review, main session*
-
-(1) G2 (field income) summed each corporation's filed income; after the fold every corporation earns nothing and G2 read 0.0. It now adds each nation's state-ledger income (its buildings' sales) - the same 'whole field's sales' quantity. (2) G3 (firms alive at the last tick / at the handoff) has no subject on a folded world. Re-pointed to BUILDINGS alive at the last tick / at the handoff, target unchanged at 70% - the closest question ('does the handoff economy survive the play'); the alternative of nations alive is vacuous (a nation only dies by conquest). (3) Firm exit is inert on a folded world: it would erase the empty champion records the major/minor reading still keys on until BL-1407. (4) BL-1206's seat clean slate (the seat's unfinished settle builds cancelled and refunded) now cancels the seat NATION's unfinished builds, its own AI's settle sites included - the ruling re-subjected to 'the seat is the nation'. (5) A nation's trade reserve is not carried by the fold and a nation cannot set one until BL-1407 saves the field (generation leaves every reserve at 0).
-
-**Why it matters.** (1)-(2) change what two merge gates measure; (4) decides how much construction the player's nation opens without.
-
-*Files: `tools/verify/market_viability.cpp`, `src/world/corporation_generation.cpp`, `src/world/corp_command.cpp`*
-
-### NR-1069 — After the fold, nations' treasuries fall during play, and on seed 46 the majors stop building
-*question · raised 2026-10-24 · from BL-1402 gate, main session*
-
-On the folded world (BL-1402), seed 46's 4 majors place NO production building in 40 seated ticks (seeds 0 and 28 still pass: 3/5 and 1/1). Diagnosed 2026-10-24 with nation_ai_builds' new diagnostic lines: every extraction candidate is refused before selection - placement (60-210 per major), construction materials not obtainable (30-110), net <= 0 and glut vetoes - and the majors decide only dials; their treasuries are far above the floor (e.g. 8549 vs 312) but FALLING (27407 -> 8549 over the window for nation 47763). A reading of a thin, glutted economy, not a scorer defect; the row is left failing rather than weakened. Owned by BL-1409. market_viability FULL on the folded world still passes every gate: G1 92.9, G1t50 85.4 (target 85), G1b 4.6, G2 95.3, G3 100.0 (buildings alive, NR-1068). BL-1403 (tax from wages, no levy) is not applied yet; its wage tax returns 10% of wages at tier III, which slows the fall.
-
-**Why it matters.** A nation that pays every wage and input from one treasury, and whose treasury drains, idles its buildings one by one under the never-debt rule - the folded economy's long-run health is the question BL-1409 measures.
-
-> **Recommendation:** Let BL-1409 measure the 400-tick treasury trajectory across the 16 seeds before any change.
-
-*Files: `tools/verify/nation_ai_builds.cpp`, `tools/verify/nation_floor_probe.cpp`*
-
-### NR-1070 — NOVEL WORK (BL-1406): a verify-only staging call verify.fold_world, seven retired verify scripts deleted, and a golden blessed under a retired lens
-*novel-work · raised 2026-10-24 · from BL-1406 lane (UI and protocol as nation)*
-
-(1) A new verify-only STAGING call, verify.fold_world, runs fold_to_ground on the --verify world (whose builder does not go through finish_campaign_world), and verify.buildings() lists nation buildings once folded. The standing rules record dated scoped exceptions for what the verify API may reveal or stage (road_admits, find_water_crossing, stage_road); this is a fifth of that family, raised here rather than assumed. (2) Seven verify scripts for retired surfaces (Corporation / Company lenses, acquisitions, company ledger, stance table) were deleted and ~15 re-pointed to the Nations lens; .claude/skills/verifier-visual/SKILL.md still names the deleted ones - a skill edit, which is yours to approve. (3) The icon_silhouettes_overview golden was blessed with the retired Corporation lens on screen, so it now differs; the golden policy says no bulk re-bless and --bless never creates - a single re-bless needs your go (BL-1408).
-
-**Why it matters.** (1) widens what verify scripts may do to the world; (2) and (3) are your gates on skills and goldens.
-
-> **Recommendation:** (1) grant, verify-only and behind --verify like its siblings; (2) approve trimming the deleted names from SKILL.md; (3) re-bless the one golden at BL-1408.
-
-*Files: `src/core/verify_api.cpp`, `.claude/skills/verifier-visual/SKILL.md`, `scripts/verify/`*
-
-### NR-1071 — BL-1407 consequences: unit upkeep now runs only as the garrison budget claim, the nation scorer does not hire, and two smaller readings
-*decision · raised 2026-10-24 · from BL-1407 lane + main session*
-
-(1) UNIT UPKEEP: the credits+goods+supply-decay vector (run_unit_upkeep) only ever ran for CORPORATION units; with corporations gone every unit takes the garrison branch, whose upkeep is a military_research budget-line claim (MILITARY.md § Nation garrisons) - so the per-unit vector no longer runs anywhere. That is MILITARY.md's model for a nation's units, applied to all of them. (2) HIRE: the scorer's corporation hire/base branch is left OFF for nations - a nation raises force through the muster (MILITARY.md), and opening the corporation hire path too would give it two. The 2026-10-23 grant named hiring among the carried-over decisions, so this is a narrowing. (3) THE SCORER'S TRADE, MARKETPLACE AND SURVEY BRANCHES are dead after the delete (they were corporation-only), so no AI nation pins a trade, builds a Marketplace or surveys; AUTO trade still runs. Re-opening them under the grant (BL-1402 T8, parked as docs/development/drafts/bl-1402-t8-nation-ai-trade.patch) was measured: market_viability FULL G1t50 85.2 -> 84.0 (FAILS the 85 target), G2 94.1 -> 96.9, G1b 4.6 -> 4.9; with manual pins off but Marketplace and surveys on, G1t50 84.6 (still fails) and G1b 5.0. Left OFF so the gates pass; YOUR CALL: re-open (and accept or re-target the gate), or keep off until BL-1409 explains how a whole-economy nation trades against its own plants. (4) A nation's quarterly return counts the wage tax as income; the seat card's trailing net still reads 0 though nations now file returns.
-
-**Why it matters.** (1) and (2) decide what a nation's army costs it and how it grows one; (3) restores AI trade, which otherwise stopped entirely.
-
-> **Recommendation:** Keep it off and fold the question into BL-1409, whose measurement (treasury trajectory and seed 46) is the same question of how a nation that owns every plant spends.
-
-*Files: `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`, `src/world/spawn_seat.cpp`*
-
-### NR-1075 — The seat clean slate still refunds a cancelled site's materials; the new rule refunds credits only
-*question · raised 2026-10-25 · from Construction payment lane (92f99bf3, merged 3dc6f34a)*
-
-A site cancelled before completion now refunds its credit cost in full; materials drawn stay spent (Ben, 2026-10-25). The seat clean slate (BL-1206: taking a seat clears the nation's unfinished sites) used to refund everything charged, materials included. The lane kept that total for the seat: the door refunds the credits and seat_clean_slate refunds the materials on top, so the seat's returned sum is unchanged.
-
-**Why it matters.** The seat clearing is not the player's choice, so a full refund keeps them whole for something done to them. But it is an exception to the rule you just set.
-
-- A) Keep the exception: the seat clean slate refunds credits and materials (as built).
-- B) The seat follows the rule: credits only, drawn materials stay spent.
-
-> **Recommendation:** A. The player did not cancel those sites; the seat did.
-
-*Files: `src/world/construction.cpp`, `tools/verify/seat_clean_slate.cpp`, `docs/economy/PRODUCTION.md`*
-
-### NR-1076 — The placement credit cost includes the site multiplier; forward claims share a short shelf pro-rata
-*decision taken on your behalf · raised 2026-10-25 · from Construction payment lane (92f99bf3, merged 3dc6f34a)*
-
-(1) The credit cost paid once at placement is build_cost x site days / (authored quarters x 90): a mountain site that takes longer also costs more credits, as PRODUCTION.md's site-time rule already stretches cash. (2) The quarter-ahead rate reads the shelf less every site's owed materials; on a contended shelf the sites share it pro-rata through the BL-1209 solver (MARKETS.md requires pro-rata on a short shelf). The claim reserves against other construction only: a processor can still buy claimed stock that tick, and the gap shows as a carried shortfall.
-
-**Why it matters.** Both shape what a build costs and how fast it runs. They follow existing rules, so they were taken rather than raised.
-
-> **Recommendation:** Keep both.
-
-*Files: `src/world/economy_system.cpp`, `docs/economy/PRODUCTION.md`*
-
-### NR-1078 — Port lanes: the calls taken laying lanes between ports
-*decision taken on your behalf · raised 2026-10-25 · from Port-lane lane (bde425bc, 6d290d3c; merged c2c2a34a)*
-
-Laying a lane from every port to every port within 50 (Ben, 2026-10-25) took these calls: (1) lanes join every port whoever holds it, while points flow only along one nation's chain; (2) a port's points ride lanes only and land only on a port tile, so a coastal building with no port beside it needs a road hub (seeding added 5/3/0/2 hubs on seeds 0/1/28/46); (3) bridges are placed only within 50, since no lane spans further; (4) a pair the sea and a lake both join is laned on the sea; (5) lanes are never unlaid when a port idles or goes.
-
-**Why it matters.** Each shapes where points reach. All follow the ruling; none was raised before building.
-
-> **Recommendation:** Keep all five.
-
-*Files: `src/world/road_generation.cpp`, `src/world/logistic_points.cpp`, `docs/economy/LOGISTICS.md`*
-
-### NR-1079 — Novelty: lanes laid from ports in play had no owning code path
-*novel-work · raised 2026-10-25 · from Port-lane lane*
-
-Before this, sea lanes came only from the colonial record at generation. Ports now lay lanes at seeding and on completion in play (economy_system.cpp completion day, construction.cpp for an instant port). LOGISTICS.md § 4b owns the rule; no backlog item owned the work.
-
-**Why it matters.** A lane is now a thing the campaign creates, not only history. Flagged so the growth is chosen.
-
-> **Recommendation:** Accept; LOGISTICS.md § 4b owns it.
-
-*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 
 ### NR-1047 — Space asset calibration (BL-1327 space asset model): costs, reach, upkeep, decay chosen in-band
 *decision · raised 2026-10-15 · from BL-1327 lane + cold review, merged to main 2026-10-15*
@@ -507,6 +439,89 @@ Your 2026-10-18 rule says no tile of a nation may hold more points than its capi
 
 > **RESOLVED.** Ben, 2026-10-23 (the logistics funding form): the routing reading. a) as built.
 
+### NR-1064 — Sprint 57 doc sweep: readings taken on your behalf re-subjecting ~60 docs to nations
+*decision · raised 2026-10-23 · from sprint 57 doc sweep (four lanes, main session review)*
+
+Taken in band while re-subjecting the corpus to 'nations own everything'. ECONOMY: FINANCE drops the '<5% of a median firm's income' anchor and the [in debt] flag; glut clearing rests on idling (no building-exit rule); the tariff triggers on the convoy's OWNING nation; MARKETS' listed value retires with no replacement; generated Marketplaces may now land on the player's ground; opening stock falls back to the capital's market where it used the HQ's; POPULATION's labour share stays the share of building count; CONTRACTS keeps no live form between nations. GENERATION: CORPORATION_GENERATION retitled Industry Generation; a charter is a priced set of buildings owned by the centre's nation; per-firm capital no longer sizes opening stock; focus is kept per charter, region-derived; INDUSTRIALISATION's listed value sums building book value. UI: slot 1 renamed 'Nation overview'; the stance ledger (slot 8) retires rather than re-subjecting; the Selection band rests on the player's nation; acquisitions.md keeps its body under a retirement banner. AI/MISC: PEOPLE's company head becomes the nation's Head; RELATIONS keeps only nation-nation stance and retires reputation and the equity_taken / levy_charged / lobbied_against factors; a garrison is drawn into battle by declared nation stance; MILITARY's base is the nation's own build. Main session: 'no capital starts dark' stands, paid from the nation's whole treasury (LOGISTICS).
+
+**Why it matters.** Each is a faithful reading, but together they re-shape a lot of prose at once; any one you would rule differently is cheap to change before the code lanes build against it.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
+*Files: `docs/economy/FINANCE.md`, `docs/economy/MARKETS.md`, `docs/generation/CORPORATION_GENERATION.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ui/ledgers/corporation.md`, `docs/politics/RELATIONS.md`, `docs/PEOPLE.md`, `docs/military/MILITARY.md`*
+
+### NR-1065 — Too many majors: the poorest surplus major is DEMOTED to a minor, not folded into another
+*decision · raised 2026-10-23 · from sprint 57 doc sweep, main session correction*
+
+The 2026-10-11 reconciliation folded the poorest major's SPECIALISTS into the richest major's champion; ground never moved. With no corporations there is nothing to move, so the faithful reading is a demotion: the poorest surplus major becomes a minor and keeps its ground and buildings, and the nation total is untouched. A lane had written it as a territorial fold, which would have cut the nation count by one outside the total's reconciliation; corrected in NATION_GENERATION.md and NATIONS.md § Own ground. BL-1404 (generation buys for nations) builds it.
+
+**Why it matters.** It decides whether reconciling the major count can ever change the map.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
+*Files: `docs/generation/NATION_GENERATION.md`*
+
+### NR-1067 — BL-1403 (nation money flows): the tax rates now bite on wages, and a nation's import duty is capped at its treasury
+*decision · raised 2026-10-24 · from BL-1403 build, main session*
+
+(1) WAGE TAX RATES: the tier rates I..V (0 / 5 / 10 / 15 / 20 %) were calibrated as shares of a firm's operating PROFIT; under your ruling they are now shares of the WAGES a nation pays, which is a much larger base, so tier V returns a fifth of the whole wage bill. Kept unchanged in band; the post-fold measurement will say whether the tiers still read as a trade-off against Discontent. (2) DUTY CAP: a nation never runs into debt, so when a nation (not a corporation) owes import duty on goods entering a foreign market, the duty is capped at what its treasury holds; the cargo still lands. The alternative is refusing the shipment at dispatch when the importer cannot pay, which is a larger change to the trade pass.
+
+**Why it matters.** (1) decides whether a high tax tier is a strong lever or a free one; (2) decides whether a broke nation can keep importing.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
+*Files: `src/world/budget_system.cpp`, `src/world/supply_system.cpp`, `src/world/nation_tax.hpp`*
+
+### NR-1068 — BL-1402 (fold to ground): market_viability's G2/G3 re-pointed, and the seat's clean slate now covers its whole nation
+*decision · raised 2026-10-24 · from BL-1402 build + cold review, main session*
+
+(1) G2 (field income) summed each corporation's filed income; after the fold every corporation earns nothing and G2 read 0.0. It now adds each nation's state-ledger income (its buildings' sales) - the same 'whole field's sales' quantity. (2) G3 (firms alive at the last tick / at the handoff) has no subject on a folded world. Re-pointed to BUILDINGS alive at the last tick / at the handoff, target unchanged at 70% - the closest question ('does the handoff economy survive the play'); the alternative of nations alive is vacuous (a nation only dies by conquest). (3) Firm exit is inert on a folded world: it would erase the empty champion records the major/minor reading still keys on until BL-1407. (4) BL-1206's seat clean slate (the seat's unfinished settle builds cancelled and refunded) now cancels the seat NATION's unfinished builds, its own AI's settle sites included - the ruling re-subjected to 'the seat is the nation'. (5) A nation's trade reserve is not carried by the fold and a nation cannot set one until BL-1407 saves the field (generation leaves every reserve at 0).
+
+**Why it matters.** (1)-(2) change what two merge gates measure; (4) decides how much construction the player's nation opens without.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
+*Files: `tools/verify/market_viability.cpp`, `src/world/corporation_generation.cpp`, `src/world/corp_command.cpp`*
+
+### NR-1069 — After the fold, nations' treasuries fall during play, and on seed 46 the majors stop building
+*question · raised 2026-10-24 · from BL-1402 gate, main session*
+
+On the folded world (BL-1402), seed 46's 4 majors place NO production building in 40 seated ticks (seeds 0 and 28 still pass: 3/5 and 1/1). Diagnosed 2026-10-24 with nation_ai_builds' new diagnostic lines: every extraction candidate is refused before selection - placement (60-210 per major), construction materials not obtainable (30-110), net <= 0 and glut vetoes - and the majors decide only dials; their treasuries are far above the floor (e.g. 8549 vs 312) but FALLING (27407 -> 8549 over the window for nation 47763). A reading of a thin, glutted economy, not a scorer defect; the row is left failing rather than weakened. Owned by BL-1409. market_viability FULL on the folded world still passes every gate: G1 92.9, G1t50 85.4 (target 85), G1b 4.6, G2 95.3, G3 100.0 (buildings alive, NR-1068). BL-1403 (tax from wages, no levy) is not applied yet; its wage tax returns 10% of wages at tier III, which slows the fall.
+
+**Why it matters.** A nation that pays every wage and input from one treasury, and whose treasury drains, idles its buildings one by one under the never-debt rule - the folded economy's long-run health is the question BL-1409 measures.
+
+> **Recommendation:** Let BL-1409 measure the 400-tick treasury trajectory across the 16 seeds before any change.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): closed as superseded by later work.
+
+*Files: `tools/verify/nation_ai_builds.cpp`, `tools/verify/nation_floor_probe.cpp`*
+
+### NR-1070 — NOVEL WORK (BL-1406): a verify-only staging call verify.fold_world, seven retired verify scripts deleted, and a golden blessed under a retired lens
+*novel-work · raised 2026-10-24 · from BL-1406 lane (UI and protocol as nation)*
+
+(1) A new verify-only STAGING call, verify.fold_world, runs fold_to_ground on the --verify world (whose builder does not go through finish_campaign_world), and verify.buildings() lists nation buildings once folded. The standing rules record dated scoped exceptions for what the verify API may reveal or stage (road_admits, find_water_crossing, stage_road); this is a fifth of that family, raised here rather than assumed. (2) Seven verify scripts for retired surfaces (Corporation / Company lenses, acquisitions, company ledger, stance table) were deleted and ~15 re-pointed to the Nations lens; .claude/skills/verifier-visual/SKILL.md still names the deleted ones - a skill edit, which is yours to approve. (3) The icon_silhouettes_overview golden was blessed with the retired Corporation lens on screen, so it now differs; the golden policy says no bulk re-bless and --bless never creates - a single re-bless needs your go (BL-1408).
+
+**Why it matters.** (1) widens what verify scripts may do to the world; (2) and (3) are your gates on skills and goldens.
+
+> **Recommendation:** (1) grant, verify-only and behind --verify like its siblings; (2) approve trimming the deleted names from SKILL.md; (3) re-bless the one golden at BL-1408.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): grant all three: verify.fold_world as a verify-only staging exception; trim the seven deleted scripts from the skill; re-bless the one golden at BL-1408.
+
+*Files: `src/core/verify_api.cpp`, `.claude/skills/verifier-visual/SKILL.md`, `scripts/verify/`*
+
+### NR-1071 — BL-1407 consequences: unit upkeep now runs only as the garrison budget claim, the nation scorer does not hire, and two smaller readings
+*decision · raised 2026-10-24 · from BL-1407 lane + main session*
+
+(1) UNIT UPKEEP: the credits+goods+supply-decay vector (run_unit_upkeep) only ever ran for CORPORATION units; with corporations gone every unit takes the garrison branch, whose upkeep is a military_research budget-line claim (MILITARY.md § Nation garrisons) - so the per-unit vector no longer runs anywhere. That is MILITARY.md's model for a nation's units, applied to all of them. (2) HIRE: the scorer's corporation hire/base branch is left OFF for nations - a nation raises force through the muster (MILITARY.md), and opening the corporation hire path too would give it two. The 2026-10-23 grant named hiring among the carried-over decisions, so this is a narrowing. (3) THE SCORER'S TRADE, MARKETPLACE AND SURVEY BRANCHES are dead after the delete (they were corporation-only), so no AI nation pins a trade, builds a Marketplace or surveys; AUTO trade still runs. Re-opening them under the grant (BL-1402 T8, parked as docs/development/drafts/bl-1402-t8-nation-ai-trade.patch) was measured: market_viability FULL G1t50 85.2 -> 84.0 (FAILS the 85 target), G2 94.1 -> 96.9, G1b 4.6 -> 4.9; with manual pins off but Marketplace and surveys on, G1t50 84.6 (still fails) and G1b 5.0. Left OFF so the gates pass; YOUR CALL: re-open (and accept or re-target the gate), or keep off until BL-1409 explains how a whole-economy nation trades against its own plants. (4) A nation's quarterly return counts the wage tax as income; the seat card's trailing net still reads 0 though nations now file returns.
+
+**Why it matters.** (1) and (2) decide what a nation's army costs it and how it grows one; (3) restores AI trade, which otherwise stopped entirely.
+
+> **Recommendation:** Keep it off and fold the question into BL-1409, whose measurement (treasury trajectory and seed 46) is the same question of how a nation that owns every plant spends.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
+*Files: `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`, `src/world/spawn_seat.cpp`*
+
 ### NR-1072 — Network upkeep bills 2-4x the world's stone and timber, so trade buildings starve and auto trade stops by tick 4
 *question · raised 2026-10-24 · from Ben's live click (trade from the start) + diagnosis lane, 2026-10-24*
 
@@ -555,6 +570,35 @@ The generation site-join (every building joined to its nation's capital road net
 
 *Files: `src/world/road_generation.cpp`, `src/world/logistic_points.cpp`*
 
+### NR-1075 — The seat clean slate still refunds a cancelled site's materials; the new rule refunds credits only
+*question · raised 2026-10-25 · from Construction payment lane (92f99bf3, merged 3dc6f34a)*
+
+A site cancelled before completion now refunds its credit cost in full; materials drawn stay spent (Ben, 2026-10-25). The seat clean slate (BL-1206: taking a seat clears the nation's unfinished sites) used to refund everything charged, materials included. The lane kept that total for the seat: the door refunds the credits and seat_clean_slate refunds the materials on top, so the seat's returned sum is unchanged.
+
+**Why it matters.** The seat clearing is not the player's choice, so a full refund keeps them whole for something done to them. But it is an exception to the rule you just set.
+
+- A) Keep the exception: the seat clean slate refunds credits and materials (as built).
+- B) The seat follows the rule: credits only, drawn materials stay spent.
+
+> **Recommendation:** A. The player did not cancel those sites; the seat did.
+
+> **RESOLVED.** Ben, 2026-10-26: B - the seat clean slate refunds credits only, as any cancelled site.
+
+*Files: `src/world/construction.cpp`, `tools/verify/seat_clean_slate.cpp`, `docs/economy/PRODUCTION.md`*
+
+### NR-1076 — The placement credit cost includes the site multiplier; forward claims share a short shelf pro-rata
+*decision taken on your behalf · raised 2026-10-25 · from Construction payment lane (92f99bf3, merged 3dc6f34a)*
+
+(1) The credit cost paid once at placement is build_cost x site days / (authored quarters x 90): a mountain site that takes longer also costs more credits, as PRODUCTION.md's site-time rule already stretches cash. (2) The quarter-ahead rate reads the shelf less every site's owed materials; on a contended shelf the sites share it pro-rata through the BL-1209 solver (MARKETS.md requires pro-rata on a short shelf). The claim reserves against other construction only: a processor can still buy claimed stock that tick, and the gap shows as a carried shortfall.
+
+**Why it matters.** Both shape what a build costs and how fast it runs. They follow existing rules, so they were taken rather than raised.
+
+> **Recommendation:** Keep both.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
+*Files: `src/world/economy_system.cpp`, `docs/economy/PRODUCTION.md`*
+
 ### NR-1077 — A major nation's capital on a 3-tile landlocked enclave leaves its whole economy off the chain (seed 1)
 *question · raised 2026-10-25 · from Port-link lane, seed 1 census on main 3361ccf9*
 
@@ -572,6 +616,32 @@ Seed 1's 12 unconnectable consumers all belong to one major nation. Its capital 
 > **RESOLVED.** Ben, 2026-10-25: D. A cession takes the Pass 2b islets hung on the ceded province with it. The conquest cut-off experiment (be2b1287) is dropped.
 
 *Files: `src/world/nation_generation.cpp`, `docs/generation/NATION_GENERATION.md`, `docs/economy/LOGISTICS.md`*
+
+### NR-1078 — Port lanes: the calls taken laying lanes between ports
+*decision taken on your behalf · raised 2026-10-25 · from Port-lane lane (bde425bc, 6d290d3c; merged c2c2a34a)*
+
+Laying a lane from every port to every port within 50 (Ben, 2026-10-25) took these calls: (1) lanes join every port whoever holds it, while points flow only along one nation's chain; (2) a port's points ride lanes only and land only on a port tile, so a coastal building with no port beside it needs a road hub (seeding added 5/3/0/2 hubs on seeds 0/1/28/46); (3) bridges are placed only within 50, since no lane spans further; (4) a pair the sea and a lake both join is laned on the sea; (5) lanes are never unlaid when a port idles or goes.
+
+**Why it matters.** Each shapes where points reach. All follow the ruling; none was raised before building.
+
+> **Recommendation:** Keep all five.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
+*Files: `src/world/road_generation.cpp`, `src/world/logistic_points.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-1079 — Novelty: lanes laid from ports in play had no owning code path
+*novel-work · raised 2026-10-25 · from Port-lane lane*
+
+Before this, sea lanes came only from the colonial record at generation. Ports now lay lanes at seeding and on completion in play (economy_system.cpp completion day, construction.cpp for an instant port). LOGISTICS.md § 4b owns the rule; no backlog item owned the work.
+
+**Why it matters.** A lane is now a thing the campaign creates, not only history. Flagged so the growth is chosen.
+
+> **Recommendation:** Accept; LOGISTICS.md § 4b owns it.
+
+> **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
 
 ### NR-1080 — A capital moved to its nearest province can land on a speck (seed 38)
 *question · raised 2026-10-25 · from Islet-cession lane, world_audit SPECK row*

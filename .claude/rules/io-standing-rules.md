@@ -56,6 +56,10 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   `verify.lane_port_census()` returns counts only to Lua (positions go to the run log, never to the
   script). Reason for the grant: a capture must aim at the chain link, shortage road or routed flow
   it is checking. Verify-only, behind `--verify`.
+  **Seventh (Ben, 2026-10-26, NR-1070):** the verify STAGING call `verify.fold_world` may run
+  `fold_to_ground` on the `--verify` world, whose builder does not go through
+  `finish_campaign_world`, and `verify.buildings()` may then list the nation buildings it folded.
+  Verify-only, behind `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of
