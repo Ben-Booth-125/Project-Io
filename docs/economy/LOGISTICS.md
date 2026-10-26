@@ -573,21 +573,32 @@ see would be invisible to the landscape search, which reads reach cost (BL-812, 
 
 **Ports in history (Ben, 2026-10-26: "Place ports in history").** Where a colonial lane lands, the
 history built a harbour, so the campaign world opens with a **port** there. Each lane end is the sea
-tile beside a seat (the seat's own, or its realm's nearest coastal seat, above), and the port stands
-on the **land tile beside that end nearest the seat** — Chebyshev, columns wrapping, ties to the lower
-tile; the seat's harbour. Where several seats land at one end, the lower seat tile names the harbour.
-- **One port per harbour.** An end that is already the mouth of a standing port (any of its six hex
-  sides) gets none, so lane ends sharing a harbour share one port. A land tile that already holds a
-  network source, or whose stack is full, is passed over for the next nearest.
+tile beside a seat (the seat's own, or its realm's nearest coastal seat, above); where several seats
+land at one end, the lower seat tile is its seat.
+- **Lane ends within two tiles share one harbour (Ben, 2026-10-26: "colonial lane ends within two
+  tiles of each other share one harbour port").** Two ends within **two hex steps over the sea** of
+  each other are one harbour, and harbours chain: A beside B and B beside C make one. Hex steps,
+  because a port's mouths are its six hex sides and its reach is walked on them; over the sea,
+  because a lane lies only on the sea, so two ends a headland parts are two harbours.
+- **The harbour's port** stands on the **land tile beside any of its ends nearest its seats** — the
+  least Chebyshev distance to any of them, columns wrapping, ties to the lower tile. A land tile that
+  already holds a network source, or whose stack is full, is passed over for the next nearest. A
+  harbour one of whose ends is already the mouth of a standing port (any of its six hex sides) is
+  served by that port and gets none.
+- **Every lane reaches its port.** An end of the harbour that is not the port's own mouth is walked
+  on over the sea, by the lane walk above, to the nearest of the port's mouths, so the lane runs into
+  the harbour on the map. Where the lane already passes the port's mouth, the end is a spur of at
+  most two tiles beyond it, and the harbour serves it.
 - **Whose.** The nation holding that ground in the finished world, as a building of that nation on
-  its own ground. Ground no nation holds gets none and is counted; an end with no land on its six hex
-  sides is open sea, gets none, and is counted.
+  its own ground. Ground no nation holds gets none and is counted; a harbour with no land beside any
+  of its ends is open sea, gets none, and is counted.
 - **Free.** The port is history's infrastructure, as the old roads (§ 4a) and the stations the rail
   handover stands (§ 4c): it stands complete, staffed full, and no treasury pays to found it. Its
   upkeep is the nation's from the opening, as every state building's is.
 - **When.** At the fold, after the rail handover and before the site roads and the Logistic Point
   seeding, so the site pass roads the port, the seeding's opening pass lays its lanes (below) and the
-  chain may carry it. Ends in ascending tile id: a pure function of the world.
+  chain may carry it. Harbours in ascending order of their lowest end tile: a pure function of the
+  world.
 
 **Every port lays lanes (Ben, 2026-10-25: "when a new port is built, it should be able to spawn
 new sea lanes … new ports form connections as sea lanes to each other port within 50 tiles").** The

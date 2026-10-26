@@ -16,7 +16,10 @@
 // Per lane END (a laned water tile with at most one laned 4-neighbour - the lane walk
 // steps the four cardinal sides): PORT (a port's mouth), COAST (beside land with no
 // port - a colonial landing, history), or OPEN (no land beside it). Each non-port end
-// carries its grid distance to the nearest port. Ends present PRE are colonial; ends new
+// carries its grid distance to the nearest port. A colonial COAST end within two hex steps
+// over water of a port's mouth is a HARBOUR end (CH): ends within two tiles share one
+// harbour port (Ben, 2026-10-26, NR-1081), so its lane is served there; a colonial coast
+// end beyond that is listed CC, a landing with no port. Ends present PRE are colonial; ends new
 // POST are the port lanes', and every one of those must be a PORT end.
 //
 // Build:  bash tools/verify/build_lua_harness.sh port_lane_probe
@@ -53,6 +56,7 @@ struct reading
     std::set<entity_id> ends;
     std::map<entity_id, lane_end> end_info;
     std::vector<entity_id> untouched_ports;
+    std::map<entity_id, int> harbour_steps; ///< sea tile -> hex steps over water from a port's mouth (<= 2)
 };
 
 reading read(world& w, entity_id body)
@@ -106,6 +110,32 @@ reading read(world& w, entity_id body)
         if (touched) ++r.touched;
         if (partner && !touched) { ++r.partner_untouched; r.untouched_ports.push_back(bid); }
     }
+    // The sea within two hex steps of a port's mouth (Ben, 2026-10-26, NR-1081: lane ends
+    // within two tiles share one harbour): a colonial end here is IN A HARBOUR - its lane
+    // runs past the port's mouth and stops short of the next one, a spur, not a portless
+    // landing. Steps are hex steps over water, the grouping's own measure.
+    std::map<entity_id, int> harbour_steps;
+    {
+        std::vector<entity_id> q(mouths.begin(), mouths.end());
+        for (const entity_id m : q) harbour_steps[m] = 0;
+        for (std::size_t head = 0; head < q.size(); ++head)
+        {
+            const entity_id cur = q[head];
+            const int d = harbour_steps[cur];
+            if (d >= 2) continue;
+            const tile_component& tc = w.tiles.at(cur);
+            for (int side = 0; side < 6; ++side)
+            {
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+                const entity_id n = at(nb.gx, nb.gy);
+                if (n == null_entity || !is_water(w.tiles.at(n).substrate) || harbour_steps.count(n) != 0)
+                    continue;
+                harbour_steps[n] = d + 1;
+                q.push_back(n);
+            }
+        }
+    }
+    r.harbour_steps = harbour_steps;
     // Lane ends.
     for (int y = 0; y < gh; ++y)
         for (int x = 0; x < gw; ++x)
@@ -183,8 +213,11 @@ int main(int argc, char** argv)
         hand_over_state_industry(w, start->reg);
         hand_over_rail(w);
         const colonial_port_report cp = place_colonial_ports(w); // ports in history (fold order)
-        std::printf("CP seed=%u ends=%d placed=%d at_port=%d open=%d unheld=%d no_room=%d\n", seed,
-                    cp.ends, cp.placed, cp.at_port, cp.open, cp.unheld, cp.no_room);
+        std::printf("CP seed=%u ends=%d groups=%d placed=%d at_port=%d open=%d unheld=%d no_room=%d "
+                    "ext=%d ext_tiles=%d ext_failed=%d\n", seed, cp.ends, cp.groups, cp.placed,
+                    cp.at_port, cp.open, cp.unheld, cp.no_room, cp.extensions, cp.extension_tiles,
+                    cp.extensions_failed);
+        defects += cp.extensions_failed; // a member lane that cannot reach its port
         lay_site_roads_every_body(w);
         const lp_seed_report rep = seed_logistics_sources(w);
 
@@ -194,12 +227,28 @@ int main(int argc, char** argv)
             const reading& pr = pre[b];
             if (post.ports == 0 && post.ends.empty()) continue;
             int c_port = 0, c_coast = 0, c_open = 0, n_port = 0, n_coast = 0, n_open = 0, near_port = 0;
+            int c_harbour = 0; // colonial coast ends within two hex steps of a port's mouth
             for (const auto& [t, e] : post.end_info)
             {
                 const bool colonial = pr.ends.count(t) != 0;
                 int& slot = e.kind == 0 ? (colonial ? c_port : n_port)
                           : e.kind == 1 ? (colonial ? c_coast : n_coast) : (colonial ? c_open : n_open);
                 ++slot;
+                if (colonial && e.kind == 1)
+                {
+                    const auto hs = post.harbour_steps.find(t);
+                    const tile_component& tc = w.tiles.at(t);
+                    if (hs != post.harbour_steps.end())
+                    {
+                        --c_coast;
+                        ++c_harbour; // a spur past its harbour's mouth: served (NR-1081)
+                        std::printf("CH seed=%u body=%u col=%d row=%d harbour_steps=%d\n", seed,
+                                    static_cast<unsigned>(b), tc.grid_x, tc.grid_y, hs->second);
+                    }
+                    else
+                        std::printf("CC seed=%u body=%u col=%d row=%d (a colonial end on a portless coast)\n",
+                                    seed, static_cast<unsigned>(b), tc.grid_x, tc.grid_y);
+                }
                 // A colonial end within three tiles of a port stops SHORT of it: listed.
                 if (colonial && e.kind != 0 && e.port_dist >= 0 && e.port_dist <= 3)
                 {
@@ -226,11 +275,11 @@ int main(int argc, char** argv)
             }
             defects += post.partner_untouched + n_coast + n_open;
             std::printf("B seed=%u body=%u PRE ports=%d ends=%d | POST ports=%d with_partner=%d lonely=%d "
-                        "touched=%d partner_untouched=%d | colonial_ends port=%d coast=%d open=%d | "
+                        "touched=%d partner_untouched=%d | colonial_ends port=%d harbour=%d coast=%d open=%d | "
                         "new_ends port=%d coast=%d open=%d | colonial_near_port=%d | lanes_laid=%d unreachable=%d\n",
                         seed, static_cast<unsigned>(b), pr.ports, static_cast<int>(pr.ends.size()),
                         post.ports, post.with_partner, post.lonely, post.touched, post.partner_untouched,
-                        c_port, c_coast, c_open, n_port, n_coast, n_open, near_port,
+                        c_port, c_harbour, c_coast, c_open, n_port, n_coast, n_open, near_port,
                         rep.port_lanes_laid, rep.port_lanes_unreachable);
         }
         std::fflush(stdout);

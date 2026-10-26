@@ -756,26 +756,37 @@ port_lane_stats lay_all_port_lanes(world& w, port_lane_trace* trace = nullptr);
 // and before the site roads and the Logistic Point seeding - so the site pass roads the
 // port, `lay_all_port_lanes` lanes it and the chain may carry it.
 //
-// Per distinct lane-end sea tile, ascending tile id:
-//   - a standing port already has it on one of its six hex sides: nothing (one port per
-//     harbour - ends sharing a mouth share the port);
-//   - no land on its six hex sides: OPEN sea, counted, no port;
-//   - else THE HARBOUR is the land tile on those sides nearest the seat (Chebyshev,
-//     columns wrapping; ties to the lower tile id; the seat of the lower tile id where
-//     several seats land at one end), skipping a tile that already holds a network
-//     source or whose non-extraction stack is full. Ground no nation holds is counted and
-//     gets none. Otherwise a port stands there, the HOLDING nation's own state asset:
-//     complete, staffed full, and FREE - history's infrastructure, as the stations the
-//     rail handover stands and the roads the past laid, never charged to a treasury.
+// HARBOURS ARE SHARED WITHIN TWO TILES (Ben, 2026-10-26, NR-1081): the distinct lane-end
+// sea tiles (one seat each: the lower seat tile where several land at one end) are
+// grouped - two ends within two hex steps over the sea of each other are one group, and
+// groups chain. Per group, ascending by its lowest end tile:
+//   - a standing port has a member end on one of its six hex sides: that port (the
+//     lowest id such) serves the group, and no port is placed;
+//   - no land beside any member end: OPEN sea, counted, no port;
+//   - else THE HARBOUR is the land tile beside any member end nearest the group's seats
+//     (the least Chebyshev distance to any of them, columns wrapping; ties to the lower
+//     tile id), skipping a tile that already holds a network source or whose
+//     non-extraction stack is full. Ground no nation holds is counted and gets none.
+//     Otherwise a port stands there, the HOLDING nation's own state asset: complete,
+//     staffed full, and FREE - history's infrastructure, as the stations the rail
+//     handover stands and the roads the past laid, never charged to a treasury.
+//   - EVERY MEMBER LANE REACHES ITS PORT: a member end that is not the serving port's own
+//     mouth is walked on over the sea to the nearest of the port's sea mouths by the lane
+//     walk (cardinal steps, the current, reuse) and stamped, so the map shows the lane
+//     running into the harbour.
 // Deterministic: sorted record, ascending tiles, no RNG. Clears the record.
 struct colonial_port_report
 {
     int ends        = 0; ///< distinct lane-end sea tiles read
-    int at_port     = 0; ///< of them, already a standing port's mouth (an earlier end's too)
-    int open        = 0; ///< no land beside the end: open sea, no port
-    int unheld      = 0; ///< the harbour is ground no nation holds
-    int no_room     = 0; ///< every land tile beside the end holds a network source or a full stack
+    int groups      = 0; ///< harbour groups they form (ends within two hex steps over the sea)
+    int at_port     = 0; ///< groups already served by a standing port (an earlier group's too)
+    int open        = 0; ///< groups with no land beside any end: open sea, no port
+    int unheld      = 0; ///< groups whose harbour is ground no nation holds
+    int no_room     = 0; ///< groups whose every land tile holds a network source or a full stack
     int placed      = 0; ///< ports stood
+    int extensions  = 0; ///< member lanes walked on to their port's mouth
+    int extension_tiles   = 0; ///< sea tiles those walks newly laned
+    int extensions_failed = 0; ///< member ends no sea walk joins to their port (a defect)
 };
 
 colonial_port_report place_colonial_ports(world& w);
