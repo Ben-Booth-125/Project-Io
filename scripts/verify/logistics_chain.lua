@@ -157,6 +157,32 @@ if fx.rail then
   frame_tile(fx.station_b_x, fx.station_b_y, 12)
   shot("logistics_chain_rail_close")
 end
+
+-- L2 - ONE COLOUR PER TILE (Ben, 2026-10-26: "go with one colour per tile, showing both
+-- networks added together"). A cell carrying a road AND a rail or sea leg is one tile of
+-- the lens: its pair is the networks' SUM (the road's routed flow plus each leg's), it
+-- takes one colour from that sum, and the road, the track and the leg stroke all draw in
+-- it. The census splits the combined cells' totals into the road's part and the legs'.
+do
+  if fx.rail then
+    frame_tile(fx.station_a_x, fx.station_a_y, 12)
+    shot("logistics_one_colour_station_close")
+  end
+  local rb = verify.logistics_roads()
+  print(string.format("[logistics_chain] road + leg cells: %d (%d with a leg share added); supplied %.2f = "
+        .. "road %.2f + legs %.2f; requested %.2f = road %.2f + legs %.2f; leg cells stroked %d",
+        rb.both, rb.both_added, rb.both_supplied, rb.both_road_supplied, rb.both_leg_supplied,
+        rb.both_requested, rb.both_road_requested, rb.both_leg_requested, rb.leg_cells_drawn))
+  verify.expect(rb.both > 0, "L2: some tile carries both a road and a leg (" .. rb.both .. ")")
+  local tol = 1e-3 * math.max(1.0, rb.both_supplied)
+  verify.expect(math.abs(rb.both_supplied - (rb.both_road_supplied + rb.both_leg_supplied)) <= tol,
+                "L2: a road + leg tile's supplied is the two networks' sum")
+  verify.expect(math.abs(rb.both_requested - (rb.both_road_requested + rb.both_leg_requested))
+                <= 1e-3 * math.max(1.0, rb.both_requested),
+                "L2: a road + leg tile's requested is the two networks' sum")
+  verify.expect(rb.leg_cells_drawn > 0, "L2: the leg is stroked tile by tile in its tiles' colours ("
+                .. rb.leg_cells_drawn .. ")")
+end
 if fx.sea then
   print("[logistics_chain] sea leg " .. fx.port_a_x .. "," .. fx.port_a_y .. " -> "
         .. fx.port_b_x .. "," .. fx.port_b_y)

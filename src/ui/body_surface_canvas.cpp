@@ -1986,7 +1986,13 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_chain.clear();
     state.lp_track.clear();
     state.lp_legs.clear();
+    state.lp_links.clear();
+    state.lp_both_cells = state.lp_both_added = 0;
+    state.lp_both_supplied = state.lp_both_requested = 0.0;
+    state.lp_both_road_supplied = state.lp_both_road_requested = 0.0;
+    state.lp_both_leg_supplied = state.lp_both_leg_requested = 0.0;
     state.lp_hover_link      = 0;
+    state.lp_hover_links     = 0;
     state.lp_hover_chain     = 0;
     state.lp_hover_granted   = 0.0f;
     state.lp_hover_supplied  = 0.0f;
@@ -2208,10 +2214,26 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             }
             // THE RAIL AND SEA LEGS onto the same cells: a leg's run carries its routed
             // flow along its whole length, so track and water between two stations or a
-            // port and its landing read as one link, not as a gap. A road tile keeps its
-            // own figures where it carries traffic (a station's tile is both); where legs
-            // share a tile their shares add, because they are different shares.
+            // port and its landing read as one link, not as a gap.
+            //
+            // ONE COLOUR PER TILE, BOTH NETWORKS ADDED TOGETHER (Ben, 2026-10-26; LENSES.md
+            // § Logistics lens). A tile carrying a road AND a leg sums the two networks'
+            // flows - supplied with supplied, requested with requested - and is coloured
+            // and labelled once from that sum; where legs share a tile their shares add
+            // too, because they are different shares. The one share NOT added is a leg's
+            // own at its END on a road the routed flow already names: `lp_route_flow`
+            // lays a rail or sea link's share on its two end tiles (a rail field is point
+            // to point), so there the road's figure already holds the leg's traffic, and
+            // adding it again would count one request twice.
             const int lgw = state.lp_reaching_gw;
+            state.lp_links.assign(n, 0);
+            for (std::size_t i = 0; i < n; ++i)
+                if (state.lp_on_road[i] == 1)
+                    state.lp_links[i] = 1;
+            // The road's own part and the legs' part, kept apart for the verify census
+            // (the tile's figure is their sum; `logistics_roads` reports all three).
+            const std::vector<float> road_sup(state.lp_supplied), road_req(state.lp_requested);
+            std::vector<float> leg_sup(n, 0.0f), leg_req(n, 0.0f);
             state.lp_legs.reserve(s_legs.size());
             for (const ui::lp_leg& leg : s_legs)
             {
@@ -2221,8 +2243,9 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                 lv.requested = leg.requested;
                 lv.granted   = leg.granted;
                 lv.available = leg.available;
-                for (const entity_id tid : leg.tiles)
+                for (std::size_t j = 0; j < leg.tiles.size(); ++j)
                 {
+                    const entity_id tid = leg.tiles[j];
                     const auto tc = w.tiles.find(tid);
                     if (tc == w.tiles.end() || tc->second.body != state.active_body || lgw <= 0)
                         continue;
@@ -2232,20 +2255,41 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                     if (i >= n)
                         continue;
                     lv.cells.push_back(static_cast<int>(i));
-                    if (state.lp_on_road[i] == 1 && state.lp_chain[i] == 2)
-                        continue; // a carrying road keeps its own pair
-                    const bool fresh = state.lp_on_road[i] != 2 && state.lp_on_road[i] != 3;
-                    state.lp_on_road[i] = leg.network == lp_network::rail ? 2 : 3;
-                    if (fresh)
+                    const bool end = j == 0 || j + 1 == leg.tiles.size();
+                    const bool road_holds_it = end && (state.lp_links[i] & 1u) != 0
+                                            && flow.find(tid) != flow.end();
+                    if (state.lp_on_road[i] == 0)
                     {
+                        state.lp_on_road[i] = leg.network == lp_network::rail ? 2 : 3;
                         state.lp_supplied[i] = state.lp_requested[i] = state.lp_granted[i] = 0.0f;
                     }
-                    state.lp_supplied[i]  += leg.available;
-                    state.lp_requested[i] += leg.requested;
-                    state.lp_granted[i]   += leg.granted;
+                    state.lp_links[i] |= leg.network == lp_network::rail ? 2u : 4u;
+                    if (!road_holds_it)
+                    {
+                        state.lp_supplied[i]  += leg.available;
+                        state.lp_requested[i] += leg.requested;
+                        state.lp_granted[i]   += leg.granted;
+                        leg_sup[i] += leg.available;
+                        leg_req[i] += leg.requested;
+                    }
+                    // Carrying beats idle beats not tied to the capital, across both networks.
                     state.lp_chain[i] = std::max<std::uint8_t>(state.lp_chain[i], lv.chain);
                 }
                 state.lp_legs.push_back(std::move(lv));
+            }
+            for (std::size_t i = 0; i < n; ++i)
+            {
+                if ((state.lp_links[i] & 1u) == 0 || (state.lp_links[i] & 6u) == 0)
+                    continue; // one network only
+                ++state.lp_both_cells;
+                state.lp_both_supplied      += state.lp_supplied[i];
+                state.lp_both_requested     += state.lp_requested[i];
+                state.lp_both_road_supplied += std::max(0.0f, road_sup[i]);
+                state.lp_both_road_requested += std::max(0.0f, road_req[i]);
+                state.lp_both_leg_supplied  += leg_sup[i];
+                state.lp_both_leg_requested += leg_req[i];
+                if (leg_sup[i] > 0.0f || leg_req[i] > 0.0f)
+                    ++state.lp_both_added;
             }
             // BL-1353: the ground card's WHY for the tile under the pointer. The card
             // holds a const world, so it is read here, off the memo the loop above
@@ -2289,6 +2333,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                         state.lp_hover_road      = state.lp_on_road[hi] != 0;
                         state.lp_hover_granted   = std::max(0.0f, state.lp_granted[hi]);
                         state.lp_hover_link      = state.lp_on_road[hi];
+                        state.lp_hover_links     = hi < state.lp_links.size() ? state.lp_links[hi] : 0;
                         state.lp_hover_chain     = hi < state.lp_chain.size() ? state.lp_chain[hi] : 0;
                     }
                 }
@@ -4799,10 +4844,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // along the lane's own water tiles — never between its ends — as the same smooth
         // curve, in the soft sea blue the wizard's lapse draws a lane in. Always-on like
         // roads: a lane is part of the network a convoy rides, not an overlay.
+        // ONE COLOUR PER TILE (Ben, 2026-10-26): under the Logistics lens a lane tile of
+        // the player's chain takes the tile's own colour, as its road and its leg do, so
+        // no tile reads in two.
+        const ImU32 lane_lens = route_lens ? lens_road_colour(t_col, t_row) : 0u;
         if (route_drawn && tile.lane_level > 0)
             draw_network([](const tile_component& t) { return t.lane_level; },
                          [](const tile_component&, int, int) { return 1; }, // a lane is a tile field
-                         IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true,
+                         lane_lens != 0u ? ((lane_lens & ~IM_COL32_A_MASK) | (190u << IM_COL32_A_SHIFT))
+                                         : IM_COL32(140, 200, 245, 190),
+                         route_r * k_lane_width, true,
                          // A lane carries no tier, so every half keeps the lane's own weight.
                          [](int, ImU32 fallback) { return fallback; },
                          [](int, float fallback) { return fallback; },
@@ -4813,10 +4864,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // line is drawn here - every track tile, on the four-cardinal grid the rail walk
         // steps on, in a dark ballast tone at a Road's weight. A leg of the player's
         // chain is stroked over it in the lens's colours by the leg pass.
+        // On a tile of the player's chain the track takes the tile's one colour (Ben,
+        // 2026-10-26: "one colour per tile"), so a road and a line on one tile never read
+        // as two networks in two colours; elsewhere it keeps the ballast tone.
         if (route_lens && track_rc(t_col, t_row))
             draw_network([&](const tile_component& t) { return track_rc(t.grid_x, t.grid_y) ? 1 : 0; },
                          [](const tile_component&, int, int) { return 1; }, // track is a tile field
-                         IM_COL32(92, 86, 80, 230), route_r * k_road_width_road, false,
+                         lane_lens != 0u ? ((lane_lens & ~IM_COL32_A_MASK) | (230u << IM_COL32_A_SHIFT))
+                                         : IM_COL32(92, 86, 80, 230),
+                         route_r * k_road_width_road, false,
                          [](int, ImU32 fallback) { return fallback; },
                          [](int, float fallback) { return fallback; },
                          std::uint8_t{0});
@@ -6266,6 +6322,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // where none does (LENSES.md § Logistics lens, "Every link of the chain"). A dark
     // casing under it so it holds on the sea's blue and the ballast's grey alike. Per
     // frame and not cached: a few legs of a few dozen tiles each.
+    state.lp_leg_cells_drawn = 0;
     if (state.overlay == overlay_mode::throughput && !state.lp_legs.empty() && raster_ok
         && state.lp_reaching_gw == gw)
     {
@@ -6276,7 +6333,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (leg.cells.size() < 2)
                 continue;
             const float thick = leg_r * (leg.network == 2 ? k_lane_width : k_road_width_highway);
-            const ImU32 col = logistics_link_colour(leg.chain, leg.available, leg.requested);
             pts.clear();
             float min_x = std::numeric_limits<float>::max(), max_x = -min_x;
             bool  shown = true;
@@ -6305,13 +6361,38 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 ? static_cast<int>(std::ceil((visible_left  - max_x) / period_px)) : 0;
             const int k_hi = (period_px > 0.0f)
                 ? static_cast<int>(std::floor((visible_right - min_x) / period_px)) : 0;
+            // ONE COLOUR PER TILE (Ben, 2026-10-26: "go with one colour per tile, showing
+            // both networks added together"). The leg is stroked tile by tile, each tile's
+            // stretch - from the midpoint shared with the tile before to the one shared
+            // with the tile after - in THAT TILE's colour: the networks' summed figures,
+            // the same colour its road and its track take. So a tile where a road and a
+            // line meet is one colour, and the leg's colour steps at tile edges exactly
+            // where its road's would.
+            const std::size_t ncell = pts.size();
+            state.lp_leg_cells_drawn += static_cast<int>(ncell);
             for (int k = k_lo; k <= k_hi; ++k)
             {
                 const float off = static_cast<float>(k) * period_px;
                 for (ImVec2& p : pts) p.x += off;
                 dl->AddPolyline(pts.data(), static_cast<int>(pts.size()), IM_COL32(12, 16, 24, 170),
                                 ImDrawFlags_None, thick + 2.0f);
-                dl->AddPolyline(pts.data(), static_cast<int>(pts.size()), col, ImDrawFlags_None, thick);
+                for (std::size_t c = 0; c < ncell; ++c)
+                {
+                    const std::size_t ci = static_cast<std::size_t>(leg.cells[c]);
+                    const std::uint8_t chain = ci < state.lp_chain.size() ? state.lp_chain[ci] : 2;
+                    const ImU32 cell_col = ci < state.lp_supplied.size()
+                        ? logistics_link_colour(chain, state.lp_supplied[ci], state.lp_requested[ci])
+                        : logistics_link_colour(leg.chain, leg.available, leg.requested);
+                    ImVec2 seg[3];
+                    int    ns = 0;
+                    if (c > 0)
+                        seg[ns++] = { (pts[c - 1].x + pts[c].x) * 0.5f, (pts[c - 1].y + pts[c].y) * 0.5f };
+                    seg[ns++] = pts[c];
+                    if (c + 1 < ncell)
+                        seg[ns++] = { (pts[c].x + pts[c + 1].x) * 0.5f, (pts[c].y + pts[c + 1].y) * 0.5f };
+                    if (ns >= 2)
+                        dl->AddPolyline(seg, ns, cell_col, ImDrawFlags_None, thick);
+                }
                 for (ImVec2& p : pts) p.x -= off;
             }
         }
@@ -6512,6 +6593,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // player's. So the lens reads nothing until the held corp's first pass.
     std::vector<const trade_flow_pass*> tf_passes;
     state.trade_flow_routed = state.trade_flow_unrouted = 0;
+    state.tf_heads_drawn = state.tf_heads_in_dest_hex = state.tf_routes_end_at_centre = 0;
+    state.tf_head_worst_r = 0.0f;
     if (state.overlay == overlay_mode::trade_flow)
         for (const trade_flow_pass& p : w.player_trade_flow)
             if ((p.corp == w.player_entity || p.corp == player_owner) && p.corp != null_entity) // BL-1406
@@ -6662,8 +6745,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     }
                     const float wpx  = trade_flow_width(f.rate, tf_max_rate);
                     const float side = 2.0f + wpx * 0.5f;
-                    // Offset right of travel, per vertex by its neighbours' direction.
+                    // Offset right of travel, per vertex by its neighbours' direction -
+                    // TAPERED TO NOTHING OVER THE LAST HOP AND A HALF (Ben, 2026-10-26:
+                    // arrowheads ended on ordinary tiles). The head used to sit at the
+                    // offset path's end trimmed back by the glyph inset: half a hex back
+                    // and up to five px aside, so on the whole-body view - a hex a few
+                    // px across - it landed on the tile before the market centre. Now
+                    // the path runs into the centre tile's own centre.
                     const std::size_t n = rpts.size();
+                    std::vector<float> to_end(n, 0.0f); // px along the path to its end
+                    for (std::size_t q = n - 1; q-- > 0;)
+                    {
+                        const float dx = rpts[q + 1].x - rpts[q].x, dy = rpts[q + 1].y - rpts[q].y;
+                        to_end[q] = to_end[q + 1] + std::sqrt(dx * dx + dy * dy);
+                    }
+                    const float taper = std::max(1.0f, hit_r * 1.5f * 1.732f);
                     opts.assign(n, ImVec2{});
                     for (std::size_t q = 0; q < n; ++q)
                     {
@@ -6671,18 +6767,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         const float vx = b.x - a.x, vy = b.y - a.y;
                         const float l = std::sqrt(vx * vx + vy * vy);
                         const float nx = l > 0.0f ? -vy / l : 0.0f, ny = l > 0.0f ? vx / l : 0.0f;
-                        opts[q] = { rpts[q].x + nx * side, rpts[q].y + ny * side };
+                        const float sd = side * std::clamp(to_end[q] / taper, 0.0f, 1.0f);
+                        opts[q] = { rpts[q].x + nx * sd, rpts[q].y + ny * sd };
                     }
-                    // Trim both ends clear of the market glyphs.
+                    // Trim the START clear of the source market; the END is not trimmed,
+                    // so the tip is the destination centre.
                     std::reverse(opts.begin(), opts.end());
                     trim_end(opts, inset);
                     std::reverse(opts.begin(), opts.end());
-                    trim_end(opts, inset);
                 }
                 if (rpts.size() >= 2 && opts.size() >= 2)
                 {
                     const float wpx  = trade_flow_width(f.rate, tf_max_rate);
-                    const float head = 5.0f + wpx;
+                    // The head is sized to the drawn hex as well as the width, so all of it
+                    // - tip on the centre, base 0.7 of a radius back - is inside that tile.
+                    const float head = std::min(5.0f + wpx, 0.7f * hit_r);
                     const ImVec2 tip = opts.back();
                     shaft = opts;
                     trim_end(shaft, head);
@@ -6693,6 +6792,26 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const float hl = std::sqrt(hx * hx + hy * hy);
                     if (hl > 0.0f) { hx /= hl; hy /= hl; } else { hx = 1.0f; hy = 0.0f; }
                     const float hnx = -hy, hny = hx;
+
+                    // WHERE THE HEAD LANDED, for the verify hook: its tip and the middle
+                    // of its base against the destination centre's hex (inside the
+                    // inscribed circle, 0.866 of the drawn hex radius).
+                    {
+                        ImVec2 dc = centre_of(f.dest);
+                        if (period_px > 0.0f)
+                            dc.x += period_px * std::round((tip.x - dc.x) / period_px);
+                        const auto in_r = [&](ImVec2 q) {
+                            const float dx = q.x - dc.x, dy = q.y - dc.y;
+                            return std::sqrt(dx * dx + dy * dy) / std::max(1.0f, hit_r);
+                        };
+                        const float tr = in_r(tip), br = in_r(se);
+                        ++state.tf_heads_drawn;
+                        if (tr <= 0.866f && br <= 0.866f)
+                            ++state.tf_heads_in_dest_hex;
+                        state.tf_head_worst_r = std::max(state.tf_head_worst_r, std::max(tr, br));
+                        if (!rt->tiles.empty() && rt->tiles.back() == w.markets.at(f.dest).centre_tile)
+                            ++state.tf_routes_end_at_centre;
+                    }
 
                     float lo = opts[0].x, hi = opts[0].x;
                     for (const ImVec2& p : opts) { lo = std::min(lo, p.x); hi = std::max(hi, p.x); }
@@ -6735,7 +6854,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         }
                         const ImVec2 t2{ tip.x + off, tip.y };
                         const ImVec2 e2{ se.x + off, se.y };
-                        const float hw = head * 0.6f;
+                        const float hw = std::max(head * 0.6f, wpx * 0.75f);
                         dl->AddTriangleFilled(t2, { e2.x + hnx * hw, e2.y + hny * hw },
                                               { e2.x - hnx * hw, e2.y - hny * hw }, palette::trade_flow_arrow);
                         for (std::size_t q = 0; q + 1 < shaft.size(); ++q)

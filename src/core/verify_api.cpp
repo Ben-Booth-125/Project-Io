@@ -1605,8 +1605,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             if (chain == 0) ++off_chain;
             else if (chain == 1) ++idle;
             else ++carrying;
-            if (m_ui.lp_on_road[i] == 2) ++rail;
-            if (m_ui.lp_on_road[i] == 3) ++sea;
+            // By the networks a cell carries (Ben, 2026-10-26: a road + rail tile is one
+            // tile of the lens, its kind still the road's), so a leg's track that runs
+            // on roads still counts as the leg's.
+            const std::uint8_t links = i < m_ui.lp_links.size() ? m_ui.lp_links[i] : 0;
+            if ((links & 2u) != 0 || m_ui.lp_on_road[i] == 2) ++rail;
+            if ((links & 4u) != 0 || m_ui.lp_on_road[i] == 3) ++sea;
             ++roads;
             const float s = m_ui.lp_supplied[i], r = m_ui.lp_requested[i];
             if (r > 0.0f)
@@ -1649,6 +1653,19 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             (lg.network == 2 ? legs_sea : legs_rail) += 1;
         out["legs_rail"] = legs_rail;
         out["legs_sea"]  = legs_sea;
+        // ONE COLOUR PER TILE (Ben, 2026-10-26): the cells carrying a road AND a leg,
+        // as counts and totals - each such cell's figure is the networks' SUM, so
+        // both_supplied = both_road_supplied + both_leg_supplied, and `both_added`
+        // counts the cells where a leg's share was added onto the road's.
+        out["both"]                = m_ui.lp_both_cells;
+        out["both_added"]          = m_ui.lp_both_added;
+        out["both_supplied"]       = m_ui.lp_both_supplied;
+        out["both_requested"]      = m_ui.lp_both_requested;
+        out["both_road_supplied"]  = m_ui.lp_both_road_supplied;
+        out["both_road_requested"] = m_ui.lp_both_road_requested;
+        out["both_leg_supplied"]   = m_ui.lp_both_leg_supplied;
+        out["both_leg_requested"]  = m_ui.lp_both_leg_requested;
+        out["leg_cells_drawn"]     = m_ui.lp_leg_cells_drawn;
         return out;
     });
 
@@ -3824,6 +3841,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["convoys"]    = convoys;
         out["over_water"] = over_water; // routes with a sea or lake leg
         out["over_rail"]  = over_rail;  // routes riding a railway
+        // Where the routed heads landed last frame (Ben, 2026-10-26): counts only.
+        out["heads"]          = m_ui.tf_heads_drawn;
+        out["heads_in_dest"]  = m_ui.tf_heads_in_dest_hex;   // tip and base inside the dest centre's hex
+        out["ends_at_centre"] = m_ui.tf_routes_end_at_centre; // route's last tile is the dest centre
+        out["head_worst_r"]   = m_ui.tf_head_worst_r;         // worst head point, in hex radii from the centre
         // Where the first route's source market centre is, so a capture can frame it:
         // a market centre is public (the Market lens draws it), a position only.
         out["has_first"] = false;

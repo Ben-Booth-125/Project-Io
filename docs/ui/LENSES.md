@@ -854,8 +854,12 @@ no nation's shipments and do not appear either.
   rail → road — the route the dispatcher recorded with the shipment and the one a convoy of it
   rides (`SUPPLY.md` § Logistical cost: the lane is the legs). It is never the chord between the
   two market centres. It sits a few pixels to the right of the route, so A → B and B → A read as
-  two paths; dark **chevrons** down its length give the direction, the **head** sits at the
-  destination, and its **width** is the volume. A flow whose route can no longer be walked (a road
+  two paths; dark **chevrons** down its length give the direction, and its **width** is the
+  volume. **The head lands on the destination market's centre** (Ben, 2026-10-26: arrowheads were
+  ending on ordinary tiles): the offset to the right of travel tapers to nothing over the last hop,
+  so the path runs into the centre tile's own centre, and the head is sized to the drawn hex, so the
+  whole of it — tip and base — lies inside that one tile at every rung, the whole-body view
+  included. A flow whose route can no longer be walked (a road
   cut since it was priced) falls back to the straight arrow between the centres.
 - **Refusals** — a marker on each market of the active body that is short of a good the
   player holds in surplus, coloured by the **best** class over the player's sources of
@@ -978,11 +982,31 @@ resolver routes on (`LOGISTICS.md` § How a tile's points get to it):
 - A leg's figures are its own: **requested** and **granted** are the routed shares whose path to the
   capital runs through that link (each request routed as the resolver routes it, its shares laid up
   its sources' paths), and **supplied** is the carrying source's points × its reach across the leg.
-  Where legs share a tile their shares add; a road tile a leg also crosses (a station's, a
-  landing's) takes the leg's figures unless the road itself carries traffic.
+  Where legs share a tile their shares add.
 - Each leg is stroked along its run over a dark casing — a Highway's weight on rail, a lane's on the
-  sea. The bake paints no rail bed under the lens, so every **track** tile is also drawn, in a dark
-  ballast tone at a Road's weight, with the player's legs over it.
+  sea. The bake paints no rail bed under the lens, so every **track** tile is also drawn, at a Road's
+  weight, with the player's legs over it: in the tile's colour on a link of the player's chain, in a
+  dark ballast tone elsewhere.
+
+**One colour per tile, both networks added together** (Ben, 2026-10-26: *"go with one colour per
+tile, showing both networks added together"*). A tile that carries a road **and** a rail or sea leg
+is one tile of the lens, not two links drawn over each other:
+
+- Its **supplied** is the road's routed flow's supplied plus each leg's, and its **requested** the
+  road's plus each leg's; the tile carries that one summed pair as its label.
+- It takes **one colour** from that summed ratio, on the same red / yellow / green log2 ramp.
+- Its state is the combined tile's: **carrying** beats **connected, idle** beats **not tied to the
+  capital** — a tile either network carries traffic across is carrying.
+- Everything drawn on it — the road's curve, the track, the leg's stroke, a lane — takes that one
+  colour. A leg is stroked tile by tile, each tile's stretch from the midpoint it shares with the
+  tile before to the one it shares with the tile after, so its colour steps at tile edges exactly
+  where a road's does.
+- A leg's share is **not** added again at its own **end** on a road whose routed flow already names
+  it: a rail or sea link's routed share lies on its two end tiles (a station's points run point to
+  point), so there the road's figure already holds the leg's traffic, and adding it would count one
+  request twice.
+- The hover card names both networks (*road + rail, granted G*; *Road + rail, idle*), so the pair is
+  never read as one network's.
 - A rail line between two connected stations that the chain did not join by is still a leg —
   **connected, idle**.
 
