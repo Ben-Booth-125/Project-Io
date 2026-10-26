@@ -1076,8 +1076,9 @@ struct building_component
     /// BL-1206 (seat clean slate): every credit charged the owner for this site
     /// so far — the whole flat build cost, paid once at placement (Ben,
     /// 2026-10-25), and the materials each tick draws in arrears at the posted
-    /// price clearing bills them at (MARKETS.md: a draw pays the posted price). The site's own record, so a
-    /// cancelled build is refunded exactly what it consumed, never an estimate.
+    /// price clearing bills them at (MARKETS.md: a draw pays the posted price). The site's own record of
+    /// what it cost; a cancelled build is refunded only its credits (`build_credit_paid`), the
+    /// materials staying spent (Ben, 2026-10-26, NR-1075).
     /// Stays at its final figure once the build completes. world_save_version 37.
     float construction_paid = 0.0f;
 
@@ -2033,8 +2034,8 @@ struct quarterly_return
     float upkeep      = 0.0f;
 
     /// BL-1206 (seat clean slate): credits REFUNDED to the firm since its last
-    /// return — today only the seat's cancelled construction, credited at the
-    /// seat and booked on the next return (FINANCE.md § The quarterly return).
+    /// return — the credits of cancelled construction, the seat's clean slate among
+    /// them, credited at the cancellation and booked on the next return (FINANCE.md § The quarterly return).
     /// A credit, so `net` = income − expenditure − maintenance − wages − interest
     /// − levies − upkeep + refunds. Zero on every other row. world_save_version 37.
     float refunds     = 0.0f;
