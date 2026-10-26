@@ -396,6 +396,12 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // earned with the rail running.
     out.rail = hand_over_rail(w);
     print_rail_handover(out.rail);
+    // PORTS IN HISTORY (Ben, 2026-10-26; LOGISTICS.md § 4b): where a colonial lane lands,
+    // the past built a harbour - a port of the nation holding that ground, free. After the
+    // rail handover and BEFORE the site roads and the seeding, so the site pass roads it,
+    // the seeding's opening `lay_all_port_lanes` lanes it and the chain may carry it.
+    out.colonial_ports = place_colonial_ports(w);
+    print_colonial_ports(out.colonial_ports);
     // BL-1347 -- A CROSSING TO EVERY SITE STAMPED SINCE GENERATION'S OWN PASS
     // (PRODUCTION.md § A building needs a road; LOGISTICS.md § 4, "Generation roads every
     // building site"). Generation roaded the sites it had laid by its tail; everything

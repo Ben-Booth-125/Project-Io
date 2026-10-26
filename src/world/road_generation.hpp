@@ -747,6 +747,41 @@ port_lane_stats lay_port_lanes(world& w, entity_id port, port_lane_trace* trace 
 port_lane_stats lay_all_port_lanes(world& w, port_lane_trace* trace = nullptr);
 
 // ---------------------------------------------------------------------------
+// PORTS IN HISTORY (Ben, 2026-10-26: "Place ports in history"; LOGISTICS.md § 4b)
+// ---------------------------------------------------------------------------
+//
+// Where a colonial lane lands, the history built a harbour, so the campaign world opens
+// with a port there. Read from `world::gen_sea_lane_landings` (the stamp's record of
+// every lane end and the seat it was taken from), at the fold, after the rail handover
+// and before the site roads and the Logistic Point seeding - so the site pass roads the
+// port, `lay_all_port_lanes` lanes it and the chain may carry it.
+//
+// Per distinct lane-end sea tile, ascending tile id:
+//   - a standing port already has it on one of its six hex sides: nothing (one port per
+//     harbour - ends sharing a mouth share the port);
+//   - no land on its six hex sides: OPEN sea, counted, no port;
+//   - else THE HARBOUR is the land tile on those sides nearest the seat (Chebyshev,
+//     columns wrapping; ties to the lower tile id; the seat of the lower tile id where
+//     several seats land at one end), skipping a tile that already holds a network
+//     source or whose non-extraction stack is full. Ground no nation holds is counted and
+//     gets none. Otherwise a port stands there, the HOLDING nation's own state asset:
+//     complete, staffed full, and FREE - history's infrastructure, as the stations the
+//     rail handover stands and the roads the past laid, never charged to a treasury.
+// Deterministic: sorted record, ascending tiles, no RNG. Clears the record.
+struct colonial_port_report
+{
+    int ends        = 0; ///< distinct lane-end sea tiles read
+    int at_port     = 0; ///< of them, already a standing port's mouth (an earlier end's too)
+    int open        = 0; ///< no land beside the end: open sea, no port
+    int unheld      = 0; ///< the harbour is ground no nation holds
+    int no_room     = 0; ///< every land tile beside the end holds a network source or a full stack
+    int placed      = 0; ///< ports stood
+};
+
+colonial_port_report place_colonial_ports(world& w);
+void print_colonial_ports(const colonial_port_report& r);
+
+// ---------------------------------------------------------------------------
 // The rail record, carried to the fold (BL-1255)
 // ---------------------------------------------------------------------------
 //
