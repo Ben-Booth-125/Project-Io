@@ -19,6 +19,14 @@
 --       ledger disarms the lens.
 --   S6  the cost: the evaluation's wall time, that it is cached (a still frame does
 --       not rebuild it), and the frame cost with the lens up against the lens down.
+-- Ben's live-click rulings of 2026-10-26 add:
+--   S7  every header is legible: each publishes the width it needs unelided (its
+--       text plus the sort arrow) and the width its column gave it, at 1720 and at
+--       1280; there is no x,y column, and every row names its place instead.
+--   S8  the selected site keeps its "build here" wash under the selection mark.
+--   S9  a site under construction carries the progress circle on the map, and
+--       hovering it - or its queue row - opens the site card naming the materials
+--       still to draw.
 --   It also PRINTS the tie measurement (rows sharing a displayed net) for Ben's
 --   province-price decision; construction_sites_ties.lua sweeps it across seeds.
 --
@@ -88,6 +96,22 @@ verify.expect(s.lens_valid + s.lens_flagged == s.n_rows,
               "S1: the lens classes exactly the tiles the ledger lists")
 verify.expect(s.lens_flagged == s.no_lp_rows, "S1: the lens flags exactly the ledger's no-logistics rows")
 verify.expect(s.sort_col == 1 and s.sort_desc, "S2: the default sort is profit, descending")
+
+-- S7 - the headers fit, the x,y column is gone, and every row names a place.
+local function assert_headers(s7, where)
+  verify.expect(s7.n_headers == 6, string.format("S7 (%s): six headers drawn (%d)", where, s7.n_headers))
+  for _, h in ipairs(s7.headers) do
+    verify.expect(h.label ~= "Tile", "S7 (" .. where .. "): no tile x,y column")
+    verify.expect(h.have + 0.5 >= h.need, string.format(
+      "S7 (%s): header '%s' is legible - needs %.1f px with its sort arrow, column gives %.1f",
+      where, h.label, h.need, h.have))
+  end
+end
+assert_headers(s, "1720x1080")
+local unnamed = 0
+for _, r in ipairs(s.rows) do if r.place == "" then unnamed = unnamed + 1 end end
+verify.expect(unnamed == 0, string.format("S7: every row names its place (%d of %d unnamed)", unnamed, s.n_rows))
+print(string.format("[construction_sites] S7: first row '%s'%s", s.rows[1].place, s.rows[1].near and " (near)" or ""))
 
 -- S2 - sorted by profit, descending, ties by tile id.
 local sorted = true
@@ -164,9 +188,21 @@ if s2.n_drawn > 0 then
   verify.frames(4)
   local card = verify.tile_card()
   verify.expect(card.drawn, "S3: pressing the top row selects its tile (the tile card draws)")
+  -- S8 - the selected site keeps its wash: the canvas washed the selected tile
+  -- with a site class (1 served, 2 no Logistic Points), not left it bare.
+  local s8 = sites()
+  verify.expect(s8.selected_wash == 1 or s8.selected_wash == 2, string.format(
+    "S8: the selected site keeps its build-here wash under the selection mark (class %d)",
+    s8.selected_wash))
 end
 verify.hover(1100, 450, 2) -- off the row just pressed, so its card does not cover the ledger
 shot("construction_sites_ledger")
+-- S8's picture: the selected site, close, green under the selection mark.
+if s2.n_drawn > 0 then
+  frame_tile(s2.rows[1].x, s2.rows[1].y, 14)
+  verify.hover(1100, 450, 2)
+  shot("construction_sites_selected_keeps_wash")
+end
 
 -- S4 - a flagged tile, framed close enough for the mark.
 local flagged = nil
@@ -213,3 +249,89 @@ verify.show_panel("construction", false)
 verify.frames(2)
 local s5 = sites()
 verify.expect(not s5.live and not s5.armed, "S5: closing the ledger disarms the lens and clears the choice")
+
+-- S7 at the narrow end: the headers still fit at 1280x720.
+verify.window(1280, 720)
+verify.frames(3)
+verify.show_panel("build", true)
+verify.site_pick(choice)
+verify.frames(4)
+assert_headers(sites(), "1280x720")
+verify.hover(900, 400, 2)
+shot("construction_sites_ledger_1280")
+verify.site_clear()
+verify.show_panel("construction", false)
+verify.window(1720, 1080)
+verify.frames(3)
+
+-- S9 - the progress circle and the site card. Stage an Iron Mine on the first
+-- Iron Mine site through the Build door's own seam (ledger_build writes the fields
+-- the press writes), let a tick run, and read the canvas's marks.
+verify.show_panel("build", true)
+verify.site_pick("Iron Mine")
+verify.frames(3)
+local si = sites()
+verify.expect(si.n_rows > 0, "S9: the site finder lists an Iron Mine site to stage on")
+if si.n_rows > 0 then
+  local t = si.rows[1]
+  verify.site_clear()
+  verify.select_tile(t.x, t.y)
+  verify.frames(2)
+  verify.ledger_build("extraction", "iron_ore", "")
+  verify.frames(3)
+  verify.econ_step(1)
+  verify.set_balance(5000000.0)
+  verify.clear_selection()
+  verify.show_panel("construction", false)
+  frame_tile(t.x, t.y, 14)
+  verify.hover(1100, 120, 2)
+  verify.frames(4)
+  local cc = verify.construction_controls()
+  print(string.format("[construction_sites] S9: %d progress circle(s) drawn", cc.n_site_marks))
+  verify.expect(cc.n_site_marks > 0, "S9: a site under construction carries the progress circle")
+  if cc.n_site_marks > 0 then
+    -- The mark nearest the canvas centre, which is the framed site.
+    local best, bd = nil, nil
+    for _, m in ipairs(cc.site_marks) do
+      local d = (m.x - 1000) ^ 2 + (m.y - 540) ^ 2
+      if not bd or d < bd then best, bd = m, d end
+    end
+    verify.expect(best.days_total > 0 and best.days_done >= 0 and best.days_done <= best.days_total,
+      string.format("S9: the circle shows days done over total (%d / %d)", best.days_done, best.days_total))
+    verify.hover(best.x, best.y, 3)
+    local card = verify.construction_controls()
+    local text = card.site_card_text or ""
+    print("[construction_sites] S9 circle card:\n" .. text)
+    verify.expect(card.site_card_for == best.building, "S9: hovering the circle opens that site's card")
+    local after = text:match("Still to draw:\n(.+)")
+    verify.expect(after ~= nil and after:find("%a") ~= nil,
+                  "S9: the card names the materials still to draw")
+    verify.expect(not text:find(" cr", 1, true), "S9: the card quotes no credit figure beside the materials")
+    if after and text:find("the market holds less", 1, true) then
+      verify.expect(after:sub(1, 2) == "! " or after:find("\n! ", 1, true) ~= nil,
+                    "S9: the footnote's '!' is on a short good's line")
+    end
+    shot("construction_sites_progress_circle", 2)
+
+    -- The same card from the queue row.
+    verify.select_tile(t.x, t.y)
+    verify.frames(1)
+    verify.show_panel("build", true)
+    verify.section("construction_queue", true)
+    verify.frames(3)
+    local q = verify.construction_queue()
+    local hovered = false
+    for _, r in ipairs(q.rows) do
+      for _, c in ipairs(r.cols) do
+        if c.key == "name" and not hovered then
+          verify.hover(c.x, c.y, 3)
+          hovered = true
+        end
+      end
+    end
+    local qc = verify.construction_controls()
+    verify.expect(hovered and (qc.site_card_text or ""):find("Still to draw:", 1, true) ~= nil,
+                  "S9: hovering the queue row opens the site card with its materials")
+    shot("construction_sites_queue_card", 2)
+  end
+end

@@ -446,6 +446,34 @@ struct construction_controls
     /// WRAP COPY of a target tile, so it is a "the mark was drawn" count rather
     /// than a second copy of `road_highlights.size()`.
     int          road_drawn    = 0;
+
+    /// THE BUILD-PROGRESS CIRCLE (Ben, 2026-10-26; construction.md § The progress
+    /// circle): one entry per circle the Planetary canvas drew this frame over a
+    /// player site under construction, nearest wrap copy first, in building-id
+    /// order. `x`/`y` are SCREEN pixels (after the camera squash), so a check can
+    /// hover the real mark. VIEW state, not serialised.
+    struct site_mark
+    {
+        entity_id building = null_entity;
+        int   col = 0, row = 0;   ///< The site's tile.
+        int   days_done  = 0;     ///< Days of work built.
+        int   days_total = 0;     ///< Days the whole build takes at full rate.
+        float x = -1.0f, y = -1.0f;
+        float r = 0.0f;           ///< Drawn radius, ground px.
+    };
+    std::vector<site_mark> site_marks;
+    /// The site card drawn this frame (the circle's hover or the queue row's),
+    /// as text: the building whose card it was and every line it carried, so a
+    /// check asserts it names the materials. Empty when no site card drew.
+    entity_id   site_card_for = null_entity;
+    std::string site_card_text;
+    int         site_card_frame = -1; ///< `ImGui::GetFrameCount()` when it drew.
+    /// The levers' measured height last frame, so the Buildings roster takes the
+    /// whole tab less exactly what the levers below it need (Ben, 2026-10-26).
+    float       levers_h = 0.0f;
+    /// The roster's drawn height and the tab height it had to fill, this frame.
+    float       roster_h = 0.0f;
+    float       roster_avail = 0.0f;
 };
 
 // --- The SITE FINDER (Ben, 2026-10-25; docs/ui/ledgers/construction.md § The site
@@ -461,7 +489,12 @@ struct construction_controls
 struct site_row
 {
     entity_id     tile     = null_entity;
-    int           x = 0, y = 0;    ///< Grid position (framing, and the checks).
+    int           x = 0, y = 0;    ///< Grid position (framing, and the checks; never on screen).
+    /// The row's identity on screen (Ben, 2026-10-26: no x,y column): the named
+    /// population centre whose province holds the tile, or the nearest one when
+    /// its province has none (`place_near`).
+    std::string   place;
+    bool          place_near = false;
     bool          priced   = false; ///< `estimate_prospective_profit(...).has_data`.
     float         profit   = 0.0f;  ///< Est. net / qtr, Logistic Point cover applied.
     float         profit_full_cover = 0.0f; ///< The same estimate at cover 1.
@@ -496,7 +529,7 @@ struct site_finder_state
     bool          armed = false;    ///< A building is chosen.
     site_option   choice;
 
-    /// Sort column (0 tile, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield) and
+    /// Sort column (0 place, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield) and
     /// direction. Default: profit, descending; every tie broken by tile id ascending.
     int           sort_col  = 1;
     bool          sort_desc = true;
@@ -529,6 +562,14 @@ struct site_finder_state
     struct drawn_row { entity_id tile = null_entity; float x = -1.0f, y = -1.0f; };
     std::vector<drawn_row> drawn;   ///< Visible rows, in drawn order.
     int           map_marks = 0;    ///< No-logistics marks the canvas drew this frame.
+    /// The class the canvas WASHED the selected tile with this frame (-1: it is
+    /// not on the active body or the lens is down). A selected site keeps its
+    /// "build here" wash under the selection mark (Ben, 2026-10-26).
+    int           selected_wash = -1;
+    /// Each header as drawn: its label, the width it needs unelided (text plus
+    /// the sort arrow) and the width the column gave it. Every header must fit.
+    struct header_fit { std::string label; float need = 0.0f, have = 0.0f; };
+    std::vector<header_fit> headers;
 };
 
 // --- Baked ground view (BL-732, docs/ui/RENDERING.md) ----------------------

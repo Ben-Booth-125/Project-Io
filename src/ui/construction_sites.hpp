@@ -47,7 +47,7 @@ float site_lp_cover(world& w, entity_id tile, bool* blocked = nullptr);
 /// for this frame. A no-op key costs a comparison.
 void update_site_finder(world& w, const recipe_registry& reg, ui_state& ui);
 
-/// Order @p rows by @p col (0 tile, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield);
+/// Order @p rows by @p col (0 place, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield);
 /// every tie broken by tile id ascending, and an unpriced row always last.
 void sort_site_rows(std::vector<site_row>& rows, int col, bool desc);
 

@@ -1,6 +1,7 @@
 #include "body_surface_canvas.hpp"
 #include "text_fit.hpp"
 
+#include "construction_panel.hpp" // the build-progress circle and its site card (Ben, 2026-10-26)
 #include "entity_summary.hpp"
 #include "highlight.hpp"
 #include "hover_card.hpp"
@@ -2892,6 +2893,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                           + static_cast<std::size_t>(x)];
     };
     state.site_finder.map_marks = 0;
+    state.site_finder.selected_wash = -1;
 
     // ARMED ROAD TARGETING (BL-1370; construction.md § "A road is built from a road
     // to a tile, in two presses"). The road row's press armed a TILE and a TIER; the
@@ -3877,10 +3879,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
         // The placement lens (Ben, 2026-10-25): the site finder's class, the same
-        // strengths as the wash over the bake below.
-        if (site_active && !selected)
+        // strengths as the wash over the bake below. The SELECTED tile keeps its
+        // wash (Ben, 2026-10-26): a site stays green while selected, the selection
+        // mark drawn over it.
+        if (site_active)
         {
             const std::uint8_t sc = site_class(tile.grid_x, tile.grid_y);
+            if (selected)
+                state.site_finder.selected_wash = sc;
             fill = (sc == 0) ? lerp_colour(fill, palette::site_dim, 0.45f)
                  : (sc == 1) ? lerp_colour(fill, palette::site_valid, 0.30f)
                              : lerp_colour(fill, palette::site_no_logistics, 0.40f);
@@ -5386,9 +5392,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 // The placement lens (Ben, 2026-10-25): compute_tile_fill's
                 // strengths as alpha washes over the bake.
-                if (site_active && !selected)
+                // The selected tile keeps it (Ben, 2026-10-26), under the mark.
+                if (site_active)
                 {
                     const std::uint8_t sc = site_class(t_col, t_row);
+                    if (selected)
+                        state.site_finder.selected_wash = sc;
                     wash(sc == 0 ? with_alpha(palette::site_dim, 0.45f)
                          : sc == 1 ? with_alpha(palette::site_valid, 0.30f)
                                    : with_alpha(palette::site_no_logistics, 0.40f));
@@ -6449,6 +6458,70 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     state.trade_flow_markers = static_cast<int>(tf_markers.size());
     state.trade_flow_passes  = static_cast<int>(tf_passes.size());
 
+    // THE BUILD-PROGRESS CIRCLE (Ben, 2026-10-26; construction.md § The progress
+    // circle): over every one of the player's sites under construction, a ring
+    // filling clockwise from twelve o'clock with the days built over the days the
+    // build takes, coloured by the quarter's rate (on schedule / stretched /
+    // paused). Hovering it opens the site card (construction_panel.cpp), the
+    // materials still to draw with "!" on a short good. Drawn whatever lens is up:
+    // it is the site's own mark, not a lens. Sites walk in building-id order.
+    state.construction_ui.site_marks.clear();
+    entity_id site_circle_hover = null_entity;
+    if (draw_r >= 5.0f)
+    {
+        std::vector<entity_id> sites;
+        for (const auto& [bid, b] : w.buildings)
+            if (b.ticks_remaining > 0 && is_player_owned(w, bid))
+                sites.push_back(bid);
+        std::sort(sites.begin(), sites.end());
+        const float cr = std::clamp(draw_r * 0.42f, 5.0f, 13.0f);
+        const float th = std::max(2.0f, cr * 0.32f);
+        float best_d2 = (cr + 3.0f) * (cr + 3.0f);
+        for (const entity_id bid : sites)
+        {
+            const building_component& b = w.buildings.at(bid);
+            const auto tit = w.tiles.find(b.tile);
+            if (tit == w.tiles.end() || tit->second.body != state.active_body)
+                continue;
+            const construction_site_reading rd = read_construction_site(w, reg, b);
+            const ImU32 ink = ImGui::ColorConvertFloat4ToU32(construction_status_colour(rd.rd));
+            const ImVec2 c0 = to_screen(hex_local_centre(tit->second.grid_x, tit->second.grid_y, hex_size));
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - c0.x) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - c0.x) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const ImVec2 c{ c0.x + static_cast<float>(k) * period_px, c0.y };
+                dl->AddCircleFilled(c, cr + th * 0.5f, IM_COL32(10, 12, 18, 200), 24);
+                dl->AddCircle(c, cr, IM_COL32(70, 74, 86, 255), 24, th);
+                if (rd.frac > 0.0f)
+                {
+                    constexpr float k_top = -1.5707964f; // twelve o'clock
+                    dl->PathArcTo(c, cr, k_top, k_top + 6.2831853f * rd.frac,
+                                  std::max(4, static_cast<int>(24.0f * rd.frac)));
+                    dl->PathStroke(ink, ImDrawFlags_None, th);
+                }
+                const float dx = mouse_g.x - c.x, dy = mouse_g.y - c.y;
+                if (dx * dx + dy * dy <= best_d2)
+                {
+                    best_d2 = dx * dx + dy * dy;
+                    site_circle_hover = bid;
+                }
+                construction_controls::site_mark m;
+                m.building   = bid;
+                m.col        = tit->second.grid_x;
+                m.row        = tit->second.grid_y;
+                m.days_done  = rd.days_done;
+                m.days_total = rd.days_total;
+                m.x          = c.x;
+                m.y          = tilt_pivot + (c.y - tilt_pivot) * tilt_sy; // after the squash
+                m.r          = cr;
+                state.construction_ui.site_marks.push_back(m);
+            }
+        }
+    }
+
     // Building-placement ghost preview. When construction mode is active and a tile
     // is hovered, draw a translucent-intent marker of the chosen building type at the
     // hovered copy's centre, tinted green when the placement-rules seam accepts the
@@ -6596,6 +6669,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         fdl->AddRect(tl, br, edge, 3.0f, 0, 1.5f);
         fdl->AddText({ tl.x + pad, tl.y + pad }, IM_COL32(230, 230, 235, 255), text.c_str()); // fit-exempt: the card is sized to its measured text
     }
+
+    // The progress circle's site card (Ben, 2026-10-26), at once, like the
+    // trade-flow read above: the circle is the site's mark, and the materials it
+    // still needs are what pointing at it asks.
+    if (site_circle_hover != null_entity && mouse.x >= grid_area_origin.x
+        && mouse.x <= grid_area_origin.x + grid_area_size.x
+        && mouse.y >= grid_area_origin.y && mouse.y <= grid_area_origin.y + grid_area_size.y)
+        construction_site_card(w, reg, site_circle_hover, state);
+    else
+        site_circle_hover = null_entity;
 
     // The border band's hover read (BL-601). Ben's ruling asked for a read that
     // NAMES the nation before the click commits - a corridor the player cannot
@@ -6754,6 +6837,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (state.hover_card_entity == null_entity &&
             hover_eid != null_entity &&
             !state.construction.active &&
+            site_circle_hover == null_entity && // the site card owns the slot (2026-10-26)
             state.hover_seconds >= kHoverAppearDelaySec - kHoverThresholdEpsilon)
         {
             state.hover_card_entity = hover_eid;

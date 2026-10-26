@@ -1109,7 +1109,10 @@ a ledger row does.
 - **Everything else** — not the player's ground, or the door would refuse it there (including a
   site the treasury cannot cover). Darkened 45 % toward black.
 
-The selected tile is skipped, as the suitability surface skips it: it is already outlined.
+**The selected tile keeps its class** (Ben, 2026-10-26): a site stays green, or amber, while it
+is selected, and the selection mark is drawn over it. Skipping it as the suitability surface does
+dropped the "build here" colour from the one tile the player had just chosen, which read as the
+site being withdrawn.
 
 **Cost.** The canvas reads one byte per tile from a class field the finder rebuilds only when its
 key moves (the chosen building, the body, the treasury, the reach budget, and the frame stamp: the

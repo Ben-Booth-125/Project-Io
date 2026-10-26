@@ -126,6 +126,10 @@
    "The Planetary surface canvas (tiles and buildings; a market centre has no hover target of its own since its glyph retired, (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs')). The Solar and Circumplanetary rungs still use a lightweight ad-hoc tooltip (name, type, orbital radius) — the full card has not migrated there yet."
   ],
   [
+   "canvas.construction_site_card",
+   "Planetary canvas: the build-progress circle drawn over each of the player's sites under construction."
+  ],
+  [
    "canvas.lens_clear",
    "Keyboard."
   ],
@@ -287,11 +291,11 @@
   ],
   [
    "ledger.construction_site_sort",
-   "Construction ledger, Construction view, the site ledger's column headers (Tile, Net, Cost, Market, LP, Yield)"
+   "Construction ledger, Construction view, the site ledger's column headers (Place, Net, Cost, Market, LP, Yield)"
   ],
   [
    "ledger.construction_site_row",
-   "Construction ledger, Construction view, a site ledger row (its Tile cell; the press spans the row)"
+   "Construction ledger, Construction view, a site ledger row (its Place cell; the press spans the row)"
   ],
   [
    "ledger.corp_card_expand",
