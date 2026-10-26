@@ -1199,10 +1199,11 @@ namespace {
 
 // BL-095: pace each under-construction building against its local market's shelf,
 // drawing its materials in arrears as it builds (credits are paid once, at
-// placement — Ben, 2026-10-25). Runs at the very top of the economy step, before production, so a building that
+// placement — Ben, 2026-10-25; the materials are unpaid — Ben, 2026-10-26). Runs at
+// the very top of the economy step, before production, so a building that
 // completes this tick is immediately eligible below. Visits buildings in ascending
-// id order (deterministic) because it mutates the shared want/fill registers
-// (report.wants / report.purchases) and corp balances.
+// id order (deterministic) because it mutates the shared shelves and the want
+// register (report.wants).
 void run_construction(world& w, const recipe_registry& reg, economy_report& report)
 {
     const float max_stretch = reg.construction().max_stretch;
@@ -1219,7 +1220,8 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
     // CREDITS UP FRONT, MATERIALS IN ARREARS (Ben, 2026-10-25, ruling NR-1073;
     // PRODUCTION.md § Construction is measured in days). The whole flat build cost
     // was paid once, at placement (`begin_construction_on_placement`); no tick pays
-    // credits. This pass, at each economy tick:
+    // credits, and the materials are never paid for at all — credits are the whole
+    // cost (Ben, 2026-10-26). This pass, at each economy tick:
     //   A. draws the materials (construction capacity included) for the days built
     //      since the last tick, IN ARREARS — `build_arrears_milli`, which also holds
     //      any shortfall carried from the tick before, so that is drawn first: a
@@ -1486,12 +1488,17 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             const float f = alloc ? alloc->rate : debt_cover(owed, avail);
             if (f > 0.0f && s.m != nullptr)
             {
-                auto& bought = report.purchases[std::make_pair(s.corp, s.mid)];
+                // CREDITS ARE THE WHOLE COST (Ben, 2026-10-26; PRODUCTION.md
+                // § Construction is measured in days): the materials leave the shelf
+                // UNPAID. No purchase is recorded, so the clearing bills nothing and
+                // writes no exchange row; the goods leave the world, as network
+                // upkeep's do. They are still DEMAND — the want below is registered
+                // whole, so the price answers them.
                 for (std::size_t r = 0; r < resource_count; ++r)
                 {
                     if (!(owed[r] > 0.0f) || !admitted_at(s, r))
-                        continue; // BL-1172: over the ceiling — not drawn, not billed
-                    // Bill only what the shelf gives (capacity can be short of its
+                        continue; // BL-1172: over the ceiling — not drawn
+                    // Draw only what the shelf gives (capacity can be short of its
                     // share; materials are covered by `f`).
                     float drawn = std::min(owed[r] * f, std::max(0.0f, s.m->inventory[r]));
                     if (alloc != nullptr)
@@ -1501,11 +1508,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                     }
                     if (!(drawn > 0.0f))
                         continue;
-                    bought[r]           += drawn;
                     s.m->inventory[r]   -= drawn;
-                    // BL-1206: the site's record of what it cost, at the posted price
-                    // the clearing bills the draw at.
-                    b.construction_paid += drawn * posted_price(*s.m, r);
                 }
             }
             // What the shelf could not cover stays owed, and is drawn first next tick.
@@ -1706,8 +1709,8 @@ float construction_credit_cost(const recipe_registry& reg, const building_compon
 {
     // The flat build cost over the site's WHOLE days: build_cost x days / (the
     // authored quarters x 90) — the site multiplier stretches cash as well as time
-    // (PRODUCTION.md § Construction site time), and this is the flat part of
-    // construction_capex exactly.
+    // (PRODUCTION.md § Construction site time), and this is construction_capex
+    // exactly: credits are the whole cost (Ben, 2026-10-26).
     const float duration = reg.economics(b.type).build_duration_ticks;
     if (duration <= 0.0f || b.days_remaining <= 0)
         return 0.0f;

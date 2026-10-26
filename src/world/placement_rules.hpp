@@ -54,6 +54,7 @@ enum class placement_reason : uint8_t
     no_road_to_extend, ///< BL-1348: a road is laid FROM a road -- the named tile carries none.
     foreign_ground,    ///< BL-1357: a road may cross a border and no further -- the named tile is another nation's.
     not_own_ground,    ///< BL-1399: a nation builds only on its own ground -- the tile is another nation's, or no nation's.
+    site_under_construction, ///< One site per tile (Ben, 2026-10-26): a building is already under construction here.
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on
@@ -455,6 +456,13 @@ int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov);
 /// @param tile_id Tile to count on.
 /// @return        Count of non-extraction buildings on the tile.
 int non_extraction_buildings_on_tile(const world& w, entity_id tile_id);
+
+/// ONE SITE PER TILE (Ben, 2026-10-26; PRODUCTION.md § One site under construction
+/// per tile): true iff some building on @p tile_id is under construction
+/// (`ticks_remaining > 0`). `can_place_in_world` refuses any building on such a tile
+/// (`site_under_construction`), whatever its type. A completed building still
+/// drawing materials it owes is standing, not a site.
+bool tile_has_site_under_construction(const world& w, entity_id tile_id);
 
 /// BL-366: if @p tile_id's non-extraction building count has reached its
 /// cap, flips `terrain_cover` to `urban` and LEAVES THE SUBSTRATE ALONE. One-way — a no-op

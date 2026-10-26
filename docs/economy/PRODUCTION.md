@@ -59,6 +59,19 @@ richest tile on the body is a decision rather than a lookup.
 The generated world obeys the same rule: the road pass lays a crossing to every site it stamps
 (`../economy/LOGISTICS.md` § 4, Generation roads every building site).
 
+### One site under construction per tile (Ben, 2026-10-26)
+
+**A tile holds at most one building under construction at a time.** Ben's reason: *"To slow the
+pace of the game down, we need to add a limit so that tiles can only construct one building at a
+time."* While a site on a tile is building, no second building of any type may be placed there; the
+tile takes its next building on the day the site completes. A completed building still drawing the
+materials it owes is standing, not a site, and does not block the tile.
+
+The rule is asked in the one world-level placement check, so the build door refuses it with its own
+reason — *a building is already under construction on this tile* — and the nation scorer never
+proposes such a tile. It limits builds only: generation stands every building complete, so no
+generated tile holds a site and the generated world is unchanged by it.
+
 ### Building stacks
 
 A tile is not a single build slot: several extraction sites may work the same deposit. Two rules
@@ -863,7 +876,8 @@ commit to it) and pays the whole flat `build_cost` then; the materials follow as
 
 - draws its materials for the days it built since the last tick — `resource_build_cost` over the
   build's duration in quarters, per quarter of work — as **real market demand** (competing with
-  population and other builds, bidding the local price up) and pays the resolved price for them;
+  population and other builds, bidding the local price up), and pays nothing for them: credits are
+  the whole cost (Ben, 2026-10-26);
 - progresses at a **rate set by how much of that per-tick material need the local market can
   supply** — read from, and drained from, the real stock of the market whose catchment holds the
   site (`market_component.inventory`, MARKETS.md § Real market inventory) — the only stock there
@@ -873,7 +887,7 @@ commit to it) and pays the whole flat `build_cost` then; the materials follow as
   `1/max_stretch` → **paused** until supply recovers.
 
 So a build in a thin market slows or stalls rather than completing instantly, and its materials
-are paid for across the build. The front door shows the analog rate/ETA/paused status rather than a
+leave the shelf across the build. The front door shows the analog rate/ETA/paused status rather than a
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A build stalled for want
 of an input registers that want as demand, so the stall is visible to the price signal.
 
@@ -885,19 +899,27 @@ placement's site multiplier (§ Construction site time), rounded to a whole day.
 
 - **Construction starts on the placement day (Ben, 2026-10-25).** A site begins building the day it
   is placed. A 180-day build placed on day 10 of a quarter completes on day 190.
-- **Credits are paid up front, once (Ben, 2026-10-25).** The whole flat build cost — `build_cost`
-  times the site multiplier, the credit part of the capex — leaves the builder's treasury when the
-  site is placed. No economy tick pays construction credits after that. The build door admits a site
-  only when the treasury's uncommitted part covers the whole capex, so the payment never overdraws
-  it; a site the treasury cannot afford is refused, never placed in debt. A founding site, which
-  generation stands complete, is priced by generation instead.
-- **Materials are drawn in arrears, at the tick (Ben, 2026-10-25).** Each day built is owed its
-  materials, construction capacity included. Each economy tick draws, off the market's shelf, the
-  materials for the days built since the last tick, and pays the market for them then. A tick draws
-  at most one quarter's materials plus any shortfall carried from before. Whatever part the shelf
-  cannot cover stays owed and is drawn first at the next tick. A building that completes still owing
-  materials pays them at the ticks after. Capacity never holds a debt: a short yard stretches a build
-  and its missing part is not billed, as construction capacity always stretches rather than pauses.
+- **Credits are the whole cost (Ben, 2026-10-26).** Ben: *"We should decouple the credit cost from
+  the price of materials. A material draw shouldn't affect the cost of buildings, but having the
+  building should affect the market."* A build's cost is its authored flat `build_cost` times the
+  site multiplier (§ Construction site time), and no material price enters it. Every reader that
+  quotes a build's cost — the affordability gate, the Build door, the site finder and the nation
+  scorer — reads that one credit figure, and it is exactly what the site pays.
+- **Credits are paid up front, once (Ben, 2026-10-25).** That whole cost leaves the builder's
+  treasury when the site is placed. No economy tick pays construction credits after that. The build
+  door admits a site only when the treasury's uncommitted part covers it, so the payment never
+  overdraws it; a site the treasury cannot afford is refused, never placed in debt. A founding site,
+  which generation stands complete, is priced by generation at the same credit figure instead.
+- **Materials are drawn in arrears, at the tick, unpaid (Ben, 2026-10-25 and 2026-10-26).** Each day
+  built is owed its materials, construction capacity included. Each economy tick draws, off the
+  market's shelf, the materials for the days built since the last tick. **Nobody pays for them**: the
+  goods leave the shelf and the world, as network upkeep's goods do, with no exchange and no credit
+  moving. They are still **demand** on that market — the site's want is registered whole, drawn or
+  short, so the clearing sees it and the price answers it. A tick draws at most one quarter's
+  materials plus any shortfall carried from before. Whatever part the shelf cannot cover stays owed
+  and is drawn first at the next tick. A building that completes still owing materials draws them at
+  the ticks after. Capacity never holds a debt: a short yard stretches a build and its missing part is
+  not drawn, as construction capacity always stretches rather than pauses.
 - **The rate for the quarter ahead is a claim on the shelf.** At each tick, after the draw, a site's
   supply rate — full, stretched or paused — is set from the shelf that is left, less the materials
   still owed by every site there. That rate times the quarter's days is the progress it makes: a
@@ -914,11 +936,11 @@ placement's site multiplier (§ Construction site time), rounded to a whole day.
 - **A cancelled site is refunded its credits in full (Ben, 2026-10-25).** A site demolished or
   cancelled before it completes returns the whole credit cost it paid at placement to the payer — a
   nation's treasury, booked on its quarterly return as a refund. The materials it drew are not
-  returned: they were spent on the site. Any it still owed are cleared, not drawn. A standing
-  building refunds nothing.
-- **The state's funding gate prices this money.** A state site costs nothing in credits at the tick.
-  Its bill at a tick is the materials it owes, at the shelf's posted price, which the gate knows
-  exactly when it runs (NATIONS.md § What a nation owns, "A losing building idles").
+  returned to the shelf: they were spent on the site. Any it still owed are cleared, not drawn. A
+  standing building refunds nothing.
+- **The state's funding gate bills a site nothing at the tick.** Its credits were paid at placement
+  and its materials are unpaid, so a site's bound at the gate is its operating cost alone
+  (NATIONS.md § What a nation owns, "A losing building idles").
 - **Progress is daily, and a site completes on a day.** Between clearings a site advances day by
   day, as surveys do. Completion fires that day: the building is operational, and a port or
   logistics hub joins the network then.
@@ -947,10 +969,11 @@ the authored `build_cost` times the same multiplier. That is the ruling, not
 an accident of arithmetic: a mountain build hauls more stone and keeps a crew longer.
 
 **So it is priced at placement.** Every reader of a build's cost — the affordability gate, the
-Build door's capex preview and the rival scorer — prices `cost × site multiplier`, never the
-authored cost alone. A commitment gate that priced less than the build will draw admits a build
-the nation or the market cannot finish — a 35-steel base on a market holding 36.5 steel, at a site
-that draws 43. Owner: BL-1066 (the player cannot build).
+Build door's capex preview and the rival scorer — prices `build_cost × site multiplier`, never the
+authored cost alone, and never a material price (§ Construction is measured in days, "Credits are the
+whole cost"). Owner: BL-1066 (the player cannot build). Whether a market can *serve* the larger
+basket is a separate question from its price: the scorer asks it of the shelf (it never starts a site
+whose materials it cannot obtain), and a short shelf stretches or pauses the build.
 
 ### Construction materials are per-named-building, not per-type (BL-590, 2026-08-24)
 
@@ -960,10 +983,9 @@ building in the game, ancient or industrial, was made of `steel` and nothing els
 anachronism the launchpad's era tag (BL-433) exists to fix for the launchpad specifically.
 
 **The override.** `recipe_registry::resource_build_cost_for(type, target, recipe)` is the single
-lookup every material-cost call site now goes through — the Build door's capex preview, the
-management view's rate, the real per-tick draw (`construction.cpp`, `economy_system.cpp`) — so a
-preview can never disagree with what the tick actually charges, the same argument BL-436 makes
-about richness. `extraction_site` is keyed by its `target_resource`; `processing_facility` by its
+lookup every material call site goes through — the Build door's materials line, the management
+view's rate, the real per-tick draw (`economy_system.cpp`) — so a preview can never disagree with
+what the tick actually draws, the same argument BL-436 makes about richness. `extraction_site` is keyed by its `target_resource`; `processing_facility` by its
 recipe. No `building_type` is needed in either key: only extraction carries a target and only
 processing carries a recipe, so the dispatch is unambiguous. Authored in `economy.lua` as an
 optional `material_overrides` table nested beside the type's own `resource_costs` — absent means
@@ -982,14 +1004,10 @@ same physical building. See `scripts/economy.lua`'s `buildings.extraction_site.m
 goods now cost something to a nation that is *building*, not only something a recipe consumes — the
 demand that makes an early quarry worth owning even before its output has a processor waiting.
 
-**A watch this item does NOT resolve**, recorded rather than silently assumed:
-`corp_ai.cpp`'s build-candidate scoring prices only the flat `build_cost` (`ex.build_cost` /
-`pe.build_cost`), never `resource_build_cost` — a pre-existing simplification, unchanged by this
-item, that predates the override. A rival can therefore still propose a candidate whose *materials*
-it cannot actually reach even though its *cash* is sufficient; `construct_building`'s own
-affordability gate refuses it cleanly (no mutation), so this is a missed opportunity for the
-scorer, not a correctness bug. Widening the scorer's estimate is real planner scope, not part of
-"materials vary per building" — a decision recorded here rather than a gap papered over.
+**The scorer and the materials.** A build's credit cost carries no material price (§ Construction is
+measured in days, "Credits are the whole cost", Ben 2026-10-26), so the scorer's capex is the credit
+figure alone. What it asks of the materials is whether they can be *obtained* at the site's market
+(BL-1183): a site whose shelf cannot serve it would sit paused, and is never started.
 
 Guard: `tools/verify/construction_harness.cpp`'s R9 asserts the lookup directly — an overridden
 target/recipe reads its override, an unoverridden one falls back to the type default, and a

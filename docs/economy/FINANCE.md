@@ -102,8 +102,9 @@ stood when it was made — the price it checked against the ceiling — with one
 price. The shelf's seller is the market, whose suppliers were paid when their goods landed, so the
 posted price leaves no unpaid gap, and a unit beside a full shelf is never refused by a price its
 own want drove up. **The same ceiling governs every goods draw (Ben, 2026-10-03):** unit and
-building upkeep, processor inputs and construction alike buy only at or under it, and a draw over
-it does not bid either, so its want leaves the price and the price can ease back. **A nation's
+building upkeep, processor inputs and construction alike draw only at or under it (construction
+draws unpaid: credits are its whole cost, Ben 2026-10-26, `PRODUCTION.md` § Construction is
+measured in days), and a draw over it does not bid either, so its want leaves the price and the price can ease back. **A nation's
 network upkeep and its space programme too (Ben, 2026-10-03):** they draw under the same ceiling
 and the same posted price — every draw off a market's shelf, and the shelf is the only stock there
 is. Measured on the curated seeds, a 50-head unit cost about 970 a year at the prices the market
@@ -146,7 +147,8 @@ price a supplied market reaches, where the 10× cap is the signal of a good nobo
 goods draw from a shelf — unit and building upkeep, processor inputs, construction, and a
 nation's network upkeep and space programme — reads the posted price, the price the last clearing
 left standing (base, on a market that has never resolved one), takes the good only where that
-price is at or under the ceiling, and is billed at it, with one exchange row at that price. The
+price is at or under the ceiling, and is billed at it, with one exchange row at that price — save
+construction's, which is billed nothing and writes no row (Ben, 2026-10-26). The
 price the tick goes on to resolve is never what the draw pays. Above the ceiling the good is not
 drawn **and not bid for**, so its want leaves the price and the price can ease: a unit or
 building goes short and takes the shortfall rule, a processor idles on that input, a trade ships
@@ -219,8 +221,9 @@ BL-049 (wage/maintenance split).
 Until it completes, a building charges no wages and no labour maintenance — only the idle floor,
 as a decommissioned building does. Labour demand already skips a site, so a wage there paid a
 crew nobody supplied; and a site stalled for want of materials should cost what holding the land
-costs, not what running the plant costs. Its materials are paid as they arrive (`PRODUCTION.md`
-§ Construction as a rate).
+costs, not what running the plant costs. Its materials leave the shelf unpaid as it builds:
+credits are the whole cost, paid at placement (Ben, 2026-10-26; `PRODUCTION.md` § Construction is
+measured in days).
 
 Maintenance and wage constants per building type load from the recipe registry
 (`scripts/economy.lua`).
@@ -320,8 +323,8 @@ The money loop is not the only thing that moves a treasury in a quarter. A retur
 one refund it books (above). Every other debit or credit lands elsewhere in the tick and appears in
 **no** return:
 
-- **Construction** — the build press's charge, and the flat per-tick build charge while a site
-  rises. (The site's materials are bought at the clear, so they *are* in `expenditure`.)
+- **Construction** — the build press's charge: the site's whole credit cost, paid once at placement.
+  (The site's materials are unpaid — Ben, 2026-10-26 — so they appear in no flow at all.)
 - **Retooling** — the charge for switching a building's recipe.
 - **Hiring** — a unit's hire cost and the kit it buys off the shelves — and a unit's
   **movement credits**, priced per Logistic Point drawn.
