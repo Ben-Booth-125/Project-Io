@@ -675,6 +675,26 @@ enum class building_type : uint8_t
 static constexpr uint8_t building_type_count =
     static_cast<uint8_t>(building_type::railway_station) + 1;
 
+/// Infrastructure is every building that is not a producer (PRODUCTION.md §
+/// Infrastructure buildings): ports, logistics hubs, railway stations, the
+/// marketplace, launchpads, military bases and the education/research houses.
+/// Extraction and processing are the producers the workforce solver steps.
+inline bool is_infrastructure(building_type t)
+{
+    return t != building_type::none && t != building_type::extraction_site
+        && t != building_type::processing_facility;
+}
+
+/// The workforce target a building is authored at. Infrastructure staffs to
+/// full employment — the internal maximum 200, shown 100 % — and stays there
+/// (Ben, 2026-10-26: "infrastructure reaches full workforce"; PRODUCTION.md §
+/// Labour demand and the shortfall). A producer opens at nominal 100 (shown
+/// 50 %) and the solver or the dial moves it from there.
+inline int default_workforce_target(building_type t)
+{
+    return is_infrastructure(t) ? 200 : 100;
+}
+
 /// BL-615 stratum placement gates (docs/economy/POPULATION.md § Strata gate
 /// buildings): which relationship to the population-centre scale ladder a
 /// building's SITE must hold. Authored DATA on the building definition —
@@ -1055,10 +1075,10 @@ struct building_component
 
     /// BL-1206 (seat clean slate): every credit charged the owner for this site
     /// so far — the whole flat build cost, paid once at placement (Ben,
-    /// 2026-10-25). Credits are the whole cost (Ben, 2026-10-26): the materials
-    /// the site draws are unpaid, so nothing is added after placement. The site's
-    /// own record. Stays at its final figure once the build completes.
-    /// world_save_version 37.
+    /// 2026-10-25), and the materials each tick draws in arrears at the posted
+    /// price clearing bills them at (MARKETS.md: a draw pays the posted price). The site's own record, so a
+    /// cancelled build is refunded exactly what it consumed, never an estimate.
+    /// Stays at its final figure once the build completes. world_save_version 37.
     float construction_paid = 0.0f;
 
     // --- Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md
@@ -1097,12 +1117,11 @@ struct building_component
 
     /// Materials are drawn IN ARREARS (Ben, 2026-10-25, ruling NR-1073;
     /// PRODUCTION.md § Construction is measured in days): the milli-days of work
-    /// built and whose materials (construction capacity included) have not yet
-    /// been drawn off the shelf. Every day built adds its rate here; the next
-    /// economy tick draws the basket for them off the shelf, unpaid (Ben,
-    /// 2026-10-26), and what the shelf cannot cover stays owed and is drawn first
-    /// at the tick after. Can outlive the site: a building completing with
-    /// materials owed still draws them.
+    /// built and whose materials (construction capacity included) the market has
+    /// not yet been paid for. Every day built adds its rate here; the next economy
+    /// tick draws the basket for them off the shelf, and what the shelf cannot
+    /// cover stays owed and is drawn first at the tick after. Can outlive the
+    /// site: a building completing with materials owed still pays them.
     int  build_arrears_milli = 0;
 
     /// The credits paid for this site at placement (Ben, 2026-10-25): the WHOLE

@@ -911,9 +911,6 @@ enum class resource_type : uint8_t; // components.hpp
 int scoped_buildings_on_tile(const world& w, entity_id tile, building_type type,
                              resource_type target);
 int scoped_non_extraction_buildings_on_tile(const world& w, entity_id tile);
-/// One site per tile (Ben, 2026-10-26): the buildings under construction
-/// (`ticks_remaining > 0`) on @p tile, from the same scope walk; -1 when no scope.
-int scoped_sites_on_tile(const world& w, entity_id tile);
 
 class province_ceiling_scope
 {

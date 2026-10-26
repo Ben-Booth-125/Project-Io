@@ -552,14 +552,32 @@ float state_building_cost_bound(const world& w, const recipe_registry& reg,
         return c;
     };
 
-    // CONSTRUCTION COSTS NOTHING AT THE TICK (Ben, 2026-10-25 and 2026-10-26;
-    // PRODUCTION.md § Construction is measured in days): the flat build cost was
-    // paid once, at placement, and the materials a site draws — owed in arrears or
-    // ahead — leave the shelf unpaid. So a site's bound is its opex alone, and a
-    // completed building still drawing owed materials is bounded as any standing
-    // building is.
-    if (b.ticks_remaining > 0)
-        return bound;
+    if (b.ticks_remaining > 0 || b.build_arrears_milli > 0)
+    {
+        // CONSTRUCTION'S MONEY THIS TICK (Ben, 2026-10-25; PRODUCTION.md
+        // § Construction is measured in days): the flat build cost was paid once, at
+        // placement, so no credits fall due here. What this tick's draw bills is
+        // the materials OWED in arrears — the days built since the last tick plus
+        // any shortfall carried (run_construction's row, capacity included) — at
+        // the shelf's posted price. Exact: the debt is known when the gate runs
+        // (the quarter is closed first). The quarter ahead draws nothing now.
+        const float duration = e.build_duration_ticks;
+        if (duration > 0.0f && b.build_arrears_milli > 0)
+        {
+            const float share = static_cast<float>(b.build_arrears_milli)
+                              / (1000.0f * static_cast<float>(k_construction_quarter_days));
+            const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
+            std::array<float, resource_count> need{};
+            for (std::size_t r = 0; r < resource_count; ++r)
+                need[r] = row[r] / duration * share;
+            const float cap_rate = reg.construction().capacity_per_build_tick;
+            if (cap_rate > 0.0f)
+                need[static_cast<std::size_t>(resource_type::construction_capacity)] += cap_rate * share;
+            bound += shelf_cost(need);
+        }
+        if (b.ticks_remaining > 0)
+            return bound;
+    }
     if (b.decommissioned)
         return bound; // idle floor only: no inputs, no upkeep goods
 
@@ -1245,6 +1263,7 @@ rail_handover_report hand_over_rail(world& w)
         bc.tile               = tile;
         bc.type               = building_type::railway_station;
         bc.workforce_assigned = 0.0f; // zero staff, the port's shape
+        bc.workforce_target   = default_workforce_target(bc.type); // full (Ben, 2026-10-26)
         bc.ticks_remaining    = 0;    // stands complete, as every generation holding does
         w.buildings[bid]  = bc;
         w.stockpiles[bid] = stockpile_component{};

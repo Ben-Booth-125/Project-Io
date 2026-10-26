@@ -161,10 +161,9 @@ void print_state_handover(const state_handover_report& r);
 
 /// The most @p b can cost its owner this tick, in credits: maintenance and
 /// wages at full labour (`compute_building_opex` at grant 1), its recipe's
-/// inputs at a full run, and its upkeep goods basket, every good at its market's
-/// POSTED price (the price every shelf draw this tick is billed at). A site
-/// under construction is bounded by its opex alone: its credits were paid at
-/// placement and its materials are unpaid (Ben, 2026-10-26). Never
+/// inputs at a full run, its upkeep goods basket, and — under construction —
+/// a full-rate tick of flat cost and materials, every good at its market's
+/// POSTED price (the price every shelf draw this tick is billed at). Never
 /// below what the tick actually charges: the gate funds against it.
 float state_building_cost_bound(const world& w, const recipe_registry& reg,
                                 const building_component& b);

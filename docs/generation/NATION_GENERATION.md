@@ -337,6 +337,19 @@ received may now be its largest group — moving the capital tile alone. A large
 landmass Pass 2b hung on the seat's own cell — gives the capital nowhere to stand, so the seat stays
 put.
 
+**The capital tile is its seat's city (Ben, 2026-10-26).** The rules above choose the seat
+*province*; the capital *tile* is that province's largest population centre — the tile with the
+most centre scale standing on it, ties to the lower tile id (the measure of `province_anchors`, the
+pick the capital garrison's post and the province holder read) — **on the capital's own land
+group**: a province can hold an islet across a strait, and the move must not seat a capital on a
+speck the rule above kept it off. Where the province has no centre on that group, the group's
+largest centre is the seat. It is set once the province partition and its anchor foundings exist,
+before roads, industry or the Logistic Point hub read the capital (`seat_capitals_on_centres`).
+Only the tile moves: the territory and every cession stand. Every land province holds a centre at
+generation, so a land group without a city is a defect to count, not a case to design for; such a
+seat keeps the tile chosen above. The capital's tile is a city tile, and a city tile takes the
+Logistic Point hub every capital holds like any other building (its stack cap is twelve).
+
 **An exclave is ceded, not kept.** A group that does not reach the core is an **exclave**, and it is
 **split among the nations that border it** (Ben, 2026-10-18): each part goes to the bordering
 nation nearest to it — province by province on a settled world, where a province never splits,

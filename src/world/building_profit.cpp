@@ -196,6 +196,7 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
     // BL-1307: the construction door's own staffing rule, never a copy of it
     // (the copy priced a military_base's staff at 0.5 where it opens at 0).
     bc.workforce_assigned = construction_initial_workforce(type);
+    bc.workforce_target   = default_workforce_target(type); // as construct_building authors it
     bc.target_resource    = target;
     bc.recipe             = recipe_id;
     if (existing)
@@ -213,7 +214,7 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
     // revenue terms below assume target 100 scales to 1. Carry the real scalar
     // so revenue and wages move together rather than only the wages half.
     const float wt_scalar =
-        existing ? std::clamp(existing->workforce_target / 100.0f, 0.0f, 2.0f) : 1.0f;
+        std::clamp(bc.workforce_target / 100.0f, 0.0f, 2.0f); // a real one's, else the authored default
 
     out.has_data = true;
 

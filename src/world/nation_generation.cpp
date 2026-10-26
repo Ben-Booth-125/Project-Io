@@ -2054,6 +2054,90 @@ entity_id garrison_border_post(world& w, const province& pr, entity_id guarded)
     return best;
 }
 
+int seat_capitals_on_centres(world& w, int* unseated)
+{
+    if (unseated) *unseated = 0;
+    if (w.nations.empty() || w.provinces.provinces.empty())
+        return 0;
+    // Summed centre scale per tile (the anchor's own measure; an integer sum, so the
+    // unordered walk cannot reach the result).
+    std::map<entity_id, int> scale_on;
+    for (const auto& [cid, tid] : w.population_centre_tile)
+        if (const auto pc = w.population_centres.find(cid); pc != w.population_centres.end()
+            && pc->second.scale > 0)
+            scale_on[tid] += pc->second.scale;
+    std::vector<entity_id> ids;
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations) ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    int moved = 0;
+    for (const entity_id nid : ids)
+    {
+        nation_component& nc = w.nations.at(nid);
+        const auto ct = w.tiles.find(nc.capital_tile);
+        if (ct == w.tiles.end())
+            continue;
+        const auto bit = w.bodies.find(ct->second.body);
+        if (bit == w.bodies.end())
+            continue;
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        const std::vector<entity_id>& grid = body_tile_grid(w, ct->second.body);
+        const uint32_t prov = w.provinces.province_of(nc.capital_tile);
+        // THE CAPITAL'S OWN LAND GROUP: the nation's dry tiles a 4-neighbour walk reaches
+        // from the capital (columns wrap) - the strait rule's own group measure - so the
+        // move never carries a capital onto an islet the seat province holds across water
+        // (No capital on a speck, above). Ascending, for the pick below.
+        std::set<entity_id> group{nc.capital_tile};
+        std::vector<entity_id> q{nc.capital_tile};
+        for (std::size_t head = 0; head < q.size(); ++head)
+        {
+            const tile_component& tc = w.tiles.at(q[head]);
+            const int x = tc.grid_x, y = tc.grid_y;
+            const int cand[4] = {y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                                 y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw};
+            for (const int c : cand)
+            {
+                if (c < 0 || static_cast<std::size_t>(c) >= grid.size()) continue;
+                const entity_id nt = grid[static_cast<std::size_t>(c)];
+                if (nt == null_entity || group.count(nt) != 0) continue;
+                const auto on = w.tile_to_nation.find(nt);
+                if (on == w.tile_to_nation.end() || on->second != nid || is_water(w.tiles.at(nt).substrate))
+                    continue;
+                group.insert(nt);
+                q.push_back(nt);
+            }
+        }
+        // The seat province's largest centre on that group; failing one, the group's.
+        // Most summed scale, ties to the lower tile id (`province_anchors`' rule).
+        const auto pick = [&](bool in_province) {
+            entity_id best = null_entity;
+            int best_scale = 0;
+            for (const entity_id t : group)
+            {
+                const auto so = scale_on.find(t);
+                if (so == scale_on.end() || is_water(w.tiles.at(t).substrate)) continue;
+                if (in_province && w.provinces.province_of(t) != prov) continue;
+                if (so->second > best_scale) { best = t; best_scale = so->second; }
+            }
+            return best;
+        };
+        entity_id city = pick(true);
+        if (city == null_entity)
+            city = pick(false);
+        if (city == null_entity)
+        {
+            if (unseated) ++*unseated;
+            continue;
+        }
+        if (city != nc.capital_tile)
+        {
+            nc.capital_tile = city;
+            ++moved;
+        }
+    }
+    return moved;
+}
+
 void seed_nation_garrisons(world& w, const nation_garrison_params& params)
 {
     if (w.nations.empty() || w.provinces.provinces.empty())

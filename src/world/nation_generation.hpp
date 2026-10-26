@@ -527,6 +527,18 @@ struct nation_garrison_params
 /// @param params Sizing and roster tuning.
 void seed_nation_garrisons(world& w, const nation_garrison_params& params = {});
 
+/// THE CAPITAL STANDS ON ITS SEAT'S CITY (Ben, 2026-10-26; NATION_GENERATION.md
+/// § Pass 2e). Pass 5 seats a nation on a seed or core tile, which mostly holds
+/// no centre. Once the partition and its anchor foundings exist, each nation's
+/// `capital_tile` moves to the seat province's largest centre (most summed scale
+/// on a tile, ties to the lower tile id — `province_anchors`' measure) STANDING ON
+/// THE CAPITAL'S OWN LAND GROUP (the nation's dry tiles a 4-neighbour walk reaches
+/// from it), so a province holding an islet across water never seats its capital
+/// there; failing one in the province, the group's largest centre. Territory and
+/// cessions never move. RNG-free; nations walked in ascending id. Returns how many
+/// capitals moved; a group with no centre at all keeps its tile (`unseated`).
+int seat_capitals_on_centres(world& w, int* unseated = nullptr);
+
 /// A BORDER garrison's post (Ben, 2026-10-03; BL-1145): the tile of @p pr
 /// facing @p guarded — the member tile (not itself @p guarded's) with the most
 /// hex sides onto @p guarded's ground, ties to the lowest tile id. Facing is

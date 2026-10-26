@@ -1625,7 +1625,6 @@ struct ceiling_memo
     std::unordered_map<uint64_t, int>      extraction_by_target; // (tile, target)
     std::unordered_map<uint64_t, int>      by_type;              // (tile, type)
     std::unordered_map<entity_id, int>     non_extraction;       // tile
-    std::unordered_map<entity_id, int>     sites;                // tile -> under construction
 };
 
 thread_local ceiling_memo* t_ceiling_memo = nullptr;
@@ -1658,8 +1657,6 @@ ceiling_memo* occupancy_for(const world& w)
             ++m->extraction_by_target[occupancy_key(bc.tile, static_cast<uint8_t>(bc.target_resource))];
         else
             ++m->non_extraction[bc.tile];
-        if (bc.ticks_remaining > 0)
-            ++m->sites[bc.tile];
     }
     m->occupancy_built = true;
     return m;
@@ -1687,15 +1684,6 @@ int scoped_non_extraction_buildings_on_tile(const world& w, entity_id tile)
         return -1;
     const auto it = m->non_extraction.find(tile);
     return it != m->non_extraction.end() ? it->second : 0;
-}
-
-int scoped_sites_on_tile(const world& w, entity_id tile)
-{
-    const ceiling_memo* m = occupancy_for(w);
-    if (m == nullptr)
-        return -1;
-    const auto it = m->sites.find(tile);
-    return it != m->sites.end() ? it->second : 0;
 }
 
 province_ceiling_scope::province_ceiling_scope(const world& w)

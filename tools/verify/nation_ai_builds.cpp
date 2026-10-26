@@ -20,9 +20,6 @@
 //       scorer's builds and every other builder's) stands on that nation's ground.
 //       Generation's own holdings are counted and printed beside it as a NOTE:
 //       they are generation's placement, not this item's (BL-1401) subject.
-//   R4  ONE SITE PER TILE (Ben, 2026-10-26; PRODUCTION.md § One site under
-//       construction per tile). After every live tick, no tile holds two buildings
-//       under construction at once.
 //
 // Build: cmd //c tools\verify\build_lua_harness.bat nation_ai_builds
 // Run:   build_gen/verify/nation_ai_builds.exe [seed ...]   (default: 0 28 46)
@@ -125,7 +122,6 @@ void run_seed(lua_state& lua, std::uint32_t seed)
     std::set<entity_id> player_added;                    // R2
     std::map<entity_id, int> production_added;           // R1, per nation
     std::vector<extraction_trace_row> trace;             // DIAGNOSTIC (BL-1402)
-    int doubled_tiles = 0, sites_seen = 0;               // R4, summed over the ticks
     corp_extraction_trace_sink() = &trace;
     for (int live = 1; live <= k_live_ticks; ++live)
     {
@@ -134,19 +130,6 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         advance_surveys(w, 90);
         w.current_day_tick = day;
         (void)run_settle_tick(w, reg, k_app_validation_ticks + (live - 1), day, /*spectating=*/false);
-        // R4 — ONE SITE PER TILE (Ben, 2026-10-26): no tile holds two buildings under
-        // construction at once, whoever placed them. Counted by key, so the
-        // unordered building walk cannot order anything.
-        {
-            std::map<entity_id, int> sites_on;
-            for (const auto& [bid, b] : w.buildings)
-            {
-                (void)bid;
-                if (b.ticks_remaining > 0) { ++sites_on[b.tile]; ++sites_seen; }
-            }
-            for (const auto& [tile, n] : sites_on)
-                if (n > 1) ++doubled_tiles;
-        }
         for (const entity_id n : nations)
         {
             std::set<entity_id>& seen = at_seat[n];
@@ -259,11 +242,6 @@ void run_seed(lua_state& lua, std::uint32_t seed)
               "(%zu of %zu abroad)", abroad, owned));
     std::printf("  NOTE generation's nation holdings: %zu of %zu abroad (generation's placement, "
                 "not BL-1401's subject)\n", gen_abroad, gen_owned);
-    // ---- R4 -------------------------------------------------------------------
-    check(doubled_tiles == 0, "R4",
-          fmt("one site per tile: no tile held two sites under construction at any tick "
-              "(%d tile-ticks did, of %d site-ticks)", doubled_tiles, sites_seen));
-
     // Printed for a run-to-run comparison (R3): two runs of one seed print one digest.
     std::printf("  state_hash after the live window: %016llX\n",
                 static_cast<unsigned long long>(w.state_hash(0)));

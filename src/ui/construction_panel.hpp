@@ -107,13 +107,14 @@ ImVec4 construction_status_colour(const construction_read& rd);
 /// candidate rather than a site).
 ImVec4 construction_rate_colour(float rate);
 
-/// How far through its build @p b is, in [0,1] — the DAYS of work done over the
-/// site's whole days. The credit fraction it read before cannot measure progress
-/// once credits are the whole cost and are paid at placement (Ben, 2026-10-26): it
-/// would read 100% on day one. The total is recomputed live
-/// (`construction_build_days`, which reads the reach/stack field), so the bar can
-/// move when a road or the stack does; the drift-free alternative is to store the
-/// original total on the building, which is a save-format change.
+/// How far through its build @p b is, in [0,1] — `construction_paid` over
+/// `construction_capex`, the CREDIT fraction. Preferred over the ticks ratio
+/// because `ticks_remaining` is measured against a total nothing stores: recomputing
+/// it calls `construction_site_multiplier`, which reads the live reach/stack field,
+/// so the denominator moves when a road or the stack does. Capex is re-priced live
+/// too, so the bar can wobble with local prices; the drift-free alternative is to
+/// store the original total on the building, which is a save-format change.
+/// Falls back to the ticks ratio where capex cannot be priced.
 float construction_progress_fraction(const world& w, const recipe_registry& reg,
                                      const building_component& b);
 

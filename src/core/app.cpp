@@ -106,7 +106,6 @@ static const char* construction_result_name(construction_result r)
         case construction_result::wrong_air:              return "wrong_air";
         case construction_result::needs_road:             return "needs_road";
         case construction_result::foreign_ground:         return "foreign_ground";
-        case construction_result::site_busy:              return "site_busy";
     }
     return "result?";
 }
@@ -2938,10 +2937,6 @@ void app::render()
                 // BL-1357: reachable only by the road door below, never by a build.
                 m_ui.construction.last_message =
                     "That ground is another nation's."; break;
-            case construction_result::site_busy:
-                // One site per tile (Ben, 2026-10-26; PRODUCTION.md).
-                m_ui.construction.last_message =
-                    "A building is already under construction on this tile."; break;
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }

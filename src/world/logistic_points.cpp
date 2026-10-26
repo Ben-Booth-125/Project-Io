@@ -6,6 +6,7 @@
 #include "river_generation.hpp" // BL-1340: hex_side_for_offset — a step prices the edge it crosses
 #include "hex_neighbors.hpp"    // BL-1396: the sea walk crosses all six hex sides
 #include "state_industry.hpp"  // state_gate_would_idle (the reading at the gate)
+#include "placement_rules.hpp" // the stack cap a stacked hub respects (Ben, 2026-10-26)
 
 #include <algorithm>
 #include <cmath>
@@ -1343,6 +1344,38 @@ std::unordered_map<entity_id, lp_flow> lp_route_flow(world& w, lp_reach_memo& me
             [](const lp_source_ref& r, entity_id id) { return r.building < id; });
         return (it != list.end() && it->building == building) ? &*it : nullptr;
     };
+    // STACKED SOURCES ARE ONE NODE (Ben, 2026-10-26: "multiple levels of logistics
+    // hubs"). Several sources of one network on one tile share one field, so routing's
+    // nearest-first tie hands every request to the lowest id and its siblings would carry
+    // nothing here although each adds its points to the pool. Wherever a walk carries a
+    // source's points, its connected same-tile, same-network siblings' points pass too.
+    std::map<entity_id, std::vector<entity_id>> siblings; // source -> co-tile sources (itself included)
+    // A SOURCE DELIVERS WHERE IT STANDS (Ben, 2026-10-26): a connected source's points are
+    // available on its own tile at full reach, whether or not a request's nearest-first
+    // route happened to pick it - the capital's own hub counted nothing at the capital
+    // while every request near it routed to a nearer source. tile -> connected sources.
+    std::map<entity_id, std::vector<entity_id>> on_tile;
+    {
+        std::map<std::pair<entity_id, int>, std::vector<entity_id>> node;
+        for (const lp_source_ref& s : list) // ascending building id
+        {
+            if (centre != null_entity && memo_chain(w, memo, nation, body, centre).count(s.building) == 0)
+                continue; // off the chain: carries nothing anywhere
+            node[{s.tile, static_cast<int>(s.network)}].push_back(s.building);
+            on_tile[s.tile].push_back(s.building);
+        }
+        for (const auto& [key, ids] : node)
+            if (ids.size() > 1)
+                for (const entity_id b : ids)
+                    siblings[b] = ids;
+    }
+    const auto tag = [&](std::vector<entity_id>& out_owners, entity_id src) {
+        const auto sit = siblings.find(src);
+        if (sit == siblings.end())
+            out_owners.push_back(src);
+        else
+            out_owners.insert(out_owners.end(), sit->second.begin(), sit->second.end());
+    };
 
     // 2. EVERY REQUEST, ALONG ITS ROUTE. Each producing building on this nation's ground
     // here is routed exactly as the resolver routed it (`route_cands`, nearest first,
@@ -1401,7 +1434,7 @@ std::unordered_map<entity_id, lp_flow> lp_route_flow(world& w, lp_reach_memo& me
             for (const auto& [tile, src] : walk)
             {
                 tiles.push_back(tile);
-                owners[tile].push_back(src);
+                tag(owners[tile], src);
             }
             std::sort(tiles.begin(), tiles.end());
             tiles.erase(std::unique(tiles.begin(), tiles.end()), tiles.end());
@@ -1420,6 +1453,8 @@ std::unordered_map<entity_id, lp_flow> lp_route_flow(world& w, lp_reach_memo& me
     // source id, so the float sum is replay-exact.
     for (auto& [tile, srcs] : owners)
     {
+        if (const auto ot = on_tile.find(tile); ot != on_tile.end())
+            srcs.insert(srcs.end(), ot->second.begin(), ot->second.end());
         std::sort(srcs.begin(), srcs.end());
         srcs.erase(std::unique(srcs.begin(), srcs.end()), srcs.end());
         float avail = 0.0f;
@@ -1501,6 +1536,7 @@ lp_seed_report seed_logistics_sources(world& w)
         bc.tile               = tile;
         bc.type               = type;
         bc.workforce_assigned = 0.0f; // zero staff, as every network node
+        bc.workforce_target   = default_workforce_target(type); // full (Ben, 2026-10-26)
         bc.ticks_remaining    = 0;    // stands complete, as every generated holding
         w.buildings[bid]  = bc;
         w.stockpiles[bid] = stockpile_component{};
@@ -2208,8 +2244,119 @@ void lp_seed_read_at_gate(world& w, const recipe_registry& reg, lp_seed_report& 
         w.rail_networks.clear();
 }
 
+void stack_logistics_hubs(world& w, const recipe_registry& reg, lp_seed_report& rep)
+{
+    const lp_tick t = resolve_logistic_points(w);
+    lp_reach_memo memo;
+    const float per_hub = lp_source_points[static_cast<std::size_t>(lp_network::road)];
+    std::map<std::pair<entity_id, entity_id>, std::unordered_map<entity_id, lp_flow>> flows;
+    const auto flow_at = [&](entity_id nation, entity_id body, entity_id tile) -> lp_flow {
+        const auto key = std::make_pair(nation, body);
+        auto it = flows.find(key);
+        if (it == flows.end())
+            it = flows.emplace(key, lp_route_flow(w, memo, t, nation, body)).first;
+        const auto ft = it->second.find(tile);
+        return ft != it->second.end() ? ft->second : lp_flow{};
+    };
+    // A running road hub on @p tile that is on its nation's chain.
+    const auto holds_connected_hub = [&](entity_id nation, entity_id body, entity_id tile) {
+        const entity_id anchor = chain_anchor(w, nation, body);
+        for (const lp_source_ref& s : memo_sources(w, memo, nation, body))
+            if (s.tile == tile && s.network == lp_network::road
+                && (anchor == null_entity || memo_chain(w, memo, nation, body, anchor).count(s.building) != 0))
+                return true;
+        return false;
+    };
+
+    std::vector<entity_id> nids;
+    for (const auto& [nid, nc] : w.nations) { (void)nc; nids.push_back(nid); }
+    std::sort(nids.begin(), nids.end());
+    std::vector<entity_id> mids;
+    for (const auto& [mid, mc] : w.markets) { (void)mc; mids.push_back(mid); }
+    std::sort(mids.begin(), mids.end());
+
+    bool placed_any = false;
+    for (const entity_id nid : nids)
+    {
+        // The targets, capital first: its own ground, dry, holding a connected hub.
+        std::vector<std::pair<entity_id, bool>> targets; // (tile, is_capital)
+        const entity_id cap = w.nations.at(nid).capital_tile;
+        if (cap != null_entity && w.tiles.count(cap) != 0)
+            targets.push_back({cap, true});
+        for (const entity_id mid : mids)
+        {
+            const entity_id ct = w.markets.at(mid).centre_tile;
+            if (ct != null_entity && ct != cap)
+                targets.push_back({ct, false});
+        }
+        float bill = -1.0f; // read once, when the first hub is asked for
+        for (const auto& [tile, is_cap] : targets)
+        {
+            const auto tit = w.tiles.find(tile);
+            if (tit == w.tiles.end() || is_water(tit->second.substrate) || host_nation(w, tile) != nid)
+                continue;
+            const entity_id body = tit->second.body;
+            // A hub on the capital is on the chain by standing there (it is the anchor);
+            // at a centre the stack builds on a connected hub already standing.
+            if (!is_cap && !holds_connected_hub(nid, body, tile))
+                continue;
+            const lp_flow fl = flow_at(nid, body, tile);
+            const float deficit = fl.requested - fl.available;
+            if (!(deficit > 0.0f) || !std::isfinite(deficit))
+                continue;
+            const int want = static_cast<int>(std::ceil(deficit / per_hub));
+            int took = 0;
+            for (int k = 0; k < want; ++k)
+            {
+                const tile_component& tc = w.tiles.at(tile);
+                if (placement_rules::non_extraction_buildings_on_tile(w, tile)
+                    >= placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover))
+                {
+                    rep.stack_refused_cap += want - k;
+                    break;
+                }
+                building_component bc;
+                bc.tile               = tile;
+                bc.type               = building_type::inland_logistics_hub;
+                bc.workforce_assigned = 0.0f; // zero staff, as every network node
+                bc.workforce_target   = default_workforce_target(bc.type);
+                bc.ticks_remaining    = 0;    // stands complete, as every generated holding
+                // THE FUNDING GATE: the nation's whole first-tick state bill, this hub
+                // added, must fit its treasury - so the gate funds every building it funded
+                // before AND the hub; nodes are paid first, so a hub the bill could not carry
+                // would idle a producer instead.
+                if (bill < 0.0f)
+                    bill = state_first_tick_bill(w, reg, nid);
+                const float bound = state_building_cost_bound(w, reg, bc) * 1.0005f; // the gate's headroom
+                nation_component& nc = w.nations.at(nid);
+                if (!(std::isfinite(bound)) || nc.treasury < bill + bound)
+                {
+                    rep.stack_refused_funds += want - k;
+                    break;
+                }
+                const entity_id bid = w.create_entity();
+                w.buildings[bid]  = bc;
+                w.stockpiles[bid] = stockpile_component{};
+                nc.state_assets.push_back(bid);
+                bill += bound;
+                ++took;
+                placed_any = true;
+                ++(is_cap ? rep.hubs_stacked_capital : rep.hubs_stacked_centre);
+            }
+            if (took > 0)
+                ++rep.stacked_tiles;
+        }
+    }
+    if (placed_any)
+        invalidate_logistics_caches(w);
+}
+
 void print_lp_seed_report(const lp_seed_report& r)
 {
+    std::printf("[lp] stacked hubs: %d at capitals, %d at market centres on %d tiles; "
+                "%d refused by the stack cap, %d by funding\n",
+                r.hubs_stacked_capital, r.hubs_stacked_centre, r.stacked_tiles,
+                r.stack_refused_cap, r.stack_refused_funds);
     std::printf("[lp] seeding: %d hubs placed; sources road %d rail %d sea %d (%d more the funding "
                 "gate idles); %d consumers "
                 "(%d full, %d partial, %d uncovered, %d on nobody's ground; %d no hub could connect, %d of them cut off; "

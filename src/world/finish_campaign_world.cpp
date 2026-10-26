@@ -435,6 +435,9 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // printed coverage is what the first tick runs.
     out.reserve = reserve_state_first_tick(w, reg, out.state);
     print_state_reserve(out.reserve);
+    // STACKED HUBS (Ben, 2026-10-26; LOGISTICS.md § Where generation puts the sources):
+    // after the reserve, so a stacked hub is one the treasury funds with its year kept.
+    stack_logistics_hubs(w, reg, out.lp);
     // BL-1398's firm top-up (fund_state_nodes_from_firms) RETIRED with BL-1402: the
     // fold above moved every firm's balance into its home treasury, so the opening node
     // bill is paid from the nation's whole treasury and "no capital starts dark" stands
