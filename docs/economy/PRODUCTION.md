@@ -926,7 +926,8 @@ placement's site multiplier (§ Construction site time), rounded to a whole day.
   cancelled before it completes returns the whole credit cost it paid at placement to the payer — a
   nation's treasury, booked on its quarterly return as a refund. The materials it drew are not
   returned: they were spent on the site. Any it still owed are cleared, not drawn. A standing
-  building refunds nothing.
+  building refunds nothing. The seat's clean slate of construction cancels its sites under this same rule,
+  with no exception for the materials (Ben, 2026-10-26, NR-1075).
 - **The state's funding gate prices this money.** A state site costs nothing in credits at the tick.
   Its bill at a tick is the materials it owes, at the shelf's posted price, which the gate knows
   exactly when it runs (NATIONS.md § What a nation owns, "A losing building idles").

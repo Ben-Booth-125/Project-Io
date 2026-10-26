@@ -199,10 +199,10 @@ void move_seat_force(world& w, entity_id previous, entity_id nation);
 /// building of NATION @p nation (BL-1407: the seat is a nation) still under
 /// construction (`ticks_remaining > 0`) is cancelled — removed through
 /// `demolish_building`, so no building, stockpile or asset entry survives — in
-/// ASCENDING building id, and what each had been charged so far
-/// (`building_component::construction_paid`, the site's own record of every
-/// credit run_construction took for it) is refunded to the treasury. Finished
-/// buildings stay.
+/// ASCENDING building id, and refunds exactly what any cancelled site does (Ben,
+/// 2026-10-26, NR-1075): its credits in full (`building_component::
+/// build_credit_paid`, refunded and booked by the demolition door); the
+/// materials it drew stay spent. Finished buildings stay.
 ///
 /// Called by both ways a seat is taken — the draw (`repoint_player`) and the
 /// pick (`corp_verb::take_seat`) — BEFORE `move_seat_force`, so a muster base

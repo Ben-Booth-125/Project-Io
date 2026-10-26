@@ -3019,9 +3019,11 @@ void arm_corporation(world& w, entity_id corp)
 float seat_clean_slate(world& w, entity_id nation)
 {
     // BL-1407: the seat is a NATION (the player IS its nation). Its unfinished
-    // sites are cancelled in ascending building id and what each had been
-    // charged is refunded to the treasury, booked on the nation's next
-    // quarterly return (FINANCE.md § The quarterly return).
+    // sites are cancelled in ascending building id. Each refunds exactly what any
+    // cancelled site does (Ben, 2026-10-26, NR-1075): its credits in full, through
+    // the demolition door, which books them on the nation's next quarterly return
+    // (refund_unbooked / refund_opening; FINANCE.md § The quarterly return). The
+    // materials already drawn stay spent — the seat keeps no exception.
     const auto nit = w.nations.find(nation);
     if (nit == w.nations.end())
         return 0.0f;
@@ -3030,33 +3032,12 @@ float seat_clean_slate(world& w, entity_id nation)
         if (const auto b = w.buildings.find(bid); b != w.buildings.end() && b->second.ticks_remaining > 0)
             sites.push_back(bid);
     std::sort(sites.begin(), sites.end());
-    float refund = 0.0f; // the materials part, booked here
-    float total  = 0.0f; // everything returned, the demolition door's credits included
+    float total = 0.0f; // the credits the door refunded
     for (const entity_id bid : sites)
     {
-        // What this site was charged and nothing else: never an estimate, so the
-        // refund cannot exceed what the nation paid in. Ben, 2026-10-25: the
-        // demolition door already refunds the credits paid at placement (and books
-        // them); this refunds the rest — the materials — so the seat's total is
-        // unchanged, booked the same way below.
-        const building_component& sb = w.buildings.at(bid);
-        const float paid   = std::max(0.0f, sb.construction_paid);
-        const float credit = std::max(0.0f, sb.build_credit_paid);
+        const float credit = std::max(0.0f, w.buildings.at(bid).build_credit_paid);
         if (demolish_building(w, nation, bid))
-        {
-            refund += std::max(0.0f, paid - credit);
-            total  += paid;
-        }
-    }
-    if (refund > 0.0f)
-    {
-        // Booked on the nation's next quarterly return as `refunds`, opened from
-        // the exact pre-refund treasury (BL-1206's rule, re-subjected).
-        nation_component& nc = w.nations.at(nation);
-        if (nc.refund_unbooked == 0.0f)
-            nc.refund_opening = nc.treasury;
-        nc.treasury        += refund;
-        nc.refund_unbooked += refund;
+            total += credit;
     }
     return total;
 }
