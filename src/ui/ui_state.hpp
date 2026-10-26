@@ -713,6 +713,15 @@ struct ui_state
     };
     std::vector<trade_flow_route> tf_routes;
     int trade_flow_unrouted = 0;
+    /// WHERE EACH ROUTED HEAD LANDED last frame (Ben, 2026-10-26: "arrowheads end on
+    /// ordinary tiles"), as counts for the verify hook: routed heads drawn; of them, the
+    /// ones whose tip AND base lie inside the destination market centre's hex; the routes
+    /// whose last tile IS that centre; and the worst tip's distance from the centre in
+    /// hex radii.
+    int   tf_heads_drawn       = 0;
+    int   tf_heads_in_dest_hex = 0;
+    int   tf_routes_end_at_centre = 0;
+    float tf_head_worst_r      = 0.0f;
     /// Lane-to-port joins on the active body the Planetary canvas draws (a lane tile's
     /// curve running on into a standing port's tile centre; Ben, 2026-10-26).
     int lane_port_joins = 0;
@@ -1524,6 +1533,19 @@ struct ui_state
         float            requested = 0.0f, granted = 0.0f, available = 0.0f;
     };
     std::vector<lp_leg_view> lp_legs;
+    /// Which NETWORKS a link cell carries, as bits (1 road, 2 rail leg, 4 sea leg). A
+    /// cell with more than one is ONE tile of the lens all the same (Ben, 2026-10-26:
+    /// "one colour per tile, showing both networks added together"): its supplied and
+    /// requested above are the networks' sum, and it is drawn in the one colour.
+    std::vector<std::uint8_t> lp_links;
+    /// The census of those combined cells for the verify hook (counts and totals only):
+    /// how many, their figures, and the road's and the legs' parts of them.
+    int    lp_both_cells = 0, lp_both_added = 0;
+    double lp_both_supplied = 0.0, lp_both_requested = 0.0;
+    double lp_both_road_supplied = 0.0, lp_both_road_requested = 0.0;
+    double lp_both_leg_supplied = 0.0, lp_both_leg_requested = 0.0;
+    /// What the leg pass drew last frame: the cells it stroked, each in its tile's colour.
+    int    lp_leg_cells_drawn = 0;
 
     /// THE CAPITAL STAR (Ben, 2026-10-25): how many stars the Planetary canvas drew
     /// last frame (one per visible wrap copy), and whether the player's own was among
@@ -1567,6 +1589,7 @@ struct ui_state
     bool      lp_hover_road      = false; ///< the pair is a link's routed flow, not the tile's own
     float     lp_hover_granted   = 0.0f;  ///< on a link: what the routed requests were granted
     int       lp_hover_link      = 0;     ///< lp_on_road's kind under the pointer (0 none, 1 road, 2 rail, 3 sea)
+    int       lp_hover_links     = 0;     ///< lp_links's bits under the pointer (1 road, 2 rail, 4 sea)
     int       lp_hover_chain     = 0;     ///< lp_chain's state under the pointer (0 off, 1 idle, 2 carrying)
 
     double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.

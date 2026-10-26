@@ -65,10 +65,28 @@ verify.expect(tr.routes > 0 and tr.routed > 0 and tr.unrouted == 0,
               .. tr.unrouted .. " unrouted)")
 verify.expect(tr.over_water > 0, "F2: the route rides its sea leg (" .. tr.over_water .. " over water)")
 
+-- H1 - EVERY HEAD ON ITS DESTINATION MARKET CENTRE (Ben, 2026-10-26: "arrowheads end
+-- on ordinary tiles"). The route runs to the destination market's centre tile (its last
+-- tile, `ends_at_centre`); the drawn head - its tip and the middle of its base - must lie
+-- inside that centre's hex at every framing, the whole body included, where a hex is a
+-- few pixels across. Counts from the canvas's own last frame.
+local function heads(label)
+  verify.frames(2)
+  local h = verify.trade_flow_routes()
+  print(string.format("[trade_flow_routed] heads %s: %d drawn, %d inside the destination centre's hex, "
+        .. "%d of %d routes end on the centre; worst head point %.2f hex radii out",
+        label, h.heads, h.heads_in_dest, h.ends_at_centre, h.routes, h.head_worst_r))
+  verify.expect(h.ends_at_centre == h.routes, "H1 (" .. label .. "): every route ends on its destination "
+                .. "market centre (" .. h.ends_at_centre .. "/" .. h.routes .. ")")
+  verify.expect(h.heads > 0 and h.heads_in_dest == h.heads, "H1 (" .. label .. "): every routed head lies "
+                .. "inside its destination centre's hex (" .. h.heads_in_dest .. "/" .. h.heads .. ")")
+end
+
 -- F3 ----------------------------------------------------------------------
 verify.clear_selection()
 verify.mouse(-100, -100)
 shot("trade_flow_routed_body")
+heads("whole body")
 if tr.has_first then
     print("[trade_flow_routed] first route " .. tr.first_len .. " tiles, from " .. tr.first_x .. "," .. tr.first_y)
     frame_tile(tr.first_x, tr.first_y, 4)
@@ -82,4 +100,39 @@ frame_tile(fx.port_a_x, fx.port_a_y, 10)
 shot("trade_flow_routed_port_close")
 frame_tile(fx.port_b_x, fx.port_b_y, 10)
 shot("trade_flow_routed_far_port_close")
+-- The destination end: framed on the unloading port, whose market centre the land leg
+-- runs on to, at three rungs so the head is seen landing on it.
+frame_tile(fx.port_b_x, fx.port_b_y, 2)
+shot("trade_flow_routed_dest_wide")
+heads("dest wide")
+frame_tile(fx.port_b_x, fx.port_b_y, 5)
+shot("trade_flow_routed_dest_mid")
+heads("dest mid")
+frame_tile(fx.port_b_x, fx.port_b_y, 12)
+shot("trade_flow_routed_dest_close")
+heads("dest close")
+
+-- H2 - A HEAD SEEN LANDING. The hook names one market centre's position, the FIRST
+-- route's source (a public position, no tile data). So the RETURN flow is staged too,
+-- destination -> source: its head lands on that same centre, and the camera can frame
+-- it there - the outbound flow leaving the centre and the return flow's head arriving
+-- on it, at three rungs.
+local back = verify.stage_trade_flow(fx.dst, fx.src, CARGO, QTY)
+print(string.format("[trade_flow_routed] return flow staged: ok %s, sea %s", tostring(back.ok), tostring(back.sea)))
+if back.ok then
+  verify.frames(3)
+  local tb = verify.trade_flow_routes()
+  verify.expect(tb.routes >= 2, "H2: both directions hold a route (" .. tb.routes .. ")")
+  if tb.has_first then
+    frame_tile(tb.first_x, tb.first_y, 2)
+    shot("trade_flow_head_on_centre_wide")
+    heads("on the centre, wide")
+    frame_tile(tb.first_x, tb.first_y, 5)
+    shot("trade_flow_head_on_centre_mid")
+    heads("on the centre, mid")
+    frame_tile(tb.first_x, tb.first_y, 12)
+    shot("trade_flow_head_on_centre_close")
+    heads("on the centre, close")
+  end
+end
 verify.set_overlay("none")

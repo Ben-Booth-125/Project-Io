@@ -113,14 +113,22 @@ void hover_structure_ground(const ui_state& ui)
                 static_cast<double>(ui.lp_hover_supplied));
     // REACH APART FROM TRAFFIC (Ben, 2026-10-25): a link nothing is routed across
     // says so, rather than reading "Requested 0" as if it were cut off.
+    // ONE TILE, BOTH NETWORKS ADDED (Ben, 2026-10-26): a tile carrying a road and a
+    // leg shows their sum, and the card names both so the pair is not read as one's.
+    const bool road_and_rail = (ui.lp_hover_links & 1) != 0 && (ui.lp_hover_links & 2) != 0;
+    const bool road_and_sea  = (ui.lp_hover_links & 1) != 0 && (ui.lp_hover_links & 4) != 0;
     if (ui.lp_hover_road && ui.lp_hover_chain == 1)
-        ImGui::TextDisabled(ui.lp_hover_link == 2 ? "Rail, connected, idle"
+        ImGui::TextDisabled(road_and_rail ? "Road + rail, idle"
+                            : road_and_sea ? "Road + sea, idle"
+                            : ui.lp_hover_link == 2 ? "Rail, connected, idle"
                             : ui.lp_hover_link == 3 ? "Sea, connected, idle"
                                                     : "Connected, idle");
     else
         ImGui::Text("Requested %.0f LP/tick", static_cast<double>(ui.lp_hover_requested));
     if (ui.lp_hover_road && ui.lp_hover_chain != 1)
-        ImGui::TextDisabled(ui.lp_hover_link == 2 ? "rail leg, granted %.0f"
+        ImGui::TextDisabled(road_and_rail ? "road + rail, granted %.0f"
+                            : road_and_sea ? "road + sea, granted %.0f"
+                            : ui.lp_hover_link == 2 ? "rail leg, granted %.0f"
                             : ui.lp_hover_link == 3 ? "sea leg, granted %.0f"
                                                     : "granted %.0f",
                             static_cast<double>(ui.lp_hover_granted));
