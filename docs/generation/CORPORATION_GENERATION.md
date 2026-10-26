@@ -147,7 +147,8 @@ small and thematically tight — a foothold in one slice of one chain.
   deposits: measured, every extractor opens at full cover.
 - **Cluster around the anchor.** The remaining slots fill the nearest valid tiles of the same nation
   that still have room, by grid distance, the anchor's own tile first — so the cluster fills a tile
-  before it spreads to the next (below).
+  before it spreads to the next. Extraction sites are the exception: they spread across the window's
+  ranked deposits before they stack (below).
 - **On own ground, every rung.** No anchor rung and no cluster slot leaves the nation's tiles (§ Design
   principles). A charter that finds no ground there is counted unspent, never scattered.
 - **Mix follows focus.** An extraction charter places extractors on its best-served rich deposits (above), a
@@ -211,7 +212,13 @@ small and thematically tight — a foothold in one slice of one chain.
     `window_exhausted` (no ground at all).
 
 **Buildings stack on every tile (Ben, 2026-10-26).** A charter may place buildings on any tile up
-to that tile's stack cap; the cluster fills a tile before it spreads to the next. The cap is the
+to that tile's stack cap; a non-extraction building fills a tile before it spreads to the next.
+**Extraction spreads, then stacks (Ben, 2026-10-26: "we should be doing both, so we have stacking and
+spread extraction").** An extraction site goes first to the best-ranked deposit of its charter's
+window (richness × cover) that no site of its target works yet, one site per deposit tile; it stacks
+only once every such deposit holds one, on the best-ranked deposit with room. So a deposit-rich
+charter spreads and a deposit-poor one stacks. A window with no deposit room left takes the nearest
+deposit beyond it, as any other slot does. The cap is the
 placement rules' own, on two axes that never share a slot: extraction sites of one target up to the
 deposit's richness-bound stack capacity, and every other building together up to the ground's
 non-extraction cap (`../economy/PRODUCTION.md` § Building stacks). A stacked site yields its rank's

@@ -107,6 +107,33 @@ void run_seed(lua_state& lua, std::uint32_t seed, int n)
     hist("all", all_on);
     hist("producers", prod_on);
 
+    // EXTR: how extraction spreads — sites, the (tile, target) deposits they
+    // work, and the share standing alone on their deposit (the spread share).
+    {
+        std::map<std::pair<entity_id, int>, int> per_deposit;
+        int sites = 0;
+        for (const entity_id bid : ids)
+        {
+            const building_component& b = w.buildings.at(bid);
+            if (b.type != building_type::extraction_site)
+                continue;
+            ++sites;
+            ++per_deposit[{ b.tile, static_cast<int>(b.target_resource) }];
+        }
+        int alone = 0;
+        std::map<int, int> h;
+        for (const auto& [k, c] : per_deposit)
+        {
+            ++h[c];
+            if (c == 1) ++alone;
+        }
+        std::printf("EXTR seed=%u sites=%d deposits=%zu alone=%d spread_share=%.1f%% stacks",
+                    static_cast<unsigned>(seed), sites, per_deposit.size(), alone,
+                    sites > 0 ? 100.0 * alone / sites : 0.0);
+        for (const auto& [k, c] : h) std::printf(" %d:%d", k, c);
+        std::printf("\n");
+    }
+
     const lp_tick t = resolve_logistic_points(w);
     double ext_sum = 0.0, proc_sum = 0.0;
     int ext_n = 0, proc_n = 0, ext_low = 0, proc_low = 0;

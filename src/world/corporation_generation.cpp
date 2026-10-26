@@ -91,6 +91,13 @@ public:
     /// 1 when the tile holds any building, else 0 (the pre-stacking reading).
     std::size_t count(entity_id tile) const { return m_tiles.count(tile); }
 
+    /// Extraction sites of @p target standing on @p tile.
+    int extraction_on(entity_id tile, resource_type target) const
+    {
+        const auto it = m_tiles.find(tile);
+        return it == m_tiles.end() ? 0 : it->second.extraction[static_cast<std::size_t>(target)];
+    }
+
     /// May one more building of @p type (extracting @p target) stand on @p tile?
     /// Validity (terrain, deposit) is `placement_rules::can_place`'s; this is the
     /// stack's room alone.
@@ -987,14 +994,14 @@ std::vector<entity_id> place_starting_assets(world& w,
                        // No RNG has been consumed on this path, so a widened retry is
                        // indistinguishable from having started at the wider rung.
 
+    gen_lp_cover local_cover;
+    gen_lp_cover& cv = cover != nullptr ? *cover : local_cover;
     entity_id anchor_tid = anchors.back().tid;
     if (ranked)
     {
         // RICHNESS x COVER (Ben, 2026-10-26): of two equally rich deposits the one
         // the chain reaches wins; where neither is reached the richer does; then
         // the lower tile id. Draws nothing.
-        gen_lp_cover local_cover;
-        gen_lp_cover& cv = cover != nullptr ? *cover : local_cover;
         float best_key = -1.0f, best_rich = -1.0f;
         anchor_tid = null_entity;
         for (const auto& c : anchors)
@@ -1061,11 +1068,74 @@ std::vector<entity_id> place_starting_assets(world& w,
     std::uniform_int_distribution<int> count_pick(count_min, count_max);
     const int target_count = count_pick(rng);
 
+    // EXTRACTION SPREADS, THEN STACKS (Ben, 2026-10-26: "we should be doing both,
+    // so we have stacking and spread extraction"). An extraction slot takes the
+    // best-ranked deposit of the anchor's window (richness x cover, then the
+    // richer, then the lower tile id) that holds no site of its target yet; only
+    // when every such deposit holds one does it stack, on the best-ranked deposit
+    // with room. A window with no deposit room left walks the neighbourhood as
+    // every other slot does. Built once, on the first extraction slot.
+    struct deposit { float key; float rich; entity_id tid; resource_type target; };
+    std::vector<deposit> deposits;
+    bool deposits_built = false;
+    const auto build_deposits = [&]() {
+        deposits_built = true;
+        for (entity_id tid : anchor_pool)
+        {
+            const auto it = w.tiles.find(tid);
+            if (it == w.tiles.end())
+                continue;
+            const tile_component& tc = it->second;
+            resource_type tgt;
+            if (digging && dig_site_of(w, tid, tc, *dig) != dig_site::none)
+                tgt = *dig;
+            else
+            {
+                bool any = false;
+                tgt = placement_rules::richest_extractable(tc, any);
+                if (!placement_rules::can_place(tc, building_type::extraction_site, tgt))
+                    continue;
+            }
+            const float rich = tc.resource_deposit[static_cast<std::size_t>(tgt)];
+            deposits.push_back({ rich * cv.cover(w, tid), rich, tid, tgt });
+        }
+        std::sort(deposits.begin(), deposits.end(), [](const deposit& a, const deposit& b) {
+            if (a.key != b.key) return a.key > b.key;
+            if (a.rich != b.rich) return a.rich > b.rich;
+            return a.tid < b.tid;
+        });
+    };
+
     int slot = 1; // slot 0 was the anchor
     while (static_cast<int>(placed.size()) < target_count)
     {
         const building_type btype =
             pattern[static_cast<std::size_t>(slot) % pattern.size()];
+
+        if (btype == building_type::extraction_site)
+        {
+            if (!deposits_built)
+                build_deposits();
+            const deposit* pick = nullptr;
+            for (int pass = 0; pass < 2 && pick == nullptr; ++pass)
+                for (const deposit& d : deposits)
+                {
+                    if (!occupied_tiles.has_room(w.tiles.at(d.tid), d.tid, btype, d.target))
+                        continue;
+                    if (pass == 0 && occupied_tiles.extraction_on(d.tid, d.target) > 0)
+                        continue; // spread first: a deposit nothing of its target works
+                    pick = &d;
+                    break;
+                }
+            if (pick != nullptr)
+            {
+                const bool dug = digging && pick->target == *dig;
+                placed.push_back(author_building(w, pick->tid, btype, occupied_tiles,
+                                                 dug ? dig : nullptr));
+                ++slot;
+                continue;
+            }
+        }
 
         // Walk outward from the anchor's own tile for the nearest tile that can
         // host this type and has room in its stack.
