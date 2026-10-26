@@ -138,6 +138,58 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
     const float flat_cost = reg.economics(c.type).build_cost;
 
     std::map<entity_id, std::string> market_names; // one name lookup per market
+
+    // THE ROW'S IDENTITY (Ben, 2026-10-26: "remove the tile x,y column ... use what
+    // the glossary offers, e.g. the province or nearest place name"). A province has
+    // no name of its own (GLOSSARY.md § Province) but it is its centre's ground
+    // (PROVINCES.md), so a row is named for the population centre its province
+    // holds - the lowest centre id where a province holds two, so the name is one
+    // answer - and, for ground no centre's province covers, the nearest named centre
+    // on the body ("near X"). Built once per evaluation, in id order.
+    std::map<std::uint32_t, std::string> province_place;
+    struct named_centre { int x = 0, y = 0; const std::string* name = nullptr; };
+    std::vector<named_centre> centres;
+    {
+        std::vector<std::pair<entity_id, entity_id>> ct(w.population_centre_tile.begin(),
+                                                        w.population_centre_tile.end());
+        std::sort(ct.begin(), ct.end());
+        for (const auto& [cid, ctile] : ct)
+        {
+            const auto nm  = w.population_centre_name.find(cid);
+            const auto tt  = w.tiles.find(ctile);
+            if (nm == w.population_centre_name.end() || nm->second.empty() || tt == w.tiles.end()
+                || tt->second.body != ui.active_body)
+                continue;
+            if (const std::uint32_t pid = w.provinces.province_of(ctile); pid != 0)
+                province_place.try_emplace(pid, nm->second);
+            centres.push_back({tt->second.grid_x, tt->second.grid_y, &nm->second});
+        }
+    }
+    const int gw_wrap = sf.gw;
+    const auto place_of = [&](entity_id tid, int x, int y, bool& near) -> std::string {
+        near = false;
+        if (const std::uint32_t pid = w.provinces.province_of(tid); pid != 0)
+            if (const auto it = province_place.find(pid); it != province_place.end())
+                return it->second;
+        // The nearest named centre, the grid wrapping east-west; ties to the lower id.
+        long best = -1;
+        const std::string* name = nullptr;
+        for (const named_centre& c : centres)
+        {
+            int dx = std::abs(c.x - x);
+            if (gw_wrap > 0)
+                dx = std::min(dx, gw_wrap - dx);
+            const int  dy = c.y - y;
+            const long d2 = static_cast<long>(dx) * dx + static_cast<long>(dy) * dy;
+            if (best < 0 || d2 < best)
+            {
+                best = d2;
+                name = c.name;
+            }
+        }
+        near = true;
+        return name != nullptr ? *name : std::string();
+    };
     for (std::size_t idx = 0; idx < grid.size() && idx < sf.cls.size(); ++idx)
     {
         const entity_id tid = grid[idx];
@@ -172,6 +224,7 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
         r.tile = tid;
         r.x    = tc.grid_x;
         r.y    = tc.grid_y;
+        r.place = place_of(tid, r.x, r.y, r.place_near);
         r.capex     = capex;
         r.site_mult = construction_site_multiplier(w, reg, tid, c.type, c.target);
         r.flat      = flat_cost * r.site_mult;
@@ -353,7 +406,7 @@ void sort_site_rows(std::vector<site_row>& rows, int col, bool desc)
         int c = 0; // <0: a first ascending
         switch (col)
         {
-        case 0: c = (a.y != b.y) ? (a.y < b.y ? -1 : 1) : (a.x != b.x ? (a.x < b.x ? -1 : 1) : 0); break;
+        case 0: c = a.place.compare(b.place); c = (c < 0) ? -1 : (c > 0 ? 1 : 0); break;
         case 1: c = (a.profit != b.profit) ? (a.profit < b.profit ? -1 : 1) : 0; break;
         case 2: c = (a.capex != b.capex) ? (a.capex < b.capex ? -1 : 1) : 0; break;
         case 3: c = a.market_name.compare(b.market_name); c = (c < 0) ? -1 : (c > 0 ? 1 : 0); break;
@@ -485,28 +538,84 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     const ImGuiTableFlags tf = ImGuiTableFlags_Sortable | ImGuiTableFlags_RowBg
                              | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV
                              | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings;
-    // Column widths, stated once: sized to their figures and headers at the fold-out's
-    // narrowest (~300 px of table), with tight cell padding, so the stretch Market
-    // column keeps a readable city name.
-    constexpr float w_tile = 44.0f, w_net = 36.0f, w_cost = 42.0f, w_lp = 36.0f, w_yield = 40.0f;
-    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {3.0f, 1.0f});
+    // Column widths, MEASURED, never guessed (Ben, 2026-10-26: "every column header
+    // must be legible: no 'Yi...' elision at any supported width"). A sortable
+    // header reserves the sort arrow beside its label (imgui_tables.cpp's
+    // `w_arrow`: 0.65 of the font size plus the frame padding), and the 2026-10-25
+    // constants were sized to the figures alone, so "Yield" lost its tail to the
+    // arrow. Each fixed column is now the wider of its header with the arrow and
+    // its widest figure; the two stretch columns (Place, Market) share the rest,
+    // and every header publishes what it needed against what it got.
+    const float arrow_w = std::floor(ImGui::GetFontSize() * 0.65f + ImGui::GetStyle().FramePadding.x);
+    // The figures' widest is measured off the rows themselves rather than a
+    // worst-case sample, because at the fold-out's narrowest every pixel a fixed
+    // column does not need is a pixel the two named columns' headers do.
+    float fig_net = 0.0f, fig_cost = 0.0f, fig_yield = 0.0f;
+    for (const site_row& r : sf.rows)
+    {
+        if (r.priced)
+            fig_net = std::max(fig_net, ImGui::CalcTextSize(fmt::abbreviate(static_cast<double>(r.profit)).c_str()).x);
+        fig_cost = std::max(fig_cost, ImGui::CalcTextSize(fmt::abbreviate(static_cast<double>(r.capex)).c_str()).x);
+        if (r.has_yield)
+            fig_yield = std::max(fig_yield, ImGui::CalcTextSize(fmt::abbreviate(static_cast<double>(r.yield)).c_str()).x);
+    }
+    // THE ARROW IS RESERVED ONLY WHERE IT DRAWS. ImGui's own header reserves the
+    // arrow's width on every sortable column, sorted or not, and elides the label
+    // against it - which at ~290 px of table cost each of six headers ~12 px for
+    // an arrow five of them never show. So the headers are drawn here: ImGui's
+    // header item keeps the press, the hover and the arrow on the SORTED column,
+    // and the label is drawn whole beside it. A header needs its text, plus the
+    // arrow only on the column the rows are sorted by.
+    const auto  header_need = [&](const char* label, int uid) {
+        return ImGui::CalcTextSize(label).x + (uid == sf.sort_col ? arrow_w : 0.0f);
+    };
+    const auto  fixed_w = [&](const char* label, int uid, float widest) {
+        return std::ceil(std::max(header_need(label, uid), widest)) + 1.0f;
+    };
+    const float lh0     = ImGui::GetTextLineHeight();
+    const float w_net   = fixed_w("Net", 1, fig_net);
+    const float w_cost  = fixed_w("Cost", 2, fig_cost);
+    // A zero cover reads as the struck truck ALONE: the flag is the zero, and a
+    // "0%" beside it cost the width the Market header needed.
+    const float w_lp    = std::max(fixed_w("LP", 4, ImGui::CalcTextSize("100%").x), std::ceil(lh0) + 1.0f);
+    const float w_yield = fixed_w("Yield", 5, fig_yield);
+    // The two stretch columns share what is left in proportion to what their
+    // headers need, so neither elides while the other has room to spare.
+    const float need_place  = header_need("Place", 0);
+    const float need_market = header_need("Market", 3);
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {2.0f, 1.0f});
     if (!ImGui::BeginTable("##site_ledger", 6, tf, {0.0f, table_h}))
     {
         ImGui::PopStyleVar();
         return;
     }
     ImGui::TableSetupScrollFreeze(0, 1);
-    ImGui::TableSetupColumn("Tile",   ImGuiTableColumnFlags_WidthFixed, w_tile, 0);
+    ImGui::TableSetupColumn("Place",  ImGuiTableColumnFlags_WidthStretch, need_place, 0);
     ImGui::TableSetupColumn("Net",    ImGuiTableColumnFlags_WidthFixed
                                       | ImGuiTableColumnFlags_DefaultSort
                                       | ImGuiTableColumnFlags_PreferSortDescending, w_net, 1);
     ImGui::TableSetupColumn("Cost",   ImGuiTableColumnFlags_WidthFixed, w_cost, 2);
-    ImGui::TableSetupColumn("Market", ImGuiTableColumnFlags_WidthStretch, 1.0f, 3);
+    ImGui::TableSetupColumn("Market", ImGuiTableColumnFlags_WidthStretch, need_market, 3);
     ImGui::TableSetupColumn("LP",     ImGuiTableColumnFlags_WidthFixed
                                       | ImGuiTableColumnFlags_PreferSortDescending, w_lp, 4);
     ImGui::TableSetupColumn("Yield",  ImGuiTableColumnFlags_WidthFixed
                                       | ImGuiTableColumnFlags_PreferSortDescending, w_yield, 5);
-    ImGui::TableHeadersRow();
+    // The header row, drawn by hand so each header can report its own fit.
+    sf.headers.clear();
+    ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+    for (int ci = 0; ci < 6; ++ci)
+    {
+        if (!ImGui::TableSetColumnIndex(ci))
+            continue;
+        const char*  name = ImGui::TableGetColumnName(ci);
+        const float  have = ImGui::GetContentRegionAvail().x;
+        const ImVec2 at   = ImGui::GetCursorScreenPos();
+        char id[24];
+        std::snprintf(id, sizeof id, "##site_hdr%d", ci);
+        ImGui::TableHeader(id); // the press, the hover and the sorted column's arrow
+        ImGui::GetWindowDrawList()->AddText(at, ImGui::GetColorU32(ImGuiCol_Text), name);
+        sf.headers.push_back({name, header_need(name, ci), have});
+    }
 
     if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsDirty)
     {
@@ -539,14 +648,23 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 cells.push_back(std::move(e));
             };
 
-            // Tile — the row's press: select it and frame it. The place action stays
-            // the tile's Build door below.
+            // Place — the row's identity and its press: select the tile and frame
+            // it. The place action stays the tile's Build door below.
             ImGui::TableSetColumnIndex(0);
-            char label[48];
-            std::snprintf(label, sizeof label, "%d,%d##site%u", r.x, r.y, static_cast<unsigned>(r.tile));
+            const std::string place = r.place.empty() ? std::string("Unnamed ground")
+                                    : r.place_near   ? "near " + r.place
+                                                     : r.place;
             const ImVec2 rp = ImGui::GetCursorScreenPos();
-            cell("tile", w_tile, "Press to select this tile and frame it on the map; its Build "
-                                "door below places the building.");
+            const float  pw = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+            cell("place", pw,
+                 (r.place.empty() ? std::string("No named place is near this tile. ")
+                  : r.place_near  ? "No centre's province holds this tile; " + r.place
+                                        + " is the nearest place. "
+                                  : "In the province of " + r.place + ". ")
+                     + "Press to select the tile and frame it on the map; its Build door "
+                       "below places the building.");
+            char label[32];
+            std::snprintf(label, sizeof label, "##site%u", static_cast<unsigned>(r.tile));
             if (ImGui::Selectable(label, ui.selected_entity == r.tile,
                                   ImGuiSelectableFlags_SpanAllColumns))
             {
@@ -557,6 +675,8 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 ui.planetary_center_row     = r.y;
                 ui.planetary_center_pending = true;
             }
+            ImGui::SameLine(0.0f, 0.0f);
+            ImGui::TextUnformatted(fitted(place.c_str(), pw).c_str());
             sf.drawn.push_back({r.tile, rp.x + 12.0f, rp.y + ImGui::GetTextLineHeight() * 0.5f});
 
             // Net / qtr — the door's estimate, cover applied.
@@ -586,14 +706,16 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                     ImGui::TextDisabled("-");
             }
 
-            // Cost — credits plus materials at this market, times the site multiplier.
+            // Cost — the flat credits times the site multiplier, paid at placement,
+            // plus the materials at this market's posted prices, bought in arrears as
+            // each tick draws them (Ben, 2026-10-26: costs depend on market prices).
             ImGui::TableSetColumnIndex(2);
             {
                 char buf[260];
                 std::snprintf(buf, sizeof buf,
                               "Costs %d cr: %d cr of flat build cost, paid when it is placed, and "
-                              "%d cr of materials at this market's prices, drawn as it builds. "
-                              "This ground's site multiplier is x%.2f.",
+                              "%d cr of materials at this market's posted prices, bought as it "
+                              "builds. This ground's site multiplier is x%.2f.",
                               static_cast<int>(std::lround(r.capex)),
                               static_cast<int>(std::lround(r.flat)),
                               static_cast<int>(std::lround(std::max(0.0f, r.capex - r.flat))),
@@ -622,9 +744,9 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 std::string text;
                 if (r.no_logistics)
                     text = r.lp_blocked
-                        ? "No Logistic Points operate here: a source reaches it but is not tied to "
+                        ? "Cover 0%: no Logistic Points operate here. A source reaches it but is not tied to "
                           "the capital. It would build, and not run."
-                        : "No Logistic Points operate here: no source reaches it. It would build, "
+                        : "Cover 0%: no Logistic Points operate here, and no source reaches it. It would build, "
                           "and not run until a hub, station or port does.";
                 else
                 {
@@ -639,9 +761,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 {
                     icons::no_logistics(dl, {p.x + lh * 0.5f, p.y + lh * 0.5f}, lh * 0.45f,
                                         palette::site_no_logistics);
-                    ImGui::Dummy({lh, lh});
-                    ImGui::SameLine(0.0f, 2.0f);
-                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::site_no_logistics), "0%%");
+                    ImGui::Dummy({lh, lh}); // the flag IS the zero; its card says so
                 }
                 else
                     ImGui::Text("%d%%", static_cast<int>(std::lround(r.cover * 100.0f)));
@@ -669,9 +789,8 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                     ImGui::TextDisabled("-");
             }
 
-            char title[64];
-            std::snprintf(title, sizeof title, "%s at %d, %d", sf.choice.name.c_str(), r.x, r.y);
-            construction_column_card(title, cells);
+            const std::string title = sf.choice.name + ", " + place;
+            construction_column_card(title.c_str(), cells);
         }
     ImGui::EndTable();
     ImGui::PopStyleVar();

@@ -152,7 +152,10 @@ verify.expect(first == "placed", "first extraction site placed (" .. first .. ")
 -- ceiling was not what refused (that ceiling is type-agnostic), so the refusal
 -- was this deposit's own cap, max(1, richness / 50) == 1.
 local second = verify.build_at(dep.x, dep.y)
-verify.expect(second == "placed" or second == "slot_occupied" or second == "invalid_tile",
+-- Since 2026-10-26 (Ben: one site under construction per tile) a second placement
+-- while the first still builds answers `site_busy`, which is the expected refusal here.
+verify.expect(second == "placed" or second == "slot_occupied" or second == "invalid_tile"
+              or second == "site_busy",
               "second of the same type on one tile: " .. second)
 
 -- A second building of a DIFFERENT family on the same tile, so the aggregate

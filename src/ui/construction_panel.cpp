@@ -121,6 +121,7 @@ construction_read read_construction(const world& w, const recipe_registry& reg,
         if (r == cap_index || !(need[r] > 0.0f))
             continue;
         const float cov = avail_of(r) / need[r];
+        out.short_of[r] = (cov < 1.0f); // the draw's own test, per good (Ben, 2026-10-26)
         rate = std::min(rate, cov);
         if (cov < worst || !have_bad)
         {
@@ -138,6 +139,7 @@ construction_read read_construction(const world& w, const recipe_registry& reg,
     if (capacity_rate > 0.0f)
     {
         const float cov = (need[cap_index] > 0.0f) ? (avail_of(cap_index) / need[cap_index]) : 1.0f;
+        out.short_of[cap_index] = (cov < 1.0f);
         const float eff = std::max(cov, pause_below);
         if (eff < rate)
         {
@@ -394,16 +396,159 @@ void construction_end_grid()
 float construction_progress_fraction(const world& w, const recipe_registry& reg,
                                      const building_component& b)
 {
-    const float capex = construction_capex(w, reg, b.tile, b.type, b.target_resource, b.recipe);
-    if (capex > 0.0f)
-        return std::clamp(b.construction_paid / capex, 0.0f, 1.0f);
-    // No priceable capex (no market yet): fall back to the DAYS ratio (Ben,
-    // 2026-10-24), live denominator and all — an approximate bar beats no bar.
-    const int total = construction_build_days(w, reg, b.tile, b.type, b.target_resource);
+    // DAYS DONE OVER DAYS TOTAL (Ben, 2026-10-26: the progress circle shows "days
+    // done / total"). The bar used to be the CREDIT fraction, construction_paid over
+    // the capex, which opened at the flat cost's share the day a site was placed and
+    // wobbled with every price move; every progress reading - the queue's bar, the
+    // site card's, the map's circle - is now the one days ratio
+    // `read_construction_site` computes.
+    const int left  = construction_days_left(b);
+    const int total = std::max(left, construction_build_days(w, reg, b.tile, b.type, b.target_resource));
     if (total <= 0)
         return 0.0f;
-    const float done = static_cast<float>(total - construction_days_left(b));
-    return std::clamp(done / static_cast<float>(total), 0.0f, 1.0f);
+    return std::clamp(static_cast<float>(total - left) / static_cast<float>(total), 0.0f, 1.0f);
+}
+
+// --- THE SITE CARD (Ben, 2026-10-26) -----------------------------------------
+// "Over every building under construction's tile, draw a circle showing build
+// progress (days done / total). Hovering that circle, or the site's row in the
+// Construction queue, shows the materials needed to build: each material's amount
+// still to draw, and an exclamation mark beside any good the market is running
+// short of." The shortage test is the draw's own (`construction_read::short_of`);
+// the amounts are `run_construction`'s `row_for` (economy_system.cpp) for the days
+// left plus the days built and not yet drawn, each with the site market's posted
+// price now - what the draw pays for it, in arrears at the tick (Ben, 2026-10-26:
+// costs depend on market prices).
+construction_site_reading read_construction_site(const world& w, const recipe_registry& reg,
+                                                 const building_component& b)
+{
+    construction_site_reading out;
+    out.days_left  = construction_days_left(b);
+    out.days_total = std::max(out.days_left,
+                              construction_build_days(w, reg, b.tile, b.type, b.target_resource));
+    out.days_done  = std::max(0, out.days_total - out.days_left);
+    out.frac       = out.days_total > 0
+                         ? std::clamp(static_cast<float>(out.days_done) / static_cast<float>(out.days_total),
+                                      0.0f, 1.0f)
+                         : 0.0f;
+    out.rd = read_construction(w, reg, b.type, b.target_resource, b.recipe, b.tile, b.state_idle,
+                               out.days_left);
+
+    const float duration = reg.economics(b.type).build_duration_ticks;
+    if (duration <= 0.0f)
+        return out;
+    // The share of a quarter's row still to draw: the days of work left, and the
+    // milli-days already built whose materials the shelf has not yet given.
+    const float q     = static_cast<float>(k_construction_quarter_days);
+    const float share = (static_cast<float>(std::max(0, out.days_left))
+                         + static_cast<float>(std::max(0, b.build_arrears_milli)) / 1000.0f) / q;
+    const auto& cost_row   = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
+    const std::size_t cap  = static_cast<std::size_t>(resource_type::construction_capacity);
+    const float cap_rate   = reg.construction().capacity_per_build_tick;
+    const market_component* m = nullptr;
+    if (const entity_id mid = market_for_tile(w, b.tile); mid != null_entity)
+        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+            m = &mit->second;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        float left = cost_row[r] / duration * share;
+        if (r == cap && cap_rate > 0.0f)
+            left += cap_rate * share;
+        if (!(left > 0.0f))
+            continue;
+        construction_material cm{static_cast<resource_type>(r), left, out.rd.short_of[r]};
+        if (m != nullptr)
+        {
+            cm.price  = m->price[r] > 0.0f ? m->price[r] : m->base_price[r];
+            cm.priced = cm.price > 0.0f;
+        }
+        out.materials.push_back(cm);
+    }
+    return out;
+}
+
+std::string draw_construction_site_card_body(const construction_site_reading& rd)
+{
+    // The shared card is 200 px wide (hover_card.cpp), so every line that can run
+    // long WRAPS, and the "!" sits in a fixed slot at the START of a material's
+    // line - beside the good, never pushed past the card's edge by a long name.
+    std::string text;
+    char line[160];
+    ImGui::PushTextWrapPos(0.0f);
+    std::snprintf(line, sizeof line, "Day %d of %d built (%.0f%%)", rd.days_done, rd.days_total,
+                  static_cast<double>(rd.frac * 100.0f));
+    ImGui::TextUnformatted(line);
+    text += line;
+
+    const std::string status = construction_status(rd.rd, rd.days_left);
+    ImGui::PushStyleColor(ImGuiCol_Text, construction_status_colour(rd.rd));
+    ImGui::TextUnformatted(status.c_str());
+    ImGui::PopStyleColor();
+    text += "\n" + status;
+
+    if (rd.materials.empty())
+    {
+        ImGui::TextDisabled("Nothing left to draw.");
+        ImGui::PopTextWrapPos();
+        text += "\nNothing left to draw.";
+        return text;
+    }
+    ImGui::TextDisabled("Still to draw:");
+    text += "\nStill to draw:";
+    ImDrawList* dl      = ImGui::GetWindowDrawList();
+    const float  lh     = ImGui::GetTextLineHeight();
+    const ImU32  warn   = palette::site_no_logistics;
+    const float  bang_w = ImGui::CalcTextSize("!").x + 3.0f;
+    bool any_short      = false;
+    for (const construction_material& m : rd.materials)
+    {
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        if (m.short_now)
+        {
+            any_short = true;
+            dl->AddText(p, warn, "!");
+        }
+        icons::resource(dl, {p.x + bang_w + lh * 0.5f, p.y + lh * 0.5f}, lh * 0.38f, m.good);
+        ImGui::Dummy({bang_w + lh, lh});
+        ImGui::SameLine();
+        if (m.priced)
+            std::snprintf(line, sizeof line, "%s %s @ %s cr",
+                          fmt::abbreviate(static_cast<double>(m.left)).c_str(), resource_name(m.good),
+                          fmt::abbreviate(static_cast<double>(m.price)).c_str());
+        else
+            std::snprintf(line, sizeof line, "%s %s (unpriced)",
+                          fmt::abbreviate(static_cast<double>(m.left)).c_str(), resource_name(m.good));
+        ImGui::TextUnformatted(line);
+        text += "\n";
+        if (m.short_now)
+            text += "! ";
+        text += line;
+    }
+    if (any_short)
+    {
+        const char* foot = "! the market holds less than this quarter's draw needs.";
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(warn));
+        ImGui::TextUnformatted(foot);
+        ImGui::PopStyleColor();
+        text += "\n";
+        text += foot;
+    }
+    ImGui::PopTextWrapPos();
+    return text;
+}
+
+void construction_site_card(const world& w, const recipe_registry& reg, entity_id id, ui_state& ui)
+{
+    const auto bit = w.buildings.find(id);
+    if (bit == w.buildings.end())
+        return;
+    const construction_site_reading rd = read_construction_site(w, reg, bit->second);
+    const std::string title = building_group_name(w, reg, bit->second);
+    std::string text;
+    construction_row_card(title.c_str(), [&]() { text = draw_construction_site_card_body(rd); });
+    ui.construction_ui.site_card_for  = id;
+    ui.construction_ui.site_card_text = title + "\n" + text;
+    ui.construction_ui.site_card_frame = ImGui::GetFrameCount();
 }
 
 namespace {
@@ -569,7 +714,14 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
     // naming its column. The cell is now a BAR carrying its own percentage, the
     // authored 25/75 % colour bands moving from the cell background onto the fill.
     ImGui::TableSetupColumn("Done",  ImGuiTableColumnFlags_WidthFixed, construction_grid::bar);
-    ImGui::TableSetupColumn("Days",  ImGuiTableColumnFlags_WidthFixed, construction_grid::eta);
+    // Days is MEASURED (Ben, 2026-10-26: no header elides): a stalled build counts
+    // four-digit days, and at the grid's 32 px "1750" ran into the Cost column and
+    // the header read "Da...". The column is the wider of the grid's budget, its
+    // header and a four-digit count.
+    const float days_w = std::ceil(std::max({construction_grid::eta,
+                                             ImGui::CalcTextSize("Days").x,
+                                             ImGui::CalcTextSize("8888").x})) + 2.0f;
+    ImGui::TableSetupColumn("Days",  ImGuiTableColumnFlags_WidthFixed, days_w);
     ImGui::TableSetupColumn("Cost",  ImGuiTableColumnFlags_WidthFixed, construction_grid::cost);
     ImGui::TableSetupColumn("##state", ImGuiTableColumnFlags_WidthFixed, construction_grid::state);
     ImGui::TableHeadersRow();
@@ -619,7 +771,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
             (row.where.empty() ? std::string("Off the map") : "Stands at " + row.where) + ". "
                 + (row.makes ? std::string("Will make ") + resource_name(row.good) + ". "
                              : std::string())
-                + "Press the row to select it."));
+                + "Press the row to select it; point at it for what it still has to draw."));
 
         ImGui::TableSetColumnIndex(2);
         // The authored bands, now the bar's FILL colour: dim (<25 %) / mid
@@ -635,8 +787,8 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
             ImGui::Dummy({construction_grid::bar, line_h});
             char buf[200];
             std::snprintf(buf, sizeof buf,
-                          "%.0f%% built - the credits paid in against what the build will cost "
-                          "at today's prices.", static_cast<double>(row.progress * 100.0f));
+                          "%.0f%% built - the days of work done against the days the whole "
+                          "build takes.", static_cast<double>(row.progress * 100.0f));
             cells.push_back(construction_cell("bar", bp, construction_grid::bar, buf, band));
         }
 
@@ -662,7 +814,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
                 std::snprintf(buf, sizeof buf,
                               "About %s left at the rate it is building now.",
                               days_label(eta).c_str());
-            cells.push_back(construction_cell("eta", ep, construction_grid::eta, buf,
+            cells.push_back(construction_cell("eta", ep, days_w, buf,
                                               ImGui::ColorConvertFloat4ToU32(
                                                   construction_status_colour(row.rd))));
         }
@@ -673,8 +825,8 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         {
             char buf[200];
             std::snprintf(buf, sizeof buf,
-                          "%.0f cr still to pay: the materials it has left to buy, at today's "
-                          "prices. Its build cost was paid when it was placed.",
+                          "%.0f cr still to pay: the materials it has left to buy, at the "
+                          "market's posted prices. Its build cost was paid when it was placed.",
                           static_cast<double>(row.cost_left));
             cells.push_back(construction_cell("cost", cp, construction_grid::cost, buf));
         }
@@ -705,7 +857,15 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         // it makes, the figures the columns abbreviate, and the stall's named good
         // in the authored sentence — but one column at a time.
         (void)hovered; // the press is the Selectable's; the cards hit-test their cells
-        construction_column_card(row.name.c_str(), cells);
+        // THE SITE CARD (Ben, 2026-10-26): pointing at the row itself - its name or
+        // its progress bar - opens the same card the map's progress circle opens,
+        // the days built and every material still to draw, a short good marked "!".
+        // The figures to the right keep their own one-fact explainers.
+        if (construction_row_hovered(cells[0].mn, cells[0].mx)
+            || construction_row_hovered(cells[1].mn, cells[1].mx))
+            construction_site_card(w, reg, row.id, ui);
+        else
+            construction_column_card(row.name.c_str(), cells);
 
         // The surface reporting its own rows: a check hovers each CELL's centre and
         // asserts that column's own explainer, and `hover` stays the union of them.
@@ -822,26 +982,23 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
         return;
     }
 
-    // AT MOST ~9 rows visible, the rest reached by scrolling (Ben's "roughly 9
-    // buildings with a vertical scroll"), and no more than there is to show — a
-    // roster of four types should not reserve nine rows of empty column. Measured
-    // off the live frame height rather than a pixel constant, so the row count
-    // survives a font or display that is not the one this was written on.
+    // THE ROSTER TAKES THE WHOLE TAB (Ben, 2026-10-26: "the buildings list shows
+    // only about a third of the height, with a scroll bar. Let it take the full
+    // height of the tab"). It used to stop at ~nine rows or 60 % of the tab, so a
+    // tall column left two thirds of itself empty under a scrolling list.
     //
-    // The levers sit BELOW the scroller. The scroller's height therefore depends on
-    // the roster's row count, which changes when a group expands — but never on
-    // which building is SELECTED, so the press that selects one cannot move the
-    // thing the player was reaching for.
-    int rows_shown = static_cast<int>(groups.size());
-    for (const building_group& g : groups)
-        if (ui.construction.buildings_expanded == g.name)
-            rows_shown += static_cast<int>(g.members.size());
-
-    const float row_h  = ImGui::GetFrameHeightWithSpacing();
-    const float want_h = row_h * static_cast<float>(std::min(rows_shown, 9)) + 4.0f;
-    const float roster_h = std::min(want_h,
-                                    std::max(row_h * 3.0f,
-                                             ImGui::GetContentRegionAvail().y * 0.60f));
+    // The levers still sit BELOW it, and the press that selects a building must not
+    // move the thing the player was reaching for: so the roster gives up exactly the
+    // levers' height, measured last frame (one frame late on the first selection,
+    // which is the cost of an immediate-mode measurement), and nothing else.
+    const bool  levered  = w.buildings.count(ui.selected_entity) != 0
+                           && is_player_owned(w, ui.selected_entity);
+    const float avail_y  = ImGui::GetContentRegionAvail().y;
+    const float row_h    = ImGui::GetFrameHeightWithSpacing();
+    const float reserve  = levered ? ui.construction_ui.levers_h : 0.0f;
+    const float roster_h = std::max(row_h * 3.0f, avail_y - reserve);
+    ui.construction_ui.roster_h     = roster_h;
+    ui.construction_ui.roster_avail = avail_y;
 
     ImGui::BeginChild("##buildings_roster", {0.0f, roster_h}, false,
                       ImGuiWindowFlags_NoSavedSettings);
@@ -917,7 +1074,11 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
     }
     ImGui::EndChild();
 
+    const float levers_y0 = ImGui::GetCursorPosY();
     draw_building_levers(w, reg, ui);
+    ui.construction_ui.levers_h = (ui.construction_ui.levers_for != null_entity)
+                                      ? ImGui::GetCursorPosY() - levers_y0
+                                      : 0.0f;
 }
 
 } // namespace

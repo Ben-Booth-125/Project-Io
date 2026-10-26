@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*156 entries — 38 gameplay · 25 canvas · 16 lens · 44 ledger · 33 chrome.*
+*157 entries — 38 gameplay · 26 canvas · 16 lens · 44 ledger · 33 chrome.*
 
 ---
 
@@ -791,6 +791,22 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Read a thing before committing a click — check a tile's landform and movement cost, a deposit's richness, or a price signal, and learn the glyph vocabulary at the point of looking.
 
+### `canvas.construction_site_card` — Planetary canvas: the build-progress circle drawn over each of the player's sites under construction.
+
+**Press.** Point at the circle (no dwell, no click).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `site` | `entity` | The building under construction whose circle is under the pointer. |
+
+**Valid when:**
+- The app is in-game with the Planetary surface primary, zoomed in far enough that a tile is drawn at 5 px or more.
+- The player owns a building on the active body with ticks_remaining > 0.
+
+**Expected output.** Every one of the player's sites under construction carries a ring over its tile, filling clockwise from twelve o'clock with the DAYS of work built over the days the build takes, inked green on schedule, amber stretched, red paused - under any lens (Ben, 2026-10-26). Pointing at a ring opens the site card at once: the building's name, 'Day D of T built', the status line, and every material still to draw (the days left plus the days built and not yet drawn, run_construction's own row) each with the site market's current posted price (what the draw pays, in arrears at the tick), with '!' beside any good the market's shelf holds less of than this quarter's draw needs - the draw's own shortage test. The entity glance card does not open over the ring. Changes nothing.
+
+**Reason to select.** See what a build still needs, and which good is holding it, from the map - before the market runs dry rather than after the build stalls.
+
 ### `canvas.lens_clear` — Keyboard.
 
 **Press.** Press 0.
@@ -1386,22 +1402,22 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Answers 'where could this building go, and where would it earn most?' without sweeping the map tile by tile. The estimate is today's prices with the tile's Logistic Point cover applied, before the building sells into its own market - one input among several, not the move.
 
-### `ledger.construction_site_sort` — Construction ledger, Construction view, the site ledger's column headers (Tile, Net, Cost, Market, LP, Yield)
+### `ledger.construction_site_sort` — Construction ledger, Construction view, the site ledger's column headers (Place, Net, Cost, Market, LP, Yield)
 
 **Press.** Click a column header; click it again to reverse the direction
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `column` | `enum` | Tile (grid position), Net (est. net / qtr, with Logistic Point cover), Cost (credits plus materials at the local market), Market (the market the tile clears in), LP (Logistic Point cover 0-100%), Yield (units / qtr, extraction) |
+| `column` | `enum` | Place (the named population centre whose province holds the tile, or the nearest one: 'near X'), Net (est. net / qtr, with Logistic Point cover), Cost (credits plus materials at the local market), Market (the market the tile clears in), LP (Logistic Point cover 0-100%), Yield (units / qtr, extraction) |
 
 **Valid when:**
 - A building is chosen in the site finder and at least one site is listed
 
-**Expected output.** Re-orders the rows by that column. Net, LP and Yield open descending, the others ascending; every tie is broken by tile id ascending in either direction, and an unpriced row sorts last on Net. The default on choosing a building is Net, descending. Pure view state.
+**Expected output.** Re-orders the rows by that column. Net, LP and Yield open descending, the others ascending; every tie is broken by tile id ascending in either direction, and an unpriced row sorts last on Net. The default on choosing a building is Net, descending. Every header reads in full at every supported width - each column is sized to its header (the sort arrow reserved only on the sorted column, the one place it draws), and the table carries no grid-position column (Ben, 2026-10-26). Pure view state.
 
 **Reason to select.** Compare sites on the axis that matters to this decision - the cheapest, the best served, the richest deposit - rather than only the estimated net.
 
-### `ledger.construction_site_row` — Construction ledger, Construction view, a site ledger row (its Tile cell; the press spans the row)
+### `ledger.construction_site_row` — Construction ledger, Construction view, a site ledger row (its Place cell; the press spans the row)
 
 **Press.** Click a row
 
@@ -1412,7 +1428,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Valid when:**
 - A building is chosen in the site finder and the row is listed
 
-**Expected output.** Selects that tile (the tile Selection element and the province outline follow, exactly as a map click) and centres the Planetary canvas on it at the current zoom. The tile's Build door, below the site ledger, then lists the buildings for that tile - the chosen one among them - and its Build press places it. The row press builds nothing.
+**Expected output.** Selects that tile (the tile Selection element and the province outline follow, exactly as a map click) and centres the Planetary canvas on it at the current zoom. The selected site KEEPS its placement-lens wash - green, or amber where no Logistic Points operate - with the selection mark drawn over it (Ben, 2026-10-26). The tile's Build door, below the site ledger, then lists the buildings for that tile - the chosen one among them - and its Build press places it. The row press builds nothing.
 
 **Reason to select.** Takes a site from the comparison to the one place a building is placed, in one press.
 
@@ -1821,7 +1837,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - Construction ledger is open on the Construction view
 
-**Expected output.** Expands or collapses the build queue. Collapsed (the default) it is one line carrying the estimated per-quarter cost of everything in progress, and the tile build bar sits directly below it. Expanded it is a four-column table over every player building with ticks_remaining > 0, NEAREST DONE FIRST: Building (press to select it; its body, tile and full status on hover), Progress (the per-cent of its capex already paid, cell-coloured dim < 25 % / mid 25-75 % / high > 75 %), Days (the days left at its CURRENT rate, 'paused' when the rate is zero) and Cost left (the credits of its capex still to pay). Under the table, one line per build that is not running at full rate, naming the good holding it - short, or priced above the fair-price build ceiling. Before BL-1343 the table was dead behind a hard-coded empty flag and the header's own 'No active construction.' showed with several builds under way. A toggle by construction - the same press undoes it.
+**Expected output.** Expands or collapses the build queue. Collapsed (the default) it is one line carrying the estimated per-quarter cost of everything in progress, and the tile build bar sits directly below it. Expanded it is one two-line grid row per player building with ticks_remaining > 0, NEAREST DONE FIRST: the building glyph and name (press to select it), Done (a bar of the DAYS of work built over the days the whole build takes, coloured dim < 25 % / mid 25-75 % / high > 75 %), Days (the days left at its CURRENT rate, a dash while paused), Cost (the credits left) and a state mark naming the good holding it. Pointing at the row's name or its Done bar opens the SITE CARD (Ben, 2026-10-26): the days built, the status line, and every material still to draw with the site market's current posted price (what the draw pays, in arrears at the tick) - with '!' beside any good the market's shelf holds less of than this quarter's draw needs (the construction draw's own shortage test). The other columns explain themselves on their own hover. A toggle by construction - the same press undoes it.
 
 **Reason to select.** The queue is empty most of the time, so it stays out of the way; open it when something is actually building and the question is when it lands.
 

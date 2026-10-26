@@ -7,6 +7,7 @@
 
 #include <imgui.h> // ImVec4 — the status colour this header hands out
 
+#include <array>      // construction_read::short_of
 #include <functional> // the hover card's content closure (BL-1365)
 #include <string>
 #include <vector>
@@ -51,6 +52,11 @@ struct construction_read
     bool          binding_priced_out = false; ///< It is ON the shelf but over the fair-price ceiling
                                               ///< (`shelf_admits`), rather than simply short.
     bool          no_market = false;          ///< The tile routes to no market: nothing can be drawn.
+    /// Per good: the shelf holds less than this quarter's draw needs of it (its
+    /// coverage in `site_rate` is below 1) - THE shortage test the construction
+    /// draw itself makes, published per good so the site card can mark each short
+    /// good with "!" rather than naming only the binding one (Ben, 2026-10-26).
+    std::array<bool, resource_count> short_of{};
 };
 
 /// The mirror itself. @p state_idle is the building's own `state_idle` (false for
@@ -107,16 +113,62 @@ ImVec4 construction_status_colour(const construction_read& rd);
 /// candidate rather than a site).
 ImVec4 construction_rate_colour(float rate);
 
-/// How far through its build @p b is, in [0,1] — `construction_paid` over
-/// `construction_capex`, the CREDIT fraction. Preferred over the ticks ratio
-/// because `ticks_remaining` is measured against a total nothing stores: recomputing
-/// it calls `construction_site_multiplier`, which reads the live reach/stack field,
-/// so the denominator moves when a road or the stack does. Capex is re-priced live
-/// too, so the bar can wobble with local prices; the drift-free alternative is to
-/// store the original total on the building, which is a save-format change.
-/// Falls back to the ticks ratio where capex cannot be priced.
+/// How far through its build @p b is, in [0,1] — DAYS done over days total (Ben,
+/// 2026-10-26), the ratio the map's progress circle shows. The total is
+/// `construction_build_days` at the tile's live site multiplier (nothing stores the
+/// original), so it can move when a road or the stack does; it is never below the
+/// days left. Days, not credits, because the credit fraction re-priced with every
+/// price move and opened at the flat cost's share the day a site was placed.
 float construction_progress_fraction(const world& w, const recipe_registry& reg,
                                      const building_component& b);
+
+// --- THE SITE CARD (Ben, 2026-10-26; construction.md § The progress circle) ----
+//
+// What a site under construction still needs, read the way the sim reads it. One
+// reading and one card body, shared by the Planetary canvas's progress circle and
+// the queue row, so the map and the ledger cannot tell one site two stories.
+
+/// One good a site still has to draw off the shelf.
+struct construction_material
+{
+    resource_type good = resource_type::iron_ore;
+    float         left = 0.0f;  ///< Units still to draw: the days left plus the days owed.
+    bool          short_now = false; ///< `construction_read::short_of` - the draw's own test.
+    bool          priced = false; ///< A market prices it (the site's market has a price or base).
+    float         price  = 0.0f;  ///< The site market's posted price per unit now - what the
+                                  ///< draw pays, in arrears at each tick (MARKETS.md: a draw pays
+                                  ///< the posted price).
+};
+
+/// A site's progress in DAYS and its materials still to draw. `days_total` is
+/// `construction_build_days` at the tile's live site multiplier, `days_done` that
+/// less `construction_days_left`; the materials are `run_construction`'s own row
+/// (`resource_build_cost_for` over the duration in quarters, plus construction
+/// capacity per quarter of work) for the days left plus the milli-days built and
+/// not yet drawn (`build_arrears_milli`). Each carries the site market's posted
+/// price now, which is what the draw pays for it at the tick.
+struct construction_site_reading
+{
+    int   days_total = 0;
+    int   days_done  = 0;
+    int   days_left  = 0;
+    float frac       = 0.0f;     ///< days_done / days_total, in [0,1].
+    construction_read rd;        ///< The quarter's rate and the shortage test.
+    std::vector<construction_material> materials; ///< Resource order; only goods with something left.
+};
+
+construction_site_reading read_construction_site(const world& w, const recipe_registry& reg,
+                                                 const building_component& b);
+
+/// Draw the site card's BODY (inside a hover card the caller opened): days built,
+/// the status line, and every material still to draw with "!" on a short good.
+/// @return the same content as text, newline-joined, for the checks.
+std::string draw_construction_site_card_body(const construction_site_reading& rd);
+
+/// Open the shared hover card at the cursor for site @p id and draw its body;
+/// publishes the text into `ui.construction_ui.site_card_*`.
+void construction_site_card(const world& w, const recipe_registry& reg, entity_id id,
+                            ui_state& ui);
 
 /// The NAME the Buildings view files @p b under — the same words the Build door
 /// offers, so a player recognises the row as the thing they built:

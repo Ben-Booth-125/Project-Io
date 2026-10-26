@@ -4499,6 +4499,34 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["open_ledger_y"]  = c.open_ledger_y;
         out["levers_ok"]      = (c.levers_for != null_entity);
         out["levers_for"]     = static_cast<unsigned>(c.levers_for);
+        // The Buildings roster's drawn height against the tab it fills (Ben,
+        // 2026-10-26: it takes the whole tab, less the levers below it).
+        out["roster_h"]       = c.roster_h;
+        out["roster_avail"]   = c.roster_avail;
+        out["levers_h"]       = c.levers_h;
+        // THE BUILD-PROGRESS CIRCLES the canvas drew this frame (Ben, 2026-10-26),
+        // by screen position and the days they show - the surface reporting its
+        // own marks, so a check hovers the real circle. No tile is named.
+        sol::table marks = st.create_table();
+        int mn = 0;
+        for (const construction_controls::site_mark& m : c.site_marks)
+        {
+            sol::table e = st.create_table();
+            e["building"]   = static_cast<unsigned>(m.building);
+            e["days_done"]  = m.days_done;
+            e["days_total"] = m.days_total;
+            e["x"]          = m.x;
+            e["y"]          = m.y;
+            e["r"]          = m.r;
+            marks[++mn] = e;
+        }
+        out["site_marks"]     = marks;
+        out["n_site_marks"]   = mn;
+        // The site card drawn this frame (the circle's hover or the queue row's).
+        // Stale after a frame without one: the card is per frame, the field is not.
+        const bool card_now = c.site_card_frame >= 0 && ImGui::GetFrameCount() - c.site_card_frame <= 1;
+        out["site_card_for"]  = card_now ? static_cast<unsigned>(c.site_card_for) : 0u;
+        out["site_card_text"] = card_now ? c.site_card_text : std::string();
         return out;
     });
 
@@ -4582,6 +4610,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["cover"]   = r.cover;
             row["no_lp"]   = r.no_logistics;
             row["market"]  = r.market_name;
+            row["place"]   = r.place;
+            row["near"]    = r.place_near;
             rows[++rn] = row;
         }
         out["rows"]   = rows;
@@ -4598,6 +4628,21 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         out["drawn"]   = drawn;
         out["n_drawn"] = dn;
+        // The class the canvas washed the SELECTED tile with (-1: none), and each
+        // header's fit - what it needed unelided against what the column gave it.
+        out["selected_wash"] = sf.selected_wash;
+        sol::table hdr = st.create_table();
+        int hn = 0;
+        for (const site_finder_state::header_fit& h : sf.headers)
+        {
+            sol::table e = st.create_table();
+            e["label"] = h.label;
+            e["need"]  = h.need;
+            e["have"]  = h.have;
+            hdr[++hn] = e;
+        }
+        out["headers"]   = hdr;
+        out["n_headers"] = hn;
         return out;
     });
 
