@@ -75,7 +75,7 @@ building_profit estimate_building_reading(const world& w, const recipe_registry&
 ///
 /// Deposit sharing IS modelled (BL-346). Under BL-193's stack rule a candidate on a tile
 /// that already works this deposit joins that stack as its NEWEST member: its own yield
-/// carries `stack_output_scalar(rank)`, and the taper is sized against the stack's
+/// carries `stack_output_scalar(rank)` (1 at every rank since Ben, 2026-10-26), and the taper is sized against the stack's
 /// COMBINED draw rather than its own. This estimator once assumed every site drew the
 /// full richness off an untouched reserve — true before BL-193, and an over-statement of
 /// both revenue and remaining life for every rank above 1 after it.
