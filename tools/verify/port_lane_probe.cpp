@@ -4,7 +4,8 @@
 // Two readings per seed, the fold's lane writers between them:
 //   PRE  — after the landscape, with the state handover and the Logistic Point seeding
 //          held back: the lanes on the water are the colonial spans' (`stamp_sea_lanes`).
-//   POST — after finish_campaign_world's own order (state handover, rail handover, site
+//   POST — after finish_campaign_world's own order (state handover, rail handover, the
+//          ports in history (`place_colonial_ports`, Ben 2026-10-26), site
 //          roads, `seed_logistics_sources`, which opens with `lay_all_port_lanes` and lays
 //          a lane for each port it lands): the colonial lanes plus every port lane.
 //
@@ -181,6 +182,9 @@ int main(int argc, char** argv)
 
         hand_over_state_industry(w, start->reg);
         hand_over_rail(w);
+        const colonial_port_report cp = place_colonial_ports(w); // ports in history (fold order)
+        std::printf("CP seed=%u ends=%d placed=%d at_port=%d open=%d unheld=%d no_room=%d\n", seed,
+                    cp.ends, cp.placed, cp.at_port, cp.open, cp.unheld, cp.no_room);
         lay_site_roads_every_body(w);
         const lp_seed_report rep = seed_logistics_sources(w);
 

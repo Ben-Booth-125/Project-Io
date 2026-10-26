@@ -383,6 +383,12 @@ struct world
     /// the span closes). GENERATION-TRANSIENT: emptied by the fold, never
     /// serialised (a world is never saved between generation and the fold).
     std::vector<std::pair<entity_id, entity_id>>           gen_rail_links;
+    /// PORTS IN HISTORY (Ben, 2026-10-26; LOGISTICS.md § 4b): every colonial lane end
+    /// `stamp_sea_lanes` laid, as (the lane's end sea tile, the seat tile it was taken
+    /// from), in walk order, a pair per laid lane end. The fold's `place_colonial_ports`
+    /// stands the port history built there. GENERATION-TRANSIENT, as `gen_rail_links`:
+    /// emptied by the fold, never serialised.
+    std::vector<std::pair<entity_id, entity_id>>           gen_sea_lane_landings;
     faithful_unordered_map<entity_id, unit_component>             units;
 
     /// Population centre entities keyed by their entity ID. Populated by

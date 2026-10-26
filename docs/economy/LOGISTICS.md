@@ -571,6 +571,24 @@ ground on the other.
 That second effect is wider than a market preference and it is intended: a tie only prices could
 see would be invisible to the landscape search, which reads reach cost (BL-812, phase 6 sees roads).
 
+**Ports in history (Ben, 2026-10-26: "Place ports in history").** Where a colonial lane lands, the
+history built a harbour, so the campaign world opens with a **port** there. Each lane end is the sea
+tile beside a seat (the seat's own, or its realm's nearest coastal seat, above), and the port stands
+on the **land tile beside that end nearest the seat** — Chebyshev, columns wrapping, ties to the lower
+tile; the seat's harbour. Where several seats land at one end, the lower seat tile names the harbour.
+- **One port per harbour.** An end that is already the mouth of a standing port (any of its six hex
+  sides) gets none, so lane ends sharing a harbour share one port. A land tile that already holds a
+  network source, or whose stack is full, is passed over for the next nearest.
+- **Whose.** The nation holding that ground in the finished world, as a building of that nation on
+  its own ground. Ground no nation holds gets none and is counted; an end with no land on its six hex
+  sides is open sea, gets none, and is counted.
+- **Free.** The port is history's infrastructure, as the old roads (§ 4a) and the stations the rail
+  handover stands (§ 4c): it stands complete, staffed full, and no treasury pays to found it. Its
+  upkeep is the nation's from the opening, as every state building's is.
+- **When.** At the fold, after the rail handover and before the site roads and the Logistic Point
+  seeding, so the site pass roads the port, the seeding's opening pass lays its lanes (below) and the
+  chain may carry it. Ends in ascending tile id: a pure function of the world.
+
 **Every port lays lanes (Ben, 2026-10-25: "when a new port is built, it should be able to spawn
 new sea lanes … new ports form connections as sea lanes to each other port within 50 tiles").** The
 colonial record is not the only writer of a lane. A standing port is joined by a lane to **every other

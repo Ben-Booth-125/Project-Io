@@ -465,7 +465,11 @@ freeing or the overlord's end. The record crosses a span's close **whole**: no d
 it as one thins the road record, because a lane outlives its maker. A pass immediately after the span stamps every
 earned leg onto the water as a **sea lane**: a lane level on each water tile the leg crosses,
 which traversal cost reads as one more multiplier, the water analogue of the ancient road. Purely
-additive; land tiles are untouched.
+additive; land tiles are untouched. **Where a lane lands, the history placed a port (Ben,
+2026-10-26: "Place ports in history"):** the campaign world opens with a port on the seat's
+harbour at each lane end that stands on a coast — the holding nation's, free, one per harbour —
+so a colonial lane never ends on a portless shore that someone holds. The rule and its order at
+the fold are `../economy/LOGISTICS.md` § 4b's.
 
 **A lane is a route of the ocean's currents and of trade between continents, not only a coastal
 hop (Ben, 2026-09-25; BL-1140, sea lanes from trade).** A **fourth writer** of a sea-leg use:

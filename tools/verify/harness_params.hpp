@@ -358,6 +358,8 @@ inline shipped_landscape apply_shipped_landscape(
         // finish_campaign_world's site roads, verbatim, BEFORE the seeding (Ben,
         // 2026-10-24: the network is the roads and the rail, so the seeding covers only
         // what a road reaches) -- every site joined to its nation's capital network.
+        // finish_campaign_world's ports in history, verbatim, before the site roads.
+        print_colonial_ports(place_colonial_ports(w));
         lay_site_roads_every_body(w);
         out.lp = seed_logistics_sources(w);
         // BL-1402: finish_campaign_world's fold to ground, verbatim, right after it.

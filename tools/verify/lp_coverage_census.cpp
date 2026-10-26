@@ -216,6 +216,7 @@ int main(int argc, char** argv)
     bool per_nation = true;
     bool stack_hubs = true;
     (void)stack_hubs;
+    bool colonial_ports = true; // ports in history (Ben, 2026-10-26)
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc)
@@ -235,9 +236,14 @@ int main(int argc, char** argv)
         {
             stack_hubs = false; // the stacked-hub pass held back: the before reading
         }
+        else if (!std::strcmp(argv[i], "--no-colonial-ports"))
+        {
+            colonial_ports = false; // the ports in history held back: the before reading
+        }
         else
         {
-            std::fprintf(stderr, "usage: lp_coverage_census [--seeds a,b,c] [--no-nations] [--no-stack]\n");
+            std::fprintf(stderr, "usage: lp_coverage_census [--seeds a,b,c] [--no-nations] [--no-stack] "
+                                 "[--no-colonial-ports]\n");
             return 2;
         }
     }
@@ -268,6 +274,11 @@ int main(int argc, char** argv)
         world& w = start->w;
         state_handover_report handover = hand_over_state_industry(w, start->reg);
         hand_over_rail(w);
+        colonial_port_report cp;
+        if (colonial_ports)
+            cp = place_colonial_ports(w); // ports in history, finish_campaign_world's order
+        std::printf("CP seed=%u ends=%d placed=%d at_port=%d open=%d unheld=%d no_room=%d\n", seed,
+                    cp.ends, cp.placed, cp.at_port, cp.open, cp.unheld, cp.no_room);
         // finish_campaign_world's site roads, before the seeding (Ben, 2026-10-24: the
         // network is the roads and the rail; every site joined to its capital's network).
         const site_road_stats sr = lay_site_roads_every_body(w);

@@ -114,6 +114,7 @@ struct finish_campaign_result
     /// (`reserve_state_first_tick`).
     state_reserve_report    reserve;
     rail_handover_report    rail;  ///< BL-1255: the rail handover at the fold
+    colonial_port_report    colonial_ports; ///< ports in history (Ben, 2026-10-26)
     lp_seed_report          lp;    ///< BL-1309: the Logistic Point sources seeded at the fold
     /// BL-1347: the crossings laid to the sites the WINNER's charters, the state handover
     /// and the hub/station seeding stamped -- summed over every body that holds a

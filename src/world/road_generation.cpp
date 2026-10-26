@@ -6,6 +6,7 @@
 #include "market_clearing.hpp" // BL-1138: market_for_tile, a town's market
 #include "hex_neighbors.hpp"   // port lanes: a port's mouths on its six hex sides
 #include "logistic_points.hpp" // port lanes: lp_sea_walk measures the 50 (Ben, 2026-10-25)
+#include "placement_rules.hpp" // ports in history: the stack cap
 #include "ocean_currents.hpp" // BL-1098: the current field a lane's walk is priced with
 #include "river_generation.hpp" // BL-1252: the snap prices its re-walk as the flood does
 
@@ -13,6 +14,7 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <functional>
 #include <limits>
@@ -2800,6 +2802,20 @@ void stamp_sea_lanes(world& w, entity_id body,
         }
         ++st.laid;
         st.path_tiles += static_cast<long long>(path.size());
+        // PORTS IN HISTORY (Ben, 2026-10-26): where the lane lands, and the seat it was
+        // taken from - the fold stands the port there (`place_colonial_ports`).
+        {
+            const auto seat_tile = [&](int seat) -> entity_id {
+                if (seat < 0 || static_cast<std::size_t>(seat) >= nodes.size())
+                    return null_entity;
+                const history_road_node& n = nodes[static_cast<std::size_t>(seat)];
+                if (n.col < 0 || n.row < 0 || n.col >= gw || n.row >= gh)
+                    return null_entity;
+                return grid[static_cast<std::size_t>(n.row * gw + n.col)];
+            };
+            w.gen_sea_lane_landings.emplace_back(grid[static_cast<std::size_t>(path.front())], seat_tile(ef.seat));
+            w.gen_sea_lane_landings.emplace_back(grid[static_cast<std::size_t>(path.back())], seat_tile(et.seat));
+        }
         if (trace != nullptr)
         {
             sea_lane_trace::lane tl;
@@ -3070,6 +3086,163 @@ port_lane_stats lay_all_port_lanes(world& w, port_lane_trace* trace)
     if (st.tiles_added > 0)
         invalidate_logistics_caches(w);
     return st;
+}
+
+// ---------------------------------------------------------------------------
+// Ports in history (Ben, 2026-10-26; LOGISTICS.md § 4b) -- see the header
+// ---------------------------------------------------------------------------
+colonial_port_report place_colonial_ports(world& w)
+{
+    colonial_port_report rep;
+    if (w.gen_sea_lane_landings.empty())
+        return rep;
+    // One seat per end: the record sorted (end, seat), the first seat kept - the lower
+    // tile id where several seats land at one end. A null seat sorts first and is
+    // passed over when a real one exists.
+    std::vector<std::pair<entity_id, entity_id>> rec = w.gen_sea_lane_landings;
+    w.gen_sea_lane_landings.clear(); // generation-transient: the fold consumes it
+    std::sort(rec.begin(), rec.end());
+    std::map<entity_id, entity_id> seat_of; // end sea tile -> seat tile, ascending
+    for (const auto& [end, seat] : rec)
+    {
+        auto it = seat_of.find(end);
+        if (it == seat_of.end())
+            seat_of.emplace(end, seat);
+        else if (it->second == null_entity)
+            it->second = seat;
+    }
+
+    // The six hex sides of a tile, as tile ids (null off the grid's rows; columns wrap).
+    const auto sides = [&](entity_id t, std::array<entity_id, 6>& out) {
+        out.fill(null_entity);
+        const tile_component& tc = w.tiles.at(t);
+        const auto bit = w.bodies.find(tc.body);
+        if (bit == w.bodies.end())
+            return;
+        const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+        const std::vector<entity_id>& grid = body_tile_grid(w, tc.body);
+        for (int side = 0; side < 6; ++side)
+        {
+            const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+            if (nb.gy < 0 || nb.gy >= gh)
+                continue;
+            const std::size_t ci = static_cast<std::size_t>(nb.gy) * static_cast<std::size_t>(gw)
+                                 + static_cast<std::size_t>(((nb.gx % gw) + gw) % gw);
+            if (ci < grid.size())
+                out[static_cast<std::size_t>(side)] = grid[ci];
+        }
+    };
+
+    // Every standing port's mouths, and the tiles holding a network source: read once,
+    // then kept current as ports stand.
+    std::set<entity_id> mouths, source_tiles;
+    std::array<entity_id, 6> nb{};
+    const auto add_mouths = [&](entity_id port_tile) {
+        sides(port_tile, nb);
+        for (const entity_id m : nb)
+            if (m != null_entity && is_water(w.tiles.at(m).substrate))
+                mouths.insert(m);
+    };
+    for (const auto& [bid, b] : w.buildings)
+    {
+        (void)bid;
+        if (w.tiles.count(b.tile) == 0)
+            continue;
+        lp_network net;
+        if (lp_source_network(b.type, net))
+            source_tiles.insert(b.tile);
+        if (port_lane_standing(b))
+            add_mouths(b.tile);
+    }
+
+    bool placed_any = false;
+    for (const auto& [end, seat] : seat_of)
+    {
+        const auto eit = w.tiles.find(end);
+        if (eit == w.tiles.end())
+            continue;
+        ++rep.ends;
+        if (mouths.count(end) != 0)
+        {
+            ++rep.at_port;
+            continue;
+        }
+        const tile_component& ec = eit->second;
+        const int gw = w.bodies.at(ec.body).grid_width;
+        // The land beside the end, nearest the seat first (ties to the lower tile id).
+        std::vector<std::pair<int, entity_id>> land;
+        sides(end, nb);
+        for (const entity_id t : nb)
+        {
+            if (t == null_entity || is_water(w.tiles.at(t).substrate))
+                continue;
+            int d = 0;
+            if (const auto sit = w.tiles.find(seat); sit != w.tiles.end())
+            {
+                const tile_component& tc = w.tiles.at(t);
+                int dc = std::abs(tc.grid_x - sit->second.grid_x);
+                if (gw > 0 && dc > gw / 2) dc = gw - dc;
+                const int dr = std::abs(tc.grid_y - sit->second.grid_y);
+                d = std::max(dc, dr);
+            }
+            land.push_back({d, t});
+        }
+        if (land.empty())
+        {
+            ++rep.open;
+            continue;
+        }
+        std::sort(land.begin(), land.end());
+        land.erase(std::unique(land.begin(), land.end()), land.end());
+        entity_id harbour = null_entity;
+        for (const auto& [d, t] : land)
+        {
+            (void)d;
+            const tile_component& tc = w.tiles.at(t);
+            if (source_tiles.count(t) != 0
+                || placement_rules::non_extraction_buildings_on_tile(w, t)
+                       >= placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover))
+                continue;
+            harbour = t;
+            break;
+        }
+        if (harbour == null_entity)
+        {
+            ++rep.no_room;
+            continue;
+        }
+        const auto tn = w.tile_to_nation.find(harbour);
+        if (tn == w.tile_to_nation.end() || w.nations.count(tn->second) == 0)
+        {
+            ++rep.unheld;
+            continue;
+        }
+        const entity_id bid = w.create_entity();
+        building_component bc;
+        bc.tile               = harbour;
+        bc.type               = building_type::port;
+        bc.workforce_assigned = 0.0f; // zero staff, as every network node
+        bc.workforce_target   = default_workforce_target(bc.type); // full (Ben, 2026-10-26)
+        bc.ticks_remaining    = 0;    // stands complete: the past built it
+        w.buildings[bid]  = bc;
+        w.stockpiles[bid] = stockpile_component{};
+        w.nations.at(tn->second).state_assets.push_back(bid);
+        source_tiles.insert(harbour);
+        add_mouths(harbour);
+        ++rep.placed;
+        placed_any = true;
+    }
+    if (placed_any)
+        invalidate_logistics_caches(w);
+    return rep;
+}
+
+void print_colonial_ports(const colonial_port_report& r)
+{
+    std::printf("[colonial ports] %d lane end(s): %d ports stood in history, %d already at a "
+                "port, %d open sea, %d on unheld ground, %d with no room\n",
+                r.ends, r.placed, r.at_port, r.open, r.unheld, r.no_room);
+    std::fflush(stdout);
 }
 
 // ---------------------------------------------------------------------------
