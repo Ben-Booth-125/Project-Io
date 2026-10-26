@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*1 entries — 1 open, 0 resolved.*
+*3 entries — 3 open, 0 resolved.*
 
 ---
 
@@ -42,6 +42,30 @@ the work happens, and that is the durable record. What stays here is what is sti
 > **Recommendation:** (1) B; (2) A. The seat screen is a pre-play pick, so it may show treasuries.
 
 *Files: `docs/ui/DISCOVERY.md`, `docs/economy/FINANCE.md`, `docs/ui/LENSES.md`*
+
+### NR-1083 — May rival nations use fronts?
+*question · raised 2026-10-26 · from sprint 58 military design*
+
+Ben granted fronts for the player's assigned units (AI_OPPONENT.md § 11). Whether a rival nation may assign its own units to fronts and score hold or push is a separate subject, so it was not written into the grant.
+
+**Why it matters.** Fronts are the cheapest way for a scorer to use an army without a planner. Without this grant, rivals have no way to fight a war beyond march_unit.
+
+- A: grant rivals fronts, hold and push scored by the nation layer; B: rivals hold only; C: no rival fronts yet
+
+> **Recommendation:** A, on the standing terms. It is what makes BL-1427 (fronts) worth building for v0.3.0's AI half.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `docs/military/MILITARY.md`*
+
+### NR-1084 — Four combat calls taken in writing the land model
+*decision taken on your behalf · raised 2026-10-26 · from sprint 58 military design*
+
+Writing Ben's land rulings into MILITARY.md § The campaign force model took four calls he did not make: (1) defence and breakthrough are separate stats (defending vs attacking); (2) no piercing-versus-armour check, hardness alone; (3) readiness takes the larger share of landed damage, so most fights end in retreat; (4) the seven classes - motorised infantry replaces trucks, one main battle tank line replaces light/medium/heavy, light armour is low-hardness reconnaissance, and air defence is added.
+
+**Why it matters.** Each shapes BL-1421 (soft hard resolver) and BL-1422 (land classes and kit) before they are built.
+
+> **Recommendation:** Keep all four; the realism case is in research/MILITARY_1960_PRESENT.md § 4 and § 10.
+
+*Files: `docs/military/MILITARY.md`, `docs/research/MILITARY_1960_PRESENT.md`*
 
 ---
 

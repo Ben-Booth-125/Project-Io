@@ -41,11 +41,11 @@ about force, not a military doc that happens to be about the past. Its neighbour
 |---|---|---|
 | Which resolver | `resolve_battle` — region beats region, this year, in one evaluation | `resolve_campaign_battle` — two forces in a province, over rounds, with withdrawal |
 | Which roster gate | `available_rows(const region&, band)` — authored region endowment | `available_rows(const world&, actor, band)` — the raising nation's stockpile and market access |
-| Naval | **Scores, and is exercised here** | **Unmodelled** (§ Naval) |
+| Naval | **Scores, and is exercised here** | Sea units with detection and a target mask (`MILITARY.md` § The campaign force model) |
 | Supply over water | A simplification, applied by this caller (§ Forage) | Overseas supply works; there is no starvation model |
 | Sea legs, colonisation | Owned here | — |
 
-**What is shared, and must stay single-sourced: the roster TABLE and the calibration.** The
+**What is shared, and must stay single-sourced: the roster TABLE.** The calibration is no longer shared: the campaign scores its own rounds by soft and hard attack and never calls `resolve_battle` (Ben, 2026-10-26). The
 nineteen rows — their bands, classes, gates and weights — live in `src/world/unit_roster.{hpp,cpp}`
 and are described by `MILITARY.md` § The roster. **Two gate paths read one table.** This document
 owns one of those paths and never a second copy of the table.
@@ -60,9 +60,8 @@ that applies to only one of them belongs in a **caller** and never in the table 
 `src/world/combat.{hpp,cpp}` (BL-272, unit/doctrine combat model). A pure function of its inputs:
 matchup × doctrine × terrain × supply × season. No RNG, no world reads, no hidden state.
 
-Its callers are `src/world/history_sim.cpp` — the Era −1 history sim (BL-271, Era −1 sandbox) —
-and, per round, `campaign_battle.cpp`. The campaign layer never calls it directly;
-`tools/verify/combat_harness.cpp` calls it to assert.
+Its caller is `src/world/history_sim.cpp` — the Era −1 history sim (BL-271, Era −1 sandbox); the
+campaign does not call it (Ben, 2026-10-26). `tools/verify/combat_harness.cpp` calls it to assert.
 
 Arithmetic is **integers in per-mille throughout** (1000 = neutral). Battle outcomes move borders
 in the sandbox, so no float decides who wins.
@@ -291,9 +290,9 @@ and its five scored verbs; this document owns what the domain gates.
 ancient sim alongside other unit types. This allows the rare case of naval warfare and trading
 provinces."*
 
-So the naval class scores real power **in this sim**, and campaign-era naval stays **unmodelled** —
-not as an oversight, but because nothing in the campaign has asked for it and a model with no
-consumer is a model nobody has tested.
+So the naval class scores real power **in this sim**. Campaign-era naval is a different model —
+sea units with detection and a target mask (`../military/MILITARY.md` § The campaign force model;
+Ben, 2026-10-26).
 
 **They are not a separate system.** Coastal Galley, Broadside Ship and Ironclad are rows in the
 same roster, raisable on the same `port_q` endowment axis as every other row, scored in the same

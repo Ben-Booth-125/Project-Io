@@ -625,6 +625,282 @@
    ],
    "title": "Five lane and port defects on library seeds, and two claims with no check",
    "design": "Found by the sprint 57 re-bless across all 16 library seeds (Ben carried them to sprint 58, 2026-10-26). DEFECTS: (1) seeds 40 and 12 each have a port with a partner within 50 and no laned water beside it; (2) seeds 13 and 10 have 3 colonial lane ends on a coast with no port. MISSING CHECKS: (a) nothing asserts zero unconnectable consumers - lp_coverage_census rule 3 excuses them; (b) port_lane_probe lists colonial portless coast ends but does not count them as defects. THE WORK: make both claims committed checks first, then fix the defects so they pass on all 16 seeds."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [],
+   "id": "BL-1421",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "SOFT_HARD_RESOLVER",
+   "priority": "A",
+   "difficulty": 4,
+   "files": [
+    "src/world/campaign_battle.cpp",
+    "src/world/campaign_battle.hpp",
+    "src/world/components.hpp",
+    "src/world/battle_system.cpp",
+    "tools/verify/campaign_battle_harness.cpp"
+   ],
+   "title": "Land units carry HP, readiness and morale; the campaign round scores soft and hard attack against hardness",
+   "design": "MILITARY.md § The campaign force model (Ben, 2026-10-26). unit_component gains HP, readiness and morale (save-format change). Each round every unit deals soft_attack*(1-hardness)+hard_attack*hardness, scaled by morale and supply; the target absorbs up to defence or breakthrough plus terrain; landed damage splits HP/readiness with readiness taking the larger share. HP 0 = the unit dies; readiness 0 = it retreats one tile from the enemy. resolve_campaign_battle stops calling resolve_battle (Era -1 keeps it). Withdrawal stays priced. Deterministic: integer arithmetic, ascending unit ids, draws only in step_campaign_battle. Harness: campaign_battle_harness rewritten against the new arithmetic, C4's monotone sweep kept as a prediction."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [
+    "BL-1421"
+   ],
+   "id": "BL-1422",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "LAND_CLASSES_AND_KIT",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "src/world/unit_roster.cpp",
+    "src/world/unit_roster.hpp",
+    "scripts/economy.lua",
+    "scripts/recipes.lua",
+    "src/world/corp_command.cpp"
+   ],
+   "title": "Seven land classes by equipment generation, and their equipment as goods",
+   "design": "MILITARY.md § Land — the classes. Infantry, motorised, mechanised, armour, light armour, artillery, air defence; each a class x equipment generation with soft, hard, hardness, defence, breakthrough. Equipment goods (small arms, armoured vehicles and artillery pieces by generation, air defence systems, drones) with recipes; hire buys the class's kit off the shelf. FPV drones are equipment raising soft/hard attack. Tech gates generations (DIGITISATION_TREE ST-FO). The campaign roster table is the class table; the Era -1 nineteen rows are untouched."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [
+    "BL-1421",
+    "BL-1422"
+   ],
+   "id": "BL-1423",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "REFIT_AND_RETREAT",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/battle_system.cpp",
+    "tools/verify/unit_upkeep.cpp"
+   ],
+   "title": "Wounded units refit from the shelf; spent units retreat; readiness recovers out of contact",
+   "design": "MILITARY.md § Land — equipment, refit and manpower. Each tick a unit below full HP draws equipment and manpower to regain HP; unmet draws leave it wounded. A unit at readiness 0 moves one tile away from the enemy (a legal march, deterministic tile pick). Readiness recovers out of contact, capped by morale. Morale is per unit, moved by supply, victories, losses and war exhaustion. Conservation: men and goods drawn equal HP regained."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [
+    "BL-1421"
+   ],
+   "id": "BL-1424",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "SOLDIERS_FROM_LABOUR",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "src/world/workforce.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_command.cpp",
+    "docs/economy/POPULATION.md"
+   ],
+   "title": "Soldiers are drawn from the nation's labour pool, conscript or professional",
+   "design": "MILITARY.md § Land — equipment, refit and manpower; POPULATION.md § The labour pool. A unit's men are labour taken from the (nation, body) pool before buildings staff, so mobilisation empties factories. A national choice between conscript (cheap per head, wide labour drain, lower quality) and professional (wages, fewer, better). Measure the labour effect on market_viability before tuning."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [
+    "BL-1421"
+   ],
+   "id": "BL-1425",
+   "category": "UI",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "UNIT_COUNTER_RENDER",
+   "priority": "A",
+   "difficulty": 2,
+   "files": [
+    "src/ui/planetary_canvas.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "title": "A land unit is a rectangle in its tile: unit count, HP bar, readiness bar, class glyph",
+   "design": "MILITARY.md § Land — on the canvas. Replaces the current unit marker on the Planetary canvas. Needs a question_log entry and a live click before complete."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [
+    "BL-1421"
+   ],
+   "id": "BL-1426",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "BUNKERS",
+   "priority": "B",
+   "difficulty": 2,
+   "files": [
+    "scripts/economy.lua",
+    "src/world/battle_system.cpp",
+    "src/world/campaign_battle.cpp"
+   ],
+   "title": "A bunker building adds defence and hardness to the units on its tile",
+   "design": "MILITARY.md § Fortifications. A building type; units on its tile gain defence, defenders gain hardness. Degraded by artillery and strikes, repaired over time."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [
+    "BL-1421",
+    "BL-1423"
+   ],
+   "id": "BL-1427",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "FRONTS",
+   "priority": "A",
+   "difficulty": 4,
+   "files": [
+    "src/world/battle_system.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_command.cpp"
+   ],
+   "title": "Fronts: assigned units hold a border line, refill gaps, fall back, and push on order",
+   "design": "MILITARY.md § Fronts; the grant is AI_OPPONENT.md § 11 (Ben, 2026-10-26: player-assigned units only). Whether rival nations use fronts is an open grant question (NEEDS_REVIEW)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [],
+   "id": "BL-1428",
+   "category": "Military",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "short_name": "WAR_GOALS_AND_PEACE",
+   "priority": "A",
+   "difficulty": 4,
+   "files": [
+    "src/world/stance.cpp",
+    "src/world/battle_system.cpp"
+   ],
+   "title": "A war has a declared cost, goals, a score and a peace that cedes ground",
+   "design": "Proposed in research/MILITARY_1960_PRESENT.md § 8, not yet ruled: declaration cost with a justification discount, war goals as provinces, war score and exhaustion, white peace or cession so tile_to_nation follows province_holder. Design first; Ben's rulings go into RELATIONS.md / MILITARY.md."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [],
+   "id": "BL-1429",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "AIR_THEATRE",
+   "priority": "A",
+   "difficulty": 4,
+   "files": [
+    "src/world/components.hpp"
+   ],
+   "title": "Air wings at airbases fly superiority, strategic and tactical missions over provinces",
+   "design": "MILITARY.md § Air. Planes and strike drones; HP, morale, air attack, ground soft/hard attack, no hardness; air superiority share per province; ground air defence engages every mission."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [],
+   "id": "BL-1430",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "SEA_THEATRE",
+   "priority": "A",
+   "difficulty": 4,
+   "files": [
+    "src/world/components.hpp",
+    "src/world/supply_system.cpp"
+   ],
+   "title": "Submarines, destroyers and capital ships patrol, escort and raid convoys",
+   "design": "MILITARY.md § Sea. One attack to HP plus detection and a target mask; engaged only once detected. Raiding acts on SUPPLY's convoys. Amphibious transport is an open design question."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 58 military design, 2026-10-26)",
+   "requires": [],
+   "id": "BL-1431",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "MISSILES_AND_SATELLITES",
+   "priority": "B",
+   "difficulty": 4,
+   "files": [
+    "src/world/components.hpp"
+   ],
+   "title": "Missiles as munitions, interceptor defence, tactical nuclear use, and military satellites",
+   "design": "MILITARY.md § Missiles and § Space. Missiles are goods fired by launchers and consumed; interceptors thin short-range attacks; tactical nuclear use permitted with a severe Alarm cost, strategic never fired. Recon satellites lift fog (SPACE_ASSETS, BL-1329 satellites and rovers). The nuclear cost reading depends on Ben's call on the era catastrophe (2026-10-26)."
   }
  ]
 }

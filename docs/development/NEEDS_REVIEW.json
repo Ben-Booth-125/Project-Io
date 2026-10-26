@@ -70,6 +70,41 @@
     "docs/ui/LENSES.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1083",
+   "title": "May rival nations use fronts?",
+   "raised": "2026-10-26",
+   "kind": "question",
+   "status": "open",
+   "source": "sprint 58 military design",
+   "what": "Ben granted fronts for the player's assigned units (AI_OPPONENT.md § 11). Whether a rival nation may assign its own units to fronts and score hold or push is a separate subject, so it was not written into the grant.",
+   "why_it_matters": "Fronts are the cheapest way for a scorer to use an army without a planner. Without this grant, rivals have no way to fight a war beyond march_unit.",
+   "options": [
+    "A: grant rivals fronts, hold and push scored by the nation layer; B: rivals hold only; C: no rival fronts yet"
+   ],
+   "recommendation": "A, on the standing terms. It is what makes BL-1427 (fronts) worth building for v0.3.0's AI half.",
+   "files": [
+    "docs/ai/AI_OPPONENT.md",
+    "docs/military/MILITARY.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1084",
+   "title": "Four combat calls taken in writing the land model",
+   "raised": "2026-10-26",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "sprint 58 military design",
+   "what": "Writing Ben's land rulings into MILITARY.md § The campaign force model took four calls he did not make: (1) defence and breakthrough are separate stats (defending vs attacking); (2) no piercing-versus-armour check, hardness alone; (3) readiness takes the larger share of landed damage, so most fights end in retreat; (4) the seven classes - motorised infantry replaces trucks, one main battle tank line replaces light/medium/heavy, light armour is low-hardness reconnaissance, and air defence is added.",
+   "why_it_matters": "Each shapes BL-1421 (soft hard resolver) and BL-1422 (land classes and kit) before they are built.",
+   "recommendation": "Keep all four; the realism case is in research/MILITARY_1960_PRESENT.md § 4 and § 10.",
+   "files": [
+    "docs/military/MILITARY.md",
+    "docs/research/MILITARY_1960_PRESENT.md"
+   ],
+   "resolution": null
   }
  ]
 }

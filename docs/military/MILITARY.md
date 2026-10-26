@@ -3,7 +3,8 @@
 > **Settles:** how force works in the campaign — what resolves a campaign battle · how terrain
 > defends and attrits · what a unit is and which domains it may traverse · where units are raised
 > and on what roster · how a march is queued and what turns stance plus position into a fight ·
-> what standing force costs each tick · why economic reach is military reach.
+> what standing force costs each tick · why economic reach is military reach · the four theatres
+> and their units' stats · soft and hard attack · fronts · missiles and nuclear use.
 > **Not here:** how force works inside the Era −1 sim — its own resolver, band ladder, naval and
 > forage rules (MILITARY_HISTORY, a generation doc) · how a rival *decides* to use force
 > (AI_OPPONENT) · what hostility and friendship *are* as quantities (RELATIONS) · what a nation
@@ -43,10 +44,11 @@ filing. The sim's rules *"apply specifically to generation, and more specificall
 history"* — they are the cheapest things that produce a believable past, and stating them here
 made them read as claims about the game. One of them was actively false as a general claim.
 
-**What is shared is the calibration, not the resolver.** The roster is single-sourced — two gate
-paths, one table (§ The roster) — and every campaign round scores its powers by calling
-`resolve_battle` and reading the two power numbers out. The campaign path adds round structure, a
-seeded swing and withdrawal on top.
+**Nothing is shared but the terrain table (Ben, 2026-10-26).** The campaign resolver scores its
+own rounds from soft and hard attack against hardness (§ The campaign force model), and no
+longer calls `resolve_battle`. `resolve_battle` stays the Era −1 sim's alone. This overturns the
+2026-08-13 reading that the calibration was shared: the two resolvers now answer their questions
+with two different models, and only `terrain_combat`'s table is read by both.
 
 ### `resolve_battle` — nation scale — MOVED
 
@@ -56,10 +58,8 @@ That document is a **generation** doc: the sim is a pass that builds a world, an
 the simplifications that make two thousand years of history cheap enough to generate — not claims
 about how war works in Io.
 
-**What still matters here**, because the campaign path depends on it: `resolve_battle` is a pure
-integer function of matchup × doctrine × terrain × supply × season, and **every campaign round
-scores its powers by calling it** and reading the two power numbers out. The calibration is
-shared; the resolver is not this document's.
+**Nothing here depends on it** (Ben, 2026-10-26). The campaign round is scored by the soft/hard
+arithmetic in § The campaign force model; `resolve_battle` is a generation function.
 
 ### `resolve_campaign_battle` — campaign scale
 
@@ -88,9 +88,10 @@ window is a real window rather than a parameter pretending to be one.
 `resolve_campaign_battle` is a convenience wrapper over those, taking a **scripted** withdrawal
 plan. It adds no rules of its own, so a scripted run and a stepped one resolve identically.
 
-**Each round.** Both stacks are scaled by remaining strength (entries scaling to zero drop out),
-`resolve_battle` scores the two powers, then exactly two draws apply a swing — attacker first,
-defender second, always in that order.
+**Each round.** Every participating unit deals its hits by the soft/hard arithmetic (§ The
+campaign force model), then exactly two draws apply a swing — attacker first, defender second,
+always in that order. A side breaks when its units' readiness is spent, not at a strength
+threshold.
 
 Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` precedent:
 
@@ -131,6 +132,127 @@ favour, consistent with every other tie across both paths.
 
 Ends are enumerated: `attacker_broken`, `defender_broken`, `attacker_withdrew`,
 `defender_withdrew`, `stalemate`. Withdrawal is its own end state rather than a flavour of defeat.
+
+---
+
+## The campaign force model (Ben, 2026-10-26)
+
+Force acts in four theatres — **land, air, sea and space** — and is set across 1960 to the near
+future. The research behind it, and the comparable games it learns from, is
+[`../research/MILITARY_1960_PRESENT.md`](../research/MILITARY_1960_PRESENT.md). Every stat a fight
+reads is shown on the surface that reads it.
+
+### Land — the unit's stats
+
+| Stat | Grain | Meaning |
+|---|---|---|
+| **HP** | stored, per unit | Men and equipment fit to fight. **At 0 the unit dies.** Refilled over time by drawing equipment and manpower (§ Refit). |
+| **Readiness** | stored, per unit | Cohesion in contact. Takes most of the damage. **At 0 the unit retreats** one tile away from the enemy. Recovers out of contact. |
+| **Morale** | stored, per unit | Will to fight. Scales the unit's attack and caps its maximum readiness. Moved by supply, victories, losses and its nation's war exhaustion. |
+| **Supply** | stored, per unit | `supply_factor_permille`, as today (§ Upkeep). Scales attack and recovery alongside morale. |
+| **Soft attack** | class × equipment | Hits per round against a target's soft share. |
+| **Hard attack** | class × equipment | Hits per round against its hard share. |
+| **Hardness** | class × equipment, 0..1 | Share of the unit that is armoured. |
+| **Defence** | class | Hits absorbed when defending. |
+| **Breakthrough** | class | Hits absorbed when attacking. |
+
+**The arithmetic.** A unit's hits on a target are
+`soft_attack × (1 − target.hardness) + hard_attack × target.hardness`, scaled by its morale and
+supply. The target absorbs up to its defence (defending) or breakthrough (attacking), raised by
+terrain and fortification; absorbed hits land at a fraction, the rest in full. Landed damage
+splits between HP and readiness, readiness taking the larger share, so most fights end in a
+retreat rather than a death — which is how real units fail. **There is no piercing-versus-armour
+check**: hardness alone carries "infantry cannot hurt tanks".
+
+### Land — the classes
+
+A unit is a **class × equipment generation**, never a free design. The class fixes the role; the
+generation is a good on the shelf, so a technology shows in the next fight.
+
+| Class | Hardness | Soft | Hard | Role |
+|---|---|---|---|---|
+| Infantry | none | medium | low, raised by anti-tank missiles | Holds ground; cheapest. |
+| Motorised infantry | slight | medium | low | Infantry in trucks; trucks are its equipment, not a unit. |
+| Mechanised infantry | high | medium | medium | Infantry in fighting vehicles. |
+| Armour | very high | medium | high | One main battle tank line, by generation. |
+| Light armour | medium | high | low | Fast reconnaissance. |
+| Artillery | low, higher self-propelled | very high | low | Fights from the second line; the largest munitions draw. |
+| Air defence | low | — | — | Shoots aircraft, drones and missiles over its province. |
+
+**Small drones are equipment, not units.** An FPV drone stock raises a land unit's soft and hard
+attack and draws a drone good, which is how they are used.
+
+### Land — equipment, refit and manpower
+
+**Equipment is goods on the shelf**, bought as muster already buys (§ The muster interface):
+small arms, armoured vehicles and artillery pieces by generation, air defence systems, drones and
+ordnance. **Refit**: a wounded unit regains HP by drawing equipment and manpower each tick. A unit
+whose kit cannot be bought stays wounded; the economy is the war's ceiling.
+
+**Soldiers come from the labour pool.** Every soldier is drawn from the same `(nation, body)`
+labour pool buildings staff from (`../economy/POPULATION.md`), so a mobilised army is an emptied
+factory. A nation chooses **conscript** or **professional** service: conscripts are cheap per head
+and drain labour widely; professionals cost wages and are fewer and better.
+
+### Land — on the canvas
+
+A land unit is drawn as a **rectangle within its tile**, showing how many units stand there, their
+HP and their readiness. The class glyph comes from `src/ui/icons.*`.
+
+### Fortifications
+
+A **bunker** is a building. Units on its tile gain defence, and the tile's defenders gain hardness
+— concrete makes infantry hard to soft attack. Strikes and artillery degrade it; it repairs over
+time.
+
+### Fronts
+
+A **front** is the line between two hostile nations' held ground. Units the player **assigns** to
+a front spread along its border tiles, fill gaps, and fall back to the next line on retreat. A front
+has two orders: **hold**, and **push** into the enemy province with the weakest defence against
+the front's attack. Fights still happen in the province envelope (§ Battles); a front decides only
+who stands where. The placement is the border-garrison rule (§ Nation garrisons) run along every
+border province. Moving the player's assigned units is a granted auto-action
+(`../ai/AI_OPPONENT.md` § 11).
+
+### Air
+
+An air wing is **based** at an airbase and **assigned** to provinces in range with a mission —
+**air superiority**, **strategic bombing** of infrastructure and production, or **tactical
+bombing** of land and sea units. It never stands on a tile. Air units carry HP, morale, an air
+attack, and ground soft and hard attack; they carry **no hardness**, because every aircraft is
+soft. Classes: planes (fighter, strike, strategic bomber, helicopter) and strike drones. Ground air
+defence engages every mission flown over its province.
+
+### Sea
+
+Sea units operate on coast and ocean tiles, on **patrol**, **escort** and **convoy raiding**.
+They carry HP, morale and **one attack** straight to HP, plus a **detection** value and a **target
+mask** (which classes they can hit). A unit is engaged only once detected, which is a submarine's
+whole value. Classes: submarines, destroyers and capital ships. A raided convoy is SUPPLY's convoy.
+
+### Missiles
+
+**A missile is a munition, not a unit**: a good fired by a launcher — a land unit, a ship, an
+aircraft or a silo building — at a province or a building, and consumed on use. **Missile defence**
+is an interceptor stock at an air defence unit or building. It thins short-range attacks well and
+long-range ones poorly, and an interceptor costs more than much of what it stops, so defence drains
+the defender's economy.
+
+**Tactical nuclear weapons may be used; strategic nuclear weapons may not.** A tactical
+warhead is a munition with a severe Alarm cost (`../economy/ERAS.md` § The two scalars). A strategic
+arsenal is held, seen and deterring, and no verb fires it.
+
+### Space
+
+Pre-space military in orbit is **intelligence satellites** and **missiles**. A reconnaissance
+satellite lifts fog over enemy ground and reveals unit stacks; the satellite classes are
+`../economy/SPACE_ASSETS.md`'s. There is no combat between orbital units.
+
+*Owners: BL-1421 (soft hard resolver), BL-1422 (land classes and kit), BL-1423 (refit and
+retreat), BL-1424 (soldiers from labour), BL-1425 (unit counter render), BL-1426 (bunkers),
+BL-1427 (fronts), BL-1429 (air theatre), BL-1430 (sea theatre), BL-1431 (missiles and
+satellites).*
 
 ---
 
@@ -220,6 +342,10 @@ carries six fields:
 | `supply_factor_permille` | `int32_t` | How well supplied, 1000 = full. Moved only by the upkeep pass's one decay rule. |
 | `muster_base` | `entity_id` | The `military_base` this unit was raised at, or `null_entity`. The **orphan key** — see § Upkeep. |
 
+**A unit also carries HP, readiness and morale (Ben, 2026-10-26)** — three stored per-unit
+quantities, defined in § The campaign force model. They are the fight's state; what follows is
+the one derived figure the condition subjects and cards read.
+
 **There is no stored strength.** Strength is derived — `unit_strength(w, u)` in
 `src/world/unit_roster.hpp` returns `count × roster_type_quality × supply_factor` at ×100 fixed
 point, so at quality 1.0 and full supply `strength == count * 100` exactly. It returns an
@@ -288,13 +414,10 @@ short crossing with no open ocean in it as a strait rather than a sea. Making th
 *ownership* rather than on distance gives it a cause the player can read: you can walk your own
 shore, not someone else's.
 
-**Campaign-era naval is UNMODELLED, and that is a scope statement rather than a gap
-(Ben, 2026-09-06).** Naval rows carry real power in the Era −1 sim — that is where Ben's ruling
-was aimed (*"we can also use coastal units in the ancient sim"*) and
-[`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md) § Naval owns it. In the
-campaign, nothing has yet asked for a fleet, and a model with no consumer is a model nobody has
-tested. The domain table above still holds: it says which classes *may* be where, and the
-campaign simply does not raise the classes that may be at sea.
+**Campaign-era naval is § The campaign force model's Sea (Ben, 2026-10-26)**, which overturns
+the 2026-09-06 reading that the campaign raises no fleet. The Era −1 sim's naval rows stay
+[`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md) § Naval's. The domain
+table above still says which classes may be where.
 
 **Overseas supply WORKS, and there is no starvation model here.** Historically nations supplied
 overseas expeditions perfectly well; that is most of what a navy is for. The Era −1 sim applies a
@@ -475,11 +598,9 @@ directly.
 (`scripts/economy.lua`), keyed by the roster row's `cls`. Spent per tick against the per-tile
 traversal-cost weight (`logistics::tile_traversal_cost`, the same plains=1.0/mountain=2.0 table
 road placement discounts), with fractional remainder banked in `order.progress` across ticks.
-Defaults: infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 — **and the zero is a
-consequence of § Domains and traversal, not a claim that fleets cannot move.** The campaign
-raises no naval units, so the campaign march model has nothing to move; the sim that does field
-them is [`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md), and it does not
-march, it resolves. A composite unit (BL-472, formations)
+Defaults: infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 — **and the zero is not
+a claim that fleets cannot move.** A sea unit moves on coast and ocean tiles under § The campaign
+force model's Sea, not on this land table. A composite unit (BL-472, formations)
 reads its **slowest** component's class entry.
 
 **Traversal cost over water is uniform.** `logistics::tile_traversal_cost` prices land by

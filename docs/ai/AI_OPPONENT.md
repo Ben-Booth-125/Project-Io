@@ -2284,3 +2284,11 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   or on ground no nation owns; no verb that exists only because the actor is now a nation; no read of
   another nation's private state beyond what any nation may observe. Pure, seeded, deterministic,
   replayable, legal verbs only, never a planner.
+
+  **Fronts move the player's assigned units — granted (Ben, 2026-10-26; `../military/MILITARY.md`
+  § Fronts).** A new subject on the player's own nation: units **the player assigns** to a front are
+  spread along its border tiles, refill gaps, fall back on retreat, and under a **push** order advance
+  into the weakest enemy province — every move a legal `march_unit`. **Not admitted:** any
+  unit the player did not assign; choosing a front, an order, a war or a target for the player's
+  nation; a campaign planned beyond the next move. Pure, seeded, deterministic, replayable, legal
+  verbs only, never a planner.

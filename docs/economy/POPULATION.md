@@ -532,7 +532,11 @@ BL-613) clears against its national pool by the same rule, before the ordinary p
 labour at habitability ≥ 0.6, ramping linearly to 0.5× at 0. Effective workforce =
 `workforce_assigned × grant`. A nation that over-builds relative to its labour force must
 outbid itself and its neighbours, so labour scarcity is priced instead of silently averaged. The
-player never hand-assigns headcount; they express intent and the pool resolves it. Building counts
+player never hand-assigns headcount; they express intent and the pool resolves it.
+
+**Soldiers draw from the same pool (Ben, 2026-10-26).** A nation's units are manned out of its
+`(nation, body)` labour pool, so mobilisation empties factories; conscript or professional service
+sets how widely and how cheaply (`../military/MILITARY.md` § The campaign force model). Building counts
 lean on available land (§ Land use, the province ceiling), not on the pool alone.
 
 ### Wages
