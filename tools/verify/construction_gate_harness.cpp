@@ -2,13 +2,16 @@
 // construction progresses each tick at a rate set by how much of its per-tick
 // material need the local market can supply — full when ample, stretched when tight,
 // paused when starved — and draws its materials in arrears as it builds, its whole
-// flat build cost paid once at placement (Ben, 2026-10-25, ruling NR-1073).
+// flat build cost paid once at placement (Ben, 2026-10-25, ruling NR-1073). CREDITS
+// ARE THE WHOLE COST (Ben, 2026-10-26): the materials leave the shelf unpaid, as
+// demand only, so a draw is read off the SHELF here — it records no purchase.
 // Hand-builds a minimal world (no Lua / SDL / ImGui); kept outside src/ so the CMake
 // glob ignores it.
 
 #include "world/components.hpp"
 #include "world/construction.hpp" // BL-1066: construction_capex / construction_build_ticks
 #include "world/economy_system.hpp"
+#include "world/market_clearing.hpp" // clear_markets: the draw is billed nothing
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
@@ -120,6 +123,7 @@ int main()
         check(std::fabs(placed - 300.0f) < 1e-3f,
               "A: placement charges the WHOLE build_cost, once", placed, 300.0f);
         const float bal1 = s.w.nations[s.corp].treasury;
+        const float shelf0 = s.w.markets.at(s.market).inventory[ri(resource_type::steel)];
         const economy_report rep = run_economy_step(s.w, reg); // closes the quarter: 90 days built
         const building_component& b = s.w.buildings[s.bld];
         check(b.ticks_remaining == 2 && b.days_remaining == 180,
@@ -127,10 +131,25 @@ int main()
               b.days_remaining, 180);
         check(b.build_day_milli == 0,
               "A: no fractional remainder at full rate", b.build_day_milli, 0.0f);
-        const float drawn = rep.purchases.count({s.corp, s.market})
-            ? rep.purchases.at({s.corp, s.market})[ri(resource_type::steel)] : 0.0f;
+        const float drawn = shelf0 - s.w.markets.at(s.market).inventory[ri(resource_type::steel)];
         check(std::fabs(drawn - per_tick_need) < 1e-3f,
-              "A: the tick draws the quarter's materials built, in arrears, as market demand", drawn, per_tick_need);
+              "A: the tick draws the quarter's materials built off the shelf, in arrears", drawn, per_tick_need);
+        const auto wit = rep.wants.find({s.corp, s.market});
+        const float wanted = wit != rep.wants.end() ? wit->second[ri(resource_type::steel)] : 0.0f;
+        check(wanted >= per_tick_need - 1e-3f,
+              "A: ...as market demand (the want is registered)", wanted, per_tick_need);
+        const auto pit = rep.purchases.find({s.corp, s.market});
+        const float bought = pit != rep.purchases.end() ? pit->second[ri(resource_type::steel)] : 0.0f;
+        economy_report rep_c = rep;
+        const auto flows = clear_markets(s.w, reg, rep_c);
+        const auto fit = flows.find(s.corp);
+        const float billed = fit != flows.end() ? fit->second.expenditure : 0.0f;
+        check(bought == 0.0f && billed == 0.0f,
+              "A: the draw costs no credits (Ben, 2026-10-26): no purchase, nothing billed at the clear",
+              billed, 0.0f);
+        check(s.w.markets.at(s.market).demand[ri(resource_type::steel)] >= per_tick_need - 1e-3f,
+              "A: the clearing sees the draw as the market's demand",
+              s.w.markets.at(s.market).demand[ri(resource_type::steel)], per_tick_need);
         const float spent = bal1 - s.w.nations[s.corp].treasury;
         check(std::fabs(spent) < 1e-3f,
               "A: the tick charges no build_cost credits", spent, 0.0f);
@@ -161,9 +180,10 @@ int main()
               "C: a paused build spends nothing", 0.0, 0.0);
     }
 
-    // --- Case D (BL-1066): on a HARD site with capacity on, the capex the gate
-    // charges is exactly what the build draws to completion — flat cash, steel
-    // and construction capacity, each over the site's rounded build ticks.
+    // --- Case D (BL-1066; Ben, 2026-10-26): on a HARD site with capacity on, the
+    // capex the gate charges is exactly the credit the build pays — the flat cash
+    // times the site multiplier, and nothing for the steel and capacity it draws,
+    // which leave the shelf over the site's days, unpaid.
     {
         recipe_registry reg_d = reg;
         construction_params cpd = cp;
@@ -194,15 +214,15 @@ int main()
         const float bal0 = s.w.nations[s.corp].treasury;
         // Ben, 2026-10-25: the flat cash is paid at placement, the rest in arrears.
         begin_construction_on_placement(s.w, reg_d, s.corp, s.w.buildings.at(s.bld), /*founding=*/false);
+        const float placed_cash = bal0 - s.w.nations[s.corp].treasury;
         float steel = 0.0f, capacity = 0.0f;
         for (int t = 0; t < 20 && s.w.buildings.at(s.bld).ticks_remaining > 0; ++t)
         {
-            const economy_report rep = run_economy_step(s.w, reg_d);
-            if (const auto it = rep.purchases.find({s.corp, s.market}); it != rep.purchases.end())
-            {
-                steel    += it->second[ri(resource_type::steel)];
-                capacity += it->second[cap];
-            }
+            const float st0 = m.inventory[ri(resource_type::steel)];
+            const float cp0 = m.inventory[cap];
+            run_economy_step(s.w, reg_d);
+            steel    += st0 - m.inventory[ri(resource_type::steel)];
+            capacity += cp0 - m.inventory[cap];
         }
         const float cash = bal0 - s.w.nations[s.corp].treasury;
         check(s.w.buildings.at(s.bld).ticks_remaining == 0, "D: the build completes", 0.0, 0.0);
@@ -212,9 +232,13 @@ int main()
               "D: it drew the authored 24 steel times days / 270", steel, want_steel);
         check(std::fabs(capacity - 0.5f * qtrs) < 1e-2f,
               "D: it drew 0.5 capacity per quarter of days", capacity, 0.5f * qtrs);
-        const float drawn_value = cash + steel * 8.0f + capacity * 4.0f;
-        check(std::fabs(capex - drawn_value) < 1e-1f,
-              "D: construction_capex == cash + steel + capacity actually drawn", capex, drawn_value);
+        check(cash == placed_cash,
+              "D: the materials cost no credits: the treasury moves only at placement", cash, placed_cash);
+        check(capex == cash,
+              "D: construction_capex == the credit the build paid, exactly", capex, cash);
+        check(std::fabs(capex - 300.0f * qtrs / 3.0f) < 1e-2f,
+              "D: that credit is build_cost x days / 270 (the site multiplier), no material price",
+              capex, 300.0f * qtrs / 3.0f);
     }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",

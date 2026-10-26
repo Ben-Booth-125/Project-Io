@@ -142,6 +142,7 @@ corp_command_result map_construction(construction_result r)
         // reason reaches the player's surface through `construction_result` itself.
         case construction_result::needs_road:
         case construction_result::foreign_ground:
+        case construction_result::site_busy: // one site per tile (Ben, 2026-10-26)
         case construction_result::invalid_tile:
         case construction_result::out_of_range:
         case construction_result::slot_occupied:

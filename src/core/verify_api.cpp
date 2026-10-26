@@ -3869,7 +3869,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::era_locked             ? "era_locked" :
                 r == construction_result::wrong_air              ? "wrong_air" :
                 r == construction_result::needs_road             ? "needs_road" :
-                r == construction_result::foreign_ground         ? "foreign_ground" : "failed";
+                r == construction_result::foreign_ground         ? "foreign_ground" :
+                r == construction_result::site_busy              ? "site_busy" : "failed";
             if (r == construction_result::placed)
             {
                 m_ui.selected_entity = built;
@@ -3912,7 +3913,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 r == construction_result::era_locked             ? "era_locked" :
                 r == construction_result::wrong_air              ? "wrong_air" :
                 r == construction_result::needs_road             ? "needs_road" :
-                r == construction_result::foreign_ground         ? "foreign_ground" : "failed";
+                r == construction_result::foreign_ground         ? "foreign_ground" :
+                r == construction_result::site_busy              ? "site_busy" : "failed";
             if (r == construction_result::placed)
             {
                 m_ui.selected_entity = built;
@@ -5296,7 +5298,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                    r == construction_result::era_locked             ? "era_locked" :
                    r == construction_result::wrong_air              ? "wrong_air" :
                    r == construction_result::needs_road             ? "needs_road" :
-                   r == construction_result::foreign_ground         ? "foreign_ground" : "failed";
+                   r == construction_result::foreign_ground         ? "foreign_ground" :
+                r == construction_result::site_busy              ? "site_busy" : "failed";
             // A refusal that is not about THIS tile ends the scan: every tile would
             // refuse it the same way, and that refusal is the answer.
             if (r == construction_result::tech_locked || r == construction_result::era_locked

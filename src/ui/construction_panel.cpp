@@ -825,8 +825,8 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         {
             char buf[200];
             std::snprintf(buf, sizeof buf,
-                          "%.0f cr still to pay: the materials it has left to buy, at today's "
-                          "prices. Its build cost was paid when it was placed.",
+                          "%.0f cr still to pay: the materials it has left to buy, at the "
+                          "market's posted prices. Its build cost was paid when it was placed.",
                           static_cast<double>(row.cost_left));
             cells.push_back(construction_cell("cost", cp, construction_grid::cost, buf));
         }

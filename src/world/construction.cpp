@@ -54,44 +54,21 @@ float construction_site_multiplier(const world& w, const recipe_registry& reg,
 float construction_capex(const world& w, const recipe_registry& reg, entity_id tile,
                          building_type type, resource_type target, std::uint16_t recipe)
 {
-    // Materials priced at the tile market's CURRENT price (base price where none has
-    // resolved). The draw itself happens tick by tick at the price prevailing then
-    // (economy_system.cpp § run_construction); this is the commitment figure.
-    const market_component* mkt = nullptr;
-    if (const entity_id mid = market_for_tile(w, tile); mid != null_entity)
-        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
-            mkt = &mit->second;
-    // BL-590: the material cost specific to THIS named building (target/recipe).
-    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
-    float material_cost = 0.0f;
-    for (std::size_t r = 0; r < resource_count; ++r)
-    {
-        if (material_cost_row[r] <= 0.0f)
-            continue;
-        const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
-        material_cost += material_cost_row[r] * p;
-    }
-    const float authored = reg.economics(type).build_cost + material_cost;
-    // The draw is the authored cost over the AUTHORED duration per full-rate tick,
-    // for as many ticks as the site actually takes — so the ratio is the ROUNDED
-    // tick count over the authored duration, not the raw multiplier (a 4-tick build
-    // at x1.2 takes 5 ticks and draws 1.25x). An instant build draws nothing per tick.
+    // CREDITS ARE THE WHOLE COST (Ben, 2026-10-26; PRODUCTION.md § Construction is
+    // measured in days): the authored flat `build_cost` times the site's days over
+    // the authored days — the site multiplier, as the days round it — and nothing
+    // else. No material price enters it: the materials leave the shelf unpaid, as
+    // demand only. This is EXACTLY what `construction_credit_cost` charges the
+    // placed site (the same expression over the same days), so the quote and the
+    // payment cannot disagree.
+    (void)recipe; // the materials vary per named building (BL-590); the credits do not
+    const float flat     = reg.economics(type).build_cost;
     const float duration = reg.economics(type).build_duration_ticks;
     if (duration <= 0.0f)
-        return authored;
-    // Ben, 2026-10-24: the site's DAYS in quarters, unrounded — a last quarter
-    // of fewer than 90 days draws only its days (run_construction's need row).
-    const float ticks = static_cast<float>(construction_build_days(w, reg, tile, type, target))
-                      / static_cast<float>(k_construction_quarter_days);
-    // BL-709 construction capacity: drawn flat per build tick, not per unit of
-    // material (run_construction's need row), so it scales with the ticks alone.
-    float capacity_cost = 0.0f;
-    if (const float cap_rate = reg.construction().capacity_per_build_tick; cap_rate > 0.0f && mkt)
-    {
-        const std::size_t ci = static_cast<std::size_t>(resource_type::construction_capacity);
-        capacity_cost = cap_rate * ticks * (mkt->price[ci] > 0.0f ? mkt->price[ci] : mkt->base_price[ci]);
-    }
-    return authored * ticks / duration + capacity_cost;
+        return flat;
+    const int days = construction_build_days(w, reg, tile, type, target);
+    return flat * static_cast<float>(days)
+         / (duration * static_cast<float>(k_construction_quarter_days));
 }
 
 int construction_build_days(const world& w, const recipe_registry& reg,
@@ -234,6 +211,9 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         // BL-1399: a nation builds only on its own ground, and the refusal says so.
         if (pr.reason == placement_rules::placement_reason::not_own_ground)
             return construction_result::foreign_ground;
+        // One site per tile (Ben, 2026-10-26): its own refusal, never "invalid tile".
+        if (pr.reason == placement_rules::placement_reason::site_under_construction)
+            return construction_result::site_busy;
         if (type == building_type::launchpad)
             return construction_result::slot_occupied;
         return construction_result::invalid_tile; // Port not coastal
@@ -241,10 +221,10 @@ construction_result construct_for(world& w, const recipe_registry& reg,
 
     // Affordability (BL-095): the nation must be able to afford the whole build to
     // start it. The flat build cost is debited AT PLACEMENT, once (Ben, 2026-10-25,
-    // below); the materials are drawn in arrears by run_construction. BL-1066
-    // (Ben, 2026-09-23): "the whole build" is what the build will DRAW — flat cost
-    // plus materials, times the site multiplier (PRODUCTION.md § Construction site
-    // time). Pricing the authored cost admitted builds the corp could not finish.
+    // below); the materials are drawn in arrears by run_construction, unpaid —
+    // credits are the whole cost (Ben, 2026-10-26). So "the whole build" is the
+    // flat cost times the site multiplier (PRODUCTION.md § Construction site time),
+    // exactly the credit `begin_construction_on_placement` takes.
     const float total_cost = construction_capex(w, reg, tile, type, target, recipe);
     if (funds < total_cost)
         return construction_result::insufficient_funds;
@@ -290,7 +270,7 @@ construction_result construct_for(world& w, const recipe_registry& reg,
     // CREDITS UP FRONT, MATERIALS IN ARREARS (Ben, 2026-10-25): the site pays its
     // whole flat build cost now (the gate above admitted it), and builds from today
     // at the rate its shelf allows less what other sites have claimed; each day's
-    // materials are drawn at the next economy tick. A founding site (unpriced
+    // materials are drawn, unpaid, at the next economy tick (Ben, 2026-10-26). A founding site (unpriced
     // `funds`) is priced by generation and pays nothing here.
     begin_construction_on_placement(w, reg, corp, bc,
                                     /*founding=*/funds == std::numeric_limits<float>::max());
@@ -314,7 +294,8 @@ construction_result construct_for(world& w, const recipe_registry& reg,
 
     assets.push_back(bld_id);
     // Ben, 2026-10-25: the flat build cost was debited above, once; the materials
-    // are drawn in arrears by run_construction as the build progresses.
+    // are drawn in arrears by run_construction as the build progresses, and cost
+    // no credits (Ben, 2026-10-26).
 
     // Before this clear existed, a newly placed port/hub extended the reach
     // field only when something unrelated (a road) happened to clear the cache —

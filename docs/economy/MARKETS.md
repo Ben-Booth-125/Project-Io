@@ -32,9 +32,11 @@ and buyer at a market is a nation's building (Ben, 2026-10-23: there are no corp
 - **The order book retires (Ben, 2026-10-10).** No standing buy or sell orders: everyone buys at
   the posted price, under the fair-price ceiling. Procurement is a shelf purchase like any other:
   the named-supplier contract retired with the corporations (Ben, 2026-10-23; `CONTRACTS.md`).
-- **Everyone buys from the shelf.** A processor's inputs, a construction site's materials,
-  building upkeep, procurement, the space programme and a launch's propellant are all bought on
-  the shelf at the posted price, under the fair-price ceiling. A nation buys even its own
+- **Everyone buys from the shelf.** A processor's inputs, building upkeep, procurement, the space
+  programme and a launch's propellant are all bought on the shelf at the posted price, under the
+  fair-price ceiling. A construction site's materials leave the same shelf under the same ceiling
+  but **unpaid**: credits are a build's whole cost, so its draw is demand with no purchase (Ben,
+  2026-10-26; `PRODUCTION.md` § Construction is measured in days). A nation buys even its own
   buildings' output back: vertical integration is a location, not a free transfer.
 - **Goods leave a market only by trade** (`TRADE.md`), which buys on one shelf and lands on
   another.
@@ -319,7 +321,9 @@ and sells the landings. In order:
 5. **Wants → demand** — two registers, read separately (§ Want and fill below). `report.wants` —
    what processors, construction sites, upkeep and trades set out to buy this tick, whether or not
    they got it — enters **market demand**, and is the only thing that does. `report.purchases` —
-   what was actually drawn — enters the **billing** pass instead (step 8). That billing is not a
+   what was actually drawn — enters the **billing** pass instead (step 8). A construction site's
+   draw is the one draw with a want and no purchase: it is demand, and is billed nothing (Ben,
+   2026-10-26). That billing is not a
    fresh grant: the real transaction already happened, capped by real inventory, in the phases
    before `clear_markets` (§ Real market inventory).
 6. **Reference prices** — computed once from the accumulated demand and the supply the price law
@@ -540,7 +544,8 @@ draw** — unit upkeep takes the same shape, not a second one.
 - **It pays the posted price, and so does every other goods draw (Ben, 2026-10-03).** The ceiling
   is read against the price standing on the shelf, and that price is what the draw is billed.
   Processor inputs, construction materials and a trade's purchase obey the same ceiling: a
-  processor idles, a site pauses and a trade ships less, rather than buy above it.
+  processor idles, a site pauses and a trade ships less, rather than draw above it (a site's draw
+  is unpaid, but the ceiling still stops it).
   [FINANCE.md](FINANCE.md) § Standing-force upkeep owns the rule.
 
 **The ceiling is the buyer's reservation** — **"go without rather than buy above this"**, never a

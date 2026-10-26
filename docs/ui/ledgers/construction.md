@@ -83,7 +83,7 @@ Six columns, **every one sortable** by its header, and **every header legible at
 |---|---|
 | **Place** | The row's identity: the named **population centre whose province holds the tile**, or, where no centre's province covers it, the nearest named centre on the body, read **"near X"**. There is no grid-position column (Ben, 2026-10-26): an x,y is an address only the map can read, and a place name is one the player already knows. A province has no name of its own (`../../GLOSSARY.md` § Province) but it is its centre's ground, so the centre names it; where a province holds two centres, the lower id names it, so the name is one answer. The row's press: it **selects the tile and frames it** on the map; the tile's Build door below places the building. The press is the whole row. Sorted by name, ties by tile id. |
 | **Net** | Est. net / qtr — `estimate_prospective_profit`, the door's own figure with the same assumptions (today's local prices, 50 % staffing, no labour shortage), **with the tile's Logistic Point cover applied** (below). Sign-coloured. The default sort, **descending**. |
-| **Cost** | `construction_capex` — the flat cost times the site multiplier, plus the materials at the local market's price. The hover splits the two halves and names the multiplier. |
+| **Cost** | `construction_capex` — the flat cost times the site multiplier, paid once at placement, plus the materials at the local market's posted price, bought in arrears as each tick draws them (Ben, 2026-10-26: costs depend on market prices; PRODUCTION.md § Construction is measured in days). The hover splits the two halves and names the multiplier. |
 | **Market** | The market the tile clears in, by its city's name (`market_city_name`). |
 | **LP** | The tile's Logistic Point cover, 0–100 % (`lp_route_to(...).cover`). **Zero is the no-logistics flag** (`icons::no_logistics`, a struck truck, in amber), drawn in place of the figure — the flag is the zero, and the width a "0%" beside it took was the width the headers needed (Ben, 2026-10-26): no source both reaches the tile and is tied to the capital, so a building there would stand and not run. The hover says which — no source reaches it, or one does and has no chain to the capital. |
 | **Yield** | Extraction: units of the good per quarter, the estimate's own revenue at the price it valued it at; the hover gives the deposit's richness and what is left in the ground, or names a Well or Wharf as depositless. Empty for a building whose output does not turn on the ground. |
@@ -287,9 +287,9 @@ band is independent of the column and stays where it is.
   the queue, the tile card's stacks and the expanded site card take **six**, the site card
   borrowing the queue's own set so one site reads identically on both. Body, tile
   and every stall sentence moved onto the hover card, and the stall lines that printed under the
-  table are gone. The 25 / 75 % colour bands were kept. Progress was
-  `construction_paid / construction_capex`; since 2026-10-26 it is days built over days total (§ Construction is durative), which re-prices live, so the bar can wobble as prices
-  and the site multiplier move; the drift-free alternative is storing the original total on the
+  table are gone. The 25 / 75 % colour bands were kept. Progress is the days of work done over the
+  site's whole days (§ Construction is durative); the total is recomputed live, so the bar can move
+  as the site multiplier does; the drift-free alternative is storing the original total on the
   building, which is a save-format change and is not taken.
 - ~~**Lens: follow-the-view or fixed?**~~ **Answered** (Ben, 2026-10-25): the Construction view arms the
   placement lens while a building is chosen; the Buildings view arms none (§ 3).
