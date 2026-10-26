@@ -117,8 +117,8 @@ ImVec4 construction_rate_colour(float rate);
 /// 2026-10-26), the ratio the map's progress circle shows. The total is
 /// `construction_build_days` at the tile's live site multiplier (nothing stores the
 /// original), so it can move when a road or the stack does; it is never below the
-/// days left. The credit fraction it replaced stopped moving once a site's credits
-/// were paid whole at placement.
+/// days left. Days, not credits, because the credit fraction re-priced with every
+/// price move and opened at the flat cost's share the day a site was placed.
 float construction_progress_fraction(const world& w, const recipe_registry& reg,
                                      const building_component& b);
 
@@ -134,6 +134,10 @@ struct construction_material
     resource_type good = resource_type::iron_ore;
     float         left = 0.0f;  ///< Units still to draw: the days left plus the days owed.
     bool          short_now = false; ///< `construction_read::short_of` - the draw's own test.
+    bool          priced = false; ///< A market prices it (the site's market has a price or base).
+    float         price  = 0.0f;  ///< The site market's posted price per unit now - what the
+                                  ///< draw pays, in arrears at each tick (MARKETS.md: a draw pays
+                                  ///< the posted price).
 };
 
 /// A site's progress in DAYS and its materials still to draw. `days_total` is
@@ -141,8 +145,8 @@ struct construction_material
 /// less `construction_days_left`; the materials are `run_construction`'s own row
 /// (`resource_build_cost_for` over the duration in quarters, plus construction
 /// capacity per quarter of work) for the days left plus the milli-days built and
-/// not yet drawn (`build_arrears_milli`). No price: materials are goods the site
-/// draws, and its credits were the whole cost.
+/// not yet drawn (`build_arrears_milli`). Each carries the site market's posted
+/// price now, which is what the draw pays for it at the tick.
 struct construction_site_reading
 {
     int   days_total = 0;

@@ -306,7 +306,8 @@ if si.n_rows > 0 then
     local after = text:match("Still to draw:\n(.+)")
     verify.expect(after ~= nil and after:find("%a") ~= nil,
                   "S9: the card names the materials still to draw")
-    verify.expect(not text:find(" cr", 1, true), "S9: the card quotes no credit figure beside the materials")
+    verify.expect(after ~= nil and (after:find(" @ ", 1, true) ~= nil or after:find("(unpriced)", 1, true) ~= nil),
+                  "S9: each material carries the market's current price (or says it is unpriced)")
     if after and text:find("the market holds less", 1, true) then
       verify.expect(after:sub(1, 2) == "! " or after:find("\n! ", 1, true) ~= nil,
                     "S9: the footnote's '!' is on a short good's line")

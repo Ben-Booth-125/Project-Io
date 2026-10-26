@@ -398,10 +398,10 @@ float construction_progress_fraction(const world& w, const recipe_registry& reg,
 {
     // DAYS DONE OVER DAYS TOTAL (Ben, 2026-10-26: the progress circle shows "days
     // done / total"). The bar used to be the CREDIT fraction, construction_paid over
-    // the capex; with a site's credits paid whole at placement and its materials
-    // drawn as goods (Ben, 2026-10-26) that ratio no longer moves as a site builds,
-    // so every progress reading - the queue's bar, the site card's, the map's circle
-    // - is the one days ratio `read_construction_site` computes.
+    // the capex, which opened at the flat cost's share the day a site was placed and
+    // wobbled with every price move; every progress reading - the queue's bar, the
+    // site card's, the map's circle - is now the one days ratio
+    // `read_construction_site` computes.
     const int left  = construction_days_left(b);
     const int total = std::max(left, construction_build_days(w, reg, b.tile, b.type, b.target_resource));
     if (total <= 0)
@@ -416,8 +416,9 @@ float construction_progress_fraction(const world& w, const recipe_registry& reg,
 // still to draw, and an exclamation mark beside any good the market is running
 // short of." The shortage test is the draw's own (`construction_read::short_of`);
 // the amounts are `run_construction`'s `row_for` (economy_system.cpp) for the days
-// left plus the days built and not yet drawn. No price is quoted: a site's credits
-// are its whole cost, and its materials are goods it draws (Ben, 2026-10-26).
+// left plus the days built and not yet drawn, each with the site market's posted
+// price now - what the draw pays for it, in arrears at the tick (Ben, 2026-10-26:
+// costs depend on market prices).
 construction_site_reading read_construction_site(const world& w, const recipe_registry& reg,
                                                  const building_component& b)
 {
@@ -444,6 +445,10 @@ construction_site_reading read_construction_site(const world& w, const recipe_re
     const auto& cost_row   = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
     const std::size_t cap  = static_cast<std::size_t>(resource_type::construction_capacity);
     const float cap_rate   = reg.construction().capacity_per_build_tick;
+    const market_component* m = nullptr;
+    if (const entity_id mid = market_for_tile(w, b.tile); mid != null_entity)
+        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+            m = &mit->second;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         float left = cost_row[r] / duration * share;
@@ -451,7 +456,13 @@ construction_site_reading read_construction_site(const world& w, const recipe_re
             left += cap_rate * share;
         if (!(left > 0.0f))
             continue;
-        out.materials.push_back({static_cast<resource_type>(r), left, out.rd.short_of[r]});
+        construction_material cm{static_cast<resource_type>(r), left, out.rd.short_of[r]};
+        if (m != nullptr)
+        {
+            cm.price  = m->price[r] > 0.0f ? m->price[r] : m->base_price[r];
+            cm.priced = cm.price > 0.0f;
+        }
+        out.materials.push_back(cm);
     }
     return out;
 }
@@ -500,8 +511,13 @@ std::string draw_construction_site_card_body(const construction_site_reading& rd
         icons::resource(dl, {p.x + bang_w + lh * 0.5f, p.y + lh * 0.5f}, lh * 0.38f, m.good);
         ImGui::Dummy({bang_w + lh, lh});
         ImGui::SameLine();
-        std::snprintf(line, sizeof line, "%s %s", fmt::abbreviate(static_cast<double>(m.left)).c_str(),
-                      resource_name(m.good));
+        if (m.priced)
+            std::snprintf(line, sizeof line, "%s %s @ %s cr",
+                          fmt::abbreviate(static_cast<double>(m.left)).c_str(), resource_name(m.good),
+                          fmt::abbreviate(static_cast<double>(m.price)).c_str());
+        else
+            std::snprintf(line, sizeof line, "%s %s (unpriced)",
+                          fmt::abbreviate(static_cast<double>(m.left)).c_str(), resource_name(m.good));
         ImGui::TextUnformatted(line);
         text += "\n";
         if (m.short_now)
