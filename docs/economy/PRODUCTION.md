@@ -779,17 +779,17 @@ network connects them.
 any matched trade whose buyer is domiciled outside it. Cross-border power is an ordinary
 cross-border sale. Nothing new is needed to make a nation earn from the power flowing through it.
 
-**And it reaches the Era's catastrophe, which is the strongest thing about it.**
-`docs/economy/ERAS.md` § The point of an Era makes Era 1 a test the player is trying to pass, scored
-on **Alarm**, and its own danger table names the answer in the economic dimension: *"keep
+**And it reaches Alarm, which is the strongest thing about it.**
+`docs/economy/ERAS.md` § The point of an Era makes **Alarm** Era 1's defining pressure, and its
+danger table names the answer in the economic dimension: *"keep
 cross-border routes live; trade interdependence is the cheapest Alarm suppressant in the game"* —
 with **Autarkic Substitution** listed as the herring that looks like resilience and cuts the ties
 holding Alarm down.
 
 International power is that interdependence in its most legible form. A nation whose lights depend
 on a neighbour's generation is a nation with a reason not to escalate, and severing that tie — by
-autarky, by tariff, or by interdiction (`LOGISTICS.md` § 7) — is a visible, causal step toward the
-rupture. That is a system feeding **Trade and Conflict at once**, which is the test
+autarky, by tariff, or by interdiction (`LOGISTICS.md` § 7) — is a visible, causal step toward
+war. That is a system feeding **Trade and Conflict at once**, which is the test
 `docs/SYSTEMS.md` sets every system, and very few pass on both.
 
 ### Power is what makes the Industry channel viable

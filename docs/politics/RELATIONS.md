@@ -2,7 +2,8 @@
 
 > **Settles:** which quantity answers which question — how A *feels* about B (sentiment, derived) ·
 > what A has *declared* toward B (stance) · how an actor is rated at large (reputation) · who is
-> refused trade outright (embargo) · what a surface reads back as standing · which of these may
+> refused trade outright (embargo) · how threatened A feels by B (Alarm) · what a surface reads back
+> as standing · which of these may
 > become hostility and which may never do so on its own · what
 > each one gates.
 > **Not here:** what hostility permits militarily — interdiction, engagement, the march queue
@@ -28,6 +29,7 @@ This table is the reason the document exists. Read it before touching any of the
 |---|---|---|---|---|
 | **Stance** | *How does A feel about B?* | hostile (directed) / friend (symmetric) | **declared** | interdiction, battle, march; passage and immunity |
 | **Sentiment** | *What has B's conduct earned with A?* | two floats (Access, Trust) per (observer nation, subject nation) | **derived** | informs a declaration; never makes one |
+| **Alarm** | *How threatened does A feel by B?* | **a third sentiment dimension**, per (observer nation, subject nation) | **derived** | informs a rival's embargo, coalition and war scoring; never makes one (§ 6) |
 | **Reputation** | *Will B do business with A again?* | **a VIEW of sentiment's Trust**, not a store | **earned** | nothing — its procurement-quote consumer retired (§ 2) |
 | **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per actor | **authored** | B's goods entering A's markets (§ 3) |
 | **Standing** | *How strong is A?* | five bands on three axes | **derived** | nothing — it is a readout |
@@ -354,6 +356,28 @@ BL-540 (nation→corp stance) was a nation's graded, derived Access/Trust read o
 It retired with the corporations; no actor is left for a nation to read at that grain.
 
 ---
+
+### 6. Alarm — how threatened A feels by B (Ben, 2026-10-26)
+
+**Alarm is a third dimension of sentiment**, beside Access and Trust, held per (observer nation,
+subject nation). It moved here from the retired Era catastrophe (`../economy/ERAS.md` § The point
+of an Era): the test is gone, the quantity stays, and its consequence is how other nations treat you.
+
+**What moves it** — the subject's **visible** capability (a technology whose tell is public, a large
+single-site facility, standing force on the observer's border, a strategic nuclear arsenal), trade
+ties the subject severed, its military posture, and its domestic unrest. Technology effects that read
+*"Alarm toward you"* write to this dimension (`../economy/tech/DIGITISATION_TREE.md`). **What
+relieves it** — decay toward neutral like every sentiment dimension, live trade between the pair, and
+the nodes that cut it.
+
+**What reads it.** A rival nation's scorer reads its own Alarm toward a nation when it weighs an
+embargo, a coalition or a declaration of war (`../ai/AI_OPPONENT.md`). **The invariant holds
+unchanged**: Alarm informs a declaration and never makes one; no Alarm threshold flips a stance
+table (§ The invariant). The player reads every nation's Alarm toward them on a surface, because a
+cost the player cannot watch is a gotcha, not a trade-off.
+
+**What it is not.** It is not a per-world aggregate and it has no Ceiling to cross; both retired with
+the test.
 
 ## Open questions
 

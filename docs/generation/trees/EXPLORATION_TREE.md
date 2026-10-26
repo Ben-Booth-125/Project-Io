@@ -117,8 +117,8 @@ home while the same purchase buys opportunity abroad.
 roadstead is the consolidator's, and it is the stronger *defensive* node by a wide margin. Both are
 legitimate ends of the branch, which is what stops the phase having one winning shape.
 
-**EX-PT-2a is the node the deterrence pair reads.** `../../economy/ERAS.md` § The two scalars gives
-the Ceiling/Alarm discipline — capability raises a neighbour's alarm by being *seen*, never by being
+**EX-PT-2a is the node the deterrence pair reads.** The sim's polity-grain deterrence pair
+(`../EXPLORATION.md`) gives the Ceiling/Alarm discipline — capability raises a neighbour's alarm by being *seen*, never by being
 used — and a standing garrison is the first thing in this tree that is visible at rest.
 
 ---

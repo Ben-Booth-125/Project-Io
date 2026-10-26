@@ -91,8 +91,8 @@ Each body, and each subdivision of land within it, has a procedurally generated 
 
 **Climate** is the living half of that profile: a per-body commons, altered by the strain of what
 nations extract and process on it, running on **planetology's own scalars — instellation,
-surface temperature, arable share, biosphere stage — unfrozen**. It is the **next Era's
-catastrophe** (`docs/economy/ERAS.md` § The point of an Era) and is designed ahead in
+surface temperature, arable share, biosphere stage — unfrozen**. It is **Era 2's defining
+pressure** (`docs/economy/ERAS.md` § The point of an Era) and is designed ahead in
 `docs/CLIMATE.md`; it is **outside prototype scope** and nothing in the prototype builds against it.
 Note it does not run on the tile hazard figure, which is the local operating-difficulty number and
 whose design job is the off-world settlement calculus.

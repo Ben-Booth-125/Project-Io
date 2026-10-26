@@ -708,10 +708,10 @@ The weights are read on the curated seeds before they are set.
 **Ben, 2026-09-11:** *"military arms races which serve to reinforce peace near to home, and
 conflict far from home."*
 
-**This is deterrence, and the project already has its shape.** `../economy/ERAS.md` § The two
-scalars carries a per-nation **Ceiling** (restraint) against a per-nation **Alarm** (how
-threatened this nation feels by others' *visible* capability), with the explicit discipline that
-neither is a new world object. The same pair, at polity grain, is what makes a standing army a
+**This is deterrence, and the sim gives it a shape of its own.** A per-polity **Ceiling**
+(restraint) stands against a per-polity **Alarm** (how threatened a polity feels by others'
+*visible* capability), with the discipline that neither is a new world object. It is a generation
+rule: the campaign keeps Alarm alone (`../politics/RELATIONS.md` § 6). The same pair, at polity grain, is what makes a standing army a
 deterrent rather than merely an expense.
 
 **Visible capability is the whole mechanism.** A fleet and a standing army are read by neighbours,
@@ -938,8 +938,8 @@ that ran off it.
 - **The depletion formula itself** — which abstract inputs, and what arithmetic. It is a stated
   formula by construction (§ Spend is estimated at the end), so writing it down IS the work; an
   unwritten estimate is the failure mode.
-- **Where the deterrence pair's thresholds sit.** The arms race borrows ERAS.md's Ceiling/Alarm
-  shape at polity grain; what makes a neighbour bind rather than test is unmeasured.
+- **Where the deterrence pair's thresholds sit.** The arms race's polity-grain Ceiling/Alarm
+  pair; what makes a neighbour bind rather than test is unmeasured.
 - **Whether both strategies stand among ONE world's strongest realms.** Read on one scale (§ Two
   ways to be strong), the creed axes do separate consolidators from expansionists across a world's
   polities, and each reaches a world's richest three somewhere on a 16-seed spread (2026-09-16).

@@ -901,6 +901,32 @@
    ],
    "title": "Missiles as munitions, interceptor defence, tactical nuclear use, and military satellites",
    "design": "MILITARY.md § Missiles and § Space. Missiles are goods fired by launchers and consumed; interceptors thin short-range attacks; tactical nuclear use permitted with a severe Alarm cost, strategic never fired. Recon satellites lift fog (SPACE_ASSETS, BL-1329 satellites and rovers). The nuclear cost reading depends on Ben's call on the era catastrophe (2026-10-26)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": null,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (era catastrophe retirement, 2026-10-26)",
+   "requires": [],
+   "id": "BL-1432",
+   "short_name": "ALARM_AS_SENTIMENT",
+   "category": "Politics",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "files": [
+    "src/world/sentiment.hpp",
+    "src/world/sentiment.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/digitisation_tree_data.hpp",
+    "tools/verify/industrialisation_sim_harness.cpp"
+   ],
+   "title": "Alarm is a third sentiment dimension that rivals read and the player can watch",
+   "design": "RELATIONS.md § 6 (Ben, 2026-10-26: the Era catastrophe retired, Alarm kept as a relations quantity). Add Alarm beside Access and Trust per (observer, subject) nation, with its factors (visible capability, severed trade, posture, unrest), decay to neutral, and the tree effects that read 'Alarm toward you' wired to it. A rival nation's scorer reads its own Alarm toward a nation when weighing embargo, coalition or war; it never declares on Alarm alone. A surface shows the player every nation's Alarm toward them. Also: industrialisation_sim_harness reading [13] still prints 'Catastrophe lean'; rename it 'Alarm lean' (INDUSTRIALISATION.md acceptance table). Whether the rival scorer reading Alarm needs its own grant is a check against AI_OPPONENT.md § 11 before building."
   }
  ]
 }

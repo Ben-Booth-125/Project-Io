@@ -240,7 +240,7 @@ long-range ones poorly, and an interceptor costs more than much of what it stops
 the defender's economy.
 
 **Tactical nuclear weapons may be used; strategic nuclear weapons may not.** A tactical
-warhead is a munition with a severe Alarm cost (`../economy/ERAS.md` § The two scalars). A strategic
+warhead is a munition with a severe Alarm cost (`../politics/RELATIONS.md` § 6). A strategic
 arsenal is held, seen and deterring, and no verb fires it.
 
 ### Space

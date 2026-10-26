@@ -220,8 +220,7 @@ campaign opens under the *threat* of the catastrophe, not its residue, and the s
 economics survive on their own merits only as a restatement of `GENERATION_STRATEGY.md`.
 
 The replacement — the bloc structure the threat produces, the diplomacy origin, the seizure cost
-of Stage 3, and the reconciliation of where the rupture sits across `docs/CONCEPT.md` (the Era 1
-exit) and `docs/research/ERA1_TECH_LANDSCAPE.md` (a visible countdown) — is **owned by BL-223
+of Stage 3, and what the near-miss leaves behind now the Era 1 test is retired (Ben, 2026-10-26) — is **owned by BL-223
 (averted rupture, diplomacy origin)**. `../generation/CIVILISATION.md` § How an empire actually falls
 supplies the mechanism the pre-epoch version of the same idea runs on: network failure — a realm
 that can no longer reach itself secedes — so Stage 5 is a parameterisation of reach rather than a
@@ -520,8 +519,6 @@ to state.
 - Should the averted rupture's claimants and outcome be seeded (varying per campaign) or
   canonical? Seeded is consistent with the rest of the generation stack; canonical is cheaper to
   write quest/tech fiction against. *BL-223's to answer.*
-- Does Kepler get a nuclear-equivalent deterrence ceiling explicitly, or is the threat's memory
-  alone the ceiling? (Affects Era 1+ conflict design.)
 - How much of this ladder surfaces to the player — a codex, generated history lines only, or
   ambient flavour in quest text? `../generation/CIVILISATION.md` § How a fall is told rules that the story surfaces in the
   history tab, quietly, which answers the pre-epoch half.

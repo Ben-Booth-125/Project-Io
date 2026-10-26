@@ -4,7 +4,7 @@
 > clusters, pairs, joints, masteries, quests and placeholders · every node's advantage, ring and
 > requirements · which next-age branch each quest keys · the traps the tree carries for Era 1.
 > **Not here:** the grammar every age's tree obeys, research points and the queue (../RESEARCH) ·
-> what Era 1 is and how its catastrophe is tested (../ERAS) · what a recipe or building does once
+> what Era 1 is and what opens the next (../ERAS) · what a recipe or building does once
 > unlocked (../PRODUCTION).
 > **Confused with:** ../RESEARCH.md, ../../generation/trees/TREES.md (retired),
 > ../../research/ERA1_TECH_LANDSCAPE.md.
@@ -70,7 +70,8 @@ the espionage and politics systems place their joints there when they land.
 
 ## The traps
 
-The tree carries Era 1's catastrophe test (`../ERAS.md` § Mistakes compound):
+The tree carries Era 1's red herrings — technologies whose cost is the Alarm they raise
+(`../ERAS.md` § Mistakes compound):
 
 | Trap | Where |
 |---|---|
@@ -104,7 +105,7 @@ sketched by what the quests open:
 | Freight | Ten Lanes | Orbital Port & Depots — staging and refuelling above the home body |
 | Force | Proven Readiness | Space Force — units that hold orbit |
 | Order | Broad Consensus | Settlement Charters — governing off-world population |
-| Accord | Quiet Borders | Planetary Accords — the climate catastrophe's Ceiling |
+| Accord | Quiet Borders | Planetary Accords — shared limits on climate Load |
 
 ## Effects
 
@@ -329,11 +330,11 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-ST-AC-B1` | Hotline | minor | 3 | Alarm spikes decay 20% faster | Diplomatic Corps IV |
 | `DG-ST-AC-Ba` | Strategic Deterrent | major (pair) | 4 | attackers’ odds -50% on your home provinces. Escalator: every rival’s Alarm toward you +10 | Hotline |
 | `DG-ST-AC-Bb` | Survivable Forces | major (pair) | 4 | units +25% defence; Alarm toward you drifts -5% a year. Looks aggressive, stabilises | Hotline |
-| `DG-ST-AC-C1` | Inspection Regimes | minor | 3 | world Ceiling +3 | Diplomatic Corps VI |
+| `DG-ST-AC-C1` | Inspection Regimes | minor | 3 | Alarm raised by your visible capability -10% | Diplomatic Corps VI |
 | `DG-ST-AC-C2` | Confidence Measures | minor | 3 | Alarm toward you -5% | Diplomatic Corps VI |
-| `DG-ST-AC-C` | Arms Control Verification | major | 4 | every nation’s Alarm toward you -25%; world Ceiling +10 | Inspection Regimes + Confidence Measures |
+| `DG-ST-AC-C` | Arms Control Verification | major | 4 | every nation’s Alarm toward you -25%; every nation’s Alarm toward every other decays 10% faster | Inspection Regimes + Confidence Measures |
 | `DG-ST-AC-M` | Diplomatic Standing | mastery | 4 | -3% Alarm toward you | Strategic Deterrent or Survivable Forces + Arms Control Verification |
-| `DG-ST-AC-Q` | Quiet Borders | quest | 2 | Alarm toward you decays 10% faster. **Deed:** Alarm toward you below Ceiling for 8 quarters. **Keys next age:** Planetary Accords | Free-Trade Accords or Import Substitution |
+| `DG-ST-AC-Q` | Quiet Borders | quest | 2 | Alarm toward you decays 10% faster. **Deed:** no nation’s Alarm toward you rises for 8 quarters. **Keys next age:** Planetary Accords | Free-Trade Accords or Import Substitution |
 
 ### Joints
 

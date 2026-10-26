@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*3 entries — 3 open, 0 resolved.*
+*5 entries — 5 open, 0 resolved.*
 
 ---
 
@@ -66,6 +66,32 @@ Writing Ben's land rulings into MILITARY.md § The campaign force model took fou
 > **Recommendation:** Keep all four; the realism case is in research/MILITARY_1960_PRESENT.md § 4 and § 10.
 
 *Files: `docs/military/MILITARY.md`, `docs/research/MILITARY_1960_PRESENT.md`*
+
+### NR-1085 — Five calls taken in retiring the Era catastrophe
+*decision taken on your behalf · raised 2026-10-26 · from era catastrophe retirement design pass*
+
+Writing Ben's retirement (ERAS.md § The point of an Era) took five calls he did not make: (1) each nation crosses into the next Era on its own when it meets the gate, not the world at once; (2) Alarm is a third sentiment dimension beside Access and Trust (RELATIONS.md § 6), directed per pair, decaying, under the informs-never-declares invariant; (3) three Digitisation nodes that read the retired Ceiling were rewritten in the store: Inspection Regimes 'Alarm raised by your visible capability -10%', Arms Control Verification's second effect 'every nation's Alarm toward every other decays 10% faster', Quiet Borders' deed 'no nation's Alarm toward you rises for 8 quarters'; Planetary Accords keys 'shared limits on climate Load'; (4) the tempo trap retired with the countdown; (5) climate is Era 2's continuous pressure with no test.
+
+**Why it matters.** Each shapes what a nation chases and what Alarm costs it before any of it is built.
+
+> **Recommendation:** Keep all five. (1) makes the race to orbit the success Ben asked for; (2) reuses a tested substrate rather than adding a new store.
+
+*Files: `docs/economy/ERAS.md`, `docs/politics/RELATIONS.md`, `docs/economy/tech/digitisation_tree.json`, `docs/CLIMATE.md`*
+
+### NR-1086 — Why are strategic nuclear weapons never fired, now there is no catastrophe?
+*question · raised 2026-10-26 · from era catastrophe retirement design pass*
+
+Ben ruled tactical nuclear use permitted and strategic never fired (MILITARY.md § Missiles), the same day the Era catastrophe retired. The old reason - 'firing one is the catastrophe' - is gone. The rule stands as written, with the arsenal acting through Alarm alone.
+
+**Why it matters.** A rule with no stated cause reads as arbitrary to the player, and the AI needs to know what an arsenal is for.
+
+- A: keep the rule; the arsenal is pure deterrence through Alarm
+- B: allow strategic use with ruinous consequences (sentiment collapse with every nation, climate strain, the target razed)
+- C: strategic use only in answer to a strategic strike (second-strike only)
+
+> **Recommendation:** A for v0.3.0: cheapest and legible; revisit B once war goals and peace exist.
+
+*Files: `docs/military/MILITARY.md`*
 
 ---
 

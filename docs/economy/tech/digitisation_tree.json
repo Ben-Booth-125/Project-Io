@@ -3730,12 +3730,12 @@
      "DG-ST-AC-T6"
     ]
    ],
-   "advantage": "world Ceiling +3",
+   "advantage": "Alarm raised by your visible capability -10%",
    "effects": [
     {
      "kind": "unread",
-     "what": "world Ceiling +3",
-     "waits_on": "Ceiling"
+     "what": "Alarm raised by your visible capability -10%",
+     "waits_on": "Alarm"
     }
    ],
    "cost_units": 6
@@ -3777,7 +3777,7 @@
      "DG-ST-AC-C2"
     ]
    ],
-   "advantage": "every nation’s Alarm toward you -25%; world Ceiling +10",
+   "advantage": "every nation’s Alarm toward you -25%; every nation’s Alarm toward every other decays 10% faster",
    "effects": [
     {
      "kind": "unread",
@@ -3786,8 +3786,8 @@
     },
     {
      "kind": "unread",
-     "what": "world Ceiling +10",
-     "waits_on": "Ceiling"
+     "what": "every nation’s Alarm toward every other decays 10% faster",
+     "waits_on": "Alarm"
     }
    ],
    "cost_units": 24
@@ -3832,7 +3832,7 @@
      "DG-ST-AC-Ab"
     ]
    ],
-   "deed": "Alarm toward you below Ceiling for 8 quarters",
+   "deed": "no nation’s Alarm toward you rises for 8 quarters",
    "deed_effect": {
     "kind": "unread",
     "waits_on": "Alarm"

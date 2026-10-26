@@ -4,8 +4,8 @@
 > and what they buy · the shape every age's tech tree shares — four tiers, links that require,
 > clusters, pairs, quests that key the next age, placeholders · how a node is priced · the research
 > queue, and how an AI nation fills it · how an effect no system reads yet is carried.
-> **Not here:** the nodes of one age's tree (tech/DIGITISATION_TREE) · what an Era is and what its
-> catastrophe tests (ERAS) · what a recipe or building does once unlocked (PRODUCTION) · which centre
+> **Not here:** the nodes of one age's tree (tech/DIGITISATION_TREE) · what an Era is and what
+> opens the next (ERAS) · what a recipe or building does once unlocked (PRODUCTION) · which centre
 > may host a university (POPULATION) · the national budget the research line sits in
 > (../politics/NATIONS).
 > **Confused with:** ERAS.md, tech/DIGITISATION_TREE.md, ../generation/trees/TREES.md (retired).

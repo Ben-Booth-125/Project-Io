@@ -105,6 +105,44 @@
     "docs/research/MILITARY_1960_PRESENT.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1085",
+   "title": "Five calls taken in retiring the Era catastrophe",
+   "raised": "2026-10-26",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "era catastrophe retirement design pass",
+   "what": "Writing Ben's retirement (ERAS.md § The point of an Era) took five calls he did not make: (1) each nation crosses into the next Era on its own when it meets the gate, not the world at once; (2) Alarm is a third sentiment dimension beside Access and Trust (RELATIONS.md § 6), directed per pair, decaying, under the informs-never-declares invariant; (3) three Digitisation nodes that read the retired Ceiling were rewritten in the store: Inspection Regimes 'Alarm raised by your visible capability -10%', Arms Control Verification's second effect 'every nation's Alarm toward every other decays 10% faster', Quiet Borders' deed 'no nation's Alarm toward you rises for 8 quarters'; Planetary Accords keys 'shared limits on climate Load'; (4) the tempo trap retired with the countdown; (5) climate is Era 2's continuous pressure with no test.",
+   "why_it_matters": "Each shapes what a nation chases and what Alarm costs it before any of it is built.",
+   "recommendation": "Keep all five. (1) makes the race to orbit the success Ben asked for; (2) reuses a tested substrate rather than adding a new store.",
+   "files": [
+    "docs/economy/ERAS.md",
+    "docs/politics/RELATIONS.md",
+    "docs/economy/tech/digitisation_tree.json",
+    "docs/CLIMATE.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1086",
+   "title": "Why are strategic nuclear weapons never fired, now there is no catastrophe?",
+   "raised": "2026-10-26",
+   "kind": "question",
+   "status": "open",
+   "source": "era catastrophe retirement design pass",
+   "what": "Ben ruled tactical nuclear use permitted and strategic never fired (MILITARY.md § Missiles), the same day the Era catastrophe retired. The old reason - 'firing one is the catastrophe' - is gone. The rule stands as written, with the arsenal acting through Alarm alone.",
+   "why_it_matters": "A rule with no stated cause reads as arbitrary to the player, and the AI needs to know what an arsenal is for.",
+   "options": [
+    "A: keep the rule; the arsenal is pure deterrence through Alarm",
+    "B: allow strategic use with ruinous consequences (sentiment collapse with every nation, climate strain, the target razed)",
+    "C: strategic use only in answer to a strategic strike (second-strike only)"
+   ],
+   "recommendation": "A for v0.3.0: cheapest and legible; revisit B once war goals and peace exist.",
+   "files": [
+    "docs/military/MILITARY.md"
+   ],
+   "resolution": null
   }
  ]
 }

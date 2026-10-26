@@ -55,5 +55,37 @@
   "anchor": "Tactical nuclear weapons may be used; strategic nuclear weapons may not",
   "stale": [],
   "owner": "BL-1431 (missiles and satellites)"
+ },
+ {
+  "ruling": "The Era catastrophe is retired: an Era is opened by achievement, with no test, countdown or Ceiling (Ben, 2026-10-26)",
+  "doc": "docs/economy/ERAS.md",
+  "anchor": "An Era is opened by what a nation achieves",
+  "stale": [
+   "each poses .{0,4}one catastrophe",
+   "Its catastrophe is nuclear war",
+   "Its catastrophe is climate collapse",
+   "Aggregate Alarm above aggregate Ceiling",
+   "next Era.s catastrophe",
+   "Era 2.s catastrophe",
+   "catastrophe test and the recipe band",
+   "how its catastrophe is tested",
+   "closer to its catastrophe",
+   "world Ceiling [+]",
+   "below Ceiling for 8",
+   "whose catastrophe is nuclear war",
+   "the climate catastrophe.s Ceiling",
+   "Catastrophe lean"
+  ],
+  "owner": "BL-1432 (alarm as sentiment)"
+ },
+ {
+  "ruling": "Alarm is kept, as a relations quantity: how threatened one nation feels by another",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "Alarm is a third dimension of sentiment",
+  "stale": [
+   "The Era.s own .{0,2}Alarm.{0,2} scalar",
+   "§ The two scalars"
+  ],
+  "owner": "BL-1432 (alarm as sentiment)"
  }
 ]

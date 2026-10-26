@@ -11,7 +11,7 @@
 > which the history does not run (../economy/RESEARCH, trees/TREES) · how a market clears and how a price resolves
 > (../economy/MARKETS) · how a haul is costed (../economy/SUPPLY) · how a charter's buildings are
 > placed on a nation's ground (CORPORATION_GENERATION) · how the culture lens draws (../ui/LENSES) · the
-> wizard round's surface (../ui/STARTUP § Rounds) · the Era 1 catastrophe test and the recipe band
+> wizard round's surface (../ui/STARTUP § Rounds) · the Era model, Alarm's place in it, and the recipe band
 > (../economy/ERAS)
 > · how force resolves inside the sim (MILITARY_HISTORY) · the pass map and the calendar
 > (GENERATION_STRATEGY § Pass 2).
@@ -772,8 +772,8 @@ were spent or remitted elsewhere for generations. That makes it the natural grou
 always hit.** Every world fights one in this span. It destroys four things: **population** (conscripts,
 famine, flight), **industry** (works and capital razed in the regions fought over), **infrastructure**
 (roads and ports), and **treasuries** (war debt). The world then redevelops before 1960, so the
-campaign opens on a recovery. It is still not the rupture: the Era 1 catastrophe stays averted, not
-past (`../lore/HISTORY.md`). The ruling below stands for how a world war forms; its "never forced"
+campaign opens on a recovery. It is still not a nuclear war: the world pulled back from that brink, and
+its memory is lore (`../lore/HISTORY.md`). The ruling below stands for how a world war forms; its "never forced"
 and the acceptance row "never all, never none" are overturned.
 
 **When and what it costs (Ben, 2026-10-11).**
@@ -845,20 +845,20 @@ industry points (§ Beat 1). War weariness lowers cohesion across the fighting r
 every subject's refusal at renewal — so a power that wins a war over empire can lose its empire
 paying for it.
 
-#### A world war leaves the campaign closer to its catastrophe
+#### A world war leaves the campaign more alarmed
 
 **SETTLED (Ben, 2026-09-15, notes):** a seed that fought a world war *"will be more likely to fail
-our Era 1 catastrophe — nuclear war."*
+our Era 1 catastrophe — nuclear war."* The catastrophe is retired (Ben, 2026-10-26); the Alarm
+stands.
 
-**It does so through the two scalars `../economy/ERAS.md` § The two scalars already carries, and
-through no third one.** A world war leaves every surviving belligerent more **Alarm**ed — standing
-mechanised force its neighbours can see, grudges written by the dead, and trade flows the war
-severed — and none of that adds **Ceiling**, which is the memory of a rupture *averted*. So a world
-war moves the epoch toward the failure branch of the test without deciding it.
+**It does so through Alarm (`../politics/RELATIONS.md` § 6), and through no other scalar.** A world
+war leaves every surviving belligerent more **Alarm**ed — standing mechanised force its neighbours
+can see, grudges written by the dead, and trade flows the war severed. So a world war opens a tenser
+campaign, not a doomed one.
 
-**It is not the rupture.** `../lore/HISTORY.md` § Stage 5 places the rupture ahead of the player,
-*averted, not past*, and a conventional world war before the epoch does not contradict that. It is
-the reason the campaign's near-miss is nearer on some worlds than on others.
+**It is not a nuclear war.** `../lore/HISTORY.md` § Stage 5 holds the near-miss the world pulled
+back from, and a conventional world war before the epoch does not contradict that. It is the reason
+some worlds open tenser than others.
 
 ---
 
@@ -878,7 +878,7 @@ prices. Every property in Part I needs a stated rule for crossing that gap.
 | Held-and-worked duration, class, throughput | `tile_component::resource_remaining` | The depletion formula (§ Spend is estimated at the end) |
 | Standing wars and patron links | A war condition on provinces | Property 3 |
 | Army stock | Regime, garrisons | Property 6's stubs; no technology crosses (Ben, 2026-10-10) |
-| War grudges, standing force, severed flows | Per-nation Alarm at the epoch | § A world war leaves the campaign closer to its catastrophe |
+| War grudges, standing force, severed flows | Per-nation Alarm at the epoch | § A world war leaves the campaign more alarmed |
 
 ### This phase sets budgets; the search spends them
 
@@ -953,7 +953,7 @@ Readings taken at **1960 CE** over a **seed spread**, never per world — the di
 | **Decolonisation** | Fewer subjects at 1960 than at 1660, not zero, and at least one lost without a war |
 | **World war** | Present in every world (Ben, 2026-10-10), with population, industry, infrastructure and treasuries lost and rebuilt by 1960 |
 | **War dead** | Every war lowers population somewhere; no region emptied by one |
-| **Catastrophe lean** | Worlds that fought a world war open with higher aggregate Alarm against Ceiling than worlds that did not |
+| **Alarm lean** | Worlds that fought a world war open with higher Alarm than worlds that did not |
 | **A rival far away** (Ben, 2026-10-03) | The strongest industrial nation has a rival on another landmass, or a quarter of the world away, holding at least a quarter of its industry points — so the player is never handed a favourite free of competition |
 
 **A reading is a requirement, not a target.** A seed that refuses one is a legitimate world; a

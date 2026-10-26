@@ -86,16 +86,16 @@ itself. This is diplomacy doing the load-bearing work rather than decorating it,
 player can join, split, or provoke.
 
 **A second brake exists in the design and is NOT available here.** Climate is a commons that the
-largest operator strains most, and it would brake a runaway without naming anyone. But climate is the
-**next Era's catastrophe** (`docs/economy/ERAS.md` § The point of an Era; designed ahead in
+largest operator strains most, and it would brake a runaway without naming anyone. But climate is
+**Era 2's pressure** (`docs/economy/ERAS.md` § The point of an Era; designed ahead in
 `docs/CLIMATE.md`) and sits **outside prototype scope** — so nothing here may lean on it. Stated
 plainly because it changes what this design is claiming: in the prototype, if coalitions do not brake
 a runaway, **nothing else does**, and that is a finding about coalitions rather than an argument for
 reaching for the opt-in dial.
 
-The Era's own **Alarm** scalar is a genuine second pressure and a different one — it bears on
-*every nation*, not on the leader, and it is a catastrophe to avoid rather than a brake on
-standing. Do not conflate them.
+**Alarm** is a genuine second pressure and a different one — it is felt per pair, toward whoever
+is visibly threatening rather than toward the leader as such (`../politics/RELATIONS.md` § 6). It
+can feed a coalition, but it is not a brake on standing. Do not conflate them.
 
 Coalitions are legible, have a cause, and **feed Trade or Conflict** — which an objective term
 does not, and which every system in Io is required to do.

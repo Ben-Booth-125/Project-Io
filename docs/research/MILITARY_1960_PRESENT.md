@@ -276,6 +276,10 @@ well against short-range threats and poorly against long-range ones. **The cost 
 game:** an interceptor costs far more than a cheap drone (§ 9), so defence drains the defender's
 economy. That is Trade ↔ Conflict in one mechanic.
 
+> **Ruled 2026-10-26:** C — tactical use permitted, strategic never fired. The same day Ben retired
+> the Era catastrophe (`economy/ERAS.md` § The point of an Era), so the collision below no longer
+> stands; strategic nuclear weapons now act through Alarm alone.
+
 ### The nuclear question — the brief collides with ERAS.md
 
 `economy/ERAS.md` makes **nuclear war Era 1's catastrophe**, fired when aggregate Alarm passes

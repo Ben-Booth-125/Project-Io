@@ -1,8 +1,8 @@
 # Project Io — Climate
 
 > **Settles:** what climate state a body carries and what moves it during play · what pressure the
-> commons puts on the people and nations under it · which era owns the catastrophe · how the change
-> is made legible · what causes the Era boundary.
+> commons puts on the people and nations under it · which era it defines · how the change is made
+> legible.
 > **Not here:** how a body's scalars were generated in the first place (generation/PLANETOLOGY) ·
 > the era ladder itself (economy/ERAS).
 > **Confused with:** generation/PLANETOLOGY.md, economy/ERAS.md, EVENTS.md.
@@ -10,40 +10,39 @@
 Authority doc for **climate**: the state of a body's habitability as it changes during play, what
 changes it, and what that does to the people and nations living under it.
 
-**Scope, stated first.** Climate is **Era 2's catastrophe** — Early Space — not Era 1's. Ben,
+**Scope, stated first.** Climate is **Era 2's defining pressure** — Early Space — not Era 1's. Ben,
 2026-08-31: *"I am not against climate change being a large problem for Era 2, but our prototype
 works solely on Era 1 for now."* This document designs it **ahead**, so the Era ladder has a second
 rung that is a real design rather than a placeholder. **Nothing in Era 1 is built against it**, and
 no other doc should lean on it as though it were available.
 
 That placement is also the right one on its own terms: climate state is per body (§ 5), so the
-catastrophe only has its full shape once more than one body is reachable — which is Era 2's
+pressure only has its full shape once more than one body is reachable — which is Era 2's
 territory.
 
 ---
 
 ## 1. The shape it inherits
 
-`docs/economy/ERAS.md` § The point of an Era makes every Era the same kind of object: **one
-catastrophe the player is playing to avoid**, resolved deterministically from a quantity the player
-can watch and act on, with attractive technologies whose real cost is not on their own stat line.
+`docs/economy/ERAS.md` § The point of an Era makes every Era the same kind of object: **opened by an
+achievement**, with a defining pressure — a quantity the player can watch and act on, raised by
+attractive technologies whose real cost is not on their own stat line. There is no catastrophe test
+(Ben, 2026-10-26): the pressure is a continuous cost, never a pass/fail.
 
-Climate is that pattern with a different quantity. Era 1's catastrophe is a nuclear war and its watched
-scalar is **Alarm** — how threatened other nations feel. Era 2's is a habitability collapse and its
-watched scalar is **Load** — how hard the world is being pushed.
+Climate is that pattern with a different quantity. Era 1's pressure is **Alarm** — how threatened
+other nations feel. Era 2's is **Load** — how hard a body is being pushed.
 
 The parallel is deliberate and load-bearing. It is what makes the Era ladder a **system** rather
 than a series of unrelated set-pieces, and it means the machinery built for the first rung — a
-watched accumulating scalar, a seeded test date, red herrings with tells, deed-gated capstones —
-is the machinery the second rung reuses.
+watched accumulating scalar, red herrings with tells, deed-gated capstones — is the machinery the
+second rung reuses.
 
 | | Era 1 — Terrestrial | Era 2 — Early Space |
 |---|---|---|
-| Catastrophe | Nuclear war | Habitability collapse |
-| Watched scalar | **Alarm** — how threatened others feel | **Load** — how hard the world is pushed |
+| Watched scalar | **Alarm** — how threatened others feel | **Load** — how hard a body is pushed |
 | Raised by | Visible capability, severed trade, posture, unrest | Extraction and processing at scale |
 | Relieved by | Trade interdependence, disclosure, inspection | Reduced draw; remediation; moving load off-world |
-| Failure lands on | The assets the space programme needed | The ground the population lives on |
+| Bites on | How other nations treat you | The ground the population lives on |
 
 ---
 
@@ -131,14 +130,14 @@ a solar system of genuinely different atmospheres, and a shared figure would hav
 extraction degrading a homeworld's air.
 
 Per body is the commons that matters, and it scales correctly: spreading production across bodies is
-also **spreading load**, which is why this catastrophe belongs to an Era where more than one body is
+also **spreading load**, which is why this pressure belongs to an Era where more than one body is
 reachable.
 
 ---
 
 ## 6. Legibility is part of the mechanism
 
-Same rule the Alarm scalar carries. The body's climate state is **visible as a number and a trend**;
+Same rule Alarm carries. The body's climate state is **visible as a number and a trend**;
 a nation's **own contribution** is visible to it; the consequence is **attributable**. A player
 who experiences climate as "my output got worse for no stated reason" has been cheated, however
 correct the arithmetic.
@@ -163,8 +162,6 @@ place to operate, never a closed one.
 4. **Whether remediation is buildable**, which would make it a market rather than only a cost.
 5. **Whether nations act on it** — a levy or a law answering climate would reach the 2026-08-18
    nation grant (`.claude/rules/io-standing-rules.md`).
-6. **The test's shape** — whether climate's catastrophe resolves on a seeded date like Alarm's, or
-   on a threshold crossing whenever it happens.
 
 ---
 
@@ -172,7 +169,7 @@ place to operate, never a closed one.
 
 | Subject | Doc |
 |---|---|
-| The Era model this inherits — catastrophe, scalar, test, herrings | `docs/economy/ERAS.md` § The point of an Era |
+| The Era model this inherits — achievement, pressure, herrings | `docs/economy/ERAS.md` § The point of an Era |
 | The physical model and its scalars | `docs/generation/PLANETOLOGY.md` |
 | Climate bands as a terrain and deposit input | `docs/generation/TILE_GENERATION.md`, `docs/economy/TILES.md` |
 | Endemic goods and their latitude bands | `docs/generation/PLANETOLOGY.md` § Endemism |
