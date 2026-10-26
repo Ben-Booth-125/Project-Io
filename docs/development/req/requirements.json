@@ -7611,21 +7611,21 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1406 - sprint 57 (Ben, 2026-10-23)",
    "batch": "sprint-57",
-   "resolved": null,
+   "resolved": "2026-10-26",
    "resolution": null,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: verifier-visual lens scripts",
       "live: Ben's click"
      ],
      "requirement": "The seat screen, header and lenses read as the nation; no corporation surface remains.",
-     "notes": "Built and captured (lane 8fcfe1cb, merged 033dd6d0): the app builds; nation_seat_ui.lua asserts pass on a folded world (header TREASURY, the Nation overview draws, Construct greyed on another nation's tile); lens_strip, lens_strip_glyphs, default_lens, header, corp_dashboard, lens_legend, lens_selection_paths pass. lens_structure_pivot / lens_one_tier / convoys_ledger / shell_pass fail on paths the lane did not touch (judged pre-existing, not proven against base). PENDING BEN'S LIVE CLICK: (1) header TREASURY, NET, runway hover; (2) rail slot 1 Nation overview, its control, segment hovers; (3) slots 5 and 9 inert, L / Shift+L never lands on a corporation lens; (4) own tile vs foreign tile: Construct enabled vs greyed, the placement ghost red off own ground; (5) a road row on unowned ground: 'No nation holds this tile'; (6) Dispatch Survey, Hire at a base, a Trades-tab press, a research queue press; (7) the seat screen list and briefing; (8) the profile card and resting Selection band show the nation."
+     "notes": "Built and captured (lane 8fcfe1cb, merged 033dd6d0): the app builds; nation_seat_ui.lua asserts pass on a folded world (header TREASURY, the Nation overview draws, Construct greyed on another nation's tile); lens_strip, lens_strip_glyphs, default_lens, header, corp_dashboard, lens_legend, lens_selection_paths pass. lens_structure_pivot / lens_one_tier / convoys_ledger / shell_pass fail on paths the lane did not touch (judged pre-existing, not proven against base). PENDING BEN'S LIVE CLICK: (1) header TREASURY, NET, runway hover; (2) rail slot 1 Nation overview, its control, segment hovers; (3) slots 5 and 9 inert, L / Shift+L never lands on a corporation lens; (4) own tile vs foreign tile: Construct enabled vs greyed, the placement ghost red off own ground; (5) a road row on unowned ground: 'No nation holds this tile'; (6) Dispatch Survey, Hire at a base, a Trades-tab press, a research queue press; (7) the seat screen list and briefing; (8) the profile card and resting Selection band show the nation. LIVE CLICK PASSED (Ben, 2026-10-24: \"everything else passes\")."
     },
     {
      "id": "R2",

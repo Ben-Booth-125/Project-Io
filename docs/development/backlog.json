@@ -623,8 +623,8 @@
    "design": "SPRINT 57 ITEM 5. Rulings: docs/GLOSSARY.md (Corporation, Company, Own ground ...), docs/CONCEPT.md § Player identity, docs/politics/NATIONS.md § What a nation owns / § Own ground, docs/ai/AI_OPPONENT.md § 11 last entry (Ben, 2026-10-23). With every building the nation's, the state / champion / other share classes (logistic_points.cpp:447-457, :641-650) collapse to one; the share rule and set_logistics_shares retire (read from old saves, ignored). Verify lp_coverage_census, lp_pool_harness."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 57,
    "written": "2026-10-23",
    "parked": false,
@@ -705,8 +705,8 @@
    "design": "SPRINT 57 ITEM 9. Every item before this moves the world; the wave re-blesses ONCE (DELIVERY.md § The digest re-bless is one act per WAVE), on Ben's go, with each mover attributed. Rail fade 8 -> 20 (NR-1056, 693be258) is in this wave too. Finish with the ruling-check skill against tools/session/rulings/sprint-57.json. ADDED 2026-10-24: the icon_silhouettes_overview golden needs one re-bless (it was blessed under the retired Corporation lens) on Ben's go (NR-1070)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 57,
    "written": "2026-10-24",
    "parked": false,
@@ -726,7 +726,7 @@
     "tools/verify/nation_ai_builds.cpp"
    ],
    "title": "A nation that owns its whole economy finds no build on a thin world, and its treasury falls",
-   "design": "SPRINT 57, found at BL-1402's gate. On the folded world (BL-1402), seed 46's 4 majors place NO production building in 40 seated ticks (seeds 0 and 28 still pass: 3/5 and 1/1). Diagnosed 2026-10-24 with nation_ai_builds' new diagnostic lines: every extraction candidate is refused before selection - placement (60-210 per major), construction materials not obtainable (30-110), net <= 0 and glut vetoes - and the majors decide only dials; their treasuries are far above the floor (e.g. 8549 vs 312) but FALLING (27407 -> 8549 over the window for nation 47763). A reading of a thin, glutted economy, not a scorer defect; the row is left failing rather than weakened. Owned by BL-1409. THE WORK: measure first (which candidates fail placement and why - reach, needs_road, own ground at the nation's edge?; whether 'materials not obtainable' reads the nation's own shelves now that every producer is the nation's), and read the treasury trajectory over market_viability's 400 ticks on the 16 seeds; then decide with Ben whether anything is wrong. Never retune to make R1 pass. Pairs with BL-1403 (the tax returns a share of wages, which slows the fall). ADDED 2026-10-24: BL-1402 T8 (AI nations pin trades, build Marketplaces, survey) is PARKED as docs/development/drafts/bl-1402-t8-nation-ai-trade.patch - re-opened it fails market_viability G1t50 (84.0; 84.6 with pins off). Measure it with the treasury trajectory: the same question of how a nation owning every plant trades against its own inputs (NR-1071)."
+   "design": "SPRINT 57, found at BL-1402's gate. On the folded world (BL-1402), seed 46's 4 majors place NO production building in 40 seated ticks (seeds 0 and 28 still pass: 3/5 and 1/1). Diagnosed 2026-10-24 with nation_ai_builds' new diagnostic lines: every extraction candidate is refused before selection - placement (60-210 per major), construction materials not obtainable (30-110), net <= 0 and glut vetoes - and the majors decide only dials; their treasuries are far above the floor (e.g. 8549 vs 312) but FALLING (27407 -> 8549 over the window for nation 47763). A reading of a thin, glutted economy, not a scorer defect; the row is left failing rather than weakened. Owned by BL-1409. THE WORK: measure first (which candidates fail placement and why - reach, needs_road, own ground at the nation's edge?; whether 'materials not obtainable' reads the nation's own shelves now that every producer is the nation's), and read the treasury trajectory over market_viability's 400 ticks on the 16 seeds; then decide with Ben whether anything is wrong. Never retune to make R1 pass. Pairs with BL-1403 (the tax returns a share of wages, which slows the fall). ADDED 2026-10-24: BL-1402 T8 (AI nations pin trades, build Marketplaces, survey) is PARKED as docs/development/drafts/bl-1402-t8-nation-ai-trade.patch - re-opened it fails market_viability G1t50 (84.0; 84.6 with pins off). Measure it with the treasury trajectory: the same question of how a nation owning every plant trades against its own inputs (NR-1071). CLOSED 2026-10-26: resolved by the sprint 57 polish wave - nation_ai_builds 24/0 on main 05f53640, R1 passes on every seed (seed 46: 4 of 4 majors build)."
   },
   {
    "status": "proposed",
@@ -751,8 +751,8 @@
    "design": "Found merging the Logistics lens, 2026-10-25. scripts/verify/logistics_lens.lua fails 4 rows on main 765f585d (BL-1354 makes, T5 generates, T6 staged hub generates, T7 green road) and 2 after the lens merge. In the verify world the player nation holds a Port at (259,83) that makes 0, the key reads generated 0 by 0 sources, and even a staged logistics hub beside it generates 0. The verify run never prints the [lp] seeding line the game prints, so its world may skip seed_logistics_sources or idle every player source (the funding gate, or construction days leaving staged sites unfinished). The live game seeds every nation (100% granted). THE WORK: find which; make the verify world build as the game does; then logistics_lens.lua passes without weakening a row. ALSO (2026-10-26, Trade-flow lane): the same empty pool makes the trade pass ship nothing for the player in the verify world (the shipment LP draw refuses it), so trade_flow_lens.lua reads 0 arrows and trade_flow_routed.lua has to stage its flow; sea_lane.lua is likely hit too."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 57,
    "written": "2026-10-25",
    "parked": false,
@@ -771,7 +771,7 @@
     "tools/verify/lp_coverage_census.cpp"
    ],
    "title": "Seed 38: one building on its own capital ground is unconnectable",
-   "design": "Found at NR-1080's gate on main 7c5eb0b4. lp_coverage_census seed 38: building 65626 of Satu Rosei (a major) at col 168 row 8 is unconnectable (granted 1650 of 1655). It stands on the nation's own 317-tile capital group, cut_off 0, so it is no enclave or speck: the site-join or the hub seeding failed to reach it inside its own ground. The seat rule moved seed 38's world, which put industry there. THE WORK: trace why lay_site_roads_every_body or the hub placement misses it; fix in that mechanism; census 0 on seeds 0, 1, 28, 38 and 46."
+   "design": "Found at NR-1080's gate on main 7c5eb0b4. lp_coverage_census seed 38: building 65626 of Satu Rosei (a major) at col 168 row 8 is unconnectable (granted 1650 of 1655). It stands on the nation's own 317-tile capital group, cut_off 0, so it is no enclave or speck: the site-join or the hub seeding failed to reach it inside its own ground. The seat rule moved seed 38's world, which put industry there. THE WORK: trace why lay_site_roads_every_body or the hub placement misses it; fix in that mechanism; census 0 on seeds 0, 1, 28, 38 and 46. CLOSED 2026-10-26: lp_coverage_census seed 38 reads 0 unconnectable on main after industry placement (d6f3eef5)."
   },
   {
    "status": "proposed",

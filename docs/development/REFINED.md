@@ -63,15 +63,15 @@ and leak treasury money into empty corporations. So the PORT lands first, the fo
 - [x] **T1** One share class; the share rule and `set_logistics_shares` retire (`logistic_points.cpp`). (R1)
 
 ### BL-1406 (UI and protocol as nation) — lane U, group `ui-as-nation`
-- [ ] **T1** Seat screen lists majors; header shows the treasury. (R1)
-- [ ] **T2** Corporation and Company lenses and the corporation/company/acquisition ledgers retire or re-subject. (R1)
-- [ ] **T3** `as_corp`, `buy_corporation`, `lobby` leave the wire; ACTIONS.json regenerated; question_log and ui_elements updated. (R2)
-- [ ] **T4** verifier-visual captures, then Ben's live click. (R1)
+- [x] **T1** Seat screen lists majors; header shows the treasury. (R1)
+- [x] **T2** Corporation and Company lenses and the corporation/company/acquisition ledgers retire or re-subject. (R1)
+- [x] **T3** `as_corp`, `buy_corporation`, `lobby` leave the wire; ACTIONS.json regenerated; question_log and ui_elements updated. (R2)
+- [x] **T4** verifier-visual captures, then Ben's live click. (R1)
 
 ### BL-1407 (delete corporation_component) — Delivery Full, group `delete-corporation`
-- [ ] **T1** Delete the type, `world::corporations`, `owner_kind::corporation`, corp-only verbs, balance branches. (R1)
-- [ ] **T2** Save v56 with a v54/v55 reader through `fold_to_ground`. (R2)
-- [ ] **T3** Harnesses: `harness_params.hpp` first; gates re-pointed; mechanism tests retired. (R1, R3)
+- [x] **T1** Delete the type, `world::corporations`, `owner_kind::corporation`, corp-only verbs, balance branches. (R1)
+- [x] **T2** Save v56 with a v54/v55 reader through `fold_to_ground`. (R2)
+- [x] **T3** Harnesses: `harness_params.hpp` first; gates re-pointed; mechanism tests retired. (R1, R3)
 
 ### BL-1408 (sprint 57 re-bless) — group `sprint-57-rebless`
 - [ ] **T1** Attribute every mover, re-pin on Ben's go, ruling-check against `rulings/sprint-57.json`. (R1)
