@@ -72,7 +72,7 @@
  "sprints": [
   {
    "id": "57",
-   "theme": "nations own everything",
+   "theme": "economy polish",
    "state": "open",
    "status_line": "OPEN 2026-10-23. Design written into GLOSSARY, CONCEPT, NATIONS, AI_OPPONENT 11 and the sibling sweep; nine items cut.",
    "opened_date": "2026-10-23",
@@ -81,7 +81,8 @@
    "planned": [
     "WAVE 1 - SEAM. BL-1399 (nation builds own ground), then BL-1401 (nation AI actor), then BL-1402 (fold to ground).",
     "WAVE 2 - PARALLEL. BL-1403 (nation money flows), BL-1404 (generation buys for nations), BL-1405 (LP one class), BL-1406 (UI and protocol as nation).",
-    "WAVE 3 - DELETE. BL-1407 (delete corporation_component), then BL-1408 (sprint 57 re-bless)."
+    "WAVE 3 - DELETE. BL-1407 (delete corporation_component), then BL-1408 (sprint 57 re-bless).",
+    "WAVE 4 - ECONOMY POLISH (Ben, 2026-10-26: label the sprint an economy polish sprint). Logistics lens, sea lanes, port links, construction days and payment, the site finder, contiguity fixes, and the live-click round of 2026-10-26."
    ],
    "risk": "The largest change in the project: every gate and digest moves, the save format bumps twice, 95 harnesses reference the deleted type. Ben chose the hard delete in one sprint over a staged one (2026-10-23).",
    "done_when": "No corporation_component in src or tools; every building on its owner's ground; minors and majors build; the player's nation is never built for; a v54 save loads; the load-bearing gates run and report; one re-bless on Ben's go.",
