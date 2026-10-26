@@ -21,6 +21,7 @@ enum class construction_result : uint8_t
     wrong_air,           ///< The recipe cannot run on this body's air (propellant routes, Ben 2026-10-09).
     needs_road,          ///< BL-1347: no road reaches the tile (a building), or the named tile carries none to lay from (BL-1348, a road).
     foreign_ground,      ///< BL-1357: a road may cross a border and no further -- the named tile is another nation's.
+    site_busy,           ///< One site per tile (Ben, 2026-10-26): a building is already under construction on the tile.
     // BL-692 removed `depth_locked` (BL-428): chain depth no longer gates a
     // build, so the value became unreachable. Tech is the only method lock now.
 };
@@ -54,10 +55,12 @@ int construction_build_days(const world& w, const recipe_registry& reg,
 int construction_build_ticks(const world& w, const recipe_registry& reg,
                              entity_id tile, building_type type, resource_type target);
 
-/// BL-1066 (Ben, 2026-09-23): what a build will actually draw, priced now — the flat
-/// `build_cost` plus the materials at the tile market's current price, times the site
-/// multiplier, plus the construction capacity drawn per build tick. The ONE figure the affordability gate, the Build door and the rival
-/// scorer price a build at, so no reader can commit to less than the build will draw.
+/// BL-1066 (Ben, 2026-09-23) / CREDITS ARE THE WHOLE COST (Ben, 2026-10-26): what a
+/// build costs in credits — the authored flat `build_cost` times the site multiplier
+/// (the site's days over the authored days), and nothing else; no material price
+/// enters it, since the materials leave the shelf unpaid. Exactly the credit the
+/// placed site pays (`construction_credit_cost`). The ONE figure the affordability
+/// gate, the Build door, the site finder and the rival scorer price a build at.
 float construction_capex(const world& w, const recipe_registry& reg, entity_id tile,
                          building_type type, resource_type target,
                          std::uint16_t recipe = no_recipe);

@@ -13,13 +13,22 @@
 //   R7  a shortfall is carried, drawn first, and claimed ahead of the quarter ahead
 //   R8  no over-promise: two sites placed on one shelf in one tick, and two at a tick
 //   R9  a site cancelled before completion refunds its credits in full, not materials
+//   R10 CREDITS ARE THE WHOLE COST (Ben, 2026-10-26): a material draw costs no credits
+//       (no purchase, nothing billed at the clear) and is still the market's demand
+//   R11 ONE SITE PER TILE (Ben, 2026-10-26): the door refuses a second site on a tile
+//       with one under construction; and the quoted cost equals the credit paid
 //
+// Draws are read off the SHELF (its steel before and after a step), never the
+// purchase register: since credits are the whole cost, a site's draw records no
+// purchase at all (R10 asserts that), so the shelf is the only honest witness.
 // Hand-builds a minimal world (no Lua / SDL / ImGui), the construction_gate_harness
 // shape: one nation, one market, one extraction site.
 
 #include "world/components.hpp"
 #include "world/construction.hpp"
 #include "world/economy_system.hpp"
+#include "world/market_clearing.hpp" // clear_markets: R10 bills the tick
+#include "world/placement_rules.hpp" // k_richness_per_site: R11
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
@@ -136,6 +145,9 @@ float output_of(const economy_report& rep, entity_id b)
             return r.output_quantity;
     return 0.0f;
 }
+
+/// The steel the shelf of @p s's market holds now.
+float shelf_steel(const scene& s) { return s.w.markets.at(s.market).inventory[ri(resource_type::steel)]; }
 
 /// Step one quarter. @p daily: advance the day loop 1..90 first, as the app does;
 /// otherwise the economy step's own catch-up advances the quarter. Returns (daily
@@ -296,9 +308,9 @@ int main()
                 if (open && done < 0 && a.w.buildings.at(a.site).ticks_remaining == 0)
                     done = q * Q + d;
             }
-            const economy_report rep = run_economy_step(a.w, reg);
-            if (const auto it = rep.purchases.find({a.nation, a.market}); it != rep.purchases.end())
-                per_tick[q] = it->second[ri(resource_type::steel)];
+            const float shelf0 = shelf_steel(a);
+            run_economy_step(a.w, reg);
+            per_tick[q] = shelf0 - shelf_steel(a);
             steel += per_tick[q];
             if (const auto lit = a.w.state_ledger.find(a.nation); lit != a.w.state_ledger.end())
                 tick_credits += lit->second.construction;
@@ -333,15 +345,15 @@ int main()
         begin_construction_on_placement(s.w, reg, s.nation, b, false);
         const std::size_t st = ri(resource_type::steel);
         s.w.markets.at(s.market).inventory[st] = 3.0f;
-        economy_report r1 = run_economy_step(s.w, reg);
-        const float d1 = r1.purchases[{s.nation, s.market}][st];
+        run_economy_step(s.w, reg);
+        const float d1 = 3.0f - shelf_steel(s);
         const building_component& b1 = s.w.buildings.at(s.site);
         check(std::fabs(d1 - 3.0f) < 1e-3f && b1.build_arrears_milli == 60000 && b1.build_rate_permille == 0,
               "R7 a short shelf: 3 of 9 drawn, 60 days' materials (6 steel) stay owed, the quarter ahead pauses",
               b1.build_arrears_milli, 60000);
         s.w.markets.at(s.market).inventory[st] = 10.0f;
-        economy_report r2 = run_economy_step(s.w, reg);
-        const float d2 = r2.purchases[{s.nation, s.market}][st];
+        run_economy_step(s.w, reg);
+        const float d2 = 10.0f - shelf_steel(s);
         const building_component& b2 = s.w.buildings.at(s.site);
         check(std::fabs(d2 - 6.0f) < 1e-3f && b2.build_arrears_milli == 0,
               "R7 the next tick draws the 6 owed first", d2, 6.0);
@@ -375,9 +387,9 @@ int main()
         const float claimed = construction_claims_on(s.w, reg, s.market)[st];
         check(r1 == 1000 && r2 == 500, "R8 placement: the second site reads what the first left (1000, 500)", r2, 500);
         check(claimed <= 13.5f + 1e-3f, "R8 a quarter's claims on one shelf never exceed it", claimed, 13.5);
-        const economy_report rep = run_economy_step(s.w, reg);
-        const auto pit = rep.purchases.find({s.nation, s.market});
-        const float drawn = pit != rep.purchases.end() ? pit->second[st] : 0.0f;
+        const float shelf8 = shelf_steel(s);
+        run_economy_step(s.w, reg);
+        const float drawn = shelf8 - shelf_steel(s);
         check(std::fabs(drawn - 13.5f) < 1e-3f && s.w.buildings.at(s.site).build_arrears_milli == 0
                   && s.w.buildings.at(site2).build_arrears_milli == 0,
               "R8 the tick draws what was claimed, and nothing is short", drawn, 13.5);
@@ -404,7 +416,7 @@ int main()
         building_component& b = s.w.buildings.at(s.site);
         b.build_rate_permille = 0; b.build_paid_days = 0;
         begin_construction_on_placement(s.w, reg, s.nation, b, false);
-        run_economy_step(s.w, reg); // 90 days built: 9 steel drawn and billed
+        run_economy_step(s.w, reg); // 90 days built: 9 steel drawn, unpaid
         const float paid = s.w.buildings.at(s.site).construction_paid;
         const float before = s.w.nations.at(s.nation).treasury;
         const float inv_before = s.w.markets.at(s.market).inventory[ri(resource_type::steel)];
@@ -413,8 +425,10 @@ int main()
         check(gone && std::fabs(back - 180.0f) < 1e-3f
                   && std::fabs(s.w.nations.at(s.nation).refund_unbooked - 180.0f) < 1e-3f,
               "R9 a cancelled site refunds the whole 180 credits paid at placement, booked as a refund", back, 180.0);
-        check(paid > 180.0f + 1e-3f && s.w.markets.at(s.market).inventory[ri(resource_type::steel)] == inv_before,
-              "R9 the materials it drew are not returned (paid more than its credits; the shelf unchanged)", paid, 180.0);
+        check(std::fabs(paid - 180.0f) < 1e-3f && inv_before < 1000.0f - 1.0f
+                  && s.w.markets.at(s.market).inventory[ri(resource_type::steel)] == inv_before,
+              "R9 the materials it drew are not returned, and were never paid (its record is the 180 credits; "
+              "the shelf, 9 short, unchanged by the cancel)", paid, 180.0);
 
         scene c = make_scene(1000.0f, 0);
         c.w.buildings.at(c.site).ticks_remaining = 0;
@@ -431,15 +445,109 @@ int main()
         float steel = 0.0f;
         for (int q = 0; q < 3; ++q)
         {
-            const economy_report rep = run_economy_step(s.w, reg);
-            if (const auto it = rep.purchases.find({s.nation, s.market}); it != rep.purchases.end())
-                steel += it->second[ri(resource_type::steel)];
+            const float shelf0 = shelf_steel(s);
+            run_economy_step(s.w, reg);
+            steel += shelf0 - shelf_steel(s);
         }
         check(std::fabs(steel - 15.0f) < 1e-3f, "R5 the whole build draws 18 x 150 / 180 steel", steel, 15.0);
-        // And construction_capex prices the same days.
         const entity_id tile = s.w.buildings.at(s.site).tile;
         check(construction_build_days(s.w, reg, tile, building_type::extraction_site, resource_type::iron_ore) >= 1,
               "R5 a durationed type takes at least one day", 1, 1);
+    }
+
+    // R10 (Ben, 2026-10-26): CREDITS ARE THE WHOLE COST. "A material draw shouldn't
+    // affect the cost of buildings, but having the building should affect the market."
+    // A site placed on day 0 builds 90 days; the next tick draws their 9 steel off the
+    // shelf. The draw records NO purchase, the clear bills the nation nothing and writes
+    // no purchase row, and the treasury does not move — yet the 9 steel are the
+    // market's demand, and the price stands above a control world's with no site.
+    {
+        scene s = make_scene(1000.0f, 180);
+        building_component& b = s.w.buildings.at(s.site);
+        b.build_rate_permille = 0; b.build_paid_days = 0;
+        begin_construction_on_placement(s.w, reg, s.nation, b, false);
+        const std::size_t st = ri(resource_type::steel);
+        const float t_placed = s.w.nations.at(s.nation).treasury;
+        const float shelf0   = shelf_steel(s);
+        economy_report rep = run_economy_step(s.w, reg);
+        const float drawn = shelf0 - shelf_steel(s);
+        const auto pit = rep.purchases.find({s.nation, s.market});
+        const float bought = pit != rep.purchases.end() ? pit->second[st] : 0.0f;
+        const auto flows = clear_markets(s.w, reg, rep);
+        const auto fit = flows.find(s.nation);
+        const float spent = fit != flows.end() ? fit->second.expenditure : 0.0f;
+        bool purchase_row = false;
+        for (const exchange_record& e : s.w.exchanges.entries)
+            if (e.side == 1 && e.resource == resource_type::steel)
+                purchase_row = true;
+        check(std::fabs(drawn - 9.0f) < 1e-3f, "R10 the tick drew the 90 days' 9 steel off the shelf", drawn, 9.0);
+        check(bought == 0.0f && spent == 0.0f && !purchase_row,
+              "R10 a material draw costs no credits: no purchase, nothing billed at the clear, no purchase row",
+              spent, 0.0);
+        check(s.w.nations.at(s.nation).treasury == t_placed,
+              "R10 the treasury does not move across the drawing tick", s.w.nations.at(s.nation).treasury, t_placed);
+        const float demand = s.w.markets.at(s.market).demand[st];
+        check(demand >= 9.0f - 1e-3f, "R10 the draw is still the market's demand (the clearing sees it)", demand, 9.0);
+
+        scene c = make_scene(1000.0f, 0); // control: the same world with the site standing
+        c.w.buildings.at(c.site).ticks_remaining = 0;
+        economy_report crep = run_economy_step(c.w, reg);
+        clear_markets(c.w, reg, crep);
+        const float p_site = s.w.markets.at(s.market).price[st];
+        const float p_ctrl = c.w.markets.at(c.market).price[st];
+        std::printf("     steel demand %.3f (control %.3f); price %.4f (control %.4f)\n", demand,
+                    c.w.markets.at(c.market).demand[st], p_site, p_ctrl);
+        check(c.w.markets.at(c.market).demand[st] == 0.0f && p_site > p_ctrl,
+              "R10 ...and the price answers it: above the control world's, which has no site", p_site, p_ctrl);
+    }
+
+    // R11 (Ben, 2026-10-26): ONE SITE PER TILE, through the build door. "To slow the pace
+    // of the game down, we need to add a limit so that tiles can only construct one
+    // building at a time." A roaded tile of the nation's own ground holds a site under
+    // construction: a second building of ANY type is refused site_busy and nothing
+    // moves. Once the site completes the tile takes its next site, and the credit that
+    // site pays is exactly the cost the door quoted for it.
+    {
+        scene s = make_scene(1000.0f, 180);
+        const entity_id tile = s.w.buildings.at(s.site).tile;
+        s.w.tiles.at(tile).road_edges = road_edges_on_every_side(1); // a building needs a road
+        // A deposit rich enough for a stack of sites, so the stack cap is not the refusal.
+        s.w.tiles.at(tile).resource_deposit[ri(resource_type::iron_ore)] = 4.0f * placement_rules::k_richness_per_site;
+        const float t0 = s.w.nations.at(s.nation).treasury;
+        const std::size_t n0 = s.w.buildings.size();
+        entity_id built = null_entity;
+        const construction_result r_same = construct_nation(s.w, reg, s.nation, tile,
+            building_type::extraction_site, resource_type::iron_ore, no_recipe, built);
+        const construction_result r_other = construct_nation(s.w, reg, s.nation, tile,
+            building_type::processing_facility, resource_type::iron_ore, no_recipe, built);
+        check(r_same == construction_result::site_busy && r_other == construction_result::site_busy,
+              "R11 a second site on a tile with one under construction is refused site_busy, whatever its type",
+              static_cast<double>(r_other), static_cast<double>(construction_result::site_busy));
+        check(built == null_entity && s.w.buildings.size() == n0 && s.w.nations.at(s.nation).treasury == t0,
+              "R11 the refusal mutates nothing", s.w.nations.at(s.nation).treasury, t0);
+
+        building_component& b = s.w.buildings.at(s.site);
+        b.ticks_remaining = 0; b.days_remaining = 0; // the site completes
+        const float quote = construction_capex(s.w, reg, tile, building_type::extraction_site,
+                                               resource_type::iron_ore);
+        const float t1 = s.w.nations.at(s.nation).treasury;
+        const construction_result r_next = construct_nation(s.w, reg, s.nation, tile,
+            building_type::extraction_site, resource_type::iron_ore, no_recipe, built);
+        const float paid = t1 - s.w.nations.at(s.nation).treasury;
+        std::printf("     quoted %.4f, paid %.4f\n", quote, paid);
+        check(r_next == construction_result::placed && built != null_entity,
+              "R11 once the site completes, the tile takes its next site", static_cast<double>(r_next), 0.0);
+        check(r_next == construction_result::placed && built != null_entity && paid == quote
+                  && s.w.buildings.at(built).build_credit_paid == quote && quote > 0.0f,
+              "R11 the quoted cost equals the credit paid, exactly", paid, quote);
+        check(built != null_entity
+                  && std::fabs(quote - 180.0f * static_cast<float>(s.w.buildings.at(built).days_remaining) / 180.0f) < 1e-3f,
+              "R11 the quote is the flat cost times the site's days over the authored days, no material price",
+              quote, 180.0);
+        entity_id third = null_entity;
+        check(construct_nation(s.w, reg, s.nation, tile, building_type::extraction_site,
+                               resource_type::iron_ore, no_recipe, third) == construction_result::site_busy,
+              "R11 ...and that new site blocks the tile in turn", 0.0, 0.0);
     }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",

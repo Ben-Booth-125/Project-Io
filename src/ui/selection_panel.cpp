@@ -2695,8 +2695,8 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
                 ImGui::Dummy({construction_grid::bar, line_h});
                 char buf[200];
                 std::snprintf(buf, sizeof buf,
-                              "%.0f%% built - the credits paid in against what the build will "
-                              "cost at today's prices.", static_cast<double>(frac * 100.0f));
+                              "%.0f%% built - the days of work done against the build's "
+                              "whole days.", static_cast<double>(frac * 100.0f));
                 cells.push_back(construction_cell("bar", bp, construction_grid::bar, buf));
             }
 
@@ -2729,8 +2729,8 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
             cells.push_back(construction_cell(
                 "cost", cp, construction_grid::cost,
                 open ? "" + std::to_string(static_cast<int>(left))
-                           + " cr still to pay, at today's prices for the materials it has left "
-                             "to buy."
+                           + " cr still to pay. Its whole credit cost was paid when it was "
+                             "placed; the materials it draws cost no credits."
                      : std::string("A rival's spending is private, so the column is empty.")));
 
             ImGui::TableSetColumnIndex(5);
@@ -3787,8 +3787,9 @@ namespace {
 
 /// The MATERIALS a build draws, in the registry's own row — "12 Stone, 4 Timber",
 /// "" where the type needs none. The credit figure beside it (`construction_capex`)
-/// already prices these at the local market, so the two lines are one cost read
-/// from two sides: what leaves the shelf, and what leaves the balance.
+/// does NOT price these (Ben, 2026-10-26: credits are the whole cost): the two
+/// lines are two different costs — what leaves the shelf, and what leaves the
+/// treasury.
 std::string build_material_line(const recipe_registry& reg, building_type type,
                                 resource_type target, std::uint16_t recipe)
 {
@@ -4226,12 +4227,10 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                 c.good       = primary_output_resource(*rc);
             }
 
-        // Capex is the figure construction.cpp actually gates on: build cost PLUS the
-        // materials priced at the local market. This ledger used to gate on build_cost
-        // alone, so between the two figures it offered an enabled Build button that
-        // then failed with nothing but a post-hoc toast.
-        // BL-1066: the SAME function the gate prices with — flat cost plus materials,
-        // times this tile's site multiplier — so the two cannot disagree again.
+        // Capex is the figure construction.cpp actually gates on and charges.
+        // BL-1066: the SAME function the gate prices with — the flat cost times this
+        // tile's site multiplier, no materials (Ben, 2026-10-26: credits are the
+        // whole cost) — so the two cannot disagree.
         c.capex = construction_capex(w, reg, tile_id, c.type, c.target, c.recipe);
 
         c.produces = (c.type == building_type::extraction_site ||
@@ -4370,8 +4369,8 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // Eight columns: glyph | name | cost | what it makes | stack | state | profit
     // bar | press. MATERIALS is the ninth and it does not fit at 380 px, so it is
     // the column dropped into the hover card (the lowest-value one: the cost in
-    // credits beside it is exactly these materials priced at this market, and the
-    // quantities a player can act on were never on the line anyway).
+    // credits beside it is the flat cost, and the quantities a player can act on
+    // were never on the line anyway).
     std::string open_category;
     bool        category_open = false;
     bool        grid_open     = false;
@@ -4467,8 +4466,8 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             c.category + " building on this tile."));
 
         // ── Column 2: THE COST IN CREDITS, abbreviated ──
-        // The figure `construction_capex` prices and the gate charges — flat cost
-        // plus the materials at this market. Abbreviated ("1.2k") because the
+        // The figure `construction_capex` prices and the gate charges — the flat
+        // cost times the site multiplier (Ben, 2026-10-26). Abbreviated ("1.2k") because the
         // column is 34 px; the hover says it in full, in credits, beside the
         // materials it paid for.
         ImGui::TableSetColumnIndex(2);
@@ -4485,8 +4484,9 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                               static_cast<int>(c.capex));
             else
                 std::snprintf(buf, sizeof buf,
-                              "Costs %d cr - the flat build cost plus its materials at this "
-                              "market's prices. Materials: %s.",
+                              "Costs %d cr, the flat build cost, paid when it is placed. Its "
+                              "materials leave this market's shelf as it builds and cost no "
+                              "credits: %s.",
                               static_cast<int>(c.capex), c.materials.c_str());
             cells.push_back(construction_cell("cost", cost_p, construction_grid::cost, buf));
         }

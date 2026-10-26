@@ -9,12 +9,15 @@
 // Fixture: one body, one market stocked with steel. Firm S holds a FINISHED
 // processor F and two construction SITES A and B (ticks_remaining 3). Every
 // operating cost is zero (maintenance, wages; no laws, no units, no sales), so
-// the only money S moves is what its two sites draw: the flat build_cost slice
-// and the steel billed at clearing. Two real economy ticks run (economy step,
-// clear, budget — the app's order), leaving both sites part-built.
+// the only money S moves is what its two sites cost: CREDITS ARE THE WHOLE COST
+// (Ben, 2026-10-26) — each site pays its whole flat build cost at placement, and
+// the steel it then draws off the shelf is unpaid. Both sites are placed, then two
+// real economy ticks run (economy step, clear, budget — the app's order), leaving
+// both part-built.
 //
-//   R1 the record: each site's construction_paid equals what the two ticks took
-//      from S's balance between them (B0 - B1 == paid_A + paid_B).
+//   R1 the record: each site's construction_paid equals what placement and the
+//      two ticks took from S's balance (B0 - B1 == paid_A + paid_B), and the ticks
+//      themselves took nothing although the sites drew steel.
 //   R2 the draw (repoint_player): A and B are gone — no building, no
 //      stockpile, no asset entry — F stays, and S's balance rises by exactly
 //      paid_A + paid_B, i.e. back to B0: what was consumed, never more.
@@ -77,7 +80,7 @@ entity_id add_tile(world& w, entity_id body)
     return t;
 }
 
-entity_id add_proc(fixture& x, int ticks_remaining)
+entity_id add_proc(fixture& x, const recipe_registry& reg, int ticks_remaining)
 {
     const entity_id id = x.w.create_entity();
     building_component bc{};
@@ -86,6 +89,10 @@ entity_id add_proc(fixture& x, int ticks_remaining)
     bc.workforce_assigned = 0.5f;
     bc.workforce_auto = false;
     bc.ticks_remaining = ticks_remaining;
+    bc.days_remaining  = ticks_remaining * k_construction_quarter_days;
+    // A site is PLACED: it pays its whole credit cost now (Ben, 2026-10-25/26).
+    if (ticks_remaining > 0)
+        begin_construction_on_placement(x.w, reg, x.s, bc, /*founding=*/false);
     x.w.buildings[id] = bc;
     x.w.stockpiles[id] = stockpile_component{};
     x.w.nations.at(x.s).state_assets.push_back(id);
@@ -103,7 +110,7 @@ recipe_registry make_registry()
     return reg;
 }
 
-fixture make_fixture()
+fixture make_fixture(const recipe_registry& reg)
 {
     fixture x;
     x.body = x.w.create_entity();
@@ -132,9 +139,9 @@ fixture make_fixture()
     oc.name = "Other"; oc.treasury = 0.0f;
     x.w.nations[x.other] = oc;
 
-    x.f = add_proc(x, 0); // finished
-    x.a = add_proc(x, 3); // site
-    x.b = add_proc(x, 3); // site
+    x.f = add_proc(x, reg, 0); // finished
+    x.a = add_proc(x, reg, 3); // site
+    x.b = add_proc(x, reg, 3); // site
     return x;
 }
 
@@ -161,11 +168,14 @@ int main()
 {
     std::printf("seat_clean_slate — BL-1206\n");
     const recipe_registry reg = make_registry();
-    fixture x = make_fixture();
-    const double b0 = x.w.nations.at(x.s).treasury;
+    const double b0 = 5000.0; // S's opening balance, before either site was placed
+    fixture x = make_fixture(reg);
+    const double b_placed = x.w.nations.at(x.s).treasury;
+    const float  steel0   = x.w.markets.at(x.market).inventory[r_steel];
     tick(x.w, reg, x.s, 0);
     tick(x.w, reg, x.s, 1);
     const double b1 = x.w.nations.at(x.s).treasury;
+    const float  steel_drawn = steel0 - x.w.markets.at(x.market).inventory[r_steel];
     const double pa = x.w.buildings.at(x.a).construction_paid;
     const double pb = x.w.buildings.at(x.b).construction_paid;
     std::printf("  balance %.4f -> %.4f after two ticks; paid A %.4f B %.4f; sites left A %d B %d ticks\n",
@@ -174,7 +184,11 @@ int main()
               && x.w.buildings.at(x.b).ticks_remaining > 0,
           "fixture: both sites have been charged and are still under construction");
     check(near(b0 - b1, pa + pb),
-          "R1 the record: construction_paid A + B == what the two ticks took from S");
+          "R1 the record: construction_paid A + B == what placement and the two ticks took from S");
+    std::printf("  placement took %.4f; the ticks took %.4f while the sites drew %.4f steel\n",
+                b0 - b_placed, b_placed - b1, static_cast<double>(steel_drawn));
+    check(b1 == b_placed && steel_drawn > 0.0f,
+          "R1 credits are the whole cost: the ticks took nothing though the sites drew steel");
 
     world copy = x.w; // R3 runs the pick on the same world
 
@@ -234,11 +248,13 @@ int main()
             const float back = c - r;
             rounds = back != c0 && (c - c0) != (c - back);
         }
-        fixture y = make_fixture();
+        fixture y = make_fixture(reg);
         nation_component& yc = y.w.nations.at(y.s);
         yc.treasury = c0;
         y.w.buildings.at(y.a).construction_paid = r;
+        y.w.buildings.at(y.a).build_credit_paid = r;
         y.w.buildings.at(y.b).construction_paid = 0.0f;
+        y.w.buildings.at(y.b).build_credit_paid = 0.0f;
         repoint_player(y.w, y.s);
         const quarterly_return* yq = tick(y.w, reg, y.s, 0);
         std::printf("  rounding case: fl(fl(C0+R)-R) %s C0; net %.9g, balance - C0 %.9g\n",
