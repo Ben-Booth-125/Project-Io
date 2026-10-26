@@ -24,22 +24,13 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*59 entries — 1 open, 58 resolved.*
+*59 entries — 0 open, 59 resolved.*
 
 ---
 
 ## Open
 
-### NR-1066 — Six questions the sweep could not settle once corporations retired
-*question · raised 2026-10-23 · from sprint 57 doc sweep*
-
-(1) EMBLEMS: PROFILE.md and ICONS.md now key the player's emblem by nation id, which sits against ICONS' own 'no nation flags' rule - keep a corporate-style emblem for the nation, or no emblem. (2) EMBARGO: what an embargo between nations gates, now there is no procurement between firms (RELATIONS.md open question 4). (3) DISCLOSURE: may the player read a rival nation's quarterly return or treasury (FINANCE.md § Disclosure; RELATIONS open question 5). (4) WORKS LEAN: INDUSTRIALISATION's Private Works vs State Arsenal fork has no subject - derive it some other way, or retire it. (5) INDUSTRIAL FOCUS: whether a nation's build scorer keeps a focus weight (AI_OPPONENT ~789) or it retires with the specialist. (6) INDUSTRY LENS: re-subjected to 'plants of nations other than the player's' - keep, or retire.
-
-**Why it matters.** Each is a design hole the removal opened; none blocks BL-1399..BL-1404, but (3) and (5) shape the AI and UI lanes.
-
-> **Recommendation:** (1) no emblem until designed; (2) an embargo bars a nation's goods from entering your markets; (3) a rival's treasury is private, its GDP public; (4) retire; (5) keep focus as the nation's economic_focus; (6) keep.
-
-*Files: `docs/ui/PROFILE.md`, `docs/politics/RELATIONS.md`, `docs/economy/FINANCE.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ai/AI_OPPONENT.md`, `docs/ui/LENSES.md`*
+*Nothing open.*
 
 ---
 
@@ -460,6 +451,19 @@ The 2026-10-11 reconciliation folded the poorest major's SPECIALISTS into the ri
 > **RESOLVED.** Ben, 2026-10-26 (sprint 57 close review form): accepted as taken.
 
 *Files: `docs/generation/NATION_GENERATION.md`*
+
+### NR-1066 — Six questions the sweep could not settle once corporations retired
+*question · raised 2026-10-23 · from sprint 57 doc sweep*
+
+(1) EMBLEMS: PROFILE.md and ICONS.md now key the player's emblem by nation id, which sits against ICONS' own 'no nation flags' rule - keep a corporate-style emblem for the nation, or no emblem. (2) EMBARGO: what an embargo between nations gates, now there is no procurement between firms (RELATIONS.md open question 4). (3) DISCLOSURE: may the player read a rival nation's quarterly return or treasury (FINANCE.md § Disclosure; RELATIONS open question 5). (4) WORKS LEAN: INDUSTRIALISATION's Private Works vs State Arsenal fork has no subject - derive it some other way, or retire it. (5) INDUSTRIAL FOCUS: whether a nation's build scorer keeps a focus weight (AI_OPPONENT ~789) or it retires with the specialist. (6) INDUSTRY LENS: re-subjected to 'plants of nations other than the player's' - keep, or retire.
+
+**Why it matters.** Each is a design hole the removal opened; none blocks BL-1399..BL-1404, but (3) and (5) shape the AI and UI lanes.
+
+> **Recommendation:** (1) no emblem until designed; (2) an embargo bars a nation's goods from entering your markets; (3) a rival's treasury is private, its GDP public; (4) retire; (5) keep focus as the nation's economic_focus; (6) keep.
+
+> **RESOLVED.** Ben, 2026-10-26: accept all six - (1) no emblem until designed; (2) an embargo bars a nation's goods from entering your markets; (3) a rival's treasury is private, its GDP public; (4) the Private Works vs State Arsenal fork retires; (5) the scorer keeps focus as the nation's economic focus; (6) the Industry lens stays.
+
+*Files: `docs/ui/PROFILE.md`, `docs/politics/RELATIONS.md`, `docs/economy/FINANCE.md`, `docs/generation/INDUSTRIALISATION.md`, `docs/ai/AI_OPPONENT.md`, `docs/ui/LENSES.md`*
 
 ### NR-1067 — BL-1403 (nation money flows): the tax rates now bite on wages, and a nation's import duty is capped at its treasury
 *decision · raised 2026-10-24 · from BL-1403 build, main session*

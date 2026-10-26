@@ -633,7 +633,7 @@
    "title": "Six questions the sweep could not settle once corporations retired",
    "raised": "2026-10-23",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "sprint 57 doc sweep",
    "what": "(1) EMBLEMS: PROFILE.md and ICONS.md now key the player's emblem by nation id, which sits against ICONS' own 'no nation flags' rule - keep a corporate-style emblem for the nation, or no emblem. (2) EMBARGO: what an embargo between nations gates, now there is no procurement between firms (RELATIONS.md open question 4). (3) DISCLOSURE: may the player read a rival nation's quarterly return or treasury (FINANCE.md § Disclosure; RELATIONS open question 5). (4) WORKS LEAN: INDUSTRIALISATION's Private Works vs State Arsenal fork has no subject - derive it some other way, or retire it. (5) INDUSTRIAL FOCUS: whether a nation's build scorer keeps a focus weight (AI_OPPONENT ~789) or it retires with the specialist. (6) INDUSTRY LENS: re-subjected to 'plants of nations other than the player's' - keep, or retire.",
    "why_it_matters": "Each is a design hole the removal opened; none blocks BL-1399..BL-1404, but (3) and (5) shape the AI and UI lanes.",
@@ -647,7 +647,7 @@
     "docs/ai/AI_OPPONENT.md",
     "docs/ui/LENSES.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-26: accept all six - (1) no emblem until designed; (2) an embargo bars a nation's goods from entering your markets; (3) a rival's treasury is private, its GDP public; (4) the Private Works vs State Arsenal fork retires; (5) the scorer keeps focus as the nation's economic focus; (6) the Industry lens stays."
   },
   {
    "id": "NR-1067",
