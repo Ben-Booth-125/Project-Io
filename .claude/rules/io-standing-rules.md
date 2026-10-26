@@ -50,6 +50,12 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   ledger row is a tile the build door accepts, that rows sort by profit, and that a capture aims at
   the player's own ground as generation moves, needs the rows the player sees. Verify-only, behind
   `--verify`.
+  **Sixth (Ben, 2026-10-26):** the verify STAGING fixtures `verify.logistics_chain_fixture()` and
+  `verify.logistics_shortage_fixture()` may return the positions of what they staged, and nothing
+  else; `verify.trade_flow_routes()` may return counts plus one market centre's position; and
+  `verify.lane_port_census()` returns counts only to Lua (positions go to the run log, never to the
+  script). Reason for the grant: a capture must aim at the chain link, shortage road or routed flow
+  it is checking. Verify-only, behind `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of
