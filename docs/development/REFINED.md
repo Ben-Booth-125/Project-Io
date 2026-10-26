@@ -74,7 +74,9 @@ and leak treasury money into empty corporations. So the PORT lands first, the fo
 - [x] **T3** Harnesses: `harness_params.hpp` first; gates re-pointed; mechanism tests retired. (R1, R3)
 
 ### BL-1408 (sprint 57 re-bless) — group `sprint-57-rebless`
-- [ ] **T1** Attribute every mover, re-pin on Ben's go, ruling-check against `rulings/sprint-57.json`. (R1)
+- [x] **T1** Attribute every mover, re-pin on Ben's go, ruling-check against `rulings/sprint-57.json`. (R1)
+  Prepared on the lane branch: shipped arc re-pinned at 71e32545, the shape in the commit message;
+  merges on Ben's go. The legacy arc is left red: it seats nobody since BL-1404 (Ben's call).
 
 ## Sprint 55 — spectator to the end of Era 1 (opened 2026-10-15, continuing 2026-10-18)
 

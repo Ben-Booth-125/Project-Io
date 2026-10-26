@@ -744,6 +744,13 @@ struct world_digest_pin
 // (BL-1346), the sprint 56 merge, and the logistics arc (BL-1360, BL-1356,
 // BL-1395, BL-1396, BL-1397, BL-1361, BL-1398, BL-1367). None unexplained. The
 // 2026-10-10 values are one commit back in git history.
+// NOT RE-PINNED at sprint 57's re-bless (BL-1408, 2026-10-26), and deliberately.
+// On main 71e32545 every legacy row seats ZERO players: generation logs "no charter
+// budget: nothing chartered, nobody seated (BL-1404, the legacy roster retired)",
+// so the ONE-is_player invariant fails every row whatever its digests read. A
+// re-pin cannot make a row pass, and pinning a seatless world would turn a broken
+// arc into a contract. These rows still held on 95796940 (16/16 PASS). Whether
+// the legacy arc retires with its roster or gets a charter budget is Ben's call.
 const std::vector<world_digest_pin> k_world_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
     { 46u, 0x276C6BBC74F03C11ull, 0xD49A771ED98586DAull, 0xACC9905E625E45B8ull, 0x5DEECE562E8D786Aull },
@@ -865,24 +872,42 @@ const std::vector<world_digest_pin> k_world_digest_pins = {
 // (BL-1346), the sprint 56 merge, and the logistics arc (BL-1360, BL-1356,
 // BL-1395, BL-1396, BL-1397, BL-1361, BL-1398, BL-1367). None unexplained. The
 // 2026-10-10 values are one commit back in git history.
+// RE-PINNED 2026-10-26 (sprint 57's one re-bless, BL-1408; PREPARED for Ben's
+// go against the shape in this commit's message, which names every mover):
+// taken by player_seed_sweep --digest-check over the sixteen library seeds on a
+// build of main 71e32545, same toolchain. Every row seated exactly one player.
+// Every row moved all four digests from D_search on. The pins held 16/16 on
+// 95796940 (v0.2.0). Movers, attributed by rebless_shape_probe on 23 cumulative
+// first-parent checkpoints: corporations retired and the fold to ground
+// (BL-1399..1407) with the opening stock and network upkeep fixes (c404a607,
+// 6cd4e37e); roads-only network and site joins (69765e67, 37b22f26), bridges
+// (2967c7cf, 483fc8ab), port links (3c402af2); construction in days and
+// payment (b3409c31, c7e2b818, NR-1073); port lanes (bde425bc, 6d290d3c);
+// islet cession and speck capitals (16e0863c, b413e666); infrastructure at
+// full workforce, capitals on cities, stacked hubs (bdb1c851); industry
+// placement (1fd96aff, 39e90e8a); one site per tile and the cost revert
+// (ceda24be); the stack debuff retired (cb5ab843); colonial ports (1b069ee1,
+// 2cd73bd8); the seat refund credits-only (910e6da3); rail fade 8 -> 20
+// (NR-1056, no shape field moved). The span counters are identical on all 16
+// seeds. The 2026-10-23 values are one commit back in git history.
 const std::vector<world_digest_pin> k_shipped_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    { 46u, 0x1B11DA29408B12DCull, 0xB108290D01C87E33ull, 0x490FCEE553EEEEA6ull, 0xCC2D608588C13F37ull },
-    { 28u, 0x8A6F8AB246A0F0F5ull, 0x7A9FA8A5D39751AEull, 0x19C4D78B5040FCDEull, 0xCCBF7EE66032D456ull },
-    { 11u, 0xDB184EBB38320054ull, 0x36DCC03D5F7428DEull, 0x8DD34849D99F64B2ull, 0x2C0E9AA9F3B035CAull },
-    { 31u, 0x3163D57D67CFD0E5ull, 0xC89D5FCD163596AAull, 0xBD0EC72FB5E9F3D8ull, 0xB6471CF03C7BC3E1ull },
-    { 40u, 0xC31CFF81250C5AC2ull, 0xAFC7C8001435344Cull, 0xE97565419DD847F3ull, 0x76521191E2D680F8ull },
-    { 12u, 0xC372F017D5309BB7ull, 0x8FD27D612974BD4Aull, 0x0AEF024257AAAB21ull, 0x332986E01E37B5A1ull },
-    { 37u, 0xF4AAD4992D3BECFCull, 0x37C87A86C0C61DBBull, 0x9858D510DFF0285Eull, 0xEAC94C28A3E20798ull },
-    { 13u, 0xD787075FA9EE9E43ull, 0xFDA7959BEE3E4BCFull, 0x6B4AC8294EA7293Bull, 0x90FBE87BF6412976ull },
-    { 41u, 0xBE949452A666BA5Full, 0x476C0C0167374F90ull, 0x94A63D9BE5AEA7F3ull, 0xA986BAF00FF25AA0ull },
-    { 43u, 0xCA21A85B0BF673CBull, 0x5B50840B2AE5F217ull, 0x87807112963D413Full, 0xE7EA036F5DED7C19ull },
-    { 32u, 0xD7C60A78B62171C2ull, 0xAC18DBA07785E870ull, 0x447DDB3158537A23ull, 0xCC29E81C2A7B72D7ull },
-    { 10u, 0xC3514CC3EEF2E66Dull, 0xCB8E5D77D83208B1ull, 0xB347BB8B66B5899Cull, 0x2C91EA9C992DF427ull },
-    { 25u, 0x43320F8D4DBF3360ull, 0xADE8FB0A5979F0FCull, 0x80BB32ACE40321D3ull, 0x23764D91E486CE0Cull },
-    { 38u, 0xDA0E1D5D3212DAB5ull, 0x3EE962C6538EFE93ull, 0x402589C429A7B7CAull, 0x0BDA6E89FA80F69Cull },
-    {  9u, 0xDF120D923F0E4178ull, 0x416F5EE96345655Eull, 0x2DFC435E0EF5494Dull, 0x33610041FEE319ACull },
-    {  0u, 0xE1A5D915A65D4830ull, 0x91B846FBC46683DEull, 0xAA3B4B80FE5C8EB1ull, 0xF0438958E2E9615Cull },
+    { 46u, 0x05A0E1FAC1622ABCull, 0x7BEDC6CC3EF42921ull, 0x6E4919FA7EFEA2C8ull, 0xCEB0F4B3B546BA54ull },
+    { 28u, 0x51D28927BCCB2200ull, 0xF3A411D627E51431ull, 0xFD7932806B2BDA00ull, 0x0BD4705051A8C81Bull },
+    { 11u, 0xF9ABA8FA37E52186ull, 0x89E0028A967EF54Dull, 0x5FD5FC84B0AA789Eull, 0x1B8CD65F620EF6C7ull },
+    { 31u, 0xEDAE80ED0F62DCCAull, 0xDBF8777A684BC1BDull, 0x8E38443A9E5BD8B4ull, 0x61E4868B4A96A1A5ull },
+    { 40u, 0xFA64ECFF98C89B30ull, 0x5022BA3623EAA2FEull, 0x80911873E076FF61ull, 0x34E9F8A088C6EA4Full },
+    { 12u, 0x66CE9A8E009F202Cull, 0x112C7666298A0CFEull, 0x2DE2620102AD8477ull, 0x7F5772D752881BEAull },
+    { 37u, 0x43C2F8731216A984ull, 0xA6DB1832B2B6B51Bull, 0x1FFECB2C866D2BBAull, 0x84DFCD8F9604D643ull },
+    { 13u, 0xD9510C497FFBA313ull, 0x2F75B9690CA3397Eull, 0xAEB570E269CD9110ull, 0x6F4350E74435549Bull },
+    { 41u, 0xEBC5C1BF9115C88Dull, 0xA00F710C37917196ull, 0xF1B8C99DC00987BBull, 0x72AA20023F1DBE97ull },
+    { 43u, 0xAE4D77A698D6EAA7ull, 0x54F24CA2DC8100EBull, 0x06CE41C29C1322D5ull, 0x8699FFFA13BD09A3ull },
+    { 32u, 0xFFEED468001AC9D3ull, 0xCD74CC8E018AF64Aull, 0x50B4BC728879273Dull, 0x92B241AD00F7D2A8ull },
+    { 10u, 0x086823EA9D888E9Aull, 0x939F0389629FC5BEull, 0x07851E621B9A0911ull, 0x9A866EED1B70915Full },
+    { 25u, 0xC2258CE3FD6A8260ull, 0x7DDB3409FFB33E5Cull, 0x3DAD6B6290BB3CF7ull, 0x918EA20BF9A7DF2Dull },
+    { 38u, 0x59106F978099B724ull, 0x86D3CDF7F310E3D0ull, 0x7E6ACFD4213E1446ull, 0xAE11FCD2784A25D0ull },
+    {  9u, 0x8E2FEB976733A894ull, 0xB36AAEC401459603ull, 0x0D88C596A0DE45FBull, 0x14861194B9F1174Eull },
+    {  0u, 0x28E270DB61925241ull, 0x823E32E4D578A77Aull, 0xA744EA0552EFABCCull, 0xE9F1641A9649EEEEull },
 };
 
 const std::vector<world_digest_pin>& digest_pins(world_arc arc)

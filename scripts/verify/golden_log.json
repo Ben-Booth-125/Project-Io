@@ -206,11 +206,11 @@
       "batch": ""
     },
     "icon_silhouettes_overview.png": {
-      "blessed_date": "2026-06-17",
-      "commit": "44b0228",
-      "reason_tag": "unknown",
-      "reason": "",
-      "batch": ""
+      "blessed_date": "2026-10-26",
+      "commit": "BL-1408",
+      "reason_tag": "world-moved",
+      "reason": "Re-blessed once (NR-1070): the Corporation lens retired (BL-1406), so the tour reads the plain canvas; sprint 57 world. Blessed through the software renderer on main 71e32545; recompare 0.0000%.",
+      "batch": "sprint-57-rebless"
     },
     "icon_silhouettes_supply_lens.png": {
       "blessed_date": "2026-06-17",
