@@ -929,6 +929,26 @@
     "docs/economy/LOGISTICS.md"
    ],
    "resolution": "Ben, 2026-10-26: place ports in history; colonial lane ends within two tiles of each other share one harbour port."
+  },
+  {
+   "id": "NR-1082",
+   "title": "Two disclosure tensions the NR-1066 doc pass found",
+   "raised": "2026-10-26",
+   "kind": "question",
+   "status": "open",
+   "source": "NR-1066 doc pass",
+   "what": "(1) A rival's treasury is private (Ben, 2026-10-26), but DISCOVERY.md § The operational fog says an open book shows \"flows, balance\", and FINANCE.md § Surfaces gives the Profitability ledger one row per nation, so a rival's filed return could expose its treasury. Whether a rival's return is readable at all is unruled. (2) The Industry lens, kept, weights rival plants by output_quantity, against \"production stays private\" (DISCOVERY.md; TOOLTIP.md). Also: the seat screen lists every major's treasury before play.",
+   "why_it_matters": "Each decides what the player can see of a rival nation.",
+   "options": [
+    "(1) A: a rival's return is unreadable; B: readable without its balance line. (2) A: the Industry lens shows rival plant count or presence, not output; B: output is public through the lens."
+   ],
+   "recommendation": "(1) B; (2) A. The seat screen is a pre-play pick, so it may show treasuries.",
+   "files": [
+    "docs/ui/DISCOVERY.md",
+    "docs/economy/FINANCE.md",
+    "docs/ui/LENSES.md"
+   ],
+   "resolution": null
   }
  ]
 }

@@ -883,6 +883,75 @@
    ],
    "title": "Drop the player-identity wash; keep the outline",
    "design": "Ben, 2026-10-26 (NR-1004 A): drop the always-on player-identity wash on the plain canvas, which tints the player's baked structures; keep the always-on player outline."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (NR-1066 doc pass, 2026-10-26)",
+   "requires": [],
+   "priority": "B",
+   "id": "BL-1417",
+   "short_name": "NO_NATION_EMBLEM",
+   "category": "UI",
+   "authority_doc": "docs/ui/PROFILE.md",
+   "files": [
+    "src/ui/profile_panel.cpp",
+    "src/ui/selection_panel.cpp",
+    "docs/ui/ui_elements.json",
+    "docs/ui/question_log.json"
+   ],
+   "title": "Remove the nation emblem the profile and Selection header still draw",
+   "design": "Ben, 2026-10-26 (NR-1066 (1)): no emblem until one is designed. profile_panel.cpp L42-59 and selection_panel.cpp L486/L499 still draw corp_emblem keyed by palette::corp_emblem_shape(nation); ui_elements.json and question_log.json still describe it.",
+   "difficulty": 1
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (NR-1066 doc pass, 2026-10-26)",
+   "requires": [],
+   "priority": "B",
+   "id": "BL-1418",
+   "short_name": "EMBARGO_BARS_GOODS",
+   "category": "Economy",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "files": [
+    "src/world/world.hpp",
+    "src/world/trade.cpp",
+    "src/world/supply_system.cpp"
+   ],
+   "title": "An embargo bars a nation's goods from entering your markets",
+   "design": "Ben, 2026-10-26 (NR-1066 (2)); RELATIONS.md § 3. Today world::corp_embargo_conditions is only saved, loaded and erased: no trade, convoy-landing or market path reads it, and rejected_embargo has no producer. THE WORK: re-key the store to nations, refuse B's cargo landing in a market on A's ground at the tariff border, add a harness row; save format travels with it.",
+   "difficulty": 3
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (NR-1066 doc pass, 2026-10-26)",
+   "requires": [],
+   "priority": "B",
+   "id": "BL-1419",
+   "short_name": "INDUSTRY_LENS_FILLS",
+   "category": "UI",
+   "authority_doc": "docs/ui/LENSES.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "docs/ui/LENSES.md"
+   ],
+   "title": "The Industry lens shows other nations' plants; it is always empty today",
+   "design": "Ben, 2026-10-26 (NR-1066 (6)): keep the Industry lens, its subject the plants of nations other than the player's. body_surface_canvas.cpp L3142 sets background_owned to always false, so the field never fills. Also LENSES.md L110 says keyboard-cycle only while L466/L679 put it on the Planetary strip - settle which.",
+   "difficulty": 2
   }
  ]
 }

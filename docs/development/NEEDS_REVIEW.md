@@ -24,13 +24,24 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*59 entries — 0 open, 59 resolved.*
+*60 entries — 1 open, 59 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-1082 — Two disclosure tensions the NR-1066 doc pass found
+*question · raised 2026-10-26 · from NR-1066 doc pass*
+
+(1) A rival's treasury is private (Ben, 2026-10-26), but DISCOVERY.md § The operational fog says an open book shows "flows, balance", and FINANCE.md § Surfaces gives the Profitability ledger one row per nation, so a rival's filed return could expose its treasury. Whether a rival's return is readable at all is unruled. (2) The Industry lens, kept, weights rival plants by output_quantity, against "production stays private" (DISCOVERY.md; TOOLTIP.md). Also: the seat screen lists every major's treasury before play.
+
+**Why it matters.** Each decides what the player can see of a rival nation.
+
+- (1) A: a rival's return is unreadable; B: readable without its balance line. (2) A: the Industry lens shows rival plant count or presence, not output; B: output is public through the lens.
+
+> **Recommendation:** (1) B; (2) A. The seat screen is a pre-play pick, so it may show treasuries.
+
+*Files: `docs/ui/DISCOVERY.md`, `docs/economy/FINANCE.md`, `docs/ui/LENSES.md`*
 
 ---
 
