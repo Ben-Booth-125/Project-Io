@@ -44,6 +44,12 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   `verify.stage_road(col, row, tier)` lays a crossing for a fixture and returns whether that tile
   ended on the network. `components.hpp` already names "is this tile on the network" the one road
   question that stays legitimate, where "this tile's tier" does not. Verify-only, behind `--verify`.
+  **Fifth (Ben, 2026-10-25):** `verify.site_finder()` may return the rows the site finder's ledger
+  draws - each row's position, estimated profit, Logistic Point cover and no-logistics flag - and
+  nothing else: nothing the screen does not already show. Reason for the grant: a check that a
+  ledger row is a tile the build door accepts, that rows sort by profit, and that a capture aims at
+  the player's own ground as generation moves, needs the rows the player sees. Verify-only, behind
+  `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of
