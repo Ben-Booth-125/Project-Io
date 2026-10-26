@@ -19,6 +19,8 @@
 #include "world/spawn_seat.hpp"    // repoint_player — enforce_chain_feasible_roster's seat
 #include "world/landscape_score.hpp" // market_terminals_closed — the champion floor (BL-1298)
 #include "world/market_saturation.hpp" // classify_resources, measure_market_balance
+#include "world/logistic_points.hpp" // lp_reach, lp_road_step — the cover at placement (Pass 3)
+#include "world/river_generation.hpp" // hex_side_for_offset — the cover walk steps as the LP field does
 
 #include <algorithm>
 #include <cassert>
@@ -32,6 +34,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
+#include <queue>
+#include <unordered_map>
 #include <random>
 #include <string>
 #include <unordered_set>
@@ -43,6 +47,170 @@
 // ---------------------------------------------------------------------------
 
 namespace {
+
+/// GENERATION'S OCCUPANCY, BY STACK (Ben, 2026-10-26; CORPORATION_GENERATION.md
+/// § Pass 3, "Buildings stack on every tile"): a charter may place buildings on
+/// any tile up to that tile's stack cap. Each tile carries two counts, read the
+/// way placement_rules reads a stack: extraction sites per target, against the
+/// deposit's richness-bound `stack_capacity`, and every other building together,
+/// against `non_extraction_stack_cap`. `count` keeps the old reading (does the
+/// tile hold any building at all) for the passes that are not a charter's — the
+/// muster base and the Marketplace retrofit keep one building per empty tile.
+class gen_occupancy
+{
+public:
+    void reserve(std::size_t n) { m_tiles.reserve(n); }
+
+    void add(const building_component& b)
+    {
+        tile_stack& s = m_tiles[b.tile];
+        ++s.total;
+        if (b.type == building_type::extraction_site)
+            ++s.extraction[static_cast<std::size_t>(b.target_resource)];
+        else
+            ++s.non_extraction;
+    }
+
+    void remove(const building_component& b)
+    {
+        const auto it = m_tiles.find(b.tile);
+        if (it == m_tiles.end())
+            return;
+        tile_stack& s = it->second;
+        if (b.type == building_type::extraction_site)
+        {
+            auto& e = s.extraction[static_cast<std::size_t>(b.target_resource)];
+            if (e > 0) --e;
+        }
+        else if (s.non_extraction > 0)
+            --s.non_extraction;
+        if (--s.total <= 0)
+            m_tiles.erase(it);
+    }
+
+    /// 1 when the tile holds any building, else 0 (the pre-stacking reading).
+    std::size_t count(entity_id tile) const { return m_tiles.count(tile); }
+
+    /// May one more building of @p type (extracting @p target) stand on @p tile?
+    /// Validity (terrain, deposit) is `placement_rules::can_place`'s; this is the
+    /// stack's room alone.
+    bool has_room(const tile_component& tc, entity_id tile, building_type type,
+                  resource_type target) const
+    {
+        const auto it = m_tiles.find(tile);
+        if (it == m_tiles.end())
+            return true;
+        const tile_stack& s = it->second;
+        if (type == building_type::extraction_site)
+            return s.extraction[static_cast<std::size_t>(target)]
+                 < placement_rules::stack_capacity(tc, type, target);
+        return s.non_extraction < placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover);
+    }
+
+private:
+    struct tile_stack
+    {
+        int total = 0;
+        int non_extraction = 0;
+        std::array<int, resource_count> extraction{};
+    };
+    std::unordered_map<entity_id, tile_stack> m_tiles;
+};
+
+// ---------------------------------------------------------------------------
+// THE COVER AT PLACEMENT (Ben, 2026-10-26; CORPORATION_GENERATION.md § Pass 3,
+// "What cover means at placement"). Logistic Point sources are seeded at the
+// fold, after every charter stands (seed_logistics_sources), so at placement no
+// cover exists. What the seeding is BOUND to lay before it reaches for any
+// consumer is read instead: a source on the nation's capital, and every market
+// centre of the nation covered at full strength by the chain laid out from it
+// (LOGISTICS.md § Where generation puts the sources, step 0). A tile's cover is
+// the road reach (`lp_reach(road, d)`: full to 6, nothing by 12) at its distance
+// d from the nearest of those points, walked as the Logistic Point road field
+// walks (the four cardinal steps, each priced by the road tier on the edge it
+// crosses) — plus, off the road, a Track step over the nation's own dry ground,
+// the crossing the site-road join will lay to the building (LOGISTICS.md § 4,
+// "Generation roads every building site"). Roads do not move during a walk
+// (the road-tier axis is applied before it, the site roads after), so a
+// nation's field is read once per walk.
+// ---------------------------------------------------------------------------
+
+/// Four-cardinal network walk over @p body from @p seeds, as lp_distance_field
+/// walks the road network: a step along a roaded edge costs that edge's tier
+/// (`lp_road_step`); with @p track_nation set, a step across an unroaded edge
+/// between two of that nation's dry tiles costs a Track's. Bounded at @p bound
+/// (<= 0: unbounded). Ascending seeds, (cost, tile) ordered: replay-exact.
+std::unordered_map<entity_id, float> gen_road_walk(world& w, entity_id body,
+                                                   std::vector<entity_id> seeds,
+                                                   entity_id track_nation, float bound)
+{
+    std::unordered_map<entity_id, float> dist;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end() || seeds.empty())
+        return dist;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    const auto own_dry = [&](entity_id t, const tile_component& tc) {
+        if (is_water(tc.substrate))
+            return false;
+        const auto tn = w.tile_to_nation.find(t);
+        return tn != w.tile_to_nation.end() && tn->second == track_nation;
+    };
+    using item = std::pair<float, entity_id>;
+    std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
+    std::sort(seeds.begin(), seeds.end());
+    for (const entity_id s : seeds)
+    {
+        const auto tit = w.tiles.find(s);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            continue;
+        if (dist.emplace(s, 0.0f).second)
+            pq.push({ 0.0f, s });
+    }
+    const int step_dc[4] = { 0, 1, 0, -1 };
+    const int step_dr[4] = { -1, 0, 1, 0 };
+    while (!pq.empty())
+    {
+        const auto [d, t] = pq.top();
+        pq.pop();
+        const auto dit = dist.find(t);
+        if (dit != dist.end() && dit->second < d)
+            continue;
+        const tile_component& tc = w.tiles.at(t);
+        const int x = tc.grid_x, y = tc.grid_y;
+        const int cand[4] = { y > 0 ? (y - 1) * gw + x : -1, y * gw + (x + 1) % gw,
+                              y + 1 < gh ? (y + 1) * gw + x : -1, y * gw + (x + gw - 1) % gw };
+        for (int ci = 0; ci < 4; ++ci)
+        {
+            const int c = cand[ci];
+            if (c < 0 || static_cast<std::size_t>(c) >= grid.size())
+                continue;
+            const entity_id nt = grid[static_cast<std::size_t>(c)];
+            if (nt == null_entity)
+                continue;
+            const tile_component& ntc = w.tiles.at(nt);
+            const int side = hex_side_for_offset(step_dc[ci], step_dr[ci], (y & 1) != 0);
+            const std::uint8_t lvl = side >= 0 ? road_tier_on_side(tc, side) : 0;
+            float sc = -1.0f;
+            if (lvl >= 1 && lvl <= 3)
+                sc = lp_road_step[lvl];
+            else if (track_nation != null_entity && own_dry(t, tc) && own_dry(nt, ntc))
+                sc = lp_road_step[1];
+            if (sc < 0.0f)
+                continue;
+            const float nd = d + sc;
+            if (bound > 0.0f && nd > bound)
+                continue;
+            const auto nit = dist.find(nt);
+            if (nit == dist.end() || nd < nit->second)
+            {
+                dist[nt] = nd;
+                pq.push({ nd, nt });
+            }
+        }
+    }
+    return dist;
+}
 
 // ---------------------------------------------------------------------------
 // BL-1407 — the generation's PROVISIONAL seat
@@ -598,7 +766,7 @@ float tile_score_for(const tile_component& tc, building_type btype,
 entity_id author_building(world& w,
                           entity_id tid,
                           building_type btype,
-                          std::unordered_set<entity_id>& occupied_tiles,
+                          gen_occupancy& occupied_tiles,
                           const resource_type* target = nullptr)
 {
     const entity_id bld_id = w.create_entity();
@@ -629,9 +797,9 @@ entity_id author_building(world& w,
     // is a registry index, unknown here); the field stays no_recipe until
     // app::load_economy assigns the default.
 
+    occupied_tiles.add(bc);
     w.buildings[bld_id]  = bc;
     w.stockpiles[bld_id] = stockpile_component{};
-    occupied_tiles.insert(tid);
     return bld_id;
 }
 
@@ -668,14 +836,61 @@ std::array<dig_site, 2> dig_ladder(resource_type dig)
     return { dig_site::well, dig_site::deposit };
 }
 
+/// THE COVER AT PLACEMENT, memoised per (nation, body) for one pass (see
+/// `gen_road_walk`'s header block): the road reach at a tile's distance from the
+/// points the seeding is bound to lay first — the nation's capital and its market
+/// centres. A tile on nobody's ground, or out of every such point's reach, reads 0.
+class gen_lp_cover
+{
+public:
+    float cover(world& w, entity_id tile)
+    {
+        const auto tn = w.tile_to_nation.find(tile);
+        const auto tit = w.tiles.find(tile);
+        if (tn == w.tile_to_nation.end() || tit == w.tiles.end())
+            return 0.0f;
+        const auto key = std::make_pair(tn->second, tit->second.body);
+        auto it = m_fields.find(key);
+        if (it == m_fields.end())
+        {
+            std::vector<entity_id> seeds;
+            if (const auto nit = w.nations.find(tn->second); nit != w.nations.end())
+                if (const entity_id cap = nit->second.capital_tile; cap != null_entity)
+                    seeds.push_back(cap);
+            for (const auto& [mid, mc] : w.markets)
+            {
+                (void)mid;
+                const auto ct = w.tile_to_nation.find(mc.centre_tile);
+                if (ct != w.tile_to_nation.end() && ct->second == tn->second)
+                    seeds.push_back(mc.centre_tile); // gen_road_walk sorts; duplicates collapse
+            }
+            const std::size_t ri = static_cast<std::size_t>(lp_network::road);
+            it = m_fields.emplace(key, gen_road_walk(w, tit->second.body, std::move(seeds), tn->second,
+                                                     lp_full_reach[ri] + lp_fade_length[ri]))
+                     .first;
+        }
+        const auto d = it->second.find(tile);
+        return d != it->second.end() ? lp_reach(lp_network::road, d->second) : 0.0f;
+    }
+
+private:
+    std::map<std::pair<entity_id, entity_id>, std::unordered_map<entity_id, float>> m_fields;
+};
+
 /// Place a clustered set of starting buildings for one corporation inside its home
-/// nation's territory. An *anchor* tile is chosen first (focus-weighted, richest
-/// for extraction); the remaining assets are placed on the valid, unoccupied tiles
-/// nearest the anchor in grid space, so a corporation's holdings group spatially
-/// rather than scatter across the body. Every placed asset is validated with
-/// `placement_rules::can_place` (never ocean; an extraction site only on a tile
-/// carrying a matching extractable deposit) — tiles that fail are skipped, so a
-/// deposit-poor anchor neighbourhood simply yields fewer extraction sites.
+/// nation's territory. An *anchor* tile is chosen first; the remaining assets are
+/// placed on the valid tiles nearest the anchor in grid space that still have room
+/// in their stack, the anchor's own tile first, so a charter's holdings fill a tile
+/// before they spread to the next (Ben, 2026-10-26: buildings stack on every tile up
+/// to its cap). Every placed asset is validated with `placement_rules::can_place`
+/// (never ocean; an extraction site only on a tile carrying a matching extractable
+/// deposit) — tiles that fail are skipped, so a deposit-poor anchor neighbourhood
+/// simply yields fewer extraction sites.
+///
+/// THE ANCHOR. An extraction anchor on a deposit is RANKED, not drawn (Ben,
+/// 2026-10-26): richness x Logistic Point cover at the tile (`gen_lp_cover`), then
+/// the richer, then the lower tile id. A Well or Wharf anchor (no deposit) keeps
+/// its habitability-weighted draw, and every other anchor its focus-weighted draw.
 ///
 /// BL-283 constrains the ANCHOR search to the corporation's home region via
 /// @p anchor_window; the neighbourhood the remaining slots walk stays national, so
@@ -683,39 +898,35 @@ std::array<dig_site, 2> dig_ladder(resource_type dig)
 /// opening short. The window is a *subset of `home_nation.tiles` in the same order*,
 /// so nothing about the search's determinism changes.
 ///
-/// @param w              World to write the new entities into.
-/// @param home_nation    The nation_component of the home nation.
-/// @param focus          Corporate industrial focus (determines the asset mix and tile preference).
-/// @param occupied_tiles Tiles already taken by another building; never reused.
-/// @param rng            Seeded RNG for the anchor weighted draw and holdings count.
 /// DIGGING A NAMED GOOD (BL-1197, gap firm digs the gap). With @p dig and a
 /// @p dig_tier other than `none`, an extraction anchor stands ONLY on a tile of
-/// that tier for @p dig (`dig_site_of`) — a Well or Wharf site, scored by habitability, or
-/// a deposit of the good, scored by that deposit — and extracts @p dig; a window
+/// that tier for @p dig (`dig_site_of`) — a Well or Wharf site, drawn by habitability,
+/// or a deposit of the good, ranked as above — and extracts @p dig; a window
 /// with no such tile places nothing and draws nothing, so the caller can try the
 /// next tier as it would the next rung. Each later extraction slot digs @p dig
 /// where its tile can, and otherwise takes the tile's richest deposit as ever.
-/// Without @p dig the placement is exactly the richest-deposit rule above.
 ///
 /// @param w              World to write the new entities into.
 /// @param home_nation    The nation_component of the home nation.
 /// @param focus          Corporate industrial focus (determines the asset mix and tile preference).
-/// @param occupied_tiles Tiles already taken by another building; never reused.
+/// @param occupied_tiles The stacks standing; a tile is used while it has room.
 /// @param rng            Seeded RNG for the anchor weighted draw and holdings count.
 /// @param anchor_window  Tiles the anchor may sit on; null/empty means the whole nation.
 /// @param dig            The good an extraction firm digs (BL-1197); null for none.
 /// @param dig_tier       Which ground the anchor must stand on to dig it.
+/// @param cover          The pass's cover memo; null reads a fresh one for this call.
 /// @return               Entity ids of every building placed (may be empty when the
 ///                       window holds no tile that can host the anchor type — the
 ///                       caller's cue to widen a rung).
 std::vector<entity_id> place_starting_assets(world& w,
                                              const nation_component& home_nation,
                                              industrial_focus focus,
-                                             std::unordered_set<entity_id>& occupied_tiles,
+                                             gen_occupancy& occupied_tiles,
                                              std::mt19937& rng,
                                              const std::vector<entity_id>* anchor_window = nullptr,
                                              const resource_type* dig = nullptr,
-                                             dig_site dig_tier = dig_site::none)
+                                             dig_site dig_tier = dig_site::none,
+                                             gen_lp_cover* cover = nullptr)
 {
     std::vector<entity_id> placed;
     if (home_nation.tiles.empty())
@@ -729,18 +940,21 @@ std::vector<entity_id> place_starting_assets(world& w,
     // BL-1197: digging only applies to an extraction anchor on a named tier.
     const bool digging = dig != nullptr && dig_tier != dig_site::none
                       && anchor_type == building_type::extraction_site;
+    // Ben, 2026-10-26: an extraction anchor on a DEPOSIT is ranked by richness x
+    // cover; only a depositless (Well / Wharf) anchor is still drawn.
+    const bool ranked = anchor_type == building_type::extraction_site
+                     && (!digging || dig_tier == dig_site::deposit);
 
-    // --- choose the anchor tile (weighted by anchor-type score) ---------------
-    // Candidates are the window's non-ocean, unoccupied tiles that can validly host
-    // the anchor type. The nation's `tiles` vector is stored in a stable order and the
-    // window preserves it, so building the candidate list by iterating is deterministic.
-    struct candidate { entity_id tid; float score; };
+    // --- choose the anchor tile ------------------------------------------------
+    // Candidates are the window's non-ocean tiles that can validly host the anchor
+    // type and whose stack has room for it. The nation's `tiles` vector is stored in
+    // a stable order and the window preserves it, so building the candidate list by
+    // iterating is deterministic.
+    struct candidate { entity_id tid; float score; float rich; };
     std::vector<candidate> anchors;
     anchors.reserve(anchor_pool.size());
     for (entity_id tid : anchor_pool)
     {
-        if (occupied_tiles.count(tid))
-            continue;
         const auto it = w.tiles.find(tid);
         if (it == w.tiles.end())
             continue;
@@ -748,20 +962,24 @@ std::vector<entity_id> place_starting_assets(world& w,
         if (digging)
         {
             // BL-1197: only the named tier's ground for the dug good.
-            if (dig_site_of(w, tid, tc, *dig) != dig_tier)
+            if (dig_site_of(w, tid, tc, *dig) != dig_tier
+                || !occupied_tiles.has_room(tc, tid, anchor_type, *dig))
                 continue;
             anchors.push_back({ tid, tile_score_for(tc, anchor_type, dig,
                                                     dig_tier == dig_site::well
-                                                    || dig_tier == dig_site::wharf) });
+                                                    || dig_tier == dig_site::wharf),
+                                tc.resource_deposit[static_cast<std::size_t>(*dig)] });
             continue;
         }
         // An extraction anchor must sit on a workable deposit; for processing/port
         // anchors can_place reduces to "non-ocean land".
         bool any = false;
         const resource_type tgt = placement_rules::richest_extractable(tc, any);
-        if (!placement_rules::can_place(tc, anchor_type, tgt))
+        if (!placement_rules::can_place(tc, anchor_type, tgt)
+            || !occupied_tiles.has_room(tc, tid, anchor_type, tgt))
             continue;
-        anchors.push_back({ tid, tile_score_for(tc, anchor_type) });
+        anchors.push_back({ tid, tile_score_for(tc, anchor_type),
+                            tc.resource_deposit[static_cast<std::size_t>(tgt)] });
     }
     if (anchors.empty())
         return placed; // nothing anchorable in this window — the caller widens, or the
@@ -769,17 +987,41 @@ std::vector<entity_id> place_starting_assets(world& w,
                        // No RNG has been consumed on this path, so a widened retry is
                        // indistinguishable from having started at the wider rung.
 
-    float total_w = 0.0f;
-    for (const auto& c : anchors)
-        total_w += c.score;
-
     entity_id anchor_tid = anchors.back().tid;
-    std::uniform_real_distribution<float> draw(0.0f, total_w);
-    float cursor = draw(rng);
-    for (const auto& c : anchors)
+    if (ranked)
     {
-        cursor -= c.score;
-        if (cursor <= 0.0f) { anchor_tid = c.tid; break; }
+        // RICHNESS x COVER (Ben, 2026-10-26): of two equally rich deposits the one
+        // the chain reaches wins; where neither is reached the richer does; then
+        // the lower tile id. Draws nothing.
+        gen_lp_cover local_cover;
+        gen_lp_cover& cv = cover != nullptr ? *cover : local_cover;
+        float best_key = -1.0f, best_rich = -1.0f;
+        anchor_tid = null_entity;
+        for (const auto& c : anchors)
+        {
+            const float key = c.rich * cv.cover(w, c.tid);
+            if (anchor_tid == null_entity || key > best_key
+                || (key == best_key && (c.rich > best_rich
+                                        || (c.rich == best_rich && c.tid < anchor_tid))))
+            {
+                anchor_tid = c.tid;
+                best_key   = key;
+                best_rich  = c.rich;
+            }
+        }
+    }
+    else
+    {
+        float total_w = 0.0f;
+        for (const auto& c : anchors)
+            total_w += c.score;
+        std::uniform_real_distribution<float> draw(0.0f, total_w);
+        float cursor = draw(rng);
+        for (const auto& c : anchors)
+        {
+            cursor -= c.score;
+            if (cursor <= 0.0f) { anchor_tid = c.tid; break; }
+        }
     }
 
     const tile_component& anchor_tc = w.tiles.at(anchor_tid);
@@ -789,17 +1031,16 @@ std::vector<entity_id> place_starting_assets(world& w,
     placed.push_back(author_building(w, anchor_tid, anchor_type, occupied_tiles,
                                      digging ? dig : nullptr));
 
-    // --- order the rest of the nation's tiles by distance to the anchor -------
+    // --- order the nation's tiles by distance to the anchor --------------------
     // Squared grid distance keeps holdings contiguous; ties break on tile id so
-    // the order is fully deterministic. We only need the cluster neighbourhood, so
-    // the whole sorted list is the search space for the remaining asset slots.
+    // the order is fully deterministic. The anchor's own tile is first (distance
+    // 0): THE CLUSTER FILLS A TILE BEFORE IT SPREADS (Ben, 2026-10-26), so each
+    // slot takes the nearest tile that can host it and still has room.
     struct ring { long long dist2; entity_id tid; };
     std::vector<ring> neighbourhood;
     neighbourhood.reserve(home_nation.tiles.size());
     for (entity_id tid : home_nation.tiles)
     {
-        if (tid == anchor_tid || occupied_tiles.count(tid))
-            continue;
         const auto it = w.tiles.find(tid);
         if (it == w.tiles.end())
             continue;
@@ -820,21 +1061,18 @@ std::vector<entity_id> place_starting_assets(world& w,
     std::uniform_int_distribution<int> count_pick(count_min, count_max);
     const int target_count = count_pick(rng);
 
-    std::size_t cursor_tile = 0;
     int slot = 1; // slot 0 was the anchor
-    while (static_cast<int>(placed.size()) < target_count
-           && cursor_tile < neighbourhood.size())
+    while (static_cast<int>(placed.size()) < target_count)
     {
         const building_type btype =
             pattern[static_cast<std::size_t>(slot) % pattern.size()];
 
-        // Walk outward from the anchor for the next tile that can host this type.
+        // Walk outward from the anchor's own tile for the nearest tile that can
+        // host this type and has room in its stack.
         bool placed_this_slot = false;
-        for (; cursor_tile < neighbourhood.size(); ++cursor_tile)
+        for (const ring& rg : neighbourhood)
         {
-            const entity_id tid = neighbourhood[cursor_tile].tid;
-            if (occupied_tiles.count(tid))
-                continue;
+            const entity_id tid = rg.tid;
             const tile_component& tc = w.tiles.at(tid);
             // BL-1197: a digging firm's extraction slot digs its good where the
             // tile can (a Well or Wharf site or a deposit of it — the slot walk
@@ -843,17 +1081,18 @@ std::vector<entity_id> place_starting_assets(world& w,
             if (digging && btype == building_type::extraction_site
                 && dig_site_of(w, tid, tc, *dig) != dig_site::none)
             {
+                if (!occupied_tiles.has_room(tc, tid, btype, *dig))
+                    continue;
                 placed.push_back(author_building(w, tid, btype, occupied_tiles, dig));
-                ++cursor_tile;
                 placed_this_slot = true;
                 break;
             }
             bool any = false;
             const resource_type tgt = placement_rules::richest_extractable(tc, any);
-            if (!placement_rules::can_place(tc, btype, tgt))
+            if (!placement_rules::can_place(tc, btype, tgt)
+                || !occupied_tiles.has_room(tc, tid, btype, tgt))
                 continue; // e.g. extraction slot on a deposit-poor tile — try next ring
             placed.push_back(author_building(w, tid, btype, occupied_tiles));
-            ++cursor_tile;
             placed_this_slot = true;
             break;
         }
@@ -891,7 +1130,7 @@ bool gap_firm_digs(std::size_t gap, bool go_processing, resource_type& dig_out)
 std::vector<entity_id> place_digging_assets(world& w,
                                             const nation_component& home_nation,
                                             industrial_focus focus,
-                                            std::unordered_set<entity_id>& occupied_tiles,
+                                            gen_occupancy& occupied_tiles,
                                             std::mt19937& rng,
                                             const std::vector<entity_id>* anchor_window,
                                             resource_type dig)
@@ -1362,12 +1601,19 @@ void accumulate_body_production(const world& w, const recipe_registry& reg,
     }
     std::sort(bids.begin(), bids.end());
 
+    // A STACK DIMINISHES (BL-193; buildings stack in generation, Ben 2026-10-26):
+    // the k-th extraction site of a (tile, target) stack, in ascending id, yields
+    // `stack_output_scalar(k)` of a lone site — the rank the economy runs it at.
+    // Exactly 1 for a lone site, so an unstacked body reads as it did.
+    std::map<std::pair<entity_id, resource_type>, int> stack_seen;
     for (const entity_id bid : bids)
     {
         const building_component& b = w.buildings.at(bid);
         if (b.type == building_type::extraction_site)
         {
-            const float nominal = extraction_nominal(w, reg, b, 1.0f);
+            const int rank = ++stack_seen[{ b.tile, b.target_resource }];
+            const float nominal = extraction_nominal(w, reg, b, 1.0f)
+                                * placement_rules::stack_output_scalar(rank);
             if (nominal > 0.0f)
                 production[static_cast<std::size_t>(b.target_resource)] += nominal;
         }
@@ -2228,11 +2474,11 @@ bool chain_firm_feeds_good(const world& w, const recipe_registry& reg,
 
 /// Undo one authored building: `author_building` writes the building, its
 /// stockpile and the occupancy, and all three go.
-void chain_unplace(world& w, entity_id bid, std::unordered_set<entity_id>& occupied)
+void chain_unplace(world& w, entity_id bid, gen_occupancy& occupied)
 {
     const auto bit = w.buildings.find(bid);
     if (bit != w.buildings.end())
-        occupied.erase(bit->second.tile);
+        occupied.remove(bit->second);
     release_from_owner(w, bid); // BL-1407: out of its nation's list too
     w.buildings.erase(bid);
     w.stockpiles.erase(bid);
@@ -2366,7 +2612,7 @@ output_want measure_output_want(world& w, const recipe_registry& reg, entity_id 
 /// @return false when nothing is left placed (the caller treats the charter as
 ///         a placement that found no feasible ground).
 bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
-                         std::vector<entity_id>& assets, std::unordered_set<entity_id>& occupied,
+                         std::vector<entity_id>& assets, gen_occupancy& occupied,
                          const std::vector<int>* serve, bool whole = true,
                          refused_draw* refused = nullptr,
                          const output_want* want_in = nullptr)
@@ -2536,7 +2782,7 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
 /// are authored, so callers can invoke this once per corp in a stable order
 /// without re-deriving occupancy each time.
 void seed_starting_military(world& w, entity_id corp_id,
-                             std::unordered_set<entity_id>& occupied_tiles)
+                             gen_occupancy& occupied_tiles)
 {
     // BL-1407: the force is a NATION's. Named by a charter, it is the charter's
     // home nation's, laid beside the charter's anchor building (the old HQ, so
@@ -2674,10 +2920,10 @@ void arm_rivals(world& w)
     for (const auto& [cid, cc] : w.gen_charters)
         if (!cc.is_background && cc.home_nation != w.player_entity)
             rivals[cid] = true;
-    std::unordered_set<entity_id> occupied;
+    gen_occupancy occupied;
     occupied.reserve(w.buildings.size() * 2);
     for (const auto& [bid, bc] : w.buildings)
-        occupied.insert(bc.tile);
+        occupied.add(bc);
     for (const auto& [cid, _] : rivals)
         if (!corporation_has_opening_force(w, cid))
             seed_starting_military(w, cid, occupied);
@@ -2692,10 +2938,10 @@ void arm_corporation(world& w, entity_id corp)
     if ((!nation && (it == w.gen_charters.end() || it->second.is_background))
         || corporation_has_opening_force(w, corp))
         return;
-    std::unordered_set<entity_id> occupied;
+    gen_occupancy occupied;
     occupied.reserve(w.buildings.size() * 2);
     for (const auto& [bid, bc] : w.buildings)
-        occupied.insert(bc.tile);
+        occupied.add(bc);
     seed_starting_military(w, corp, occupied);
 }
 
@@ -3160,10 +3406,10 @@ std::vector<entity_id> generate_corporations(
 
     // Seed occupied_tiles from all buildings already in the world (pre-authored
     // Kepler installations and any other pre-existing buildings).
-    std::unordered_set<entity_id> occupied_tiles;
+    gen_occupancy occupied_tiles;
     occupied_tiles.reserve(w.buildings.size() * 2);
     for (const auto& kv : w.buildings)
-        occupied_tiles.insert(kv.second.tile);
+        occupied_tiles.add(kv.second);
 
     // corp_assets[c] = building entity ids placed for corp c (a clustered set).
     std::vector<std::vector<entity_id>> corp_assets(static_cast<std::size_t>(corp_count));
@@ -3470,10 +3716,10 @@ std::vector<entity_id> generate_corporations(
     // rival_military_seeding_harness. Order unchanged: the player (when armed)
     // first, then the rivals in corp_ids order.
     {
-        std::unordered_set<entity_id> military_occupied_tiles;
+        gen_occupancy military_occupied_tiles;
         military_occupied_tiles.reserve(w.buildings.size());
         for (const auto& [bld_id, bc] : w.buildings)
-            military_occupied_tiles.insert(bc.tile);
+            military_occupied_tiles.add(bc);
 
         const entity_id seat_corp = provisional_seat_corp(w); // BL-1407
         if (params.seed_starting_force && seat_corp != null_entity)
@@ -3684,10 +3930,10 @@ std::vector<entity_id> generate_background_firms(
         // generate_corporations' own player-muster-building block) — every
         // building already on the board, including this body's own prior
         // background firms placed earlier in this same loop.
-        std::unordered_set<entity_id> occupied_tiles;
+        gen_occupancy occupied_tiles;
         occupied_tiles.reserve(w.buildings.size() * 2);
         for (const auto& kv : w.buildings)
-            occupied_tiles.insert(kv.second.tile);
+            occupied_tiles.add(kv.second);
 
         int nation_cursor    = 0;
         int firms_this_body  = 0;
@@ -3918,7 +4164,7 @@ std::vector<entity_id> generate_background_firms(
                 {
                     const auto bit = w.buildings.find(bid);
                     if (bit != w.buildings.end())
-                        occupied_tiles.erase(bit->second.tile);
+                        occupied_tiles.remove(bit->second);
                     w.buildings.erase(bid);
                     // author_building writes BOTH w.buildings and w.stockpiles;
                     // erasing only the first orphans a stockpile keyed to a
@@ -4100,7 +4346,7 @@ struct unplace_tally
 /// only). WORLD BUILD ONLY, before any tick. Ascending corp id (std::map).
 /// Shared by the roster's chain enforcement and the default-recipe pass.
 unplace_tally unplace_and_reseat(world& w, const std::map<entity_id, std::vector<entity_id>>& gone,
-                                 std::unordered_set<entity_id>& occupied)
+                                 gen_occupancy& occupied)
 {
     unplace_tally out;
     for (const auto& [cid, bids] : gone)
@@ -4149,10 +4395,10 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
         if (!corp.is_background)
             ids.push_back(cid);
     std::sort(ids.begin(), ids.end());
-    std::unordered_set<entity_id> occupied;
+    gen_occupancy occupied;
     occupied.reserve(w.buildings.size() * 2);
     for (const auto& kv : w.buildings)
-        occupied.insert(kv.second.tile);
+        occupied.add(kv.second);
     chain_reach cr = make_chain_reach(w, reg);
     // The roster's processors, in (corp id, asset order) — the order every
     // step below walks.
@@ -4704,7 +4950,7 @@ int assign_default_recipes(world& w, const recipe_registry& reg, const char* sit
             ownerless.push_back(id); // release builds: the assert above did not hold
     }
 
-    std::unordered_set<entity_id> occupied; // generation's occupancy sets are local to their passes
+    gen_occupancy occupied; // generation's occupancy sets are local to their passes
     const unplace_tally ut = unplace_and_reseat(w, gone, occupied);
     for (const entity_id id : ownerless)
         chain_unplace(w, id, occupied);
@@ -4823,6 +5069,8 @@ int charter_region_dist(int c0, int r0, int c1, int r1, int gw)
     return std::max(dc, std::abs(r0 - r1));
 }
 
+struct charter_ladder_cache;
+
 /// One budgeted centre, resolved once.
 struct charter_centre
 {
@@ -4886,7 +5134,137 @@ struct charter_centre
     std::vector<entity_id> centre_window;
     bool                   region_window_built = false;
     std::vector<entity_id> region_tiles;
+
+    /// THE ANCHOR LADDER and THE COVER (Ben, 2026-10-26; Pass 3): shared by every
+    /// centre of one walk — each nation's capital and market centres as places a
+    /// processing or trade charter anchors at, and the cover memo an extractor's
+    /// deposit is ranked by. Neither the roads, the markets nor the capitals move
+    /// during a walk. Null until first asked (`charter_ladders_of`).
+    std::shared_ptr<charter_ladder_cache> ladders;
 };
+
+/// The walk's per-nation anchor places, built once per nation, and its cover memo.
+struct charter_ladder_cache
+{
+    std::map<entity_id, std::vector<charter_centre>> by_nation;
+    gen_lp_cover                                     cover;
+};
+
+charter_ladder_cache& charter_ladders_of(charter_centre& cc)
+{
+    if (!cc.ladders)
+        cc.ladders = std::make_shared<charter_ladder_cache>();
+    return *cc.ladders;
+}
+
+/// A PLACE a charter may anchor at, resolved like a centre (tile, body, grid,
+/// nation, and the anchoring region: `nearest_region` only when it is the
+/// nation's own) so the two BL-283 windows build around it exactly as they do
+/// around a budgeted centre.
+charter_centre charter_anchor_place(const world& w, const settlement_state* settle,
+                                    entity_id nation, entity_id tile)
+{
+    charter_centre p;
+    const auto t = w.tiles.find(tile);
+    if (t == w.tiles.end())
+        return p;
+    p.tile   = tile;
+    p.body   = t->second.body;
+    p.x      = t->second.grid_x;
+    p.y      = t->second.grid_y;
+    const auto b = w.bodies.find(p.body);
+    p.gw     = (b != w.bodies.end()) ? b->second.grid_width : 0;
+    p.nation = nation;
+    std::vector<entity_id> nation_ids;
+    nation_ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
+        nation_ids.push_back(kv.first);
+    std::sort(nation_ids.begin(), nation_ids.end());
+    p.nation_idx = static_cast<int>(std::lower_bound(nation_ids.begin(), nation_ids.end(), nation)
+                                    - nation_ids.begin());
+    if (settle != nullptr && !settle->regions.empty() && p.gw > 0)
+    {
+        const int pi = nearest_region(*settle, p.x, p.y, p.gw);
+        if (pi >= 0)
+        {
+            const int rn = settle->regions[static_cast<std::size_t>(pi)].nation;
+            if (rn >= 0 && rn < static_cast<int>(nation_ids.size())
+                && nation_ids[static_cast<std::size_t>(rn)] == nation)
+                p.anchor_region_idx = pi;
+        }
+    }
+    return p;
+}
+
+/// WHERE A CHARTER ANCHORS (Ben, 2026-10-26; CORPORATION_GENERATION.md § Pass 3,
+/// "Industry gathers where logistics is cheap"). An extraction charter stands on
+/// its deposits, so it anchors at its own centre (@p cc) as ever. A processing or
+/// trade charter anchors at its nation's CAPITAL first, then at the nation's
+/// MARKET CENTRES by CHAIN DISTANCE to the capital, nearest first, ties to the
+/// lower tile index. Chain distance is the road-network cost from the capital
+/// (`gen_road_walk`, roads only, unbounded): the network the seeding lays the
+/// chain out along. A centre the capital's roads do not reach (across water)
+/// comes after every reached one, by tile index. Places on the capital's body
+/// only. A nation with no capital and no market centre on its ground anchors at
+/// its own centre, the one place it has.
+std::vector<charter_centre*> charter_anchor_places(world& w, charter_centre& cc,
+                                                   const settlement_state* settle,
+                                                   industrial_focus focus)
+{
+    if (focus_asset_pattern(focus).front() == building_type::extraction_site
+        || cc.nation == null_entity)
+        return { &cc };
+    charter_ladder_cache& lc = charter_ladders_of(cc);
+    auto it = lc.by_nation.find(cc.nation);
+    if (it == lc.by_nation.end())
+    {
+        std::vector<charter_centre> places;
+        const auto nit = w.nations.find(cc.nation);
+        const entity_id cap = nit != w.nations.end() ? nit->second.capital_tile : null_entity;
+        const auto cap_t = w.tiles.find(cap);
+        const entity_id body = cap_t != w.tiles.end() ? cap_t->second.body : cc.body;
+        if (cap_t != w.tiles.end())
+            places.push_back(charter_anchor_place(w, settle, cc.nation, cap));
+        std::set<entity_id> centre_tiles;
+        for (const auto& [mid, mc] : w.markets)
+        {
+            (void)mid;
+            const auto ct = w.tiles.find(mc.centre_tile);
+            const auto tn = w.tile_to_nation.find(mc.centre_tile);
+            if (ct == w.tiles.end() || ct->second.body != body || mc.centre_tile == cap
+                || tn == w.tile_to_nation.end() || tn->second != cc.nation)
+                continue;
+            centre_tiles.insert(mc.centre_tile);
+        }
+        if (!centre_tiles.empty())
+        {
+            std::unordered_map<entity_id, float> chain;
+            if (cap_t != w.tiles.end())
+                chain = gen_road_walk(w, body, { cap }, null_entity, 0.0f);
+            std::vector<std::pair<float, entity_id>> ranked;
+            for (const entity_id t : centre_tiles)
+            {
+                const auto d = chain.find(t);
+                ranked.push_back({ d != chain.end() ? d->second
+                                                    : std::numeric_limits<float>::infinity(), t });
+            }
+            std::sort(ranked.begin(), ranked.end());
+            for (const auto& [d, t] : ranked)
+            {
+                (void)d;
+                places.push_back(charter_anchor_place(w, settle, cc.nation, t));
+            }
+        }
+        it = lc.by_nation.emplace(cc.nation, std::move(places)).first;
+    }
+    std::vector<charter_centre*> out;
+    for (charter_centre& p : it->second)
+        if (p.tile != null_entity)
+            out.push_back(&p);
+    if (out.empty())
+        out.push_back(&cc);
+    return out;
+}
 
 /// Rung 1: the centre nation's tiles within @p radius of the centre tile on the
 /// column-WRAPPED squared metric, in the nation's stored order (so the window is
@@ -4965,27 +5343,27 @@ std::vector<entity_id> charter_under_province_cap(const world& w,
 /// Only asked after a placement failed, to name WHY it failed.
 bool charter_window_anchorable(const world& w, const std::vector<entity_id>& window,
                                industrial_focus focus,
-                               const std::unordered_set<entity_id>& occupied,
+                               const gen_occupancy& occupied,
                                const resource_type* dig = nullptr)
 {
     const building_type anchor_type = focus_asset_pattern(focus).front();
     for (entity_id tid : window)
     {
-        if (occupied.count(tid))
-            continue;
         const auto it = w.tiles.find(tid);
         if (it == w.tiles.end())
             continue;
         // BL-1197: a digging firm anchors only on ground for its good.
         if (dig != nullptr && anchor_type == building_type::extraction_site)
         {
-            if (dig_site_of(w, tid, it->second, *dig) != dig_site::none)
+            if (dig_site_of(w, tid, it->second, *dig) != dig_site::none
+                && occupied.has_room(it->second, tid, anchor_type, *dig))
                 return true;
             continue;
         }
         bool any = false;
         const resource_type tgt = placement_rules::richest_extractable(it->second, any);
-        if (placement_rules::can_place(it->second, anchor_type, tgt))
+        if (placement_rules::can_place(it->second, anchor_type, tgt)
+            && occupied.has_room(it->second, tid, anchor_type, tgt))
             return true;
     }
     return false;
@@ -5012,20 +5390,23 @@ const std::vector<entity_id>& charter_rung_window(const world& w, const nation_c
 /// otherwise `window_exhausted`. With no cap in force always the latter. Asked
 /// only once a placement is known to fail (`charter_place`'s own failure, or a
 /// focus that already failed at this centre — see the turn).
-charter_unspent_reason charter_place_failure_reason(const world& w, const nation_component& nc,
+charter_unspent_reason charter_place_failure_reason(world& w, const nation_component& nc,
                                                     industrial_focus focus,
-                                                    const std::unordered_set<entity_id>& occupied,
+                                                    const gen_occupancy& occupied,
                                                     charter_centre& cc,
                                                     const settlement_state* settle,
                                                     const charter_spend_params& spend,
                                                     const std::map<uint32_t, int>* by_province,
                                                     const resource_type* dig = nullptr)
 {
+    // Ben, 2026-10-26: every place the focus anchors at (`charter_anchor_places`).
     if (by_province != nullptr)
-        for (const charter_rung rung : k_charter_rungs)
-            if (charter_window_anchorable(w, charter_rung_window(w, nc, cc, settle, spend, rung),
-                                          focus, occupied, dig))
-                return charter_unspent_reason::province_cap;
+        for (charter_centre* place : charter_anchor_places(w, cc, settle, focus))
+            for (const charter_rung rung : k_charter_rungs)
+                if (charter_window_anchorable(w, charter_rung_window(w, nc, *place, settle, spend,
+                                                                     rung),
+                                              focus, occupied, dig))
+                    return charter_unspent_reason::province_cap;
     return charter_unspent_reason::window_exhausted;
 }
 
@@ -5065,7 +5446,7 @@ charter_unspent_reason charter_place_failure_reason(const world& w, const nation
 /// focus having no ground.
 std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                                      industrial_focus focus,
-                                     std::unordered_set<entity_id>& occupied,
+                                     gen_occupancy& occupied,
                                      std::mt19937& rng,
                                      charter_centre& cc,
                                      const settlement_state* settle,
@@ -5098,12 +5479,20 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
     const std::array<dig_site, 2> ladder =
         digging ? dig_ladder(*dig) : std::array<dig_site, 2>{ dig_site::none, dig_site::none };
     const std::size_t n_tiers = digging ? ladder.size() : 1u;
+    // WHERE IT ANCHORS (Ben, 2026-10-26; `charter_anchor_places`): an extraction
+    // charter at its own centre; a processing or trade charter at its nation's
+    // capital, then its market centres by chain distance — each place's two
+    // windows in turn, the BL-283 search unchanged.
+    const std::vector<charter_centre*> places = charter_anchor_places(w, cc, settle, focus);
+    gen_lp_cover* cover = &charter_ladders_of(cc).cover;
     for (std::size_t ti = 0; ti < n_tiers; ++ti)
     {
         const dig_site tier = ladder[ti];
+        for (charter_centre* place : places)
         for (const charter_rung rung : k_charter_rungs)
         {
-            const std::vector<entity_id>& base = charter_rung_window(w, nc, cc, settle, spend, rung);
+            const std::vector<entity_id>& base =
+                charter_rung_window(w, nc, *place, settle, spend, rung);
             std::vector<entity_id> window = (by_province != nullptr && province_rungs != nullptr)
                 ? charter_under_province_cap(w, base, *by_province, *province_rungs)
                 : base;
@@ -5133,7 +5522,7 @@ std::vector<entity_id> charter_place(world& w, const nation_component& nc,
                 continue;
             std::vector<entity_id> assets = place_starting_assets(
                 w, nc, focus, occupied, rng, &window,
-                tier != dig_site::none ? dig : nullptr, tier);
+                tier != dig_site::none ? dig : nullptr, tier, cover);
             if (!assets.empty())
             {
                 // BL-1233 (BL-1217 D6 final review): each rung's refusal is its
@@ -6039,7 +6428,7 @@ void resolve_charter_centre(const world& w, const settlement_state* settle,
 entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_centre& cc,
                                 const settlement_state* settle,
                                 const charter_spend_params& spend, uint32_t seed,
-                                std::unordered_set<entity_id>& occupied, chain_reach& chain,
+                                gen_occupancy& occupied, chain_reach& chain,
                                 const output_want* want, charter_rung& rung,
                                 charter_unspent_reason& why, std::vector<entity_id>& assets_out,
                                 bool nation_wide = false,
@@ -6163,7 +6552,7 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
                 break;
             std::mt19937 wide_rng = charter_stream(seed, k_charter_salt_spec_asset ^ 0x5EEDu, cc.centre);
             assets = place_starting_assets(w, nc, f, occupied, wide_rng, &window, nullptr,
-                                           dig_site::none);
+                                           dig_site::none, &charter_ladders_of(cc).cover);
             if (!assets.empty())
             {
                 // A copy: a refused chain unplaces what it authored, and the
@@ -6175,7 +6564,8 @@ entity_id charter_specialist_at(world& w, const recipe_registry& reg, charter_ce
                     std::mt19937 again = charter_stream(seed, k_charter_salt_spec_asset ^ 0x5EEDu,
                                                         cc.centre);
                     assets = place_starting_assets(w, nc, f, occupied, again, &window,
-                                                   nullptr, dig_site::none);
+                                                   nullptr, dig_site::none,
+                                                   &charter_ladders_of(cc).cover);
                 }
                 else
                     assets = tried;
@@ -6297,11 +6687,14 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     // --- resolve every budgeted centre once, in id order ---------------------
     std::vector<charter_centre> centres;
     centres.reserve(budget.points().size());
+    // Ben, 2026-10-26: one anchor ladder and one cover memo for the whole walk.
+    const std::shared_ptr<charter_ladder_cache> ladders = std::make_shared<charter_ladder_cache>();
     for (const auto& [centre_id, pts] : budget.points())
     {
         charter_centre cc;
         cc.centre = centre_id;
         cc.points = pts;
+        cc.ladders = ladders;
 
         resolve_charter_centre(w, settle, nation_ids, cc);
         if (cc.nation == null_entity)   // no tile, or a tile no nation owns:
@@ -6321,10 +6714,10 @@ std::vector<entity_id> charter_web_from_budget(world& w,
 
     // Occupancy from every building already standing — the base world's
     // installations and nothing of the removed roster.
-    std::unordered_set<entity_id> occupied;
+    gen_occupancy occupied;
     occupied.reserve(w.buildings.size() * 2);
     for (const auto& kv : w.buildings)
-        occupied.insert(kv.second.tile);
+        occupied.add(kv.second);
 
     // BL-1146: each province's centre rung, read ONCE — the walk charters
     // buildings, never centres, so no rung moves under it.
@@ -6718,10 +7111,15 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 if (fit == feedable_of.end())
                 {
                     std::set<std::uint32_t> fs;
-                    for (const charter_rung rg : k_charter_rungs)
-                        for (const entity_id t : charter_rung_window(w, nc, cc, settle, spend, rg))
-                            if (const std::uint32_t fg = tile_feed_power_grid(w, t); fg != 0)
-                                fs.insert(fg);
+                    // A power firm is a processing charter: it stands in the windows
+                    // of the places processing anchors at (Ben, 2026-10-26).
+                    for (charter_centre* place : charter_anchor_places(
+                             w, cc, settle, industrial_focus::processing))
+                        for (const charter_rung rg : k_charter_rungs)
+                            for (const entity_id t :
+                                 charter_rung_window(w, nc, *place, settle, spend, rg))
+                                if (const std::uint32_t fg = tile_feed_power_grid(w, t); fg != 0)
+                                    fs.insert(fg);
                     fit = feedable_of.emplace(cc.centre, std::move(fs)).first;
                 }
                 reachable = &fit->second;
@@ -7687,9 +8085,9 @@ marketplace_retrofit_report retrofit_marketplaces(world& w, const recipe_registr
 
     // 4. The catchment tiles of every market that bought, nearest its centre
     //    first. One raster walk; a tile holding any building is passed over.
-    std::unordered_set<entity_id> occupied;
+    gen_occupancy occupied;
     for (const auto& [bid, bc] : w.buildings)
-        occupied.insert(bc.tile);
+        occupied.add(bc);
     struct site { long long d2; entity_id tile; };
     std::map<entity_id, std::vector<site>> sites;
     std::map<entity_id, std::pair<int, int>> centre_xy;
@@ -8067,10 +8465,10 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
             });
         }
 
-        std::unordered_set<entity_id> occupied;
+        gen_occupancy occupied;
         occupied.reserve(w.buildings.size() * 2);
         for (const auto& kv : w.buildings)
-            occupied.insert(kv.second.tile);
+            occupied.add(kv.second);
         chain_reach chain = make_chain_reach(w, reg);
         const champion_floor champ_floor = make_champion_floor(w, reg); // BL-1298 / BL-1283
 
@@ -8131,7 +8529,7 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
                     {
                         rung = charter_rung::consolidated;
                         for (const entity_id bid : assets)   // the merged holdings stand
-                            occupied.insert(w.buildings.at(bid).tile);
+                            occupied.add(w.buildings.at(bid));
                     }
                 }
                 if (corp == null_entity)

@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <tuple>
+#include <unordered_map>
 
 input_reach make_input_reach(const world& w, const recipe_registry& reg)
 {
@@ -86,8 +88,10 @@ float extract_share(const tile_component& tc, std::size_t r)
 
 float building_output(const world& w, const recipe_registry& reg, entity_id bid,
                       const building_component& b, std::size_t r,
-                      const economy_report* report)
+                      const economy_report* report, int stack_rank)
 {
+    // BL-193: a stacked site runs at its rank's share (1 for a lone site).
+    const float stack = placement_rules::stack_output_scalar(stack_rank);
     if (r >= resource_count || !standing(b))
         return 0.0f;
     const bool actual = report != nullptr && !report->buildings.empty();
@@ -125,7 +129,7 @@ float building_output(const world& w, const recipe_registry& reg, entity_id bid,
             if (r != pr)
                 return 0.0f;
             if (!actual)
-                return extraction_nominal(w, reg, b, 1.0f);
+                return extraction_nominal(w, reg, b, 1.0f) * stack;
             const building_report* br = row_of(*report, bid);
             return (br != nullptr && br->active) ? br->output_quantity : 0.0f;
         }
@@ -136,7 +140,7 @@ float building_output(const world& w, const recipe_registry& reg, entity_id bid,
         if (!(share > 0.0f))
             return 0.0f;
         if (!actual)
-            return extraction_nominal(w, reg, b, 1.0f) * share;
+            return extraction_nominal(w, reg, b, 1.0f) * stack * share;
         const building_report* br = row_of(*report, bid);
         if (br == nullptr || !br->active)
             return 0.0f;
@@ -199,7 +203,36 @@ bool producer_less(const input_reach::producer& a, const input_reach::producer& 
 
 template <typename F>
 void contribute(const world& w, const recipe_registry& reg, const input_reach& ir, entity_id bid,
-                const building_component& b, entity_id& m, F&& emit);
+                const building_component& b, entity_id& m, F&& emit, int rank);
+
+/// Each extraction site's rank in its (tile, target) stack, ascending id — the
+/// economy's stack order (`placement_rules::stack_members`). Only ranks above 1
+/// are held: an absent site is a lone one.
+std::unordered_map<entity_id, int> extraction_stack_ranks(const world& w)
+{
+    std::vector<std::tuple<entity_id, resource_type, entity_id>> sites;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type == building_type::extraction_site)
+            sites.emplace_back(b.tile, b.target_resource, bid);
+    std::sort(sites.begin(), sites.end());
+    std::unordered_map<entity_id, int> rank;
+    int run = 0;
+    for (std::size_t i = 0; i < sites.size(); ++i)
+    {
+        const bool same = i > 0 && std::get<0>(sites[i]) == std::get<0>(sites[i - 1])
+                       && std::get<1>(sites[i]) == std::get<1>(sites[i - 1]);
+        run = same ? run + 1 : 1;
+        if (run > 1)
+            rank[std::get<2>(sites[i])] = run;
+    }
+    return rank;
+}
+
+int rank_of(const std::unordered_map<entity_id, int>& ranks, entity_id bid)
+{
+    const auto it = ranks.find(bid);
+    return it != ranks.end() ? it->second : 1;
+}
 
 void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
 {
@@ -217,6 +250,7 @@ void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
     std::sort(ids.begin(), ids.end());
 
     std::array<std::map<entity_id, float>, resource_count> draw_by_market;
+    const std::unordered_map<entity_id, int> ranks = extraction_stack_ranks(w);
     for (const entity_id bid : ids)
     {
         const building_component& b = w.buildings.at(bid);
@@ -226,7 +260,7 @@ void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
                 ir.producers[r].push_back({m, bid, o});
             if (d > 0.0f)
                 draw_by_market[r][m] += d;
-        });
+        }, rank_of(ranks, bid));
     }
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -240,7 +274,7 @@ void build_index(const world& w, const recipe_registry& reg, input_reach& ir)
 /// market (null: none — it contributes nothing).
 template <typename F>
 void contribute(const world& w, const recipe_registry& reg, const input_reach& ir, entity_id bid,
-                const building_component& b, entity_id& m, F&& emit)
+                const building_component& b, entity_id& m, F&& emit, int rank)
 {
     m = null_entity;
     {
@@ -275,7 +309,7 @@ void contribute(const world& w, const recipe_registry& reg, const input_reach& i
             const bool may_take = rc != nullptr && rc->inputs[r] > 0.0f;
             if (!may_make && !may_take)
                 continue;
-            const float o = building_output(w, reg, bid, b, r, ir.report);
+            const float o = building_output(w, reg, bid, b, r, ir.report, rank);
             const float d = committed_draw(reg, b, r); // BL-1234: a pending plant's too
             if (o > 0.0f || d > 0.0f)
                 emit(r, o, d);
@@ -284,10 +318,11 @@ void contribute(const world& w, const recipe_registry& reg, const input_reach& i
 }
 
 
-input_reach::building_sig sig_of(const building_component& b)
+input_reach::building_sig sig_of(const building_component& b, int rank)
 {
     return { b.type, b.recipe, b.tile, b.target_resource, b.workforce_assigned,
-             building_supply_scalar(b), b.workforce_target, b.ticks_remaining, b.decommissioned };
+             building_supply_scalar(b), b.workforce_target, b.ticks_remaining, b.decommissioned,
+             rank };
 }
 
 } // namespace
@@ -300,12 +335,14 @@ void input_reach_refresh(const world& w, const recipe_registry& reg, input_reach
         ir.refresh_mode = true;
         ir.index_built  = true;
     }
+    // BL-193: a site whose stack rank moved (a lower-id site came or went) is changed.
+    const std::unordered_map<entity_id, int> ranks = extraction_stack_ranks(w);
     // What changed, in ascending id (the stores are unordered).
     std::vector<entity_id> gone, added;
     for (const auto& [bid, ib] : ir.seen)
     {
         const auto bit = w.buildings.find(bid);
-        if (bit == w.buildings.end() || !(sig_of(bit->second) == ib.sig))
+        if (bit == w.buildings.end() || !(sig_of(bit->second, rank_of(ranks, bid)) == ib.sig))
             gone.push_back(bid);
     }
     for (const auto& [bid, b] : w.buildings)
@@ -313,7 +350,7 @@ void input_reach_refresh(const world& w, const recipe_registry& reg, input_reach
         if (b.type != building_type::processing_facility && b.type != building_type::extraction_site)
             continue;
         const auto sit = ir.seen.find(bid);
-        if (sit == ir.seen.end() || !(sit->second.sig == sig_of(b)))
+        if (sit == ir.seen.end() || !(sit->second.sig == sig_of(b, rank_of(ranks, bid))))
             added.push_back(bid);
     }
     if (gone.empty() && added.empty())
@@ -347,7 +384,7 @@ void input_reach_refresh(const world& w, const recipe_registry& reg, input_reach
     {
         const building_component& b = w.buildings.at(bid);
         input_reach::indexed_building ib;
-        ib.sig = sig_of(b);
+        ib.sig = sig_of(b, rank_of(ranks, bid));
         entity_id m = null_entity;
         contribute(w, reg, ir, bid, b, m, [&](std::size_t r, float o, float d) {
             if (o > 0.0f)
@@ -363,7 +400,7 @@ void input_reach_refresh(const world& w, const recipe_registry& reg, input_reach
                 ib.draw.push_back({r, d});
                 touched.insert({r, m});
             }
-        });
+        }, rank_of(ranks, bid));
         ib.market = m;
         ir.seen[bid] = std::move(ib);
     }
@@ -650,7 +687,9 @@ reachable_spare reachable_supply(world& w, const recipe_registry& reg, input_rea
     if (self != null_entity)
         if (const auto sit = w.buildings.find(self); sit != w.buildings.end())
         {
-            self_out  = building_output(w, reg, self, sit->second, r, ir.report);
+            self_out  = building_output(w, reg, self, sit->second, r, ir.report,
+                                        sit->second.type == building_type::extraction_site
+                                            ? placement_rules::stack_rank(w, self) : 1);
             self_draw = committed_draw(reg, sit->second, r); // the index's own reading
             self_mkt  = market_for_tile(w, sit->second.tile);
         }
