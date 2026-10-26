@@ -1312,10 +1312,13 @@ void draw_industry_key(ImDrawList* dl, const ui_state& state)
 /// THE LOGISTICS LENS'S ROAD RAMP (Ben, 2026-10-24; LENSES.md § Logistics lens). A
 /// road of the player's nation is coloured by SUPPLIED over REQUESTED - the points
 /// granted to the requests routed through it over those requests - on a log2 scale:
-/// a ratio of 2 or more is full green, 0.5 or less full yellow, 1 the midpoint. A road
-/// no request routes through reads green: its supply is at least double a zero request.
+/// a ratio of 2 or more is full green, 1 yellow, 0.5 or less full RED (Ben, 2026-10-26:
+/// "use red for the extreme"), interpolated on log2 between the three stops. A road no
+/// request routes through reads green: its supply is at least double a zero request.
+constexpr ImU32 k_logistics_road_red    = IM_COL32(226,  72,  58, 255);
 constexpr ImU32 k_logistics_road_yellow = IM_COL32(236, 206,  60, 255);
 constexpr ImU32 k_logistics_road_green  = IM_COL32( 84, 214, 104, 255);
+/// The ramp position: 0 at 0.5x or less, 0.5 at 1x, 1 at 2x or more.
 float logistics_road_t(float supplied, float requested)
 {
     if (!(requested > 0.0f))
@@ -1324,10 +1327,16 @@ float logistics_road_t(float supplied, float requested)
         return 0.0f;
     return std::clamp((std::log2(supplied / requested) + 1.0f) * 0.5f, 0.0f, 1.0f);
 }
+/// The three-stop ramp at position @p t (logistics_road_t): red -> yellow -> green.
+ImU32 logistics_ramp_colour(float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    return t < 0.5f ? lerp_colour(k_logistics_road_red, k_logistics_road_yellow, t * 2.0f)
+                    : lerp_colour(k_logistics_road_yellow, k_logistics_road_green, (t - 0.5f) * 2.0f);
+}
 ImU32 logistics_road_colour(float supplied, float requested)
 {
-    return lerp_colour(k_logistics_road_yellow, k_logistics_road_green,
-                       logistics_road_t(supplied, requested));
+    return logistics_ramp_colour(logistics_road_t(supplied, requested));
 }
 
 /// REACH, KEPT APART FROM TRAFFIC (Ben, 2026-10-25: "an unused road between them
@@ -1382,7 +1391,7 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     // (Ben, 2026-10-24: "it is not clear whether logistics works as intended"):
     // "Generated 0" beside what production needs is the answer, not a blank key.
     const float body_h = state.lp_player_known
-        ? pad + line_h + 4.0f + bar_h + 2.0f + line_h + 6.0f
+        ? pad + line_h + 4.0f + bar_h + 2.0f + line_h + 2.0f + line_h + 6.0f // ramp, stops, caption
               + 2.0f * (line_h + 2.0f) + 4.0f // the idle and off-chain swatches
               + (have ? std::max(line_h, mark_d) : line_h) + 4.0f
               + 4.0f * (line_h + 2.0f) + pad
@@ -1408,25 +1417,29 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
         return;
     }
 
-    // Bar 1 - THE ROAD RAMP (Ben, 2026-10-24): a road's colour is SUPPLIED over
-    // REQUESTED on a log2 scale, yellow at half or less, green at double or more.
-    // The ground is not tinted, so this is the one ramp the lens draws.
+    // Bar 1 - THE ROAD RAMP (Ben, 2026-10-24; red end 2026-10-26): a road's colour is
+    // SUPPLIED over REQUESTED on a log2 scale - red at half or less, yellow at 1x,
+    // green at double or more. The ground is not tinted, so this is the one ramp.
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
-        const float t0 = static_cast<float>(i) / segs;
-        dl->AddRectFilled({ x + bar_w * t0, y },
+        const float t0 = (static_cast<float>(i) + 0.5f) / segs;
+        dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h },
-                          lerp_colour(k_logistics_road_yellow, k_logistics_road_green, t0));
+                          logistics_ramp_colour(t0));
     }
     y += bar_h + 2.0f;
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "0.5x"); // fit-exempt: legend box sized to its measured entries (container 2)
-    const char* mid = "supplied / requested";
-    const ImVec2 mts = ImGui::CalcTextSize(mid);
-    dl->AddText({x + (bar_w - mts.x) * 0.5f, y}, IM_COL32(150, 155, 165, 255), mid); // fit-exempt: legend box sized to its measured entries (container 2)
+    const char* one = "1x";
+    const ImVec2 ots = ImGui::CalcTextSize(one);
+    dl->AddText({x + (bar_w - ots.x) * 0.5f, y}, IM_COL32(170, 175, 185, 255), one); // fit-exempt: legend box sized to its measured entries (container 2)
     const char* top = "2x+";
     const ImVec2 nts = ImGui::CalcTextSize(top);
     dl->AddText({x + bar_w - nts.x, y}, IM_COL32(170, 175, 185, 255), top); // fit-exempt: legend box sized to its measured entries (container 2)
+    y += line_h + 2.0f;
+    const char* mid = "supplied / requested";
+    const ImVec2 mts = ImGui::CalcTextSize(mid);
+    dl->AddText({x + (bar_w - mts.x) * 0.5f, y}, IM_COL32(150, 155, 165, 255), mid); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 6.0f;
 
     // REACH APART FROM TRAFFIC (Ben, 2026-10-25): the two states off the ramp - a link
@@ -2511,6 +2524,83 @@ void update_body_vision(world& w, ui_state& state, double now_days)
         live[cv.id] = std::move(entry);
     }
     s_lanes.swap(live); // convoys that arrived or were cut drop out of the cache
+}
+
+void update_trade_flow_routes(world& w, ui_state& state)
+{
+    // THE TRADE-FLOW LENS DRAWS THE ROUTE, NOT THE CHORD (Ben, 2026-10-26; LENSES.md
+    // § Trade-flow lens). Each flow is drawn along the tiles its NEWEST shipment was
+    // priced on - the overland path, or land -> port -> lane -> port -> land, or road ->
+    // rail -> road - read by `convoy_route_tiles` from the waypoints the dispatcher
+    // recorded, the one owner of "which tiles does this haul ride" (the convoy beam,
+    // interdiction and capture read it too). A route is a function of those waypoints
+    // and the network, so each is CACHED on them and the world's logistics generation,
+    // as the convoy beams' lanes are: a frame re-derives nothing unless a road, a lane,
+    // a port or a shipment's route moved. View state only.
+    state.tf_routes.clear();
+    if (state.overlay != overlay_mode::trade_flow || state.active_body == null_entity)
+        return;
+    const entity_id me = player_actor(w);
+    std::map<std::tuple<entity_id, entity_id, std::uint16_t>, const trade_flow_shipment*> newest;
+    for (const trade_flow_pass& p : w.player_trade_flow)
+    {
+        if (p.corp == null_entity || (p.corp != w.player_entity && p.corp != me))
+            continue;
+        for (const trade_flow_shipment& s : p.shipments)
+            newest[{s.source, s.dest, s.good}] = &s; // later passes overwrite: the newest
+    }
+    struct cached_route
+    {
+        std::uint64_t gen = 0;
+        entity_id     origin = null_entity, port_a = null_entity, port_b = null_entity;
+        entity_id     station_a = null_entity, station_b = null_entity;
+        convoy_mode   mode = convoy_mode::land;
+        convoy_route  route;
+    };
+    static std::map<std::tuple<entity_id, entity_id, std::uint16_t>, cached_route> s_routes;
+    std::map<std::tuple<entity_id, entity_id, std::uint16_t>, cached_route> live;
+    for (const auto& [key, s] : newest)
+    {
+        const auto sm = w.markets.find(s->source);
+        const auto dm = w.markets.find(s->dest);
+        if (sm == w.markets.end() || dm == w.markets.end()
+            || sm->second.body != state.active_body || dm->second.body != state.active_body)
+            continue;
+        cached_route entry;
+        const auto hit = s_routes.find(key);
+        if (hit != s_routes.end() && hit->second.gen == w.logistics_cache_generation
+            && hit->second.origin == s->origin_tile && hit->second.port_a == s->port_a
+            && hit->second.port_b == s->port_b && hit->second.station_a == s->station_a
+            && hit->second.station_b == s->station_b && hit->second.mode == s->mode)
+        {
+            entry = std::move(hit->second);
+        }
+        else
+        {
+            convoy_component cv;
+            cv.source_market = s->source;
+            cv.dest_market   = s->dest;
+            cv.mode          = s->mode;
+            cv.origin_tile   = s->origin_tile;
+            cv.port_a        = s->port_a;
+            cv.port_b        = s->port_b;
+            cv.station_a     = s->station_a;
+            cv.station_b     = s->station_b;
+            entry.gen       = w.logistics_cache_generation;
+            entry.origin    = s->origin_tile;
+            entry.port_a    = s->port_a;
+            entry.port_b    = s->port_b;
+            entry.station_a = s->station_a;
+            entry.station_b = s->station_b;
+            entry.mode      = s->mode;
+            entry.route     = convoy_route_tiles(w, cv);
+        }
+        if (entry.route.body == state.active_body && entry.route.tiles.size() >= 2)
+            state.tf_routes.push_back({ std::get<0>(key), std::get<1>(key), std::get<2>(key),
+                                        entry.route.tiles });
+        live[key] = std::move(entry);
+    }
+    s_routes.swap(live);
 }
 
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
@@ -4242,7 +4332,96 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             + static_cast<std::size_t>(col);
         return i < state.lp_track.size() && state.lp_track[i] != 0;
     };
-    const auto emit_routes = [&](ImDrawList* out, int t_col, int t_row, const tile_component& tile,
+    // A SEA LANE'S ENDS GO INTO THE PORT (Ben, 2026-10-26; RENDERING.md § Roads and sea
+    // lanes, "A lane ends in its port"). A port lays its lanes from the water on its six
+    // sides (lay_port_lanes), so a lane used to stop on the sea tile BESIDE the port and
+    // read as unconnected to it. Per raster cell, the hex sides (bit = side) along which
+    // that LANE tile draws its curve on into a standing port's tile centre. Which lane
+    // tiles join a port: every lane END beside it (one cardinal lane neighbour or none);
+    // a port no lane ends beside but a lane runs past joins the lowest-index lane tile
+    // beside it, so a lane hugging the coast is not fanned into the port three times.
+    // Held on the body's frame stamp (buildings, day tick for a completed port, the
+    // logistics generation that a lane laid bumps).
+    static body_frame_stamp           s_port_stamp;
+    static std::vector<std::uint8_t>  s_port_sides;
+    static int                        s_port_joins = 0; // set bits over s_port_sides
+    {
+        const body_frame_stamp ps = make_body_frame_stamp(w, state.active_body);
+        if (ps != s_port_stamp || s_port_sides.size() != static_cast<std::size_t>(gw) * gh)
+        {
+            s_port_stamp = ps;
+            s_port_sides.assign(static_cast<std::size_t>(std::max(0, gw)) * std::max(0, gh), 0u);
+            const auto lane_at = [&](int c, int r) -> bool {
+                if (r < 0 || r >= gh || gw <= 0) return false;
+                const tile_component* t = tile_rc(((c % gw) + gw) % gw, r);
+                return t && t->lane_level > 0;
+            };
+            std::vector<entity_id> port_tiles;
+            for (const auto& [bid, b] : w.buildings)
+            {
+                (void)bid;
+                if (b.type != building_type::port || b.ticks_remaining > 0 || b.decommissioned)
+                    continue;
+                const auto tit = w.tiles.find(b.tile);
+                if (tit != w.tiles.end() && tit->second.body == state.active_body)
+                    port_tiles.push_back(b.tile);
+            }
+            std::sort(port_tiles.begin(), port_tiles.end()); // determinism: buildings is unordered
+            port_tiles.erase(std::unique(port_tiles.begin(), port_tiles.end()), port_tiles.end());
+            for (const entity_id pt : port_tiles)
+            {
+                const tile_component& p = w.tiles.at(pt);
+                struct beside { int idx; int side_to_port; bool end; };
+                std::vector<beside> beside_port;
+                for (int side = 0; side < 6; ++side)
+                {
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(p.grid_x, p.grid_y, side);
+                    if (!lane_at(nb.gx, nb.gy))
+                        continue;
+                    const int lc = ((nb.gx % gw) + gw) % gw, lr = nb.gy;
+                    // The side of the LANE tile that faces the port.
+                    int back = -1;
+                    for (int s2 = 0; s2 < 6; ++s2)
+                    {
+                        const hex_neighbors::coord bb = hex_neighbors::neighbour(lc, lr, s2);
+                        if (((bb.gx % gw) + gw) % gw == p.grid_x && bb.gy == p.grid_y) { back = s2; break; }
+                    }
+                    if (back < 0)
+                        continue;
+                    const int deg = (lane_at(lc + 1, lr) ? 1 : 0) + (lane_at(lc - 1, lr) ? 1 : 0)
+                                  + (lane_at(lc, lr + 1) ? 1 : 0) + (lane_at(lc, lr - 1) ? 1 : 0);
+                    beside_port.push_back({ lr * gw + lc, back, deg <= 1 });
+                }
+                if (beside_port.empty())
+                    continue;
+                const bool any_end = std::any_of(beside_port.begin(), beside_port.end(), [](const beside& b) { return b.end; });
+                if (any_end)
+                {
+                    for (const beside& b : beside_port)
+                        if (b.end)
+                            s_port_sides[static_cast<std::size_t>(b.idx)] |= static_cast<std::uint8_t>(1u << b.side_to_port);
+                }
+                else
+                {
+                    const auto lo = std::min_element(beside_port.begin(), beside_port.end(),
+                                                     [](const beside& a, const beside& b) { return a.idx < b.idx; });
+                    s_port_sides[static_cast<std::size_t>(lo->idx)] |= static_cast<std::uint8_t>(1u << lo->side_to_port);
+                }
+            }
+            s_port_joins = 0;
+            for (const std::uint8_t m : s_port_sides)
+                for (std::uint8_t b = m; b != 0; b &= static_cast<std::uint8_t>(b - 1))
+                    ++s_port_joins;
+        }
+    }
+    // Published for the verify census: how many lane-to-port joins this body draws.
+    state.lane_port_joins = s_port_joins;
+    const auto port_sides_rc = [&](int col, int row) -> std::uint8_t {
+        if (row < 0 || row >= gh || gw <= 0) return 0u;
+        const std::size_t i = static_cast<std::size_t>(row) * gw + static_cast<std::size_t>(((col % gw) + gw) % gw);
+        return i < s_port_sides.size() ? s_port_sides[i] : 0u;
+    };
+    const auto emit_routes =[&](ImDrawList* out, int t_col, int t_row, const tile_component& tile,
                                  float cx, float cy, ImVec2 vo, int k, bool on_bake, float vision,
                                  std::vector<structure_hit_zone>& zones)
     {
@@ -4291,8 +4470,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // BL-1390: @p weight_of / @p thick_of turn ONE DIRECTION's link value into the
         // colour and width drawn across it, with the passed col/thick as the fallback for
         // a network whose value carries no tier (a sea lane, which is a tile field).
+        // @p port_mask (Ben, 2026-10-26): the hex sides along which this LANE tile's
+        // curve runs on into a port tile's centre (s_port_sides); 0 for every other network.
         const auto draw_network = [&](auto level_of, auto link_of, ImU32 col, float thick,
-                                      bool skip_rungs, auto weight_of, auto thick_of)
+                                      bool skip_rungs, auto weight_of, auto thick_of,
+                                      std::uint8_t port_mask)
         {
             static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
             const auto through = [&](int c, int r, bool horizontal) {
@@ -4300,10 +4482,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     ? (on_network(level_of, c + 1, r) && on_network(level_of, c - 1, r))
                     : (on_network(level_of, c, r + 1) && on_network(level_of, c, r - 1));
             };
-            ImVec2 mids[4];
-            float  vis[4];
-            ImU32  ecol[4];   // BL-1390: this DIRECTION's colour...
-            float  ethick[4]; // ...and its width, from the edge's own tier
+            // Four cardinal links and up to six port ends (a lane tile can face more than
+            // one port; in practice it is one or two).
+            ImVec2 mids[10];
+            float  vis[10];
+            ImU32  ecol[10];   // BL-1390: this DIRECTION's colour...
+            float  ethick[10]; // ...and its width, from the edge's own tier
             int    deg = 0;
             for (int n = 0; n < 4; ++n)
             {
@@ -4350,6 +4534,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // own edge's fog; the tier rides the same seam.
                 ecol[deg]   = weight_of(link_tier, col);
                 ethick[deg] = thick_of(link_tier, thick);
+                ++deg;
+            }
+
+            // THE PORT ENDS. Each joins the tile's curve like a link - its mid is the
+            // shared edge's midpoint - and the half on the PORT's side, edge to port
+            // centre, is drawn here, since the port tile carries no lane of its own.
+            for (int side = 0; side < 6 && port_mask != 0; ++side)
+            {
+                if (!(port_mask & (1u << side)))
+                    continue;
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(t_col, t_row, side);
+                if (nb.gy < 0 || nb.gy >= gh)
+                    continue;
+                const int pc = ((nb.gx % gw) + gw) % gw;
+                if (!(survey_tile_visible(body.survey, gw, gh, pc, nb.gy) || god_view_lift))
+                    continue;
+                // The raw column places the centre across the seam on its own.
+                ImVec2 p_sc = to_scr(vo, hex_local_centre(nb.gx, nb.gy, hex_size));
+                p_sc.x += static_cast<float>(k) * period_px;
+                const ImVec2 m = { (cx + p_sc.x) * 0.5f, (cy + p_sc.y) * 0.5f };
+                const float  pv = std::max(vision, vision_rc(pc, nb.gy));
+                const ImU32  pcol = fog_dim(col, pv);
+                out->AddLine(m, p_sc, pcol, thick);
+                out->AddCircleFilled(p_sc, std::max(1.0f, thick * 0.75f), pcol);
+                mids[deg]   = m;
+                vis[deg]    = pv;
+                ecol[deg]   = col;
+                ethick[deg] = thick;
                 ++deg;
             }
 
@@ -4429,7 +4641,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // and each pair is one curve — so a junction reads as two crossing runs,
             // not a star of spokes, and a dense city lattice curves as a run does.
             // Deterministic: ties keep the first pair in the fixed E, W, S, N order.
-            bool   used[4] = {false, false, false, false};
+            bool   used[10] = {};
             ImVec2 hub     = {cx, cy}; // where an odd branch joins: the last curve's apex
             for (int left = deg; left >= 2; left -= 2)
             {
@@ -4571,7 +4783,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                  case 3:  return route_r * k_road_width_highway;
                                  default: return fallback;
                              }
-                         });
+                         },
+                         std::uint8_t{0});
         }
 
         if (metered)
@@ -4586,7 +4799,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          IM_COL32(140, 200, 245, 190), route_r * k_lane_width, true,
                          // A lane carries no tier, so every half keeps the lane's own weight.
                          [](int, ImU32 fallback) { return fallback; },
-                         [](int, float fallback) { return fallback; });
+                         [](int, float fallback) { return fallback; },
+                         port_sides_rc(t_col, t_row));
 
         // RAIL UNDER THE LOGISTICS LENS (Ben, 2026-10-25). The bake paints no route
         // surface under this lens (strip_painted_routes), the rail bed included, so the
@@ -4598,7 +4812,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                          [](const tile_component&, int, int) { return 1; }, // track is a tile field
                          IM_COL32(92, 86, 80, 230), route_r * k_road_width_road, false,
                          [](int, ImU32 fallback) { return fallback; },
-                         [](int, float fallback) { return fallback; });
+                         [](int, float fallback) { return fallback; },
+                         std::uint8_t{0});
 
         if (metered)
             pm.mark(canvas_pass_meter::lanes, dl);
@@ -4974,6 +5189,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // The Logistics lens's road colour is per tile and moves with the
                 // routed flow, not with the geometry: it is part of the bucket too.
                 own = mix(own, lens_road_colour(cc, r));
+                // A lane tile's port ends (Ben, 2026-10-26) move when a port stands or goes.
+                own = mix(own, static_cast<std::uint64_t>(port_sides_rc(cc, r)) + 0x51ull);
                 h = mix(h, own);
             }
 
@@ -6285,6 +6502,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // behind (now a rival), and drawing it would show that rival's flows as the
     // player's. So the lens reads nothing until the held corp's first pass.
     std::vector<const trade_flow_pass*> tf_passes;
+    state.trade_flow_routed = state.trade_flow_unrouted = 0;
     if (state.overlay == overlay_mode::trade_flow)
         for (const trade_flow_pass& p : w.player_trade_flow)
             if ((p.corp == w.player_entity || p.corp == player_owner) && p.corp != null_entity) // BL-1406
@@ -6360,14 +6578,173 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         };
         float best_arrow_d2 = std::numeric_limits<float>::max();
 
-        // Arrows. The destination is taken at the SHORTEST wrap displacement, and
-        // the shaft sits a few px right of the centre line so A->B and B->A read
-        // as two arrows rather than one double-headed line.
+        // ROUTED PATHS (Ben, 2026-10-26): a flow is drawn along the tiles its newest
+        // shipment rides (state.tf_routes, update_trade_flow_routes) - its roads, its
+        // lane, its rail - a few px right of the route so A->B and B->A read as two,
+        // with chevrons down its length for direction and the head at the destination.
+        // A flow with no route known keeps the straight arrow below, the fallback.
+        const auto route_of = [&](const tf_arrow& f) -> const ui_state::trade_flow_route* {
+            const auto it = std::lower_bound(
+                state.tf_routes.begin(), state.tf_routes.end(), f,
+                [](const ui_state::trade_flow_route& r, const tf_arrow& a) {
+                    return std::tie(r.src, r.dest, r.good) < std::tie(a.src, a.dest, a.good);
+                });
+            return (it != state.tf_routes.end() && it->src == f.src && it->dest == f.dest
+                    && it->good == f.good) ? &*it : nullptr;
+        };
+        std::vector<ImVec2> rpts, opts, shaft;
+        // Trim @p len px off the END of polyline @p v, walking back along it.
+        const auto trim_end = [](std::vector<ImVec2>& v, float len) {
+            while (v.size() >= 2 && len > 0.0f)
+            {
+                ImVec2& b = v.back();
+                const ImVec2 a = v[v.size() - 2];
+                const float dx = b.x - a.x, dy = b.y - a.y;
+                const float l = std::sqrt(dx * dx + dy * dy);
+                if (l > len) { b = { b.x - dx / l * len, b.y - dy / l * len }; return; }
+                len -= l;
+                v.pop_back();
+            }
+        };
         for (std::size_t i = 0; i < tf_arrows.size(); ++i)
         {
             const tf_arrow& f = tf_arrows[i];
             if (f.src == f.dest)
                 continue;
+            const ui_state::trade_flow_route* rt = route_of(f);
+            if (rt != nullptr)
+            {
+                // Tile centres, columns unwrapped tile to tile so a route across the
+                // cylinder seam stays one continuous line.
+                rpts.clear();
+                int prev_col = 0;
+                for (const entity_id tid : rt->tiles)
+                {
+                    const auto tit = w.tiles.find(tid);
+                    if (tit == w.tiles.end())
+                        continue;
+                    int col = tit->second.grid_x;
+                    if (!rpts.empty() && gw > 0)
+                    {
+                        while (col - prev_col > gw / 2) col -= gw;
+                        while (prev_col - col > gw / 2) col += gw;
+                    }
+                    prev_col = col;
+                    const ImVec2 p = to_screen(hex_local_centre(col, tit->second.grid_y, hex_size));
+                    if (!rpts.empty() && std::fabs(p.x - rpts.back().x) + std::fabs(p.y - rpts.back().y) < 0.5f)
+                        continue;
+                    rpts.push_back(p);
+                }
+                if (rpts.size() >= 2)
+                {
+                    // One Chaikin pass: the centre chain rounds toward the curve the roads draw.
+                    if (rpts.size() >= 3)
+                    {
+                        opts.clear();
+                        opts.push_back(rpts.front());
+                        for (std::size_t q = 0; q + 1 < rpts.size(); ++q)
+                        {
+                            const ImVec2 a = rpts[q], b = rpts[q + 1];
+                            opts.push_back({ a.x * 0.75f + b.x * 0.25f, a.y * 0.75f + b.y * 0.25f });
+                            opts.push_back({ a.x * 0.25f + b.x * 0.75f, a.y * 0.25f + b.y * 0.75f });
+                        }
+                        opts.push_back(rpts.back());
+                        rpts.swap(opts);
+                    }
+                    const float wpx  = trade_flow_width(f.rate, tf_max_rate);
+                    const float side = 2.0f + wpx * 0.5f;
+                    // Offset right of travel, per vertex by its neighbours' direction.
+                    const std::size_t n = rpts.size();
+                    opts.assign(n, ImVec2{});
+                    for (std::size_t q = 0; q < n; ++q)
+                    {
+                        const ImVec2 a = rpts[q > 0 ? q - 1 : q], b = rpts[q + 1 < n ? q + 1 : q];
+                        const float vx = b.x - a.x, vy = b.y - a.y;
+                        const float l = std::sqrt(vx * vx + vy * vy);
+                        const float nx = l > 0.0f ? -vy / l : 0.0f, ny = l > 0.0f ? vx / l : 0.0f;
+                        opts[q] = { rpts[q].x + nx * side, rpts[q].y + ny * side };
+                    }
+                    // Trim both ends clear of the market glyphs.
+                    std::reverse(opts.begin(), opts.end());
+                    trim_end(opts, inset);
+                    std::reverse(opts.begin(), opts.end());
+                    trim_end(opts, inset);
+                }
+                if (rpts.size() >= 2 && opts.size() >= 2)
+                {
+                    const float wpx  = trade_flow_width(f.rate, tf_max_rate);
+                    const float head = 5.0f + wpx;
+                    const ImVec2 tip = opts.back();
+                    shaft = opts;
+                    trim_end(shaft, head);
+                    if (shaft.size() < 2)
+                        shaft = { opts.front(), opts.back() };
+                    const ImVec2 se = shaft.back();
+                    float hx = tip.x - se.x, hy = tip.y - se.y;
+                    const float hl = std::sqrt(hx * hx + hy * hy);
+                    if (hl > 0.0f) { hx /= hl; hy /= hl; } else { hx = 1.0f; hy = 0.0f; }
+                    const float hnx = -hy, hny = hx;
+
+                    float lo = opts[0].x, hi = opts[0].x;
+                    for (const ImVec2& p : opts) { lo = std::min(lo, p.x); hi = std::max(hi, p.x); }
+                    const int k_min = (period_px > 0.0f)
+                        ? static_cast<int>(std::ceil((visible_left  - hi) / period_px)) : 0;
+                    const int k_max = (period_px > 0.0f)
+                        ? static_cast<int>(std::floor((visible_right - lo) / period_px)) : 0;
+                    const float every = std::max(36.0f, wpx * 10.0f); // a chevron every ~10 widths
+                    const float cs    = 2.5f + wpx * 0.6f;
+                    const float hit   = std::max(5.0f, wpx * 0.5f + 3.0f);
+                    for (int k = k_min; k <= k_max; ++k)
+                    {
+                        const float off = static_cast<float>(k) * period_px;
+                        for (ImVec2& p : shaft) p.x += off; // this copy, put back below
+                        dl->AddPolyline(shaft.data(), static_cast<int>(shaft.size()),
+                                        IM_COL32(10, 12, 18, 170), ImDrawFlags_None, wpx + 2.0f);
+                        dl->AddPolyline(shaft.data(), static_cast<int>(shaft.size()),
+                                        palette::trade_flow_arrow, ImDrawFlags_None, wpx);
+                        // DIRECTION DOWN THE LENGTH: dark chevrons on the shaft.
+                        float run = every * 0.5f;
+                        for (std::size_t q = 0; q + 1 < shaft.size(); ++q)
+                        {
+                            const ImVec2 a = shaft[q], b = shaft[q + 1];
+                            const float dx = b.x - a.x, dy = b.y - a.y;
+                            const float l = std::sqrt(dx * dx + dy * dy);
+                            if (!(l > 0.0f))
+                                continue;
+                            const float ux = dx / l, uy = dy / l;
+                            while (run <= l)
+                            {
+                                const ImVec2 c{ a.x + ux * run, a.y + uy * run };
+                                const ImVec2 chev[3] = {
+                                    { c.x - ux * cs - uy * cs, c.y - uy * cs + ux * cs },
+                                    { c.x + ux * cs * 0.4f,    c.y + uy * cs * 0.4f },
+                                    { c.x - ux * cs + uy * cs, c.y - uy * cs - ux * cs } };
+                                dl->AddPolyline(chev, 3, IM_COL32(10, 12, 18, 210), ImDrawFlags_None, 1.6f);
+                                run += every;
+                            }
+                            run -= l;
+                        }
+                        const ImVec2 t2{ tip.x + off, tip.y };
+                        const ImVec2 e2{ se.x + off, se.y };
+                        const float hw = head * 0.6f;
+                        dl->AddTriangleFilled(t2, { e2.x + hnx * hw, e2.y + hny * hw },
+                                              { e2.x - hnx * hw, e2.y - hny * hw }, palette::trade_flow_arrow);
+                        for (std::size_t q = 0; q + 1 < shaft.size(); ++q)
+                        {
+                            const float d2 = seg_d2(mouse_g, shaft[q], shaft[q + 1]);
+                            if (d2 <= hit * hit && d2 < best_arrow_d2)
+                            {
+                                best_arrow_d2  = d2;
+                                tf_hover_arrow = static_cast<int>(i);
+                            }
+                        }
+                        for (ImVec2& p : shaft) p.x -= off;
+                    }
+                    ++state.trade_flow_routed;
+                    continue;
+                }
+            }
+            ++state.trade_flow_unrouted;
             const ImVec2 a0 = centre_of(f.src);
             ImVec2       b0 = centre_of(f.dest);
             if (period_px > 0.0f)
@@ -6929,6 +7306,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // the tile". Here there is no falling through: the click selects
             // nothing and the band returns to resting.
             bool lens_answered_nothing = false;
+            // Set when the Logistics lens's press lands on a tile (Ben, 2026-10-26).
+            bool logistics_tile_press = false;
 
             // The hand-wired Corporation-lens pivot that used to sit here — a
             // clicked BUILDING resolving through to its owning corporation — is
@@ -7031,13 +7410,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         state.history_view = history_view_tectonics;
                     }
                 }
-                // The GROUND is a hover read only (BL-1353; Ben, 2026-10-20): a
-                // press on it is no answer, so it clears the band like any other.
                 else if (area_kind != structure_kind::none && area_kind != structure_kind::ground
                          && area_id != null_entity)
                 {
                     structure_hit = area_id;
                     struct_kind   = area_kind;
+                }
+                // UNDER THE LOGISTICS LENS A PRESS SELECTS THE TILE (Ben, 2026-10-26,
+                // overturning 2026-10-20's "a click stays inert"). The lens is a value
+                // field with no structure, so before this the press answered nothing
+                // and cleared the band to RESTING - the player's own nation - which
+                // read as "a click selects the nation". Any tile, the player's or
+                // not: the tile card is what the press is for. Below, no cycle.
+                else if (state.overlay == overlay_mode::throughput && hovered_tile != null_entity)
+                {
+                    logistics_tile_press = true;
                 }
                 else
                 {
@@ -7048,6 +7435,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (non_entity_structure)
             {
                 // Already dispatched into its own field above; nothing further.
+            }
+            else if (logistics_tile_press)
+            {
+                // The tile, as the no-lens fallback selects it, but ONE TIER: the
+                // repeat-click cycle is a no-lens gesture (SELECTION.md), so the
+                // cycle anchor is dropped and a second press re-selects the tile.
+                state.selected_entity      = hovered_tile;
+                state.selected_province    = w.provinces.province_of(hovered_tile);
+                state.province_sync_entity = hovered_tile;
+                state.selection_cycle_tile = null_entity;
+                state.clear_battle_selection();
+                state.clear_lens_region_selection();
             }
             else if (lens_answered_nothing)
             {

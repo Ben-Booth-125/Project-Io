@@ -2670,6 +2670,10 @@ void app::render()
                 // envelope under the sources and both must describe one frame.
                 ui::update_body_throughput(m_world, m_ui, m_registry,
                                            m_last_econ_report.logistic_points);
+                // The Trade-flow lens's routes (Ben, 2026-10-26): each flow drawn over
+                // the network it rides, for the same reason - the path cache wants a
+                // mutable world. Cached on the waypoints; a no-op off the lens.
+                ui::update_trade_flow_routes(m_world, m_ui);
                 // BL-732: the baked-ground cache. Bakes the far page on a body
                 // switch and a budgeted few full-res chunks against last frame's
                 // ground_request, then publishes ui_state::ground for the canvas

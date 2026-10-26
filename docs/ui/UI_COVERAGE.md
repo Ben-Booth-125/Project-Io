@@ -51,18 +51,18 @@ and so is the safety net.
 | `UI-039` Lens system (overlay_mode family) > Industry lens | sub-element | `industry_lens`, `province_render`, `lens_strip_and_fields` | 5 | 0 | 0 |
 | `UI-041` Lens system (overlay_mode family) > Reach lens | sub-element | `lens_modes`, `lens_legend`, `province_render`, `lens_strip_and_fields` | 6 | 0 | 5 |
 | `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 6 | 0 | 2 |
-| `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 26 | 1 | 3 |
-| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 57 | 0 | 7 |
+| `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 27 | 1 | 3 |
+| `UI-044` Selection band > Active/Focus/Selection pointer-state model | sub-element | `click_injection`, `lens_structure_pivot`, `hover_freeze`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields`, `lens_region_destinations` | 58 | 0 | 7 |
 | `UI-045` Selection band > Tile selection layout | sub-element | `selection_tile_layout`, `tile_card`, `ui_shell_fixture` | 57 | 1 | 4 |
 | `UI-117` Selection band > Water tile selection | sub-element | `water_tile_selection` | 1 | 0 | 1 |
-| `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `workforce_step`, `construction_ledger_tabs`, `building_management_shell` | 90 | 2 | 11 |
-| `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs`, `air_gate` | 54 | 1 | 7 |
-| `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 27 | 0 | 4 |
-| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 35 | 0 | 3 |
+| `UI-047` Selection band > Building selection (expanded tile card) | sub-element | `building_element`, `tile_card`, `workforce_step`, `construction_ledger_tabs`, `building_management_shell` | 91 | 2 | 11 |
+| `UI-048` Selection band > Tile selection layout > Tile construction ledger (build-here fold-out) | sub-element | `tile_build_ledger`, `tile_build_ledger_survives`, `drill_through_fold`, `construction_ledger_tabs`, `air_gate` | 55 | 1 | 7 |
+| `UI-049` Hover Card | element | `hover_freeze`, `sticky_card`, `border_band`, `lens_one_tier`, `lens_strip_and_fields` | 28 | 0 | 4 |
+| `UI-050` Hover Card > Hover content dispatch (lens-keyed) | sub-element | `lens_structure_pivot`, `lens_selection_paths`, `lens_one_tier`, `lens_strip_and_fields` | 36 | 0 | 3 |
 | `UI-051` Header Panel | panel | `header`, `shell_pass`, `nation_seat_ui` | 9 | 1 | 1 |
 | `UI-052` Header Panel > Treasury figure | sub-element | `header`, `debt_interest`, `nation_seat_ui` | 9 | 0 | 0 |
-| `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 30 | 1 | 7 |
-| `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build`, `air_gate`, `construction_progress` | 114 | 0 | 5 |
+| `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 31 | 1 | 7 |
+| `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build`, `air_gate`, `construction_progress` | 115 | 0 | 5 |
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 36 | 0 | 0 |
 | `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 32 | 1 | 7 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `market_density` | 21 | 1 | 0 |
@@ -72,7 +72,7 @@ and so is the safety net.
 | `UI-093` New World wizard > Wizard planetology round (System or Life) | sub-element | `planetology_generation`, `life_to_people` | 9 | 1 | 0 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 10 | 0 | 1 |
-| `UI-098` Lens system (overlay_mode family) > Logistics lens | sub-element | `logistics_lens`, `lens_strip_and_fields` | 22 | 0 | 0 |
+| `UI-098` Lens system (overlay_mode family) > Logistics lens | sub-element | `logistics_lens`, `logistics_chain`, `lens_strip_and_fields` | 46 | 0 | 2 |
 | `UI-122` Lens system (overlay_mode family) > Nations lens | sub-element | `nations_lens` | 4 | 0 | 1 |
 | `UI-100` Nation overview | ledger | `corp_dashboard`, `nation_seat_ui` | 19 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
@@ -184,7 +184,6 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `history_lapse_marks` (7 captures, 2 expects) — THE MARKS THAT EARN THEIR PLACE (BL-1094; Ben, 2026-09-24, sprint 47
 - `history_lapse_works` (8 captures, 8 expects) — THE WORKS AND THE RUNG ON ROUND 6 (BL-1099, BL-1100; Ben, 2026-09-24,
 - `lens_strip_glyphs` (7 captures, 3 expects) — BL-1225 (every lens on strip): every built lens sits in at least one rung row
-- `logistics_chain` (16 captures, 15 expects) — Visual verification for three rulings on the Logistics lens and the capital star
 - `logistics_unpaint_perf` (0 captures, 0 expects) — What arming the Logistics lens costs the FRAME, on the play path (Ben, 2026-10-25:
 - `names_and_voice` (6 captures, 10 expects) — BL-1106 -- THE TICKER AND BOARD SPEAK THE HISTORY'S WORDS.
 - `pan_perf` (0 captures, 0 expects) — Pan-cost measurement (the "stutter while panning" report, 2026-08-02).
@@ -200,6 +199,7 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `terrain_variants` (1 captures, 0 expects) — BL-1243 (terrain variant families) — RENDERING.md § Mountains, rivers and
 - `towns_denser` (3 captures, 4 expects) — TOWNS DENSER (BL-1258; Ben, 2026-10-10: towns should read like the it3 C-F
 - `trade_flow_lens` (8 captures, 5 expects) — Visual verification for the Trade-flow lens (overlay_mode::trade_flow, BL-1222).
+- `trade_flow_routed` (6 captures, 5 expects) — The Trade-flow lens draws a flow ALONG THE ROUTE IT RIDES (Ben, 2026-10-26: "render the
 - `turbulence_lean` (5 captures, 1 expects) — Verification for BL-839 — the historical turbulence lean, in the wizard.
 - `wharf_on_shore` (5 captures, 0 expects) — BL-1218 (wharf placed on shore): the construction ledger offers a Fishing
 

@@ -318,7 +318,9 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             if (corp == w.player_entity)
             {
                 tf.shipments.push_back({a, b, static_cast<std::uint16_t>(ri), sent,
-                                        dispatch_market_price(w.markets.at(b), ri)});
+                                        dispatch_market_price(w.markets.at(b), ri),
+                                        leg.mode, leg.origin_tile,
+                                        leg.port_a, leg.port_b, leg.station_a, leg.station_b});
                 tf.best[std::make_pair(b, static_cast<std::uint16_t>(ri))] = trade_refusal::sent;
             }
             return sent;

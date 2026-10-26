@@ -573,9 +573,23 @@ ground"*. Roads (`road_level`) and sea lanes (`lane_level`, [LOGISTICS.md](../ec
 both draw by one rule:
 
 - **A route is drawn along its own tiles, never between its ends.** A lane is drawn
-  only on the sea tiles it was stamped on, so it can never cross land; the wizard's
+  only on the sea tiles it was stamped on, so it can never cross open land; the wizard's
   lapse draws a lane along the same water-only walk the stamp lays, port to port
   ([STARTUP.md](STARTUP.md) § Round 5, "The lane").
+- **A lane ends in its port** (Ben, 2026-10-26: *"draw a sea lane with its ends going into
+  land, where the port tiles are"*) — the one place a lane's line leaves the water. A port lays
+  its lanes from the water on its six sides (LOGISTICS.md § 4b, "Every port lays lanes"), so the
+  stamped lane stops on the sea tile **beside** the port, and drawn to its own tiles alone it read
+  as a lane that never reached the port. So a lane tile beside a **standing** port draws its curve
+  on across the shared edge **into the port tile's centre**, as though the port were one more link:
+  the curve bends to the edge midpoint like any other link, and the half on the port's side runs
+  from that midpoint to the port's centre, capped there. **Which lane tiles join:** every lane
+  **end** beside the port (one cardinal lane neighbour or none); a port no lane ends beside but a
+  lane runs past joins the **lowest-index** lane tile beside it, so a lane hugging the coast is not
+  fanned into the port from every side. Any of the six hex sides joins, not only the four the
+  walk steps on, because a port's mouths are its six sides. No other land is ever touched. This
+  is the drawn network's rule (the Logistics lens, and the vector fallback where the ground is not
+  yet baked); the baked wake is the water's own mark and stays on the water.
 - **The line is a smooth curve through the tile chain.** A tile joined to two
   neighbours draws one quadratic from one shared-edge midpoint to the other, with
   its own centre as the control point: consecutive tiles meet tangent-continuous at

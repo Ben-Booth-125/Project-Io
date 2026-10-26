@@ -4,8 +4,8 @@
 -- The claims this check photographs and asserts:
 --   T1  NO GROUND TINT, AND THE ROADS CARRY THE COLOUR (Ben, 2026-10-24). The whole
 --       grid: the ground is the plain canvas's, and every road of the player's nation
---       is coloured green -> yellow by supplied over requested along the routed chains
---       (2x or more green, 0.5x or less yellow, log2 between; nothing routed reads
+--       is coloured red -> yellow -> green by supplied over requested along the routed chains
+--       (2x or more green, 1x yellow, 0.5x or less red, log2 between - Ben 2026-10-26; nothing routed reads
 --       green). Other nations' roads keep their ordinary colour.
 --   T2  every Logistic Point SOURCE carries a ring. BL-1352: a source is a running
 --       logistics hub, railway station or port on some nation's ground. A CITY IS
@@ -170,11 +170,11 @@ verify.mouse(-100, -100)
 verify.frames(3)
 local r = verify.logistics_roads()
 print(string.format("[logistics_lens] roads: %d of the player's (%d routed, %d routed green); green %d, "
-      .. "between %d, yellow %d; other ground tiles %d; supplied %.1f of requested %.1f",
-      r.roads, r.routed, r.routed_green, r.green, r.between, r.yellow, r.ground, r.supplied, r.requested))
+      .. "between %d, red %d; other ground tiles %d; supplied %.1f of requested %.1f",
+      r.roads, r.routed, r.routed_green, r.green, r.between, r.red, r.ground, r.supplied, r.requested))
 verify.expect(r.roads > 0, "T7: the player nation has roads on the home body (" .. r.roads .. ")")
 verify.expect(r.routed > 0, "T7: some request routes through a road (" .. r.routed .. ")")
-verify.expect(r.green + r.between + r.yellow == r.roads,
+verify.expect(r.green + r.between + r.red == r.roads,
               "T7: every road lands in exactly one colour class")
 -- SUPPLIED is what the chain COULD deliver through a road, so a road whose hub has
 -- slack carries more than is asked of it and reads green.

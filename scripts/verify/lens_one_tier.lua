@@ -148,9 +148,10 @@ for _, lens in ipairs({ "population", "industry" }) do
                   lens .. " lens: a press selects nothing and clears the band to resting")
 end
 
--- BL-1353: Throughput is a HOVER READ with no selection. The built tile is the
--- player's, on its home nation's ground, so the field covers it and the pointer
--- resolves to the ground - and a press there still clears the band to resting.
+-- BL-1353: Throughput is a HOVER READ. The built tile is the player's, on its home
+-- nation's ground, so the field covers it and the pointer resolves to the ground.
+-- A PRESS SELECTS THE TILE (Ben, 2026-10-26, overturning 2026-10-20's inert press):
+-- it used to clear the band to resting, which shows the player's own nation.
 verify.set_overlay("logistics")
 local tp = dwell(built_col, built_row)
 verify.expect(tp.hovered_structure_kind == "ground",
@@ -162,8 +163,11 @@ verify.set_overlay("nations")
 press(built_col, built_row)
 verify.set_overlay("logistics")
 local tpp = press(built_col, built_row)
-verify.expect(tpp.has_selection == false,
-              "throughput lens: a press on the ground selects nothing and clears the band")
+verify.expect(tpp.has_selection == true and tpp.selection_kind == "tile",
+              "logistics lens: a press on the ground selects the TILE (" .. tostring(tpp.selection_kind) .. ")")
+local tpp2 = press(built_col, built_row)
+verify.expect(tpp2.selection_kind == "tile",
+              "logistics lens: a repeat press re-selects the tile - no cycle under a lens")
 
 verify.set_overlay("population")
 dwell(built_col, built_row)
