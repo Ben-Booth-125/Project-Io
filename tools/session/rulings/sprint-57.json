@@ -168,5 +168,40 @@
   "anchor": "A press under Logistics selects the TILE",
   "stale": [],
   "owner": "sprint 57 polish"
+ },
+ {
+  "ruling": "No capital on a speck: a moved capital seats on the nation's largest group",
+  "doc": "docs/generation/NATION_GENERATION.md",
+  "anchor": "No capital on a speck",
+  "stale": [],
+  "owner": "sprint 57 polish (NR-1080)"
+ },
+ {
+  "ruling": "The Logistic Point network is the roads and the rail",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "The network is the roads and the",
+  "stale": [],
+  "owner": "sprint 57 polish (roads-only network)"
+ },
+ {
+  "ruling": "A nation buys its network repairs only from its own markets, rates re-sized to production",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "buys its repairs only from its own markets",
+  "stale": [],
+  "owner": "sprint 57 polish (NR-1072)"
+ },
+ {
+  "ruling": "Every overseas building group gets a port link",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "Every overseas building group gets a port link",
+  "stale": [],
+  "owner": "sprint 57 polish (NR-1074)"
+ },
+ {
+  "ruling": "The seat clean slate refunds credits only, as any cancelled site",
+  "doc": "docs/economy/PRODUCTION.md",
+  "anchor": "with no exception for the materials",
+  "stale": [],
+  "owner": "sprint 57 polish (NR-1075)"
  }
 ]

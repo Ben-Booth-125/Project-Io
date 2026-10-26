@@ -952,6 +952,29 @@
    "title": "The Industry lens shows other nations' plants; it is always empty today",
    "design": "Ben, 2026-10-26 (NR-1066 (6)): keep the Industry lens, its subject the plants of nations other than the player's. body_surface_canvas.cpp L3142 sets background_owned to always false, so the field never fills. Also LENSES.md L110 says keyboard-cycle only while L466/L679 put it on the Planetary strip - settle which.",
    "difficulty": 2
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "written": "2026-10-26",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (BL-1408 re-bless, 2026-10-26)",
+   "requires": [],
+   "id": "BL-1420",
+   "short_name": "LANE_PORT_DEFECTS_AND_CHECKS",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/road_generation.cpp",
+    "tools/verify/port_lane_probe.cpp",
+    "tools/verify/lp_coverage_census.cpp"
+   ],
+   "title": "Five lane and port defects on library seeds, and two claims with no check",
+   "design": "Found by the sprint 57 re-bless across all 16 library seeds (Ben carried them to sprint 58, 2026-10-26). DEFECTS: (1) seeds 40 and 12 each have a port with a partner within 50 and no laned water beside it; (2) seeds 13 and 10 have 3 colonial lane ends on a coast with no port. MISSING CHECKS: (a) nothing asserts zero unconnectable consumers - lp_coverage_census rule 3 excuses them; (b) port_lane_probe lists colonial portless coast ends but does not count them as defects. THE WORK: make both claims committed checks first, then fix the defects so they pass on all 16 seeds."
   }
  ]
 }
