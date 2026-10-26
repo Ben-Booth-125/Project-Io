@@ -895,6 +895,23 @@
     "docs/generation/NATION_GENERATION.md"
    ],
    "resolution": "Ben, 2026-10-25: treat it as work. A capital moved to its nearest province must not land on a speck; seat it on the nation's largest group."
+  },
+  {
+   "id": "NR-1081",
+   "title": "Ports in history, and nearby colonial landings sharing a harbour",
+   "raised": "2026-10-26",
+   "kind": "question",
+   "status": "resolved",
+   "source": "Colonial-ports lane (1b069ee1, merged 9bd9d261)",
+   "what": "Colonial sea lanes ended where no port stood (39 ends on seed 0). Ben ruled: place ports in history. Seeds whose seats lie close together landed on neighbouring sea tiles, so seed 0 gained 68 ports, some a tile or two apart.",
+   "why_it_matters": "Ports carry upkeep from the opening, and a cluster of ports reads as noise on the map.",
+   "options": [],
+   "recommendation": "",
+   "files": [
+    "src/world/road_generation.cpp",
+    "docs/economy/LOGISTICS.md"
+   ],
+   "resolution": "Ben, 2026-10-26: place ports in history; colonial lane ends within two tiles of each other share one harbour port."
   }
  ]
 }

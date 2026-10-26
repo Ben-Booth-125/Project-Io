@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*58 entries — 36 open, 22 resolved.*
+*59 entries — 36 open, 23 resolved.*
 
 ---
 
@@ -583,4 +583,15 @@ Seed 38: a major whose seat region has no carve cell has its capital moved to it
 > **RESOLVED.** Ben, 2026-10-25: treat it as work. A capital moved to its nearest province must not land on a speck; seat it on the nation's largest group.
 
 *Files: `src/world/nation_generation.cpp`, `docs/generation/NATION_GENERATION.md`*
+
+### NR-1081 — Ports in history, and nearby colonial landings sharing a harbour
+*question · raised 2026-10-26 · from Colonial-ports lane (1b069ee1, merged 9bd9d261)*
+
+Colonial sea lanes ended where no port stood (39 ends on seed 0). Ben ruled: place ports in history. Seeds whose seats lie close together landed on neighbouring sea tiles, so seed 0 gained 68 ports, some a tile or two apart.
+
+**Why it matters.** Ports carry upkeep from the opening, and a cluster of ports reads as noise on the map.
+
+> **RESOLVED.** Ben, 2026-10-26: place ports in history; colonial lane ends within two tiles of each other share one harbour port.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
 
