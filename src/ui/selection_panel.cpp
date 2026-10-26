@@ -2695,8 +2695,8 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
                 ImGui::Dummy({construction_grid::bar, line_h});
                 char buf[200];
                 std::snprintf(buf, sizeof buf,
-                              "%.0f%% built - the credits paid in against what the build will "
-                              "cost at today's prices.", static_cast<double>(frac * 100.0f));
+                              "%.0f%% built - the days of work done against the build's "
+                              "whole days.", static_cast<double>(frac * 100.0f));
                 cells.push_back(construction_cell("bar", bp, construction_grid::bar, buf));
             }
 

@@ -3609,8 +3609,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                 }
                             }
                         }
+                        // ONE SITE PER TILE (Ben, 2026-10-26): a tile already holding a
+                        // site under construction — the build's own tile, once the build
+                        // is durative — is never proposed for the hub.
                         for (const entity_id spot : spots)
-                            if (lay_hub(spot))
+                            if (!placement_rules::tile_has_site_under_construction(w, spot)
+                                && lay_hub(spot))
                                 break;
                     }
                 }

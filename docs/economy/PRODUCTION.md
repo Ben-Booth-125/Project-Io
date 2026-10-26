@@ -59,6 +59,19 @@ richest tile on the body is a decision rather than a lookup.
 The generated world obeys the same rule: the road pass lays a crossing to every site it stamps
 (`../economy/LOGISTICS.md` § 4, Generation roads every building site).
 
+### One site under construction per tile (Ben, 2026-10-26)
+
+**A tile holds at most one building under construction at a time.** Ben's reason: *"To slow the
+pace of the game down, we need to add a limit so that tiles can only construct one building at a
+time."* While a site on a tile is building, no second building of any type may be placed there; the
+tile takes its next building on the day the site completes. A completed building still drawing the
+materials it owes is standing, not a site, and does not block the tile.
+
+The rule is asked in the one world-level placement check, so the build door refuses it with its own
+reason — *a building is already under construction on this tile* — and the nation scorer never
+proposes such a tile. It limits builds only: generation stands every building complete, so no
+generated tile holds a site and the generated world is unchanged by it.
+
 ### Building stacks
 
 A tile is not a single build slot: several extraction sites may work the same deposit. Two rules
@@ -874,7 +887,8 @@ commit to it) and pays the whole flat `build_cost` then; the materials follow as
 
 - draws its materials for the days it built since the last tick — `resource_build_cost` over the
   build's duration in quarters, per quarter of work — as **real market demand** (competing with
-  population and other builds, bidding the local price up) and pays the resolved price for them;
+  population and other builds, bidding the local price up) and buys them at the shelf's posted
+  price (Ben, 2026-10-26: costs depend on market prices);
 - progresses at a **rate set by how much of that per-tick material need the local market can
   supply** — read from, and drained from, the real stock of the market whose catchment holds the
   site (`market_component.inventory`, MARKETS.md § Real market inventory) — the only stock there
@@ -904,7 +918,8 @@ placement's site multiplier (§ Construction site time), rounded to a whole day.
   generation stands complete, is priced by generation instead.
 - **Materials are drawn in arrears, at the tick (Ben, 2026-10-25).** Each day built is owed its
   materials, construction capacity included. Each economy tick draws, off the market's shelf, the
-  materials for the days built since the last tick, and pays the market for them then. A tick draws
+  materials for the days built since the last tick, and buys them from the market then, at the
+  shelf's posted price — a build's cost depends on market prices (Ben, 2026-10-26). A tick draws
   at most one quarter's materials plus any shortfall carried from before. Whatever part the shelf
   cannot cover stays owed and is drawn first at the next tick. A building that completes still owing
   materials pays them at the ticks after. Capacity never holds a debt: a short yard stretches a build

@@ -21,10 +21,20 @@
 //   * with no tariff law enacted, the world is bit-identical to the pre-item
 //     baseline (a state hash over every treasury, shelf and price).
 //
+// PART 4 — CONSTRUCTION (Ben, 2026-10-26: costs depend on market prices). A
+// site's flat credits leave the treasury once, at placement, and the materials it
+// draws are a PURCHASE: each tick's draw is billed at the shelf's posted price.
+// Measured over whole ticks (economy step, clear, budget) against a control world
+// whose site draws no materials: the drawing world's treasury falls below the
+// control's by exactly what the clears billed for the draws, which is exactly what
+// the site recorded as paid beyond its flat credit. No credit is lost or minted
+// between the draw, the bill and the record.
+//
 // Kept outside src/ so the CMake glob does not pull it into the real build.
 
 #include "world/budget_system.hpp"
 #include "world/components.hpp"
+#include "world/construction.hpp" // construction_capex: PART 4's quote
 #include "world/economy_system.hpp"
 #include "world/law.hpp"
 #include "world/market_clearing.hpp"
@@ -312,6 +322,93 @@ int main()
 
     // PART 3 (an 8-tick span of contract flows) is RETIRED with the procurement
     // contract it paced (BL-1407).
+
+    // =======================================================================
+    // PART 4 — construction: the material draw is a purchase (Ben, 2026-10-26)
+    // =======================================================================
+    std::printf("PART 4  construction: credits at placement, materials bought at posted price\n");
+    {
+        // One nation, one market holding 1000 steel, and a 180-day extraction site
+        // (180 credits, 18 steel) placed on its own roaded ground. @p with_materials
+        // false is the control: the same site with no material basket.
+        struct site_world { world w; entity_id nation = null_entity, market = null_entity, site = null_entity, tile = null_entity; };
+        const auto make_world = [](recipe_registry& reg, bool with_materials) {
+            building_economics ex;
+            ex.base_rate = 10.0f; ex.maintenance = 0.0f; ex.base_wage = 0.0f;
+            ex.build_cost = 180.0f; ex.build_duration_ticks = 2.0f;
+            if (with_materials)
+                ex.resource_build_cost[ri(resource_type::steel)] = 18.0f;
+            reg.set_economics(building_type::extraction_site, ex);
+            construction_params cp; cp.max_stretch = 10.0f; reg.set_construction(cp);
+            site_world sw;
+            world& w = sw.w;
+            const entity_id body = w.create_entity();
+            w.bodies[body] = body_component{};
+            sw.tile = w.create_entity();
+            tile_component tc{}; tc.body = body;
+            tc.substrate = terrain_substrate::sedimentary; tc.cover = terrain_cover::grass; tc.cover_density = 150;
+            tc.resource_deposit[ri(resource_type::iron_ore)] = 2.0f;
+            tc.road_edges = road_edges_on_every_side(1);
+            w.tiles[sw.tile] = tc;
+            sw.market = w.create_entity();
+            market_component mc; mc.body = body; mc.centre_tile = sw.tile;
+            mc.base_price[ri(resource_type::steel)] = 8.0f;
+            mc.price = mc.base_price;
+            mc.inventory[ri(resource_type::steel)] = 1000.0f;
+            w.markets[sw.market] = mc;
+            sw.nation = w.create_entity();
+            nation_component nc; nc.name = "Builder"; nc.tiles.push_back(sw.tile); nc.treasury = 10000.0f;
+            w.nations[sw.nation] = nc;
+            w.tile_to_nation[sw.tile] = sw.nation;
+            return sw;
+        };
+        recipe_registry reg_m, reg_c;
+        site_world a = make_world(reg_m, true);
+        site_world c = make_world(reg_c, false);
+        const float quote = construction_capex(a.w, reg_m, a.tile, building_type::extraction_site,
+                                               resource_type::iron_ore);
+        const double t0 = total_nation_treasury(a.w);
+        const construction_result ra = construct_nation(a.w, reg_m, a.nation, a.tile, building_type::extraction_site,
+                                                        resource_type::iron_ore, no_recipe, a.site);
+        const construction_result rc = construct_nation(c.w, reg_c, c.nation, c.tile, building_type::extraction_site,
+                                                        resource_type::iron_ore, no_recipe, c.site);
+        check(ra == construction_result::placed && rc == construction_result::placed,
+              "P4.0 the site is placed through the build door, in both worlds");
+        const double placed = t0 - total_nation_treasury(a.w);
+        std::printf("        quote %.4f; placement took %.4f\n", static_cast<double>(quote), placed);
+        check(near(placed, 180.0) && near(total_nation_treasury(c.w), 10000.0 - 180.0),
+              "P4.1 placement takes the flat credit once (180 = build_cost x 180 / 180), in both worlds");
+        check(near(quote, 180.0 + 18.0 * 8.0),
+              "P4.2 the quote is that credit plus the 18 steel at the market's price (180 + 18 x 8)");
+        double billed_a = 0.0, billed_c = 0.0;
+        for (int t = 0; t < 4; ++t)
+        {
+            for (site_world* sw : {&a, &c})
+            {
+                const recipe_registry& rg = (sw == &a) ? reg_m : reg_c;
+                economy_report rep = run_economy_step(sw->w, rg);
+                auto flows = clear_markets(sw->w, rg, rep);
+                const auto fit = flows.find(sw->nation);
+                (sw == &a ? billed_a : billed_c) += fit != flows.end() ? fit->second.expenditure : 0.0f;
+                apply_budget(sw->w, rg, flows, rep.workforce_contention);
+            }
+        }
+        const float steel_gone = 1000.0f - a.w.markets.at(a.market).inventory[ri(resource_type::steel)];
+        bool purchase_row = false;
+        for (const exchange_record& e : a.w.exchanges.entries)
+            if (e.side == 1 && e.resource == resource_type::steel)
+                purchase_row = true;
+        const double gap      = total_nation_treasury(c.w) - total_nation_treasury(a.w);
+        const double recorded = static_cast<double>(a.w.buildings.at(a.site).construction_paid) - 180.0;
+        std::printf("        steel drawn %.4f; billed %.4f (control %.4f); treasury gap %.4f; recorded %.4f\n",
+                    static_cast<double>(steel_gone), billed_a, billed_c, gap, recorded);
+        check(a.w.buildings.at(a.site).ticks_remaining == 0 && near(steel_gone, 18.0),
+              "P4.3 the site completed, drawing its whole 18 steel off the shelf");
+        check(billed_c == 0.0 && billed_a > 0.0 && purchase_row,
+              "P4.4 the draw is a purchase: billed at the clear with a purchase row (the control billed nothing)");
+        check(near(gap, billed_a) && near(recorded, billed_a),
+              "P4.5 CONSERVED: the treasury gap to the control == what the clears billed == what the site recorded");
+    }
 
     if (g_failures == 0) std::printf("\nALL PASS  (0 failures)\n");
     else                 std::printf("\nFAILURES (%d failures)\n", g_failures);

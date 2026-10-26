@@ -394,11 +394,10 @@ void construction_end_grid()
 float construction_progress_fraction(const world& w, const recipe_registry& reg,
                                      const building_component& b)
 {
-    const float capex = construction_capex(w, reg, b.tile, b.type, b.target_resource, b.recipe);
-    if (capex > 0.0f)
-        return std::clamp(b.construction_paid / capex, 0.0f, 1.0f);
-    // No priceable capex (no market yet): fall back to the DAYS ratio (Ben,
-    // 2026-10-24), live denominator and all — an approximate bar beats no bar.
+    // The DAYS ratio (Ben, 2026-10-24), live denominator and all. The flat cost is
+    // paid whole at placement and the materials in arrears, so the credit fraction
+    // reads the flat share on day one: it is no measure of progress.
+    (void)w;
     const int total = construction_build_days(w, reg, b.tile, b.type, b.target_resource);
     if (total <= 0)
         return 0.0f;
@@ -635,8 +634,8 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
             ImGui::Dummy({construction_grid::bar, line_h});
             char buf[200];
             std::snprintf(buf, sizeof buf,
-                          "%.0f%% built - the credits paid in against what the build will cost "
-                          "at today's prices.", static_cast<double>(row.progress * 100.0f));
+                          "%.0f%% built - the days of work done against the build's whole "
+                          "days.", static_cast<double>(row.progress * 100.0f));
             cells.push_back(construction_cell("bar", bp, construction_grid::bar, buf, band));
         }
 

@@ -234,6 +234,9 @@ construction_result construct_for(world& w, const recipe_registry& reg,
         // BL-1399: a nation builds only on its own ground, and the refusal says so.
         if (pr.reason == placement_rules::placement_reason::not_own_ground)
             return construction_result::foreign_ground;
+        // One site per tile (Ben, 2026-10-26): its own refusal, never "invalid tile".
+        if (pr.reason == placement_rules::placement_reason::site_under_construction)
+            return construction_result::site_busy;
         if (type == building_type::launchpad)
             return construction_result::slot_occupied;
         return construction_result::invalid_tile; // Port not coastal
