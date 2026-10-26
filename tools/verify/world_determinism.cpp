@@ -381,9 +381,8 @@ int main()
     //       a non-empty budget, a derived price, every point accounted — and
     //       it is the same stockpile on two same-seed builds. The prehistory-
     //       OFF world runs no span, so its stockpile is empty (the pre-budget
-    //       world). A span-OFF world with the prehistory on is the LEGACY arc,
-    //       and player_seed_sweep --arc legacy fails any such row whose
-    //       stockpile holds a point.
+    //       world). A span-OFF world with the prehistory on is the LEGACY arc
+    //       (its player_seed_sweep digest check retired, BL-1408).
     {
         const stockpile_budget s_a1 = build_stockpile_budget(w_a1);
         const stockpile_budget s_a2 = build_stockpile_budget(w_a2);
