@@ -264,6 +264,48 @@
         "filed": "BL-1370..BL-1377, BL-1382, BL-1386, BL-1389; NR-1049..NR-1054 (NR-1052 open)."
       },
       "closed_date": "2026-10-23"
+    },
+    "57": {
+      "id": "57",
+      "theme": "economy polish",
+      "state": "landed",
+      "status_line": "CLOSED 2026-10-26 at the v0.2.1 cut. Opened as \"nations own everything\" and labelled economy polish (Ben, 2026-10-26). Corporations and companies are gone, every building is its ground nation's; then a long live-click round polished logistics, construction, ports and generation. One re-bless (BL-1408), authorised against its shape.",
+      "opened_date": "2026-10-23",
+      "author": "Ben (2026-10-23)",
+      "goal": "Corporations and companies are gone: every nation owns and builds every building on its own ground, majors and minors build through the scorer, the player builds its own, and corporation_component is deleted.",
+      "planned": [
+        "WAVE 1 - SEAM. BL-1399 (nation builds own ground), then BL-1401 (nation AI actor), then BL-1402 (fold to ground).",
+        "WAVE 2 - PARALLEL. BL-1403 (nation money flows), BL-1404 (generation buys for nations), BL-1405 (LP one class), BL-1406 (UI and protocol as nation).",
+        "WAVE 3 - DELETE. BL-1407 (delete corporation_component), then BL-1408 (sprint 57 re-bless).",
+        "WAVE 4 - ECONOMY POLISH (Ben, 2026-10-26: label the sprint an economy polish sprint). Logistics lens, sea lanes, port links, construction days and payment, the site finder, contiguity fixes, and the live-click round of 2026-10-26."
+      ],
+      "risk": "The largest change in the project: every gate and digest moves, the save format bumps twice, 95 harnesses reference the deleted type. Ben chose the hard delete in one sprint over a staged one (2026-10-23).",
+      "done_when": "No corporation_component in src or tools; every building on its owner's ground; minors and majors build; the player's nation is never built for; a v54 save loads; the load-bearing gates run and report; one re-bless on Ben's go.",
+      "notes": "Rulings 2026-10-23: every nation one owner (then no corporations at all), legacy path retired, territory binds everyone incl. state, unowned ground closed, one road crossing in, ground carries its buildings, buyout retired, hard delete, only the player builds for itself, AI grant majors and minors, tax from wages, tariff on foreign goods entering.",
+      "closed_date": "2026-10-26",
+      "retro": {
+        "landed": [
+          "WAVES 1-3: BL-1399 (nation builds own ground), BL-1401 (nation AI actor), BL-1402 (fold to ground), BL-1403 (nation money flows), BL-1404 (generation buys for nations), BL-1405 (LP one class), BL-1406 (UI and protocol as nation), BL-1407 (delete corporation component).",
+          "LOGISTICS: the network is the roads and the rail; site joins and bridges reach every building; port links for overseas groups; every port lays lanes to every port within 50, sea or lake; points ride the lanes; network repairs from own markets, re-rated; the Logistics lens (drawn roads only, capital star, every chain link, red/yellow/green, one colour per tile with road and rail summed, tile selection); stacked hubs at generation; infrastructure at full workforce.",
+          "CONSTRUCTION: measured in days, building from placement; credits once at placement, materials at market in arrears; a cancelled site refunds credits only, the seat clean slate too; one site under construction per tile; the site finder (valid tiles, no-logistics flag, ledger sorted by estimated profit), progress ring and priced site card.",
+          "GENERATION: a cession carries its Pass 2b islets; no capital on a speck; capitals on their city; industry anchors at the capital then market centres, deposits by richness x cover, extraction spreads then stacks; ports in history where colonial lanes land, nearby landings sharing a harbour; the stack debuff retired.",
+          "TRADE-FLOW: paths drawn along the network, heads on the destination centre. BL-1408 (sprint 57 re-bless), BL-1409 and BL-1411 closed by the polish wave."
+        ],
+        "carried": [
+          "Dropped at the close (Ben, 2026-10-26): BL-1400 (shipment pays whole route), BL-1410 (verify world LP sources), BL-1412 (roadless generated building).",
+          "To sprint 58: BL-1413 (re-curate six seeds), BL-1414 (Trade-flow room without rivals), BL-1415 (header NET excludes refunds), BL-1416 (drop the identity wash), BL-1417 (no nation emblem), BL-1418 (embargo bars goods), BL-1419 (Industry lens fills), BL-1420 (lane and port defects and checks); NR-1082 (two disclosure tensions) open."
+        ],
+        "feedback": [
+          "Ben drove most of the sprint by live click; the lanes kept pace when each ruling went straight into its doc and a lane.",
+          "Two reversals inside the sprint (credits-only cost, form vs typed answer) argue for reading a ruling back before building it.",
+          "A lane that squashed against an older tree silently rolled back a merged change; lane commits are now checked for out-of-brief files before merge."
+        ],
+        "gates": [
+          "market_viability FULL at the cut: G1 93.4, G1t50 86.6, G1b 3.7, G2 144.4, G3 100.0, all pass; seven seeds miss G1t50 alone.",
+          "world_determinism and save_roundtrip pass; the shipped player-seed arc re-pinned 16/16; two icon goldens blessed once (NR-1070); the legacy arc retired.",
+          "Ruling register 26 of 26 pass."
+        ]
+      }
     }
   }
 }

@@ -10,6 +10,61 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-23 to 2026-10-26 — Sprint 57: nations own everything, then economy polish — version 0.2.1
+
+**Runtime:** about four days, one long session; Delivery Full across ~25 worktree lanes, driven by
+Ben's live clicks.
+
+**What was built.** Corporations and companies retired: every building is its ground nation's
+(BL-1399..BL-1407), the fold carries firm money home, tax comes from wages. Then the live-click
+round:
+- **Logistics:**
+  - the network is roads and rail;
+  - site joins, bridges and port links reach every building;
+  - ports lay lanes to every port within 50, sea or lake, and points ride them;
+  - network repairs come from a nation's own markets;
+  - the Logistics lens shows drawn roads only, a capital star, every chain link, a red/yellow/green scale, one colour per tile, and selects tiles;
+  - stacked hubs at generation, and infrastructure staffs to full.
+- **Construction:**
+  - days, building from placement;
+  - credits once at placement, materials paid at market;
+  - credits-only refunds, the seat clean slate included;
+  - one site per tile;
+  - the site finder, sorted by estimated profit (CONCEPT.md: showing versus acting is the only line);
+  - a progress ring and a priced site card.
+- **Generation:**
+  - a cession carries its Pass 2b islets;
+  - no speck capitals, and capitals on their city;
+  - industry at the capital then market centres;
+  - extraction spreads then stacks;
+  - ports in history, with nearby landings sharing a harbour;
+  - the stack debuff retired.
+- **Trade-flow:** paths along the network, heads on the destination centre.
+
+**Decisions.** Every ruling is in its owning doc; the register (`tools/session/rulings/sprint-57.json`)
+passes 26 of 26. Two reversals inside the sprint: credits-only cost was built and then reverted (costs
+depend on market prices), and a form answer was overridden by Ben's typed one. The review queue was
+drained at the close: 59 entries resolved, NR-1082 left open.
+
+**Re-bless.** BL-1408, authorised against its shape:
+- history untouched;
+- cities double;
+- every actor a nation, with treasuries 88k → 301k;
+- ports 9.5 → 32.1;
+- roads reach every site;
+- fewer hubs, bases and open sites;
+- extraction up 10%, processors down 13%.
+
+The shipped seat arc was re-pinned 16/16, two icon goldens were blessed once, and the legacy arc
+retired with its roster.
+
+**Left open.** BL-1413..BL-1420 to sprint 58, BL-1420 (five lane and port defects, two missing checks)
+first. Seven seeds miss G1t50 on their own; the nation AI's stack pricing ignores depletion.
+
+**A process note.** A lane that squashed its work against an older tree silently rolled back a merged
+change; it surfaced only as a later doc conflict. Lane commits are now checked for out-of-brief files
+before merging.
+
 ## 2026-10-14 — Sprint 54: UI improvements, run beside sprint 53
 
 **Runtime:** 2026-10-12 to 2026-10-14; Design on each of Ben's walks, then Delivery Full in lanes

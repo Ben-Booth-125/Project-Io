@@ -353,6 +353,62 @@
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
     },
+    "delete-corporation": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "build: build_app.bat and all harness targets"
+          ],
+          "requirement": "corporation_component, world::corporations and owner_kind::corporation no longer exist and the full build links.",
+          "notes": "corporation_component, world::corporations and owner_kind::corporation are gone (no live use left in src or tools; two report fields and one string literal mention the word). The app builds (build/ProjectIo.exe 2026-10-24 15:37, main 964e1a46); every harness builds through build_harness / build_lua_harness; nmake links 149 targets incl. ProjectIo (73 Lua harnesses fail to link under CMake alone - the same gap as base). 14 harnesses retired with their mechanism (buyout, ownership class, firm exit, procurement, laws-as-levy, corp solvency...)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: save_roundtrip"
+          ],
+          "requirement": "A v54 save loads into the nation-owned world.",
+          "notes": "save_roundtrip 97/0 incl. P22: a real v54 stream reads into the nation-owned world, its corporations folded in a scratch structure and discarded; world_save_version 56 carries no corporation record and saves the nation's quarterly returns and trade reserve/points."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism, market_viability, player_seed_sweep, history_sim_harness, lp_coverage_census, nation_targets_harness"
+          ],
+          "requirement": "The load-bearing gates run green or report their movement.",
+          "notes": "Verified on main 964e1a46 by the main session: world_determinism ALL PASS, save_roundtrip OK, fold_census 21/0 (nothing left to fold), nation_actor_seam 95/0, money_conservation and tax_discontent_harness (44/0) pass, lp_coverage_census rules pass; market_viability FULL G1 93.0 G1t50 85.2 G1b 4.6 G2 94.1 G3 100.0 (from 92.9/85.8/4.6/95.8/100.0); nation_targets identical majors on 16 seeds; history_sim_harness 145/2 as base. Known reds unchanged: nation_ai_builds R1 seed 46 (BL-1409), lp_pool L7, nation_budget R9a-m. lp_pool L6 re-pointed to the seat-is-the-nation (main session)."
+        }
+      ]
+    },
+    "digitisation-tree-store": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: node tools/session/tech_tree_store.js --check"
+          ],
+          "requirement": "The store holds 160 nodes - 70 travel (7 joints, 9 masteries), 51 minor, 30 major, 9 quest - and passes every grammar rule: requirement groups resolve, pairs are symmetric, one quest and one mastery per branch, every node reachable from a first travel node.",
+          "notes": "",
+          "result_metric": "tech_tree_store.js digitisation --check OK - 160 nodes (70 travel incl. 7 joints and 9 masteries, 51 minor, 30 major, 9 quest)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: tech_tree_store.js --check; header_graph.js --dangling (compare counts)"
+          ],
+          "requirement": "The doc carries the store's tables current, and no authority doc cites a heading that does not exist in RESEARCH.md, DIGITISATION_TREE.md or TREES.md.",
+          "notes": "",
+          "result_metric": "tables current; header_graph dangling counts unchanged by the new docs (compared, the tool FAILs repo-wide)."
+        }
+      ],
+      "resolution": "Delivered with sprint 52."
+    },
     "far-pairs-across-water": {
       "rows": [
         {
@@ -498,6 +554,37 @@
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
     },
+    "fold-to-ground": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: fold_census"
+          ],
+          "requirement": "After the fold no building is owned by a firm and none stands on foreign or unowned ground.",
+          "notes": "fold_census F1a-F1c, seeds 0/28/46 on the SHIPPED mirror (probe): no corporation owns a building, none stands off its owner's ground (the rail-handover station is re-homed), no unit/trade/convoy/route/track is a corporation's, every mustered unit belongs to its base's owner."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: fold_census, money_conservation"
+          ],
+          "requirement": "Money is conserved across the fold: the sum of balances plus treasuries before equals treasuries after.",
+          "notes": "fold_census F2: every treasury right after the fold equals its own before plus its firms' positive balances, recomputed in float in the fold's order - exact; nothing forgiven or stranded on the three seeds; no treasury negative."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: save_roundtrip"
+          ],
+          "requirement": "The world saves and loads identically after the fold.",
+          "notes": "fold_census F3/F4: a second fold moves nothing; the folded start round-trips the save with an equal state_hash; save_roundtrip OK; world_determinism ALL PASS."
+        }
+      ]
+    },
     "gate-logistics-row": {
       "rows": [
         {
@@ -542,6 +629,46 @@
         }
       ],
       "resolution": "complete"
+    },
+    "generation-for-nations": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: fold_census on fresh worlds, 16 seeds"
+          ],
+          "requirement": "A generated world holds no corporation records and every building is its ground nation's.",
+          "notes": "SCOPED (2026-10-24): generation still charters the specialists as the seat's handle until BL-1407; the fold leaves no corporation-owned building (fold_census 21/0, seeds 0/28/46, on the integrated tree bc3d3517). Stations now go to their ground nation at the source (seed 0: 0 re-homed by the fold, was 1). The legacy 8-corp path no longer runs on the campaign; a budget that charters no specialist lays an unchartered world (none of the 16 library seeds hits it)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: nation_targets_harness, save_roundtrip"
+          ],
+          "requirement": "The major count target is still always hit, and is_major round-trips the save.",
+          "notes": "nation_targets --natural: all 16 seeds identical before/after on total, majors, planned, chartered and polities; the grid 576 checks, 0 failures. is_major is saved (world_save_version 55, a trailing majors section; a v54 stream derives it from the champions) - save_roundtrip P21 rows pass; the hash folds the majors only when any is set. Too many majors demotes the poorest (NR-1065), keeping its ground."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: seat_clean_slate"
+          ],
+          "requirement": "The seat lists major nations and the player entity is a nation.",
+          "notes": "The seat still lists champions as handles (the seat screen shows them as nations, BL-1406); the player entity becoming the nation is BL-1407's."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: market_viability"
+          ],
+          "requirement": "market_viability's five gates are measured and reported on the new world (FULL, par_seeds).",
+          "notes": "market_viability FULL on the integrated tree (BL-1403/1404/1405): G1 92.9 G1t50 85.8 G1b 4.6 G2 95.8 G3 100.0, all pass; the lane alone moved G2 95.3 -> 95.5 and nothing else. history_sim_harness 145/2 identical before and after (R3a2/R3a3 red on its base)."
+        }
+      ]
     },
     "ground-never-magnified": {
       "rows": [
@@ -811,6 +938,19 @@
       ],
       "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending. Live clicks passed by Ben 2026-10-10."
     },
+    "lp-one-class": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: lp_coverage_census, lp_pool_harness"
+          ],
+          "requirement": "A nation's pool serves its own buildings as one class; the census rules still pass.",
+          "notes": "From its lane (ddebcab8, on f1d05dfc): every claim counts under one class and trader_pot is one pot; set_logistics_shares refused for every actor (lp_pool_harness L6, 14 commands); L4 0 of 360 consumers owned off their ground nation on seed 0 (the folded-world claim verified); L5 a set share rule moves no grant. lp_coverage_census rules pass; world_determinism ALL PASS; save_roundtrip OK; fold_census 21/0; market_viability quick identical before/after. L7 (a v49 stream) red as on main, untouched."
+        }
+      ]
+    },
     "markets-can-die": {
       "rows": [
         {
@@ -886,6 +1026,92 @@
       ],
       "resolution": "merged d0db9927"
     },
+    "nation-money-flows": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: tax_discontent_harness"
+          ],
+          "requirement": "Tax returns the tier's share of wages paid to the treasury each quarter; Discontent responds to the tier as before.",
+          "notes": "tax_discontent_harness 43/0 on the folded start: T1 each nation's ledger tax is exactly nation_wage_tax of the wages its buildings paid at its tier, its treasury ends higher by exactly that than with every rate 0, no corporation is taxed, the report rows equal the ledger; T2-T8 (Discontent climbs, bites, ebbs; the seam; the save; the scorer; determinism) unchanged and passing. Also fixes the harness's net_tail compile break."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: money_conservation"
+          ],
+          "requirement": "The tariff charges the foreign seller nation and exempts a nation's own goods; it is a transfer.",
+          "notes": "money_conservation ALL PASS: P2.8 a nation's own goods entering its own market pay nothing; P2.9 a foreign shipper's goods pay even when they left a market on the destination's ground (the retired source-market rule's reverse); the duty is a transfer (P2.7). A nation importer's duty is capped at its treasury (NR-1067)."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: nation_budget_harness"
+          ],
+          "requirement": "No levy is seeded and no public_works or charters claim is paid.",
+          "notes": "Generation seeds no extraction levy (hard_coded_world.cpp); public_works and charters are RESERVED enum values with no consumer (nation_budget.hpp); debt interest retired (budget_system.cpp). nation_budget_harness: 66 pass, the 8 R9 failures are the same rows red on main before this item (network-upkeep shelf purchases), unchanged."
+        }
+      ]
+    },
+    "nation-tech-state": {
+      "rows": [
+        {
+          "id": "R0",
+          "status": "complete",
+          "verification": [
+            "headless: nation_tech_harness --seeds 16 (new); world_determinism x2"
+          ],
+          "requirement": "ITEM-SPANNING: on a 16-seed campaign run every nation opens holding no node on the industrial band, accrues research, and completes nodes through its queue; the run is identical twice.",
+          "notes": "",
+          "result_metric": "nation_tech_harness 16 seeds x2: every nation opens holding nothing on the industrial band, pools empty at the seat, the scripted queue completes, byte-identical twice; pacing at 200 RP a unit: 751/751 reach DG-PR-EX-A in 32 quarters, p10/p50/p90 10/21/30. The live game queues nothing until BL-1275 (nation research AI)."
+        },
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: nation_tech_harness accrual rows"
+          ],
+          "requirement": "Research points accrue to each nation each quarter from its academic-research budget line and its staffed Universities and research institutes, deterministically.",
+          "notes": "",
+          "result_metric": "accrual rows PASS (base + sqrt(line spend) + Universities + institutes); the line pays only what the queue owes."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: nation_tech_harness queue rows"
+          ],
+          "requirement": "The queue: queuing a node queues its unheld requirement groups ahead of it (cheapest member of a choice); RP flow to the head and overflow on; a quest with an unmet deed is passed over and completes when its deed is met; a queue holding one side of a pair refuses the other.",
+          "notes": "",
+          "result_metric": "queue rows PASS: prerequisite expansion, AND groups, pair refusal, overflow, quest passed over. Quest COMPLETION awaits deed_met (BL-1285)."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: save_roundtrip"
+          ],
+          "requirement": "Nation tech state - held set, pool, queue, the in-progress remainder - survives save and load at a bumped world_save_version.",
+          "notes": "",
+          "result_metric": "save_roundtrip OK at v47, incl. refusal of an out-of-range or contradictory queue."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: build + world_determinism; code read by the cold review"
+          ],
+          "requirement": "The per-corporation earned_techs gates and scripts/tech_tree.lua are retired; every former consumer (placement, construction, recipe switch, corp_ai, selection panel, condition research) reads the nation's tree; the build is green.",
+          "notes": "",
+          "result_metric": "old gates and the Lua tree retired; the build links; every consumer reads the nation hooks, which return open/identity until BL-1274 - structural only."
+        }
+      ],
+      "resolution": "Merged 14e8cace; verified on the merged tree."
+    },
     "naval-points-carry-over": {
       "rows": [
         {
@@ -930,6 +1156,37 @@
         }
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
+    },
+    "own-ground": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: nation_actor_seam"
+          ],
+          "requirement": "A nation may build on its own ground and is refused on another nation's tiles and on unowned ground, for every building kind.",
+          "notes": "nation_actor_seam N2, seeds 0/28/46: every placeable kind refused on foreign ground with state_hash unchanged; unowned land refused to every nation the tech gate admits, and the door mutates nothing."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: nation_actor_seam"
+          ],
+          "requirement": "A road may be laid one crossing into foreign ground and never from it.",
+          "notes": "nation_actor_seam N3, seeds 0/28/46: an admitted land crossing into ground the nation does not hold (reason ok); from such ground, foreign_ground."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: nation_actor_seam"
+          ],
+          "requirement": "A minor nation can issue a build with no champion anywhere in the world.",
+          "notes": "nation_actor_seam N1, seeds 0/28/46: a minor builds an extraction site, a NON-strategic processor and a hub as itself; each joins its state_assets."
+        }
+      ]
     },
     "owner-multi-select": {
       "rows": [
@@ -1671,6 +1928,20 @@
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
     },
+    "sprint-57-rebless": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: player_seed_sweep"
+          ],
+          "requirement": "Digests and floors re-pinned once on Ben's go, every mover attributed.",
+          "notes": "AUTHORISED by Ben 2026-10-26 against the shape (commit 25c60c06). Before side 95796940 (v0.2.0): shipped and legacy digest pins 16/16 PASS. Main: shipped arc 16/16 rows FAIL on all four digests, each row seating one player; re-pinned to main's reading, recheck 16/16 rows PASS. Legacy arc RETIRED (Ben, 2026-10-26): every row seated 0 players since BL-1404 retired its roster; its table, --arc legacy and the charter-budget digest instruments checked against it are removed; shipped arc 16/16 after. Unpinned/unmoved: world_determinism ALL PASS, save_roundtrip OK, exploration_sim_harness ALL PASS both sides (R3b pins unmoved), history span counters identical on 16 seeds (rebless_shape_probe), history_sweep carries no pinned counters. market_viability FULL G1 93.4 G1t50 86.6 G1b 3.7 G2 144.4 G3 100.0, all pass (targets, not pins). icon_silhouettes_overview golden re-blessed once (NR-1070), recompare 0.0000%; icon_silhouettes_supply_lens re-blessed once (Ben, 2026-10-26), recompare 0.0000%. Claim checks on 16 seeds: lp_coverage_census P 16/16 every capital on a city, unconnectable 0 on 16/16, RULES PASS; world_audit SPECK 16/16 PASS; logistic_points_harness L10 passes (harness 110/22 overall, the 22 outside L10); port_lane_probe PORT_LANES FAIL 2 defects (seeds 40, 12: a port with a partner in 50 and no laned mouth) plus 3 portless colonial ends (seeds 13, 10) it lists but does not count. ruling_check sprint-57.json 21/0."
+        }
+      ],
+      "resolution": "Re-blessed once on Ben's go (2026-10-26) against the shape description: shipped digests re-pinned at 71e32545, the legacy arc retired, both icon_silhouettes goldens re-blessed. Five defects and two missing checks carried to sprint 58 by the main session."
+    },
     "stratum-placement-gates": {
       "rows": [
         {
@@ -1856,6 +2127,29 @@
         }
       ],
       "resolution": "Sprint 51 closed 2026-10-10 with this group built; only the live-click rows remain pending. Live clicks passed by Ben 2026-10-10."
+    },
+    "ui-as-nation": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: verifier-visual lens scripts",
+            "live: Ben's click"
+          ],
+          "requirement": "The seat screen, header and lenses read as the nation; no corporation surface remains.",
+          "notes": "Built and captured (lane 8fcfe1cb, merged 033dd6d0): the app builds; nation_seat_ui.lua asserts pass on a folded world (header TREASURY, the Nation overview draws, Construct greyed on another nation's tile); lens_strip, lens_strip_glyphs, default_lens, header, corp_dashboard, lens_legend, lens_selection_paths pass. lens_structure_pivot / lens_one_tier / convoys_ledger / shell_pass fail on paths the lane did not touch (judged pre-existing, not proven against base). PENDING BEN'S LIVE CLICK: (1) header TREASURY, NET, runway hover; (2) rail slot 1 Nation overview, its control, segment hovers; (3) slots 5 and 9 inert, L / Shift+L never lands on a corporation lens; (4) own tile vs foreign tile: Construct enabled vs greyed, the placement ghost red off own ground; (5) a road row on unowned ground: 'No nation holds this tile'; (6) Dispatch Survey, Hire at a base, a Trades-tab press, a research queue press; (7) the seat screen list and briefing; (8) the profile card and resting Selection band show the nation. LIVE CLICK PASSED (Ben, 2026-10-24: \"everything else passes\")."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: agent protocol harness"
+          ],
+          "requirement": "The wire refuses as_corp, buy_corporation and lobby; ACTIONS.json matches the verbs.",
+          "notes": "agent_seam_harness 22/0 on the merged tree (033dd6d0); a session acts as its nation (the seat corporation's id is accepted and redirected to the nation once folded); buy_corporation and the firm-only verbs refused; ACTIONS.json updated and re-rendered (153 entries; set_logistics_shares kept retired at the merge)."
+        }
+      ]
     },
     "wharf-placed-on-shore": {
       "rows": [

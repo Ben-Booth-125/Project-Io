@@ -59,22 +59,7 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 57 — economy polish
-*Open · opened 2026-10-23 · Ben (2026-10-23)*
-
-**Goal.** Corporations and companies are gone: every nation owns and builds every building on its own ground, majors and minors build through the scorer, the player builds its own, and corporation_component is deleted.
-
-**Planned.**
-- WAVE 1 - SEAM. BL-1399 (nation builds own ground), then BL-1401 (nation AI actor), then BL-1402 (fold to ground).
-- WAVE 2 - PARALLEL. BL-1403 (nation money flows), BL-1404 (generation buys for nations), BL-1405 (LP one class), BL-1406 (UI and protocol as nation).
-- WAVE 3 - DELETE. BL-1407 (delete corporation_component), then BL-1408 (sprint 57 re-bless).
-- WAVE 4 - ECONOMY POLISH (Ben, 2026-10-26: label the sprint an economy polish sprint). Logistics lens, sea lanes, port links, construction days and payment, the site finder, contiguity fixes, and the live-click round of 2026-10-26.
-
-**Done when.** No corporation_component in src or tools; every building on its owner's ground; minors and majors build; the player's nation is never built for; a v54 save loads; the load-bearing gates run and report; one re-bless on Ben's go.
-
-**Risk.** The largest change in the project: every gate and digest moves, the save format bumps twice, 95 harnesses reference the deleted type. Ben chose the hard delete in one sprint over a staged one (2026-10-23).
-
-Rulings 2026-10-23: every nation one owner (then no corporations at all), legacy path retired, territory binds everyone incl. state, unowned ground closed, one road crossing in, ground carries its buildings, buyout retired, hard delete, only the player builds for itself, AI grant majors and minors, tax from wages, tariff on foreign goods entering.
+*Nothing open.*
 
 ## Where things stand
 
@@ -155,10 +140,10 @@ Rulings 2026-10-23: every nation one owner (then no corporations at all), legacy
 | 54 | UI improvements | CLOSED 2026-10-14 (Ben: every live click passed, merge to main). Run beside sprint 53 from origin/main: the tile card split, the market pass, a Nations lens, the trade value record, the workforce stepped auto, the settle's readings handed to play. |
 | 56 | trustworthy ground | CLOSED 2026-10-23 at the v0.2.0 cut. Merged into main at 903586b9 (integration bookkeeping 091a43bb). Ten items delivered; BL-1338's re-pin is the v0.2.0 re-bless. Handoff: docs/development/HANDOFF_SPRINT_56.md. |
 | 55 | spectator to the end of Era 1 | CLOSED 2026-10-23 at the v0.2.0 cut (Ben: v0.2.0 is the economy functioning, logistics included). Opened as a spectator run to 2040 with space; it became the logistics arc. Delivered: the construction UI arc, roads as edges with bridges and placement rules, taxes and Discontent, the Life reroll, the space asset model, the headless spectator runner, nation research AI, then one Logistic Point system routed to the capital, port reach over water, trade drawing points, capital-first seeding and the opening node bill. The space waves (BL-1326..BL-1333) carry. |
-| 57 | economy polish | OPEN 2026-10-23. Design written into GLOSSARY, CONCEPT, NATIONS, AI_OPPONENT 11 and the sibling sweep; nine items cut. |
+| 57 | economy polish | CLOSED 2026-10-26 at the v0.2.1 cut. Opened as "nations own everything" and labelled economy polish (Ben, 2026-10-26). Corporations and companies are gone, every building is its ground nation's; then a long live-click round polished logistics, construction, ports and generation. One re-bless (BL-1408), authorised against its shape. |
 
 **Next up.** SPRINT 57 OPEN 2026-10-23: nations own everything (BL-1399, BL-1401..BL-1408). Worklist: docs/development/REFINED.md.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 
-*75 sprints archived cold; 1 open/gated in the hot store.*
+*76 sprints archived cold; 0 open/gated in the hot store.*

@@ -1,6 +1,6 @@
 # REFINED — active worklist
 
-## Sprint 57 — nations own everything (opened 2026-10-23)
+## Sprint 57 — nations own everything, then economy polish (opened 2026-10-23, CLOSED 2026-10-26 at v0.2.1)
 
 **Goal.** `sprints.json` holds it. The corporation and company layer is deleted: every nation owns and
 builds every building on its own ground, every non-player nation builds through the scorer, the
