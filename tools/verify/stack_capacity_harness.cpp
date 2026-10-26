@@ -1,22 +1,23 @@
 // Headless harness for BUILDING STACKS (BL-193, rule settled 2026-07-26; no SDL /
 // Lua / ImGui). Several extraction sites may work one tile's deposit, and the
-// settled rule has two halves that have to hold together:
+// rule has two halves that have to hold together:
 //
-//   * diminishing per-site output — the k-th site of a stack yields 0.8^(k-1) of a
-//     lone site, so two sites make 1.8x and five make 3.36x, never 5x;
+//   * every site yields in full — the k-th site of a stack yields exactly what a
+//     lone site would, so a stack of k makes k x (1 + 1 + 1). The 0.8^(k-1) decay
+//     is retired (Ben, 2026-10-26: "There's already depletion");
 //   * honest shared depletion — every site draws REAL reserve for what it takes,
-//     and the whole stack tapers against the COMBINED nominal draw, so it drains
-//     the deposit faster than its output multiple and exhausts together.
+//     and the whole stack tapers against the COMBINED nominal draw, so a stack of
+//     k drains the deposit k times as fast and exhausts together.
 //
 // The pair is the point: stacking buys throughput now at the cost of the tile's
 // life, so stack-vs-spread is a real trade-off rather than a dominant strategy. A
 // check on either half alone would pass while the trade-off was broken, so this
-// harness asserts the curve against `placement_rules` AND the realised output and
-// exhaustion against `run_economy_step`'s own arithmetic.
+// harness asserts the per-site share against `placement_rules` AND the realised
+// output and exhaustion against `run_economy_step`'s own arithmetic.
 //
 // Also pins the two things the rule leans on: the richness-derived ceiling
-// (max(1, richness/50), a legibility bound now that the curve carries the balance)
-// and the determinism of the stored-order walk that decides who is rank 1.
+// (max(1, richness/50), a legibility bound now that depletion carries the balance)
+// and the determinism of the stored-order walk that decides each site's rank.
 //
 // Kept outside src/ so the CMake glob does not pull it into the real build; the
 // CTest block in CMakeLists.txt picks it up automatically and links io_world_obj.
@@ -50,7 +51,7 @@ namespace {
 
 /// The fixture: one body, one iron tile, `sites` extraction sites stacked on it,
 /// all owned by a single corp. Deliberately plain — every factor except the stack
-/// rank is held at 1 so a realised output IS the stack scalar times a round number.
+/// rank is held at 1 so a realised output IS a round number times the taper.
 struct fixture
 {
     world                  w;
@@ -133,9 +134,13 @@ fixture make_fixture(int sites, float reserve, bool with_market = false)
 
     // Created LAST on purpose: every id above keeps the value it had before the market
     // was an option, so S.R4-S.R6's stored-order assertions are untouched by it.
-    // estimate_prospective_profit refuses to answer without a market (a chart of zeros
-    // is a lie), so the BL-346 section is the only one that asks for it.
-    if (with_market)
+    //
+    // RE-AUTHORED 2026-10-26 (with the stack-decay retirement). The market is now
+    // UNCONDITIONAL: since BL-1265 a site's output lands on its tile market's shelf
+    // and a site with no market works nothing, so a market-less fixture produced 0
+    // on every tick and S.R4/S.R5 had been failing on the tick side, unrecorded.
+    // `with_market` is kept so the call sites read as before; it no longer gates.
+    (void)with_market;
     {
         f.market = f.w.create_entity();
         market_component mc;
@@ -143,6 +148,24 @@ fixture make_fixture(int sites, float reserve, bool with_market = false)
         mc.base_price[ri(resource_type::iron_ore)] = k_iron_price;
         mc.price = mc.base_price;
         f.w.markets[f.market] = mc;
+    }
+
+    // The same re-authoring, for BL-1309 (LOGISTICS.md § Logistic Points): a
+    // producing building runs at the share of its point need its HOST nation's pool
+    // grants, and nobody's ground grants nothing. So the tile is the owning nation's
+    // own ground, with one running inland hub on it (120 points against a need of at
+    // most 5 sites x 5) — the pool never binds, every site's grant is 1, and output
+    // is again exactly the stack rule times the taper. A 1x1 grid, so the hub's
+    // point field has a raster to walk. The hub is unowned: a source needs no owner.
+    f.w.bodies[f.body].grid_width  = 1;
+    f.w.bodies[f.body].grid_height = 1;
+    f.w.set_tile_nation(f.tile, f.corp);
+    {
+        const entity_id hub = f.w.create_entity();
+        building_component hb{};
+        hb.tile = f.tile;
+        hb.type = building_type::inland_logistics_hub;
+        f.w.buildings[hub] = hb;
     }
     return f;
 }
@@ -194,29 +217,29 @@ bool exhausted_at(const economy_report& rep, entity_id building)
 
 int main()
 {
-    std::printf("BL-193 building-stack harness (diminishing returns, shared depletion)\n");
+    std::printf("BL-193 building-stack harness (every site in full, shared depletion)\n");
 
     const recipe_registry reg = make_registry();
 
     // ---------------------------------------------------------------------
-    // S.R1 — the curve. d = 0.8 per step down the stack, and the cumulative
-    // multiples are the numbers the design names: 2 sites = 1.8x, 5 = 3.36x.
+    // S.R1 — the per-site share. Every rank yields in full (Ben, 2026-10-26), so
+    // the cumulative multiple of a stack of k is exactly k: 1 + 1 + 1.
     // ---------------------------------------------------------------------
     {
         using placement_rules::stack_output_scalar;
-        check(near(stack_output_scalar(1), 1.0f),    "S.R1 site 1 undiminished",       stack_output_scalar(1), 1.0f);
-        check(near(stack_output_scalar(2), 0.8f),    "S.R1 site 2 yields 0.8",         stack_output_scalar(2), 0.8f);
-        check(near(stack_output_scalar(3), 0.64f),   "S.R1 site 3 yields 0.64",        stack_output_scalar(3), 0.64f);
-        check(near(stack_output_scalar(4), 0.512f),  "S.R1 site 4 yields 0.512",       stack_output_scalar(4), 0.512f);
-        check(near(stack_output_scalar(5), 0.4096f), "S.R1 site 5 yields 0.4096",      stack_output_scalar(5), 0.4096f);
+        check(stack_output_scalar(1) == 1.0f, "S.R1 site 1 yields in full", stack_output_scalar(1), 1.0f);
+        check(stack_output_scalar(2) == 1.0f, "S.R1 site 2 yields in full", stack_output_scalar(2), 1.0f);
+        check(stack_output_scalar(3) == 1.0f, "S.R1 site 3 yields in full", stack_output_scalar(3), 1.0f);
+        check(stack_output_scalar(4) == 1.0f, "S.R1 site 4 yields in full", stack_output_scalar(4), 1.0f);
+        check(stack_output_scalar(5) == 1.0f, "S.R1 site 5 yields in full", stack_output_scalar(5), 1.0f);
 
         float total = 0.0f;
         for (int k = 1; k <= 5; ++k)
         {
             total += stack_output_scalar(k);
-            if (k == 2) check(near(total, 1.8f),    "S.R1 2 sites = 1.8x a lone site",  total, 1.8f);
-            if (k == 3) check(near(total, 2.44f),   "S.R1 3 sites = 2.44x",             total, 2.44f);
-            if (k == 5) check(near(total, 3.3616f), "S.R1 5 sites = 3.36x, never 5x",   total, 3.3616f);
+            if (k == 2) check(near(total, 2.0f), "S.R1 2 sites = 2x a lone site", total, 2.0f);
+            if (k == 3) check(near(total, 3.0f), "S.R1 3 sites = 3x",             total, 3.0f);
+            if (k == 5) check(near(total, 5.0f), "S.R1 5 sites = 5x",             total, 5.0f);
         }
         // A rank the caller could not supply must not silently zero a site's output.
         check(near(stack_output_scalar(0), 1.0f), "S.R1 rank 0 reads as a lone site",
@@ -297,8 +320,8 @@ int main()
 
     // ---------------------------------------------------------------------
     // S.R4 — realised output through run_economy_step, not a restatement of the
-    // formula. Rank comes from stored order, so the sites must come out 20 /
-    // 16 / 12.8 in creation order, summing to 2.44x the lone-site control.
+    // formula. Every site yields in full, so the sites come out 20 / 20 / 20,
+    // summing to 3x the lone-site control.
     // ---------------------------------------------------------------------
     {
         fixture solo = make_fixture(/*sites=*/1, /*reserve=*/1.0e6f);
@@ -318,11 +341,11 @@ int main()
         const float o1 = output_of(rep, f.sites[0]);
         const float o2 = output_of(rep, f.sites[1]);
         const float o3 = output_of(rep, f.sites[2]);
-        check(near(o1, lone),          "S.R4 site 1 of a stack is undiminished", o1, lone);
-        check(near(o2, lone * 0.8f),   "S.R4 site 2 yields 0.8 of site 1",       o2, lone * 0.8f);
-        check(near(o3, lone * 0.64f),  "S.R4 site 3 yields 0.64 of site 1",      o3, lone * 0.64f);
-        check(near(o1 + o2 + o3, lone * 2.44f, 1e-2f),
-              "S.R4 3-site stack totals 2.44x a lone site", o1 + o2 + o3, lone * 2.44f);
+        check(near(o1, lone), "S.R4 site 1 of a stack yields a lone site's output", o1, lone);
+        check(near(o2, lone), "S.R4 site 2 yields in full",                         o2, lone);
+        check(near(o3, lone), "S.R4 site 3 yields in full",                         o3, lone);
+        check(near(o1 + o2 + o3, lone * 3.0f, 1e-2f),
+              "S.R4 3-site stack totals 3x a lone site", o1 + o2 + o3, lone * 3.0f);
 
         // Honest depletion: the reserve falls by exactly what was produced. No
         // clamp, no fake cap, no output conjured that the deposit did not pay for.
@@ -335,25 +358,25 @@ int main()
 
     // ---------------------------------------------------------------------
     // S.R5 — shared depletion. The taper is sized against the stack's COMBINED
-    // nominal, so every member rides the same curve, the stack drains faster than
-    // its output multiple, and the members exhaust on the same tick.
+    // nominal, so every member rides the same curve, a stack of k drains the
+    // deposit k times as fast, and the members exhaust on the same tick.
     // ---------------------------------------------------------------------
     {
-        // Combined nominal of a 3-site stack = 20 * 2.44 = 48.8; the taper band is
-        // 8x that = 390.4. Half a band of reserve puts every member at taper 0.5.
-        fixture f = make_fixture(/*sites=*/3, /*reserve=*/195.2f);
+        // Combined nominal of a 3-site stack = 20 * 3 = 60; the taper band is
+        // 8x that = 480. Half a band of reserve puts every member at taper 0.5.
+        fixture f = make_fixture(/*sites=*/3, /*reserve=*/240.0f);
         const economy_report rep = run_economy_step(f.w, reg);
-        check(near(output_of(rep, f.sites[0]), k_lone_nominal * 1.0f   * 0.5f, 1e-2f),
+        check(near(output_of(rep, f.sites[0]), k_lone_nominal * 0.5f, 1e-2f),
               "S.R5 site 1 tapered by the STACK's band", output_of(rep, f.sites[0]), 10.0f);
-        check(near(output_of(rep, f.sites[1]), k_lone_nominal * 0.8f   * 0.5f, 1e-2f),
-              "S.R5 site 2 sees the same taper", output_of(rep, f.sites[1]), 8.0f);
-        check(near(output_of(rep, f.sites[2]), k_lone_nominal * 0.64f  * 0.5f, 1e-2f),
-              "S.R5 site 3 sees the same taper", output_of(rep, f.sites[2]), 6.4f);
+        check(near(output_of(rep, f.sites[1]), k_lone_nominal * 0.5f, 1e-2f),
+              "S.R5 site 2 sees the same taper", output_of(rep, f.sites[1]), 10.0f);
+        check(near(output_of(rep, f.sites[2]), k_lone_nominal * 0.5f, 1e-2f),
+              "S.R5 site 3 sees the same taper", output_of(rep, f.sites[2]), 10.0f);
 
-        // Same reserve, one site: its own band is 8 x 20 = 160, so 195.2 is ample
+        // Same reserve, one site: its own band is 8 x 20 = 160, so 240 is ample
         // and it runs at full rate. The stack is already half-tapered on the reserve
         // the lone site has not started to feel — that IS the trade-off.
-        fixture solo = make_fixture(/*sites=*/1, /*reserve=*/195.2f);
+        fixture solo = make_fixture(/*sites=*/1, /*reserve=*/240.0f);
         const economy_report rsolo = run_economy_step(solo.w, reg);
         check(near(output_of(rsolo, solo.sites[0]), k_lone_nominal, 1e-2f),
               "S.R5 a lone site on the same reserve is not tapered at all",
@@ -384,8 +407,8 @@ int main()
               "S.R5 every member of the stack exhausts on the SAME tick",
               static_cast<float>(first_exhausted[2]), static_cast<float>(first_exhausted[0]));
 
-        // And the stack burns the deposit down faster than its output multiple: a
-        // lone site on an identical reserve is still working long after.
+        // And the stack burns the deposit down k times as fast: a lone site on an
+        // identical reserve is still working long after.
         fixture h = make_fixture(/*sites=*/1, /*reserve=*/2000.0f);
         int solo_active = 0;
         for (int tick = 0; tick < 200; ++tick)
@@ -448,8 +471,8 @@ int main()
     // to a constant, the pair could drift together and stay green.
     // ---------------------------------------------------------------------
     {
-        // --- the decay half: rank 1, 2, 3 on an ample reserve (taper is 1 throughout,
-        //     so what is left in the comparison is the stack curve alone).
+        // --- the per-site half: rank 1, 2, 3 on an ample reserve (taper is 1
+        //     throughout, so what is left in the comparison is the stack share alone).
         fixture f = make_fixture(/*sites=*/0, /*reserve=*/1.0e6f, /*with_market=*/true);
         float   est_rank1 = 0.0f, est_rank3 = 0.0f;
         for (int rank = 1; rank <= 3; ++rank)
@@ -467,13 +490,14 @@ int main()
             if (rank == 1) est_rank1 = est.revenue;
             if (rank == 3) est_rank3 = est.revenue;
         }
-        // And the curve is genuinely in there: the third site is priced at 0.64 of the
-        // first. Before BL-346 both estimates were the lone-site figure.
-        check(near(est_rank3, est_rank1 * 0.64f, 1e-2f),
-              "S.R7 the rank-3 estimate is 0.64x the rank-1 estimate (decay is priced)",
-              est_rank3, est_rank1 * 0.64f);
-        check(est_rank3 < est_rank1,
-              "S.R7 stacking is never estimated as free", est_rank3, est_rank1);
+        // Every site yields in full, so on an ample reserve the third site is priced
+        // exactly as the first (Ben, 2026-10-26). Stacking is not free: its price is
+        // the shared taper, which the reserve sweep and the regression block below
+        // assert (a stacked candidate on a mid-band reserve estimates BELOW a lone one).
+        check(near(est_rank3, est_rank1, 1e-2f),
+              "S.R7 on an ample reserve the rank-3 estimate equals the rank-1 estimate",
+              est_rank3, est_rank1);
+        check(est_rank1 > 0.0f, "S.R7 the rank-1 estimate is a real revenue", est_rank1, 0.0f);
 
         // --- the shared-depletion half: sweep the reserve across a 3-stack's taper
         //     band, including below the exhaustion floor. At each level the estimate
@@ -481,10 +505,10 @@ int main()
         //     must read zero on exactly the reserves where the tick reports exhausted.
         //     That is the remaining-life claim, checked pointwise rather than asserted.
         //
-        //     A 3-stack's combined nominal is 20 x 2.44 = 48.8, so its taper band is
-        //     8 x 48.8 = 390.4. The levels below straddle it: ample, mid-band, deep,
-        //     and under run_extraction's floor.
-        const float reserves[] = { 1.0e6f, 390.0f, 195.2f, 40.0f, 4.0f };
+        //     A 3-stack's combined nominal is 20 x 3 = 60, so its taper band is
+        //     8 x 60 = 480. The levels below straddle it: ample, just inside the band,
+        //     mid-band, deep, and under run_extraction's floor.
+        const float reserves[] = { 1.0e6f, 470.0f, 240.0f, 40.0f, 4.0f };
         for (const float reserve : reserves)
         {
             fixture g = make_fixture(/*sites=*/2, reserve, /*with_market=*/true);

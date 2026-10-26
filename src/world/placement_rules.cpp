@@ -691,14 +691,11 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
 
 // --- Building stacks (BL-193; the rule and both constants live in the header) --
 
-float stack_output_scalar(int rank)
+float stack_output_scalar(int /*rank*/)
 {
-    // Repeated multiplication, not std::pow: the same product in the same order on
-    // every platform, so a stacked site's yield cannot drift a save out of sync.
-    float s = 1.0f;
-    for (int k = 1; k < rank; ++k)
-        s *= k_stack_output_decay;
-    return s;
+    // Every site in a stack yields in full (Ben, 2026-10-26: "There's already
+    // depletion"); the shared taper in run_extraction's stack pre-pass is the brake.
+    return 1.0f;
 }
 
 int stack_capacity(const tile_component& tc, building_type type, resource_type target)

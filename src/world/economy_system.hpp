@@ -967,7 +967,7 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
 /// one of them, and `estimate_prospective_profit` prices one of them (BL-346), so
 /// the figure the taper is sized against is always the figure actually drawn.
 ///
-/// Exported for the estimator; the taper and the stack decay are NOT in it.
+/// Exported for the estimator; the taper and the stack share are NOT in it.
 ///
 /// BL-479: the owning corp's earned `extraction_rate` modifiers are folded in
 /// HERE (`nation_scalar` on the corp's home nation's held nodes, BL-1273 and
@@ -985,7 +985,7 @@ recipe_switch_result try_switch_recipe(world& w, const recipe_registry& reg,
 /// @param contention The (corp, body) labour-contention scalar to apply.
 /// @param corp       Owning corp, for its earned extraction_rate modifiers;
 ///                   `null_entity` applies none (every estimator's default).
-/// @return           Units per tick, before stack decay and before depletion taper.
+/// @return           Units per tick, before the stack share and before depletion taper.
 float extraction_nominal(const world& w, const recipe_registry& reg,
                          const building_component& b, float contention,
                          entity_id corp = null_entity);
@@ -1031,9 +1031,8 @@ float credit_processing_outputs(world& w, const recipe_registry& reg, entity_id 
 ///
 /// @param stack_rank This site's 1-based rank in its tile's stack (BL-193). The
 ///                   solver's revenue model scales by `stack_output_scalar(rank)`
-///                   exactly as `run_extraction` does — without it the dial was
-///                   maximised against a curve a stacked site never realises
-///                   (BL-346). 1 (the default) is a lone site.
+///                   exactly as `run_extraction` does (BL-346) — 1 at every rank
+///                   since the per-site decay was retired (Ben, 2026-10-26).
 /// @param out_gain Optional. Receives the solver's OWN modelled net at the
 ///                 returned target minus its modelled net at `b.workforce_target`
 ///                 — i.e. what moving the dial is actually worth, in the same

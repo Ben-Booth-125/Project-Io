@@ -93,8 +93,8 @@ void log_reflex_agency(world& w, entity_id corp, entity_id body, const char* wha
 /// BL-193 building stacks: the per-tick state one extraction site shares with the
 /// rest of its tile's stack, handed down by the pre-pass in run_economy_step.
 ///
-/// `rank` is the site's 1-based place in stored order, which sets how far down the
-/// diminishing-returns curve it sits. `taper` is computed ONCE per stack, against
+/// `rank` is the site's 1-based place in stored order (every rank yields in full
+/// since the per-site decay was retired, Ben 2026-10-26). `taper` is computed ONCE per stack, against
 /// the stack's COMBINED nominal draw rather than each site's own — that is what
 /// makes a stack exhaust *together* instead of dribbling out of a spent deposit
 /// one site at a time, and what makes a five-site stack burn its taper band five
@@ -284,8 +284,8 @@ namespace {
 
 /// Extraction: credit the (corp, body) pool from EVERY deposit on the site's tile
 /// and draw each from its own finite reserve. Nominal output is
-/// base_rate × richness × workforce × (1 − hazard), diminished by this site's rank
-/// in its tile's stack (BL-193); it tapers as the *stack's* shared reserve nears
+/// base_rate × richness × workforce × (1 − hazard), in full at every stack rank
+/// (BL-193; Ben 2026-10-26); it tapers as the *stack's* shared reserve nears
 /// empty and the building reports `exhausted` once it can draw nothing. Deposits
 /// never refill.
 ///
@@ -337,11 +337,10 @@ building_report run_extraction(world& w, const recipe_registry& reg,
         return rep;
     }
 
-    // Rate the deposit would yield at full reserve (richness sets the rate),
-    // diminished by this site's rank in the tile's stack (BL-193): the second site
-    // yields 0.8 of the first, the third 0.64, and so on. Stacking therefore pays
-    // sub-linearly — and there is no clamp under the curve, because the curve is
-    // the economics.
+    // Rate the deposit would yield at full reserve (richness sets the rate). Every
+    // site in a stack yields in full (BL-193; the per-site decay was retired, Ben
+    // 2026-10-26: "There's already depletion") — a stack of k makes k x, and the
+    // brake is the shared taper below, sized against the stack's combined draw.
     const float nominal = extraction_nominal(w, reg, b, contention, corp)
                         * placement_rules::stack_output_scalar(stack != nullptr ? stack->rank : 1);
     if (nominal <= 0.0f)
@@ -1133,10 +1132,9 @@ int solve_workforce_target(world& w, const recipe_registry& reg,
                 ? placement_rules::depositless_rate_scalar(b.target_resource)
                 : richness_rate_scalar(reg.economics(building_type::extraction_site),
                                        tit->second.resource_deposit[ri]);
-            // Stack decay (BL-193), applied here for the same reason run_extraction
-            // applies it: a rank-3 site never yields the lone-site rate, so a dial
-            // solved against the lone-site rate is solved against a curve this
-            // building cannot reach (BL-346).
+            // Stack share (BL-193), read here for the same reason run_extraction
+            // reads it, so the dial is solved against the curve the building
+            // realises (BL-346). Every rank now yields in full (Ben, 2026-10-26).
             const float decay = placement_rules::stack_output_scalar(stack_rank);
             const float k    = e.base_rate * rich * eff * (1.0f - tit->second.hazard_level) * decay;
             const float q    = k * wts;
@@ -2523,8 +2521,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // contain no stack at all.
     //
     // Everything below walks in stored order (ascending entity id, which is creation
-    // order): that order picks who is rank 1 and takes the undiminished yield, so it
-    // can never be read off world::buildings' own iteration.
+    // order): that order picks each site's rank, so it can never be read off
+    // world::buildings' own iteration.
 
     /// One extraction site, keyed so that sorting groups a tile's stack together with
     /// its members already in stored order.
@@ -2670,7 +2668,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
         for (const auto& [first, last] : stack_runs)
         {
             // Combined draw: what the whole stack takes off this deposit this tick,
-            // decay included. A mothballed or half-built site keeps its RANK — rank is
+            // every member in full. A mothballed or half-built site keeps its RANK — rank is
             // simply place in the tile's build order, the same population the placement
             // ceiling counts — but contributes nothing to the draw.
             float combined = 0.0f;

@@ -1580,9 +1580,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     : richness_rate_scalar(ex, tc.resource_deposit[ri]);
                 // BL-1227 (idle mines; AI_OPPONENT.md, "An extraction candidate
                 // is priced at the rank it would take"): the new site joins the
-                // stack already working this deposit, at its BOTTOM, and yields
-                // 0.8^(rank-1) of a lone site (PRODUCTION.md § Building stacks).
-                // Priced at rank 1, the scorer stacked up to 85 sites on one
+                // stack already working this deposit, at its BOTTOM. Every rank
+                // now yields in full (PRODUCTION.md § Building stacks; Ben,
+                // 2026-10-26), so the scalar reads 1. Priced at rank 1 under the
+                // retired decay, the scorer stacked up to 85 sites on one
                 // tile whose deep members earned about a tenth of their running
                 // cost, and the loss reflex then idled them. The rank is BL-162's
                 // own model (placement_rules::prospective_stack_rank, what
@@ -1823,7 +1824,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // candidate is new, so it has no golden to protect and no reason
                 // to inherit the weaker model: the proper one takes opex through
                 // compute_building_opex, so it carries habitability-scaled wages,
-                // real input cost at local prices, and BL-193 stack decay.
+                // real input cost at local prices, and the BL-193 stack share.
                 //
                 // What it still does NOT model is input STARVATION — it prices a
                 // full run. Measured at 30.9% of processing building-ticks
@@ -2349,7 +2350,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 //
                 // This MUST use the same estimator the idle decision uses, or the
                 // two fight. It used to hand-roll revenue − wages: no maintenance,
-                // no input cost, no stack decay, no depletion taper, no supply
+                // no input cost, no stack share, no depletion taper, no supply
                 // response. That reads high on exactly the buildings the reflex
                 // tier (economy_system.cpp's BL-079 block) has just idled on
                 // `estimate_building_profit`'s fuller number, so the scorer

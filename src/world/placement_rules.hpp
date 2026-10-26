@@ -375,43 +375,37 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
 // deposit, up to a ceiling the deposit itself sets — a rich seam supports a
 // bigger operation than a thin one.
 //
-// Two rules govern the stack, and they pull against each other on purpose
+// One rule governs the stack's output, and depletion is the whole brake
 // (docs/economy/PRODUCTION.md § Building stacks):
 //
-//   * **Output diminishes per site.** The k-th site of a stack — counted in
-//     stored order, oldest first — yields `k_stack_output_decay^(k-1)` of what it
-//     would yield alone. Two sites make 1.8x, five make 3.36x, never 5x.
+//   * **Every site yields in full.** The k-th site of a stack yields exactly what
+//     it would alone, so a stack of k makes k x a lone site. The per-site decay
+//     curve (0.8^(k-1)) is RETIRED (Ben, 2026-10-26: "There's already depletion").
 //   * **Depletion is honest and shared.** Every site draws REAL reserve for what
-//     it extracts, so a full stack drains the deposit faster than its output
-//     multiple, and the whole stack tapers and exhausts together (the stack
-//     pre-pass in economy_system.cpp § run_extraction).
+//     it extracts, so a k-site stack drains the deposit k times as fast, and the
+//     whole stack tapers and exhausts together (the stack pre-pass in
+//     economy_system.cpp § run_extraction).
 //
 // So stacking buys throughput now at the cost of the tile's life; spreading buys
-// life at the cost of transport and land. Neither dominates. There are no clamps
-// and no fake caps under this — the curve IS the economics.
+// life at the cost of transport and land. There are no clamps under this.
 
 /// Deposit richness that buys one additional extraction site. Deposits generate in
 /// the 0-250 band (tile_generation.cpp § generate_deposits), so this puts a thin
 /// seam at 1 site and the richest tiles at 5.
 ///
-/// SETTLED (BL-193, 2026-07-26). Kept at 50 deliberately: with the decay curve
-/// above carrying the economics, the ceiling is a **legibility** bound — how many
+/// SETTLED (BL-193, 2026-07-26). Kept at 50 deliberately: with shared depletion
+/// carrying the economics, the ceiling is a **legibility** bound — how many
 /// markers a tile can host and a player can reason about — not the balance lever.
 inline constexpr float k_richness_per_site = 50.0f;
 
-/// Per-site output decay across a stack (BL-193). The k-th site yields
-/// `k_stack_output_decay^(k-1)` of a lone site's rate: 1, 0.8, 0.64, 0.512, 0.4096,
-/// summing to 1.0 / 1.8 / 2.44 / 2.952 / 3.3616 for stacks of 1-5.
-inline constexpr float k_stack_output_decay = 0.8f;
-
-/// Output multiplier for the @p rank-th site of a stack — `k_stack_output_decay`
-/// raised to `rank - 1`, by repeated multiplication rather than `std::pow` so the
-/// figure is bit-identical everywhere the simulation runs.
+/// Output multiplier for the @p rank-th site of a stack. RETIRED to the identity
+/// (Ben, 2026-10-26: "There's already depletion"): every site yields in full, so
+/// a stack of k makes k x a lone site, and only the shared depletion taper brakes
+/// it. Kept as a seam so every reader keeps one named place a stack's per-site
+/// share is read from; it returns 1 for every rank.
 ///
-/// @param rank 1-based position in the tile's stack (stored order, oldest first).
-///             Anything at or below 1 reads as rank 1 — a lone site is never
-///             diminished for want of a stack entry.
-/// @return     The scalar on this site's nominal output (0 < s <= 1).
+/// @param rank 1-based position in the tile's stack (ignored).
+/// @return     1.0f.
 float stack_output_scalar(int rank);
 
 /// Sites of @p type (and @p target, for extraction) that @p tc can carry at once.

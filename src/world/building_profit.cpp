@@ -245,8 +245,8 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
         // BL-346: the candidate joins whatever stack already works this deposit, and
         // BOTH halves of the BL-193 stack rule bear on its number.
         //
-        //   * It is the NEWEST site, so it lands at the bottom of the decay curve —
-        //     rank = (sites already here) + 1, yielding 0.8^(rank-1) of a lone site.
+        //   * It is the NEWEST site, rank = (sites already here) + 1, and yields
+        //     in full (the per-site decay was retired, Ben 2026-10-26).
         //   * The taper is SHARED and sized against the whole stack's combined draw,
         //     this candidate included, so a stacked deposit's remaining life is
         //     shorter than the same reserve would give one site.

@@ -564,10 +564,11 @@ sites already targeting that resource, so the pull decays as the shortage is ans
 and dials enumerate per owned building. Bounded enumeration is what keeps the per-tick cost flat.
 
 **An extraction candidate is priced at the rank it would take (Ben, 2026-10-07; BL-1227, idle
-mines).** A new site on a tile that already carries a stack yields `0.8^(k−1)` of the first
-(`PRODUCTION.md` § Building stacks), so its build estimate reads its own stack rank, as BL-162's
-`estimate_prospective_profit` already models it — never the first site's output. Priced at rank 1,
-the scorer stacked up to 85 sites on one tile, the deep ones earning about a tenth of their running
+mines).** A new site's build estimate reads its own stack rank, as BL-162's
+`estimate_prospective_profit` models it. Every rank now yields in full (`PRODUCTION.md` § Building
+stacks; Ben, 2026-10-26: "There's already depletion"), so the rank's scalar is 1; the read stays as
+the one seam a stack's share is priced through. Priced at rank 1 under the retired 0.8 decay, the
+scorer stacked up to 85 sites on one tile, the deep ones earning about a tenth of their running
 cost, and the loss reflex then idled them. This corrects a wrong estimate inside the existing
 scorer grant (§ 11); it adds no behaviour.
 
@@ -915,7 +916,7 @@ There is no directed dispatch: a rival does not name a one-off convoy. Every shi
   `estimate_prospective_profit`, which also makes idled *processors* resumable. Three details make
   that call honest: it takes the **existing** building and reads its real workforce dial rather
   than pricing a fresh probe at construction defaults; it takes the **stack rank the building
-  actually holds** rather than charging one further step of stack decay against itself; and it
+  actually holds** rather than counting itself a second time in its stack's combined draw; and it
   credits only the **labour share** of maintenance as saved by idling, since the fixed material
   share survives decommissioning (the BL-049 wage/maintenance split). The idle side carries the
   mirror image. `ai_skill_harness` counts the reflex tier's idlings alongside commands, so
@@ -1091,7 +1092,7 @@ The build work of BL-199 is carried by:
 | **BL-205** (corp chat log) | The § 7 surface: chat panel, channels + groups, agency-event feed |
 
 Economics the scorer prices, settled alongside: **BL-153** (convoy pay by distance) and
-**BL-193** (stack diminishing returns); **BL-160** (auto exchange policy) / **BL-161**
+**BL-193** (building stacks); **BL-160** (auto exchange policy) / **BL-161**
 (counterparty allow/deny) are the AI's trade-policy primitives (their actor is now the nation) — the AI authors the same policy
 objects via commands.
 
