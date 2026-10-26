@@ -884,6 +884,21 @@ Points from the capital's chain. The ports are the nation's own buildings on its
 bridge cap is unchanged: the link is how a nation crosses water a bridge may not span. Ground with
 no coast, or no own-ground road to one, gets no link and is counted.
 
+**Hubs stack where the need warrants, the capital first (Ben, 2026-10-26: "allow multiple levels
+of logistics hubs from generation, especially at the capital").** Several logistics hubs may
+stand on one tile, each a source of its own adding its points to the pool; stacked hubs share
+one field, so wherever routing carries one of them, the points of all of them pass. After the
+rules above have placed one source per place, generation reads the requests routed across the
+capital — what the Logistics lens reads as *requested* — against what the chain makes available
+there, and stands as many more hubs on the capital as the shortfall takes, one per hub's points.
+It then does the same at each market centre already holding a connected hub. Two limits bind it,
+and neither is a target: the tile's **stack cap** (the non-extraction cap every building obeys —
+a city tile takes twelve), and the nation's **funding** — a stacked hub is stood only while the
+treasury still carries the nation's whole first-tick state bill with the hub added, so the funding
+gate funds the hub and idles nothing it funded before (nodes are paid first, so a hub the bill
+could not carry would idle a producer instead). A capital the treasury cannot stack is left with
+the hub it has.
+
 How many sources, at what tier, and how the lesser centres are ranked are **in-band calibration**:
 chosen against these three rules, logged, and re-measured by the coverage census rather than fixed
 here.

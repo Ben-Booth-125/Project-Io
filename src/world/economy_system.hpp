@@ -595,15 +595,13 @@ int advance_construction_to(world& w, const recipe_registry& reg, int day_in_qua
 /// its generation caller and pays nothing here), and builds from the day after the
 /// world's cursor — the placement day — for the days left in this quarter, at the
 /// rate the shelf allows LESS every claim already on it (`construction_claims_on`).
-/// Nothing is drawn: each day built is owed its materials, drawn (unpaid) at the
-/// next tick.
+/// Nothing is drawn: each day built is owed its materials, drawn at the next tick.
 /// The build door (construction.cpp) calls this, after its affordability gate.
 void begin_construction_on_placement(world& w, const recipe_registry& reg, entity_id payer,
                                      building_component& b, bool founding);
 
 /// The flat credits a site pays at placement: `build_cost` x its days over the
-/// authored quarters x 90 — exactly `construction_capex`, since credits are the
-/// whole cost and the materials are drawn unpaid (Ben, 2026-10-26).
+/// authored quarters x 90 — the flat part of `construction_capex`.
 float construction_credit_cost(const recipe_registry& reg, const building_component& b);
 
 /// What construction has CLAIMED on @p market's shelf and not yet drawn (Ben,

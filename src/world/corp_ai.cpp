@@ -161,14 +161,15 @@ float local_price(const world& w, entity_id tile, std::size_t r)
     return (m.price[r] > 0.0f) ? m.price[r] : m.base_price[r];
 }
 
-/// BL-709 / NR-592 — a build candidate is priced at its whole capital cost,
+/// BL-709 / NR-592 — a build candidate is priced at its whole capital cost:
+/// flat cost, materials at the serving market's LOCAL price (a material the
+/// local market has ceiled is genuinely dearer to build with there, and the
+/// scorer should prefer the site where it is not), and the construction
+/// capacity the project will draw. A contended capacity pool the scorer cannot
+/// see makes it propose builds the pool cannot serve, every evaluation — the
+/// thrash BL-696 measured. BL-1066 (Ben, 2026-09-23) moved the figure into
 /// `construction_capex` (construction.hpp), which the affordability gate charges
-/// too (BL-1066), so the scorer's spend and the gate's refusal cannot disagree.
-/// CREDITS ARE THE WHOLE COST (Ben, 2026-10-26): that figure is the flat cost
-/// times the site multiplier, with no material price in it — the materials leave
-/// the shelf unpaid. Whether the materials can be GOT is a separate question the
-/// scorer still asks (`construction_materials_obtainable`, below): a site whose
-/// shelf cannot serve it would sit paused.
+/// too, so the scorer's spend and the gate's refusal can no longer disagree.
 
 /// BL-1187 (build only what runs) — per-batch margin of `recipe_id` at the
 /// market serving `tile`, its INPUTS priced at what the processor would actually
@@ -1611,11 +1612,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     trace(extraction_trace_outcome::materials, net, 0.0f);
                     continue;
                 }
-                // BL-1066: the shared figure the gate charges. It feeds both
-                // `c.score` (via the net^2/capex curve) and `c.spend` (the
-                // solvency gate). CREDITS ARE THE WHOLE COST (Ben, 2026-10-26):
-                // the flat cost times the site multiplier, no material price —
-                // the materials' availability is the obtainable check above.
+                // BL-709 / NR-592: capex is now CASH PLUS MATERIALS PLUS the
+                // capacity the project will draw. It feeds both `c.score` (via
+                // the net^2/capex curve) and `c.spend` (the solvency gate), so
+                // a rival now prefers the site whose materials are cheap and
+                // reserves against what the build will really cost it.
+                //
+                // THIS MOVES NUMBERS, and knowingly: every economy golden
+                // records a world evolved under a materials-blind scorer. Ben
+                // scheduled it with this item precisely because the shared
+                // capacity pool makes the blindness a correctness problem
+                // rather than a missed opportunity.
+                // BL-1066: the shared figure the gate charges — flat cost,
+                // materials and capacity, times the site's build ticks.
                 const float capex = std::max(1.0f, construction_capex(
                     w, reg, s.tile, building_type::extraction_site, s.target, no_recipe));
 
@@ -3600,12 +3609,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                 }
                             }
                         }
-                        // ONE SITE PER TILE (Ben, 2026-10-26): a tile already holding a
-                        // site under construction — the build's own tile, once the build
-                        // is durative — is never proposed for the hub.
                         for (const entity_id spot : spots)
-                            if (!placement_rules::tile_has_site_under_construction(w, spot)
-                                && lay_hub(spot))
+                            if (lay_hub(spot))
                                 break;
                     }
                 }

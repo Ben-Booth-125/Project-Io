@@ -142,7 +142,6 @@ corp_command_result map_construction(construction_result r)
         // reason reaches the player's surface through `construction_result` itself.
         case construction_result::needs_road:
         case construction_result::foreign_ground:
-        case construction_result::site_busy: // one site per tile (Ben, 2026-10-26)
         case construction_result::invalid_tile:
         case construction_result::out_of_range:
         case construction_result::slot_occupied:
@@ -376,6 +375,10 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
             if (seat)
                 return corp_command_result::rejected_invalid;
             if (cmd.workforce < 0 || cmd.workforce > 200)
+                return corp_command_result::rejected_invalid;
+            // Infrastructure staffs to full and stays there (Ben, 2026-10-26;
+            // PRODUCTION.md § Labour demand): no dial moves it off 200.
+            if (is_infrastructure(b.type))
                 return corp_command_result::rejected_invalid;
             if (b.workforce_target == cmd.workforce && !b.workforce_auto)
                 return corp_command_result::rejected_state;

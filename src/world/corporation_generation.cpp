@@ -614,6 +614,7 @@ entity_id author_building(world& w,
     // institute is staffed like the University (Ben, 2026-10-10; PRODUCTION.md).
     bc.workforce_assigned =
         (btype == building_type::port || btype == building_type::military_base) ? 0.0f : 0.5f;
+    bc.workforce_target   = default_workforce_target(btype); // infrastructure at full (Ben, 2026-10-26)
 
     if (btype == building_type::extraction_site)
     {
@@ -2720,10 +2721,8 @@ float seat_clean_slate(world& w, entity_id nation)
         // What this site was charged and nothing else: never an estimate, so the
         // refund cannot exceed what the nation paid in. Ben, 2026-10-25: the
         // demolition door already refunds the credits paid at placement (and books
-        // them); this refunds the rest, so the seat's total is unchanged, booked
-        // the same way below. Since credits are the whole cost (Ben, 2026-10-26)
-        // the materials are unpaid, so the rest is zero on any site placed now; a
-        // site an older save carries may still hold a paid materials part.
+        // them); this refunds the rest — the materials — so the seat's total is
+        // unchanged, booked the same way below.
         const building_component& sb = w.buildings.at(bid);
         const float paid   = std::max(0.0f, sb.construction_paid);
         const float credit = std::max(0.0f, sb.build_credit_paid);

@@ -2877,6 +2877,19 @@ void run_tail(generation_cursor& c)
                             /*seed=*/params.seed ^ 0xC17910E6u);
     stamp_urban_land_use(w, kepler, &kepler_settlement); // BL-1130: footprints stop at the cell
 
+    // THE CAPITAL ON ITS SEAT'S CITY (Ben, 2026-10-26; NATION_GENERATION.md § Pass
+    // 2e): every province now holds a centre, so each capital tile moves onto its
+    // seat province's anchor before anything downstream (roads, the seat's
+    // industry, the Logistic Point hub) reads it. RNG-free; the seat province is
+    // unchanged.
+    {
+        int unseated = 0;
+        const int moved = seat_capitals_on_centres(w, &unseated);
+        std::printf("[capital] %d capitals moved onto their seat's city (%d without one)\n",
+                    moved, unseated);
+        std::fflush(stdout);
+    }
+
     // Road network (BL-146): stamp each nation's road lattice onto tile.road_edges — a
     // road is an EDGE between two tiles (BL-1340; LOGISTICS.md § 4), laid between
     // consecutive tiles of each link's A* path,

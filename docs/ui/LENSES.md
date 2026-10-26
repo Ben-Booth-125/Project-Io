@@ -917,7 +917,11 @@ it along the chains of `LOGISTICS.md` § How a tile's points get to it:
 - **Supplied** is what the chain **could deliver** there: every source whose walk crosses
   the road tile — a building's walk back to its source, or a source's link back toward the
   capital — counted **once** at that tile however many requests brought it, its points made
-  this tick × its reach at the tile, summed. Supply can therefore exceed the request, which
+  this tick × its reach at the tile, summed. **A source also supplies the tile it stands on,
+  and stacked sources supply together** (Ben, 2026-10-26): every connected source standing on
+  the tile counts there at full reach whether or not a request's nearest-first route picked
+  it, and wherever one hub of a stack carries a request, every hub of that stack's network
+  on its tile carries it too. Supply can therefore exceed the request, which
   is what the scale below needs; what the resolver actually **granted** those requests is
   kept beside it on the hover card.
 - A request is routed as the resolver routes it: its qualifying sources, nearest first,

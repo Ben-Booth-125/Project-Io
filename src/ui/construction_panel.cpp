@@ -394,9 +394,11 @@ void construction_end_grid()
 float construction_progress_fraction(const world& w, const recipe_registry& reg,
                                      const building_component& b)
 {
-    // The DAYS ratio (Ben, 2026-10-24), live denominator and all. Credits are paid
-    // whole at placement (Ben, 2026-10-26), so the credit fraction is no progress.
-    (void)w;
+    const float capex = construction_capex(w, reg, b.tile, b.type, b.target_resource, b.recipe);
+    if (capex > 0.0f)
+        return std::clamp(b.construction_paid / capex, 0.0f, 1.0f);
+    // No priceable capex (no market yet): fall back to the DAYS ratio (Ben,
+    // 2026-10-24), live denominator and all — an approximate bar beats no bar.
     const int total = construction_build_days(w, reg, b.tile, b.type, b.target_resource);
     if (total <= 0)
         return 0.0f;
@@ -633,8 +635,8 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
             ImGui::Dummy({construction_grid::bar, line_h});
             char buf[200];
             std::snprintf(buf, sizeof buf,
-                          "%.0f%% built - the days of work done against the build's whole "
-                          "days.", static_cast<double>(row.progress * 100.0f));
+                          "%.0f%% built - the credits paid in against what the build will cost "
+                          "at today's prices.", static_cast<double>(row.progress * 100.0f));
             cells.push_back(construction_cell("bar", bp, construction_grid::bar, buf, band));
         }
 
@@ -671,8 +673,8 @@ void draw_queue_section(const world& w, const recipe_registry& reg, ui_state& ui
         {
             char buf[200];
             std::snprintf(buf, sizeof buf,
-                          "%.0f cr still to pay. Its whole credit cost was paid when it was "
-                          "placed; the materials it draws as it builds cost no credits.",
+                          "%.0f cr still to pay: the materials it has left to buy, at today's "
+                          "prices. Its build cost was paid when it was placed.",
                           static_cast<double>(row.cost_left));
             cells.push_back(construction_cell("cost", cp, construction_grid::cost, buf));
         }

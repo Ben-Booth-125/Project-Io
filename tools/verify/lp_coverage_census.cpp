@@ -214,6 +214,8 @@ int main(int argc, char** argv)
 {
     std::vector<std::uint32_t> seeds{0};
     bool per_nation = true;
+    bool stack_hubs = true;
+    (void)stack_hubs;
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc)
@@ -229,9 +231,13 @@ int main(int argc, char** argv)
         {
             per_nation = false;
         }
+        else if (!std::strcmp(argv[i], "--no-stack"))
+        {
+            stack_hubs = false; // the stacked-hub pass held back: the before reading
+        }
         else
         {
-            std::fprintf(stderr, "usage: lp_coverage_census [--seeds a,b,c] [--no-nations]\n");
+            std::fprintf(stderr, "usage: lp_coverage_census [--seeds a,b,c] [--no-nations] [--no-stack]\n");
             return 2;
         }
     }
@@ -289,7 +295,7 @@ int main(int argc, char** argv)
         int lanes_before = 0, ports_before = 0;
         lane_census(lanes_before, ports_before);
         const auto t0 = std::chrono::steady_clock::now();
-        const lp_seed_report rep = seed_logistics_sources(w);
+        lp_seed_report rep = seed_logistics_sources(w);
         const auto t1 = std::chrono::steady_clock::now();
         const double seed_ms =
             std::chrono::duration<double, std::milli>(t1 - t0).count();
@@ -302,6 +308,13 @@ int main(int argc, char** argv)
         // is idled for this reading, as `lp_seed_read_at_gate` does. The world is this
         // census's own and is discarded after, so nothing is restored.
         reserve_state_first_tick(w, start->reg, handover);
+#ifdef LP_HAS_STACK_HUBS // absent on a pre-2026-10-26 tree, so the census builds there for a baseline
+        if (stack_hubs)
+            stack_logistics_hubs(w, start->reg, rep); // finish_campaign_world's (Ben, 2026-10-26)
+        std::printf("ST seed=%u stacked_capital=%d stacked_centre=%d stacked_tiles=%d refused_cap=%d refused_funds=%d\n",
+                    seed, rep.hubs_stacked_capital, rep.hubs_stacked_centre, rep.stacked_tiles,
+                    rep.stack_refused_cap, rep.stack_refused_funds);
+#endif
         print_state_node_fund(fund_state_nodes_from_firms(w, start->reg)); // BL-1398
         int gate_idled = 0;
         std::set<entity_id> dark_nations; // nations the gate idles a network node of
@@ -677,7 +690,75 @@ int main(int argc, char** argv)
                         seed, capitals, excluded, cap_src, cap_dark, cap_full, rep.consumers, uncovered,
                         rep.unconnectable, dark_consumers, unexplained, gate_idled,
                         r1 ? "PASS" : "FAIL", r2 ? "PASS" : "FAIL", r3 ? "PASS" : "FAIL");
-            if (!(r1 && r2 && r3))
+            // THE CAPITAL TILE IS A CITY (Ben, 2026-10-26; NATION_GENERATION.md § Pass 2e):
+            // every capital on its nation's own ground stands on a population centre's
+            // tile. A fourth rule, gated with the three.
+            std::set<entity_id> centre_tiles_pc;
+            for (const auto& [cid, tid] : w.population_centre_tile)
+            {
+                (void)cid;
+                centre_tiles_pc.insert(tid);
+            }
+            int caps_read = 0, caps_on_city = 0;
+            std::vector<entity_id> nids;
+            for (const auto& [nid, nc] : w.nations) { (void)nc; nids.push_back(nid); }
+            std::sort(nids.begin(), nids.end());
+            for (const entity_id nid : nids)
+            {
+                const entity_id cap = w.nations.at(nid).capital_tile;
+                if (cap == null_entity || w.tiles.count(cap) == 0)
+                    continue;
+                ++caps_read;
+                if (centre_tiles_pc.count(cap) != 0)
+                    ++caps_on_city;
+                else
+                    std::printf("PX seed=%u nation=%u col=%d row=%d own_ground=%d\n", seed,
+                                static_cast<unsigned>(nid), w.tiles.at(cap).grid_x, w.tiles.at(cap).grid_y,
+                                (w.tile_to_nation.count(cap) != 0 && w.tile_to_nation.at(cap) == nid) ? 1 : 0);
+            }
+            const bool r4 = caps_on_city == caps_read;
+            std::printf("P seed=%u capitals=%d on_city=%d | %s every-capital-on-a-city\n", seed,
+                        caps_read, caps_on_city, r4 ? "PASS" : "FAIL");
+
+            // THE CAPITAL'S SUPPLIED / REQUESTED (Ben, 2026-10-26): the routed requests
+            // crossing the capital tile against what the chain makes available there
+            // (`lp_route_flow`, the Logistics lens's own reading), at the funding gate.
+            {
+                lp_reach_memo fmemo;
+                double sum_req = 0.0, sum_av = 0.0;
+                int n_read = 0, n_short = 0, hubs_total = 0, stacked_caps = 0;
+                for (const entity_id nid : nids)
+                {
+                    const entity_id cap = w.nations.at(nid).capital_tile;
+                    const auto ct = w.tiles.find(cap);
+                    if (ct == w.tiles.end())
+                        continue;
+                    int hubs = 0;
+                    for (const auto& [bid, b] : w.buildings)
+                        if (b.tile == cap && b.type == building_type::inland_logistics_hub && lp_source_running(b))
+                            ++hubs;
+                    const auto fl = lp_route_flow(w, fmemo, t, nid, ct->second.body);
+                    const auto fit = fl.find(cap);
+                    const double req = fit != fl.end() ? fit->second.requested : 0.0;
+                    const double av  = fit != fl.end() ? fit->second.available : 0.0;
+                    ++n_read;
+                    hubs_total += hubs;
+                    if (hubs > 1) ++stacked_caps;
+                    if (av < req) ++n_short;
+                    sum_req += req;
+                    sum_av  += av;
+                    if (per_nation)
+                        std::printf("C seed=%u nation=%u major=%d hubs=%d requested=%.0f available=%.0f ratio=%.2f "
+                                    "treasury=%.0f bill=%.1f\n",
+                                    seed, static_cast<unsigned>(nid), is_major_nation(w, nid) ? 1 : 0, hubs,
+                                    req, av, req > 0.0 ? av / req : 0.0,
+                                    static_cast<double>(w.nations.at(nid).treasury),
+                                    static_cast<double>(state_first_tick_bill(w, start->reg, nid)));
+                }
+                std::printf("CS seed=%u capitals=%d hubs=%d stacked_capitals=%d short=%d requested=%.0f available=%.0f\n",
+                            seed, n_read, hubs_total, stacked_caps, n_short, sum_req, sum_av);
+            }
+            if (!(r1 && r2 && r3 && r4))
                 ++rule_fail_seeds;
         }
 

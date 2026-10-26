@@ -507,6 +507,15 @@ struct lp_seed_report
     int   port_lanes_laid        = 0;
     int   port_lane_tiles        = 0;
     int   port_lanes_unreachable = 0;
+    /// Stacked hubs (Ben, 2026-10-26; `stack_logistics_hubs`): hubs stood on a tile
+    /// already holding a source, at capitals and at market centres; the tiles that
+    /// took any; and the hubs wanted but refused by the tile's stack cap or by the
+    /// nation's funding (its whole first-tick state bill must still fit its treasury).
+    int   hubs_stacked_capital   = 0;
+    int   hubs_stacked_centre    = 0;
+    int   stacked_tiles          = 0;
+    int   stack_refused_cap      = 0;
+    int   stack_refused_funds    = 0;
 };
 
 /// Place logistics sources at the fold so every producing building on a nation's ground is
@@ -530,5 +539,21 @@ void lp_seed_read(world& w, lp_seed_report& rep);
 /// fold calls it after the state reserve, so the printed line is what the first
 /// tick will run.
 void lp_seed_read_at_gate(world& w, const recipe_registry& reg, lp_seed_report& rep);
+
+/// STACKED HUBS WHERE THE NEED WARRANTS (Ben, 2026-10-26: "allow multiple levels of
+/// logistics hubs from generation, especially at the capital"; LOGISTICS.md § Where
+/// generation puts the sources). After the seeding and the founding reserve: for each
+/// nation (ascending id), at its capital first and then at each market centre on its
+/// ground that already holds a connected road hub (ascending market id), the routed
+/// requests crossing that tile (`lp_route_flow`'s `requested`) are set against what the
+/// chain makes available there; the shortfall is met by further road hubs on the same
+/// tile, one per `lp_source_points[road]`. Each is refused when the tile's
+/// non-extraction stack cap is full, or when the nation's treasury would no longer carry
+/// its whole first-tick state bill (`state_first_tick_bill`) with the hub's bound added -
+/// so the funding gate funds the hub and everything it funded before. Nation-owned,
+/// complete, staffed full.
+/// One flow reading per nation, taken before any stacking: RNG-free and order-free.
+void stack_logistics_hubs(world& w, const recipe_registry& reg, lp_seed_report& rep);
+#define LP_HAS_STACK_HUBS 1 // lp_coverage_census reads it to build against an older tree
 
 void print_lp_seed_report(const lp_seed_report& r);

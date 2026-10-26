@@ -586,16 +586,17 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                     ImGui::TextDisabled("-");
             }
 
-            // Cost — the flat credits times the site multiplier; the materials cost
-            // no credits (Ben, 2026-10-26: credits are the whole cost).
+            // Cost — credits plus materials at this market, times the site multiplier.
             ImGui::TableSetColumnIndex(2);
             {
                 char buf[260];
                 std::snprintf(buf, sizeof buf,
-                              "Costs %d cr, the flat build cost, paid when it is placed. Its "
-                              "materials leave the market's shelf as it builds and cost no "
-                              "credits. This ground's site multiplier is x%.2f.",
+                              "Costs %d cr: %d cr of flat build cost, paid when it is placed, and "
+                              "%d cr of materials at this market's prices, drawn as it builds. "
+                              "This ground's site multiplier is x%.2f.",
                               static_cast<int>(std::lround(r.capex)),
+                              static_cast<int>(std::lround(r.flat)),
+                              static_cast<int>(std::lround(std::max(0.0f, r.capex - r.flat))),
                               static_cast<double>(r.site_mult));
                 cell("cost", w_cost, buf);
                 ImGui::TextDisabled("%s", fmt::abbreviate(static_cast<double>(r.capex)).c_str());

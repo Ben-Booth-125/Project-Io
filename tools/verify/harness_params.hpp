@@ -387,6 +387,7 @@ inline shipped_landscape apply_shipped_landscape(
         // the seeding's reading at the gate, verbatim, right after it.
         out.reserve = reserve_state_first_tick(w, reg, out.state);
         print_state_reserve(out.reserve);
+        stack_logistics_hubs(w, reg, out.lp); // finish_campaign_world's, verbatim (Ben, 2026-10-26)
         // BL-1398's firm top-up retired with the fold (finish_campaign_world).
         if (charter.skip_fold)
             print_state_node_fund(fund_state_nodes_from_firms(w, reg));
