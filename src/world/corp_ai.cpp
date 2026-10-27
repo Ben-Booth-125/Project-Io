@@ -2011,6 +2011,21 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // local posted price a glut on the shelf would quote — the
                     // shelf is not what feeds the plant once it is drawn down.
                     // Resume and recipe switch keep the OBTAINABLE pricing.
+                    //
+                    // BL-1442 (post-capacity starvation; PRODUCTION.md § A new
+                    // plant buys at its own market's price): and the plant's OWN
+                    // shelf must offer the input at a price a plant pays. A
+                    // processor buys only off its own market, at that market's
+                    // posted price, and declines over the fair-price ceiling
+                    // (run_processing, BL-1172). Where the input already sits
+                    // over the ceiling there, the market is short of it beyond
+                    // what any plant pays, and a new plant only joins the plants
+                    // already starving on it. A public price, and the ceiling
+                    // every draw reads.
+                    const market_component* own_mkt = nullptr;
+                    if (mid != null_entity)
+                        if (const auto omit = w.markets.find(mid); omit != w.markets.end())
+                            own_mkt = &omit->second;
                     std::array<float, resource_count> input_cost{};
                     bool supplied = true;
                     for (std::size_t r = 0; r < resource_count && supplied; ++r)
@@ -2021,7 +2036,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         supplied = input_supply_covers(w, reg, reach(), mid, r,
                                                        abs->inputs[r] * batches,
                                                        null_entity, &landed)
-                                && landed >= 0.0f;
+                                && landed >= 0.0f
+                                && (own_mkt == nullptr
+                                    || shelf_admits(*own_mkt, r, reg.price_band().reservation_mult,
+                                                    /*off_buys=*/true));
                         input_cost[r] = landed;
                     }
                     if (!supplied)

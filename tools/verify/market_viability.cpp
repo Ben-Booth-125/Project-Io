@@ -183,6 +183,8 @@
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
+#include "world/input_reach.hpp"
+#include "world/trade.hpp"
 #include "world/market_clearing.hpp"
 #include "world/resource_names.hpp"
 #include "world/recipe_registry.hpp"
@@ -236,6 +238,11 @@ bool  g_logistics  = true;    ///< BL-1223: the L row (--no-logistics drops it)
 /// its last row read input; good the report row's limiting input, -1 none), for
 /// a reader that places them on the history's regions (rise_fall_probe).
 const char* g_dump_processors = nullptr;
+/// BL-1442 (post-capacity starvation): when set, every processor at play tick 50
+/// is appended as `seed bid state recipe limiting born done decom_at last_row
+/// player loss_streak` (born/done/decom_at: -1 at the build, settle step 0..11,
+/// play tick 12+k-1; -2 never). A pure reader.
+const char* g_dump_t50 = nullptr;
 entity_id   g_trace_proc = null_entity; ///< --trace-proc BID: one processor's settle, tick by tick
 std::vector<int> g_lg_ticks;  ///< L: the probe play ticks (set in main)
 
@@ -1180,6 +1187,18 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     // BL-1407: no corporation (of any focus) exists at the handoff; the count reads 0.
     r.trade_corps_at_build = 0;
     last_row_map last_row;
+    std::map<entity_id, int> p_born, p_done, p_decom, p_ran; // BL-1442 --dump-t50
+    auto track_life = [&](int t) {
+        if (g_dump_t50 == nullptr) return;
+        for (const auto& [bid, b] : w.buildings)
+        {
+            if (b.type != building_type::processing_facility) continue;
+            p_born.try_emplace(bid, t);
+            if (b.ticks_remaining <= 0) p_done.try_emplace(bid, t);
+            if (b.decommissioned) p_decom.try_emplace(bid, t);
+        }
+    };
+    track_life(-1);
     settle_starve_map settle_starve_rows;
     lg_probe slg; // L over the settle (G1b's window): the play row's reader, every settle tick
     slg.reg = &reg;
@@ -1230,6 +1249,10 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         r.inc_settle_mean += field_income(w) / k_campaign_settle_ticks;
         g5_track(w, g5, step, false, r);
         remember_rows(w, res.report, reg, last_row);
+        track_life(step);
+        if (g_dump_t50 != nullptr)
+            for (const building_report& br : res.report.buildings)
+                if (br.type == building_type::processing_facility && br.active) p_ran.try_emplace(br.building, step);
         remember_starve(w, res.report, reg, step, settle_starve_rows);
         if (g_trace_proc != null_entity)
             if (const auto tb = w.buildings.find(g_trace_proc); tb != w.buildings.end())
@@ -1466,6 +1489,135 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         }
         g5_track(w, g5, k_campaign_settle_ticks + (k - 1), true, r);
         if (k <= k_g1_g2_play_tick) remember_rows(w, res.report, reg, last_row);
+        if (k <= k_g1_g2_play_tick) track_life(k_campaign_settle_ticks + k - 1);
+        if (g_dump_t50 != nullptr && k <= k_g1_g2_play_tick)
+            for (const building_report& br : res.report.buildings)
+                if (br.type == building_type::processing_facility && br.active) p_ran.try_emplace(br.building, k_campaign_settle_ticks + k - 1);
+        if (k == k_g1_g2_play_tick && g_dump_t50 != nullptr)
+        {
+            std::ofstream dump(g_dump_t50, std::ios::app);
+            std::ostringstream out;
+            const entity_id pn = player_nation(w);
+            std::set<entity_id> mine;
+            if (const auto pit = w.nations.find(pn); pit != w.nations.end())
+                for (const entity_id a : pit->second.state_assets) mine.insert(a);
+            std::vector<entity_id> ids;
+            for (const auto& [bid, b] : w.buildings)
+                if (b.type == building_type::processing_facility) ids.push_back(bid);
+            std::sort(ids.begin(), ids.end());
+            auto at = [](const std::map<entity_id, int>& m, entity_id id) {
+                const auto it = m.find(id); return it == m.end() ? -2 : it->second; };
+            // The scorer's own supply reading, asked at t50 of each plant's
+            // inputs (self taken out): a reader's const_cast, as export_refusal's.
+            input_reach ir = make_input_reach(w, reg);
+            ir.report = &res.report;
+            input_reach ir_loc = make_input_reach(w, reg);
+            ir_loc.report = &res.report;
+            ir_loc.same_market_only = true;
+            // Every site's per-tick material draw, per market (corp_ai's
+            // standing_construction_draws, re-derived here as a reader).
+            std::map<entity_id, std::array<float, resource_count>> site_draw;
+            for (const entity_id sb : [&] { std::vector<entity_id> v; for (const auto& [i, bb] : w.buildings) if (bb.ticks_remaining > 0) v.push_back(i); std::sort(v.begin(), v.end()); return v; }())
+            {
+                const building_component& bb = w.buildings.at(sb);
+                const float dur = reg.economics(bb.type).build_duration_ticks;
+                const entity_id sm = market_for_tile(w, bb.tile);
+                if (!(dur > 0.0f) || sm == null_entity) continue;
+                const auto& row = reg.resource_build_cost_for(bb.type, bb.target_resource, bb.recipe);
+                auto& acc = site_draw[sm];
+                for (std::size_t g = 0; g < resource_count; ++g) acc[g] += row[g] / dur;
+            }
+            std::map<entity_id, float> mkt_pts; // every owner's trade points, per market, this tick
+            for (const auto& [nid, nc] : w.nations)
+            {
+                (void)nc;
+                for (const auto& [m, pts] : market_trade_points(w, reg, &res.report, nid)) mkt_pts[m] += pts;
+            }
+            const float base_rate = reg.economics(building_type::processing_facility).base_rate;
+            for (const entity_id bid : ids)
+            {
+                const building_component& b = w.buildings.at(bid);
+                const building_report* row = row_of(res.report, bid);
+                const proc_state s = classify(b, row, reg);
+                const recipe* rc = reg.get_recipe(b.recipe);
+                const auto li = last_row.find(bid);
+                int good = (row != nullptr && row->has_limiting) ? static_cast<int>(row->limiting_input) : -1;
+                // The worst input by spare / judged need (the limiting one when read).
+                float worst = 1e30f, need_j = 0.0f, need_now = 0.0f, spare = 0.0f, hb = 0.0f, hf = 0.0f;
+                int wg = -1;
+                const entity_id mid = market_for_tile(w, b.tile);
+                if (rc != nullptr && mid != null_entity && b.ticks_remaining <= 0)
+                    for (std::size_t g = 0; g < resource_count; ++g)
+                    {
+                        if (!(rc->inputs[g] > 0.0f) || reg.grid_goods().grid(g)) continue;
+                        const float nj = rc->inputs[g] * judged_batches(reg, b);
+                        const reachable_spare sp = reachable_supply(w, reg, ir, mid, g, bid);
+                        const float ratio = nj > 0.0f ? sp.spare / nj : 1e30f;
+                        if ((good >= 0 && static_cast<int>(g) == good) || (good < 0 && ratio < worst))
+                        {
+                            worst = ratio; wg = static_cast<int>(g); need_j = nj; spare = sp.spare;
+                            need_now = rc->inputs[g] * base_rate * b.workforce_assigned
+                                     * std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+                            const market_component& mc = w.markets.at(mid);
+                            hb = mc.household_bid[g]; hf = mc.household_fill[g];
+                            if (good >= 0) break;
+                        }
+                    }
+                float loc = 0.0f, rem_out = 0.0f, rem_out_pts = 0.0f, rem_cap = 0.0f;
+                int n_rem = 0, n_rem_pts = 0;
+                if (wg >= 0)
+                {
+                    const std::size_t g = static_cast<std::size_t>(wg);
+                    loc = reachable_supply(w, reg, ir_loc, mid, g, bid).spare;
+                    const auto it = ir.supply_memo.find(std::make_pair(mid, g));
+                    if (it != ir.supply_memo.end())
+                        for (const auto& sm : it->second.markets)
+                        {
+                            if (sm.market == mid) continue;
+                            ++n_rem; rem_out += sm.out;
+                            const auto pit = mkt_pts.find(sm.market);
+                            if (pit != mkt_pts.end() && pit->second > 0.0f)
+                            {
+                                ++n_rem_pts; rem_out_pts += sm.out;
+                                rem_cap += pit->second * reg.trade().capacity[g];
+                            }
+                        }
+                }
+                // Price / base of the primary output and the dearest input at
+                // its own market, and the output's supply and demand there.
+                float out_pb = -1.0f, in_pb = -1.0f, o_sup = 0.0f, o_dem = 0.0f;
+                if (rc != nullptr && mid != null_entity)
+                {
+                    const market_component& mc = w.markets.at(mid);
+                    std::size_t po = 0; float pq = 0.0f;
+                    for (std::size_t g = 0; g < resource_count; ++g)
+                    {
+                        if (rc->outputs[g] > pq) { pq = rc->outputs[g]; po = g; }
+                        if (rc->inputs[g] > 0.0f && mc.base_price[g] > 0.0f)
+                            in_pb = std::max(in_pb, posted_price(mc, g) / mc.base_price[g]);
+                    }
+                    if (pq > 0.0f && mc.base_price[po] > 0.0f) out_pb = posted_price(mc, po) / mc.base_price[po];
+                    o_sup = mc.supply[po]; o_dem = mc.demand[po];
+                }
+                char buf[720];
+                std::snprintf(buf, sizeof buf, "%u %llu %s %s %s %d %d %d %s %d %d %d %s %.2f %.2f %.2f %.1f %.1f %d %.2f %.2f %d %.2f %d %.2f %.2f %.2f %.2f %.2f %.1f %.1f %.2f %.2f\n",
+                              seed, static_cast<unsigned long long>(bid), k_state_name[s],
+                              rc ? rc->name.c_str() : "?",
+                              good >= 0 ? resource_names::name_of(static_cast<resource_type>(good)).c_str() : "-",
+                              at(p_born, bid), at(p_done, bid), at(p_decom, bid),
+                              li != last_row.end() ? k_state_name[li->second] : "never",
+                              mine.count(bid) ? 1 : 0, b.loss_streak, b.state_idle ? 1 : 0,
+                              wg >= 0 ? resource_names::name_of(static_cast<resource_type>(wg)).c_str() : "-",
+                              need_j, need_now, spare, hb, hf, at(p_ran, bid), b.workforce_assigned,
+                              loc, n_rem, rem_out, n_rem_pts, rem_out_pts, rem_cap,
+                              [&] { const auto q = mkt_pts.find(mid); return q == mkt_pts.end() ? 0.0f : q->second; }(),
+                              out_pb, in_pb, o_sup, o_dem,
+                              [&] { if (wg < 0) return 0.0f; const auto q = site_draw.find(mid); return q == site_draw.end() ? 0.0f : q->second[static_cast<std::size_t>(wg)]; }(),
+                              [&] { if (wg < 0 || mid == null_entity) return 0.0f; return w.markets.at(mid).inventory[static_cast<std::size_t>(wg)]; }());
+                out << buf;
+            }
+            dump << out.str();
+        }
         if (k >= k_g5_from && k <= k_g5_to) read_shelf(w, reg, snap, r);
         if (k >= k_g5_from && k <= k_g5_to) read_water(w, snap.inv, r.w_early, max_convoy_id);
         else if (k > ticks - k_w_late && k > k_g5_to) read_water(w, snap.inv, r.w_late, max_convoy_id);
@@ -1577,6 +1729,7 @@ int main(int argc, char** argv)
         else if (!std::strcmp(argv[i], "--no-spoil")) g_no_spoil = true;
         else if (!std::strcmp(argv[i], "--no-logistics")) g_logistics = false;
         else if (!std::strcmp(argv[i], "--dump-processors") && i + 1 < argc) g_dump_processors = argv[++i]; // BL-1287
+        else if (!std::strcmp(argv[i], "--dump-t50") && i + 1 < argc) g_dump_t50 = argv[++i]; // BL-1442
         else if (!std::strcmp(argv[i], "--trace-proc") && i + 1 < argc) g_trace_proc = static_cast<entity_id>(std::strtoull(argv[++i], nullptr, 10));
         else if (!std::strcmp(argv[i], "--no-snap")) g_road_probe_no_snap = true; // BL-1252 measurement
         else if (!std::strcmp(argv[i], "--snap-run") && i + 1 < argc) g_road_probe_snap_run = std::atoi(argv[++i]); // BL-1252
