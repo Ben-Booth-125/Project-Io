@@ -124,6 +124,9 @@ assert(tile, "no completed player military base to hire at")
 local r1 = hire_at(tile)
 local r2 = hire_at(tile)
 print("unit_counter: hires at the base: " .. tostring(r1) .. ", " .. tostring(r2))
+-- BL-1435: a hire QUEUES at the base and becomes a unit when its muster completes
+-- (90-180 days, one or two ticks), so step until both have landed.
+verify.econ_step(2)
 
 -- The tile holding the most player units.
 local stack, best = nil, 0
