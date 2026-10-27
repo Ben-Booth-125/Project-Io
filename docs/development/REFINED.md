@@ -11,6 +11,13 @@ quick tier before and after. A cold `code-reviewer` pass with a fix round budget
 **Re-bless held to sprint end** (Ben, 2026-10-27): BL-1422's Rifle Infantry seeding moves the
 world digests (D_land onward); they stay red until the sprint's one re-bless.
 
+### BL-1427 (fronts) — Delivery Full, group `fronts`
+Starts after the refit lane merges (both move the unit record, the save version and the verb enum).
+- [ ] **T1** Contract on main: `fronts.hpp` (front, derive_fronts, front_key), the assignment on the unit, the order store, the two verbs' enum slots, the save section. (R1, R2)
+- [ ] **T2** World lane (worktree): derivation, the verbs, the per-tick slot and push step, re-anchoring, rival front scoring, `fronts_harness`. (R1-R4)
+- [ ] **T3** UI lane (main): front lines on the canvas, the front selection kind and card, Assign to front on the unit card and stack panel, `scripts/verify/fronts.lua`. (R5)
+- [ ] **T4** Merge, cold review, gates, Ben's live click.
+
 ### BL-1437 (obsolete unit types) — Delivery Full, group `obsolete-unit-types`
 - [x] **T1** Per-nation flips, `roster_row_obsolete`, the `set_unit_obsolete` verb (39), save v60, hash; `obsolete_units` harness.
 - [x] **T2** Recruit and the tile card hide obsolete rows; the Design tab's toggles; the scorer skips them; ACTIONS entries.

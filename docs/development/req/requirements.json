@@ -7702,6 +7702,68 @@
      "notes": "military_ledger_recruit: \"Show obsolete (19)\" and the seven modern rows; the Design tab's Unit types toggles sit below the class list. The scorer skip is code (corp_ai.cpp hire candidates), not asserted by a harness. Live click owed. LIVE: Ben, 2026-10-27: \"Looks good\"."
     }
    ]
+  },
+  {
+   "brief": "fronts",
+   "title": "BL-1427 - Fronts: contiguous border spans per neighbour; assigned units hold or push",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1427 - sprint 58 (Ben, 2026-10-27: \"Build fronts next\")",
+   "batch": "sprint-58",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: fronts_harness"
+     ],
+     "requirement": "A nation's fronts are derived from tile_to_nation: per neighbour, each contiguous span of its border tiles is one front; a border cut in two is two fronts; fronts re-derive when territory changes. Same world, same fronts, same order.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: fronts_harness",
+      "headless: save_roundtrip"
+     ],
+     "requirement": "assign_front assigns the actor's own unit to one of its nation's fronts (named by a tile in the span) or unassigns it; set_front_order sets hold or push, push only toward a hostile neighbour; every refusal mutates nothing. Assignments and orders are saved and re-anchored when spans change.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: fronts_harness"
+     ],
+     "requirement": "Each tick, a front's assigned units are given slots spaced evenly along its span and march to them (legal march_unit); a gap left by a dead or retreated unit is refilled; units in battle are left alone. Under push, the units march into the neighbour's weakest adjacent province.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: fronts_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "A rival nation's scorer assigns its own units to its own fronts and chooses hold or push, deterministically; it never touches another nation's units or fronts.",
+     "notes": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "visual: fronts",
+      "live"
+     ],
+     "requirement": "The canvas draws the player's fronts along their border edges, coloured by stance, with the assigned count; clicking a front selects it and the front card shows its neighbour, span, units and order with Hold and Push; the unit card and the stack panel carry Assign to front.",
+     "notes": null
+    }
+   ]
   }
  ]
 }
