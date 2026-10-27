@@ -74,7 +74,7 @@ enum class corp_verb : uint8_t
     // command-at-tile / engagement-at-province split; see NR-405.
     // 2026-10-27 (Ben: "all marches go to a tile") RETURNED IT TO `tile`: the march
     // ends on its tile, and `province` is ignored. Same value, same position.
-    march_unit,    ///< Set/replace `subject`'s (a unit) movement order to tile `tile`, path-marched across ticks and ending on it; the path avoids every tile another nation's units stand on, save `tile` itself. rejected_not_owner / rejected_invalid (unknown unit or tile, a tile the type may not enter, off the unit's body, unreachable) / rejected_state (already on `tile`, in a battle, refitting). `province` is ignored.
+    march_unit,    ///< Set/replace `subject`'s (a unit) movement order to tile `tile`, path-marched across ticks and ending on it; the path avoids every tile another nation's units stand on, save `tile` itself. rejected_not_owner / rejected_invalid (unknown unit or tile, a tile the type may not enter, off the unit's body, unreachable) / rejected_state (already on `tile`, in a battle, refitting, or spent — readiness 0 — and `tile` held by a nation the actor is hostile to) — see `march_check`. `province` is ignored.
     halt_unit,     ///< Clear `subject`'s movement order. rejected_state if it has none.
     disband_unit,  ///< Erase `subject` (a unit) outright. No refund — manpower walks away.
     // --- BL-467: the battle seam (2026-08-21) ---
@@ -405,6 +405,21 @@ float refit_credit_cost(const recipe_registry& reg, uint16_t from, uint16_t to);
 /// (rejected_funds). `applied` means the verb would apply.
 corp_command_result refit_check(const world& w, const recipe_registry& reg, entity_id nation,
                                 entity_id unit, uint16_t target);
+
+/// Every check `march_unit` makes, READ-ONLY save for the logistics path cache the
+/// route search warms, in its order — so a caller can ask before it acts (the
+/// right-click "declare and attack" runs it for every unit before it declares): the
+/// unit exists and is @p actor's (rejected_invalid / rejected_not_owner); it is in no
+/// battle and not refitting (rejected_state); @p tile is a tile the unit's type may
+/// enter, on its body (rejected_invalid); the unit is not already there, and is not a
+/// SPENT unit (readiness 0) marching onto a tile a nation @p actor is hostile to holds
+/// — an attack `open_tile_battle` would refuse (rejected_state); a path reaches it
+/// (rejected_invalid). @p assume_hostile, when named, is read as hostile already (a
+/// declare the caller is about to make). `applied` means the verb would apply; the
+/// path it would order is written to @p out_path when given.
+corp_command_result march_check(world& w, entity_id actor, entity_id unit, entity_id tile,
+                                entity_id assume_hostile = null_entity,
+                                std::vector<entity_id>* out_path = nullptr);
 
 /// Apply one command through the player-grade seams. Deterministic; a rejected
 /// command mutates nothing. `out_building` (optional) receives the entity id a

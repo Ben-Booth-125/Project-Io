@@ -135,8 +135,11 @@ void move_morale(world& w, const std::vector<entity_id>& units, int delta)
 /// unit's own nation's ground; ties to the lowest tile id.
 /// `null_entity` if no neighbour qualifies — the unit stays where it is, out of the
 /// fight.
+/// With @p province_term false (`resolve_shared_tiles`: a step off a shared tile,
+/// with no battle and so no province to leave) the province preference is dropped
+/// and only the own-ground preference and the tie-break remain.
 entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
-                       const std::set<entity_id>& foreign_tiles)
+                       const std::set<entity_id>& foreign_tiles, bool province_term = true)
 {
     const auto here = w.tiles.find(u.position);
     if (here == w.tiles.end())
@@ -156,7 +159,7 @@ entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
         if (tit == w.tiles.end() || is_water(tit->second.substrate))
             continue;
         const auto nat  = w.tile_to_nation.find(n);
-        const int  rank = (w.provinces.province_of(n) != province ? 2 : 0)
+        const int  rank = (province_term && w.provinces.province_of(n) != province ? 2 : 0)
                         + (nat != w.tile_to_nation.end() && nat->second == u.owner ? 1 : 0);
         if (rank > best_rank || (rank == best_rank && n < best))
         {
@@ -585,11 +588,101 @@ int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks)
                && attacks[j].attacker == attacks[i].attacker
                && attacks[j].defender == attacks[i].defender)
             stack.push_back(attacks[j++].unit);
-        if (open_tile_battle(w, tick, attacks[i].tile, attacks[i].attacker, attacks[i].defender, stack))
+        const bool ok =
+            open_tile_battle(w, tick, attacks[i].tile, attacks[i].attacker, attacks[i].defender, stack);
+        if (ok)
             ++opened;
+        // An order is spent only by the battle it opens: every unit of this group the
+        // opened battle does not hold as its attacking stack (all of them on a refusal)
+        // gets its registered order back. A pair fights at most one battle per tile,
+        // so the one matching (tile, attacker, defender) is the battle just opened.
+        const active_battle* nb = nullptr;
+        if (ok)
+            for (const active_battle& b : w.battles)
+                if (b.tile == attacks[i].tile && b.attacker == attacks[i].attacker
+                    && b.defender == attacks[i].defender)
+                    nb = &b;
+        for (std::size_t k = i; k < j; ++k)
+        {
+            const bool taken = nb != nullptr
+                && std::find(nb->attacking_units.begin(), nb->attacking_units.end(), attacks[k].unit)
+                       != nb->attacking_units.end();
+            const auto uit = w.units.find(attacks[k].unit);
+            if (!taken && uit != w.units.end() && uit->second.order.dest == null_entity)
+                uit->second.order = attacks[k].order;
+        }
         i = j;
     }
     return opened;
+}
+
+shared_tile_fix resolve_shared_tiles(world& w)
+{
+    shared_tile_fix out;
+    // tile -> standing units there, ascending id (the map and the sorted walk).
+    std::vector<entity_id> ids;
+    ids.reserve(w.units.size());
+    for (const auto& kv : w.units)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    std::map<entity_id, std::vector<entity_id>> on_tile;
+    for (const entity_id uid : ids)
+    {
+        const unit_component& u = w.units.at(uid);
+        if (u.count > 0 && u.position != null_entity)
+            on_tile[u.position].push_back(uid);
+    }
+
+    std::set<entity_id> doomed;
+    for (const auto& [tile, here] : on_tile)
+    {
+        const entity_id keeper = w.units.at(here.front()).owner; // the lowest-id unit's nation
+        bool shared = false;
+        for (const entity_id uid : here)
+            shared = shared || w.units.at(uid).owner != keeper;
+        if (!shared)
+            continue;
+        ++out.tiles;
+        for (const entity_id uid : here)
+        {
+            unit_component& u = w.units.at(uid);
+            if (u.owner == keeper)
+                continue;
+            // Read as the world stands NOW: earlier step-offs count, so no step lands a
+            // second nation anywhere.
+            const std::set<entity_id> foreign = foreign_held_tiles(w, u.owner);
+            const entity_id to = retreat_tile(w, u, 0, foreign, false);
+            if (to != null_entity)
+            {
+                u.position = to;
+                u.order    = movement_order{};
+                ++out.stepped;
+            }
+            else
+            {
+                doomed.insert(uid);
+                u.count = 0; // out of every later tile's occupancy until it is erased below
+            }
+        }
+    }
+
+    if (!doomed.empty())
+    {
+        const auto strip = [&](std::vector<entity_id>& v) {
+            v.erase(std::remove_if(v.begin(), v.end(), [&](entity_id x) { return doomed.count(x) != 0; }),
+                    v.end());
+        };
+        for (active_battle& b : w.battles)
+        {
+            strip(b.attacker_units);
+            strip(b.defender_units);
+            strip(b.attacking_units);
+        }
+        for (const entity_id uid : doomed)
+            w.units.erase(uid);
+        out.disbanded = static_cast<int>(doomed.size());
+    }
+    return out;
 }
 
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick)

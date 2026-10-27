@@ -185,6 +185,11 @@ struct tile_attack
     entity_id attacker = null_entity;
     entity_id defender = null_entity;
     entity_id unit     = null_entity;
+    /// @p unit's order as it stood when the attack registered. The march pass clears
+    /// the live order; `open_tile_battles` puts this back on every unit of the stack
+    /// that the battle did NOT take (a refused open, or a unit already pulled into
+    /// another fight), so a refused attack never leaves its unit idle.
+    movement_order order;
 };
 
 /// Open a battle over @p tile, which @p defender's units hold, attacked by
@@ -210,6 +215,16 @@ bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, en
 /// each identity's units merged into one attacking stack. So two attacks onto
 /// one tile in one tick open it once, and which battle claims an adjacent stack
 /// first is a property of the ids, never of the march's visit order.
+///
+/// AN ORDER IS SPENT ONLY BY THE BATTLE IT OPENS. Every attacking unit the opened
+/// battle's `attacking_units` does not hold - the whole stack when the open is
+/// refused (the defender walked off in the same pass, the attacker is spent, the
+/// pair already fights there), or a unit another battle of this pass pulled in
+/// first - gets back the order it registered with (`tile_attack::order`), so it
+/// carries on next tick against fresh state: onto the tile if it is now empty, an
+/// attack again if the stack is still there, or held by its battle until released.
+/// The restore runs in the same sorted order as the opens, so it adds no
+/// dependence on the visit order.
 /// @return battles opened.
 int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks);
 
@@ -268,6 +283,26 @@ std::set<entity_id> units_in_live_battles(const world& w);
 
 /// Every tile a unit (count > 0) of a nation OTHER than @p owner stands on.
 std::set<entity_id> foreign_held_tiles(const world& w, entity_id owner);
+
+/// What `resolve_shared_tiles` did.
+struct shared_tile_fix
+{
+    int tiles     = 0; ///< tiles that held more than one nation's units
+    int stepped   = 0; ///< units moved off one
+    int disbanded = 0; ///< units with nowhere to step, disbanded (erased)
+};
+
+/// ONE NATION PER TILE, restored on a world that breaks it - a pre-v63 save, whose
+/// rules let two nations stand on one tile (`read_world_snapshot` calls this for
+/// such a stream). Tiles in ascending id: the nation whose LOWEST-ID unit (count >
+/// 0) stands there keeps the tile; every other nation's units there, ascending id,
+/// step off by the retreat rule (`retreat_tile`, without the battle's province
+/// term): one crossable neighbour, land, held by no other nation's units as they
+/// stand at that moment, preferring the unit's own nation's ground, ties to the
+/// lowest tile id. A unit that steps off loses its order (its path started where it
+/// no longer stands). A unit with nowhere to go is DISBANDED - erased, and struck
+/// from every battle's lists. A world that keeps the rule is untouched.
+shared_tile_fix resolve_shared_tiles(world& w);
 
 /// The march path @p from -> @p dest on @p body for a unit of @p owner, in TRAVEL
 /// order (path[0] == @p from), solved around every tile in @p blocked save @p dest

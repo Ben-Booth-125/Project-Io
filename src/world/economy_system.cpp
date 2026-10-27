@@ -4650,7 +4650,10 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
                     // AN ATTACK, wherever on the path it meets the stack: the march
                     // stops on the tile it stands on, and the battle opens over the
                     // defender's tile once every unit has moved (open_tile_battles).
-                    attacks.push_back({ next_id, u.owner, holder, id });
+                    // The order rides with the attack: only the battle it opens spends
+                    // it, so a refused open (the stack walked off later in this pass)
+                    // hands it back rather than leaving the unit idle.
+                    attacks.push_back({ next_id, u.owner, holder, id, u.order });
                     u.order = movement_order{};
                     ++out.attacks;
                     break;

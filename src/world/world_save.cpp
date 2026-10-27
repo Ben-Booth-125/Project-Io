@@ -1,6 +1,7 @@
 #include "world_save.hpp"
 #include "logistic_points.hpp" // BL-1309: lp_share_rule_valid
 
+#include "battle_system.hpp" // BL-1443: resolve_shared_tiles - a pre-v63 stream's shared tiles
 #include "binary_io.hpp"
 #include "logistics.hpp"        // BL-1340: road_edges_mirrored — the mirror is checked on load
 #include "river_generation.hpp"  // BL-1340: hex_side_for_offset — the pre-v53 migration
@@ -1889,6 +1890,13 @@ bool read_world_snapshot(world& w, std::istream& in)
         return false;
     if (!r_vec(in, s.battles, r_battle))
         return false;
+    // A battle's identity tile must be a tile of this stream (the tiles are read
+    // above). Untrusted: a battle over a tile that does not exist is refused whole,
+    // the reader's usual way, rather than dropped - a dropped battle would silently
+    // free its units from a fight the stream says they are in.
+    for (const active_battle& b : s.battles)
+        if (s.tiles.find(b.tile) == s.tiles.end())
+            return false;
     // A pre-v63 stream was sorted by province; re-keyed by tile, it is re-sorted so
     // `battle_order_less` holds (a v63 stream is already in this order).
     std::sort(s.battles.begin(), s.battles.end(), battle_order_less);
@@ -2623,6 +2631,16 @@ bool read_world_snapshot(world& w, std::istream& in)
         }
         (void)fold_legacy_firms(s, firms);
     }
+
+    // BL-1443 — ONE NATION PER TILE on an old stream. Pre-v63 rules let two nations'
+    // units share a tile; v63 forbids it, and nothing downstream expects it. Resolved
+    // here, after the fold has re-owned any corporation's units, deterministically:
+    // the lowest-id unit's nation keeps each shared tile, every other nation's units
+    // step off by the retreat rule, and a unit with nowhere to go is disbanded
+    // (`resolve_shared_tiles`). A v63 stream keeps the rule already and is not touched,
+    // so save -> load -> save of the fixed world is byte-stable.
+    if (version <= k_world_save_version_pre_tile)
+        (void)resolve_shared_tiles(s);
 
     clear_derived_state(s);
     w = std::move(s); // replace only on full success

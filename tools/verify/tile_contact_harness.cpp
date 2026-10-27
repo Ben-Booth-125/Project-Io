@@ -26,6 +26,13 @@
 //   T12 EVERY VERB REFUSAL IS HASH-IDENTICAL.                               (R1/R2)
 //   T13 THE SAVE ROUND-TRIPS A TILE BATTLE, AND A v62 STREAM READS.         (R4)
 //   T14 A FINISHED MUSTER WAITS WHILE A FOREIGN STACK STANDS ON ITS BASE.   (R1)
+//   T15 A REGISTERED ATTACK KEEPS ITS ORDER UNLESS A BATTLE OPENS WITH IT:
+//       the defender walks off in the same pass, or the attacker is pulled
+//       into an earlier battle first.                                       (R2)
+//   T16 A SPENT UNIT'S MARCH ONTO A HOSTILE STACK IS REFUSED (march_check). (R2)
+//   T17 A SAVED BATTLE OVER A TILE THE STREAM DOES NOT HOLD IS REFUSED.     (R4)
+//   T18 A PRE-v63 STREAM WITH TWO NATIONS ON ONE TILE LOADS WITH ONE: the
+//       lowest-id unit's nation keeps it, the rest step off or disband.     (R4)
 //
 // Run: node tools/verify/build_harness.js tile_contact_harness --run
 // ---------------------------------------------------------------------------
@@ -700,6 +707,190 @@ int main()
         advance_musters(f.w);
         check(f.w.units.size() == before + 1 && f.w.musters.empty() && shared_tiles(f.w) == 0,
               "T14b the tile clear, it completes on its base");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nT15 - a registered attack keeps its order unless a battle opens with it\n");
+    {
+        fixture f; build(f);
+        (void)declare_hostile(f.w, f.A, f.B);
+        const entity_id T  = f.at(5, 4);
+        const entity_id au = add_unit(f, f.A, f.at(4, 4)); // the lower id: visited first
+        const entity_id bu = add_unit(f, f.B, T);
+        check(au < bu, "T15 setup: the attacker is the lower id, so it is visited first");
+        check(march(f, reg, f.A, au, T) == corp_command_result::applied, "T15 setup: A's attack march applies");
+        check(march(f, reg, f.B, bu, f.at(5, 7)) == corp_command_result::applied,
+              "T15 setup: B's stack is ordered off the tile");
+        const unit_march_tick mt = step_march(f, reg);
+        check(mt.attacks == 1 && mt.battles_opened == 0 && f.w.battles.empty()
+                  && f.w.units.at(bu).position != T,
+              "T15 setup: A registered the attack, then B walked off T in the same pass: nothing opened");
+        check(f.w.units.at(au).order.dest == T && f.w.units.at(au).position == f.at(4, 4),
+              "T15a THE REFUSED ATTACK HANDED THE ORDER BACK: A still marches on T (it was wiped before)");
+        step_march(f, reg);
+        check(f.w.units.at(au).position == T && f.w.units.at(au).order.dest == null_entity
+                  && shared_tiles(f.w) == 0,
+              "T15b next tick A carried on onto the emptied tile and arrived");
+
+        // Pulled into an earlier battle first: a1 stands beside T1 (the lower tile id)
+        // and attacks T2; a2's attack on T1 opens first and takes a1 in as a joiner,
+        // so a1's own attack finds it busy and is refused - its order must come back.
+        fixture g; build(g);
+        (void)declare_hostile(g.w, g.A, g.B);
+        const entity_id T1 = g.at(4, 4), T2 = g.at(6, 4);
+        const entity_id a1 = add_unit(g, g.A, g.at(5, 4));
+        const entity_id a2 = add_unit(g, g.A, g.at(3, 4));
+        add_unit(g, g.B, T1);
+        add_unit(g, g.B, T2);
+        check(march(g, reg, g.A, a1, T2) == corp_command_result::applied
+                  && march(g, reg, g.A, a2, T1) == corp_command_result::applied && T1 < T2,
+              "T15 setup: two attacks, onto T1 and T2 (T1 the lower tile id)");
+        const unit_march_tick gt = step_march(g, reg);
+        const active_battle* b1 = battle_over(g.w, T1);
+        check(gt.attacks == 2 && gt.battles_opened == 1 && b1 != nullptr && in_list(b1->attacker_units, a1)
+                  && !in_list(b1->attacking_units, a1) && battle_over(g.w, T2) == nullptr,
+              "T15 setup: T1's battle opened and took a1 in beside it; T2's open found a1 busy");
+        check(g.w.units.at(a1).order.dest == T2 && g.w.units.at(a2).order.dest == null_entity,
+              "T15c the unit pulled into the earlier battle KEEPS its order; the one whose battle opened spent it");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nT16 - a spent unit's march onto a hostile stack is refused\n");
+    {
+        fixture f; build(f);
+        (void)declare_hostile(f.w, f.A, f.B);
+        const entity_id au = add_unit(f, f.A, f.at(4, 4));
+        add_unit(f, f.B, f.at(6, 4));
+        add_unit(f, f.C, f.at(4, 6));
+        f.w.units.at(au).readiness_permille = 0;
+        const std::string bytes = to_bytes(f.w);
+        const uint64_t hash = f.w.state_hash(5);
+        check(march(f, reg, f.A, au, f.at(6, 4)) == corp_command_result::rejected_state
+                  && to_bytes(f.w) == bytes && f.w.state_hash(5) == hash,
+              "T16a a spent unit marching onto a HOSTILE stack is refused (rejected_state), world identical");
+        check(march_check(f.w, f.A, au, f.at(4, 6), f.C) == corp_command_result::rejected_state
+                  && march_check(f.w, f.A, au, f.at(4, 6)) == corp_command_result::applied
+                  && to_bytes(f.w) == bytes,
+              "T16b march_check reads a named nation as hostile already (the declare-and-attack pre-check)");
+        check(march(f, reg, f.A, au, f.at(4, 6)) == corp_command_result::applied,
+              "T16c ...but a spent unit marching onto a NEUTRAL stack applies (a block, not an attack)");
+        f.w.units.at(au).order = movement_order{};
+        check(march(f, reg, f.A, au, f.at(9, 1)) == corp_command_result::applied,
+              "T16d ...and a spent unit may still march onto empty ground");
+        f.w.units.at(au).order = movement_order{};
+        f.w.units.at(au).readiness_permille = 1;
+        check(march(f, reg, f.A, au, f.at(6, 4)) == corp_command_result::applied,
+              "T16e with any readiness left the attack march applies");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nT17 - a saved battle over a tile the stream does not hold is refused\n");
+    {
+        fixture f; build(f);
+        (void)declare_hostile(f.w, f.A, f.B);
+        const entity_id T = f.at(5, 4);
+        const entity_id atk = add_unit(f, f.A, f.at(4, 4));
+        add_unit(f, f.B, T);
+        (void)march(f, reg, f.A, atk, T);
+        step_march(f, reg);
+        check(f.w.battles.size() == 1, "T17 setup: one battle");
+        world good;
+        check(from_bytes(to_bytes(f.w), good), "T17 setup: the honest stream reads");
+        f.w.battles.front().tile = f.w.battles.front().ground_tile = 0x7FFFFFF0u; // names no tile
+        const std::string bad = to_bytes(f.w);
+        world s1;
+        check(!from_bytes(bad, s1) && s1.battles.empty() && s1.units.empty(),
+              "T17a a battle whose identity tile is not a tile of the stream is REFUSED whole, destination untouched");
+        std::string v62;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_tile(f.w, o);
+            v62 = o.str();
+        }
+        world s2;
+        check(!from_bytes(v62, s2) && s2.battles.empty(), "T17b ...and so is a v62 stream's");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nT18 - a pre-v63 stream with two nations on one tile loads with one\n");
+    {
+        fixture f; build(f);
+        const entity_id T = f.at(5, 4);
+        const entity_id a  = add_unit(f, f.A, T);  // the lowest id on T: A keeps it
+        const entity_id b  = add_unit(f, f.B, T);
+        const entity_id c  = add_unit(f, f.C, T);
+        const entity_id a2 = add_unit(f, f.A, T);  // A's second unit stays with A's stack
+        // B's own ground beside T: the step-off prefers it over a lower-id neutral tile.
+        std::vector<entity_id> cross;
+        for (int sd = 0; sd < 6; ++sd)
+            if (road_side_is_crossable(sd, f.w.tiles.at(T).grid_y))
+                if (const entity_id n = road_edge_neighbour(f.w, T, sd); n != null_entity)
+                    cross.push_back(n);
+        std::sort(cross.begin(), cross.end());
+        check(cross.size() >= 3, "T18 setup: T has at least three crossable neighbours");
+        const entity_id b_home = cross.back();
+        f.w.tile_to_nation[b_home] = f.B;
+        // A cornered tile S: every crossable neighbour water, save one A holds. B's unit
+        // there has nowhere to go and is disbanded.
+        const entity_id S = f.at(15, 4);
+        std::vector<entity_id> s_cross;
+        for (int sd = 0; sd < 6; ++sd)
+            if (road_side_is_crossable(sd, f.w.tiles.at(S).grid_y))
+                if (const entity_id n = road_edge_neighbour(f.w, S, sd); n != null_entity)
+                    s_cross.push_back(n);
+        std::sort(s_cross.begin(), s_cross.end());
+        for (std::size_t k = 1; k < s_cross.size(); ++k)
+            f.w.tiles.at(s_cross[k]).substrate = terrain_substrate::ocean;
+        invalidate_logistics_caches(f.w);
+        add_unit(f, f.A, s_cross[0]);
+        const entity_id sa = add_unit(f, f.A, S);
+        const entity_id sb = add_unit(f, f.B, S);
+        // B and A in a (pre-v63, province-keyed) battle that lists the doomed unit.
+        active_battle ob{};
+        ob.tile = S; ob.ground_tile = S; ob.province = f.w.provinces.province_of(S);
+        ob.attacker = f.A; ob.defender = f.B; ob.attacker_units = { sa }; ob.defender_units = { sb };
+        ob.state.stream_seed = 0x1445u; ob.state.rng_state = ob.state.stream_seed;
+        f.w.battles.push_back(ob);
+        (void)march(f, reg, f.B, b, f.at(9, 1)); // a live order, which a step-off must drop
+        check(shared_tiles(f.w) == 2, "T18 setup: two tiles each held by two or more nations");
+        std::string v62;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_tile(f.w, o);
+            v62 = o.str();
+        }
+        world back;
+        const bool ok = from_bytes(v62, back);
+        check(ok && shared_tiles(back) == 0, "T18a THE OLD STREAM LOADS WITH NO TILE HELD BY TWO NATIONS");
+        check(ok && back.units.at(a).position == T && back.units.at(a2).position == T,
+              "T18b the nation of the lowest-id unit on T kept it, its whole stack in place");
+        check(ok && back.units.at(b).position == b_home && back.units.at(b).order.dest == null_entity,
+              "T18c B's unit stepped off onto its own ground (preferred over lower ids), its stale order dropped");
+        bool c_ok = false;
+        if (ok && back.units.count(c) != 0)
+        {
+            const entity_id ct = back.units.at(c).position;
+            c_ok = ct != T && std::find(cross.begin(), cross.end(), ct) != cross.end()
+                && !is_water(back.tiles.at(ct).substrate);
+        }
+        check(c_ok, "T18d C's unit stepped off one crossable land tile");
+        check(ok && back.units.count(sb) == 0 && back.units.at(sa).position == S
+                  && back.battles.size() == 1 && back.battles.front().defender_units.empty(),
+              "T18e the unit with nowhere to go was DISBANDED and struck from its battle");
+        // Stable once fixed: save -> load -> save is byte- and hash-identical.
+        const std::string once = ok ? to_bytes(back) : std::string();
+        world again;
+        check(ok && from_bytes(once, again) && to_bytes(again) == once
+                  && again.state_hash(6) == back.state_hash(6),
+              "T18f the fixed world round-trips byte- and hash-identical");
+        world twice;
+        check(from_bytes(v62, twice) && to_bytes(twice) == once,
+              "T18g the fix-up is deterministic: the same old stream loads to the same bytes twice");
+        // A v63 stream is never touched by the fix-up (it cannot hold a shared tile
+        // the march made; this one is written by hand to prove the gate).
+        world cur;
+        check(from_bytes(to_bytes(f.w), cur) && shared_tiles(cur) == 2,
+              "T18h a v63 stream is read as written: the fix-up gates on the old version only");
     }
 
     // -----------------------------------------------------------------------
