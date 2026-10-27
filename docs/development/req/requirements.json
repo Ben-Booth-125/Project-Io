@@ -7508,40 +7508,40 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1425 - sprint 58 (Ben, 2026-10-27: \"the rectangle in the tile with unit count, HP bar and readiness bar, and show readiness and morale on the unit card\")",
    "batch": "sprint-58",
-   "resolved": null,
+   "resolved": "2026-10-27",
    "resolution": null,
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: unit_counter capture",
       "live: click a garrison counter"
      ],
      "requirement": "Units on the Planetary canvas group per (tile, owner) and draw as a rectangle in the tile: owner colour, the number of units on that tile, an HP bar (men over establishment) and a readiness bar (men-weighted). A click on it selects the group's lowest-id unit.",
-     "notes": null
+     "notes": "LIVE: Ben looked in the release build 2026-10-27 after three iterations (vertical HP/readiness bars, hover ring, square corners, a narrower owner band, a 9 px floor so the bars read at play zoom) and ruled \"the counter is what I had in mind now\". Captures: scripts/verify/unit_counter.lua (own, middle zoom, hover, stack), 0 failures, 10a1f8e7."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: unit_counter capture",
       "live: open a unit card"
      ],
      "requirement": "The unit card shows HP (men / establishment), readiness and morale, each with its bar, and the unit's land class with its soft attack, hard attack and hardness.",
-     "notes": null
+     "notes": "Captures unit_counter_card and unit_counter_group_member: HP, readiness and morale bars visible without scrolling; the Roster page names the land class with soft, hard and hardness. The group panel (unit_counter_group) lists each unit with men, HP, readiness and morale. Not verified headless: a press on a group ROW opening that unit's card (the capture selects it through verify.select_unit) — owed to the next live session."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: unit_counter capture"
      ],
      "requirement": "A rival's counter shows its owner and unit count; its HP and readiness bars are the player's own units' only until Ben rules otherwise (NR, rival disclosure).",
-     "notes": null
+     "notes": "Capture unit_counter_rival: a rival counter shows owner band and count, no bars; rival rows in the group panel show type, class and men only (BL-068). Whether to widen this is NR-1088."
     }
    ]
   }

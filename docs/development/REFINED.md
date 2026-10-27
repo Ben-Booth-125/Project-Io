@@ -13,7 +13,7 @@ quick tier before and after. A cold `code-reviewer` pass with a fix round budget
 - [x] **T1** `icons::unit_counter` — the rectangle: owner band, count, HP bar, readiness bar (`icons.{hpp,cpp}`, ICONS.md). (R1, R3)
 - [x] **T2** The canvas groups units per (tile, owner) with men, establishment and readiness, and draws the counter; hit zone on it (`body_surface_canvas.cpp`, `ui_state.hpp`). (R1, R3)
 - [x] **T3** The unit card: HP, readiness, morale bars; the land class and its stats (`selection_panel.cpp`). (R2)
-- [ ] **T4** `scripts/verify/unit_counter.lua` capture; question_log entry; live click. (R1-R3)
+- [x] **T4** `scripts/verify/unit_counter.lua` capture; question_log entry; live click (Ben, 2026-10-27). (R1-R3)
 
 ### BL-1421 (soft hard resolver) — Delivery Full, group `land-combat-core`
 Carries BL-1422 (land classes and kit) T1 — the class stat table — and BL-1423 (refit and retreat)
