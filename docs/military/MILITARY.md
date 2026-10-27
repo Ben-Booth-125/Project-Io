@@ -378,8 +378,8 @@ by entity id), which is what keeps the container's iteration order off the deter
 - `src/world/hard_coded_world.cpp` — the Kepler player stub, count 50, type 0. No `muster_base`
   (that world has none), so it is deliberately never orphaned.
 - `src/world/corporation_generation.cpp` — `seed_starting_military`: a starting unit beside a
-  starting base (BL-331, starting military presence; BL-476, rivals start armed), count 50, roster
-  row 0, recorded with that base as its `muster_base`. Its subject was every non-background
+  starting base (BL-331, starting military presence; BL-476, rivals start armed), count 50, the
+  modern infantry row (§ The roster), recorded with that base as its `muster_base`. Its subject was every non-background
   corporation, placed by the HQ; the corporations and the HQ are retired (Ben, 2026-10-23), so the
   unit and base are a nation's, on its own ground, and which nations open with one is open.
 - `src/world/corp_command.cpp` — the `hire_unit` verb, count `hire_batch_manpower` = 50. Records
@@ -533,12 +533,42 @@ the markets the nation's buildings sit in alone; the credit cost is subject to t
 tree: availability is derived from ground and era band, with no research, no player choice and no
 unlock events.
 
-**Nineteen** rows across four cumulative bands — `classical` 7, `medieval` 4, `gunpowder` 4,
-`industrial` 4. Bands are cumulative because nothing un-invents a spear: an industrial polity still
-fields levies where its ground cannot pay for better.
+**Twenty-six** rows across five cumulative bands — `classical` 7, `medieval` 4, `gunpowder` 4,
+`industrial` 4, and the campaign-only `modern` 7. Bands are cumulative because nothing un-invents a
+spear: an industrial polity still fields levies where its ground cannot pay for better.
 
-Each row carries `{name, band, cls, gate, power_mod, weight}`. The `roster_gate` is four thresholds
-on 0..1000 endowment axes: `ore_q`, `farm_q`, `port_q`, `energy_q`.
+Each row carries `{name, band, cls, gate, power_mod, weight, domains, land}`. The `roster_gate` is
+four thresholds on 0..1000 endowment axes: `ore_q`, `farm_q`, `port_q`, `energy_q`. Rows are only
+ever **appended**: `unit_component::type` is a saved index into the table.
+
+**The modern band is the campaign's, and the Era −1 sim never reaches it (BL-1422, land classes and
+kit).** It holds one row per land class (§ Land — the classes), and each declares its class in
+`land`; every earlier row leaves `land` unset and `land_class_for` derives its class from `cls` and
+band. The sim reaches the roster only through `roster_band_for_capacity`, which tops out at
+`industrial`, and the region-gated `available_rows`; no ladder capacity maps to `modern`. The sim's
+per-band counters stay sized by the four ladder bands (`roster_band_count`).
+
+| Row | Land class | Gate (ore / energy) | `power_mod` |
+|---|---|---|---|
+| Rifle Infantry | Infantry | — / — | 440 |
+| Motor Rifles | Motorised infantry | 300 / 500 | 450 |
+| Mechanised Infantry | Mechanised infantry | 600 / 600 | 470 |
+| Battle Tank | Armour | 800 / 700 | 500 |
+| Armoured Scouts | Light armour | 500 / 600 | 460 |
+| Field Gun Battery | Artillery | 700 / 400 | 480 |
+| Air Defence Battery | Air defence | 600 / 400 | 470 |
+
+The **class carries the role and `power_mod` the generation**. A modern row sits one step above the
+industrial rows (380–420), and the spread is kept narrow so the class, not the modifier, decides the
+fight: `unit_land_stats` scales the class stats by 1000 + `power_mod`. Ore gates steel-heavy kit and
+energy gates fuelled vehicles; infantry is ungated, the floor a modern state can always raise. Each
+modern row also names the nearest Era −1 `cls` for what still keys on it — the march points per
+class and the stack adapter: foot and trucks march as infantry, armour as cavalry, guns as siege,
+air defence as ranged.
+
+**Seeded forces open on modern infantry.** A nation's garrisons and its opening unit take
+`campaign_opening_unit_row()`, the modern row of land class infantry, looked up by class and band
+rather than by index.
 
 Two of those axes are **named substitutions** — the convention is to name the stand-in, never fake
 the input. `farm_q` proxies for pasture, because horses have no signal of their own. `energy_q`
@@ -568,9 +598,9 @@ graduated dial; quantity-scaled readiness is a follow-on.
 fixed at no single value, and it is **not** derived from a military-capacity score — that is the
 Era −1 settlement model — but from `recipe_registry::era()`, the same coarse ancient/industrial
 split every other era gate reads. Every nation opens on the industrial band (`../economy/ERAS.md`
-§ Where the ladder starts; Ben, 2026-10-10), so the campaign roster opens at its highest band
-(`industrial`). Because bands are
-cumulative, every earlier row the nation's ground supports is exposed either way.
+§ Where the ladder starts; Ben, 2026-10-10), so the campaign roster opens at its highest band,
+`modern`. An ancient campaign opens at `classical`. Because bands are cumulative, every earlier row
+the nation's ground supports is exposed either way.
 
 `roster_stack(manpower, region, band, readiness)` composes an army stack from region manpower.
 Later bands crowd out earlier ones — a row's weight decays ×0.35 per band it sits below the
@@ -976,7 +1006,8 @@ M5: state-hash replay determinism with marching units in flight. M6: a corrupted
 recompute guard's trigger) recomputes identically across two independent runs.
 
 **`rival_military_seeding_harness.cpp`** — `seed_starting_military`. R1: every seeded owner
-ends generation owning exactly one `military_base` and one unit (roster index 0, 50 manpower); its
+ends generation owning exactly one `military_base` and one unit (the modern infantry row, 50
+manpower); its
 corporation-and-HQ reading retired with the corporations (Ben, 2026-10-23). R2: two same-seed runs
 seed identically.
 

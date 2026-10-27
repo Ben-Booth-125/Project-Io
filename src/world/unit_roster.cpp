@@ -11,7 +11,10 @@ roster_band campaign_roster_band_for(era_band band)
     switch (band)
     {
         case era_band::ancient: return roster_band::classical;
-        default:                return roster_band::industrial; // industrial, and the unset `any` default
+        // Industrial, and the unset `any` default: the campaign's top band,
+        // which is the campaign-only `modern` (BL-1422). Cumulative, so the
+        // Era -1 rows stay available beside it.
+        default:                return roster_band::modern;
     }
 }
 
@@ -70,6 +73,33 @@ const std::vector<roster_row> g_table = {
     {"Breech Artillery",roster_band::industrial, unit_class::siege,   {700,   0,   0, 600}, 400, 170},
     {"Ironclad",        roster_band::industrial, unit_class::naval,   {700,   0, 650, 600}, 400, 120, k_domains_naval},
     {"Mechanised Column", roster_band::industrial, unit_class::cavalry,{750,  0,   0, 700}, 420, 160},
+
+    // --- Modern (CAMPAIGN ONLY, BL-1422): one row per land class -----------
+    // APPENDED, never interleaved: `unit_component::type` is a saved index into
+    // this table. No ladder capacity maps to `modern` (roster_band_for_capacity
+    // stops at industrial), so the Era -1 sim never fields one of these.
+    //
+    // Each row DECLARES its land class (the last column); the class carries the
+    // role (MILITARY.md § Land — the classes). power_mod carries the generation
+    // and stays modest — one step above the industrial rows (380-420), spread
+    // only 440-500 so the class, not the modifier, decides the fight:
+    // unit_land_stats scales the class stats by 1000 + power_mod.
+    //
+    // Gates: ore for steel-heavy kit, energy for fuelled vehicles. Infantry is
+    // ungated — the floor a modern state can always raise, as Levy Spear is the
+    // floor of the ancient bands. The campaign gate is presence-based (0/1000),
+    // so the thresholds are ordinal here; the ordering still says what each needs.
+    //
+    // `cls` is the nearest Era -1 class, read by what still keys on it (the march
+    // points per class, the stack adapter): foot and trucks march as infantry,
+    // tracked and wheeled armour as cavalry, guns as siege, air defence as ranged.
+    {"Rifle Infantry",       roster_band::modern, unit_class::infantry, {  0, 0, 0,   0}, 440, 340, k_domains_land, land_class::infantry},
+    {"Motor Rifles",         roster_band::modern, unit_class::infantry, {300, 0, 0, 500}, 450, 200, k_domains_land, land_class::motorised},
+    {"Mechanised Infantry",  roster_band::modern, unit_class::cavalry,  {600, 0, 0, 600}, 470, 160, k_domains_land, land_class::mechanised},
+    {"Battle Tank",          roster_band::modern, unit_class::cavalry,  {800, 0, 0, 700}, 500, 120, k_domains_land, land_class::armour},
+    {"Armoured Scouts",      roster_band::modern, unit_class::cavalry,  {500, 0, 0, 600}, 460, 100, k_domains_land, land_class::light_armour},
+    {"Field Gun Battery",    roster_band::modern, unit_class::siege,    {700, 0, 0, 400}, 480, 150, k_domains_land, land_class::artillery},
+    {"Air Defence Battery",  roster_band::modern, unit_class::ranged,   {600, 0, 0, 400}, 470,  60, k_domains_land, land_class::air_defence},
 };
 
 /// The shared primitive both gate paths (region, campaign) funnel through —
@@ -385,6 +415,9 @@ const land_combat_stats& land_class_stats(land_class c)
 
 land_class land_class_for(const roster_row& r)
 {
+    // BL-1422: a row that declares its class fights as it (every modern row).
+    if (r.land != k_land_class_from_cls)
+        return r.land;
     switch (r.cls)
     {
         case unit_class::infantry: return land_class::infantry;
@@ -395,6 +428,21 @@ land_class land_class_for(const roster_row& r)
         case unit_class::naval:    return land_class::none;
     }
     return land_class::infantry;
+}
+
+int modern_row_for(land_class c)
+{
+    const std::vector<roster_row>& t = unit_roster_table();
+    for (std::size_t i = 0; i < t.size(); ++i)
+        if (t[i].band == roster_band::modern && land_class_for(t[i]) == c)
+            return static_cast<int>(i);
+    return -1;
+}
+
+uint16_t campaign_opening_unit_row()
+{
+    const int i = modern_row_for(land_class::infantry);
+    return i >= 0 ? static_cast<uint16_t>(i) : uint16_t{0};
 }
 
 land_combat_stats unit_land_stats(const unit_component& u)

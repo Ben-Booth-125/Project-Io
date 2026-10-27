@@ -79,8 +79,8 @@ int main()
           "R1 the ancient band derives to classical, NOT industrial");
     check(campaign_roster_band_for(era_band::ancient) != roster_band::industrial,
           "R1 (restated) the ancient band is explicitly not industrial");
-    check(campaign_roster_band_for(era_band::industrial) == roster_band::industrial,
-          "R2 the industrial band derives to industrial (pre-BL-461 behaviour preserved)");
+    check(campaign_roster_band_for(era_band::industrial) == roster_band::modern,
+          "R2 the industrial band derives to the campaign's top band, modern (BL-1422)");
 
     // --- R3: the observable hire-list surface -------------------------------
     std::printf("\nR3 -- available_rows() over a fully-gated corp fixture\n");
@@ -129,8 +129,9 @@ int main()
         check(contains_band(industrial_rows, roster_band::classical) &&
                   contains_band(industrial_rows, roster_band::medieval) &&
                   contains_band(industrial_rows, roster_band::gunpowder) &&
-                  contains_band(industrial_rows, roster_band::industrial),
-              "R3 the industrial band still offers every band up to and including industrial");
+                  contains_band(industrial_rows, roster_band::industrial) &&
+                  contains_band(industrial_rows, roster_band::modern),
+              "R3 the industrial band offers every band, the modern rows included (BL-1422)");
 
         check(ancient_rows.size() < industrial_rows.size(),
               "R3 the ancient band's hire list is a strict subset in size of the industrial one");
@@ -156,7 +157,7 @@ int main()
 
         check(from_ancient_reg == roster_band::classical,
               "R4 selection_panel/corp_ai/corp_command's shared expression agrees with R1 for ancient");
-        check(from_industrial_reg == roster_band::industrial,
+        check(from_industrial_reg == roster_band::modern,
               "R4 selection_panel/corp_ai/corp_command's shared expression agrees with R2 for industrial");
         check(from_ancient_reg != from_industrial_reg,
               "R4 the two eras are never conflated onto the same band");

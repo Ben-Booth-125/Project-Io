@@ -21,6 +21,7 @@
 #include "world/market_saturation.hpp" // classify_resources, measure_market_balance
 #include "world/logistic_points.hpp" // lp_reach, lp_road_step — the cover at placement (Pass 3)
 #include "world/river_generation.hpp" // hex_side_for_offset — the cover walk steps as the LP field does
+#include "world/unit_roster.hpp"     // campaign_opening_unit_row -- the opening unit (BL-1422)
 
 #include <algorithm>
 #include <cassert>
@@ -2940,8 +2941,9 @@ void seed_starting_military(world& w, entity_id corp_id,
     if (const auto cit = w.gen_charters.find(corp_id); cit != w.gen_charters.end())
         cit->second.assets.push_back(base_id);
 
-    // One basic unit, seeded on the same tile as the base. Roster index 0 is
-    // the cheapest/first roster row — a deterministic starting choice, not a
+    // One basic unit, seeded on the same tile as the base. BL-1422: modern
+    // infantry, looked up by its land class (`campaign_opening_unit_row`),
+    // never by a hard-coded index — a deterministic starting choice, not a
     // tuned one. The manpower-per-batch figure mirrors hire_unit's own
     // hire_batch_manpower constant (corp_command.cpp) so a starting unit
     // reads the same size as a player-hired one.
@@ -2955,7 +2957,7 @@ void seed_starting_military(world& w, entity_id corp_id,
         .position = best_tid,
         .owner    = owner,
         .count    = starting_unit_manpower,
-        .type     = 0,
+        .type     = campaign_opening_unit_row(),
         .supply_factor_permille = 1000,
         .muster_base = base_id,
         .establishment = starting_unit_manpower, // BL-1421: the HP bar's full mark

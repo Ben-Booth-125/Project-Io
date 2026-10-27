@@ -502,9 +502,10 @@ struct nation_garrison_params
     /// Ceiling so a large treasury cannot field an unbounded garrison.
     int max_count = 200;
 
-    /// Roster row every garrison uses — row 0, the same default
-    /// `seed_starting_military` gives a corp's opening unit.
-    uint16_t roster_row = 0;
+    // BL-1422: the garrison's roster row is not a parameter. Every garrison
+    // is modern infantry, looked up by its land class through
+    // `campaign_opening_unit_row()` (unit_roster.hpp) — the same row
+    // `seed_starting_military` gives a nation's opening unit.
 };
 
 /// Seed one static garrison per nation, per `nation_garrison_params` above.
