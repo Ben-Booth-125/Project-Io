@@ -4022,9 +4022,14 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
         // § Nation garrisons: "A garrison does not draw the credits+goods
         // vector run_unit_upkeep charges corp units."
         // BL-1407: every unit is a NATION's, so every unit takes this branch.
-        if (u.owner != null_entity || u.owner == null_entity)
+        // MILITARY.md § Upkeep, "Orphan cleanup": a unit whose owner, tile or
+        // recorded muster base has been erased is disbanded. The muster-base and
+        // tile checks sat after an always-true branch and never ran (BL-1439's
+        // lane found it); they run here now.
         {
-            if (w.nations.find(u.owner) == w.nations.end())
+            if (w.nations.find(u.owner) == w.nations.end()
+                || (u.muster_base != null_entity && w.buildings.find(u.muster_base) == w.buildings.end())
+                || w.tiles.find(u.position) == w.tiles.end())
                 disband.push_back(id);
             else
                 ++out.units; // alive, counted, untouched by the rest of this loop
