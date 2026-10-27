@@ -623,6 +623,17 @@ where a processor genuinely differs from a mine:
   clause: it runs the recipe the plant already drew for. Measured before the ruling: 121 of the
   314 plants starved at the handoff had been switched in the settle (116 by the strategic chase,
   70 of them onto consumer goods off a shelf households were already emptying; 5 by the rescue).
+  **A new plant buys at its own market's price (BL-1442, post-capacity starvation).** Spare in
+  reach feeds a plant only through its own market's shelf, and a plant buys there only at or under
+  the fair-price ceiling (`../economy/MARKETS.md`; `../economy/PRODUCTION.md` § Output and the
+  shelf). So for a NEW processor an input is supplied only when, besides the supply clause, the
+  input's posted price on the plant's own market is at or under the ceiling. Over it, that market
+  is short of the input past what any plant pays, and a new plant only joins the plants already
+  starving there. It reads one public price against the ceiling every draw reads. Measured at play
+  tick 50 on the curated set before the rule: 268 of 344 input-starved plants had their scarcest
+  input priced over the ceiling at their own market, while the supply clause still found spare in
+  reach for most of them. Resume and recipe switch keep their clauses unchanged: applied there too,
+  the measured share of running plants fell.
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
   switching it would move every blessed golden for no player-visible gain; a new candidate had no
