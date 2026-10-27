@@ -1060,6 +1060,60 @@
    "title": "A nation marks unit types obsolete; Recruit hides them; pre-modern rows start obsolete",
    "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): a per-nation obsolete flag per roster row, defaulting true below the modern band; a command verb to set it (validated, whole-or-nothing); Recruit hides obsolete rows with a show-obsolete switch; the Design tab carries the toggles; the rival scorer skips obsolete rows. Saved.",
    "delivered": "2026-10-27"
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-10-27)",
+   "requires": [],
+   "id": "BL-1438",
+   "short_name": "RETIRE_CONSTRUCTION_CAPACITY",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/construction.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/state_industry.cpp",
+    "src/world/market_saturation.cpp",
+    "scripts/recipes.lua",
+    "scripts/economy.lua",
+    "scripts/world_gen.lua",
+    "src/ui/construction_panel.cpp"
+   ],
+   "title": "Retire the construction-capacity system: builds no longer wait on construction capacity",
+   "design": "Ben, 2026-10-27: \"We are going to retire that system, and it will hopefully make building smoother.\" Overturns PRODUCTION.md § Construction as a rate (Ben, 2026-08-31). A build site no longer draws construction_capacity; it progresses on its materials and days alone. The construction building, its five production methods and generation's capacity seeding retire; the construction_capacity good keeps its enum slot (resource arrays are saved) with no producer and no consumer, retired in name. Docs: PRODUCTION.md, RESOURCES.md, MARKETS.md siblings. Gates: market_viability FULL before and after, history_sim_harness, world_determinism, construction harnesses re-pointed or retired with reasons."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-10-27)",
+   "requires": [],
+   "id": "BL-1439",
+   "short_name": "CAPITAL_MILITARY_BASE",
+   "category": "Generation",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/nation_generation.cpp",
+    "src/world/corporation_generation.cpp"
+   ],
+   "title": "Every nation's capital is generated with a completed military base",
+   "design": "Ben, 2026-10-27: \"make sure that the capital is generated with a military base\". At generation each nation gets a completed military_base on its own ground in its capital province (the capital garrison's province), owned by the nation (state_assets), on a tile the ordinary placement rules accept; the capital garrison records it as its muster_base. MILITARY.md § Nation garrisons and § The muster interface say so."
   }
  ]
 }
