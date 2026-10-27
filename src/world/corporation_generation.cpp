@@ -2845,101 +2845,196 @@ bool make_chain_feasible(world& w, const recipe_registry& reg, chain_reach& cr,
     return true;
 }
 
-/// BL-476 — seed one `military_base` + one starting `unit_component` for
-/// `corp_id`, exactly the logic BL-330 originally scoped to the player only.
-/// Placed on the nearest valid land tile to the corp's HQ (falling back to the
-/// nation's first valid tile if there is no HQ to anchor on); a land-poor
-/// nation with no valid tile is skipped gracefully — no crash, no seeding.
-/// `occupied_tiles` is the live occupancy set, updated in place as buildings
-/// are authored, so callers can invoke this once per corp in a stable order
-/// without re-deriving occupancy each time.
-void seed_starting_military(world& w, entity_id corp_id,
-                             gen_occupancy& occupied_tiles)
+/// BL-1439 (Ben, 2026-10-27; MILITARY.md § Nation garrisons) — THE CAPITAL
+/// POST: the capital garrison's tile (the capital province's anchor centre) —
+/// the lowest-id unit of @p nation standing in its capital province that was
+/// not raised at a base (it was posted, not hired, and may since have adopted
+/// the capital base) — or `nc.capital_tile` while no garrison stands.
+entity_id capital_post_of(const world& w, entity_id nation)
 {
-    // BL-1407: the force is a NATION's. Named by a charter, it is the charter's
-    // home nation's, laid beside the charter's anchor building (the old HQ, so
-    // no base moves); named by a nation, beside its capital.
-    entity_id owner = corp_id;
-    entity_id hq_tile = null_entity;
-    if (const auto cit = w.gen_charters.find(corp_id); cit != w.gen_charters.end())
-    {
-        owner = cit->second.home_nation;
-        const auto hq_bld_it = w.buildings.find(cit->second.hq_building);
-        if (hq_bld_it != w.buildings.end())
-            hq_tile = hq_bld_it->second.tile;
-    }
-    const auto nation_it = w.nations.find(owner);
-    if (nation_it == w.nations.end() || nation_it->second.tiles.empty())
-        return;
-    if (w.gen_charters.find(corp_id) == w.gen_charters.end())
-        hq_tile = nation_it->second.capital_tile;
-
-    // Nearest unoccupied, can_place-valid tile to the HQ (falling back to the
-    // nation's first such tile if there is no HQ to anchor on) — narratively
-    // the muster building sits beside the corp's seat. military_base needs no
-    // deposit, so can_place reduces to "non-ocean land" here
-    // (placement_rules.cpp, military_base case).
-    entity_id best_tid = null_entity;
-    long long best_dist2 = std::numeric_limits<long long>::max();
-
-    long long anchor_x = 0, anchor_y = 0;
-    bool have_anchor = false;
-    if (hq_tile != null_entity)
-    {
-        const auto hq_tile_it = w.tiles.find(hq_tile);
-        if (hq_tile_it != w.tiles.end())
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return null_entity;
+    const uint32_t cap_prov = nit->second.capital_tile != null_entity
+                            ? w.provinces.province_of(nit->second.capital_tile) : 0u;
+    entity_id best = null_entity, post = null_entity;
+    if (cap_prov != 0)
+        for (const auto& [uid, u] : w.units) // an argmin by id: order-free
         {
-            anchor_x = hq_tile_it->second.grid_x;
-            anchor_y = hq_tile_it->second.grid_y;
-            have_anchor = true;
+            if (u.owner != nation || unit_is_raised(uid, u))
+                continue;
+            if (w.provinces.province_of(u.position) != cap_prov)
+                continue;
+            if (best == null_entity || uid < best)
+            {
+                best = uid;
+                post = u.position;
+            }
         }
-    }
+    return post != null_entity ? post : nit->second.capital_tile;
+}
 
-    for (entity_id tid : nation_it->second.tiles)
+/// One pass of `capital_base_site`: @p stack false takes EMPTY tiles only; true
+/// takes any tile the ordinary stacking rule has room on (the non-extraction
+/// cap, `gen_occupancy::has_room`) and that carries no site under construction
+/// (PRODUCTION.md § One site under construction per tile).
+entity_id capital_base_site_pass(const world& w, entity_id nation, const gen_occupancy& occupied,
+                                 bool capital_province_only, bool stack);
+
+/// BL-1439 — THE CAPITAL BASE'S TILE: the legal tile nearest the capital post
+/// (`capital_post_of`), ties to the lowest tile id. Legal = the nation's own
+/// ground, on the post's body, and `placement_rules::can_place` (non-ocean land;
+/// the base needs no deposit). An EMPTY tile is preferred (one building per
+/// tile, as every generated base keeps); failing one, a tile the ordinary
+/// stacking rule still has room on — a one-tile nation whose only tile already
+/// holds a building is still given its base. With @p capital_province_only the
+/// tile must also lie in the capital province. Distance is squared grid
+/// distance with the columns wrapped (the body is a cylinder). Read-only and
+/// draw-free; `null_entity` when no tile qualifies.
+entity_id capital_base_site(const world& w, entity_id nation, const gen_occupancy& occupied,
+                            bool capital_province_only)
+{
+    const entity_id t = capital_base_site_pass(w, nation, occupied, capital_province_only, false);
+    return t != null_entity ? t
+                            : capital_base_site_pass(w, nation, occupied, capital_province_only, true);
+}
+
+entity_id capital_base_site_pass(const world& w, entity_id nation, const gen_occupancy& occupied,
+                                 bool capital_province_only, bool stack)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return null_entity;
+    const nation_component& nc = nit->second;
+    const entity_id post = capital_post_of(w, nation);
+    const auto pt = w.tiles.find(post);
+    if (pt == w.tiles.end())
+        return null_entity;
+    const auto bit = w.bodies.find(pt->second.body);
+    const long long gw = bit != w.bodies.end() ? bit->second.grid_width : 0;
+    const uint32_t cap_prov = nc.capital_tile != null_entity
+                            ? w.provinces.province_of(nc.capital_tile) : 0u;
+    if (capital_province_only && cap_prov == 0)
+        return null_entity;
+
+    entity_id best_tid = null_entity;
+    long long best_d2  = std::numeric_limits<long long>::max();
+    for (const entity_id tid : nc.tiles)
     {
-        if (occupied_tiles.count(tid))
+        if (!stack && occupied.count(tid))
             continue;
-        const auto tile_it = w.tiles.find(tid);
-        if (tile_it == w.tiles.end())
+        const auto own = w.tile_to_nation.find(tid);
+        if (own == w.tile_to_nation.end() || own->second != nation)
             continue;
-        const tile_component& tc = tile_it->second;
+        const auto tit = w.tiles.find(tid);
+        if (tit == w.tiles.end() || tit->second.body != pt->second.body)
+            continue;
+        if (capital_province_only && w.provinces.province_of(tid) != cap_prov)
+            continue;
+        const tile_component& tc = tit->second;
         bool any = false;
         const resource_type tgt = placement_rules::richest_extractable(tc, any);
         if (!placement_rules::can_place(tc, building_type::military_base, tgt))
             continue;
-
-        if (!have_anchor)
+        if (stack && (!occupied.has_room(tc, tid, building_type::military_base, tgt)
+                      || placement_rules::tile_has_site_under_construction(w, tid)))
+            continue;
+        long long dx = std::llabs(static_cast<long long>(tc.grid_x) - pt->second.grid_x);
+        if (gw > 0 && dx > gw - dx)
+            dx = gw - dx;
+        const long long dy = static_cast<long long>(tc.grid_y) - pt->second.grid_y;
+        const long long d2 = dx * dx + dy * dy;
+        if (d2 < best_d2 || (d2 == best_d2 && tid < best_tid))
         {
-            best_tid = tid;
-            break; // no HQ to measure from — first valid tile is fine
-        }
-        const long long dx = tc.grid_x - anchor_x;
-        const long long dy = tc.grid_y - anchor_y;
-        const long long dist2 = dx * dx + dy * dy;
-        if (dist2 < best_dist2 || (dist2 == best_dist2 && tid < best_tid))
-        {
-            best_dist2 = dist2;
+            best_d2  = d2;
             best_tid = tid;
         }
     }
+    return best_tid;
+}
 
-    // A degenerate world (no valid land tile at all) simply skips the seeding
-    // rather than crashing — mirrors place_starting_assets's own
-    // graceful-empty behaviour for a deposit/land-poor nation.
-    if (best_tid == null_entity)
+/// BL-1439 — the nation's STANDING capital base: its lowest-id completed,
+/// not-decommissioned `military_base` on its own ground in its capital province
+/// (anywhere on its own ground when @p capital_province_only is false), or
+/// `null_entity` when it holds none.
+entity_id standing_capital_base(const world& w, entity_id nation, bool capital_province_only)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return null_entity;
+    const nation_component& nc = nit->second;
+    const uint32_t cap_prov = nc.capital_tile != null_entity
+                            ? w.provinces.province_of(nc.capital_tile) : 0u;
+    if (capital_province_only && cap_prov == 0)
+        return null_entity;
+    entity_id best = null_entity;
+    for (const entity_id bid : nc.state_assets)
+    {
+        const auto b = w.buildings.find(bid);
+        if (b == w.buildings.end() || b->second.type != building_type::military_base
+            || b->second.ticks_remaining > 0 || b->second.decommissioned)
+            continue;
+        const auto own = w.tile_to_nation.find(b->second.tile);
+        if (own == w.tile_to_nation.end() || own->second != nation)
+            continue;
+        if (capital_province_only && w.provinces.province_of(b->second.tile) != cap_prov)
+            continue;
+        if (best == null_entity || bid < best)
+            best = bid;
+    }
+    return best;
+}
+
+/// BL-476 — seed one `military_base` + one starting `unit_component` for
+/// `corp_id`, exactly the logic BL-330 originally scoped to the player only.
+/// BL-1439 (Ben, 2026-10-27): THE OPENING FORCE MUSTERS AT THE CAPITAL BASE.
+/// The unit stands on the nation's standing capital base when it holds one
+/// (`standing_capital_base`); otherwise the base is laid by the capital-base
+/// tile rule (`capital_base_site`: the capital province first, then the
+/// nation's nearest own tile anywhere), so the opening force's base and the
+/// capital base are one building, never two. A land-poor nation with no valid
+/// tile is skipped gracefully — no crash, no seeding. `occupied_tiles` is the
+/// live occupancy set, updated in place as buildings are authored, so callers
+/// can invoke this once per corp in a stable order without re-deriving
+/// occupancy each time.
+void seed_starting_military(world& w, entity_id corp_id,
+                             gen_occupancy& occupied_tiles)
+{
+    // BL-1407: the force is a NATION's. Named by a charter, it is the charter's
+    // home nation's; named by a nation, its own.
+    entity_id owner = corp_id;
+    if (const auto cit = w.gen_charters.find(corp_id); cit != w.gen_charters.end())
+        owner = cit->second.home_nation;
+    const auto nation_it = w.nations.find(owner);
+    if (nation_it == w.nations.end() || nation_it->second.tiles.empty())
         return;
 
-    const entity_id base_id =
-        author_building(w, best_tid, building_type::military_base, occupied_tiles);
-    // The base is the nation's own (BL-1407: every building is its nation's).
-    nation_it->second.state_assets.push_back(base_id);
-    // ...and, armed by a charter, it stands in that charter's index as every
-    // charter building does: the state industry's "holds none" test (the
-    // founding, the coastal port) reads a charter's buildings as not the
-    // state's, and the close keeps each nation's list in the order the retired
-    // fold appended it — exactly as when the base was the corporation's.
-    if (const auto cit = w.gen_charters.find(corp_id); cit != w.gen_charters.end())
-        cit->second.assets.push_back(base_id);
+    entity_id base_id  = standing_capital_base(w, owner, /*capital_province_only=*/true);
+    entity_id best_tid = null_entity;
+    if (base_id != null_entity)
+        best_tid = w.buildings.at(base_id).tile;
+    else
+    {
+        best_tid = capital_base_site(w, owner, occupied_tiles, /*capital_province_only=*/true);
+        if (best_tid == null_entity)
+            best_tid = capital_base_site(w, owner, occupied_tiles, /*capital_province_only=*/false);
+        // A degenerate world (no valid land tile at all) simply skips the
+        // seeding rather than crashing — mirrors place_starting_assets's own
+        // graceful-empty behaviour for a deposit/land-poor nation.
+        if (best_tid == null_entity)
+            return;
+        base_id = author_building(w, best_tid, building_type::military_base, occupied_tiles);
+        // The base is the nation's own (BL-1407: every building is its nation's).
+        nation_it->second.state_assets.push_back(base_id);
+        // ...and, armed by a charter, it stands in that charter's index as every
+        // charter building does: the state industry's "holds none" test (the
+        // founding, the coastal port) reads a charter's buildings as not the
+        // state's, and the close keeps each nation's list in the order the
+        // retired fold appended it — exactly as when the base was the
+        // corporation's.
+        if (const auto cit = w.gen_charters.find(corp_id); cit != w.gen_charters.end())
+            cit->second.assets.push_back(base_id);
+    }
 
     // One basic unit, seeded on the same tile as the base. BL-1422: modern
     // infantry, looked up by its land class (`campaign_opening_unit_row`),
@@ -2972,16 +3067,103 @@ bool corporation_has_opening_force(const world& w, entity_id corp)
     entity_id owner = corp;
     if (const auto cit = w.gen_charters.find(corp); cit != w.gen_charters.end())
         owner = cit->second.home_nation;
-    const std::vector<entity_id>* owned = assets_of(w, owner);
-    if (owned == nullptr)
+    // BL-1439: every nation holds a capital base once generation lays them, so
+    // a base is no longer the force: the force is a unit RAISED at a base
+    // (`unit_is_raised`). Before the capital bases exist a base always came
+    // with its unit, so the two readings agree on every generation path.
+    if (w.nations.count(owner) == 0)
         return false;
-    for (const entity_id bid : *owned)
-    {
-        const auto b = w.buildings.find(bid);
-        if (b != w.buildings.end() && b->second.type == building_type::military_base)
+    for (const auto& [uid, u] : w.units) // an any-of: order-free
+        if (u.owner == owner && unit_is_raised(uid, u))
             return true;
-    }
     return false;
+}
+
+bool unit_is_raised(entity_id uid, const unit_component& u)
+{
+    // A unit is created after the base it is raised at (the base must stand
+    // before anything musters there), so its id is the greater. A garrison was
+    // posted before any base existed and ADOPTS its capital base (BL-1439), so
+    // its id is the smaller; a null muster base is no base at all.
+    return u.muster_base != null_entity && uid > u.muster_base;
+}
+
+capital_base_report seed_capital_military_bases(world& w)
+{
+    capital_base_report out;
+    std::vector<entity_id> ids;
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    gen_occupancy occupied;
+    occupied.reserve(w.buildings.size() * 2);
+    for (const auto& [bid, bc] : w.buildings)
+        occupied.add(bc);
+    for (const entity_id nid : ids)
+    {
+        nation_component& nc = w.nations.at(nid);
+        if (nc.tiles.empty())
+            continue;
+        ++out.nations;
+        // A standing base in the capital province (the opening force's, laid by
+        // the same tile rule) is THE base: adopted, never doubled.
+        entity_id base = standing_capital_base(w, nid, /*capital_province_only=*/true);
+        if (base != null_entity)
+            ++out.adopted;
+        else if (const entity_id t = capital_base_site(w, nid, occupied, true); t != null_entity)
+        {
+            base = author_building(w, t, building_type::military_base, occupied);
+            nc.state_assets.push_back(base);
+            ++out.laid;
+        }
+        else
+        {
+            // No legal tile in the capital province: the nearest legal own tile
+            // anywhere, adopting a base already standing on own ground first.
+            ++out.outside_capital_province;
+            base = standing_capital_base(w, nid, /*capital_province_only=*/false);
+            if (base != null_entity)
+                ++out.adopted;
+            else if (const entity_id t2 = capital_base_site(w, nid, occupied, false); t2 != null_entity)
+            {
+                base = author_building(w, t2, building_type::military_base, occupied);
+                nc.state_assets.push_back(base);
+                ++out.laid;
+            }
+            else
+            {
+                ++out.none;
+                continue;
+            }
+        }
+        // The capital garrison records the base as its muster base. Read before
+        // the write: `capital_post_of`'s garrison is the unit not yet raised.
+        entity_id garrison = null_entity;
+        const uint32_t cap_prov = nc.capital_tile != null_entity
+                                ? w.provinces.province_of(nc.capital_tile) : 0u;
+        if (cap_prov != 0)
+            for (const auto& [uid, u] : w.units) // an argmin by id: order-free
+                if (u.owner == nid && u.muster_base == null_entity
+                    && w.provinces.province_of(u.position) == cap_prov
+                    && (garrison == null_entity || uid < garrison))
+                    garrison = uid;
+        if (garrison != null_entity)
+        {
+            w.units.at(garrison).muster_base = base;
+            ++out.garrisons_recorded;
+        }
+    }
+    return out;
+}
+
+void print_capital_bases(const capital_base_report& r)
+{
+    std::printf("[capital bases] %d nation(s): %d laid, %d adopted, %d outside the capital "
+                "province, %d with none; %d capital garrison(s) recorded\n",
+                r.nations, r.laid, r.adopted, r.outside_capital_province, r.none,
+                r.garrisons_recorded);
+    std::fflush(stdout);
 }
 
 void arm_rivals(world& w)
@@ -3067,7 +3249,7 @@ void move_seat_force(world& w, entity_id previous, entity_id nation)
 {
     // BL-1154 / BL-1407: the seat opens unarmed, whichever NATION it is, and
     // the nation it leaves takes the opening force every rival has. A nation's
-    // garrisons (no muster base) are not the opening force and stay. The same
+    // garrisons (never raised at a base, BL-1439) are not the opening force and stay. The same
     // nation re-seated is still disarmed: generation armed every rival before
     // the pick, so the seat's own opening force goes.
     disarm_corporation(w, nation);
@@ -3086,21 +3268,30 @@ void disarm_corporation(world& w, entity_id corp)
         return;
     // Its units first (ascending id, so the erase order is fixed), then its
     // military bases with their stockpiles, out of its asset list too. A NATION's
-    // garrisons (BL-571: no muster base) are not the opening force and stay.
+    // garrisons (BL-571) are not the opening force and stay: a border garrison
+    // has no muster base, and the capital garrison ADOPTED its capital base
+    // rather than being raised there (`unit_is_raised`, BL-1439) — and that
+    // base stays with it, so the seat keeps the capital base Ben's ruling gives
+    // every nation (2026-10-27) and loses only the force raised at it.
     std::vector<entity_id> units;
     for (const auto& [uid, uc] : w.units)
-        if (uc.owner == owner && uc.muster_base != null_entity)
+        if (uc.owner == owner && unit_is_raised(uid, uc))
             units.push_back(uid);
     std::sort(units.begin(), units.end());
     for (const entity_id uid : units)
         w.units.erase(uid);
+    std::set<entity_id> held; // the bases a surviving garrison records
+    for (const auto& [uid, uc] : w.units)
+        if (uc.owner == owner && uc.muster_base != null_entity)
+            held.insert(uc.muster_base);
     std::vector<entity_id>& assets = *owned;
     std::vector<entity_id> kept;
     kept.reserve(assets.size());
     for (const entity_id bid : assets)
     {
         const auto b = w.buildings.find(bid);
-        if (b != w.buildings.end() && b->second.type == building_type::military_base)
+        if (b != w.buildings.end() && b->second.type == building_type::military_base
+            && held.count(bid) == 0)
         {
             w.buildings.erase(bid);
             w.stockpiles.erase(bid);

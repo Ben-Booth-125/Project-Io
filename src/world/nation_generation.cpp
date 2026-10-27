@@ -2014,10 +2014,12 @@ void place_garrison(world& w, entity_id nation, uint32_t province_id, entity_id 
     // nation that wants ground HIRES; a garrison that marched would make the
     // nation its own mercenary" (MILITARY.md § Nation garrisons). No code
     // path may ever hand this unit a march order.
-    // uc.muster_base stays null_entity: "a nation raises no base" (same
-    // section) — this is the orphan key run_unit_upkeep reads for a CORP
-    // unit, and a garrison is deliberately never checked against it (see
-    // run_unit_upkeep's own nation-owner branch, economy_system.cpp).
+    // uc.muster_base stays null_entity HERE: no base stands yet. BL-1439 (Ben,
+    // 2026-10-27): finish_campaign_world lays every capital's military base
+    // (`seed_capital_military_bases`, corporation_generation.cpp) and the
+    // CAPITAL garrison then records it as its muster base; a border garrison
+    // keeps none. A garrison adopts its base rather than being raised there,
+    // which `unit_is_raised` reads off the ids (the garrison is the older).
     w.units[u] = uc;
 }
 
