@@ -96,8 +96,8 @@ const std::vector<roster_row> g_table = {
     {"Rifle Infantry",       roster_band::modern, unit_class::infantry, {  0, 0, 0,   0}, 440, 340, k_domains_land, land_class::infantry},
     {"Motor Rifles",         roster_band::modern, unit_class::infantry, {300, 0, 0, 500}, 450, 200, k_domains_land, land_class::motorised},
     {"Mechanised Infantry",  roster_band::modern, unit_class::cavalry,  {600, 0, 0, 600}, 470, 160, k_domains_land, land_class::mechanised},
-    {"Battle Tank",          roster_band::modern, unit_class::cavalry,  {800, 0, 0, 700}, 500, 120, k_domains_land, land_class::armour},
-    {"Armoured Scouts",      roster_band::modern, unit_class::cavalry,  {500, 0, 0, 600}, 460, 100, k_domains_land, land_class::light_armour},
+    {"Medium Armour",        roster_band::modern, unit_class::cavalry,  {800, 0, 0, 700}, 500, 120, k_domains_land, land_class::armour},
+    {"Light Armour",         roster_band::modern, unit_class::cavalry,  {500, 0, 0, 600}, 460, 100, k_domains_land, land_class::light_armour},
     {"Field Gun Battery",    roster_band::modern, unit_class::siege,    {700, 0, 0, 400}, 480, 150, k_domains_land, land_class::artillery},
     {"Air Defence Battery",  roster_band::modern, unit_class::ranged,   {600, 0, 0, 400}, 470,  60, k_domains_land, land_class::air_defence},
 };

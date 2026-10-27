@@ -7656,10 +7656,10 @@
    "difficulty": 2,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1437 - sprint 58 (Ben, 2026-10-27: \"we should be able to mark unit types as obsolete\")",
    "batch": "sprint-58",
-   "resolved": null,
+   "resolved": "2026-10-27",
    "resolution": null,
    "rows": [
     {
@@ -7693,13 +7693,13 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: military_ledger",
       "live"
      ],
      "requirement": "Recruit and the base tile card hide obsolete rows, with a \"Show obsolete (N)\" switch on Recruit; the Design tab lists every type with an obsolete toggle; a rival nation's scorer skips obsolete rows.",
-     "notes": "military_ledger_recruit: \"Show obsolete (19)\" and the seven modern rows; the Design tab's Unit types toggles sit below the class list. The scorer skip is code (corp_ai.cpp hire candidates), not asserted by a harness. Live click owed."
+     "notes": "military_ledger_recruit: \"Show obsolete (19)\" and the seven modern rows; the Design tab's Unit types toggles sit below the class list. The scorer skip is code (corp_ai.cpp hire candidates), not asserted by a harness. Live click owed. LIVE: Ben, 2026-10-27: \"Looks good\"."
     }
    ]
   }

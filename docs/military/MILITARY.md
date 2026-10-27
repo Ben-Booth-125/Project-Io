@@ -588,8 +588,8 @@ per-band counters stay sized by the four ladder bands (`roster_band_count`).
 | Rifle Infantry | Infantry | — / — | 440 |
 | Motor Rifles | Motorised infantry | 300 / 500 | 450 |
 | Mechanised Infantry | Mechanised infantry | 600 / 600 | 470 |
-| Battle Tank | Armour | 800 / 700 | 500 |
-| Armoured Scouts | Light armour | 500 / 600 | 460 |
+| Medium Armour | Armour | 800 / 700 | 500 |
+| Light Armour | Light armour | 500 / 600 | 460 |
 | Field Gun Battery | Artillery | 700 / 400 | 480 |
 | Air Defence Battery | Air defence | 600 / 400 | 470 |
 

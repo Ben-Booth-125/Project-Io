@@ -1034,8 +1034,8 @@
    "design": "Ben, 2026-10-27: kit is researched in the age tree, not a ladder of its own (RESEARCH.md § What technology is for; MILITARY.md § Land — the classes). research/MILITARY_KIT.md § 2 lists the items (two slots a class, gens 1-3). DESIGN PASS FIRST: the tree's grammar holds about fifteen nodes a branch (RESEARCH.md § The shape of an age's tree), so place the kit by subject across branches — small arms, section weapons, guns and protection in Force; armour materials in Processing; sensors, fire control, drones and networked kit in Signal & Orbit — as minors and majors in clusters, keeping each major's two-minors rule; say where the grammar must widen and put that to Ben. Then the store edit (tech_tree_store.js --check, gen_tech_tree_table.js), each node naming its kit as an unlock effect (unread until BL-1434, unit designs)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 58,
    "version_goal": "v0.3.0",
    "written": "2026-10-27",
@@ -1058,7 +1058,8 @@
     "src/ui/military_ledger.cpp"
    ],
    "title": "A nation marks unit types obsolete; Recruit hides them; pre-modern rows start obsolete",
-   "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): a per-nation obsolete flag per roster row, defaulting true below the modern band; a command verb to set it (validated, whole-or-nothing); Recruit hides obsolete rows with a show-obsolete switch; the Design tab carries the toggles; the rival scorer skips obsolete rows. Saved."
+   "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): a per-nation obsolete flag per roster row, defaulting true below the modern band; a command verb to set it (validated, whole-or-nothing); Recruit hides obsolete rows with a show-obsolete switch; the Design tab carries the toggles; the rival scorer skips obsolete rows. Saved.",
+   "delivered": "2026-10-27"
   }
  ]
 }
