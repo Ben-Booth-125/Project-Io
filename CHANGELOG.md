@@ -12,6 +12,40 @@ release.
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-10-26
+
+*Nations own everything, then economy polish. Corporations and companies are retired: every
+building belongs to the nation whose ground it stands on. A long live-click round then polished
+logistics, construction, ports and generation. All five market viability targets pass, and the
+re-bless is authorised against its shape.*
+
+### Changed
+
+- **Nations own every building** (BL-1399 (nation builds own ground) .. BL-1407 (delete corporation
+  component)): the fold carries firm money home, tax comes from wages, and every non-player nation
+  builds through the scorer.
+- **The Logistic Point network is roads and rail.** Generation joins every building to its nation's
+  network, bridges short straits, and links overseas groups by port. Every port lays lanes to every
+  port within 50 tiles, over sea or lake, and points ride the lanes. A nation buys its network repairs
+  from its own markets.
+- **Construction is measured in days**, building from the placement day. Credits are paid once at
+  placement; materials are bought at market price as they are drawn. A cancelled site, the seat's
+  clean slate included, refunds its credits. One site may be under construction on a tile at once.
+- **Generation**: a cession carries its attached islets; no capital sits on a speck, and every
+  capital sits on its city; industry anchors at the capital, then market centres; extraction spreads
+  first, then stacks; ports stand where colonial lanes land; stacked hubs open short capitals.
+- **Stacks yield in full**: the 0.8 per-rank debuff is retired; shared depletion stays.
+- **Infrastructure staffs to 100%.**
+
+### Added
+
+- **The site finder**: pick a building, its valid tiles light up, tiles without logistics are
+  flagged, and a ledger sorts them by estimated profit. A progress ring and a priced site card show
+  what each build still needs.
+- **The Logistics lens** draws the network itself: a star on every capital, every chain link by road,
+  rail and lane, red below half supply, one colour per tile, and tile selection.
+- **Trade-flow paths** follow the network, ending on the destination market.
+
 ## [0.2.0] — 2026-10-23
 
 *The economy functions, logistics included. Sprint 55 opened as a spectator run to 2040 with space
@@ -1658,7 +1692,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.32...v0.2.0
 [0.1.32]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.31...v0.1.32
 [0.1.31]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.30...v0.1.31
