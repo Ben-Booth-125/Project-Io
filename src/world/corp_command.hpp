@@ -194,6 +194,12 @@ enum class corp_verb : uint8_t
     // muster interface, "Refit to a newer type". No grant lets a rival refit, so
     // corp_ai.cpp issues no such verb; any nation may refit its OWN units.
     refit_unit,           ///< Refit unit `subject` to roster row `unit_type`: a newer model of the same land class the nation fields now (`refit_targets`). Paid now (the price difference, floored at 0, plus the target's gated goods); takes the target's muster days. rejected_not_owner / rejected_invalid / rejected_state (in a battle, already refitting) / rejected_placement (off its own ground) / rejected_funds — see `refit_check`.
+    // --- BL-1427: fronts (Ben, 2026-10-27) ---
+    // Appended AFTER refit_unit, same append-only rule. MILITARY.md § Fronts. Any
+    // nation on its OWN units and fronts; rivals issue both by the grant in
+    // AI_OPPONENT.md § 11 ("Rival nations use fronts").
+    assign_front,         ///< Assign unit `subject` to the actor's front whose span holds `tile`, or unassign it when `tile` is null_entity. rejected_not_owner (not the actor's unit) / rejected_invalid (no such front of the actor's).
+    set_front_order,      ///< Set the actor's front whose span holds `tile` to `order` (0 hold, 1 push). rejected_invalid (no such front, or another order) / rejected_state (push toward a neighbour the actor is not hostile to, or no change).
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -203,7 +209,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::refit_unit) + 1;
+    static_cast<uint8_t>(corp_verb::set_front_order) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

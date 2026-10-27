@@ -93,6 +93,8 @@ const VERBS = [
   'set_tax_tier',                                      // BL-1335 -- the seat's nation's tax tier; nation + order (1..5)
   'set_unit_obsolete',                                 // BL-1437 -- the seat's nation marks a roster row obsolete; unit_type + order (0/1)
   'refit_unit',                                        // 2026-10-27 -- refit the actor's unit subject to a newer roster row unit_type
+  'assign_front',                                      // BL-1427 -- assign unit subject to the actor's front holding tile (null tile unassigns)
+  'set_front_order',                                   // BL-1427 -- set the actor's front holding tile to order (0 hold, 1 push)
 ];
 
 // io::dg::node_count (src/world/digitisation_tree_data.hpp, generated from

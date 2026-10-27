@@ -166,6 +166,8 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::march_unit:
         case corp_verb::halt_unit: // march's stop verb: a nation that may march may halt
         case corp_verb::refit_unit: // Ben, 2026-10-27: a nation refits its own units
+        case corp_verb::assign_front:    // BL-1427: a nation's own units and fronts
+        case corp_verb::set_front_order: // BL-1427
         case corp_verb::place_road:
         case corp_verb::set_trade:
         case corp_verb::clear_trade:
@@ -994,6 +996,12 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             u.order = movement_order{};
             return corp_command_result::applied;
         }
+
+        case corp_verb::assign_front:
+        case corp_verb::set_front_order:
+            // BL-1427 (fronts) T1: the slots exist; the world lane (T2) gives them
+            // their checks and effects. Until then every press is refused, whole.
+            return corp_command_result::rejected_invalid;
 
         case corp_verb::halt_unit:
         {

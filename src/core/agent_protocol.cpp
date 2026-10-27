@@ -174,6 +174,8 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::set_tax_tier:
         case corp_verb::set_unit_obsolete: // BL-1437
         case corp_verb::refit_unit:        // 2026-10-27: the actor's own units
+        case corp_verb::assign_front:      // BL-1427
+        case corp_verb::set_front_order:   // BL-1427
         // BL-1407: every player verb is sent as the nation, these included.
         case corp_verb::survey:
         case corp_verb::hold_convoy:

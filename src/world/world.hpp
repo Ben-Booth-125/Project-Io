@@ -396,6 +396,10 @@ struct world
     std::vector<muster_order> musters;
     uint32_t                  next_muster_id = 1; ///< The id the next hire takes.
 
+    /// BL-1427 (fronts): every front order that is not hold, sorted by (nation, key).
+    /// Fronts themselves are derived (fronts.hpp), never stored.
+    std::vector<front_order_entry> front_orders;
+
     /// Population centre entities keyed by their entity ID. Populated by
     /// generate_population_centres() after tile generation; empty until that
     /// call is made for a body. No AI behaviour in the prototype.

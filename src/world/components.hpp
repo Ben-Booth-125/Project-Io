@@ -1899,6 +1899,11 @@ struct unit_component
 
     /// Days left on the refit; 0 when not refitting.
     int32_t   refit_days = 0;
+
+    /// BL-1427 (fronts): the front this unit is assigned to, named by its key (the
+    /// lowest tile id in the span; fronts.hpp), or `null_entity` when unassigned.
+    /// Set by `assign_front`; kept on its span by `reanchor_fronts`.
+    entity_id front = null_entity;
 };
 
 /// `unit_component::refit_type`'s "not refitting" sentinel. Never a roster index.
@@ -1922,6 +1927,22 @@ struct muster_order
     uint16_t  unit_type      = 0;           ///< Roster row index, as unit_component::type.
     int32_t   days_total     = 0;           ///< The muster's length, for the queue's progress bar.
     int32_t   days_remaining = 0;           ///< Days left; <= 0 completes on the next tick.
+};
+
+/// BL-1427 (fronts; MILITARY.md § Fronts): a front's order. Hold is the default and
+/// is never stored; push is open only toward a neighbour the nation is hostile to.
+enum class front_order : uint8_t
+{
+    hold = 0,
+    push = 1,
+};
+
+/// One stored front order: the nation, the front's key (fronts.hpp), the order.
+struct front_order_entry
+{
+    entity_id   nation = null_entity;
+    entity_id   key    = null_entity;
+    front_order order  = front_order::hold;
 };
 
 /// The count a unit is raised to: `establishment`, or the current count where
