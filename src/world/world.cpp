@@ -368,6 +368,28 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, u.refit_type);
                 fnv1a_i32(h, u.refit_days);
             }
+            // BL-1427 (fronts): the unit's front assignment, folded only while it
+            // has one, behind its own marker, so a world nobody assigns keeps every hash.
+            if (u.front != null_entity)
+            {
+                fnv1a_u32(h, 0x46524E54u); // "FRNT"
+                fnv1a_u32(h, u.front);
+            }
+        }
+    }
+
+    // BL-1427 (fronts): the stored front orders (sorted by (nation, key) by
+    // contract), folded only when there are any, so a world that never pushes
+    // hashes as it did.
+    if (!front_orders.empty())
+    {
+        fnv1a_u32(h, 0x464F5244u); // "FORD"
+        fnv1a_u32(h, static_cast<uint32_t>(front_orders.size()));
+        for (const front_order_entry& e : front_orders)
+        {
+            fnv1a_u32(h, e.nation);
+            fnv1a_u32(h, e.key);
+            fnv1a_u32(h, static_cast<uint32_t>(e.order));
         }
     }
 

@@ -2773,6 +2773,56 @@
    "reason_to_select": "Upgrade the force you have instead of disbanding and re-hiring: the unit keeps its men and condition, and pays only the difference in price. Refit out of contact and at home, and weigh the days it cannot march."
   },
   {
+   "id": "gameplay.assign_front",
+   "family": "gameplay",
+   "surface": "Assign to front on the unit card (and the stack panel for a stack) in the Selection element, for the player's own unit: the fronts of its nation, each named by its neighbour and span. Also a corp_verb (corp_verb::assign_front, 41) on the command seam.",
+   "press": "Select your unit, press Assign to front, and pick a front (or Unassign). The press queues the command, applied through apply_corp_command at the frame's end. Over the seam: COMMAND corp=<nation> verb=41 subject=<unit id> tile=<a tile of the front's span, normally its key; 0 unassigns>.",
+   "args": [
+    {
+     "name": "subject",
+     "type": "entity_id",
+     "meaning": "The unit to assign: one of the actor's own."
+    },
+    {
+     "name": "tile",
+     "type": "entity_id (tile)",
+     "meaning": "Names the front: its key, or any tile of its span (the front keyed by the tile wins where a tile is in two spans). null_entity (0) unassigns."
+    }
+   ],
+   "preconditions": [
+    "The unit exists (rejected_invalid otherwise) and is the actor's own (rejected_not_owner otherwise).",
+    "A non-null `tile` lies in one of the actor's own fronts (rejected_invalid otherwise).",
+    "The assignment changes something: not the same front again, not unassigning an unassigned unit (rejected_state otherwise)."
+   ],
+   "expected_output": "The unit stores the front's key (unit_component::front). From the next economy tick the front moves it: to an evenly spaced slot along the span under hold, or into the neighbour's weakest adjacent province under push, each move a legal march_unit. A manual march on an assigned unit is overridden; unassign to march by hand. The assignment follows the front as the border moves and drops when the front is gone. Saved (world_save_version 62). Rival nations' scorers issue it for their own units (AI_OPPONENT.md § 11, 'Rival nations use fronts').",
+   "reason_to_select": "Hold a border without placing every unit by hand: the front spreads its units along the span and refills gaps as units die or fall back."
+  },
+  {
+   "id": "gameplay.set_front_order",
+   "family": "gameplay",
+   "surface": "The front card's Hold and Push presses in the Selection element, after clicking one of the player's fronts on the canvas. Also a corp_verb (corp_verb::set_front_order, 42) on the command seam.",
+   "press": "Click a front's line on the canvas and press Hold or Push on its card. Over the seam: COMMAND corp=<nation> verb=42 tile=<the front's key, or any tile of its span> order=<0 hold, 1 push>.",
+   "args": [
+    {
+     "name": "tile",
+     "type": "entity_id (tile)",
+     "meaning": "Names the front: its key, or any tile of its span."
+    },
+    {
+     "name": "order",
+     "type": "uint32 (0 or 1)",
+     "meaning": "0 hold, 1 push."
+    }
+   ],
+   "preconditions": [
+    "`tile` lies in one of the actor's own fronts and `order` is 0 or 1 (rejected_invalid otherwise).",
+    "Push only toward a neighbour the actor has declared hostility to, one direction (is_hostile(actor, neighbour)); rejected_state otherwise.",
+    "The order changes (rejected_state otherwise)."
+   ],
+   "expected_output": "Push is stored in world::front_orders under the front's key; hold erases the entry, since hold is the default and never stored. Under push the front's units march into the neighbour's adjacent land province with the lowest defence (the summed unit_strength of the neighbour's units there, ties to the lower province id). A unit already in one of those provinces holds what it took. If the hostility ends, the stored push acts as hold. Saved (world_save_version 62). Rival nations' scorers issue it for their own fronts.",
+   "reason_to_select": "Push where your assigned force clearly outweighs the weakest province across the border; hold everywhere else."
+  },
+  {
    "id": "ledger.military_show_obsolete",
    "family": "ledger",
    "surface": "The Military ledger's Recruit tab (nav rail slot 7): the 'Show obsolete (N)' checkbox above the roster.",

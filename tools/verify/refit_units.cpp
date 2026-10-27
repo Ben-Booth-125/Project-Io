@@ -324,7 +324,10 @@ int main()
         world old;
         std::istringstream in60(v60, std::ios::binary);
         const bool ok60 = read_world_snapshot(old, in60);
-        check(ok60 && v60.size() == bytes.size() - (4 + 10) && !unit_refitting(old.units.at(b))
+        // BL-1427 (v62): today's stream ends with the fronts section, two empty counts
+        // here (8 bytes) after the refits.
+        constexpr std::size_t fronts_tail = 8;
+        check(ok60 && v60.size() == bytes.size() - (4 + 10) - fronts_tail && !unit_refitting(old.units.at(b))
                   && old.units.at(b).type == levy,
               "R5b a v60 stream (14 bytes shorter) reads as no refit");
         check(ok60 && old.units.at(a).establishment == 50 && old.units.at(a).readiness_permille == 600
@@ -344,7 +347,7 @@ int main()
 
         std::string bad = bytes;
         const int16_t no_row = 0x7FFF;
-        std::memcpy(&bad[bad.size() - 6], &no_row, sizeof no_row); // the row's target
+        std::memcpy(&bad[bad.size() - fronts_tail - 6], &no_row, sizeof no_row); // the row's target
         world sentinel;
         std::istringstream inb(bad, std::ios::binary);
         check(!read_world_snapshot(sentinel, inb) && sentinel.units.empty(),

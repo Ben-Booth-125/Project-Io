@@ -7,6 +7,7 @@
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
 #include "corp_ai.hpp"         // run_corp_strategic_step (BL-202 strategic tier)
+#include "fronts.hpp"          // reanchor_fronts, advance_fronts (BL-1427)
 #include "logistics.hpp"       // invalidate_logistics_caches, tile_traversal_cost, intra_body_path (BL-470)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "placement_rules.hpp" // stack_output_scalar (BL-193 building stacks)
@@ -2078,6 +2079,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
 
     economy_report report;
 
+    // BL-1427 (fronts): re-anchor before anything this tick reads a front. On a
+    // freshly loaded world this builds the front cache from the territory the save
+    // carried — the same fronts the saving world held at the end of its last tick
+    // (it re-anchors there too, below) — so a load replays as the original does.
+    reanchor_fronts(w);
 
     // BL-545/BL-546: one tick of the relational substrate's DECAY half, before
     // anything this tick can observe. `run_sentiment_step` is decay-then-fold
@@ -3486,6 +3492,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // can be drawn into a fight that opens on its province.
     advance_musters(w);
     advance_refits(w); // Ben, 2026-10-27: a refit completes before the battle pass too
+    // BL-1427 (fronts; MILITARY.md § Fronts): after the musters and refits (a unit
+    // that finishes either this tick is free to be sent) and BEFORE the battle pass,
+    // so a front's orders are issued against this tick's contacts: a unit already in
+    // a battle is left alone, and the orders issued here are walked by the march
+    // pass below, after the battles - the same "fight before you march out" rule
+    // every other order obeys.
+    advance_fronts(w, reg);
 
     {
         const battle_tick bt = run_battles(w, reg, w.current_day_tick);
@@ -3514,6 +3527,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // the shelf only at the clear, so upkeep draws what earlier ticks left there.)
     run_building_upkeep(w, reg, report);
     phase_stamp(13); // building_upkeep
+
+    // BL-1427 (fronts): re-anchor once more at the tick's end, after everything
+    // that can move a border or kill a unit, so a save taken between ticks holds
+    // keys that name live fronts and the cache (which a load drops) is current.
+    reanchor_fronts(w);
 
     return report;
 }

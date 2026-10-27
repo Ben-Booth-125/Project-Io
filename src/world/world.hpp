@@ -5,6 +5,7 @@
 #include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
 #include "era_band.hpp"     // era_band (BL-1101: the world's own recipe band, below)
 #include "faithful_unordered_map.hpp" // every unordered store below (BL-1034: copies tick as their source)
+#include "fronts.hpp"       // front_cache (BL-1427 fronts, below)
 #include "law.hpp"          // law (BL-343 enacted-law list, below)
 #include "nation_tech.hpp"  // nation_tech_state (BL-1273: the nation holds technology, below)
 #include "nation_budget.hpp" // nation_budget (Sprint N3 T2: the persistent weight map, below)
@@ -399,6 +400,20 @@ struct world
     /// BL-1427 (fronts): every front order that is not hold, sorted by (nation, key).
     /// Fronts themselves are derived (fronts.hpp), never stored.
     std::vector<front_order_entry> front_orders;
+
+    /// BL-1427 (fronts): bumped by `set_tile_nation`, the one owner setter, so the
+    /// front cache below can tell that the territory map moved. Derived, never
+    /// serialised, never hashed; 0 on a fresh or loaded world.
+    std::uint64_t territory_generation = 0;
+
+    /// BL-1427 (fronts): every nation's fronts as of the last `reanchor_fronts`
+    /// (fronts.hpp), stamped with the `territory_generation` they were derived at.
+    /// A DERIVED CACHE: a pure function of `tile_to_nation` and the grids, so it is
+    /// never serialised and never hashed, and a load drops it (clear_derived_state).
+    /// It is kept for one reason beyond speed: when the territory moves, the OLD
+    /// fronts are what tell `reanchor_fronts` which neighbour an assignment faced.
+    /// `std::map`: ascending nation id.
+    front_cache fronts_cache;
 
     /// Population centre entities keyed by their entity ID. Populated by
     /// generate_population_centres() after tile generation; empty until that
@@ -878,6 +893,7 @@ struct world
     {
         tile_to_nation[tile] = nation;
         ++catchment_generation;
+        ++territory_generation; // BL-1427: the front cache reads it
     }
 
     /// Per-body NEAREST LOGISTIC POINT ANCHOR (BL-1117) — see lp_anchor_field. A

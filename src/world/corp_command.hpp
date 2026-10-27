@@ -198,8 +198,8 @@ enum class corp_verb : uint8_t
     // Appended AFTER refit_unit, same append-only rule. MILITARY.md § Fronts. Any
     // nation on its OWN units and fronts; rivals issue both by the grant in
     // AI_OPPONENT.md § 11 ("Rival nations use fronts").
-    assign_front,         ///< Assign unit `subject` to the actor's front whose span holds `tile`, or unassign it when `tile` is null_entity. rejected_not_owner (not the actor's unit) / rejected_invalid (no such front of the actor's).
-    set_front_order,      ///< Set the actor's front whose span holds `tile` to `order` (0 hold, 1 push). rejected_invalid (no such front, or another order) / rejected_state (push toward a neighbour the actor is not hostile to, or no change).
+    assign_front,         ///< Assign unit `subject` to the actor's front whose span holds `tile` (the front KEYED `tile` first: `front_named`), or unassign it when `tile` is null_entity. The unit stores the front's key. rejected_invalid (no such unit, or no such front of the actor's) / rejected_not_owner (not the actor's unit) / rejected_state (already so — the same front, or already unassigned).
+    set_front_order,      ///< Set the actor's front whose span holds `tile` (`front_named`) to `order` (0 hold, 1 push). rejected_invalid (no such front, or another order) / rejected_state (push toward a neighbour the actor is not hostile to, or no change).
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve

@@ -6,6 +6,8 @@
 #include "building_profit.hpp"
 #include "decision_trace.hpp"  // BL-704: opt-in streaming decision sink
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
+#include "battle_system.hpp"   // unit_in_battle (BL-1427: a rival assigns only idle units)
+#include "fronts.hpp"          // BL-1427: a rival uses its fronts
 #include "input_reach.hpp"     // BL-1187: obtainable inputs (the BL-1185 reach)
 #include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
 #include "market_clearing.hpp" // market_for_tile
@@ -1256,6 +1258,111 @@ ranked_site_map rank_extraction_sites(const world& w, const recipe_registry& reg
     }
     return out;
 }
+
+// ---------------------------------------------------------------------------
+// BL-1427 — a rival nation uses its fronts (AI_OPPONENT.md § 11, "Rival nations
+// use fronts", Ben 2026-10-27; MILITARY.md § Fronts). The grant and nothing
+// wider: the nation's OWN idle units onto its OWN fronts, and each of its OWN
+// fronts set to hold or push, through the same two verbs the player's front card
+// issues. It never declares the hostility a push needs (the stance scorer's,
+// BL-450) and never plans past the next order. Pure arithmetic on sorted ids.
+//
+//   ASSIGN. An idle unit — its own, unassigned, no march order, not in a battle,
+//   not refitting, and not standing in the capital province (the capital's force
+//   stays home) — goes to the front with the fewest assigned units per span tile,
+//   ties to the first in (neighbour, key) order. Units are taken in ascending id,
+//   and each assignment counts before the next is placed.
+//   ORDER. A front is set to PUSH when the nation is hostile to its neighbour, a
+//   push target exists, and the strength assigned to it (summed `unit_strength`)
+//   exceeds `k_front_push_margin` times the target province's defence; otherwise
+//   HOLD. Issued only where it differs from the stored order.
+// ---------------------------------------------------------------------------
+
+/// How much stronger a front's assigned force must be than the weakest adjacent
+/// province's defence before a rival pushes: 3:2, a clear but not crushing edge.
+constexpr int64_t k_front_push_margin_num = 3;
+constexpr int64_t k_front_push_margin_den = 2;
+
+void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation, int tick)
+{
+    const std::vector<front> fronts = nation_fronts(w, nation); // a copy: the verbs below may re-anchor
+    if (fronts.empty())
+        return;
+
+    const auto nit = w.nations.find(nation);
+    const uint32_t capital_prov = nit != w.nations.end() && nit->second.capital_tile != null_entity
+                                      ? w.provinces.province_of(nit->second.capital_tile)
+                                      : 0u;
+
+    std::vector<entity_id> own;
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == nation)
+            own.push_back(uid);
+    std::sort(own.begin(), own.end());
+
+    std::vector<std::size_t> count(fronts.size(), 0);
+    std::vector<int64_t>     strength(fronts.size(), 0);
+    const auto index_of = [&](entity_id key) -> int {
+        for (std::size_t i = 0; i < fronts.size(); ++i)
+            if (fronts[i].key == key) return static_cast<int>(i);
+        return -1;
+    };
+    for (const entity_id uid : own)
+    {
+        const unit_component& u = w.units.at(uid);
+        const int i = u.front != null_entity ? index_of(u.front) : -1;
+        if (i >= 0)
+        {
+            ++count[static_cast<std::size_t>(i)];
+            strength[static_cast<std::size_t>(i)] += unit_strength(w, u);
+        }
+    }
+
+    // ASSIGN.
+    for (const entity_id uid : own)
+    {
+        const unit_component& u = w.units.at(uid);
+        if (u.front != null_entity || u.order.dest != null_entity || u.count <= 0
+            || u.position == null_entity || unit_refitting(u) || unit_in_battle(w, uid))
+            continue;
+        if (capital_prov != 0 && w.provinces.province_of(u.position) == capital_prov)
+            continue;
+        std::size_t best = 0;
+        for (std::size_t i = 1; i < fronts.size(); ++i)
+            // count_i / span_i < count_best / span_best, cross-multiplied
+            if (count[i] * fronts[best].span.size() < count[best] * fronts[i].span.size())
+                best = i;
+        corp_command cmd;
+        cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+        cmd.verb = corp_verb::assign_front; cmd.subject = uid; cmd.tile = fronts[best].key;
+        const int64_t s = unit_strength(w, u);
+        if (apply_corp_command(w, reg, cmd) == corp_command_result::applied)
+        {
+            ++count[best];
+            strength[best] += s;
+        }
+    }
+
+    // ORDER.
+    for (std::size_t i = 0; i < fronts.size(); ++i)
+    {
+        const front& f = fronts[i];
+        bool push = false;
+        if (front_may_push(w, f) && strength[i] > 0)
+        {
+            int64_t defence = 0;
+            if (front_push_target(w, f, &defence) != 0)
+                push = strength[i] * k_front_push_margin_den > defence * k_front_push_margin_num;
+        }
+        const front_order want = push ? front_order::push : front_order::hold;
+        if (front_order_of(w, nation, f.key) == want)
+            continue;
+        corp_command cmd;
+        cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+        cmd.verb = corp_verb::set_front_order; cmd.tile = f.key; cmd.order = push ? 1u : 0u;
+        (void)apply_corp_command(w, reg, cmd);
+    }
+}
 } // namespace
 
 bool corp_strategic_eval_due(const world& w, entity_id corp, int tick, const corp_ai_params& p)
@@ -1392,6 +1499,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         if ((tick % k) != (static_cast<int>(index) % k))
             continue;
         report.corps_evaluated.push_back(corp);
+
+        // BL-1427 (AI_OPPONENT.md § 11, "Rival nations use fronts", Ben 2026-10-27):
+        // a nation's own units onto its own fronts, and each front's order. Past the
+        // player guard above, so never the player's nation in a seated session.
+        if (actor.is_nation)
+            score_nation_fronts(w, reg, corp, tick);
 
         // BL-1309 grant (AI_OPPONENT.md § 11, Ben 2026-10-15): a producing build
         // beyond its host nation's Logistic Point reach is scored with the capex of

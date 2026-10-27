@@ -521,8 +521,19 @@ void t6_save(const app_start_world& out)
         if (b.ticks_remaining > 0)
             sync_construction_days(b);
     }
+    // ...and the v62 FRONTS (BL-1427): a pre-fronts stream reads with no unit
+    // assigned and every front holding; a stepped world's rivals have assigned some.
+    // A unit a front marched may have lost supply and so morale, and the v58 combat
+    // state is not in a v51 stream either: it reads with full readiness and morale.
+    for (auto& [uid, u] : base.units)
+    {
+        (void)uid;
+        u.front = null_entity;
+        u.establishment = 0; u.readiness_permille = 1000; u.morale_permille = 1000;
+    }
+    base.front_orders.clear();
     check(ok51 && r51.state_hash(0) == base.state_hash(0), "T6",
-          "...and hashes as the default world less the v56 books, the majors and the v57 day state (the fold is sparse)");
+          "...and hashes as the default world less the v56 books, the majors, the v57 day state and the v62 fronts (the fold is sparse)");
 
     // Bad values refuse whole and leave the target untouched. The FIRST row of
     // the section is ids.front(): id (4) then tier (1) then discontent (4).
