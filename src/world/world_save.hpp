@@ -507,7 +507,16 @@ inline constexpr uint32_t world_save_magic =
 /// id, as (id, establishment, readiness_permille, morale_permille) as i32s. v57 is a
 /// STRICT PREFIX of v58 and is read too (`k_world_save_version_pre_combat`): its units
 /// load with no establishment recorded and full readiness and morale.
-inline constexpr uint32_t world_save_version = 58;
+///
+/// Bumped to 59 (BL-1435, muster queue; MILITARY.md § The muster interface): A TRAILING
+/// MUSTER SECTION after the unit combat state carries `next_muster_id` (u32) and the
+/// queue in issue order, each as (id u32, base id, owner id, unit_type u16, days_total
+/// i32, days_remaining i32). v58 is a STRICT PREFIX of v59 and is read too
+/// (`k_world_save_version_pre_muster`), as a world with an empty queue.
+inline constexpr uint32_t world_save_version = 59;
+
+/// v58, a strict prefix of v59 (the muster section is v59's only addition).
+inline constexpr uint32_t k_world_save_version_pre_muster = 58;
 
 /// v57, a strict prefix of v58 (the unit combat-state section is v58's only addition).
 inline constexpr uint32_t k_world_save_version_pre_combat = 57;
@@ -630,6 +639,10 @@ void write_world_snapshot_pre_days(const world& w, std::ostream& out);
 /// unit combat-state section — so the v57 reader has a real producer
 /// (tools/verify/save_roundtrip). The game never writes it.
 void write_world_snapshot_pre_combat(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1435): @p w written as a v58 stream — today's stream less the
+/// muster section — so the v58 reader has a real producer. The game never writes it.
+void write_world_snapshot_pre_muster(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

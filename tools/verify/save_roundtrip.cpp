@@ -501,7 +501,8 @@ int main()
             rows += canonical_construction_days(b).any() ? 1 : 0;
         // BL-1421 (v58): today's stream carries the unit combat-state section AFTER
         // the days, 4 bytes + 16 a unit, so the days section ends that far from the tail.
-        const std::size_t unit_section = 4 + 16 * wd.units.size();
+        // BL-1435 (v59): the muster section follows it — next id and count, 8 bytes, 22 a row.
+        const std::size_t unit_section = 4 + 16 * wd.units.size() + 8 + 22 * wd.musters.size();
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -562,13 +563,14 @@ int main()
                 ok57 = ok57 && u.establishment == 0 && u.readiness_permille == 1000
                     && u.morale_permille == 1000;
         check(ok57, "P24 a v57 stream reads, its units with no establishment and full readiness and morale");
-        check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size(),
+        const std::size_t muster_section = 8 + 22 * wu.musters.size(); // BL-1435 (v59), after the units
+        check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
         // Untrusted: readiness past 1000 is refused whole. The first row's
         // readiness sits 8 bytes into it (after the id and the establishment).
         std::string bad = b58;
-        const std::size_t row0 = b58.size() - 16 * wu.units.size();
+        const std::size_t row0 = b58.size() - muster_section - 16 * wu.units.size();
         if (have)
         {
             const int32_t over = 1001;

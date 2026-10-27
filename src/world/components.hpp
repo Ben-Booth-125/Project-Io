@@ -1890,6 +1890,20 @@ struct unit_component
     int32_t   morale_permille = 1000;
 };
 
+/// A hire waiting to become a unit (BL-1435, muster queue; MILITARY.md § The
+/// muster interface — "raising takes time", Ben 2026-10-27). `hire_unit` pays and
+/// queues one at the base; each economy tick takes a quarter's days off it, and at
+/// zero it becomes a unit standing on the base's tile.
+struct muster_order
+{
+    uint32_t  id             = 0;           ///< Issue order; unique, ascending.
+    entity_id base           = null_entity; ///< The military_base it musters at.
+    entity_id owner          = null_entity; ///< The nation raising it.
+    uint16_t  unit_type      = 0;           ///< Roster row index, as unit_component::type.
+    int32_t   days_total     = 0;           ///< The muster's length, for the queue's progress bar.
+    int32_t   days_remaining = 0;           ///< Days left; <= 0 completes on the next tick.
+};
+
 /// The count a unit is raised to: `establishment`, or the current count where
 /// none was recorded.
 inline int unit_establishment(const unit_component& u)

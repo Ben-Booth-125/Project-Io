@@ -391,6 +391,11 @@ struct world
     std::vector<std::pair<entity_id, entity_id>>           gen_sea_lane_landings;
     faithful_unordered_map<entity_id, unit_component>             units;
 
+    /// BL-1435 (muster queue): hires waiting to become units, in issue order
+    /// (`muster_order::id` ascending). Saved (world_save_version 59).
+    std::vector<muster_order> musters;
+    uint32_t                  next_muster_id = 1; ///< The id the next hire takes.
+
     /// Population centre entities keyed by their entity ID. Populated by
     /// generate_population_centres() after tile generation; empty until that
     /// call is made for a body. No AI behaviour in the prototype.

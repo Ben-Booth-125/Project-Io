@@ -1477,10 +1477,10 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 58 (BL-1421): THE UNIT COMBAT STATE, the last section. Every
-    // unit, ascending id, as (id, establishment, readiness, morale). A v57 stream ends
-    // before it and is read with full readiness and morale.
-    if (version == world_save_version)
+    // world_save_version 58 (BL-1421): THE UNIT COMBAT STATE. Every unit, ascending
+    // id, as (id, establishment, readiness, morale). A v57 stream ends before it and is
+    // read with full readiness and morale.
+    if (version >= k_world_save_version_pre_muster)
     {
         std::vector<entity_id> ids;
         ids.reserve(w.units.size());
@@ -1497,6 +1497,29 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, u.morale_permille);
         }
     }
+
+    // world_save_version 59 (BL-1435): THE MUSTER QUEUE, the last section —
+    // next_muster_id, then every order in issue order.
+    if (version == world_save_version)
+    {
+        w_u32(out, w.next_muster_id);
+        w_u32(out, static_cast<uint32_t>(w.musters.size()));
+        for (const muster_order& m : w.musters)
+        {
+            w_u32(out, m.id);
+            w_id(out, m.base);
+            w_id(out, m.owner);
+            w_u16(out, m.unit_type);
+            w_i32(out, m.days_total);
+            w_i32(out, m.days_remaining);
+        }
+    }
+}
+
+void write_world_snapshot_pre_muster(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1435): the v58 stream shape — no muster section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_muster);
 }
 
 void write_world_snapshot_pre_combat(const world& w, std::ostream& out)
@@ -1596,7 +1619,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_major      // BL-1404: v54, majors derived
             && version != k_world_save_version_pre_books      // BL-1407: v55, corporations folded
             && version != k_world_save_version_pre_days       // v56: days derived from ticks (Ben, 2026-10-24)
-            && version != k_world_save_version_pre_combat))   // BL-1421: v57, full readiness and morale
+            && version != k_world_save_version_pre_combat     // BL-1421: v57, full readiness and morale
+            && version != k_world_save_version_pre_muster))   // BL-1435: v58, an empty muster queue
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2276,6 +2300,35 @@ bool read_world_snapshot(world& w, std::istream& in)
             uit->second.establishment      = est;
             uit->second.readiness_permille = ready;
             uit->second.morale_permille    = morale;
+        }
+    }
+
+    // v59 (BL-1435): the muster queue. Untrusted: ids strictly ascending, each below
+    // next_muster_id; base and owner real (the base a building, the owner a nation);
+    // days_total in [1, 3650], days_remaining in [-90, days_total]. Refused whole
+    // otherwise. A v58 (and older) stream ends before it: the queue is empty.
+    if (version == world_save_version)
+    {
+        uint32_t next = 0, count = 0;
+        if (!r_u32(in, next) || next == 0 || !r_u32(in, count) || count > 100000)
+            return false;
+        s.next_muster_id = next;
+        s.musters.reserve(count);
+        uint32_t prev = 0;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            muster_order m;
+            if (!(r_u32(in, m.id) && r_id(in, m.base) && r_id(in, m.owner) && r_u16(in, m.unit_type)
+                  && r_i32(in, m.days_total) && r_i32(in, m.days_remaining)))
+                return false;
+            if (m.id == 0 || m.id <= prev || m.id >= next
+                || s.buildings.find(m.base) == s.buildings.end()
+                || s.nations.find(m.owner) == s.nations.end()
+                || m.days_total < 1 || m.days_total > 3650
+                || m.days_remaining < -90 || m.days_remaining > m.days_total)
+                return false;
+            prev = m.id;
+            s.musters.push_back(m);
         }
     }
 

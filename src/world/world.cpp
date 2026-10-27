@@ -363,6 +363,24 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // BL-1435: the muster queue, folded only when non-empty (the battles
+    // precedent) so a world that never hires hashes as it did.
+    if (!musters.empty())
+    {
+        fnv1a_u32(h, 0x4D555354u); // "MUST"
+        fnv1a_u32(h, next_muster_id);
+        fnv1a_u32(h, static_cast<uint32_t>(musters.size()));
+        for (const muster_order& m : musters)
+        {
+            fnv1a_u32(h, m.id);
+            fnv1a_u32(h, m.base);
+            fnv1a_u32(h, m.owner);
+            fnv1a_u32(h, m.unit_type);
+            fnv1a_i32(h, m.days_total);
+            fnv1a_i32(h, m.days_remaining);
+        }
+    }
+
     // The manual trades (BL-1266). Hashed in STORED order, not sorted: an
     // owner's reserve is spent in placement order, so the sequence is part of
     // the state. `next_trade_id` is folded too, so a world that has set and
