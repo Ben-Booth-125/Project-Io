@@ -2813,11 +2813,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the signal that a marker click should land on the TILE (grouped stack
     // list) rather than assuming the whole hex is one installation.
     static std::unordered_map<entity_id, int>            tile_bld_count;
-    // Unit groups per province (BL-575) — see the pre-pass below. Keyed on the
-    // SAME stamp as the maps above, since a hire/disband changes w.units.size()
-    // and a march order's actual tile move only happens on a tick (already
-    // caught by day_tick).
-    static std::unordered_map<uint32_t, std::vector<unit_marker_summary>> province_units;
     // BL-1145 (a province's readers take its anchor, not its lowest tile): the
     // tile each (province, owner) unit group DRAWS on — its lowest-id unit's own
     // tile, so the marker sits where the army stands — and the tile each
@@ -2868,14 +2863,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
 
-        // Unit groups per province (BL-575). A unit's command grain is the
-        // province (BL-511's march_unit retarget), so units sharing a province
-        // AND an owner draw as one marker with a count badge, exactly as the
-        // "+N" building-stack badge above groups several buildings on one tile.
-        // Iterated in ascending unit-id order so `sample_unit` (the group's
-        // click/hover target) is deterministically the LOWEST id in the group,
-        // the same "lowest id wins" precedent tile_to_bld uses just above.
-        province_units.clear();
+        // Unit groups per (TILE, owner) (BL-1425; MILITARY.md § Land — on the
+        // canvas: "the number of units on that tile"). Units of one owner on one
+        // tile draw as ONE counter carrying their count, summed men and
+        // establishment (the HP bar) and men-weighted readiness. This replaces
+        // BL-575's per-province grouping, which drew a whole province's force on
+        // its lowest unit's tile. Iterated in ascending unit id, so each group's
+        // `sample_unit` (its click/hover target) is the LOWEST id on the tile —
+        // the "lowest id wins" precedent tile_to_bld uses above — and groups on a
+        // tile stand in the order their lowest units were raised.
+        tile_units.clear();
         {
             std::vector<entity_id> unit_ids;
             unit_ids.reserve(w.units.size());
@@ -2885,40 +2882,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (const entity_id uid : unit_ids)
             {
                 const auto& uc = w.units.at(uid);
+                if (uc.count <= 0)
+                    continue;
                 const auto utile_it = w.tiles.find(uc.position);
                 if (utile_it == w.tiles.end() || utile_it->second.body != state.active_body)
                     continue;
-                const uint32_t upid = w.provinces.province_of(uc.position);
-                if (upid == 0)
+                if (w.provinces.province_of(uc.position) == 0)
                     continue;
-                std::vector<unit_marker_summary>& groups = province_units[upid];
+                std::vector<unit_marker_summary>& groups = tile_units[uc.position];
                 auto grp_it = std::find_if(groups.begin(), groups.end(),
                     [&](const unit_marker_summary& g) { return g.owner == uc.owner; });
                 if (grp_it == groups.end())
                 {
-                    // BL-575 stub: `committed` stays false — no writer sets it
-                    // true until BL-573 (wave 4) adds the real per-unit flag.
-                    groups.push_back({ uc.owner, uid, 1, /*committed=*/false });
+                    unit_marker_summary g;
+                    g.owner       = uc.owner;
+                    g.sample_unit = uid;
+                    groups.push_back(g);
+                    grp_it = groups.end() - 1;
                 }
-                else
-                {
-                    ++grp_it->count;
-                }
+                ++grp_it->count;
+                grp_it->men           += uc.count;
+                grp_it->establishment += unit_establishment(uc);
+                grp_it->ready_men     += static_cast<long long>(uc.count) * uc.readiness_permille;
             }
         }
-
-        // Each group draws on its sample (lowest-id) unit's own tile. A tile
-        // lies in exactly one province, so every group landing on a tile comes
-        // from ONE province's vector, in that vector's own (ascending-unit-id)
-        // order — the unordered walk of `province_units` cannot reorder them.
-        tile_units.clear();
-        for (const auto& [upid, groups] : province_units)
-            for (const unit_marker_summary& g : groups)
-            {
-                const auto uit = w.units.find(g.sample_unit);
-                if (uit != w.units.end())
-                    tile_units[uit->second.position].push_back(g);
-            }
 
         // The battle glyph's tile per province of this body: its anchor.
         province_mark_tile.clear();
@@ -5996,21 +5983,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
-            // UNIT MARKERS (BL-575). Grouped at the province grain like the
-            // battle marker just above: drawn once per (province, owner)
-            // GROUP, not once per unit or per tile — a unit's command grain is
-            // the province (BL-511's march_unit retarget), so a large
-            // province full of units reads as a handful of markers with count
-            // badges rather than a scatter. Offset BELOW the hex centre so it
-            // never sits directly under the battle glyph, which claims the
-            // centre when a fight is live here — the two can both be true at
-            // once, since a battle needs forces present.
-            //
-            // WHERE (BL-1145): on the group's lowest-id unit's OWN tile, not the
-            // province's lowest-id tile — in a province of a thousand tiles that
-            // tile can lie far from every unit in it, leaving an army on screen
-            // with no marker. Groups whose sample units share a tile spread
-            // side by side, as before.
+            // UNIT COUNTERS (BL-1425; MILITARY.md § Land — on the canvas). One
+            // counter per (tile, owner): the units of one owner standing on this
+            // tile, their count, HP and readiness. Offset BELOW the hex centre so
+            // it never sits directly under the battle glyph, which claims the
+            // centre when a fight is live here — the two can both be true at once,
+            // since a battle needs forces present. Several owners on one tile
+            // stand side by side.
             if ((tflags & 4u) && draw_r >= 6.0f && !tile_units.empty() && prov_id_of() != 0)
             {
                 {
@@ -6018,29 +5997,31 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     if (pu_it != tile_units.end() && !pu_it->second.empty())
                     {
                         const std::vector<unit_marker_summary>& groups = pu_it->second;
-                        const float ur      = std::max(2.5f, draw_r * 0.30f);
-                        const float spacing = ur * 2.4f;
-                        const float uy      = cy + draw_r * 0.62f;
+                        // BL-1425: a COUNTER per (tile, owner) — 2.2ur wide, 1.5ur
+                        // tall — WITHIN the tile (Ben, 2026-10-26: "rectangles within
+                        // tiles"): at ur = 0.36 r, centred half a radius below the
+                        // hex centre, its lower corners meet the hex's slanted sides
+                        // (half-width 0.40 r at 0.77 r down). Several owners on one
+                        // tile stand side by side and may then overhang it.
+                        const float ur      = std::max(3.0f, draw_r * 0.36f);
+                        const float spacing = ur * 2.45f;
+                        const float uy      = cy + draw_r * 0.50f;
                         const float start_x = cx - spacing * (static_cast<float>(groups.size() - 1) * 0.5f);
                         for (std::size_t gi = 0; gi < groups.size(); ++gi)
                         {
                             const unit_marker_summary& grp = groups[gi];
                             const ImVec2 mpos{ start_x + spacing * static_cast<float>(gi), uy };
                             const ImU32  fill = corp_identity(grp.owner);
-                            icons::unit_marker(dl, mpos, ur, fill, grp.committed);
-
-                            // "+N" stack badge — the same k/N text-overlay idiom the
-                            // building stack badge and the survey badge both use, for
-                            // a group of more than one unit entity.
-                            if (grp.count > 1)
-                            {
-                                char nbuf[8];
-                                std::snprintf(nbuf, sizeof nbuf, "+%d", grp.count - 1);
-                                const ImVec2 bpos{ mpos.x + ur * 0.85f, mpos.y + ur * 0.85f };
-                                dl->AddCircleFilled(bpos, 7.0f, IM_COL32(18, 20, 26, 225), 12);
-                                dl->AddText({bpos.x - 6.0f, bpos.y - 6.0f},
-                                            IM_COL32(230, 230, 235, 235), nbuf); // fit-exempt: on-canvas marker badge, no containing box
-                            }
+                            // HP is men over establishment; readiness men-weighted.
+                            // The bars are the player's own units' only (BL-068's
+                            // rule that a rival's internals stay private — the
+                            // battle card's precedent; NR-1088 asks Ben).
+                            const float hp = grp.establishment > 0
+                                ? static_cast<float>(grp.men) / static_cast<float>(grp.establishment) : 0.0f;
+                            const float ready = grp.men > 0
+                                ? static_cast<float>(grp.ready_men) / static_cast<float>(grp.men) / 1000.0f : 0.0f;
+                            icons::unit_counter(dl, mpos, ur, fill, grp.count, hp, ready,
+                                                /*show_bars=*/grp.owner == player_owner);
 
                             // Hit zone (BL-031/BL-059/BL-575): the group's LOWEST-id
                             // unit is the click/hover target — same "lowest id wins"
@@ -6049,7 +6030,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             hz.id     = grp.sample_unit;
                             hz.kind   = marker_hit_zone::kind::unit;
                             hz.centre = mpos;
-                            hz.radius = ur * 2.0f;
+                            hz.radius = ur * 1.3f; // BL-1425: the counter's half-width, and a little over
                             state.marker_hit_zones.push_back(hz);
                         }
                     }

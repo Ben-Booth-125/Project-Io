@@ -1313,8 +1313,38 @@ std::vector<unit_page> unit_pages(const world& w, entity_id id)
 // BL-454 adds the upkeep line beneath it: a unit's per-tick credit wage and its
 // goods draw. Both read the SAME resolve_unit_upkeep the budget and the unit
 // pass read, so the card cannot disagree with the money.
+/// One labelled condition bar (BL-1425): label and value on a line, the bar beneath,
+/// in the colour the canvas counter uses for the same quantity.
+void draw_unit_condition_bar(const char* label, float share, ImU32 col, const char* value)
+{
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", label);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", value);
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImGui::ColorConvertU32ToFloat4(col));
+    ImGui::ProgressBar(std::clamp(share, 0.0f, 1.0f), ImVec2(-1.0f, 6.0f), "");
+    ImGui::PopStyleColor();
+}
+
 void draw_unit_strength_page(const world& w, const recipe_registry& reg, const unit_component& u)
 {
+    // BL-1425: THE FIGHT'S STATE FIRST (MILITARY.md § Land — the unit's stats) —
+    // HP, readiness, morale, the three numbers the canvas counter and the land
+    // round read. The player's own units only: a rival's internals stay private
+    // (BL-068, the battle card's precedent; NR-1088 asks Ben).
+    if (u.owner == player_actor(w) || u.owner == w.player_entity)
+    {
+        char v[48];
+        const int est = unit_establishment(u);
+        std::snprintf(v, sizeof v, "%d / %d men", u.count, est);
+        draw_unit_condition_bar("HP", est > 0 ? static_cast<float>(u.count) / est : 0.0f,
+                                palette::unit_hp, v);
+        std::snprintf(v, sizeof v, "%.0f%%", u.readiness_permille / 10.0f);
+        draw_unit_condition_bar("Readiness", u.readiness_permille / 1000.0f, palette::unit_readiness, v);
+        std::snprintf(v, sizeof v, "%.0f%%", u.morale_permille / 10.0f);
+        draw_unit_condition_bar("Morale", u.morale_permille / 1000.0f, palette::unit_morale, v);
+        ImGui::Spacing();
+    }
+
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Strength");
     ImGui::Text("%lld", static_cast<long long>(unit_strength(w, u)));
     ImGui::TextDisabled("%d x %.2f quality x %.2f supply",
@@ -1365,6 +1395,22 @@ void draw_unit_roster_page(const world& w, const unit_component& u)
 {
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Type");
     ImGui::Text("%s", unit_roster_display_name(u.type).c_str());
+
+    // BL-1425: the land class the row fights as, and the numbers the round reads
+    // (per man, quality-scaled; MILITARY.md § Land — the classes).
+    {
+        static constexpr const char* k_class_names[land_class_count] = {
+            "Infantry", "Motorised infantry", "Mechanised infantry", "Armour",
+            "Light armour", "Artillery", "Air defence", "Not a land fighter",
+        };
+        const std::vector<roster_row>& table = unit_roster_table();
+        const land_class cls = u.type < table.size() ? land_class_for(table[u.type]) : land_class::infantry;
+        const land_combat_stats st = unit_land_stats(u);
+        ImGui::Spacing();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Fights as");
+        ImGui::Text("%s", k_class_names[static_cast<int>(cls)]);
+        ImGui::TextDisabled("soft %d  hard %d  hardness %d%%", st.soft, st.hard, st.hardness / 10);
+    }
     ImGui::Spacing();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Owner");
     const char* owner_name = owner_display_name(w, u.owner); // BL-1406: a nation's unit

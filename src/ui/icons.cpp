@@ -3,7 +3,9 @@
 #include "presentation.hpp"
 
 #include <algorithm>
+#include <cfloat> // FLT_MAX — unit_counter's text measure
 #include <cmath>
+#include <cstdio> // std::snprintf — unit_counter's count
 
 namespace ui::icons {
 
@@ -1259,6 +1261,60 @@ void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool commit
         constexpr ImU32 kCommittedRing = IM_COL32(255, 195, 60, 230);
         dl->AddCircle(centre, r * 1.20f, kCommittedRing, 20, 2.0f);
     }
+}
+
+void unit_counter(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count,
+                  float hp, float readiness, bool show_bars)
+{
+    // A counter, not a figure (MILITARY.md § Land — on the canvas): a dark plate
+    // with the owner's colour as a band down its left edge, the count in the
+    // rest, and two condition bars along the bottom. Dark plate rather than an
+    // owner-filled one so the count and the bars read on every identity colour.
+    const float hw = r * 1.10f, hh = r * 0.75f;
+    const ImVec2 tl{ centre.x - hw, centre.y - hh };
+    const ImVec2 br{ centre.x + hw, centre.y + hh };
+    const float  rounding = std::max(1.0f, r * 0.12f);
+    dl->AddRectFilled(tl, br, IM_COL32(18, 20, 26, 235), rounding);
+
+    const float band_w = hw * 2.0f * 0.22f;
+    dl->AddRectFilled(tl, { tl.x + band_w, br.y }, fill, rounding, ImDrawFlags_RoundCornersLeft);
+
+    // The bars: HP over readiness, each a dim track and a filled share.
+    const float inner_l = tl.x + band_w + r * 0.12f;
+    const float inner_r = br.x - r * 0.12f;
+    const float bar_h   = std::max(1.0f, r * 0.18f);
+    const float gap     = std::max(1.0f, r * 0.08f);
+    const float ready_b = br.y - r * 0.12f;
+    const float ready_t = ready_b - bar_h;
+    const float hp_b    = ready_t - gap;
+    const float hp_t    = hp_b - bar_h;
+    if (show_bars)
+    {
+        auto bar = [&](float t, float b, float share, ImU32 col) {
+            dl->AddRectFilled({ inner_l, t }, { inner_r, b }, IM_COL32(60, 64, 74, 255));
+            const float s = std::clamp(share, 0.0f, 1.0f);
+            if (s > 0.0f)
+                dl->AddRectFilled({ inner_l, t }, { inner_l + (inner_r - inner_l) * s, b }, col);
+        };
+        bar(hp_t, hp_b, hp, palette::unit_hp);
+        bar(ready_t, ready_b, readiness, palette::unit_readiness);
+    }
+
+    // The count, in what is left above the bars — only where it can be read.
+    const float text_bottom = show_bars ? hp_t - gap : br.y;
+    const float text_h      = text_bottom - tl.y;
+    if (text_h >= 9.0f && count > 0)
+    {
+        char buf[8];
+        std::snprintf(buf, sizeof buf, "%d", count);
+        ImFont*     font = ImGui::GetFont();
+        const float size = std::min(ImGui::GetFontSize(), text_h * 0.95f);
+        const ImVec2 ts  = font->CalcTextSizeA(size, FLT_MAX, 0.0f, buf);
+        const ImVec2 at{ (inner_l + inner_r) * 0.5f - ts.x * 0.5f, tl.y + (text_h - ts.y) * 0.5f };
+        dl->AddText(font, size, at, IM_COL32(235, 235, 240, 255), buf); // fit-exempt: on-canvas counter, sized to its own plate
+    }
+
+    dl->AddRect(tl, br, outline, rounding, 0, 1.0f);
 }
 
 void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour)

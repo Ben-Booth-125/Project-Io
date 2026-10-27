@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*6 entries — 6 open, 0 resolved.*
+*7 entries — 7 open, 0 resolved.*
 
 ---
 
@@ -103,6 +103,21 @@ Ben ruled tactical nuclear use permitted and strategic never fired (MILITARY.md 
 > **Recommendation:** Keep all six; (3) is the one to feel in play.
 
 *Files: `src/world/campaign_battle.cpp`, `src/world/battle_system.cpp`, `src/world/unit_roster.cpp`, `docs/military/MILITARY.md`*
+
+### NR-1088 — Should a rival's unit counter show its HP and readiness?
+*question · raised 2026-10-27 · from BL-1425 (unit counter render)*
+
+The counter and the unit card show HP, readiness and morale for the player's own units only. A rival's counter shows its owner colour and unit count, and its card shows no condition bars. This follows BL-068 (a rival's internals stay private) as the battle card already applies it. Your brief said units show HP and readiness, without saying whose.
+
+**Why it matters.** Seeing a rival's spent units is how a player picks where to push, and fronts (BL-1427) will lean on it; but it is a widening of what the player sees of another nation, which is yours to rule.
+
+- A: own units only (as built)
+- B: everyone's bars always
+- C: a rival's bars only where the player has units in contact or a recon satellite overhead (the intelligence layer, BL-1431)
+
+> **Recommendation:** C, with A until satellites exist: it makes intelligence a thing worth buying.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `src/ui/selection_panel.cpp`, `docs/ui/DISCOVERY.md`*
 
 ---
 

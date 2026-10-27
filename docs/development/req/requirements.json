@@ -7501,6 +7501,49 @@
      "notes": "world_determinism ALL PASS; save_roundtrip OK incl. P24 (v58 round-trip by value, v57 reads with defaults, readiness 1001 refused) and P6 (a mid-fight battle continues identically after load); battle_engagement_harness B21a (a fully supplied world that never fights hashes as before) and B21b (an unsupplied unit's morale drift moves the hash, by design). market_viability FULL 16 seeds identical to the BL-1408 reading on 71e32545: G1 93.4 G1t50 86.6 G1b 3.7 G2 144.4 G3 100.0. OWED: player_seed_sweep --digest-check fails 16/16 on D_land, D_settle and D_seat. D_land is taken before any tick, so its move is the v58 stream itself (version byte and unit section); D_settle/D_seat may also carry morale drift toward supply. Re-bless is Ben's call. RE-BLESSED 2026-10-27 on Ben's go after the shape probe: rebless_shape_probe ROW and MIX lines identical on all 16 seeds between e205c8f0 (before) and 9f68dcff (after); the 16 player_seed_sweep pins re-pinned (D_search unmoved on 16; D_land, D_settle, D_seat moved by the v58 stream and morale drift). Recheck: par_seeds --digest-check, 16 of 16 rows PASS (each shard 1/1 PASS; its exit 3 is the harness's partial-coverage code for a one-seed run)."
     }
    ]
+  },
+  {
+   "brief": "unit-counter-render",
+   "title": "BL-1425 - A land unit is a rectangle in its tile: unit count, HP bar, readiness bar",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1425 - sprint 58 (Ben, 2026-10-27: \"the rectangle in the tile with unit count, HP bar and readiness bar, and show readiness and morale on the unit card\")",
+   "batch": "sprint-58",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: unit_counter capture",
+      "live: click a garrison counter"
+     ],
+     "requirement": "Units on the Planetary canvas group per (tile, owner) and draw as a rectangle in the tile: owner colour, the number of units on that tile, an HP bar (men over establishment) and a readiness bar (men-weighted). A click on it selects the group's lowest-id unit.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "visual: unit_counter capture",
+      "live: open a unit card"
+     ],
+     "requirement": "The unit card shows HP (men / establishment), readiness and morale, each with its bar, and the unit's land class with its soft attack, hard attack and hardness.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "visual: unit_counter capture"
+     ],
+     "requirement": "A rival's counter shows its owner and unit count; its HP and readiness bars are the player's own units' only until Ben rules otherwise (NR, rival disclosure).",
+     "notes": null
+    }
+   ]
   }
  ]
 }

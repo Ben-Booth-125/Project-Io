@@ -6056,6 +6056,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["owner"] = static_cast<unsigned int>(u.owner);
             row["count"] = u.count;
             row["type"]  = static_cast<int>(u.type);
+            // BL-1425: whose unit — the counter draws its bars for the player's own.
+            row["player"] = (u.owner == player_actor(m_world) || u.owner == m_world.player_entity);
             if (const auto tit = m_world.tiles.find(u.position); tit != m_world.tiles.end())
             {
                 row["col"] = tit->second.grid_x;
@@ -6324,6 +6326,18 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 break;
             }
         }
+    });
+    // BL-1425: select the unit @p id, as a click on its counter does (a marker hit:
+    // no province mirror). Non-mutating. Returns false and selects nothing for an
+    // unknown id.
+    v.set_function("select_unit", [this](unsigned id) -> bool {
+        const entity_id uid = static_cast<entity_id>(id);
+        if (m_world.units.find(uid) == m_world.units.end())
+            return false;
+        m_ui.selected_entity      = uid;
+        m_ui.selected_province    = 0;
+        m_ui.province_sync_entity = uid;
+        return true;
     });
     // Switch the construction panel's sub-view (0 = Construction/queue, 1 = Buildings/
     // management detail) so a script can capture the building-management screen, which

@@ -161,6 +161,28 @@
     "docs/military/MILITARY.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1088",
+   "title": "Should a rival's unit counter show its HP and readiness?",
+   "raised": "2026-10-27",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1425 (unit counter render)",
+   "what": "The counter and the unit card show HP, readiness and morale for the player's own units only. A rival's counter shows its owner colour and unit count, and its card shows no condition bars. This follows BL-068 (a rival's internals stay private) as the battle card already applies it. Your brief said units show HP and readiness, without saying whose.",
+   "why_it_matters": "Seeing a rival's spent units is how a player picks where to push, and fronts (BL-1427) will lean on it; but it is a widening of what the player sees of another nation, which is yours to rule.",
+   "options": [
+    "A: own units only (as built)",
+    "B: everyone's bars always",
+    "C: a rival's bars only where the player has units in contact or a recon satellite overhead (the intelligence layer, BL-1431)"
+   ],
+   "recommendation": "C, with A until satellites exist: it makes intelligence a thing worth buying.",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp",
+    "docs/ui/DISCOVERY.md"
+   ],
+   "resolution": null
   }
  ]
 }

@@ -101,6 +101,11 @@ namespace palette {
 // --- value direction (budget deltas, price moves, supply/demand balance) ---
 inline constexpr ImU32 positive = IM_COL32(110, 200, 120, 255); ///< Profit, surplus, gain.
 inline constexpr ImU32 negative = IM_COL32(216, 100,  96, 255); ///< Loss, deficit, drop.
+
+// --- a land unit's condition (BL-1425; MILITARY.md § Land — the unit's stats) ---
+inline constexpr ImU32 unit_hp        = IM_COL32(110, 200, 120, 255); ///< Men fit to fight — `positive`'s green.
+inline constexpr ImU32 unit_readiness = IM_COL32(232, 186,  72, 255); ///< Cohesion in contact — amber, distinct from HP.
+inline constexpr ImU32 unit_morale    = IM_COL32(120, 160, 230, 255); ///< Will to fight — blue, the card only.
 inline constexpr ImU32 neutral  = IM_COL32(170, 175, 185, 255); ///< No change / not applicable.
 
 // --- the placement lens (Ben, 2026-10-25; LENSES.md § The placement lens) ---

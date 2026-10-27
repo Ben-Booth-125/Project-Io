@@ -168,6 +168,11 @@ struct unit_marker_summary
     entity_id sample_unit = null_entity; ///< Lowest-id unit in the group — the marker's click/hover target (marker_hit_zone::id).
     int       count       = 0;           ///< Number of unit ENTITIES in the group (not summed manpower).
 
+    // BL-1425: the counter's two bars, summed over the group's units.
+    long long men           = 0; ///< Men standing (HP).
+    long long establishment = 0; ///< The count the units are raised to (unit_establishment).
+    long long ready_men     = 0; ///< Sum of men x readiness_permille: / men / 1000 is the men-weighted readiness.
+
     /// Contract-committed stub (BL-575, wave 1). Always false — no writer sets
     /// it true yet. BL-573 (wave 4 of the same batch) adds the real per-unit
     /// committed flag this will fold from; left here now, with the ring already

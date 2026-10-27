@@ -515,6 +515,14 @@ void acquisition(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 ///                  landing needs no further change here.
 void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool committed);
 
+/// BL-1425: a land unit COUNTER — a rectangle 2.2r wide and 1.5r tall centred on
+/// @p centre. An owner-colour band (@p fill) on its left; the number of units on
+/// the tile (@p count); and, when @p show_bars, an HP bar (@p hp, 0..1, men over
+/// establishment) over a readiness bar (@p readiness, 0..1). The count is printed
+/// only where the rectangle is tall enough to read it.
+void unit_counter(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count,
+                  float hp, float readiness, bool show_bars);
+
 /// Draw a settlement marker — a small skyline whose number of towers grows with
 /// @p tier (1 = outpost … 5 = metropolis) — in @p colour. The civilisation read on
 /// the Planetary canvas (population centres, BL-083); tier is carried by the glyph

@@ -205,7 +205,10 @@ and drain labour widely; professionals cost wages and are fewer and better.
 ### Land — on the canvas
 
 A land unit is drawn as a **rectangle within its tile**, showing how many units stand there, their
-HP and their readiness. The class glyph comes from `src/ui/icons.*`.
+HP and their readiness. One rectangle stands for each owner on the tile, marked with the owner's
+colour; HP is men over establishment, readiness men-weighted. The bars are the player's own units'
+(a rival's internals stay private, BL-068). The unit card carries HP, readiness and morale, and
+the land class the unit fights as (`../ui/ICONS.md` § Entity markers).
 
 ### Fortifications
 
