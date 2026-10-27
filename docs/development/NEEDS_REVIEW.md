@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*7 entries — 6 open, 1 resolved.*
+*9 entries — 8 open, 1 resolved.*
 
 ---
 
@@ -105,6 +105,35 @@ The counter and the unit card show HP, readiness and morale for the player's own
 > **Recommendation:** C, with A until satellites exist: it makes intelligence a thing worth buying.
 
 *Files: `src/ui/body_surface_canvas.cpp`, `src/ui/selection_panel.cpp`, `docs/ui/DISCOVERY.md`*
+
+### NR-1089 — Refit: the calls taken on your behalf
+*decision · raised 2026-10-27 · from sprint 58 refit lane (Ben, 2026-10-27: "add refitting a unit's type from selection to a newer compatible model")*
+
+Compatible means the same land class and a newer row: a later band, or the same band with a higher power. Credits are the hire price difference (hire_cost_per_power x the power gap, floored at 0) plus the target row's goods in full. It takes the target's muster days. The unit must stand on its own nation's ground, out of battle, and cannot march while refitting. Men, readiness and morale are kept. A refit clears the unit's standing march order. Rival nations never refit.
+
+**Why it matters.** Each is a balance or feel call. Charging the full goods makes kit upgrades cost as much as new kit; clearing the march order is a choice the brief did not make.
+
+- A: keep all as built
+- B: change one (say which)
+
+> **Recommendation:** A. Revisit the price once kit and designs (BL-1434, BL-1436) give refits more to buy.
+
+*Files: `docs/military/MILITARY.md`, `src/world/corp_command.cpp`*
+
+### NR-1090 — "Refit" now names two things
+*question · raised 2026-10-27 · from sprint 58 refit lane*
+
+MILITARY.md § Land — equipment, refit and manpower already uses "refit" for refilling a wounded unit's HP. The new verb uses it for changing a unit's type. The doc says they are distinct, but GLOSSARY.md settles neither.
+
+**Why it matters.** One word for two mechanics confuses the player and the action dictionary.
+
+- A: "Refit" is the type change; the HP refill becomes "Replenish"
+- B: keep "Refit" for HP; the type change becomes "Upgrade"
+- C: leave both
+
+> **Recommendation:** A. The button on the unit card already reads Refit, and replenish is the military term for refilling men and kit.
+
+*Files: `docs/military/MILITARY.md`, `docs/GLOSSARY.md`*
 
 ---
 

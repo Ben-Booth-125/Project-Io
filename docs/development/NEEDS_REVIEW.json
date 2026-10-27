@@ -183,6 +183,47 @@
     "docs/ui/DISCOVERY.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1089",
+   "title": "Refit: the calls taken on your behalf",
+   "raised": "2026-10-27",
+   "kind": "decision",
+   "status": "open",
+   "source": "sprint 58 refit lane (Ben, 2026-10-27: \"add refitting a unit's type from selection to a newer compatible model\")",
+   "what": "Compatible means the same land class and a newer row: a later band, or the same band with a higher power. Credits are the hire price difference (hire_cost_per_power x the power gap, floored at 0) plus the target row's goods in full. It takes the target's muster days. The unit must stand on its own nation's ground, out of battle, and cannot march while refitting. Men, readiness and morale are kept. A refit clears the unit's standing march order. Rival nations never refit.",
+   "why_it_matters": "Each is a balance or feel call. Charging the full goods makes kit upgrades cost as much as new kit; clearing the march order is a choice the brief did not make.",
+   "options": [
+    "A: keep all as built",
+    "B: change one (say which)"
+   ],
+   "recommendation": "A. Revisit the price once kit and designs (BL-1434, BL-1436) give refits more to buy.",
+   "files": [
+    "docs/military/MILITARY.md",
+    "src/world/corp_command.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1090",
+   "title": "\"Refit\" now names two things",
+   "raised": "2026-10-27",
+   "kind": "question",
+   "status": "open",
+   "source": "sprint 58 refit lane",
+   "what": "MILITARY.md § Land — equipment, refit and manpower already uses \"refit\" for refilling a wounded unit's HP. The new verb uses it for changing a unit's type. The doc says they are distinct, but GLOSSARY.md settles neither.",
+   "why_it_matters": "One word for two mechanics confuses the player and the action dictionary.",
+   "options": [
+    "A: \"Refit\" is the type change; the HP refill becomes \"Replenish\"",
+    "B: keep \"Refit\" for HP; the type change becomes \"Upgrade\"",
+    "C: leave both"
+   ],
+   "recommendation": "A. The button on the unit card already reads Refit, and replenish is the military term for refilling men and kit.",
+   "files": [
+    "docs/military/MILITARY.md",
+    "docs/GLOSSARY.md"
+   ],
+   "resolution": null
   }
  ]
 }
