@@ -570,6 +570,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 .type     = cmd.unit_type,
                 .supply_factor_permille = 1000, // raised fully supplied (BL-454)
                 .muster_base            = muster_base,
+                .establishment          = hire_batch_manpower, // BL-1421: the HP bar's full mark
             };
             if (out_building)
                 *out_building = unit;

@@ -2007,6 +2007,7 @@ void place_garrison(world& w, entity_id nation, uint32_t province_id, entity_id 
     uc.owner                  = nation;               // a nation, not a corp — the fourth writer
     uc.position                = post;
     uc.count                   = count;
+    uc.establishment           = count; // BL-1421: the HP bar's full mark
     uc.type                    = roster_row;
     uc.supply_factor_permille  = 1000;
     // uc.order stays default (dest == null_entity): STATIC by ruling — "a

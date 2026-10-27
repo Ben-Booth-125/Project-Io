@@ -351,3 +351,61 @@ army_stack_entry unit_to_stack_entry(const world& w, const unit_component& u)
     e.type_power_mod = row ? row->power_mod : 0;
     return e;
 }
+
+// ---------------------------------------------------------------------------
+// Land classes (BL-1421)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Per man per round. The ratios carry the design (MILITARY.md § Land — the
+// classes): infantry defends best and hits armour least; armour hits hard and is
+// hard; artillery hits soft targets hardest and cannot hold; air defence is a
+// passenger in a ground fight. The absolute scale is set against
+// campaign_battle_params (campaign_battle_harness prints the curve).
+constexpr std::array<land_combat_stats, land_class_count> k_land_stats = {{
+    //  soft  hard  hardness defence breakthrough
+    {   60,   15,     0,      90,     25 }, // infantry
+    {   60,   15,   100,      70,     35 }, // motorised
+    {   70,   45,   600,      70,     70 }, // mechanised
+    {  100,  140,   900,      35,    120 }, // armour
+    {   90,   25,   500,      25,     70 }, // light armour
+    {  160,   25,   100,      15,     15 }, // artillery
+    {   10,   10,   200,      20,      5 }, // air defence
+    {    0,    0,     0,       5,      0 }, // none
+}};
+
+} // namespace
+
+const land_combat_stats& land_class_stats(land_class c)
+{
+    const auto i = static_cast<std::size_t>(c);
+    return k_land_stats[i < k_land_stats.size() ? i : static_cast<std::size_t>(land_class::none)];
+}
+
+land_class land_class_for(const roster_row& r)
+{
+    switch (r.cls)
+    {
+        case unit_class::infantry: return land_class::infantry;
+        case unit_class::ranged:   return land_class::infantry;
+        case unit_class::cavalry:  return r.band == roster_band::industrial ? land_class::mechanised
+                                                                            : land_class::light_armour;
+        case unit_class::siege:    return land_class::artillery;
+        case unit_class::naval:    return land_class::none;
+    }
+    return land_class::infantry;
+}
+
+land_combat_stats unit_land_stats(const unit_component& u)
+{
+    const roster_row* row = row_or_null(u.type);
+    land_combat_stats s = land_class_stats(row ? land_class_for(*row) : land_class::infantry);
+    const int64_t q = roster_type_quality_permille(u.type);
+    auto scale = [q](int v) { return static_cast<int>(static_cast<int64_t>(v) * q / 1000); };
+    s.soft         = scale(s.soft);
+    s.hard         = scale(s.hard);
+    s.defence      = scale(s.defence);
+    s.breakthrough = scale(s.breakthrough);
+    return s;
+}

@@ -34,6 +34,7 @@
 #include "combat.hpp"
 #include "components.hpp" // resource_count, unit_component (the upkeep vector)
 #include "entity.hpp"
+#include "land_combat_stats.hpp" // BL-1421
 
 #include <array>
 #include <cstddef>
@@ -424,3 +425,40 @@ int64_t unit_strength(const world& w, const unit_component& u);
 /// place: doubling quality into count as well would square it against
 /// `unit_strength`.
 army_stack_entry unit_to_stack_entry(const world& w, const unit_component& u);
+
+// ---------------------------------------------------------------------------
+// Land classes and their combat stats (BL-1421; MILITARY.md § Land — the classes)
+// ---------------------------------------------------------------------------
+//
+// The campaign's land fight scores soft and hard attack against hardness, and
+// absorbs with defence (defending) or breakthrough (attacking). The stats belong
+// to a LAND CLASS, not to a roster row: a row maps to one class
+// (`land_class_for`), and its quality scales the class's numbers, which is how an
+// equipment generation shows in the next fight. The Era -1 sim never reads this.
+
+enum class land_class : uint8_t
+{
+    infantry     = 0, ///< Holds ground; cheapest.
+    motorised    = 1, ///< Infantry in trucks.
+    mechanised   = 2, ///< Infantry in fighting vehicles.
+    armour       = 3, ///< The main battle tank line.
+    light_armour = 4, ///< Fast reconnaissance.
+    artillery    = 5, ///< Fights from the second line.
+    air_defence  = 6, ///< Shoots aircraft; next to nothing in a ground fight.
+    none         = 7, ///< Not a land fighter (a ship ashore): no attack, token defence.
+};
+
+inline constexpr int land_class_count = 8;
+
+/// The authored stats of @p c (land_combat_stats.hpp).
+const land_combat_stats& land_class_stats(land_class c);
+
+/// The land class a roster row fights as. An industrial cavalry row is
+/// mechanised; an earlier one light armour (fast, soft-hitting); siege is
+/// artillery; ranged fights as infantry; naval is `none`.
+land_class land_class_for(const roster_row& r);
+
+/// @p u's stats: its row's class, attacks, defence and breakthrough scaled by the
+/// row's quality (`roster_type_quality_permille`). Hardness is the class's own.
+/// An unknown row fights as infantry, as `unit_to_stack_entry` reads it.
+land_combat_stats unit_land_stats(const unit_component& u);

@@ -3,6 +3,7 @@
 #include "combat.hpp"
 #include "components.hpp"
 #include "entity.hpp"
+#include "land_combat_stats.hpp" // BL-1421
 
 #include <cstdint>
 #include <vector>
@@ -20,14 +21,14 @@
 // two-path split 2026-08-13, overturning this item's own earlier
 // engine-parity strand. Do not "unify" it back.
 //
-// WHAT IS SHARED, SO THE TWO DO NOT DRIFT. The roster (unit_roster.hpp) and
-// the CALIBRATION — the class matchup matrix, the base powers, the terrain and
-// supply scalars — are single-sourced: every round below scores its powers by
-// calling resolve_battle itself and reading the two power numbers out. What
-// this file adds on top is the round structure, the seeded swing, and
-// withdrawal. It deliberately does NOT reuse resolve_battle's loss/decisiveness
-// model, which is tuned for a whole war-year in one shot; per-round attrition
-// is this file's own (see campaign_battle_params).
+// NOTHING IS SHARED BUT THE TERRAIN TABLE (Ben, 2026-10-26; MILITARY.md § The
+// campaign force model). A round here never calls resolve_battle. Each unit
+// deals soft attack against the target's soft share and hard attack against its
+// hard share; the target absorbs with defence or breakthrough, raised by
+// terrain_defence; landed damage splits between men (HP) and readiness. A unit
+// at readiness 0 leaves the fight. The 2026-08-13 reading that the two paths
+// shared a calibration is overturned: they answer different questions with
+// different models, and only terrain_combat's table is read by both.
 //
 // DETERMINISM. The randomness is real to the player and absent to the engine:
 // every draw comes from a splitmix64 stream folded from the battle's own
@@ -87,21 +88,45 @@ struct campaign_battle_params
     /// (campaign_battle_harness's C4 table), not asserted from arithmetic.
     int swing_permille = 600;
 
-    /// Strength (per-mille of the force that marched in) at or below which a
-    /// side breaks and the fight ends early.
-    int rout_threshold = 300;
+    /// BL-1421: THE LAND ROUND. Hits are milli-hits, per man per round, on the
+    /// scale of unit_roster.cpp's class table.
+    ///
+    /// Absorbed hits — those within the target's defence (or breakthrough) —
+    /// land at this share; hits beyond it land in full. The gap is what makes
+    /// attacking dear: infantry absorbs with defence when it holds and with its
+    /// far smaller breakthrough when it goes forward.
+    int absorbed_land_permille = 250;
 
-    /// Per-round attrition on the side that LOST the round: a flat base plus a
-    /// share of the round's margin. Applied multiplicatively to that side's
-    /// REMAINING strength, so a long fight compounds rather than sums.
-    int round_loser_loss_base   = 90;
-    int round_loser_loss_margin = 400;
+    /// The share of landed damage that kills men (HP); the rest spends
+    /// readiness. Readiness takes the larger share, so most fights end in a
+    /// retreat rather than a death — which is how real units fail.
+    int hp_share_permille = 300;
 
-    /// Per-round attrition on the side that WON the round. Falls as the round
-    /// gets more lopsided — a rout costs the winner little.
-    int round_winner_loss_base   = 45;
-    int round_winner_loss_margin = 20;
-    int round_winner_loss_floor  = 5;
+    /// Milli-hits of HP damage that kill one man.
+    int hp_cost = 400;
+
+    /// Milli-hits of readiness damage, per man, that spend a unit's whole
+    /// readiness.
+    int readiness_cost = 185;
+
+    /// How much the battle ground's terrain_defence divides the ATTACKER's hits:
+    /// hits x 1000 / (1000 + terrain_defence x this / 1000). At 1000 a mountain
+    /// (terrain_defence 1000) halves them.
+    int terrain_attack_scale = 1000;
+
+    /// Side readiness (the strength reading) at or below which the phase reads
+    /// WAVERING. A reading only — no unit breaks on it.
+    int wavering_readiness = 300;
+
+    /// Morale a battle's winners gain, and its losers (and every unit that
+    /// retreats) lose, per-mille (battle_system.cpp).
+    int morale_win  = 50;
+    int morale_loss = 100;
+
+    /// Out of contact, per tick: readiness regained (scaled by supply, never above
+    /// morale), and the most morale moves toward the unit's supply.
+    int readiness_recovery_permille = 100;
+    int morale_recovery_permille    = 10;
 
     /// WITHDRAWAL COST. Disengaging is a first-class verb, not a failure state,
     /// but it is never free — otherwise committing force carries no risk and
@@ -143,7 +168,7 @@ enum class withdrawing_side : uint8_t
 enum class campaign_battle_end : uint8_t
 {
     in_progress       = 0, ///< Only seen on a live campaign_battle_state.
-    attacker_broken   = 1, ///< Attacker fell to the rout threshold.
+    attacker_broken   = 1, ///< No attacking unit is left fighting (all spent or dead).
     defender_broken   = 2,
     attacker_withdrew = 3,
     defender_withdrew = 4,
@@ -155,10 +180,10 @@ enum class campaign_battle_end : uint8_t
 struct campaign_battle_round
 {
     int round = 0;                    ///< 1-based.
-    int attacker_power = 0;           ///< Scored power AFTER the round's swing.
+    int attacker_power = 0;           ///< Milli-hits that side LANDED this round (BL-1421).
     int defender_power = 0;
-    battle_result round_winner = battle_result::defender_victory;
-    int attacker_strength_permille = 0; ///< Remaining strength AFTER this round.
+    battle_result round_winner = battle_result::defender_victory; ///< More landed; defender on a tie.
+    int attacker_strength_permille = 0; ///< Side readiness AFTER this round (`side_readiness`).
     int defender_strength_permille = 0;
 };
 
@@ -191,6 +216,31 @@ struct campaign_battle_outcome
     std::vector<campaign_battle_round> rounds;
 };
 
+/// One unit in a land fight (BL-1421). The resolver is world-free, so the
+/// caller builds these from `unit_component`s, steps, and writes `men` and
+/// `readiness` back. A vector of these is ALWAYS in ascending unit id: the
+/// men-loss remainder is handed out in vector order.
+struct land_combatant
+{
+    entity_id         unit      = null_entity;
+    int               men       = 0;    ///< HP: men fit to fight. Mutated by the round.
+    int               readiness = 1000; ///< Per-mille. Mutated by the round; 0 = out of the fight.
+    int               morale    = 1000; ///< Per-mille. Scales the hits this unit deals.
+    int               supply    = 1000; ///< Per-mille. Scales the hits this unit deals.
+    land_combat_stats stats{};          ///< unit_land_stats(), resolved at build.
+};
+
+/// Still in the fight: men standing and readiness left.
+inline bool land_combatant_fighting(const land_combatant& c)
+{
+    return c.men > 0 && c.readiness > 0;
+}
+
+/// A side's STRENGTH READING since BL-1421: its men-weighted mean readiness,
+/// per-mille, over combatants with men standing (0 when none). What the card,
+/// the phase, the dispatch and the withdrawal price read.
+int side_readiness(const std::vector<land_combatant>& side);
+
 /// A battle in progress. THE SPAN IS MODELLED EXPLICITLY: a caller steps this
 /// round by round, so the withdrawal window is a real window rather than a
 /// parameter pretending to be one. The UI drives it a round at a time; a
@@ -200,7 +250,11 @@ struct campaign_battle_outcome
 /// stepping is a pure function of (state, params).
 struct campaign_battle_state
 {
-    std::vector<army_stack_entry> attacker;  ///< The forces that marched in, unscaled.
+    // CARRIED FOR THE STREAM SHAPE ONLY since BL-1421. The land round reads its
+    // forces from the caller's combatants, not from these stacks, and reads no
+    // doctrine or season; the fields stay so a saved battle keeps its v57 shape.
+    // begin_campaign_battle leaves the stacks empty.
+    std::vector<army_stack_entry> attacker;
     std::vector<army_stack_entry> defender;
     doctrine_row attacker_doctrine{};
     doctrine_row defender_doctrine{};
@@ -213,10 +267,10 @@ struct campaign_battle_state
     std::uint8_t        terrain_density = 150u;
     terrain_landform    terrain_lf      = terrain_landform::plains;
     season              battle_season = season::summer;
-    int attacker_supply = 1000;
+    int attacker_supply = 1000; ///< Mean supply at open, for the record; the round reads each unit's.
     int defender_supply = 1000;
 
-    int attacker_strength_permille = 1000; ///< Remaining share of what marched in.
+    int attacker_strength_permille = 1000; ///< `side_readiness`, refreshed after every round.
     int defender_strength_permille = 1000;
 
     uint64_t rng_state  = 0; ///< Advanced once per draw; never re-seeded mid-fight.
@@ -295,34 +349,45 @@ inline bool battle_order_less(const active_battle& a, const active_battle& b)
 /// different streams.
 uint64_t campaign_battle_seed(const campaign_battle_identity& id);
 
-/// Open a battle. Nothing is resolved yet — round 1 happens on the first
-/// step_campaign_battle call, which is what gives a commander a window at all.
-campaign_battle_state begin_campaign_battle(const campaign_battle_identity&      id,
-                                            const std::vector<army_stack_entry>& attacker,
-                                            const doctrine_row&                  attacker_doctrine,
-                                            const std::vector<army_stack_entry>& defender,
-                                            const doctrine_row&                  defender_doctrine,
-                                            terrain_substrate                    terrain_sub,
-                                            terrain_cover                        terrain_cov,
-                                            std::uint8_t                         terrain_density,
-                                            terrain_landform                     terrain_lf,
-                                            season                               battle_season,
-                                            int                                  attacker_supply,
-                                            int                                  defender_supply);
+/// Open a battle over two sides' combatants (each ascending by unit id).
+/// Nothing is resolved yet — round 1 happens on the first step_campaign_battle
+/// call, which is what gives a commander a window at all.
+campaign_battle_state begin_campaign_battle(const campaign_battle_identity&    id,
+                                            const std::vector<land_combatant>& attacker,
+                                            const std::vector<land_combatant>& defender,
+                                            terrain_substrate                  terrain_sub,
+                                            terrain_cover                      terrain_cov,
+                                            std::uint8_t                       terrain_density,
+                                            terrain_landform                   terrain_lf);
 
-/// Fight one round. Returns false once the battle is over (@p st.end set), at
-/// which point further calls are no-ops. Consumes exactly two draws from the
-/// stream — attacker swing, then defender swing — in that fixed order.
-bool step_campaign_battle(campaign_battle_state& st,
+/// Fight one round over @p attacker and @p defender, mutating their men and
+/// readiness in place. Both sides' hits are computed from the state BEFORE the
+/// round and applied together. A side with no unit fighting at the start of a
+/// round deals nothing and absorbs nothing — its spent units are overrun, the
+/// enemy's hits landing on them in full — and is broken. Returns false once the
+/// battle is over (@p st.end set), at which point further calls are no-ops.
+/// Consumes exactly two draws from the stream — attacker swing, then defender
+/// swing — in that fixed order.
+bool step_campaign_battle(campaign_battle_state&        st,
+                          std::vector<land_combatant>&  attacker,
+                          std::vector<land_combatant>&  defender,
                           const campaign_battle_params& params = {});
 
-/// Break off. Applies the withdrawal cost to @p side and ends the fight; the
-/// side that stayed holds the field. Consumes no draws — disengaging is a
-/// decision, not another gamble. A no-op on an already-finished battle or on
-/// withdrawing_side::none.
-void withdraw_campaign_battle(campaign_battle_state& st,
-                              withdrawing_side              side,
-                              const campaign_battle_params& params = {});
+/// Break off. The withdrawing side pays the three-term parting cost IN MEN —
+/// `quote_withdrawal`'s total, per-mille of its standing men, floor shares then
+/// the remainder in vector order — and the fight ends; the side that stayed
+/// holds the field. @p leaving is the withdrawing side's combatants. Consumes no
+/// draws — disengaging is a decision, not another gamble. A no-op on an
+/// already-finished battle or on withdrawing_side::none. @return men removed.
+int withdraw_campaign_battle(campaign_battle_state&        st,
+                             withdrawing_side              side,
+                             std::vector<land_combatant>&  leaving,
+                             const campaign_battle_params& params = {});
+
+/// The parting cost, per-mille, that withdraw_campaign_battle charges @p side:
+/// base + rounds fought x per-round + pursuit x how far behind, clamped.
+int withdrawal_cost_permille(const campaign_battle_state& st, withdrawing_side side,
+                             const campaign_battle_params& params = {});
 
 /// Read the finished (or in-progress) state as an outcome record.
 campaign_battle_outcome campaign_battle_result(const campaign_battle_state& st);
@@ -334,18 +399,18 @@ campaign_battle_outcome campaign_battle_result(const campaign_battle_state& st);
 ///
 /// This is a convenience wrapper over begin/step/withdraw and adds no rules of
 /// its own, so a scripted run and a player-driven one resolve identically.
-campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity&      id,
-                                                const std::vector<army_stack_entry>& attacker,
-                                                const doctrine_row&                  attacker_doctrine,
-                                                const std::vector<army_stack_entry>& defender,
-                                                const doctrine_row&                  defender_doctrine,
-                                                terrain_substrate                    terrain_sub,
-                                                terrain_cover                        terrain_cov,
-                                                std::uint8_t                         terrain_density,
-                                                terrain_landform                     terrain_lf,
-                                                season                               battle_season,
-                                                int                                  attacker_supply,
-                                                int                                  defender_supply,
-                                                withdrawing_side                     withdrawer = withdrawing_side::none,
-                                                int                                  withdraw_after_round = 0,
-                                                const campaign_battle_params&        params = {});
+///
+/// @p attacker and @p defender are taken by value and fought on copies; pass
+/// out-params to read the men and readiness each side ended on.
+campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity& id,
+                                                std::vector<land_combatant>     attacker,
+                                                std::vector<land_combatant>     defender,
+                                                terrain_substrate               terrain_sub,
+                                                terrain_cover                   terrain_cov,
+                                                std::uint8_t                    terrain_density,
+                                                terrain_landform                terrain_lf,
+                                                withdrawing_side                withdrawer = withdrawing_side::none,
+                                                int                             withdraw_after_round = 0,
+                                                const campaign_battle_params&   params = {},
+                                                std::vector<land_combatant>*    attacker_out = nullptr,
+                                                std::vector<land_combatant>*    defender_out = nullptr);

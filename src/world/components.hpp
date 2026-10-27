@@ -1870,7 +1870,32 @@ struct unit_component
     /// that can see it; it disbands a unit whose muster base has been erased.
     /// Null means "no muster base recorded" and is never orphaned.
     entity_id muster_base = null_entity;
+
+    // The fight's state (BL-1421; MILITARY.md § The campaign force model). HP is
+    // `count` — men fit to fight — against `establishment`, the count the unit is
+    // raised to; a unit at 0 men dies through the upkeep pass's orphan cleanup.
+
+    /// The count this unit is raised to, the HP bar's full mark and what a refit
+    /// fills back to. 0 means "unset" and reads as the current count
+    /// (`unit_establishment`), so a fixture that sets only `count` still holds.
+    int32_t   establishment = 0;
+
+    /// Cohesion in contact, per-mille. Takes the larger share of landed damage;
+    /// at 0 the unit leaves the fight and retreats. Recovers out of contact,
+    /// never above `morale_permille`.
+    int32_t   readiness_permille = 1000;
+
+    /// Will to fight, per-mille. Scales the unit's attack and caps its readiness.
+    /// Moved by a battle's result and, out of contact, toward its supply.
+    int32_t   morale_permille = 1000;
 };
+
+/// The count a unit is raised to: `establishment`, or the current count where
+/// none was recorded.
+inline int unit_establishment(const unit_component& u)
+{
+    return u.establishment > 0 ? u.establishment : u.count;
+}
 
 // ---------------------------------------------------------------------------
 // Convoy component

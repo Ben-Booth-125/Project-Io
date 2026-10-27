@@ -501,7 +501,16 @@ inline constexpr uint32_t world_save_magic =
 /// is read too (`k_world_save_version_pre_days`): its cursor reads 0 and each site's
 /// days are derived from its ticks_remaining (x 90, less its construction_progress
 /// fraction of a quarter) — `sync_construction_days`.
-inline constexpr uint32_t world_save_version = 57;
+///
+/// Bumped to 58 (BL-1421; MILITARY.md § The campaign force model): THE UNIT COMBAT
+/// STATE. A TRAILING SECTION after the construction days carries every unit, ascending
+/// id, as (id, establishment, readiness_permille, morale_permille) as i32s. v57 is a
+/// STRICT PREFIX of v58 and is read too (`k_world_save_version_pre_combat`): its units
+/// load with no establishment recorded and full readiness and morale.
+inline constexpr uint32_t world_save_version = 58;
+
+/// v57, a strict prefix of v58 (the unit combat-state section is v58's only addition).
+inline constexpr uint32_t k_world_save_version_pre_combat = 57;
 
 /// v56, a strict prefix of v57 (the construction-days section is v57's only addition).
 inline constexpr uint32_t k_world_save_version_pre_days = 56;
@@ -616,6 +625,11 @@ void write_world_snapshot_legacy(const world& w,
 /// less the construction-days section — so the v56 reader (days derived from ticks)
 /// has a real producer (tools/verify/save_roundtrip). The game never writes it.
 void write_world_snapshot_pre_days(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1421): @p w written as a v57 stream — today's stream less the
+/// unit combat-state section — so the v57 reader has a real producer
+/// (tools/verify/save_roundtrip). The game never writes it.
+void write_world_snapshot_pre_combat(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

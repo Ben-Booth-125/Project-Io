@@ -1,5 +1,7 @@
 #include "campaign_battle.hpp"
 
+#include "terrain_combat.hpp"
+
 #include <algorithm>
 #include <cstdint>
 
@@ -38,30 +40,169 @@ int swing_multiplier(uint64_t& state, int swing)
     return 1000 - swing + static_cast<int>(next_draw(state) % span);
 }
 
-/// The force a side still has on the field: its committed stack scaled by the
-/// strength it has left. Entries that scale to zero drop out, which is how a
-/// worn-down stack loses its smallest contingents first.
-std::vector<army_stack_entry> scaled_stack(const std::vector<army_stack_entry>& base, int strength)
+/// Men standing among a side's FIGHTING units.
+int64_t fighting_men(const std::vector<land_combatant>& side)
 {
-    std::vector<army_stack_entry> out;
-    out.reserve(base.size());
-    for (const army_stack_entry& e : base)
-    {
-        army_stack_entry s = e;
-        s.count = static_cast<int>(static_cast<std::int64_t>(std::max(0, e.count)) * strength / 1000);
-        if (s.count > 0) out.push_back(s);
-    }
-    return out;
+    int64_t n = 0;
+    for (const land_combatant& c : side)
+        if (land_combatant_fighting(c))
+            n += c.men;
+    return n;
 }
 
-/// Apply a per-mille LOSS to a strength value, multiplicatively — so attrition
-/// across a long fight compounds instead of summing past zero.
-int apply_loss(int strength, int loss_permille)
+/// The men-weighted hardness of a side's fighting units, per-mille. A side with
+/// none fighting is read as soft — its spent units are caught in the open.
+int64_t side_hardness(const std::vector<land_combatant>& side)
 {
-    return clamp_permille(strength * (1000 - clamp_permille(loss_permille)) / 1000);
+    int64_t men = 0, hard = 0;
+    for (const land_combatant& c : side)
+        if (land_combatant_fighting(c))
+        {
+            men  += c.men;
+            hard += static_cast<int64_t>(c.men) * std::clamp(c.stats.hardness, 0, 1000);
+        }
+    return men > 0 ? hard / men : 0;
+}
+
+/// Milli-hits a side deals against a target of @p target_hardness: per unit,
+/// men x (soft x (1 - h) + hard x h), scaled by the unit's morale and supply.
+/// Before the swing.
+int64_t side_hits(const std::vector<land_combatant>& side, int64_t target_hardness)
+{
+    int64_t hits = 0;
+    for (const land_combatant& c : side)
+    {
+        if (!land_combatant_fighting(c))
+            continue;
+        const int64_t per_man = (static_cast<int64_t>(std::max(0, c.stats.soft)) * (1000 - target_hardness)
+                               + static_cast<int64_t>(std::max(0, c.stats.hard)) * target_hardness) / 1000;
+        hits += static_cast<int64_t>(c.men) * per_man
+              * clamp_permille(c.morale) / 1000 * clamp_permille(c.supply) / 1000;
+    }
+    return hits;
+}
+
+/// Milli-hits a side can absorb: men x defence when it defends, men x
+/// breakthrough when it attacks.
+int64_t side_absorb(const std::vector<land_combatant>& side, bool defending)
+{
+    int64_t absorb = 0;
+    for (const land_combatant& c : side)
+        if (land_combatant_fighting(c))
+            absorb += static_cast<int64_t>(c.men)
+                    * std::max(0, defending ? c.stats.defence : c.stats.breakthrough);
+    return absorb;
+}
+
+/// What actually lands of @p hits against @p absorb.
+int64_t landed_hits(int64_t hits, int64_t absorb, const campaign_battle_params& p)
+{
+    const int64_t within = std::min(hits, absorb);
+    const int64_t beyond = std::max<int64_t>(0, hits - absorb);
+    return within * clamp_permille(p.absorbed_land_permille) / 1000 + beyond;
+}
+
+/// Kill exactly @p to_remove men across @p targets (indices into @p side),
+/// proportional to men, floor shares first and the remainder one man at a time
+/// in vector order — ascending unit id by the combatant contract. Integer
+/// throughout, so the split cannot depend on a rounding mode. @return removed.
+int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::size_t>& targets,
+                   int64_t to_remove)
+{
+    int64_t total = 0;
+    for (const std::size_t k : targets)
+        total += side[k].men;
+    if (to_remove <= 0 || total <= 0)
+        return 0;
+    to_remove = std::min(to_remove, total);
+
+    std::vector<int64_t> hit(targets.size(), 0);
+    int64_t assigned = 0;
+    for (std::size_t t = 0; t < targets.size(); ++t)
+    {
+        hit[t]    = to_remove * side[targets[t]].men / total;
+        assigned += hit[t];
+    }
+    // Bounded: to_remove <= total, so while assigned < to_remove some unit has room.
+    while (assigned < to_remove)
+    {
+        bool progressed = false;
+        for (std::size_t t = 0; t < targets.size() && assigned < to_remove; ++t)
+            if (hit[t] < side[targets[t]].men)
+            {
+                ++hit[t];
+                ++assigned;
+                progressed = true;
+            }
+        if (!progressed)
+            break;
+    }
+    int64_t removed = 0;
+    for (std::size_t t = 0; t < targets.size(); ++t)
+    {
+        land_combatant& c = side[targets[t]];
+        const int take = static_cast<int>(std::min<int64_t>(hit[t], c.men));
+        c.men   -= take;
+        removed += take;
+    }
+    return removed;
+}
+
+/// Land @p landed milli-hits on @p side. The HP share kills men across the
+/// side's fighting units (or, if none is fighting, across every unit still
+/// standing — the overrun); the rest spends each fighting unit's readiness by
+/// its men's share of the hits.
+void apply_landed(std::vector<land_combatant>& side, int64_t landed, const campaign_battle_params& p)
+{
+    if (landed <= 0)
+        return;
+
+    std::vector<std::size_t> fighting, standing;
+    for (std::size_t k = 0; k < side.size(); ++k)
+    {
+        if (land_combatant_fighting(side[k])) fighting.push_back(k);
+        if (side[k].men > 0)                  standing.push_back(k);
+    }
+    const bool overrun = fighting.empty();
+    const std::vector<std::size_t>& targets = overrun ? standing : fighting;
+    if (targets.empty())
+        return;
+
+    // Readiness first, read against the men standing BEFORE this round's deaths,
+    // so the two halves of the same hits are measured against the same force.
+    if (!overrun)
+    {
+        int64_t men = 0;
+        for (const std::size_t k : targets)
+            men += side[k].men;
+        const int64_t ready_hits = landed * (1000 - clamp_permille(p.hp_share_permille)) / 1000;
+        for (const std::size_t k : targets)
+        {
+            land_combatant& c = side[k];
+            const int64_t own = ready_hits * c.men / men;
+            const int64_t cost = static_cast<int64_t>(c.men) * std::max(1, p.readiness_cost);
+            const int64_t loss = own * 1000 / cost;
+            c.readiness = static_cast<int>(std::max<int64_t>(0, c.readiness - loss));
+        }
+    }
+
+    const int64_t hp_hits = overrun ? landed : landed * clamp_permille(p.hp_share_permille) / 1000;
+    remove_men(side, targets, hp_hits / std::max(1, p.hp_cost));
 }
 
 } // namespace
+
+int side_readiness(const std::vector<land_combatant>& side)
+{
+    int64_t men = 0, ready = 0;
+    for (const land_combatant& c : side)
+        if (c.men > 0)
+        {
+            men   += c.men;
+            ready += static_cast<int64_t>(c.men) * clamp_permille(c.readiness);
+        }
+    return men > 0 ? static_cast<int>(ready / men) : 0;
+}
 
 uint64_t campaign_battle_seed(const campaign_battle_identity& id)
 {
@@ -77,123 +218,104 @@ uint64_t campaign_battle_seed(const campaign_battle_identity& id)
     return h;
 }
 
-campaign_battle_state begin_campaign_battle(const campaign_battle_identity&      id,
-                                            const std::vector<army_stack_entry>& attacker,
-                                            const doctrine_row&                  attacker_doctrine,
-                                            const std::vector<army_stack_entry>& defender,
-                                            const doctrine_row&                  defender_doctrine,
-                                            terrain_substrate                    terrain_sub,
-                                            terrain_cover                        terrain_cov,
-                                            std::uint8_t                         terrain_density,
-                                            terrain_landform                     terrain_lf,
-                                            season                               battle_season,
-                                            int                                  attacker_supply,
-                                            int                                  defender_supply)
+campaign_battle_state begin_campaign_battle(const campaign_battle_identity&    id,
+                                            const std::vector<land_combatant>& attacker,
+                                            const std::vector<land_combatant>& defender,
+                                            terrain_substrate                  terrain_sub,
+                                            terrain_cover                      terrain_cov,
+                                            std::uint8_t                       terrain_density,
+                                            terrain_landform                   terrain_lf)
 {
+    auto mean_supply = [](const std::vector<land_combatant>& side) {
+        int64_t sum = 0;
+        for (const land_combatant& c : side) sum += clamp_permille(c.supply);
+        return side.empty() ? 1000 : static_cast<int>(sum / static_cast<int64_t>(side.size()));
+    };
+
     campaign_battle_state st;
-    st.attacker          = attacker;
-    st.defender          = defender;
-    st.attacker_doctrine = attacker_doctrine;
-    st.defender_doctrine = defender_doctrine;
-    st.terrain_sub       = terrain_sub;
-    st.terrain_cov       = terrain_cov;
-    st.terrain_density   = terrain_density;
-    st.terrain_lf        = terrain_lf;
-    st.battle_season     = battle_season;
-    st.attacker_supply   = clamp_permille(attacker_supply);
-    st.defender_supply   = clamp_permille(defender_supply);
-    st.stream_seed       = campaign_battle_seed(id);
-    st.rng_state         = st.stream_seed;
-    st.end               = campaign_battle_end::in_progress;
+    st.terrain_sub     = terrain_sub;
+    st.terrain_cov     = terrain_cov;
+    st.terrain_density = terrain_density;
+    st.terrain_lf      = terrain_lf;
+    st.battle_season   = season::summer; // read by nothing since BL-1421; kept for the stream shape
+    st.attacker_supply = mean_supply(attacker);
+    st.defender_supply = mean_supply(defender);
+    st.attacker_strength_permille = side_readiness(attacker);
+    st.defender_strength_permille = side_readiness(defender);
+    st.stream_seed     = campaign_battle_seed(id);
+    st.rng_state       = st.stream_seed;
+    st.end             = campaign_battle_end::in_progress;
     return st;
 }
 
-bool step_campaign_battle(campaign_battle_state& st, const campaign_battle_params& params)
+bool step_campaign_battle(campaign_battle_state&        st,
+                          std::vector<land_combatant>&  attacker,
+                          std::vector<land_combatant>&  defender,
+                          const campaign_battle_params& params)
 {
     if (st.end != campaign_battle_end::in_progress)
         return false;
 
-    const std::vector<army_stack_entry> atk = scaled_stack(st.attacker, st.attacker_strength_permille);
-    const std::vector<army_stack_entry> def = scaled_stack(st.defender, st.defender_strength_permille);
-
-    // POWER SCORING IS THE ERA -1 ENGINE'S, unchanged — matchup x doctrine x
-    // terrain x supply x season. Only the two power numbers are read; the
-    // one-shot loss and decisiveness model below it belongs to a war-year, not
-    // to a round, so this file computes its own (see header § what is shared).
-    const battle_outcome scored = resolve_battle(atk, st.attacker_doctrine,
-                                                  def, st.defender_doctrine,
-                                                  st.terrain_sub, st.terrain_cov,
-                                                  st.terrain_density, st.terrain_lf,
-                                                  st.battle_season,
-                                                  st.attacker_supply, st.defender_supply);
-
-    // FIXED DRAW ORDER: attacker, then defender, exactly two per round.
+    // FIXED DRAW ORDER: attacker, then defender, exactly two per round — drawn
+    // even when a side cannot fight, so the stream position is a function of
+    // rounds fought alone.
     const int atk_swing = swing_multiplier(st.rng_state, params.swing_permille);
     const int def_swing = swing_multiplier(st.rng_state, params.swing_permille);
 
-    const std::int64_t atk_power = static_cast<std::int64_t>(scored.attacker_power) * atk_swing / 1000;
-    const std::int64_t def_power = static_cast<std::int64_t>(scored.defender_power) * def_swing / 1000;
+    // BOTH SIDES' HITS FROM THE STATE BEFORE THE ROUND, applied together: neither
+    // side's losses this round weaken what it deals this round.
+    // THE GROUND DIVIDES THE ATTACKER'S HITS: x 1000 / (1000 + terrain_defence x
+    // scale / 1000), so at the default scale a mountain halves them. On the hits
+    // rather than the absorb, so the ground counts in every fight — a raise to the
+    // absorb would matter only where hits already exceed it.
+    const int64_t terrain_d = terrain_defence(st.terrain_sub, st.terrain_cov,
+                                              st.terrain_density, st.terrain_lf);
+    const int64_t ground = 1000 + std::max<int64_t>(0, terrain_d) * params.terrain_attack_scale / 1000;
+    const int64_t atk_hits = side_hits(attacker, side_hardness(defender)) * atk_swing / 1000 * 1000 / ground;
+    const int64_t def_hits = side_hits(defender, side_hardness(attacker)) * def_swing / 1000;
+    const int64_t on_def = landed_hits(atk_hits, side_absorb(defender, true), params);
+    const int64_t on_atk = landed_hits(def_hits, side_absorb(attacker, false), params);
 
-    // Same tie-break as resolve_battle: the defender holds an inconclusive round.
-    const bool attacker_won = atk_power > def_power;
+    const bool atk_could_fight = fighting_men(attacker) > 0;
+    const bool def_could_fight = fighting_men(defender) > 0;
 
-    const std::int64_t winner_power = std::max(atk_power, def_power);
-    const std::int64_t loser_power  = std::min(atk_power, def_power);
-    const int margin = winner_power > 0
-        ? clamp_permille(static_cast<int>((winner_power - loser_power) * 1000 / winner_power))
-        : 0;
+    apply_landed(defender, on_def, params);
+    apply_landed(attacker, on_atk, params);
 
-    const int loser_loss = clamp_permille(params.round_loser_loss_base +
-                                           margin * params.round_loser_loss_margin / 1000);
-    const int winner_loss = clamp_permille(std::max(params.round_winner_loss_floor,
-                                                     params.round_winner_loss_base -
-                                                     margin * params.round_winner_loss_margin / 1000));
-
-    if (attacker_won)
-    {
-        st.attacker_strength_permille = apply_loss(st.attacker_strength_permille, winner_loss);
-        st.defender_strength_permille = apply_loss(st.defender_strength_permille, loser_loss);
-    }
-    else
-    {
-        st.attacker_strength_permille = apply_loss(st.attacker_strength_permille, loser_loss);
-        st.defender_strength_permille = apply_loss(st.defender_strength_permille, winner_loss);
-    }
-
+    st.attacker_strength_permille = side_readiness(attacker);
+    st.defender_strength_permille = side_readiness(defender);
     ++st.rounds_fought;
 
     campaign_battle_round rec;
     rec.round                      = st.rounds_fought;
-    rec.attacker_power             = static_cast<int>(std::min<std::int64_t>(atk_power, INT32_MAX));
-    rec.defender_power             = static_cast<int>(std::min<std::int64_t>(def_power, INT32_MAX));
-    rec.round_winner               = attacker_won ? battle_result::attacker_victory
-                                                   : battle_result::defender_victory;
+    rec.attacker_power             = static_cast<int>(std::min<int64_t>(on_def, INT32_MAX));
+    rec.defender_power             = static_cast<int>(std::min<int64_t>(on_atk, INT32_MAX));
+    rec.round_winner               = on_def > on_atk ? battle_result::attacker_victory
+                                                     : battle_result::defender_victory;
     rec.attacker_strength_permille = st.attacker_strength_permille;
     rec.defender_strength_permille = st.defender_strength_permille;
     st.rounds.push_back(rec);
 
-    // Breaking is checked AFTER the round resolves, so a side that routs still
-    // took (and dealt) that round's damage. Both breaking at once is decided in
-    // the defender's favour, consistent with every other tie in the two paths.
-    const bool atk_broken = st.attacker_strength_permille <= params.rout_threshold;
-    const bool def_broken = st.defender_strength_permille <= params.rout_threshold;
+    // A side breaks when no unit of it is left fighting — checked AFTER the
+    // round, so a side that breaks still took (and dealt) the round's damage. A
+    // side that could not fight at the start of the round is broken by it. Both
+    // at once is decided in the defender's favour, as every tie on both paths.
+    const bool atk_broken = !atk_could_fight || fighting_men(attacker) == 0;
+    const bool def_broken = !def_could_fight || fighting_men(defender) == 0;
 
-    if (atk_broken && !def_broken)      st.end = campaign_battle_end::attacker_broken;
-    else if (def_broken && !atk_broken) st.end = campaign_battle_end::defender_broken;
-    else if (atk_broken && def_broken)  st.end = campaign_battle_end::attacker_broken;
+    if (atk_broken)                     st.end = campaign_battle_end::attacker_broken;
+    else if (def_broken)                st.end = campaign_battle_end::defender_broken;
     else if (st.rounds_fought >= std::max(1, params.max_rounds))
-                                         st.end = campaign_battle_end::stalemate;
+                                        st.end = campaign_battle_end::stalemate;
 
     return st.end == campaign_battle_end::in_progress;
 }
 
-void withdraw_campaign_battle(campaign_battle_state&        st,
-                              withdrawing_side              side,
-                              const campaign_battle_params& params)
+int withdrawal_cost_permille(const campaign_battle_state& st, withdrawing_side side,
+                             const campaign_battle_params& params)
 {
-    if (st.end != campaign_battle_end::in_progress || side == withdrawing_side::none)
-        return;
-
+    if (side == withdrawing_side::none)
+        return 0;
     const bool attacker_leaving = (side == withdrawing_side::attacker);
     const int own   = attacker_leaving ? st.attacker_strength_permille : st.defender_strength_permille;
     const int enemy = attacker_leaving ? st.defender_strength_permille : st.attacker_strength_permille;
@@ -203,17 +325,40 @@ void withdraw_campaign_battle(campaign_battle_state&        st,
     // already fought have separately cost their own attrition — so a late
     // break-off is dear twice over. Nothing here is clamped to produce that
     // ordering; it falls out of the shape.
-    const int behind  = std::max(0, enemy - own);
-    const int parting = clamp_permille(params.withdraw_base_permille +
-                                        st.rounds_fought * params.withdraw_per_round_permille +
-                                        behind * params.withdraw_pursuit_scale / 1000);
+    const int behind = std::max(0, enemy - own);
+    return clamp_permille(params.withdraw_base_permille +
+                          st.rounds_fought * params.withdraw_per_round_permille +
+                          behind * params.withdraw_pursuit_scale / 1000);
+}
 
-    const int after = apply_loss(own, parting);
-    if (attacker_leaving) st.attacker_strength_permille = after;
-    else                  st.defender_strength_permille = after;
+int withdraw_campaign_battle(campaign_battle_state&        st,
+                             withdrawing_side              side,
+                             std::vector<land_combatant>&  leaving,
+                             const campaign_battle_params& params)
+{
+    if (st.end != campaign_battle_end::in_progress || side == withdrawing_side::none)
+        return 0;
+
+    const int parting = withdrawal_cost_permille(st, side, params);
+
+    // The parting cost lands IN MEN (BL-1421), on every unit still standing.
+    std::vector<std::size_t> standing;
+    int64_t men = 0;
+    for (std::size_t k = 0; k < leaving.size(); ++k)
+        if (leaving[k].men > 0)
+        {
+            standing.push_back(k);
+            men += leaving[k].men;
+        }
+    const int removed = static_cast<int>(remove_men(leaving, standing, men * parting / 1000));
+
+    const bool attacker_leaving = (side == withdrawing_side::attacker);
+    if (attacker_leaving) st.attacker_strength_permille = side_readiness(leaving);
+    else                  st.defender_strength_permille = side_readiness(leaving);
 
     st.end = attacker_leaving ? campaign_battle_end::attacker_withdrew
                               : campaign_battle_end::defender_withdrew;
+    return removed;
 }
 
 campaign_battle_outcome campaign_battle_result(const campaign_battle_state& st)
@@ -241,8 +386,8 @@ campaign_battle_outcome campaign_battle_result(const campaign_battle_state& st)
             out.result = battle_result::attacker_victory;
             break;
         default:
-            // Stalemate (or read mid-fight): the stronger remaining force holds,
-            // defender on an exact tie.
+            // Stalemate (or read mid-fight): the side with more readiness left
+            // holds, defender on an exact tie.
             out.result = st.attacker_strength_permille > st.defender_strength_permille
                              ? battle_result::attacker_victory
                              : battle_result::defender_victory;
@@ -256,27 +401,21 @@ campaign_battle_outcome campaign_battle_result(const campaign_battle_state& st)
     return out;
 }
 
-campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity&      id,
-                                                const std::vector<army_stack_entry>& attacker,
-                                                const doctrine_row&                  attacker_doctrine,
-                                                const std::vector<army_stack_entry>& defender,
-                                                const doctrine_row&                  defender_doctrine,
-                                                terrain_substrate                    terrain_sub,
-                                                terrain_cover                        terrain_cov,
-                                                std::uint8_t                         terrain_density,
-                                                terrain_landform                     terrain_lf,
-                                                season                               battle_season,
-                                                int                                  attacker_supply,
-                                                int                                  defender_supply,
-                                                withdrawing_side                     withdrawer,
-                                                int                                  withdraw_after_round,
-                                                const campaign_battle_params&        params)
+campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity& id,
+                                                std::vector<land_combatant>     attacker,
+                                                std::vector<land_combatant>     defender,
+                                                terrain_substrate               terrain_sub,
+                                                terrain_cover                   terrain_cov,
+                                                std::uint8_t                    terrain_density,
+                                                terrain_landform                terrain_lf,
+                                                withdrawing_side                withdrawer,
+                                                int                             withdraw_after_round,
+                                                const campaign_battle_params&   params,
+                                                std::vector<land_combatant>*    attacker_out,
+                                                std::vector<land_combatant>*    defender_out)
 {
-    campaign_battle_state st = begin_campaign_battle(id, attacker, attacker_doctrine,
-                                                      defender, defender_doctrine,
-                                                      terrain_sub, terrain_cov, terrain_density,
-                                                      terrain_lf, battle_season,
-                                                      attacker_supply, defender_supply);
+    campaign_battle_state st = begin_campaign_battle(id, attacker, defender, terrain_sub,
+                                                     terrain_cov, terrain_density, terrain_lf);
 
     const bool scripted = (withdrawer != withdrawing_side::none) && (withdraw_after_round > 0);
 
@@ -287,11 +426,15 @@ campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity& 
         // player would get the choice.
         if (scripted && st.rounds_fought >= withdraw_after_round)
         {
-            withdraw_campaign_battle(st, withdrawer, params);
+            withdraw_campaign_battle(st, withdrawer,
+                                     withdrawer == withdrawing_side::attacker ? attacker : defender,
+                                     params);
             break;
         }
-        step_campaign_battle(st, params);
+        step_campaign_battle(st, attacker, defender, params);
     }
 
+    if (attacker_out) *attacker_out = attacker;
+    if (defender_out) *defender_out = defender;
     return campaign_battle_result(st);
 }

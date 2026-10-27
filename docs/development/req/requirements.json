@@ -7430,6 +7430,77 @@
    "batch": "sprint-57",
    "resolved": "2026-10-26",
    "archived": "docs/development/archive/requirements-2026-Q4.json"
+  },
+  {
+   "brief": "land-combat-core",
+   "title": "BL-1421 - Land units carry HP, readiness and morale; the campaign round scores soft and hard attack against hardness",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1421 (with BL-1422 T1 class stats, BL-1423 T1 recovery) - sprint 58 (Ben, 2026-10-26: \"build the land combat infrastructure\")",
+   "batch": "sprint-58",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: campaign_battle_harness"
+     ],
+     "requirement": "A round deals soft_attack*(1-hardness)+hard_attack*hardness per man, scaled by morale, supply and the seeded swing; the defender's ground divides the attacker's hits (terrain_defence); the target absorbs up to defence (defending) or breakthrough (attacking); absorbed hits land at a fraction. resolve_battle is not called by the campaign path.",
+     "notes": "campaign_battle_harness 23/23 (C1-C6) on the uncommitted tree 2026-10-27; resolve_battle is called only from history_sim.cpp (cold review)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: campaign_battle_harness",
+      "headless: battle_engagement_harness"
+     ],
+     "requirement": "Landed damage splits between HP (men) and readiness, readiness the larger share. A unit at readiness 0 leaves the fight and retreats one tile away; a unit at 0 men dies through the existing orphan cleanup. A side with no unit left fighting is broken.",
+     "notes": "campaign_battle_harness C6 (readiness falls faster than men; a spent side is overrun and broken); battle_engagement_harness B18 (a spent unit steps one marchable tile and leaves the fight), B22 (a unit in two battles retreats once). 79/79."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: campaign_battle_harness"
+     ],
+     "requirement": "Seven land classes carry authored soft, hard, hardness, defence and breakthrough; every roster row maps to one (only naval rows to none); armour beats infantry in the open; a mountain costs an attacker; hardness turns soft attack away.",
+     "notes": "campaign_battle_harness C5: every roster row maps to a class (only naval to none); armour 1:1 beats infantry 100/100 on plains; infantry 2:1 wins 100/100 on plains, 70/100 on a mountain; artillery hurts armour far less than infantry. Armour, motorised and air defence have no roster row until BL-1422 (land classes and kit)."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "headless: battle_engagement_harness"
+     ],
+     "requirement": "Out of contact, readiness recovers toward morale and morale toward supply; a battle's winner gains morale and its loser loses it.",
+     "notes": "battle_engagement_harness B18d, B19 (winner +50, loser -100), B20 (readiness 0 -> 820 over twelve idle ticks under morale 700 -> 820; an unsupplied unit's morale falls)."
+    },
+    {
+     "id": "R5",
+     "status": "complete",
+     "verification": [
+      "headless: battle_engagement_harness"
+     ],
+     "requirement": "Conservation is exact (men removed equal the losses reported) and the withdrawal quote equals the charge, now charged in men.",
+     "notes": "battle_engagement_harness B5 (men removed == losses reported, per tick and end to end), B12 (quote 144 permille -> 67 men, charged 67); campaign_battle_harness C3 (a three-unit side charged exactly the quoted share)."
+    },
+    {
+     "id": "R6",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "headless: save_roundtrip",
+      "headless: battle_engagement_harness"
+     ],
+     "requirement": "Same seed twice is byte-identical; a save round-trips establishment, readiness and morale; a v57 stream loads with full readiness and morale; a world whose units never fight and are fully supplied keeps its state_hash (an unsupplied unit's morale drifts toward its supply by design, so its hash moves; and the v58 stream moves every snapshot-byte digest, which is the sprint's re-bless to take).",
+     "notes": "world_determinism ALL PASS; save_roundtrip OK incl. P24 (v58 round-trip by value, v57 reads with defaults, readiness 1001 refused) and P6 (a mid-fight battle continues identically after load); battle_engagement_harness B21a (a fully supplied world that never fights hashes as before) and B21b (an unsupplied unit's morale drift moves the hash, by design). market_viability FULL 16 seeds identical to the BL-1408 reading on 71e32545: G1 93.4 G1t50 86.6 G1b 3.7 G2 144.4 G3 100.0. OWED: player_seed_sweep --digest-check fails 16/16 on D_land, D_settle and D_seat. D_land is taken before any tick, so its move is the v58 stream itself (version byte and unit section); D_settle/D_seat may also carry morale drift toward supply. Re-bless is Ben's call."
+    }
+   ]
   }
  ]
 }

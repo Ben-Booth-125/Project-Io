@@ -346,6 +346,20 @@ uint64_t world::state_hash(int tick) const
             for (const entity_id t : u.order.path) fnv1a_u32(h, t);
             fnv1a_u32(h, static_cast<uint32_t>(u.order.next_index));
             fnv1a_f32(h, u.order.progress);
+            // BL-1421: the fight's state, folded ONLY OFF ITS DEFAULTS — the
+            // battles precedent below. A unit raised to its count, at full
+            // readiness and morale, hashes exactly as it did before this item,
+            // so a world that never fights keeps every pinned hash. Off-default,
+            // all three are folded behind a marker so (est, 1000, 1000) and a
+            // shifted triple cannot collide.
+            const bool est_default = (u.establishment == 0 || u.establishment == u.count);
+            if (!est_default || u.readiness_permille != 1000 || u.morale_permille != 1000)
+            {
+                fnv1a_u32(h, 0xC0B7A71Eu);
+                fnv1a_i32(h, u.establishment);
+                fnv1a_i32(h, u.readiness_permille);
+                fnv1a_i32(h, u.morale_permille);
+            }
         }
     }
 

@@ -1,5 +1,6 @@
 #include "battle_system.hpp"
 
+#include "logistics.hpp" // road_edge_neighbour: the retreat step (BL-1421)
 #include "placement_rules.hpp"
 #include "province.hpp"
 #include "recipe_registry.hpp"
@@ -77,143 +78,224 @@ terrain_pick defender_ground(const world& w, const std::vector<entity_id>& defen
     return best;
 }
 
+
 // ---------------------------------------------------------------------------
-// Per-unit hits
+// Combatants (BL-1421)
 // ---------------------------------------------------------------------------
-// The resolver returns per-side STRENGTH, per-mille of what marched in. The map
-// needs per-unit counts. This distributes a side's losses across its units
-// proportional to count, remainder assigned by ascending entity id.
-//
-// NO NEW DRAWS. It is a pure function of the round outcome, which is what keeps
-// the battle's whole uncertainty budget inside step_campaign_battle's two draws.
-// Supply and quality already entered through unit_to_stack_entry, so an
-// unsupplied unit is weaker IN THE RESOLVER and its losses bite harder, with no
-// second mechanism bolted on here.
-//
-// CONSERVATION: the distributed total equals the requested total exactly, or the
-// pass would quietly mint or destroy men. `battle_engagement_harness` asserts it.
-int distribute_losses(world& w, const std::vector<entity_id>& units, int to_remove)
+// The resolver is world-free: it fights `land_combatant`s. This pass builds them
+// from the units a battle snapshotted at open, steps, and writes men and
+// readiness back. NO NEW DRAWS anywhere in this file — the battle's whole
+// uncertainty budget stays inside step_campaign_battle's two.
+
+/// A side's combatants, in the side's own (ascending unit id) order, every unit
+/// with men standing.
+std::vector<land_combatant> build_combatants(const world& w, const std::vector<entity_id>& units)
 {
-    if (to_remove <= 0 || units.empty())
-        return 0;
-
-    int total = 0;
-    for (const entity_id uid : units)
-    {
-        const auto it = w.units.find(uid);
-        if (it != w.units.end() && it->second.count > 0)
-            total += it->second.count;
-    }
-    if (total <= 0)
-        return 0;
-    if (to_remove > total)
-        to_remove = total;
-
-    // Floor share first, then hand the remainder out one man at a time in
-    // ascending unit id. Integer arithmetic throughout — a float share would
-    // make the split depend on rounding mode.
-    int assigned = 0;
-    std::vector<std::pair<entity_id, int>> hits;
-    hits.reserve(units.size());
-    for (const entity_id uid : units)
-    {
-        const auto it = w.units.find(uid);
-        const int  c  = (it != w.units.end()) ? std::max(0, it->second.count) : 0;
-        const long long share = (static_cast<long long>(to_remove) * c) / total;
-        hits.emplace_back(uid, static_cast<int>(share));
-        assigned += static_cast<int>(share);
-    }
-    // The remainder, one man at a time in ascending unit id, sweeping until it is
-    // spent. Written as a bounded outer loop rather than an index that wraps:
-    // termination is guaranteed (to_remove is clamped to the standing total, so
-    // while assigned < to_remove some unit still has room), but a wrapping index
-    // makes that argument something a reader has to reconstruct, and a loop that
-    // is only obviously-terminating after a proof is a hazard.
-    for (int pass = 0; assigned < to_remove && pass <= to_remove; ++pass)
-    {
-        bool progressed = false;
-        for (std::size_t i = 0; i < hits.size() && assigned < to_remove; ++i)
-        {
-            const auto it = w.units.find(hits[i].first);
-            if (it == w.units.end())
-                continue;
-            if (hits[i].second < it->second.count)
-            {
-                ++hits[i].second;
-                ++assigned;
-                progressed = true;
-            }
-        }
-        if (!progressed)
-            break; // every unit is at its own count; nothing left to assign
-    }
-
-    int removed = 0;
-    for (const auto& [uid, hit] : hits)
-    {
-        if (hit <= 0)
-            continue;
-        const auto it = w.units.find(uid);
-        if (it == w.units.end())
-            continue;
-        const int take = std::min(hit, it->second.count);
-        it->second.count -= take;
-        removed += take;
-    }
-    return removed;
-}
-
-/// Men currently standing on a side.
-int side_count(const world& w, const std::vector<entity_id>& units)
-{
-    int n = 0;
-    for (const entity_id uid : units)
-    {
-        const auto it = w.units.find(uid);
-        if (it != w.units.end())
-            n += std::max(0, it->second.count);
-    }
-    return n;
-}
-
-/// Build the resolver's stack for a side, in ascending unit id.
-std::vector<army_stack_entry> build_side(const world& w, const std::vector<entity_id>& units)
-{
-    std::vector<army_stack_entry> out;
+    std::vector<land_combatant> out;
     out.reserve(units.size());
     for (const entity_id uid : units)
     {
         const auto it = w.units.find(uid);
-        if (it != w.units.end() && it->second.count > 0)
-            out.push_back(unit_to_stack_entry(w, it->second));
+        if (it == w.units.end() || it->second.count <= 0)
+            continue;
+        const unit_component& u = it->second;
+        land_combatant c;
+        c.unit      = uid;
+        c.men       = u.count;
+        c.readiness = std::clamp(u.readiness_permille, 0, 1000);
+        c.morale    = std::clamp(u.morale_permille, 0, 1000);
+        c.supply    = std::clamp(u.supply_factor_permille, 0, 1000);
+        c.stats     = unit_land_stats(u);
+        out.push_back(c);
     }
     return out;
 }
 
-/// True iff a stack can actually fight — at least one entry with a positive
-/// count, of ANY class.
-///
-/// THE DEGENERATE CASE THIS SCREENS, and it is not theoretical. `resolve_battle`
-/// rejects nothing: a stack that scores zero power still resolves, and with BOTH
-/// sides at zero its tie-break is a strict `>`, so a 0-vs-0 fight resolves as a
-/// DEFENDER VICTORY and still returns 400/200 per-mille losses — casualties
-/// inflicted on forces that could not have fought. Discovery opens a battle on
-/// stance and position alone and never inspects unit class, so nothing else
-/// would catch it.
-///
-/// BL-779 NARROWED WHAT THIS COVERS, and the change of status is the point. The
-/// clause read `e.cls != unit_class::naval`, because an all-naval stack was
-/// degenerate BY CONSTRUCTION — combat.cpp scored the class at exactly zero. It
-/// scores like any other class now, so an all-naval fight is an ordinary fight
-/// and screening it out would suppress the very engagement the water model
-/// exists to make expressible. What remains guarded is the genuinely EMPTY
-/// stack, which is a caller error in any era.
-bool stack_can_fight(const std::vector<army_stack_entry>& stack)
+/// Write a side's men and readiness back to its units. @return men removed.
+/// CONSERVATION: the men the resolver removed are exactly the men the units
+/// lose — the count is copied, never re-derived — so the pass cannot mint or
+/// destroy men. `battle_engagement_harness` asserts it.
+int write_back(world& w, const std::vector<land_combatant>& side)
 {
-    for (const army_stack_entry& e : stack)
-        if (e.count > 0)
+    int removed = 0;
+    for (const land_combatant& c : side)
+    {
+        const auto it = w.units.find(c.unit);
+        if (it == w.units.end())
+            continue;
+        removed += std::max(0, it->second.count - c.men);
+        it->second.count              = std::max(0, c.men);
+        it->second.readiness_permille = std::clamp(c.readiness, 0, 1000);
+    }
+    return removed;
+}
+
+/// True iff a side can START a fight: at least one unit with men and readiness.
+/// A defender need only have men standing — spent defenders are overrun.
+bool side_can_attack(const std::vector<land_combatant>& side)
+{
+    // Fighting AND able to hit: a side of `none`-class units (a ship ashore) has
+    // nothing to attack with, and must not open a fight it can only lose.
+    for (const land_combatant& c : side)
+        if (land_combatant_fighting(c) && (c.stats.soft > 0 || c.stats.hard > 0))
             return true;
     return false;
+}
+
+bool side_has_men(const std::vector<land_combatant>& side)
+{
+    for (const land_combatant& c : side)
+        if (c.men > 0)
+            return true;
+    return false;
+}
+
+void move_morale(world& w, const std::vector<entity_id>& units, int delta)
+{
+    for (const entity_id uid : units)
+    {
+        const auto it = w.units.find(uid);
+        if (it != w.units.end())
+            it->second.morale_permille = std::clamp(it->second.morale_permille + delta, 0, 1000);
+    }
+}
+
+/// Where a retreating unit goes: ONE TILE AWAY FROM THE ENEMY (MILITARY.md § Land —
+/// the unit's stats). Among the neighbours a march can step to — the four sides a
+/// cost walk crosses (`road_side_is_crossable`), never all six — land only and never
+/// a tile an enemy of the unit's owner stands on, preferring ground outside the
+/// battle's province, then the unit's own nation's ground; ties to the lowest tile id.
+/// `null_entity` if no neighbour qualifies — the unit stays where it is, out of the
+/// fight.
+entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
+                       const std::set<entity_id>& enemy_tiles)
+{
+    const auto here = w.tiles.find(u.position);
+    if (here == w.tiles.end())
+        return null_entity;
+    const int row = here->second.grid_y;
+
+    entity_id best      = null_entity;
+    int       best_rank = -1;
+    for (int side = 0; side < 6; ++side)
+    {
+        if (!road_side_is_crossable(side, row))
+            continue;
+        const entity_id n = road_edge_neighbour(w, u.position, side);
+        if (n == null_entity || enemy_tiles.count(n) != 0)
+            continue;
+        const auto tit = w.tiles.find(n);
+        if (tit == w.tiles.end() || is_water(tit->second.substrate))
+            continue;
+        const auto nat  = w.tile_to_nation.find(n);
+        const int  rank = (w.provinces.province_of(n) != province ? 2 : 0)
+                        + (nat != w.tile_to_nation.end() && nat->second == u.owner ? 1 : 0);
+        if (rank > best_rank || (rank == best_rank && n < best))
+        {
+            best      = n;
+            best_rank = rank;
+        }
+    }
+    return best;
+}
+
+/// Every tile an ENEMY OF @p owner stands on, across every live battle @p owner is
+/// in — a unit can be in more than one fight in one province, and a retreat must not
+/// walk onto any of its foes.
+std::set<entity_id> enemy_tiles_of(const world& w, entity_id owner)
+{
+    std::set<entity_id> out;
+    auto add = [&](const std::vector<entity_id>& units) {
+        for (const entity_id uid : units)
+        {
+            const auto it = w.units.find(uid);
+            if (it != w.units.end() && it->second.count > 0 && it->second.position != null_entity)
+                out.insert(it->second.position);
+        }
+    };
+    for (const active_battle& b : w.battles)
+    {
+        if (b.attacker == owner) add(b.defender_units);
+        if (b.defender == owner) add(b.attacker_units);
+    }
+    return out;
+}
+
+/// Retreat every unit of @p units with men standing that is spent (readiness 0)
+/// or, when @p all, every one of them: each moves one tile away from its enemies,
+/// clears its order, loses morale ONCE, and leaves EVERY battle's unit list — a unit
+/// in two fights retreats from both, not twice. Dead units stay listed for the upkeep
+/// pass's orphan cleanup. The enemy tiles are read once, before anyone moves, so the
+/// order units retreat in cannot change where they go. @return units retreated.
+int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint32_t province,
+                 bool all, const campaign_battle_params& p)
+{
+    std::vector<entity_id> leaving;
+    for (const entity_id uid : units)
+    {
+        const auto it = w.units.find(uid);
+        if (it != w.units.end() && it->second.count > 0
+            && (all || it->second.readiness_permille <= 0))
+            leaving.push_back(uid);
+    }
+    if (leaving.empty())
+        return 0;
+
+    const std::set<entity_id> enemy_tiles = enemy_tiles_of(w, owner);
+    for (const entity_id uid : leaving)
+    {
+        unit_component& u = w.units.at(uid);
+        if (const entity_id to = retreat_tile(w, u, province, enemy_tiles); to != null_entity)
+            u.position = to;
+        u.order           = movement_order{};
+        u.morale_permille = std::clamp(u.morale_permille - p.morale_loss, 0, 1000);
+    }
+
+    const std::set<entity_id> gone(leaving.begin(), leaving.end());
+    auto strip = [&](std::vector<entity_id>& v) {
+        v.erase(std::remove_if(v.begin(), v.end(), [&](entity_id x) { return gone.count(x) != 0; }),
+                v.end());
+    };
+    for (active_battle& other : w.battles)
+    {
+        strip(other.attacker_units);
+        strip(other.defender_units);
+    }
+    strip(units); // a no-op when @p units is one of w.battles' own lists; kept for a caller's copy
+    return static_cast<int>(leaving.size());
+}
+
+/// Out of contact, every unit recovers: readiness toward its morale (scaled by its
+/// supply, never above it), morale toward its supply. Each unit's step reads only
+/// itself, so the visit order cannot matter. A fully supplied unit at full
+/// readiness and morale is untouched, so a world that never fights is unmoved.
+void recover_out_of_contact(world& w, const campaign_battle_params& p)
+{
+    std::set<entity_id> in_contact;
+    for (const active_battle& b : w.battles)
+    {
+        if (b.state.end != campaign_battle_end::in_progress)
+            continue;
+        in_contact.insert(b.attacker_units.begin(), b.attacker_units.end());
+        in_contact.insert(b.defender_units.begin(), b.defender_units.end());
+    }
+    for (auto& [uid, u] : w.units)
+    {
+        if (u.count <= 0 || in_contact.count(uid) != 0)
+            continue;
+        const int supply = std::clamp(u.supply_factor_permille, 0, 1000);
+        int morale = std::clamp(u.morale_permille, 0, 1000);
+        if (morale < supply)      morale += std::min(p.morale_recovery_permille, supply - morale);
+        else if (morale > supply) morale -= std::min(p.morale_recovery_permille, morale - supply);
+        u.morale_permille = morale;
+
+        int ready = std::clamp(u.readiness_permille, 0, 1000);
+        if (ready < morale)
+            ready = std::min(morale, ready + p.readiness_recovery_permille * supply / 1000);
+        else
+            ready = morale;
+        u.readiness_permille = ready;
+    }
 }
 
 /// A candidate engagement found by discovery, before any battle is opened.
@@ -245,13 +327,13 @@ battle_phase read_battle_phase(const active_battle& b, int attacker_swing, int d
         return battle_phase::concluded;
     }
 
-    // WAVERING is read against the rout threshold rather than a fixed number, so
-    // the word stays true if the threshold is ever tuned. Within a quarter of the
-    // threshold is "about to break" — near enough that leaving is the live
-    // question, which is the whole reason the phase exists.
-    const int near_rout = params.rout_threshold + params.rout_threshold / 4;
-    if (b.state.attacker_strength_permille <= near_rout
-     || b.state.defender_strength_permille <= near_rout)
+    // WAVERING is read against the authored readiness mark rather than a fixed
+    // number, so the word stays true if it is ever tuned (BL-1421: the strength
+    // reading is side readiness, and a side breaks only when none is left).
+    // Near enough that leaving is the live question, which is the whole reason
+    // the phase exists.
+    if (b.state.attacker_strength_permille <= params.wavering_readiness
+     || b.state.defender_strength_permille <= params.wavering_readiness)
         return battle_phase::wavering;
 
     // CRISIS is a big swing across this tick's batch on either side. Quoted
@@ -291,7 +373,9 @@ withdrawal_price quote_withdrawal(const active_battle& b, withdrawing_side side,
     q.base      = params.withdraw_base_permille;
     q.per_round = b.state.rounds_fought * params.withdraw_per_round_permille;
     q.pursuit   = behind * params.withdraw_pursuit_scale / 1000;
-    q.total     = std::clamp(q.base + q.per_round + q.pursuit, 0, 1000);
+    // One price: the resolver's own total, which is what withdraw_campaign_battle
+    // charges (in men since BL-1421).
+    q.total     = withdrawal_cost_permille(b.state, side, params);
     return q;
 }
 
@@ -413,10 +497,11 @@ bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, enti
     if (attacker_units.empty() || defender_units.empty())
         return false;
 
-    const std::vector<army_stack_entry> atk_stack = build_side(w, attacker_units);
-    const std::vector<army_stack_entry> def_stack = build_side(w, defender_units);
-    if (!stack_can_fight(atk_stack) || !stack_can_fight(def_stack))
-        return false; // see stack_can_fight's own doc comment: the 0-vs-0 trap
+    // A spent attacker starts nothing; a defender need only have men standing.
+    const std::vector<land_combatant> atk = build_combatants(w, attacker_units);
+    const std::vector<land_combatant> def = build_combatants(w, defender_units);
+    if (!side_can_attack(atk) || !side_has_men(def))
+        return false;
 
     const terrain_pick g = defender_ground(w, defender_units);
 
@@ -427,32 +512,14 @@ bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, enti
     id.tick       = static_cast<uint64_t>(tick);
     id.world_seed = w.provinces.seed;
 
-    auto mean_supply = [&](const std::vector<entity_id>& us) {
-        long long sum = 0; int n = 0;
-        for (const entity_id uid : us)
-        {
-            const auto it = w.units.find(uid);
-            if (it == w.units.end()) continue;
-            sum += it->second.supply_factor_permille;
-            ++n;
-        }
-        return n ? static_cast<int>(sum / n) : 1000;
-    };
-
     active_battle nb;
     nb.province        = province;
     nb.attacker        = attacker;
     nb.defender        = defender;
-    nb.attacker_units   = attacker_units;
-    nb.defender_units   = defender_units;
-    nb.ground_tile      = g.tile; // the ground the fight is ON, fixed at open (BL-1145 review)
-    nb.state = begin_campaign_battle(
-        id,
-        atk_stack, doctrine_row{},
-        def_stack, doctrine_row{},
-        g.sub, g.cov, g.density, g.lf,
-        season::summer, // forced, exactly as trigger 1 — the world carries no season
-        mean_supply(attacker_units), mean_supply(defender_units));
+    nb.attacker_units  = attacker_units;
+    nb.defender_units  = defender_units;
+    nb.ground_tile     = g.tile; // the ground the fight is ON, fixed at open (BL-1145 review)
+    nb.state = begin_campaign_battle(id, atk, def, g.sub, g.cov, g.density, g.lf);
 
     w.battles.push_back(std::move(nb));
     std::sort(w.battles.begin(), w.battles.end(), battle_order_less);
@@ -463,6 +530,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
 {
     battle_tick out;
     (void)reg; // the resolver's tuning is campaign_battle_params, not the registry
+    const campaign_battle_params params{};
 
     // -----------------------------------------------------------------------
     // 1. DISCOVERY
@@ -475,8 +543,8 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
     // unit map this joins against is unordered.
     if (!w.corp_hostile_pairs.empty() && !w.units.empty())
     {
-        // corp -> province -> its unit ids, ascending. Built once per tick.
-        std::map<entity_id, std::map<uint32_t, std::vector<entity_id>>> by_corp;
+        // owner -> province -> its unit ids, ascending. Built once per tick.
+        std::map<entity_id, std::map<uint32_t, std::vector<entity_id>>> by_owner;
         {
             std::vector<entity_id> uids;
             uids.reserve(w.units.size());
@@ -491,21 +559,20 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                 const uint32_t prov = w.provinces.province_of(u.position);
                 if (prov == 0)
                     continue; // unpartitioned ground (ocean, off-body) frames no fight
-                by_corp[u.owner][prov].push_back(uid);
+                by_owner[u.owner][prov].push_back(uid);
             }
         }
 
         std::vector<candidate> candidates;
         for (const auto& [from, to] : w.corp_hostile_pairs)
         {
-            const auto fit = by_corp.find(from);
-            const auto tit = by_corp.find(to);
-            if (fit == by_corp.end() || tit == by_corp.end())
+            const auto fit = by_owner.find(from);
+            const auto tit = by_owner.find(to);
+            if (fit == by_owner.end() || tit == by_owner.end())
                 continue;
             for (const auto& [prov, fu] : fit->second)
             {
-                const auto pit = tit->second.find(prov);
-                if (pit == tit->second.end())
+                if (tit->second.find(prov) == tit->second.end())
                     continue;
                 // DIRECTED HOSTILITY SUFFICES — the ambush property BL-448 paid
                 // two tables for. The declarer attacks; the target is drawn in
@@ -524,18 +591,16 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         // That rule is enforced by the `exists` scan below and by this sort, NOT
         // by a dedup pass. A std::unique over unordered-by-pair equality was
         // tried and removed: std::unique only collapses ADJACENT equals, and
-        // with a third corp C where A < C < B the sorted order is
+        // with a third nation C where A < C < B the sorted order is
         // (P,A,B), (P,A,C), (P,B,A) — the mutual pair is not adjacent, so the
         // dedup silently did nothing in exactly the case it was written for. The
         // sort is what makes (P,A,B) reach `exists` before (P,B,A); the scan is
         // what refuses the second. One mechanism, and it works for any number of
-        // corps.
+        // nations.
         std::sort(candidates.begin(), candidates.end(), candidate_less);
 
         for (const candidate& c : candidates)
         {
-            // Already fighting? A corp pair fights at most one battle per
-            // province at a time.
             bool exists = false;
             for (const active_battle& b : w.battles)
             {
@@ -554,9 +619,16 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             nb.province = c.province;
             nb.attacker = c.attacker;
             nb.defender = c.defender;
-            nb.attacker_units = by_corp[c.attacker][c.province];
-            nb.defender_units = by_corp[c.defender][c.province];
+            nb.attacker_units = by_owner[c.attacker][c.province];
+            nb.defender_units = by_owner[c.defender][c.province];
             if (nb.attacker_units.empty() || nb.defender_units.empty())
+                continue;
+
+            // A spent attacker starts nothing; a defender need only have men
+            // standing — spent defenders are overrun (step_campaign_battle).
+            const std::vector<land_combatant> atk = build_combatants(w, nb.attacker_units);
+            const std::vector<land_combatant> def = build_combatants(w, nb.defender_units);
+            if (!side_can_attack(atk) || !side_has_men(def))
                 continue;
 
             const terrain_pick g = defender_ground(w, nb.defender_units);
@@ -573,42 +645,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             // worlds with equal ids still differ").
             id.world_seed = w.provinces.seed;
 
-            // Supply is already per-unit and already folded into the stack by
-            // unit_to_stack_entry; the side-level figure the resolver takes is
-            // the mean, so an army with one starving column is measurably
-            // weaker without a second supply model.
-            auto mean_supply = [&](const std::vector<entity_id>& us) {
-                long long sum = 0; int n = 0;
-                for (const entity_id uid : us)
-                {
-                    const auto it = w.units.find(uid);
-                    if (it == w.units.end()) continue;
-                    sum += it->second.supply_factor_permille;
-                    ++n;
-                }
-                return n ? static_cast<int>(sum / n) : 1000;
-            };
-
-            const std::vector<army_stack_entry> atk_stack = build_side(w, nb.attacker_units);
-            const std::vector<army_stack_entry> def_stack = build_side(w, nb.defender_units);
-            if (!stack_can_fight(atk_stack) || !stack_can_fight(def_stack))
-                continue; // see stack_can_fight: a 0-vs-0 resolve is a false victory
-
-            nb.state = begin_campaign_battle(
-                id,
-                // Doctrine is an ALL-ZERO STUB on both sides, and deliberately
-                // named as one: no per-corp doctrine field exists anywhere on
-                // corporation_component, so resolve_battle's doctrine machinery
-                // contributes nothing to any production battle. Giving it real
-                // rows is its own item, not a line to invent here.
-                atk_stack, doctrine_row{},
-                def_stack, doctrine_row{},
-                g.sub, g.cov, g.density, g.lf,
-                // Summer is FORCED, not chosen: the world carries no season, so
-                // the resolver's winter penalty is dead in production until one
-                // exists. Named here so it reads as a gap rather than a default.
-                season::summer,
-                mean_supply(nb.attacker_units), mean_supply(nb.defender_units));
+            nb.state = begin_campaign_battle(id, atk, def, g.sub, g.cov, g.density, g.lf);
 
             w.battles.push_back(std::move(nb));
             ++out.opened;
@@ -616,49 +653,44 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         std::sort(w.battles.begin(), w.battles.end(), battle_order_less);
     }
 
-    if (w.battles.empty())
-        return out;
-
     // -----------------------------------------------------------------------
     // 2. STEP — several rounds per tick (ruling 3)
     // -----------------------------------------------------------------------
     // `w.battles` is kept sorted, so this walk is order-independent even though
     // discovery joined against unordered containers.
-    const campaign_battle_params params{};
     for (active_battle& b : w.battles)
     {
         if (b.state.end != campaign_battle_end::in_progress)
             continue;
 
-        // STRENGTH IS CAPTURED BEFORE THE WITHDRAWAL, NOT AFTER — and the order
-        // is the whole point rather than a detail. Captured after, the parting
-        // cost was invisible: withdraw_campaign_battle reduces strength_permille,
-        // so a `before` read afterwards saw the already-reduced value, `drop`
-        // came out zero for the withdrawing side, and disengaging killed nobody
-        // while the record that held the cost was erased at the end of the tick.
-        // Withdrawal was free in men and expensive only in a number nothing
-        // outlived. It bites now.
+        // The side's units AS THEY STAND NOW: men lost, readiness spent and supply
+        // moved since the last batch all carry into this one.
+        std::vector<land_combatant> atk = build_combatants(w, b.attacker_units);
+        std::vector<land_combatant> def = build_combatants(w, b.defender_units);
+
         const int before_a = b.state.attacker_strength_permille;
         const int before_d = b.state.defender_strength_permille;
+        const int rounds_before = b.state.rounds_fought;
 
         // WITHDRAWAL IS HONOURED AT THE TICK BOUNDARY, before the next round
         // batch — that is what makes the window a real window. The price is the
-        // resolver's own three-term cost; this pass adds no second rule.
+        // resolver's own three-term cost, charged in men; this pass adds no
+        // second rule.
+        withdrawing_side left = withdrawing_side::none;
         if (b.withdraw_requested != withdrawing_side::none)
         {
-            withdraw_campaign_battle(b.state, b.withdraw_requested, params);
+            left = b.withdraw_requested;
+            withdraw_campaign_battle(b.state, left,
+                                     left == withdrawing_side::attacker ? atk : def, params);
             b.withdraw_requested = withdrawing_side::none;
             ++out.withdrew;
         }
 
-        int fought = 0;
         const int budget = std::max(1, params.rounds_per_tick);
-        while (fought < budget && b.state.end == campaign_battle_end::in_progress)
-        {
-            if (!step_campaign_battle(b.state, params))
-                break;
-            ++fought;
-        }
+        while (b.state.end == campaign_battle_end::in_progress
+               && b.state.rounds_fought - rounds_before < budget)
+            step_campaign_battle(b.state, atk, def, params);
+        const int fought = b.state.rounds_fought - rounds_before;
         if (fought > 0)
         {
             ++out.stepped;
@@ -666,25 +698,31 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         }
 
         // -------------------------------------------------------------------
-        // 3. PER-UNIT HITS
+        // 3. PER-UNIT HITS, then RETREATS
         // -------------------------------------------------------------------
-        // The strength LOST this tick, as a share of what marched in, applied to
-        // the men actually standing. Losses land per round batch, so a battle
-        // weakens units while it runs rather than only at the end — which is
-        // what makes a mid-fight withdrawal a real decision.
-        auto apply_side = [&](const std::vector<entity_id>& units, int before, int after) {
-            const int drop = before - after;
-            if (drop <= 0) return 0;
-            const int standing = side_count(w, units);
-            if (standing <= 0) return 0;
-            const int want = static_cast<int>(
-                (static_cast<long long>(standing) * drop) / std::max(1, before));
-            const int removed = distribute_losses(w, units, want);
-            out.losses += removed;
-            return removed;
-        };
-        const int lost_a = apply_side(b.attacker_units, before_a, b.state.attacker_strength_permille);
-        const int lost_d = apply_side(b.defender_units, before_d, b.state.defender_strength_permille);
+        // Men and readiness land on the units as the batch fought them, so a
+        // battle weakens units while it runs — which is what makes a mid-fight
+        // withdrawal a real decision.
+        const int lost_a = write_back(w, atk);
+        const int lost_d = write_back(w, def);
+        out.losses += lost_a + lost_d;
+
+        // A spent unit leaves the fight one tile away from its enemies; a side that
+        // withdrew leaves whole.
+        retreat_side(w, b.attacker_units, b.attacker, b.province,
+                     left == withdrawing_side::attacker, params);
+        retreat_side(w, b.defender_units, b.defender, b.province,
+                     left == withdrawing_side::defender, params);
+
+        // The strength reading follows the units STILL IN the fight, so the next
+        // withdrawal price and phase are read against the force that is there, not
+        // against the spent units that just left it. A concluded battle keeps the
+        // reading its last round ended on — that is what decided its field.
+        if (b.state.end == campaign_battle_end::in_progress)
+        {
+            b.state.attacker_strength_permille = side_readiness(build_combatants(w, b.attacker_units));
+            b.state.defender_strength_permille = side_readiness(build_combatants(w, b.defender_units));
+        }
 
         if (b.state.end != campaign_battle_end::in_progress)
             ++out.concluded;
@@ -698,9 +736,9 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         // player most needs, and it describes a record that no longer exists by
         // the time any surface runs.
         //
-        // Nothing here consumes a draw or touches world state. The text is a pure
-        // function of this record plus the battle's own stream seed, so the
-        // dispatch layer cannot move the simulation however it is written.
+        // Nothing here consumes a draw. The text is a pure function of this record
+        // plus the battle's own stream seed, so the dispatch layer cannot move the
+        // simulation however it is written.
         if (fought > 0 || b.state.end != campaign_battle_end::in_progress || lost_a || lost_d)
         {
             const int swing_a = b.state.attacker_strength_permille - before_a;
@@ -726,22 +764,17 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                 d.withdrew = withdrawing_side::attacker;
             else if (b.state.end == campaign_battle_end::defender_withdrew)
                 d.withdrew = withdrawing_side::defender;
-            // WHO HOLDS THE FIELD: the side that stayed, defender on ties — both
-            // the resolver's own rules, restated here rather than re-derived so
-            // the dispatch and the resolver cannot disagree about who won.
+            // WHO HOLDS THE FIELD: the resolver's own rule, read through
+            // campaign_battle_result so the dispatch and the resolver cannot
+            // disagree about who won.
             if (b.state.end != campaign_battle_end::in_progress)
-                d.field_held_by = (d.withdrew == withdrawing_side::attacker) ? b.defender
-                                : (d.withdrew == withdrawing_side::defender) ? b.attacker
-                                : (b.state.attacker_strength_permille
-                                       > b.state.defender_strength_permille ? b.attacker
-                                                                            : b.defender);
+                d.field_held_by = campaign_battle_result(b.state).result == battle_result::attacker_victory
+                                      ? b.attacker : b.defender;
 
             // BL-569 (province holder): a DECISIVE close moves the holder to
             // whoever field_held_by already names — every ending except
             // stalemate, mirroring MILITARY.md's "moved by a decisive
-            // battle's field_held_by, left untouched by a stalemate". Read
-            // straight off the dispatch's own field so the record and the
-            // holder can never disagree about who won. Reuses
+            // battle's field_held_by, left untouched by a stalemate". Reuses
             // `province_partition::find` (province.hpp) to translate the
             // province id into `province_holder`'s positional index; a world
             // whose holder vector was never seeded (empty, or a fixture that
@@ -756,6 +789,13 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                     if (idx < w.province_holder.size())
                         w.province_holder[idx] = d.field_held_by;
                 }
+
+                // MORALE ON THE RESULT (MILITARY.md § Land — the unit's stats): the
+                // field's holders gain, the units the other side still has in the
+                // fight lose. Units that retreated already paid their loss.
+                const bool atk_won = (d.field_held_by == b.attacker);
+                move_morale(w, atk_won ? b.attacker_units : b.defender_units,  params.morale_win);
+                move_morale(w, atk_won ? b.defender_units : b.attacker_units, -params.morale_loss);
             }
 
             out.dispatches.push_back(d);
@@ -776,6 +816,11 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                            return b.state.end != campaign_battle_end::in_progress;
                        }),
         w.battles.end());
+
+    // -----------------------------------------------------------------------
+    // 5. RECOVERY (BL-1421) — every unit not in a live fight
+    // -----------------------------------------------------------------------
+    recover_out_of_contact(w, params);
 
     return out;
 }

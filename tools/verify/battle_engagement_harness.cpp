@@ -492,16 +492,20 @@ int main()
             check(q.total == std::clamp(q.base + q.per_round + q.pursuit, 0, 1000),
                   "B12a the three terms sum to the total (they are legible, not decorative)");
 
-            const int before = b.state.attacker_strength_permille;
+            // BL-1421: the charge is IN MEN — the quoted per-mille of the side's
+            // standing men, removed exactly.
+            const int before = f.w.units.at(f.ua).count;
             campaign_battle_state copy = b.state;
-            withdraw_campaign_battle(copy, withdrawing_side::attacker, params);
-            const int actual_drop = before - copy.attacker_strength_permille;
-            const int quoted_drop = before * q.total / 1000;
-            check(std::abs(actual_drop - quoted_drop) <= 1,
+            std::vector<land_combatant> side(1);
+            side[0].unit = f.ua; side[0].men = before;
+            side[0].readiness = f.w.units.at(f.ua).readiness_permille;
+            const int charged = withdraw_campaign_battle(copy, withdrawing_side::attacker, side, params);
+            const int quoted  = before * q.total / 1000;
+            check(charged == quoted && side[0].men == before - charged,
                   "B12b THE QUOTE MATCHES THE CHARGE — the card cannot mis-state what leaving costs");
             std::printf("        quoted %d permille (base %d + per-round %d + pursuit %d)"
-                        " -> %d men-equivalent; charged %d\n",
-                        q.total, q.base, q.per_round, q.pursuit, quoted_drop, actual_drop);
+                        " -> %d men; charged %d\n",
+                        q.total, q.base, q.per_round, q.pursuit, quoted, charged);
         }
         else
         {
@@ -612,24 +616,20 @@ int main()
         check(province_holder_for(f.w, f.province) == null_entity,
               "B15 setup: the fixture's province starts with no recorded holder");
 
-        // Hand-built battle, already at its final round, with the DEFENDER
-        // preset BELOW the rout threshold (300). A round can only ever
-        // REDUCE strength, so the defender's post-round permille stays
-        // <= 250 regardless of the swing draw -- def_broken is guaranteed.
-        // The attacker starts at 1000 and the worst possible single-round
-        // loss (a full-margin round) is 490 permille, leaving >= 510 -- so
-        // atk_broken is impossible. The ending is defender_broken, by
-        // construction, not by luck.
+        // Hand-built battle with the DEFENDER'S UNIT SPENT (BL-1421: readiness 0).
+        // A side with no unit fighting at the start of a round deals nothing and
+        // is broken by it, so defender_broken is guaranteed on round 1 whatever
+        // the swing draws, and the fresh attacker cannot break. By construction,
+        // not by luck.
+        f.w.units.at(f.ub).readiness_permille = 0;
         active_battle b;
         b.province        = f.province;
         b.attacker        = f.att;
         b.defender        = f.def;
         b.attacker_units  = { f.ua };
         b.defender_units  = { f.ub };
-        b.state.attacker  = { unit_to_stack_entry(f.w, f.w.units.at(f.ua)) };
-        b.state.defender  = { unit_to_stack_entry(f.w, f.w.units.at(f.ub)) };
         b.state.attacker_strength_permille = 1000;
-        b.state.defender_strength_permille = 250;
+        b.state.defender_strength_permille = 0;
         b.state.rounds_fought = 0;
         b.state.end           = campaign_battle_end::in_progress;
         b.state.stream_seed   = 0xB569D0u;
@@ -642,7 +642,7 @@ int main()
         {
             const battle_dispatch& d = t.dispatches.front();
             check(d.end == campaign_battle_end::defender_broken,
-                  "B15b the defender broke -- guaranteed by the preset strengths, not the swing draw");
+                  "B15b the defender broke -- guaranteed by its spent unit, not the swing draw");
             check(d.field_held_by == f.att, "B15c the attacker held the field");
             check(province_holder_for(f.w, f.province) == f.att,
                   "B15d THE PROVINCE HOLDER MOVED to the winner");
@@ -667,21 +667,17 @@ int main()
             f.w.province_holder[idx] = third;
         }
 
-        // Hand-built battle, ONE ROUND SHORT of max_rounds (6), both sides at
-        // 900 permille. The worst possible single-round loss between two
-        // EQUAL stacks is bounded by the swing range alone (400..1600 permille
-        // -> margin <= 750 -> loser_loss <= 90 + 750*400/1000 = 390), so
-        // apply_loss(900, 390) = 549 -- comfortably above the 300 rout
-        // threshold whichever side the swing happens to favour. Round 6
-        // therefore concludes as a stalemate by construction, not by luck.
+        // Hand-built battle, ONE ROUND SHORT of max_rounds (6), both units fresh
+        // and equal. One round at the widest swing spends at most a few hundred
+        // per-mille of either side's readiness (campaign_battle_harness C6 prints
+        // a whole parity fight spending 1000 over six), so neither side can be
+        // spent by round 6 and it concludes as a stalemate by construction.
         active_battle b;
         b.province        = f.province;
         b.attacker        = f.att;
         b.defender        = f.def;
         b.attacker_units  = { f.ua };
         b.defender_units  = { f.ub };
-        b.state.attacker  = { unit_to_stack_entry(f.w, f.w.units.at(f.ua)) };
-        b.state.defender  = { unit_to_stack_entry(f.w, f.w.units.at(f.ub)) };
         b.state.attacker_strength_permille = 900;
         b.state.defender_strength_permille = 900;
         b.state.rounds_fought = 5;
@@ -696,7 +692,7 @@ int main()
         {
             const battle_dispatch& d = t.dispatches.front();
             check(d.end == campaign_battle_end::stalemate,
-                  "B16b round 6 elapsed with both sides still standing -- guaranteed by the preset strengths");
+                  "B16b round 6 elapsed with both sides still standing -- guaranteed by two fresh equal units");
             check(province_holder_for(f.w, f.province) == third,
                   "B16c THE PROVINCE HOLDER STAYED PUT -- a stalemate mutates nothing here");
         }
@@ -758,6 +754,147 @@ int main()
         const int after = total_men(w);
         check(after < before,
               "B17g men died through the real step -- conservation and combat both hold for a nation side");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB18 — BL-1421: a spent unit retreats one tile away and leaves the fight\n");
+    {
+        fixture f;
+        build_fixture(f);
+        const entity_id start = f.w.units.at(f.ua).position;
+        bool retreated = false;
+        int morale_after = 1000;
+        for (int i = 0; i < 10 && !retreated; ++i)
+        {
+            run_battles(f.w, reg, i);
+            const unit_component& u = f.w.units.at(f.ua);
+            if (u.position != start)
+            {
+                retreated   = true;
+                morale_after = u.morale_permille;
+            }
+        }
+        // Parity assault on open ground: the attacker is spent (C6), so it goes.
+        check(retreated, "B18a the spent attacker moved off its tile (R2: readiness 0 retreats)");
+        if (retreated)
+        {
+            const unit_component& u = f.w.units.at(f.ua);
+            const int side = road_side_between(f.w, start, u.position);
+            check(side >= 0 && road_side_is_crossable(side, f.w.tiles.at(start).grid_y),
+                  "B18b ...exactly one tile, across a side a march can cross");
+            check(!unit_in_battle(f.w, f.ua), "B18c ...and it is out of the fight");
+            check(morale_after < 1000, "B18d retreating cost it morale (R4)");
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB19 — BL-1421: the winner gains morale, the loser loses it\n");
+    {
+        // B15's construction: a spent defender, so the attacker wins on round 1.
+        fixture f;
+        build_fixture(f, /*declare=*/false);
+        f.w.units.at(f.ua).morale_permille = 800;
+        f.w.units.at(f.ub).morale_permille = 800;
+        f.w.units.at(f.ub).readiness_permille = 0;
+        active_battle b;
+        b.province = f.province; b.attacker = f.att; b.defender = f.def;
+        b.attacker_units = { f.ua }; b.defender_units = { f.ub };
+        b.state.end = campaign_battle_end::in_progress;
+        b.state.stream_seed = 0xB1421u; b.state.rng_state = b.state.stream_seed;
+        f.w.battles.assign(1, b);
+        const battle_tick t = run_battles(f.w, reg, 0);
+        const campaign_battle_params p{};
+        check(!t.dispatches.empty() && t.dispatches.front().end == campaign_battle_end::defender_broken,
+              "B19 setup: the spent defender broke");
+        // The winner's +win lands, then recovery moves it at most one step back
+        // toward its supply (1000) — so it is above where it started.
+        check(f.w.units.at(f.ua).morale_permille >= 800 + p.morale_win,
+              "B19a the field's holder gained morale");
+        check(f.w.units.at(f.ub).morale_permille < 800,
+              "B19b the broken side lost morale");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB20 — BL-1421: out of contact, readiness recovers toward morale\n");
+    {
+        fixture f;
+        build_fixture(f, /*declare=*/false);
+        unit_component& u = f.w.units.at(f.ua);
+        u.readiness_permille = 0;
+        u.morale_permille    = 700;
+        u.supply_factor_permille = 1000;
+        int prev = 0;
+        bool rising = true;
+        for (int i = 0; i < 12; ++i)
+        {
+            run_battles(f.w, reg, i);
+            const int r = f.w.units.at(f.ua).readiness_permille;
+            if (r < prev) rising = false;
+            prev = r;
+        }
+        const unit_component& after = f.w.units.at(f.ua);
+        std::printf("        readiness 0 -> %d, morale 700 -> %d over twelve idle ticks\n",
+                    after.readiness_permille, after.morale_permille);
+        check(rising && after.readiness_permille > 0, "B20a readiness climbs back while out of contact");
+        check(after.readiness_permille <= after.morale_permille,
+              "B20b ...never above morale");
+        check(after.morale_permille > 700, "B20c a fully supplied unit's morale climbs toward its supply");
+
+        unit_component& hungry = f.w.units.at(f.ub);
+        hungry.supply_factor_permille = 400;
+        run_battles(f.w, reg, 20);
+        check(f.w.units.at(f.ub).morale_permille < 1000, "B20d an unsupplied unit's morale falls toward its supply");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB21 — BL-1421: a world that never fights is unmoved\n");
+    {
+        fixture f;
+        build_fixture(f, /*declare=*/false);
+        const uint64_t h0 = f.w.state_hash(0);
+        for (int i = 0; i < 5; ++i) run_battles(f.w, reg, i);
+        check(f.w.state_hash(0) == h0,
+              "B21a fully supplied units at full readiness and morale hash exactly as before (R6)");
+
+        // The counter-case, stated so R6's scope is honest: an UNSUPPLIED unit's
+        // morale drifts toward its supply even with no fight, and the hash moves.
+        f.w.units.at(f.ua).supply_factor_permille = 900;
+        const uint64_t h1 = f.w.state_hash(0);
+        run_battles(f.w, reg, 9);
+        check(f.w.state_hash(0) != h1 && f.w.units.at(f.ua).morale_permille == 990,
+              "B21b an unsupplied unit's morale moves without a fight (10 toward its supply), so the hash does");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB22 — a unit in two battles retreats once, not twice\n");
+    {
+        // One spent unit of A listed in two battles at once, (P,A,B) and (P,A,C).
+        fixture f;
+        build_fixture(f, /*declare=*/false);
+        const entity_id third = add_corp(f.w, "Third");
+        const entity_id t = f.w.units.at(f.ua).position;
+        const entity_id uc = add_unit(f.w, third, t);
+        f.w.units.at(f.ua).readiness_permille = 0;
+        auto battle_vs = [&](entity_id def, entity_id du, uint64_t seed) {
+            active_battle b;
+            b.province = f.province; b.attacker = f.att; b.defender = def;
+            b.attacker_units = { f.ua }; b.defender_units = { du };
+            b.state.end = campaign_battle_end::in_progress;
+            b.state.stream_seed = seed; b.state.rng_state = seed;
+            return b;
+        };
+        f.w.battles = { battle_vs(f.def, f.ub, 0xB22A), battle_vs(third, uc, 0xB22B) };
+        std::sort(f.w.battles.begin(), f.w.battles.end(), battle_order_less);
+        run_battles(f.w, reg, 0);
+        const campaign_battle_params p{};
+        const unit_component& u = f.w.units.at(f.ua);
+        const int side = road_side_between(f.w, t, u.position);
+        std::printf("        morale 1000 -> %d; moved %s\n", u.morale_permille, side >= 0 ? "one tile" : "elsewhere");
+        check(u.morale_permille == 1000 - p.morale_loss + p.morale_recovery_permille,
+              "B22a it paid the morale loss ONCE (then one tick of recovery)");
+        check(side >= 0, "B22b it moved one tile, not two");
+        const std::set<entity_id> foes = { f.w.units.at(f.ub).position, f.w.units.at(uc).position };
+        check(foes.count(u.position) == 0, "B22c it did not retreat onto either foe's tile");
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

@@ -499,19 +499,84 @@ int main()
         std::size_t rows = 0; // the buildings the v57 section carries
         for (const auto& [bid, b] : wd.buildings)
             rows += canonical_construction_days(b).any() ? 1 : 0;
-        check(have && b57.size() == b56.size() + 8 + 36 * rows && rows >= 2,
-              "P23 v56 is v57 less its section (8 bytes + 36 a row)");
+        // BL-1421 (v58): today's stream carries the unit combat-state section AFTER
+        // the days, 4 bytes + 16 a unit, so the days section ends that far from the tail.
+        const std::size_t unit_section = 4 + 16 * wd.units.size();
+        check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
+              "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
         // Untrusted: a cursor past the quarter is refused whole.
         std::string bad = b57;
-        if (have && b57.size() >= 8 + 36 * rows)
+        if (have && b57.size() >= 8 + 36 * rows + unit_section)
         {
             const int32_t past = 91;
-            std::memcpy(&bad[b57.size() - 8 - 36 * rows], &past, sizeof past);
+            std::memcpy(&bad[b57.size() - unit_section - 8 - 36 * rows], &past, sizeof past);
         }
         world sentinel;
         check(have && !from_bytes(bad, sentinel) && sentinel.buildings.empty(),
               "P23 a cursor past day 90 is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // P24 (BL-1421, requirement R6) -- the v58 unit combat state round-trips by
+    // value, a v57 stream reads with full readiness and morale, and a value out
+    // of range is refused whole.
+    // -----------------------------------------------------------------------
+    {
+        world wu = w;
+        std::vector<entity_id> uids;
+        for (const auto& [uid, u] : wu.units) uids.push_back(uid);
+        std::sort(uids.begin(), uids.end());
+        const bool have = !uids.empty();
+        if (have)
+        {
+            unit_component& u = wu.units.at(uids[0]);
+            u.establishment      = u.count + 17;
+            u.readiness_permille = 333;
+            u.morale_permille    = 777;
+        }
+        const std::string b58 = to_bytes(wu);
+        world back;
+        bool ok = have && from_bytes(b58, back);
+        if (ok)
+        {
+            const unit_component& r = back.units.at(uids[0]);
+            ok = r.establishment == wu.units.at(uids[0]).establishment
+              && r.readiness_permille == 333 && r.morale_permille == 777
+              && back.state_hash(3) == wu.state_hash(3) && to_bytes(back) == b58;
+        }
+        check(ok, "P24 a unit's establishment, readiness and morale round-trip by value (hash and bytes equal)");
+
+        std::string b57;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_combat(wu, o);
+            b57 = o.str();
+        }
+        uint32_t stamped = 0;
+        std::memcpy(&stamped, &b57[4], sizeof stamped);
+        world old;
+        bool ok57 = have && stamped == k_world_save_version_pre_combat && from_bytes(b57, old);
+        if (ok57)
+            for (const auto& [uid, u] : old.units)
+                ok57 = ok57 && u.establishment == 0 && u.readiness_permille == 1000
+                    && u.morale_permille == 1000;
+        check(ok57, "P24 a v57 stream reads, its units with no establishment and full readiness and morale");
+        check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size(),
+              "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
+
+        // Untrusted: readiness past 1000 is refused whole. The first row's
+        // readiness sits 8 bytes into it (after the id and the establishment).
+        std::string bad = b58;
+        const std::size_t row0 = b58.size() - 16 * wu.units.size();
+        if (have)
+        {
+            const int32_t over = 1001;
+            std::memcpy(&bad[row0 + 8], &over, sizeof over);
+        }
+        world sentinel;
+        check(have && !from_bytes(bad, sentinel) && sentinel.units.empty(),
+              "P24 a readiness past 1000 is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------
@@ -1155,14 +1220,15 @@ int main()
         id.tick       = 900;
         id.world_seed = 4242;
 
-        const std::vector<army_stack_entry> att = {
-            { 1, unit_class::infantry, 40, 0 },
-            { 2, unit_class::cavalry, 12, 0 },
+        // BL-1421: the round fights combatants built from units each tick; the
+        // saved battle carries the stream and the strength reading, and these
+        // vectors stand in for the units on both sides of the load.
+        auto combatant = [](entity_id u, land_class c, int men) {
+            land_combatant x; x.unit = u; x.men = men; x.stats = land_class_stats(c); return x;
         };
-        const std::vector<army_stack_entry> def = {
-            { 1, unit_class::infantry, 35, 0 },
-            { 3, unit_class::ranged, 10, 0 },
-        };
+        std::vector<land_combatant> att = { combatant(101, land_class::infantry, 400),
+                                            combatant(102, land_class::light_armour, 120) };
+        std::vector<land_combatant> def = { combatant(201, land_class::infantry, 350) };
 
         active_battle ab;
         ab.province       = id.province;
@@ -1171,15 +1237,13 @@ int main()
         ab.attacker_units = { 101, 102 };
         ab.defender_units = { 201 };
         ab.ground_tile    = 777; // BL-1145 review (world_save_version 30): the ground, stored at open
-        ab.state = begin_campaign_battle(id, att, doctrine_row{}, def, doctrine_row{},
-                                         terrain_substrate::sedimentary, terrain_cover::grass,
-                                         150u, terrain_landform::plains, season::summer,
-                                         1000, 1000);
+        ab.state = begin_campaign_battle(id, att, def, terrain_substrate::sedimentary,
+                                         terrain_cover::grass, 150u, terrain_landform::plains);
 
         // Fight a round or two so the save is taken MID-fight, with the stream
         // already advanced -- a battle saved before its first round would not
         // test the thing this row is about.
-        step_campaign_battle(ab.state);
+        step_campaign_battle(ab.state, att, def);
         check(ab.state.end == campaign_battle_end::in_progress,
               "P6 the test battle is still in progress when the snapshot is taken");
         note("rng_state at save: ", (unsigned long long)ab.state.rng_state);
@@ -1209,8 +1273,9 @@ int main()
             // the two fights end identically -- same rounds, same losses.
             campaign_battle_state live  = ab.state;
             campaign_battle_state saved = after.battles[0].state;
-            while (step_campaign_battle(live)) {}
-            while (step_campaign_battle(saved)) {}
+            std::vector<land_combatant> la = att, ld = def, sa = att, sd = def;
+            while (step_campaign_battle(live, la, ld)) {}
+            while (step_campaign_battle(saved, sa, sd)) {}
 
             const campaign_battle_outcome ol = campaign_battle_result(live);
             const campaign_battle_outcome os = campaign_battle_result(saved);

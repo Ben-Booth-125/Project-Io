@@ -56,7 +56,7 @@ class recipe_registry;
 /// Rounds are mechanically uniform — every one is the same two draws against the
 /// same scoring. The phase is a READING of a round, not a property of it: the
 /// opening reads as a skirmish, the middle as commitment, a large swing as a
-/// crisis, an approach to the rout threshold as wavering. It exists so a player
+/// crisis, readiness running low as wavering. It exists so a player
 /// can tell at a glance whether a fight is worth staying in.
 ///
 /// It is derived HERE, once, because two surfaces consume it — the dispatch
@@ -68,7 +68,7 @@ enum class battle_phase : uint8_t
     opening,    ///< First rounds. Contact made, nothing decided.
     committed,  ///< The middle. Both sides are in it now.
     crisis,     ///< A large swing this round — the fight turned.
-    wavering,   ///< A side is near the rout threshold.
+    wavering,   ///< A side's readiness is at or below `wavering_readiness`.
     broke_off,  ///< A withdrawal was honoured this tick, with its price paid.
     concluded,  ///< The fight ended. Who holds the field, and what it cost.
 };
@@ -121,7 +121,7 @@ struct battle_dispatch
 battle_phase read_battle_phase(const active_battle& b, int attacker_swing, int defender_swing,
                                const campaign_battle_params& params);
 
-/// The CURRENT price of breaking off, per-mille of remaining strength, with its
+/// The CURRENT price of breaking off, per-mille of the side's standing men, with its
 /// three terms separated so a surface can show them (BL-469 asks for exactly
 /// this: "the three terms legible ... updating as rounds pass").
 ///
@@ -191,8 +191,8 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
 ///
 /// Returns false and leaves `w.battles` untouched if the pair is already
 /// fighting in @p province, if either side has no standing unit there, or if
-/// `stack_can_fight` rejects either side (§ the degenerate 0-vs-0 case,
-/// `stack_can_fight`'s own doc comment).
+/// no attacking unit has readiness left to start a fight (BL-1421: a spent
+/// attacker starts nothing; spent defenders are still caught and overrun).
 bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, entity_id defender);
 
 /// Request that @p corp break off a battle it is fighting in @p province.

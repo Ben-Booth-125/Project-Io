@@ -143,6 +143,24 @@
     "docs/military/MILITARY.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1087",
+   "title": "Six calls taken building the land combat core",
+   "raised": "2026-10-27",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1421 (soft hard resolver)",
+   "what": "(1) HP is the unit's count of men against a stored establishment; equipment joins HP with BL-1423 (refit and retreat). (2) Terrain DIVIDES the attacker's hits (a mountain halves them) rather than raising the defender's absorb: an absorb raise mattered only where hits already exceeded defence, so infantry-on-infantry ignored mountains. MILITARY.md says so now. (3) The calibration, measured by campaign_battle_harness C4 (infantry on plains, 200 seeds): breaking a defender takes about 2:1 - decisive 0% at 1:1, 15% at 1.5:1, 64% at 1.75:1, 89% at 2:1, 99% from 2.5:1; fights last about two ticks. The old curve was 50% at 1:1 because the old round had no attacker penalty. (4) A side of spent units is overrun: it deals nothing, the enemy's hits land on it in full, and it is broken. (5) A retreat moves one tile: land, never onto an enemy of the fight, preferring outside the province then own ground, ties to the lowest tile id; a unit with nowhere to go stays put, out of the fight. (6) Morale: +50 to a battle's winners, -100 to its losers and to every unit that retreats; out of contact readiness regains 100 a tick scaled by supply, never above morale, and morale moves 10 a tick toward supply. Found by the cold review and left for you: (7) a static nation garrison that retreats has no order to return, so it stays off its post; (8) the rival scorer's unit_strength still reads men x quality x supply and ignores class, readiness and morale, so the AI's picture of strength has drifted from the resolver (BL-1427, fronts, is where the AI reads force); (9) a v57 save loads its units with no establishment, so a unit wounded before the load reads at full HP.",
+   "why_it_matters": "Each sets how war feels before fronts and the AI are built on it. And the re-bless: player_seed_sweep digests fail 16/16 with the v58 stream, owed to the sprint's re-bless.",
+   "recommendation": "Keep all six; (3) is the one to feel in play.",
+   "files": [
+    "src/world/campaign_battle.cpp",
+    "src/world/battle_system.cpp",
+    "src/world/unit_roster.cpp",
+    "docs/military/MILITARY.md"
+   ],
+   "resolution": null
   }
  ]
 }

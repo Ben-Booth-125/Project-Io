@@ -99,20 +99,27 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 |---|---|---|
 | `max_rounds` | 6 | Rounds before the fight is called a stalemate |
 | `swing_permille` | 600 | Half-width of the per-round power swing — a uniform draw in [400, 1600] |
-| `rout_threshold` | 300 | Strength at or below which a side breaks and the fight ends |
-| `round_loser_loss_base` / `_margin` | 90 / 400 | The round-loser's attrition: flat base plus a share of the margin |
-| `round_winner_loss_base` / `_margin` / `_floor` | 45 / 20 / 5 | The round-winner's, falling as the round gets lopsided |
+| `absorbed_land_permille` | 250 | Share at which hits within the target's defence (or breakthrough) land; hits beyond it land in full |
+| `hp_share_permille` | 300 | Share of landed damage that kills men; the rest spends readiness |
+| `hp_cost` | 400 | Milli-hits of HP damage that kill one man |
+| `readiness_cost` | 185 | Milli-hits per man that spend a unit's whole readiness |
+| `terrain_attack_scale` | 1000 | How far `terrain_defence` divides the attacker's hits — a mountain halves them |
+| `wavering_readiness` | 300 | Side readiness at or below which the phase reads wavering |
+| `morale_win` / `morale_loss` | 50 / 100 | Morale a battle's winners gain, and its losers and every retreating unit lose |
+| `readiness_recovery_permille` / `morale_recovery_permille` | 100 / 10 | Out of contact, per tick: readiness regained (by supply, never above morale), and morale's step toward supply |
 | `withdraw_base_permille` | 20 | Flat price of turning your back at all |
 | `withdraw_per_round_permille` | 25 | Added per round already fought |
 | `withdraw_pursuit_scale` | 400 | Share of how far behind the withdrawing side is |
 | `rounds_per_tick` | 3 | Rounds fought per economy tick (Ben's ruling 3, 2026-08-19) |
 
-Attrition is applied **multiplicatively** to remaining strength, so a long fight compounds rather
-than sums past zero.
+**The strength reading is side readiness**: a side's men-weighted mean readiness, read against the
+units still in the fight. The withdrawal price is charged **in men**, per-mille of the side's
+standing men.
 
-`swing_permille` is 600 rather than 300 (NR-204): at 300 a 1.4:1 attacker won 99% of fights,
-which Ben ruled too safe. Measured at 600 over 1000 seeds per ratio: 1.0:1 → 50%, 1.2:1 → 76%,
-1.4:1 → 89%, 2.0:1 → 99.8%.
+**The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio): attacking is
+dear, and breaking a defender takes about 2:1 in men — decisive 0% at 1:1, 15% at 1.5:1, 64% at
+1.75:1, 89% at 2:1, 99% from 2.5:1, a fight lasting about two ticks. `swing_permille` stays at 600
+(NR-204: a narrower swing made the edge too safe).
 
 `rounds_per_tick` at 3 against `max_rounds` 6 means a full battle spans two ticks and the player
 gets exactly one real between-tick decision. Raise it and the fight resolves before anyone can
@@ -158,8 +165,9 @@ reads is shown on the surface that reads it.
 
 **The arithmetic.** A unit's hits on a target are
 `soft_attack × (1 − target.hardness) + hard_attack × target.hardness`, scaled by its morale and
-supply. The target absorbs up to its defence (defending) or breakthrough (attacking), raised by
-terrain and fortification; absorbed hits land at a fraction, the rest in full. Landed damage
+supply. The defender's ground divides the attacker's hits (`terrain_defence`: a mountain halves
+them). The target absorbs up to its defence (defending) or breakthrough (attacking), raised by
+fortification; absorbed hits land at a fraction, the rest in full. Landed damage
 splits between HP and readiness, readiness taking the larger share, so most fights end in a
 retreat rather than a death — which is how real units fail. **There is no piercing-versus-armour
 check**: hardness alone carries "infantry cannot hurt tanks".
@@ -376,12 +384,11 @@ by entity id), which is what keeps the container's iteration order off the deter
 - `src/world/nation_generation.cpp` — a nation's garrisons, owner set to the nation entity, no
   `muster_base` (a nation raises no base). See § Nation garrisons, below.
 
-**The bridge from a unit to the resolver** is `unit_to_stack_entry(w, u)`
-(`src/world/unit_roster.hpp`), the adapter that resolves a live unit into the value both resolvers
-accept: supply is carried in the entry's `count`, quality in its `type_power_mod` — deliberately
-not both in one place, since doubling quality into count would square it against `unit_strength`.
-`run_battles` calls it for every participating unit. `roster_stack` — the other composition path,
-from *region manpower* — is Era −1's alone.
+**The bridge from a unit to the campaign resolver** is the `land_combatant` `run_battles` builds
+from each participating unit: its men, readiness, morale and supply, and `unit_land_stats` — its
+row's land class, scaled by the row's quality (`src/world/unit_roster.hpp`). `unit_to_stack_entry`
+is the Era −1 resolver's adapter, and `roster_stack` — composition from *region manpower* — is
+Era −1's too.
 
 **What reads a unit.** Two condition subjects — `military_units` (summed counts) and
 `military_strength` (summed derived strengths, an integer sum) — in `src/world/condition_set.cpp`,
@@ -663,13 +670,10 @@ against each existing participant rather than joining theirs. **Membership is sn
 open** — a unit marching in after the first round reinforces nothing — and the participating unit
 ids are stored ascending per side.
 
-Both sides are screened by `stack_can_fight` (§ `resolve_battle`). Doctrine is `doctrine_row{}`
-on both sides — no per-nation doctrine field exists, so the doctrine machinery contributes nothing
-to a campaign battle until a formation carries a row (BL-472, formations). Season is `summer` —
-the world carries no season, so the winter penalty is a history-sim-only effect. Side supply is
-the mean of the participating units' `supply_factor_permille`; per-unit supply and quality have
-already entered through `unit_to_stack_entry`, so an unsupplied unit is weaker in the resolver
-with no second mechanism.
+**Who can fight.** A battle opens only where the attacker has a unit with readiness left and an
+attack to make; the defender need only have men standing — spent defenders are caught and overrun.
+Supply, morale and quality reach the round per unit (§ The campaign force model), so an unsupplied
+unit is weaker with no second mechanism. The round reads no doctrine and no season.
 
 **What makes it deterministic.** The containers a battle is discovered from are unordered, so every
 stage recovers order explicitly: candidates are sorted by (province, attacker, defender) before any
@@ -677,12 +681,18 @@ battle opens; `world::battles` is kept in that order (`battle_order_less`); unit
 the terrain pick is an argmax broken by tile id; and no stage consumes a draw outside
 `step_campaign_battle`. `state_hash` folds the battle list.
 
-**Per-unit hits.** Each tick the strength a side lost, as a share of what marched in, is applied
-to the men actually standing: `distribute_losses` hands out floor shares, then the remainder one
-man at a time in ascending unit id — integer arithmetic throughout. **Conservation is exact**: men
-removed equal the losses the pass reports, or the pass would quietly mint or destroy men. Losses
-land per round batch, so a battle weakens units while it runs, which is what makes a mid-fight
-withdrawal a real decision.
+**Per-unit hits.** The round kills men across a side's fighting units in proportion to their men —
+floor shares, then the remainder one man at a time in ascending unit id, integer arithmetic
+throughout — and spends each one's readiness by its share of the hits. The pass copies the men and
+readiness back to the units, so **conservation is exact**: men removed equal the losses the pass
+reports. Losses land per round batch, so a battle weakens units while it runs, which is what makes
+a mid-fight withdrawal a real decision.
+
+**Retreat.** A unit spent to readiness 0, and every unit of a side that withdrew, steps one tile
+away from its enemies — to a neighbour a march can reach, land, never a foe's tile, preferring
+ground outside the province and then its own nation's — loses morale once, and leaves every battle
+it was in. A unit with nowhere to go stays put, out of the fight. The side's strength reading is
+then re-read over the units still in it.
 
 **Withdrawal** is `request_withdraw(w, actor, province, against)`. `against` names the fight, because
 a nation can be in more than one battle in one province; `null_entity` means "the first, in sorted
@@ -711,7 +721,7 @@ way the aftermath — who held the field, what it cost — can reach a surface a
 surfaces consume it and they must never disagree. Rounds are mechanically uniform; the phase is a
 *reading*: `opening` (the first batch), `committed` (after it — a statement about the withdrawal
 price, since by round 4 the per-round term alone has tripled), `crisis` (a swing of 150 or more
-across the batch, either side), `wavering` (a side within a quarter above `rout_threshold`, read
+across the batch, either side), `wavering` (a side's readiness at or below `wavering_readiness`, read
 against the parameter so the word stays true if it is tuned), `broke_off`, `concluded`. Later
 readings are the more urgent ones and win.
 
@@ -832,8 +842,8 @@ goods draw went unmet. Both fire the **same** subtraction on `supply_factor_perm
 mean the same thing — an army that is not being supplied gets weaker. It is deliberately not two
 rules. The subtraction stops at the unit's **supply share**: zero out of reach, and on a short draw
 the mean over its goods of the fraction met, in integer per-mille (BL-1172, fair-price upkeep). A
-unit fed half its draw fights at half strength, since `unit_strength` and `unit_to_stack_entry`
-both scale by the supply factor.
+unit fed half its draw hits at half strength, since the land round scales each unit's hits by its
+supply factor, and its morale drifts toward it.
 
 The reach trigger is **opt-in**: a non-positive `out_of_supply_reach` disables it *and* the
 Dijkstra behind it, so a zero table costs no time as well as no credits. The test is
@@ -852,9 +862,8 @@ reports the count as `unit_upkeep_tick::disbanded`.
 `muster_base == null_entity` means "no base recorded" — the hard-coded world's stub unit — and is
 never orphaned.
 
-**Supply is measurably real in the resolver, not merely expensive.** `unit_strength` and
-`unit_to_stack_entry` both read `supply_factor_permille`, so an unsupplied army is weaker where it
-counts.
+**Supply is measurably real in the resolver, not merely expensive.** The land round reads each
+unit's `supply_factor_permille`, so an unsupplied army is weaker where it counts.
 
 ---
 
@@ -914,11 +923,14 @@ asserts over is
 **`campaign_battle_harness.cpp`** — `resolve_campaign_battle`. C1: replay determinism including the
 per-round trace, stepping matching the scripted wrapper, and the seed genuinely folding from the
 identity (a different tick, and a role swap, both give different streams). C2: the randomness
-reaches the outcome and a near-even fight is uncertain. C3: withdrawing later usually costs more,
-and a later exit only ever gets cheaper because the deficit narrowed. C4: a strength sweep that is
-monotone in force, with an uncertain band and a near-unloseable top. C5: the two resolvers never
-disagree on a lopsided fight. C4's rate threshold is written as a **prediction**, not a
-tuned-to-pass number.
+reaches the outcome and a fight inside the band is uncertain. C3: withdrawing later usually costs
+more men, a later exit only ever gets cheaper because the deficit narrowed, and a many-unit side's
+charge is exactly the quoted share of its men. C4: a strength sweep that is monotone in force, with
+an uncertain band, a near-unloseable top and the defender holding at parity, plus the printed
+decisive curve. C5: every roster row maps to a land class; armour beats infantry in the open; a
+mountain costs an attacker; hardness turns soft attack away. C6: readiness falls faster than men,
+and a side of spent units deals nothing, is overrun and broken. C4's rates are written as
+**predictions**, not tuned-to-pass numbers.
 
 **`battle_engagement_harness.cpp`** — `run_battles`. B1: the trigger fires from hostility plus a
 shared province alone, men die through the tick rather than a direct resolver call, and two
@@ -932,7 +944,11 @@ honoured on the following tick. B9: a unit in contact reads as in-battle and `ma
 it. B10–B11: a battle that fought emits a dispatch naming the fight, rounds/max and the stream
 seed; a concluded dispatch names who held the field after the record is gone. B12: the three
 withdrawal terms sum to the total and **the quote matches the charge**. B13: twin worlds emit
-byte-identical dispatch sequences and stay identical. B14: every phase produces a line.
+byte-identical dispatch sequences and stay identical. B14: every phase produces a line. B18: a spent
+unit retreats one marchable tile and leaves the fight, losing morale. B19: the winner gains morale,
+the loser loses it. B20: out of contact readiness climbs toward morale, never above it, and morale
+moves toward supply either way. B21: a world of fully supplied units at full readiness and morale
+hashes as it did; an unsupplied one moves.
 
 **`unit_upkeep.cpp`** — the upkeep pass and derived strength. U1: the credit charge is exactly N ×
 the type's rate and nothing else in the budget moves; the goods debit is exactly N × each authored

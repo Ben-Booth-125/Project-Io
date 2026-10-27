@@ -1763,7 +1763,7 @@ void draw_battle_side(const world& w, const char* label, entity_id corp,
     // The aggregate first: it is the number that answers "am I winning".
     ImGui::ProgressBar(std::clamp(strength_permille / 1000.0f, 0.0f, 1.0f),
                        ImVec2(-1.0f, 0.0f));
-    ImGui::TextDisabled("%.1f%% of what marched in", strength_permille / 10.0f);
+    ImGui::TextDisabled("%.1f%% readiness", strength_permille / 10.0f); // BL-1421: side readiness
 
     if (!show_units)
     {

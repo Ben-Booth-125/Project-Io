@@ -2958,6 +2958,7 @@ void seed_starting_military(world& w, entity_id corp_id,
         .type     = 0,
         .supply_factor_permille = 1000,
         .muster_base = base_id,
+        .establishment = starting_unit_manpower, // BL-1421: the HP bar's full mark
     };
 }
 

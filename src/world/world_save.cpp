@@ -1449,7 +1449,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // build_day_milli, completion_day, output_share_permille, milli-days of
     // materials owed, credits paid at placement (f32) — Ben, 2026-10-25). A v56 stream ends
     // before it and is read with its days derived from its ticks.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_combat)
     {
         w_i32(out, w.construction_quarter_day);
         std::vector<entity_id> ids;
@@ -1476,6 +1476,34 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_f32(out, cd.credit);  // Ben, 2026-10-25: credits paid at placement
         }
     }
+
+    // world_save_version 58 (BL-1421): THE UNIT COMBAT STATE, the last section. Every
+    // unit, ascending id, as (id, establishment, readiness, morale). A v57 stream ends
+    // before it and is read with full readiness and morale.
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(w.units.size());
+        for (const auto& [uid, u] : w.units)
+            ids.push_back(uid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id uid : ids)
+        {
+            const unit_component& u = w.units.at(uid);
+            w_id(out, uid);
+            w_i32(out, u.establishment);
+            w_i32(out, u.readiness_permille);
+            w_i32(out, u.morale_permille);
+        }
+    }
+}
+
+void write_world_snapshot_pre_combat(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1421): the v57 stream shape — no unit combat-state
+    // section — so the v57 reader has a producer. The game never writes an old version.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_combat);
 }
 
 void write_world_snapshot_pre_days(const world& w, std::ostream& out)
@@ -1567,7 +1595,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_net        // BL-1337: v53, nets as f32
             && version != k_world_save_version_pre_major      // BL-1404: v54, majors derived
             && version != k_world_save_version_pre_books      // BL-1407: v55, corporations folded
-            && version != k_world_save_version_pre_days))     // v56: days derived from ticks (Ben, 2026-10-24)
+            && version != k_world_save_version_pre_days       // v56: days derived from ticks (Ben, 2026-10-24)
+            && version != k_world_save_version_pre_combat))   // BL-1421: v57, full readiness and morale
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2164,7 +2193,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // day in [0, 90]; share in [0, 1000]. Refused whole otherwise. A v56 (and
     // older) stream ends before it: its cursor is 0 and each site's days are
     // DERIVED from its ticks (`sync_construction_days`, x 90).
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_combat)
     {
         const int qd = k_construction_quarter_days;
         int32_t cursor = 0;
@@ -2217,6 +2246,37 @@ bool read_world_snapshot(world& w, std::istream& in)
         for (auto& [bid, b] : s.buildings)
             if (b.ticks_remaining > 0)
                 sync_construction_days(b);
+    }
+
+    // v58 (BL-1421): the unit combat state. Untrusted: exactly one row per unit in
+    // the stream, strictly ascending, never null; establishment in [0, 10^7];
+    // readiness and morale in [0, 1000]. Refused whole otherwise. A v57 (and older)
+    // stream ends before it: its units keep the struct defaults — no establishment
+    // recorded (`unit_establishment` reads the count), full readiness and morale.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count != s.units.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev))
+                return false;
+            prev = uid;
+            const auto uit = s.units.find(uid);
+            if (uit == s.units.end())
+                return false;
+            int32_t est = 0, ready = 0, morale = 0;
+            if (!(r_i32(in, est) && r_i32(in, ready) && r_i32(in, morale)))
+                return false;
+            if (est < 0 || est > 10'000'000 || ready < 0 || ready > 1000 || morale < 0 || morale > 1000)
+                return false;
+            uit->second.establishment      = est;
+            uit->second.readiness_permille = ready;
+            uit->second.morale_permille    = morale;
+        }
     }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct

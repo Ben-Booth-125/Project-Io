@@ -1,5 +1,29 @@
 # REFINED — active worklist
 
+## Sprint 58 — the land combat core (opened 2026-10-26)
+
+**Goal.** The campaign's land fight runs on MILITARY.md § The campaign force model: per-unit HP,
+readiness and morale; soft and hard attack against hardness; retreat on spent readiness.
+
+**Gates.** The item's harnesses (`campaign_battle_harness`, `battle_engagement_harness`),
+`world_determinism`, `save_roundtrip`. A world mover only where battles occur: `market_viability`
+quick tier before and after. A cold `code-reviewer` pass with a fix round budgeted.
+
+### BL-1421 (soft hard resolver) — Delivery Full, group `land-combat-core`
+Carries BL-1422 (land classes and kit) T1 — the class stat table — and BL-1423 (refit and retreat)
+T1 — readiness and morale recovery — because a fight cannot be scored without stats, nor repeated
+without recovery. Kit goods, refit and the labour pool stay with their items.
+- [x] **T1** `unit_component` gains `establishment`, `readiness_permille`, `morale_permille`; the three
+  writers set them; save v58 appends them (v57 reads full); `state_hash` folds them only off-default. (R6)
+- [x] **T2** `land_class` and its stat table; `land_class_for(roster_row)`; stats scaled by the row's
+  quality (`unit_roster.{hpp,cpp}`). (R3)
+- [x] **T3** The pure land round: `land_combatant`, `step_campaign_battle` over combatants; the
+  withdrawal cost charged in men; `resolve_battle` no longer called (`campaign_battle.{hpp,cpp}`). (R1, R2, R5)
+- [x] **T4** `run_battles` builds combatants from units, writes men and readiness back, retires spent
+  units to a tile away, moves morale at the end, recovers units out of contact (`battle_system.cpp`). (R2, R4, R5)
+- [x] **T5** Re-point `campaign_battle_harness`, `battle_engagement_harness`, `save_roundtrip`; the card and
+  dispatch read the new strength. (R1-R6)
+
 ## Sprint 57 — nations own everything, then economy polish (opened 2026-10-23, CLOSED 2026-10-26 at v0.2.1)
 
 **Goal.** `sprints.json` holds it. The corporation and company layer is deleted: every nation owns and
