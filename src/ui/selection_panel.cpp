@@ -1658,7 +1658,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
 
         // March (BL-575): arms province-picking mode on the Planetary canvas
         // (body_surface_canvas.cpp reads pending_march_unit and, on the next
-        // province click, fills pending_march_dest_province for app::render
+        // province click, fills pending_march_dest_tile for app::render
         // to dispatch as corp_verb::march_unit). Visible armed state via the
         // same accent-ring "primed" idiom the building card's Auto button
         // uses — and per the project's toggle rule (any control whose active
@@ -2330,7 +2330,7 @@ void draw_battle_selection(world& w, ui_state& ui)
             ImGui::Text("Break off, forfeiting %.1f%% of your remaining force?", q.total / 10.0f);
             if (ImGui::Button("Break off"))
             {
-                ui.construction.pending_withdraw_province = b.province;
+                ui.construction.pending_withdraw_tile = b.tile;
                 ui.construction.pending_withdraw_against =
                     (b.attacker == player) ? b.defender : b.attacker;
                 ImGui::CloseCurrentPopup();

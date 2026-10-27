@@ -872,61 +872,48 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (unit_refitting(uit->second))
                 return corp_command_result::rejected_state;
 
-            // BL-511: the destination is a PROVINCE, not a tile. THIS is the
-            // domain check the untrusted-input rule asks for and the one a
-            // wire range gate cannot stand in for: `find` binary-searches the
-            // built partition, so an id that merely FITS a uint32 — including
-            // the 0 default of an omitted field — is refused here rather than
-            // being coerced into some nearby province.
-            const province* dp = w.provinces.find(cmd.province);
-            if (dp == nullptr || dp->tiles.empty())
+            // EVERY MARCH GOES TO A TILE (Ben, 2026-10-27: "all marches go to a
+            // tile"). The destination is `cmd.tile`, and the march ends on it.
+            // `cmd.province` is IGNORED: the province grain BL-511 gave the march is
+            // retired, and a command naming only a province names no tile, so it is
+            // refused below as an unknown tile. This is the domain check the
+            // untrusted-input rule asks for: the wire proves the id fits an
+            // entity_id, and only `w.tiles` knows whether it is a tile.
+            const auto dit = w.tiles.find(cmd.tile);
+            if (dit == w.tiles.end())
                 return corp_command_result::rejected_invalid;
+            const uint32_t dprov = w.provinces.province_of(cmd.tile);
+            const province* dp   = w.provinces.find(dprov);
 
-            // BL-778 TURNED THIS FLAT REFUSAL INTO A DOMAIN QUESTION.
-            //
-            // BL-516 restored a water test here once sea provinces became
-            // addressable, and it read `!= province_kind::land` — units were
-            // land-bound, full stop. Under docs/military/MILITARY.md § Domains
-            // and traversal a unit TYPE declares which domains it may cross, so
-            // the question is no longer "is this water" but "may THIS type be
-            // here". Rejection still mutates nothing, as every path around it
-            // does.
-            //
-            // The middle case is the one this exists for: a land type may enter
-            // coastal water its OWN polity owns — a shore you hold is shallow,
-            // bridged, causewayed — and may not enter anyone else's, nor the
-            // open ocean at any price. Ownership is read from the province
-            // holder, never from what is built on the water
-            // (docs/generation/PROVINCES.md § Who owns water).
-            //
-            // In practice the campaign refuses every water destination today,
-            // because it raises no naval rows and a land row needs owned water
-            // — the behaviour is unchanged where nothing has changed. What is
-            // different is the REASON, which is now a property of the unit.
+            // BL-778: MAY THIS TYPE BE THERE. A unit type declares the domains it
+            // may cross (docs/military/MILITARY.md § Domains and traversal). A land
+            // type may enter coastal water its OWN polity holds and no other water.
+            // The tile's domain is its province's kind; a tile no province holds is
+            // read off its substrate (water is the open ocean, at any price).
             {
-                const province_kind pk = province_kind_of(w, *dp);
-                const traversal_domain dest_domain =
-                      (pk == province_kind::open_ocean)    ? traversal_domain::open_ocean
-                    : (pk == province_kind::coastal_water) ? traversal_domain::coastal_water
-                                                           : traversal_domain::land;
+                traversal_domain dest_domain = traversal_domain::land;
+                if (dp != nullptr)
+                {
+                    const province_kind pk = province_kind_of(w, *dp);
+                    dest_domain = (pk == province_kind::open_ocean)    ? traversal_domain::open_ocean
+                                : (pk == province_kind::coastal_water) ? traversal_domain::coastal_water
+                                                                       : traversal_domain::land;
+                }
+                else if (is_water(dit->second.substrate))
+                    dest_domain = traversal_domain::open_ocean;
 
                 const std::vector<roster_row>& rows = unit_roster_table();
                 if (uit->second.type >= rows.size())
                     return corp_command_result::rejected_invalid; // no such row to ask
 
-                // "Its own polity": the acting corp's home nation against the
-                // nation holding the destination. A corp with no home nation
-                // owns no water, which refuses rather than permits.
                 bool owned_by_mover = false;
                 if (dest_domain == traversal_domain::coastal_water)
                 {
-                    // BL-1402: owner-generic — a corporation's home nation, or
-                    // the nation itself when it marches as itself.
+                    // BL-1402: owner-generic — a corporation's home nation, or the
+                    // nation itself when it marches as itself.
                     const entity_id home = owner_home_nation(w, cmd.corp);
-                    owned_by_mover = (home != null_entity)
-                                  && (province_holder_for(w, cmd.province) == home);
+                    owned_by_mover = (home != null_entity) && (province_holder_for(w, dprov) == home);
                 }
-
                 if (!row_can_traverse(rows[uit->second.type], dest_domain, owned_by_mover))
                     return corp_command_result::rejected_invalid;
             }
@@ -935,44 +922,28 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (sit == w.tiles.end())
                 return corp_command_result::rejected_invalid; // unit's own tile is gone
 
-            if (dp->body != sit->second.body)
+            if (dit->second.body != sit->second.body)
                 return corp_command_result::rejected_invalid; // BL-470's ruling 1: intra-body path march only
 
-            if (w.provinces.province_of(uit->second.position) == cmd.province)
+            if (uit->second.position == cmd.tile)
                 return corp_command_result::rejected_state; // already there — halt_unit is the stop verb
 
-            // Solve to the LOWEST-ID reachable member tile. `province::tiles`
-            // is ascending by contract, so first-reachable-wins is a stable,
-            // container-independent choice; and because the march ENDS on
-            // entering the province (run_unit_march), which member tile was
-            // picked only decides the route's tail, never where the unit
-            // stops. Every lookup below is read-only — nothing is written
-            // until the single `order` assignment at the end, so a rejection
-            // on any path here mutates nothing.
-            entity_id       chosen = null_entity;
-            std::vector<entity_id> chosen_path;
-            for (const entity_id cand : dp->tiles)
-            {
-                if (cand == uit->second.position)
-                    continue; // degenerate; the already-there test above covers the real case
-                const logistics_path& p = intra_body_path(w, sit->second.body, uit->second.position, cand);
-                if (p.reachable && !p.tiles.empty())
-                {
-                    chosen      = cand;
-                    chosen_path = p.tiles;
-                    break;
-                }
-            }
-            if (chosen == null_entity)
-                return corp_command_result::rejected_invalid; // no member tile is reachable
+            // ONE NATION PER TILE (Ben, 2026-10-27): the path is solved around every
+            // tile another nation's units stand on, save the destination itself —
+            // marching onto a held destination is an attack (toward a nation the
+            // actor is hostile to) or a block, decided as the march steps
+            // (run_unit_march). Read-only: nothing is written until the single
+            // `order` assignment below, so a refusal mutates nothing.
+            const std::vector<entity_id> path =
+                march_path(w, sit->second.body, uit->second.position, cmd.tile,
+                           foreign_held_tiles(w, uit->second.owner));
+            if (path.size() < 2)
+                return corp_command_result::rejected_invalid; // unreachable
 
             movement_order mo;
-            mo.dest          = chosen;
-            mo.dest_province = cmd.province;
-            mo.path = chosen_path; // canonical (lo->hi) order — see world.hpp's logistics_path comment
-            if (mo.path.front() != uit->second.position)
-                std::reverse(mo.path.begin(), mo.path.end());
-            mo.next_index = 1; // path[0] is the tile the unit already occupies
+            mo.dest       = cmd.tile;
+            mo.path       = path; // travel order: path[0] is the tile the unit occupies
+            mo.next_index = 1;
             mo.progress   = 0.0f;
             uit->second.order = mo;
             return corp_command_result::applied;
@@ -1089,14 +1060,12 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
         case corp_verb::withdraw_from_battle:
         {
-            // The DOMAIN CHECK the untrusted-input rule asks for, and the reason
-            // it cannot be a wire range gate: `province` is a real id in a built
-            // partition, so a value that merely fits a uint32 — including the 0
-            // default of an omitted field — must be refused rather than coerced
-            // into some nearby province. request_withdraw resolves against the
-            // live battle list and mutates NOTHING when it finds no match, so a
+            // The battle is named by its DEFENDED TILE (`cmd.tile`, 2026-10-27).
+            // request_withdraw resolves against the live battle list and mutates
+            // NOTHING when it finds no match — a tile id that merely fits, the
+            // null default of an omitted field included, names no battle — so a
             // rejection here leaves the world byte-identical.
-            if (!request_withdraw(w, cmd.corp, cmd.province, cmd.counterparty))
+            if (!request_withdraw(w, cmd.corp, cmd.tile, cmd.counterparty))
                 return corp_command_result::rejected_state;
             return corp_command_result::applied;
         }

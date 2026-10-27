@@ -250,7 +250,8 @@ void run_port_rows(const world& w0, const recipe_registry& reg, const std::vecto
                                        static_cast<double>(cost), static_cast<int>(r)));
                 if (!hired) break;
 
-                // M2: march it to a land province on the same body.
+                // M2: march it to a tile of a land province on the same body (every march
+                // goes to a tile, 2026-10-27 — the province's lowest member tile here).
                 const entity_id body = w.tiles.at(t).body;
                 const std::uint32_t here = w.provinces.province_of(t);
                 {
@@ -258,7 +259,7 @@ void run_port_rows(const world& w0, const recipe_registry& reg, const std::vecto
                     corp_command oc = self_cmd(other, corp_verb::march_unit);
                     oc.subject = unit;
                     for (const province& p : w.provinces.provinces)
-                        if (p.body == body && p.id != here) { oc.province = p.id; break; }
+                        if (p.body == body && p.id != here && !p.tiles.empty()) { oc.tile = p.tiles.front(); break; }
                     before = fingerprint(o);
                     r = apply_corp_command(o, reg, oc);
                     check(r == corp_command_result::rejected_not_owner && fingerprint(o) == before, "M2",
@@ -274,10 +275,10 @@ void run_port_rows(const world& w0, const recipe_registry& reg, const std::vecto
                     if (++asked > 40) break;
                     corp_command mc = self_cmd(m, corp_verb::march_unit);
                     mc.subject = unit;
-                    mc.province = p.id;
+                    mc.tile = p.tiles.front();
                     world o = w;
                     if (apply_corp_command(o, reg, mc) == corp_command_result::applied
-                        && o.units.at(unit).order.dest_province == p.id)
+                        && o.units.at(unit).order.dest == p.tiles.front())
                     {
                         marched = true;
                         break;

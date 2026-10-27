@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -163,6 +164,16 @@ const std::vector<entity_id>& body_tile_grid(world& w, entity_id body);
 /// before any call that can invalidate; never mutate it through a cast.
 const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_tile,
                                       entity_id dst_tile);
+
+/// `intra_body_path` solved AROUND @p blocked (2026-10-27, one nation per tile —
+/// MILITARY.md § Marching): the same directed Dijkstra over the same edges, from
+/// @p dst_tile's side, that never enters a tile in @p blocked save @p dst_tile
+/// itself (and @p src_tile, where the walker already stands). NOT cached — the
+/// blocked set is the units' positions, which move every tick — and returned by
+/// value, `tiles` in the same canonical lo -> hi order. Deterministic: the queue
+/// is fed in a fixed order and nothing reads a hash layout.
+logistics_path intra_body_path_avoiding(world& w, entity_id body, entity_id src_tile,
+                                        entity_id dst_tile, const std::set<entity_id>& blocked);
 
 /// Every cell of @p body whose travel cost TO @p anchor_tile is at most
 /// @p max_cost, as (raster index, cost) pairs in settle order (cost

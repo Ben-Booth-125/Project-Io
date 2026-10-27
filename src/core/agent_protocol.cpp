@@ -321,7 +321,12 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         // every id; whether it names a nation the session may act for is the
         // actor gate below, and whether the corp is its champion the seam's.
         const long long nat_v   = kv_get_checked(kv, "nation", 0, 0, id_max, &ok);
-        // BL-511: march_unit's destination province. A province id is NOT an
+        // 2026-10-27: NO VERB READS `province` NOW — march_unit's destination and
+        // withdraw_from_battle's battle are TILES, range-checked above as `tile`
+        // (an entity_id; whether it is a real tile is the seam's own check, which
+        // refuses the whole command and mutates nothing). The gate below stays so
+        // an old caller's `province=` still parses rather than failing the line.
+        // BL-511 (history): march_unit's destination province. A province id is NOT an
         // entity_id — it is derived from (body rank | block | component)
         // (province.hpp) and lives in its own uint32 domain, so it is gated
         // against uint32's range and NOT against id_max. This gate only

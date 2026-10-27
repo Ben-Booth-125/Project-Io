@@ -335,7 +335,7 @@ void w_unit(std::ostream& o, const unit_component& u)
     w_int(o, u.count);
     w_u16(o, u.type);
     w_id(o, u.order.dest);
-    w_u32(o, u.order.dest_province);
+    w_u32(o, 0u); // the retired march province (2026-10-27): every march ends on its tile
     w_ids(o, u.order.path);
     w_count(o, u.order.next_index);
     w_f32(o, u.order.progress);
@@ -346,8 +346,12 @@ void w_unit(std::ostream& o, const unit_component& u)
 bool r_unit(std::istream& i, unit_component& u)
 {
     uint32_t next_index = 0;
+    // The u32 after `dest` is the retired march province (2026-10-27). Read past: a
+    // pre-v63 order that named a province walks on to its tile, `dest`, the member
+    // tile it was solved to — every march now ends on its tile.
+    uint32_t retired_province = 0;
     if (!(r_id(i, u.position) && r_id(i, u.owner) && r_int(i, u.count) && r_u16(i, u.type)
-          && r_id(i, u.order.dest) && r_u32(i, u.order.dest_province) && r_ids(i, u.order.path)
+          && r_id(i, u.order.dest) && r_u32(i, retired_province) && r_ids(i, u.order.path)
           && r_count(i, next_index) && r_f32(i, u.order.progress)
           && r_i32(i, u.supply_factor_permille) && r_id(i, u.muster_base)))
         return false;
@@ -914,15 +918,24 @@ void w_battle(std::ostream& o, const active_battle& b)
     w_ids(o, b.defender_units);
     w_battle_state(o, b.state);
     w_enum(o, b.withdraw_requested);
-    w_id(o, b.ground_tile); // BL-1145 review: world_save_version 30
+    // BL-1145 review: world_save_version 30. Since v63 the slot carries the battle's
+    // identity, the defended tile, which is also its ground.
+    w_id(o, b.tile);
 }
 
 bool r_battle(std::istream& i, active_battle& b)
 {
-    return r_u32(i, b.province) && r_id(i, b.attacker) && r_id(i, b.defender)
-        && r_ids(i, b.attacker_units) && r_ids(i, b.defender_units)
-        && r_battle_state(i, b.state) && r_enum(i, b.withdraw_requested, max_withdraw)
-        && r_id(i, b.ground_tile);
+    if (!(r_u32(i, b.province) && r_id(i, b.attacker) && r_id(i, b.defender)
+          && r_ids(i, b.attacker_units) && r_ids(i, b.defender_units)
+          && r_battle_state(i, b.state) && r_enum(i, b.withdraw_requested, max_withdraw)
+          && r_id(i, b.ground_tile)))
+        return false;
+    // The identity tile (v63). A pre-v63 battle, keyed by province, converts to its
+    // ground tile; one with none to its province id, the province's lowest member
+    // tile (BL-515). The ground and the identity are one tile from here on.
+    b.tile = (b.ground_tile != null_entity) ? b.ground_tile : static_cast<entity_id>(b.province);
+    b.ground_tile = b.tile;
+    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -1555,10 +1568,10 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 62 (BL-1427, fronts): THE FRONTS, the last section — every
-    // unit with a front, ascending id, as (id, key); then every stored front order
-    // in its (nation, key) order, as (nation, key, u8 order).
-    if (version == world_save_version)
+    // world_save_version 62 (BL-1427, fronts): THE FRONTS — every unit with a front,
+    // ascending id, as (id, key); then every stored front order in its (nation, key)
+    // order, as (nation, key, u8 order).
+    if (version >= k_world_save_version_pre_tile)
     {
         std::vector<entity_id> ids;
         for (const auto& [uid, u] : w.units)
@@ -1579,6 +1592,21 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_u8(out, static_cast<uint8_t>(e.order));
         }
     }
+
+    // world_save_version 63 (BL-1443, tile contact): THE ATTACKING STACKS, the last
+    // section — each battle's, in battle order, as (count, ids ascending).
+    if (version == world_save_version)
+    {
+        w_u32(out, static_cast<uint32_t>(w.battles.size()));
+        for (const active_battle& b : w.battles)
+            w_ids(out, b.attacking_units);
+    }
+}
+
+void write_world_snapshot_pre_tile(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1443): the v62 stream shape — no attacking-stack section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_tile);
 }
 
 void write_world_snapshot_pre_fronts(const world& w, std::ostream& out)
@@ -1706,7 +1734,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_muster     // BL-1435: v58, an empty muster queue
             && version != k_world_save_version_pre_obsolete   // BL-1437: v59, every nation on the defaults
             && version != k_world_save_version_pre_refit      // 2026-10-27: v60, no unit refitting
-            && version != k_world_save_version_pre_fronts))   // BL-1427: v61, no fronts
+            && version != k_world_save_version_pre_fronts     // BL-1427: v61, no fronts
+            && version != k_world_save_version_pre_tile))     // BL-1443: v62, battles keyed by province
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -1860,6 +1889,9 @@ bool read_world_snapshot(world& w, std::istream& in)
         return false;
     if (!r_vec(in, s.battles, r_battle))
         return false;
+    // A pre-v63 stream was sorted by province; re-keyed by tile, it is re-sorted so
+    // `battle_order_less` holds (a v63 stream is already in this order).
+    std::sort(s.battles.begin(), s.battles.end(), battle_order_less);
 
     // The embedded IOHL stream -- fills s.history_log AND s.provinces.
     if (!read_history_log(s, in))
@@ -2485,7 +2517,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // strictly ascending by (nation, key), each nation in the stream, each key a tile it
     // holds, each order push (hold is never stored). Refused whole otherwise. A v61 (and
     // older) stream ends before it: no unit is assigned and every front holds.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_tile)
     {
         const auto held_by = [&](entity_id tile, entity_id nation) {
             const auto it = s.tile_to_nation.find(tile);
@@ -2528,6 +2560,29 @@ bool read_world_snapshot(world& w, std::istream& in)
             v.push_back(e);
         }
         s.front_orders = std::move(v);
+    }
+
+    // v63 (BL-1443, tile contact): each battle's attacking stack. Untrusted: one entry
+    // per battle, each strictly ascending and a subset of that battle's attacker units.
+    // Refused whole otherwise. A v62 (and older) stream ends before it: no battle has
+    // an attacking stack, so none advances.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count != s.battles.size())
+            return false;
+        for (active_battle& b : s.battles)
+        {
+            std::vector<entity_id> v;
+            if (!r_ids(in, v))
+                return false;
+            for (std::size_t k = 0; k < v.size(); ++k)
+                if ((k > 0 && v[k] <= v[k - 1])
+                    || std::find(b.attacker_units.begin(), b.attacker_units.end(), v[k])
+                           == b.attacker_units.end())
+                    return false;
+            b.attacking_units = std::move(v);
+        }
     }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct

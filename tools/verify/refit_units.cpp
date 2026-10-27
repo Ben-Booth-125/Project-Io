@@ -272,7 +272,7 @@ int main()
                 "R3i a unit on foreign ground is refused rejected_placement");
 
         active_battle b;
-        b.attacker = f.nation; b.defender = f.other; b.province = 1;
+        b.attacker = f.nation; b.defender = f.other; b.tile = f.abroad;
         b.attacker_units = { u };
         f.w.battles.push_back(b);
         refused(f, reg, f.nation, u, rifle, corp_command_result::rejected_state,
@@ -324,9 +324,10 @@ int main()
         world old;
         std::istringstream in60(v60, std::ios::binary);
         const bool ok60 = read_world_snapshot(old, in60);
-        // BL-1427 (v62): today's stream ends with the fronts section, two empty counts
-        // here (8 bytes) after the refits.
-        constexpr std::size_t fronts_tail = 8;
+        // BL-1427 (v62): today's stream carries the fronts section, two empty counts
+        // here (8 bytes) after the refits; BL-1443 (v63) ends it with the attacking-stack
+        // section, an empty battle count (4 bytes).
+        constexpr std::size_t fronts_tail = 8 + 4;
         check(ok60 && v60.size() == bytes.size() - (4 + 10) - fronts_tail && !unit_refitting(old.units.at(b))
                   && old.units.at(b).type == levy,
               "R5b a v60 stream (14 bytes shorter) reads as no refit");

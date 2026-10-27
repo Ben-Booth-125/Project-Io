@@ -1348,7 +1348,7 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         if (front_may_push(w, f) && strength[i] > 0)
         {
             int64_t defence = 0;
-            if (front_push_target(w, f, &defence) != 0)
+            if (front_push_target(w, f, &defence) != null_entity) // the weakest tile (2026-10-27)
                 push = strength[i] * k_front_push_margin_den > defence * k_front_push_margin_num;
         }
         const front_order want = push ? front_order::push : front_order::hold;
@@ -4019,11 +4019,10 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
             {
                 const unit_component& u = w.units.at(uid);
                 add_fact(bb, tick, uid, "unit_tile", static_cast<double>(u.position), 1.0f, fact_provenance::own_asset);
-                // BL-511: the unit STORES a tile and DERIVES its province, and
-                // the province is what march_unit now takes — so an agent that
-                // could only read `unit_tile` could read its own position but
-                // not name a destination in the same vocabulary. 0 = the tile
-                // is unpartitioned (ocean or a world with no partition built).
+                // BL-511: the unit STORES a tile and DERIVES its province. Since
+                // 2026-10-27 march_unit takes a TILE again (`unit_tile` is the
+                // vocabulary a destination is named in); the province stays as a
+                // reading. 0 = the tile is unpartitioned.
                 add_fact(bb, tick, uid, "unit_province",
                          static_cast<double>(w.provinces.province_of(u.position)), 1.0f,
                          fact_provenance::own_asset);
@@ -4036,11 +4035,11 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
                 if (has_order)
                 {
                     add_fact(bb, tick, uid, "unit_order_dest", static_cast<double>(u.order.dest), 1.0f, fact_provenance::own_asset);
-                    // BL-511: the province the order was actually GIVEN in.
-                    // `unit_order_dest` is the member tile the path was solved
-                    // to, which is a route detail; this is the command.
+                    // The province the destination tile lies in — a reading, since
+                    // every march goes to a tile (2026-10-27): `unit_order_dest` is
+                    // the command.
                     add_fact(bb, tick, uid, "unit_order_dest_province",
-                             static_cast<double>(u.order.dest_province), 1.0f,
+                             static_cast<double>(w.provinces.province_of(u.order.dest)), 1.0f,
                              fact_provenance::own_asset);
                 }
             }

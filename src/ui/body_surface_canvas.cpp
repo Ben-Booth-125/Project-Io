@@ -7529,7 +7529,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // construction placement mode does: the unit card's March press ARMED
         // `pending_march_unit`, so this click's whole job is to name a
         // destination province, not to select or build anything.
-        // app::render reads both fields once `pending_march_dest_province` is
+        // app::render reads both fields once `pending_march_dest_tile` is
         // non-zero, dispatches `corp_verb::march_unit`, and clears both — the
         // same deferred-mutation path every other canvas gesture takes (this
         // canvas holds only `const world&`). A click that misses every
@@ -7561,10 +7561,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
         else if (state.pending_march_unit != null_entity)
         {
-            const uint32_t march_prov = (hovered_tile != null_entity)
-                                        ? w.provinces.province_of(hovered_tile) : 0u;
-            if (march_prov != 0)
-                state.pending_march_dest_province = march_prov;
+            // Every march goes to a tile (2026-10-27): the hovered one.
+            if (hovered_tile != null_entity)
+                state.pending_march_dest_tile = hovered_tile;
         }
         else if (!state.construction.active)
         {
