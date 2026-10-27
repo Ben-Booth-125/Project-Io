@@ -2489,6 +2489,7 @@ bool app::load_game_from(const std::string& path)
 
     // Selection state that indexes into the replaced world.
     m_ui.clear_battle_selection();
+    m_ui.clear_front_selection();
 
     m_screen = app_screen::in_game;
     open_play_log(path);
@@ -3252,6 +3253,56 @@ void app::render()
                 m_ui.construction.last_message = "Can't refit to that type."; break;
         }
         m_ui.pending_refit_unit = null_entity; // consume the request
+    }
+
+    // Fronts (BL-1427; MILITARY.md § Fronts): the front card's Hold / Push, through
+    // the same seam any caller uses (`set_front_order`). A refusal mutates nothing.
+    if (m_ui.pending_front_order_tile != null_entity)
+    {
+        corp_command cmd;
+        cmd.tick  = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp  = m_world.player_entity;
+        cmd.verb  = corp_verb::set_front_order;
+        cmd.tile  = m_ui.pending_front_order_tile;
+        cmd.order = m_ui.pending_front_order_value;
+        switch (player_command(cmd))
+        {
+            case corp_command_result::applied:
+                m_ui.construction.last_message =
+                    m_ui.pending_front_order_value == 1 ? "Front ordered to push." : "Front ordered to hold.";
+                break;
+            case corp_command_result::rejected_state:
+                m_ui.construction.last_message = "Can't push there: not hostile."; break;
+            default:
+                m_ui.construction.last_message = "No such front."; break;
+        }
+        m_ui.pending_front_order_tile = null_entity; // consume the request
+    }
+
+    // Assign to front (BL-1427): the unit card's and the unit group's menu — one
+    // `assign_front` per unit, the group's units in ascending id.
+    if (!m_ui.pending_front_assign.empty())
+    {
+        int applied = 0, refused = 0;
+        for (const auto& [unit, tile] : m_ui.pending_front_assign)
+        {
+            corp_command cmd;
+            cmd.tick    = static_cast<int>(m_sim_loop.day_tick());
+            cmd.corp    = m_world.player_entity;
+            cmd.verb    = corp_verb::assign_front;
+            cmd.subject = unit;
+            cmd.tile    = tile;
+            (player_command(cmd) == corp_command_result::applied ? applied : refused) += 1;
+        }
+        const bool unassign = m_ui.pending_front_assign.front().second == null_entity;
+        if (refused == 0)
+            m_ui.construction.last_message = unassign ? "Unassigned." : "Assigned to the front.";
+        else if (applied == 0)
+            m_ui.construction.last_message = unassign ? "Couldn't unassign." : "Couldn't assign to that front.";
+        else
+            m_ui.construction.last_message = std::to_string(applied) + " assigned, "
+                                           + std::to_string(refused) + " refused.";
+        m_ui.pending_front_assign.clear(); // consume the request
     }
 
     // Ledger presses (BL-293; the trade presses since BL-1269) — same

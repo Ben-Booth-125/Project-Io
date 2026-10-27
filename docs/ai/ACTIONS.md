@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*163 entries — 40 gameplay · 26 canvas · 16 lens · 48 ledger · 33 chrome.*
+*166 entries — 40 gameplay · 27 canvas · 16 lens · 50 ledger · 33 chrome.*
 
 ---
 
@@ -1095,6 +1095,20 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** This is the ONLY route to a nation. It replaced the Country lens, which used to own it: under that lens a hovered tile resolved to its owning nation. Ben, 2026-08-24 — 'National borders should not diffuse together, instead they should borders extending their colour inwards. With this, we can drop the nation lens' and, on what replaces the route, 'click the border itself'. The border is what carries the nation on screen now, so it is the thing that opens it.
 
+### `canvas.front_select` — A front line on the Planetary canvas: the player nation's fronts, drawn along the shared hex edges between each span and the neighbour's ground, in the colour of the player's stance toward that neighbour (hostile red, neutral gold, friendly green), with the number of units assigned on a small plate at the span's middle edge. Plain canvas only, like the border band.
+
+**Press.** Single left-click on the line. Hovering it first lights the line and names the front at the cursor (Front: <neighbour> - <N> tiles - <n> units).
+
+**Valid when:**
+- Planetary rung, no lens active (a lens owns the pointer, BL-664).
+- A unit counter under the pointer WINS: the press takes the counter.
+- The corridor is the edge's own half of the border corridor: 0.09 of the hex radius either side of the edge, 3 px minimum. Beyond it, on the nation's inset rule, the press takes the nation (canvas.border_band_select).
+- Only the PLAYER nation's fronts are drawn; a rival's fronts have no line.
+
+**Expected output.** The FRONT is selected - pointer_target().selection_kind becomes 'front' - and the Selection band shows the front card (neighbour, span, assigned units, Hold / Push). Every other selection channel clears. Nothing in the world changes.
+
+**Reason to select.** The only route to a front: the card it opens is where its order is set and its assigned units are read back.
+
 ---
 
 ## Lenses — re-skinning the map to answer a question
@@ -1975,6 +1989,32 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Obsolete roster rows appear (or disappear) in Recruit. Nothing in the world changes.
 
 **Reason to select.** To raise a type you have marked obsolete without un-marking it.
+
+### `ledger.selection_front_order` — Selection band, the front card's right-hand Order block: two buttons, 'Hold' and 'Push', the active one lit in the front's stance colour.
+
+**Press.** Click 'Push' to order the front to push, or 'Hold' to return it to hold. Clicking the lit 'Push' again returns the front to hold (the toggle rule); the lit 'Hold' does nothing. Sends gameplay.set_front_order (corp_verb 42) with `tile` = the front's key (a tile of its span) and `order` 0 or 1, through the player's seat.
+
+**Valid when:**
+- A front of the player nation is selected (canvas.front_select).
+- Push is DISABLED toward a neighbour the nation is not hostile to; the card reads 'Not hostile' beneath the pair. A front already pushing keeps its Push enabled so it can be returned to hold.
+- The verb's own preconditions apply (gameplay.set_front_order); a refusal mutates nothing and is worded on the status line.
+
+**Expected output.** The front's order is set; the lit button moves. Status line: 'Front ordered to push.' / 'Front ordered to hold.', or 'Can't push there: not hostile.' / 'No such front.' on a refusal.
+
+**Reason to select.** Push sends the front's units into the neighbour's weakest adjacent province; hold keeps them spread along the span (MILITARY.md § Fronts).
+
+### `ledger.selection_assign_front` — Selection band: the unit card's action grid, sixth cell (a flag glyph, tooltip 'Assign to front'), and the unit group's header button 'Assign to front' (the player's own groups only).
+
+**Press.** Click it to open the menu: one entry per front of the unit's own nation, named '<neighbour> - <N> tiles' (with '(north)'/'(south)', '(west)'/'(east)' or '(n of m)' where one neighbour has more than one front), in its stance colour, then 'Unassign'. The current front is checked; pick another to move the unit there, pick the checked one again or 'Unassign' to unassign. From the group, the pick applies to every unit of the stack. Sends one gameplay.assign_front (corp_verb 41) per unit with `subject` = the unit and `tile` = the front's key, or null to unassign.
+
+**Valid when:**
+- A unit of the player nation is selected, or the group of the player's units on one tile.
+- A rival's unit card shows the cell disabled ('Competitor unit - intel only'); a rival group has no button.
+- The verb's own preconditions apply (gameplay.assign_front); a refusal mutates nothing.
+
+**Expected output.** Each unit's front is set (or cleared); the cell wears the primed ring while the unit is assigned and the Strength page reads 'Front: <label>'. The front line's count plate moves. Status line: 'Assigned to the front.' / 'Unassigned.', or how many were refused.
+
+**Reason to select.** A front does nothing without units on it: assigned units spread along the span, fill gaps and push when ordered.
 
 ---
 

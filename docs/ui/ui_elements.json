@@ -1968,6 +1968,42 @@
    "checks": [
     "construction_sites"
    ]
+  },
+  {
+   "id": "UI-129",
+   "name": "Front line",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/military/MILITARY.md",
+    "docs/ui/SELECTION.md",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/front_view.cpp"
+   ],
+   "summary": "The player nation's fronts drawn along their span's shared hex edges, coloured by the stance toward each neighbour, with the assigned unit count on a plate at the span's middle edge. Hover lights a line; a press selects the front.",
+   "interesting_question": "The front line runs along the same frontier the national border band already marks, and both are clickable. Which does a press there take?",
+   "resolution": "Both, by distance: the band's rule is inset 0.18 r into each side, and the front line owns the corridor's first 0.09 r either side of the edge (3 px floor), so a press on the edge takes the front and a press on the inset rule still takes the nation. A unit counter outranks both (SELECTION.md § The front element; body_surface_canvas.cpp's front pass).",
+   "checks": [
+    "fronts"
+   ]
+  },
+  {
+   "id": "UI-130",
+   "name": "Front card",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/military/MILITARY.md",
+    "docs/ui/SELECTION.md",
+    "src/ui/selection_panel.cpp",
+    "src/ui/ui_state.hpp"
+   ],
+   "summary": "The Selection band's content for a selected front: neighbour, span length and stance; the assigned units (each row opens that unit's card); the order, as a Hold / Push toggle pair with Push disabled 'Not hostile' toward a non-hostile neighbour.",
+   "interesting_question": "A front is derived from the territory map and has no entity id. What does the selection hold when the border it was derived from moves?",
+   "resolution": "It holds (nation, key) - the key is the span's lowest tile id, the name fronts.hpp gives a front - in its own ui_state fields, the battle card's precedent. A key that no longer names a front of the nation clears itself in the Selection element and the band falls through to its resting card (draw_front_selection).",
+   "checks": [
+    "fronts"
+   ]
   }
  ]
 }

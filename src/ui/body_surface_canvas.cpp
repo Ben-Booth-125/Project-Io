@@ -7,6 +7,7 @@
 #include "hover_card.hpp"
 #include "hover_content.hpp"
 #include "hex_render.hpp"
+#include "front_view.hpp"      // BL-1427: the player's fronts, cached, with their edges
 #include "icons.hpp"
 #include "logistics_chain.hpp" // the Logistics lens's rail and sea legs (Ben, 2026-10-25)
 #include "tile_inspector.hpp"   // history_view_tectonics (BL-660 routing)
@@ -2793,6 +2794,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // later.
         state.clear_battle_selection();
                 state.clear_lens_region_selection();
+        state.clear_front_selection(); // BL-1427: the front channel, the same rule
         // A selection made elsewhere (a group row, a ledger) is ONE unit's card.
         state.selection_unit_group = false;
         state.province_sync_entity = state.selected_entity;
@@ -6208,6 +6210,140 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.hovered_structure_kind = sk;
     }
 
+    // --- FRONTS (BL-1427; MILITARY.md § Fronts, SELECTION.md § The front element) ---
+    // The PLAYER's fronts: a line along every shared hex edge between a span tile
+    // and the neighbour's ground, in the colour of the player's stance toward that
+    // neighbour, with the number of units assigned to it on a small plate at the
+    // span's middle edge. On the plain canvas only, as the border band is: under a
+    // lens the lens owns the pointer (BL-664). The fronts are the world's answer
+    // (`derive_fronts`), cached per tick and territory change in front_view.cpp,
+    // never derived here. Hover lights the line under the pointer; the click path
+    // below selects it. Per frame, not baked: a hover and a count both move.
+    state.hovered_front_key = null_entity;
+    state.fronts_drawn      = 0;
+    if (state.overlay == overlay_mode::none && player_owner != null_entity)
+    {
+        const std::vector<front_view>& fronts = fronts_of(w, player_owner);
+
+        // The corridor a press takes the line by: the edge's own half of the
+        // border corridor (the nation rule sits 0.18 r inside each side, so the
+        // edge owns the first 0.09 r), with a 3 px floor so it stays aimable.
+        const float hit_hw = std::max(3.0f, std::min(5.0f, draw_r * 0.09f));
+        const float stroke = std::max(2.0f, draw_r * 0.14f);
+
+        auto seg_d2 = [](ImVec2 p, ImVec2 a, ImVec2 b) {
+            const float abx = b.x - a.x, aby = b.y - a.y;
+            const float len2 = abx * abx + aby * aby;
+            float t = len2 > 0.0f ? ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2 : 0.0f;
+            t = std::clamp(t, 0.0f, 1.0f);
+            const float dx = p.x - (a.x + abx * t), dy = p.y - (a.y + aby * t);
+            return dx * dx + dy * dy;
+        };
+
+        // A counter outranks the line (a marker is a thing the player aimed at,
+        // as it outranks the border band); a building zone does not, because a
+        // press there falls through to the ground anyway (BL-1312).
+        const entity_id over_marker =
+            resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
+        const bool pointer_free = hovered_tile != null_entity
+                               && (over_marker == null_entity || w.units.count(over_marker) == 0);
+
+        // Pass 1: geometry per wrap copy, and the hover.
+        struct seg { ImVec2 a, b; std::size_t front; std::size_t edge; };
+        static std::vector<seg> segs;
+        segs.clear();
+        float best = hit_hw * hit_hw;
+        for (std::size_t fi = 0; fi < fronts.size(); ++fi)
+        {
+            const front_view& fv = fronts[fi];
+            if (fv.body != state.active_body)
+                continue;
+            for (std::size_t ei = 0; ei < fv.edges.size(); ++ei)
+            {
+                const front_edge& e = fv.edges[ei];
+                const ImVec2 ca = to_screen(hex_local_centre(e.a_col, e.a_row, hex_size));
+                const ImVec2 cb = to_screen(hex_local_centre(e.b_col, e.b_row, hex_size));
+                float dx = cb.x - ca.x, dy = cb.y - ca.y;
+                const float len = std::sqrt(dx * dx + dy * dy);
+                if (len <= 0.0f)
+                    continue;
+                dx /= len;
+                dy /= len;
+                // The shared side: at the midpoint, perpendicular to the centre
+                // line, one hex side long (the border band's construction).
+                const ImVec2 m{ (ca.x + cb.x) * 0.5f, (ca.y + cb.y) * 0.5f };
+                const float  half = hit_r * 0.5f;
+                const ImVec2 a{ m.x + dy * half, m.y - dx * half };
+                const ImVec2 b{ m.x - dy * half, m.y + dx * half };
+                if (m.y < clip_top_g || m.y > clip_bot_g) // ground-space row band (BL-737)
+                    continue;
+                const int k_lo = (period_px > 0.0f)
+                    ? static_cast<int>(std::ceil((visible_left - m.x) / period_px)) : 0;
+                const int k_hi = (period_px > 0.0f)
+                    ? static_cast<int>(std::floor((visible_right - m.x) / period_px)) : 0;
+                for (int k = k_lo; k <= k_hi; ++k)
+                {
+                    const float off = static_cast<float>(k) * period_px;
+                    const seg s{ { a.x + off, a.y }, { b.x + off, b.y }, fi, ei };
+                    segs.push_back(s);
+                    if (pointer_free)
+                    {
+                        const float d2 = seg_d2(mouse_g, s.a, s.b);
+                        if (d2 <= best)
+                        {
+                            best = d2;
+                            state.hovered_front_key = fv.f.key;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pass 2: the lines, a dark casing under each so it holds on any ground.
+        for (const seg& s : segs)
+        {
+            const front_view& fv = fronts[s.front];
+            const bool lit = fv.f.key == state.hovered_front_key
+                          || (state.has_front_selection() && state.selected_front_key == fv.f.key
+                              && state.selected_front_nation == player_owner);
+            const ImU32 col = front_stance_colour(stance_toward(w, player_owner, fv.f.neighbour));
+            const float wd  = lit ? stroke + 1.5f : stroke;
+            dl->AddLine(s.a, s.b, IM_COL32(16, 16, 20, 200), wd + 2.0f);
+            dl->AddLine(s.a, s.b, lit ? lerp_colour(col, IM_COL32(255, 255, 255, 255), 0.35f) : col, wd);
+        }
+
+        // Pass 3: the assigned count, once per front per wrap copy, at the span's
+        // middle edge. A dark plate in the stance colour; the same 9 px floor the
+        // unit counter keeps, so the number reads at play zoom.
+        for (std::size_t fi = 0; fi < fronts.size(); ++fi)
+            if (fronts[fi].body == state.active_body && !fronts[fi].edges.empty())
+                ++state.fronts_drawn;
+        for (const seg& s : segs)
+        {
+            const front_view& fv = fronts[s.front];
+            if (s.edge != fv.edges.size() / 2)
+                continue;
+            const int n = static_cast<int>(front_units(w, player_owner, fv.f.key).size());
+            char txt[16];
+            std::snprintf(txt, sizeof txt, "%d", n);
+            const ImU32  col = front_stance_colour(stance_toward(w, player_owner, fv.f.neighbour));
+            const ImVec2 m{ (s.a.x + s.b.x) * 0.5f, (s.a.y + s.b.y) * 0.5f };
+            {
+                const float  fs = std::max(9.0f, ImGui::GetFontSize() * 0.85f);
+                const ImVec2 ts = ImGui::GetFont()->CalcTextSizeA(fs, std::numeric_limits<float>::max(), 0.0f, txt);
+                const float  ph = std::max(9.0f, ts.y + 2.0f);
+                const float  pw = std::max(ph, ts.x + 6.0f);
+                const ImVec2 tl{ m.x - pw * 0.5f, m.y - ph * 0.5f };
+                const ImVec2 br{ m.x + pw * 0.5f, m.y + ph * 0.5f };
+                const bool lit = fv.f.key == state.hovered_front_key;
+                dl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
+                dl->AddRect(tl, br, col, 3.0f, 0, lit ? 2.0f : 1.2f);
+                dl->AddText(ImGui::GetFont(), fs, { m.x - ts.x * 0.5f, m.y - ts.y * 0.5f },
+                            IM_COL32(236, 236, 240, 255), txt); // fit-exempt: the plate is sized to its measured text
+            }
+        }
+    }
+
     // No market-centre marker (Ben, 2026-10-10: "We should remove the HQ glyph
     // and market center glyphs"). A market is selected through the MARKET LENS —
     // a press on its catchment, SELECTION.md § A lens collapses selection to ONE
@@ -7191,7 +7327,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y, &hk);
         const char* label = nullptr;
         ImU32       label_col = palette::neutral;
-        if (hovered_structure != null_entity && hk == structure_kind::nation)
+        // A FRONT under the pointer names itself instead (BL-1427): the press
+        // there takes the front, so the read says so before the click commits.
+        std::string front_label;
+        if (state.hovered_front_key != null_entity)
+        {
+            if (const front_view* fv = front_by_key(w, player_owner, state.hovered_front_key))
+            {
+                const int n = static_cast<int>(front_units(w, player_owner, fv->f.key).size());
+                front_label = "Front: " + fv->label + " \xc2\xb7 " + std::to_string(n)
+                            + (n == 1 ? " unit" : " units");
+                label       = front_label.c_str();
+                label_col   = front_stance_colour(stance_toward(w, player_owner, fv->f.neighbour));
+            }
+        }
+        else if (hovered_structure != null_entity && hk == structure_kind::nation)
         {
             if (const auto nit = w.nations.find(hovered_structure); nit != w.nations.end())
             {
@@ -7485,9 +7635,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // Written against the general resolver, not against nations: a plate
             // rim or a catchment edge routes through this same branch once it
             // produces zones, which is what BL-603 generalises.
+            // A FRONT LINE (BL-1427; SELECTION.md § The front element), between
+            // the markers and the border band: a counter outranks it, and inside
+            // its corridor the front is what the pointer is on — the border rule
+            // sits further in, so the band is still reached a little inside each
+            // side. The front pass set `hovered_front_key` only on the plain canvas
+            // and only where no counter is under the pointer.
+            const bool front_press = !lensed && marker_hit == null_entity
+                                  && state.hovered_front_key != null_entity;
+            if (!front_press)
+                state.clear_front_selection(); // every other press clears the channel
+
             structure_kind struct_kind = structure_kind::nation;
             entity_id structure_hit =
-                (marker_hit == null_entity)
+                (marker_hit == null_entity && !front_press)
                     ? resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y,
                                             &struct_kind) // ground space, as hover asks
                     : null_entity;
@@ -7631,7 +7792,21 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
-            if (non_entity_structure)
+            if (front_press)
+            {
+                // The front is a non-entity selection: (nation, key) in its own
+                // fields, every other channel cleared, the cycle anchor dropped.
+                state.selected_entity       = null_entity;
+                state.selected_province     = 0u;
+                state.province_sync_entity  = null_entity;
+                state.selection_cycle_tile  = null_entity;
+                state.selection_unit_group  = false;
+                state.clear_battle_selection();
+                state.clear_lens_region_selection();
+                state.selected_front_nation = player_owner;
+                state.selected_front_key    = state.hovered_front_key;
+            }
+            else if (non_entity_structure)
             {
                 // Already dispatched into its own field above; nothing further.
             }

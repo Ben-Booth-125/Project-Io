@@ -652,6 +652,18 @@
   [
    "ledger.military_show_obsolete",
    "The Military ledger's Recruit tab (nav rail slot 7): the 'Show obsolete (N)' checkbox above the roster."
+  ],
+  [
+   "canvas.front_select",
+   "A front line on the Planetary canvas: the player nation's fronts, drawn along the shared hex edges between each span and the neighbour's ground, in the colour of the player's stance toward that neighbour (hostile red, neutral gold, friendly green), with the number of units assigned on a small plate at the span's middle edge. Plain canvas only, like the border band."
+  ],
+  [
+   "ledger.selection_front_order",
+   "Selection band, the front card's right-hand Order block: two buttons, 'Hold' and 'Push', the active one lit in the front's stance colour."
+  ],
+  [
+   "ledger.selection_assign_front",
+   "Selection band: the unit card's action grid, sixth cell (a flag glyph, tooltip 'Assign to front'), and the unit group's header button 'Assign to front' (the player's own groups only)."
   ]
  ]
 }

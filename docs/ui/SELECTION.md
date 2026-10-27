@@ -126,6 +126,7 @@ Each kind routes its 'go to' to the right place:
 | **Body** (planet/moon/asteroid/station/star) | Unsurveyed → **Dispatch Survey**. Surveyed → **Go to surface** (descends via `focus_on_entity`). The star carries neither. | **Commercial activity** pulse (activity fog) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened".) |
 | **Building** (any) | The host tile's card with this stack expanded in place, no header row — § The building element's layout. Player-owned and rival buildings alike. | | None: the tile element draws no go-to. |
 | **Unit** | Dedicated three-column band — § The unit element's layout. | | Canvas: entity's position. |
+| **Front** (non-entity) | Its own card — § The front element. | | None: a front is selected from its line on the canvas. |
 | **Market** | **Go to** — locate on the canvas. | (none) | Canvas: `focus_on_surface`. |
 | **Nation** | None — **"Open its ledger via [>]."** | (none) | A ledger (no canvas of its own). |
 
@@ -453,8 +454,9 @@ card's shape is built ahead of units carrying much in the live economy (Ben's di
      `unit_component::type` from that table's own index; an out-of-range index falls back to
   `"Type %u"`) and `owner` resolved via the same owner-name lookup the building card's rival
      summary uses.
-3. **Right quarter — a 2×3 action grid**: **Go to** (`focus_on_entity`) plus five reserved
-   slots (`glyph_reserved`), matching the tile/building cards' pattern.
+3. **Right quarter — a 2×3 action grid**: **Go to** (`focus_on_entity`), **March**, **Halt**,
+   **Disband**, **Refit** and **Assign to front** (§ The front element), matching the
+   tile/building cards' pattern.
 
 `ui_state::selection_unit_page` is the pager index, mirroring `selection_building_page`.
 
@@ -475,7 +477,9 @@ band shows the group that unit stands in. The group itself is derived every fram
 cannot go stale. The canvas sets the flag on a press on a counter (and on the repeat-click cycle's
 unit rung); any selection made elsewhere clears it.
 
-1. **Header** — the owner, `N units`, and the tile's grid position; 'go to' on the right.
+1. **Header** — the owner, `N units`, and the tile's grid position; 'go to' on the right. A group
+   of the player's own units carries **Assign to front** left of 'go to', assigning every unit of
+   the group in one press (§ The front element).
 2. **Left quarter** — the counter itself, drawn large: band, count, and the summed bars.
 3. **The rest — one row per unit**: roster type, the land class it fights as, men over
    establishment, an HP bar and a readiness bar in the counter's colours, and morale.
@@ -487,6 +491,45 @@ readiness or morale (BL-068, the counter's own rule).
 
 A counter stands below its hex centre and can overhang the hex beneath. A press on it takes the
 counter, never a repeat-click step on the ground under the pointer.
+
+### The front element
+
+A **front** (`../military/MILITARY.md` § Fronts) is one contiguous span of a nation's border with
+one neighbour, **derived** from the territory map and never stored. It has no entity id, so — like
+the battle and the deposit — it is a **non-entity selection**: `ui_state::selected_front_nation`
+and `selected_front_key` hold *(nation, key)*, where the key is the span's lowest tile id, the name
+`fronts.hpp` gives a front. The channel is mutually exclusive with every other: the press that sets
+it clears the rest, and every other press or selection clears it. A key that no longer names a
+front of its nation — the border moved — clears itself in the Selection element, and the band
+falls through to its resting card.
+
+**On the canvas** the player nation's fronts draw as a line along every shared hex edge between a
+span tile and the neighbour's ground, in the colour of the player's stance toward that neighbour
+(hostile, neutral, friendly; `presentation.hpp`'s `front_*`), with the number of units assigned on
+a small plate at the span's middle edge. Plain canvas only, as the border band is: under a lens
+the lens owns the pointer. Hovering a line lights it and names the front at the cursor before the
+press commits. **A press on the line selects the front.** A unit counter outranks it; the line
+owns the corridor's first 0.09 r either side of the edge (3 px floor) and the border band's inset
+rule keeps the rest, so the nation is still reached a little inside each side.
+
+**The card** (`draw_front_selection`, `src/ui/selection_panel.cpp`):
+
+1. **Header** — *Front*, the neighbour's name in the stance colour, the span's length in tiles
+   and the stance (with the label's disambiguator where one neighbour has two fronts).
+2. **Left — the assigned units**, one row each: roster type, the land class it fights as, men over
+   establishment. **A row is the door to that unit's card** (DRILL_THROUGH.md).
+3. **Right — the order**: **Hold** and **Push**, a toggle pair with the active order lit. Pressing
+   an active Push returns the front to hold; an active Hold has nothing beneath it. **Push is
+   disabled toward a neighbour the nation is not hostile to**, and the card says *Not hostile*
+   beneath the pair. A press sends `set_front_order` through the player's seat.
+
+**Assign to front** is on the unit card (the action grid's sixth cell) and on the header of a
+group of the player's own units. It opens a menu of the units' own nation's fronts, each named by
+neighbour and span — *Varneth — 14 tiles*, with *(north)*/*(south)*, *(west)*/*(east)* or
+*(n of m)* where one neighbour has more than one — plus **Unassign**. The front every unit is
+already on is checked, and picking it again unassigns (the toggle rule). A pick sends one
+`assign_front` per unit. The unit card's cell wears the primed ring while the unit is assigned,
+and its Strength page names the front.
 
 ### The province is a section, not a selection
 
