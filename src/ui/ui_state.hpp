@@ -11,6 +11,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include <vector>
 #include <vector>
@@ -980,6 +981,46 @@ struct ui_state
         selected_battle_attacker = null_entity;
         selected_battle_defender = null_entity;
     }
+
+    // --- The selected front (BL-1427; SELECTION.md § The front element) ----
+    // A front has NO ENTITY ID: it is derived from the territory map
+    // (world/fronts.hpp) and named by its KEY, the lowest tile id in its span. So,
+    // like the battle triple above, it travels in its own fields as (nation, key)
+    // rather than in `selected_entity`. MUTUALLY EXCLUSIVE with every other
+    // selection channel: the canvas press that sets it clears the others, and
+    // every other press clears it. A key no longer naming a front of the nation
+    // (the border moved) clears itself in the Selection element.
+    entity_id selected_front_nation = null_entity;
+    entity_id selected_front_key    = null_entity;
+
+    bool has_front_selection() const
+    {
+        return selected_front_nation != null_entity && selected_front_key != null_entity;
+    }
+    void clear_front_selection()
+    {
+        selected_front_nation = null_entity;
+        selected_front_key    = null_entity;
+    }
+
+    /// The key of the player's front line under the pointer this frame, or null.
+    /// Written by the Planetary canvas's front pass; read by its own hover label,
+    /// the click path and the verify seam. No lens is active when it is non-null.
+    entity_id hovered_front_key = null_entity;
+
+    /// How many front lines the canvas drew this frame (verify readout).
+    int fronts_drawn = 0;
+
+    /// Set by the front card's Hold / Push (BL-1427): a tile of the front's span
+    /// and the order to set (0 hold, 1 push). `null_entity` = nothing pending.
+    /// app::render sends `set_front_order` through player_command and clears it.
+    entity_id     pending_front_order_tile  = null_entity;
+    std::uint8_t  pending_front_order_value = 0;
+
+    /// Set by Assign to front on the unit card and the unit group (BL-1427): each
+    /// pair is (unit, a tile of the chosen front's span — or null_entity to
+    /// unassign). app::render sends one `assign_front` per pair and clears it.
+    std::vector<std::pair<entity_id, entity_id>> pending_front_assign;
 
     // --- The selected deposit and plate (BL-659 / BL-660) -----------------
     // Ben, 2026-08-28, choosing option A: follow the battle precedent rather

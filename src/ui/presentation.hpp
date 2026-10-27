@@ -108,6 +108,12 @@ inline constexpr ImU32 unit_readiness = IM_COL32(240, 140,  40, 255); ///< Cohes
 inline constexpr ImU32 unit_morale    = IM_COL32(120, 160, 230, 255); ///< Will to fight — blue, the card only.
 inline constexpr ImU32 neutral  = IM_COL32(170, 175, 185, 255); ///< No change / not applicable.
 
+// --- a front's line, by the stance toward its neighbour (BL-1427; MILITARY.md § Fronts) ---
+// Bright enough to read over the muted national border rule it runs beside.
+inline constexpr ImU32 front_hostile  = IM_COL32(232,  84,  72, 255); ///< Hostile either way: push is open from our side.
+inline constexpr ImU32 front_neutral  = IM_COL32(236, 206, 112, 255); ///< Neither hostile nor friends: hold only.
+inline constexpr ImU32 front_friendly = IM_COL32(120, 206, 150, 255); ///< An accepted friendship: hold only.
+
 // --- the placement lens (Ben, 2026-10-25; LENSES.md § The placement lens) ---
 // A site the chosen building may take, a site with no Logistic Points operating
 // (amber: it will build, but it will not run until a source reaches it), and the

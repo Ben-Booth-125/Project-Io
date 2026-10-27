@@ -1718,8 +1718,17 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case ui::selection_kind::corporation: k = "corporation"; break;
             default:                              k = "none";        break;
             }
+            // BL-1427: a front is a fourth non-entity channel; the band draws it
+            // when it is set, so the word the script asserts on is the card's.
+            if (m_ui.has_front_selection())
+                k = "front";
             out["selection_kind"] = std::string(k);
         }
+        // BL-1427 (fronts): whether the pointer is on one of the player's front
+        // lines, and how many the canvas drew. UI state: booleans and a count —
+        // no key, no tile, nothing a sweep could turn into a territory map.
+        out["hovered_front"] = (m_ui.hovered_front_key != null_entity);
+        out["fronts_drawn"]  = m_ui.fronts_drawn;
         // Ben, 2026-10-27 (unit counter hover and group): the KIND the pointer
         // resolved to (the hover pass's answer, so a script can aim at a counter
         // without being told where one is), and whether the band shows the
@@ -6379,6 +6388,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // leaves one of the three selection channels set diverges from the
         // gesture it stands in for, and a capture after it shows a stale card.
         m_ui.clear_battle_selection();
+        m_ui.clear_front_selection(); // BL-1427: the fourth channel
     });
     v.set_function("select_building", [this](int col, int row) {
         for (const auto& [bid, bc] : m_world.buildings)

@@ -10,6 +10,7 @@
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "format.hpp"         // fmt::credits — the god-view corp readout (BL-408)
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
+#include "front_view.hpp"      // BL-1427: the front card, Assign to front
 #include "icons.hpp"
 #include "market_ledger.hpp"   // market_city_name — a building's market, by city
 #include "nav_pane.hpp"        // close_all_panels — the card's doors onto the fold-out column
@@ -1358,6 +1359,11 @@ void draw_unit_strength_page(const world& w, const recipe_registry& reg, const u
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                                "Refitting to %s \xe2\x80\x94 %d d left",
                                unit_roster_display_name(u.refit_type).c_str(), u.refit_days);
+        // BL-1427: the front it holds, if any — what Assign to front set.
+        if (const front_view* fv = front_by_key(w, u.owner, u.front))
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(
+                                   front_stance_colour(stance_toward(w, u.owner, fv->f.neighbour))),
+                               "Front: %s", fv->label.c_str());
         ImGui::Spacing();
     }
 
@@ -1474,6 +1480,80 @@ namespace {
 // read-only (a unit is not yet operable) and with only "Go to" wired for real
 // in the action grid, the rest reserved (matching the tile/building cards'
 // own reserved-slot idiom).
+// ASSIGN TO FRONT (BL-1427; MILITARY.md § Fronts, SELECTION.md § The front
+// element): the popup the unit card and the unit group share. It lists the fronts
+// of the units' own nation, each named by neighbour and span (front_view.cpp's
+// label, disambiguated where one neighbour has two), plus Unassign; the entry
+// every unit already sits on is checked. A press queues one `assign_front` per
+// unit (pending_front_assign; app::render sends them). Pressing the checked front
+// again UNASSIGNS — the toggle rule, a visible state undone by its own press.
+void draw_assign_front_popup(const world& w, ui_state& ui, const char* popup_id,
+                             const std::vector<entity_id>& units)
+{
+    if (!ImGui::BeginPopup(popup_id))
+        return;
+    entity_id nation = null_entity;
+    entity_id shared = null_entity; // the front every unit is on, if they agree
+    bool      agree  = true;
+    for (std::size_t i = 0; i < units.size(); ++i)
+    {
+        const auto it = w.units.find(units[i]);
+        if (it == w.units.end())
+            continue;
+        if (nation == null_entity)
+        {
+            nation = it->second.owner;
+            shared = it->second.front;
+        }
+        else if (it->second.front != shared)
+            agree = false;
+    }
+    auto queue = [&](entity_id tile) {
+        ui.pending_front_assign.clear();
+        for (const entity_id u : units)
+            ui.pending_front_assign.emplace_back(u, tile);
+        ImGui::CloseCurrentPopup();
+    };
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                       units.size() > 1 ? "Assign %d units to front" : "Assign to front",
+                       static_cast<int>(units.size()));
+    ImGui::Separator();
+    const std::vector<front_view>& fronts = fronts_of(w, nation);
+    if (fronts.empty())
+        ImGui::TextDisabled("This nation has no fronts.");
+    for (const front_view& fv : fronts)
+    {
+        const bool on = agree && shared == fv.f.key;
+        ImGui::PushID(static_cast<int>(fv.f.key));
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(
+            front_stance_colour(stance_toward(w, nation, fv.f.neighbour))));
+        const bool pressed = ImGui::MenuItem(fv.label.c_str(), nullptr, on);
+        ImGui::PopStyleColor();
+        if (pressed)
+            queue(on ? null_entity : fv.f.key); // the key is a tile of its own span
+        ImGui::PopID();
+    }
+    ImGui::Separator();
+    const bool none = agree && shared == null_entity;
+    ImGui::BeginDisabled(none);
+    if (ImGui::MenuItem("Unassign", nullptr, none))
+        queue(null_entity);
+    ImGui::EndDisabled();
+    ImGui::EndPopup();
+}
+
+// A flag over a staff — the Assign to front glyph (BL-1427): "stand on a line",
+// apart from March's arrow (go there) and Halt's bars (stop).
+void glyph_front(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddLine({c.x - r * 0.40f, c.y - r * 0.60f}, {c.x - r * 0.40f, c.y + r * 0.60f}, col, 2.2f);
+    dl->AddTriangleFilled({c.x - r * 0.40f, c.y - r * 0.60f},
+                          {c.x + r * 0.55f, c.y - r * 0.35f},
+                          {c.x - r * 0.40f, c.y - r * 0.10f}, col);
+    dl->AddLine({c.x - r * 0.70f, c.y + r * 0.60f}, {c.x + r * 0.70f, c.y + r * 0.60f}, col, 2.2f);
+}
+
 void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_state& ui)
 {
     const entity_id sel = ui.selected_entity;
@@ -1709,7 +1789,26 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             ImGui::EndPopup();
         }
         ImGui::SameLine();
-        tile_icon_button("##unit_reserved5", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        // Assign to front (BL-1427): the grid's sixth cell, the last reserved slot.
+        // The popup lists the unit's nation's fronts; the current one is checked.
+        {
+            const entity_id cur = uit->second.front;
+            const front_view* fv = owned ? front_by_key(w, uit->second.owner, cur) : nullptr;
+            std::string tip = !owned ? std::string("Competitor unit - intel only")
+                            : fv != nullptr ? "Assign to front - on " + fv->label
+                                            : std::string("Assign to front - hold a span of your border");
+            if (owned && fv != nullptr)
+            {
+                // Assigned: the cell wears the primed ring, as March does when armed.
+                const ImVec2 pmin = ImGui::GetCursorScreenPos();
+                dl->AddRect({pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                           palette::selection, 4.0f, 0, 2.0f);
+            }
+            if (tile_icon_button("##unit_front", bsz, owned, tip.c_str(), glyph_front) && owned)
+                ImGui::OpenPopup("unit_front_menu");
+            draw_assign_front_popup(w, ui, "unit_front_menu", { sel });
+        }
 
         ImGui::EndChild();
     }
@@ -1775,6 +1874,19 @@ void draw_unit_group_selection(const world& w, ui_state& ui, const std::vector<e
                                 tit->second.grid_x, tit->second.grid_y);
         else
             ImGui::TextDisabled("%d units", n);
+        // Assign to front (BL-1427): every unit of the group, one press — the
+        // player's own groups only. Left of 'go to', as the card's "< Group" is.
+        if (own)
+        {
+            const char* lbl = "Assign to front";
+            const float bw  = ui::fit_width(lbl) + ImGui::GetStyle().FramePadding.x * 2.0f;
+            ImGui::SameLine(bar_w - frame_h - ImGui::GetStyle().ItemSpacing.x - bw);
+            if (ImGui::Button("Assign to front##unit_group_front", {bw, frame_h}))
+                ImGui::OpenPopup("unit_group_front_menu");
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Assign every unit here to one front");
+            draw_assign_front_popup(w, ui, "unit_group_front_menu", group);
+        }
         ImGui::SameLine(bar_w - frame_h);
         if (ImGui::Button(">##unit_group_goto", {frame_h, frame_h}))
             focus_on_entity(w, ui, group.front());
@@ -3923,6 +4035,160 @@ void draw_plate_selection(ui_state& ui)
     ImGui::TextDisabled("Its tectonic record is open in the History ledger.");
 }
 
+// THE FRONT ELEMENT (BL-1427; SELECTION.md § The front element, MILITARY.md
+// § Fronts): what a press on a front line opens. A header naming the neighbour in
+// the stance colour, the span's length and the stance; then the assigned units —
+// a row is the door to that unit's card — and, on the right, the order: Hold and
+// Push, the active one lit. Push is open only toward a neighbour the nation is
+// hostile to, and says so when it is not. Returns false when the selected key no
+// longer names a front (the border moved), having cleared the selection.
+bool draw_front_selection(const world& w, ui_state& ui)
+{
+    const entity_id   nation = ui.selected_front_nation;
+    const front_view* fv     = front_by_key(w, nation, ui.selected_front_key);
+    if (fv == nullptr)
+    {
+        ui.clear_front_selection();
+        return false;
+    }
+    const front_view  view   = *fv; // a copy: the cache may be re-filled below
+    const bool        own    = is_player_side(w, nation);
+    const front_stance st    = stance_toward(w, nation, view.f.neighbour);
+    const ImU32       st_col = front_stance_colour(st);
+    const ImGuiStyle& style  = ImGui::GetStyle();
+
+    // ── Header: Front · Neighbour ·  N tiles · Stance ──
+    {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Front");
+        ImGui::SameLine();
+        const char* nb = actor_name(w, view.f.neighbour);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(st_col), "%s",
+                           (nb != nullptr && nb[0] != '\0') ? nb : "\xe2\x80\x94");
+        ImGui::SameLine();
+        ImGui::TextDisabled("%d tiles \xc2\xb7 %s", static_cast<int>(view.f.span.size()),
+                            front_stance_name(st));
+        if (view.label.find('(') != std::string::npos)
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("\xc2\xb7 %s", view.label.substr(view.label.find('(')).c_str());
+        }
+    }
+    ImGui::Separator();
+
+    const float avail   = ImGui::GetContentRegionAvail().x;
+    const float total_h = ImGui::GetContentRegionAvail().y;
+    const float right_w = avail * 0.25f;
+    const float left_w  = std::max(80.0f, avail - right_w - style.ItemSpacing.x);
+
+    // ── Left: the assigned units, one row each ──
+    const std::vector<entity_id> units = front_units(w, nation, view.f.key);
+    ImGui::BeginChild("##front_units", {left_w, total_h}, false, ImGuiWindowFlags_NoSavedSettings);
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                       "Assigned units (%d)", static_cast<int>(units.size()));
+    if (units.empty())
+    {
+        ImGui::TextDisabled("None. Assign units from a unit's card or a unit group.");
+    }
+    else
+    {
+        const ImGuiTableFlags tf = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY
+                                 | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV;
+        if (ImGui::BeginTable("##front_unit_rows", 3, tf, {0.0f, 0.0f}))
+        {
+            ImGui::TableSetupScrollFreeze(0, 1);
+            ImGui::TableSetupColumn("Unit",      ImGuiTableColumnFlags_None, 2.0f);
+            ImGui::TableSetupColumn("Fights as", ImGuiTableColumnFlags_None, 1.4f);
+            ImGui::TableSetupColumn("Strength",  ImGuiTableColumnFlags_None, 1.2f);
+            ImGui::TableHeadersRow();
+            entity_id open = null_entity;
+            for (const entity_id uid : units)
+            {
+                const unit_component& u = w.units.at(uid);
+                ImGui::PushID(static_cast<int>(uid));
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                if (ImGui::Selectable(unit_roster_display_name(u.type).c_str(), false,
+                                      ImGuiSelectableFlags_SpanAllColumns))
+                    open = uid;
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Open this unit's card");
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted(land_class_display_name(unit_land_class(u)));
+                ImGui::TableSetColumnIndex(2);
+                ImGui::Text("%d / %d", u.count, unit_establishment(u));
+                ImGui::PopID();
+            }
+            ImGui::EndTable();
+            if (open != null_entity)
+            {
+                ui.clear_front_selection();
+                ui.selected_entity      = open;
+                ui.selection_unit_group = false;
+                ui.selection_unit_page  = 0;
+            }
+        }
+    }
+    ImGui::EndChild();
+    ImGui::SameLine();
+
+    // ── Right: the order, Hold / Push ──
+    ImGui::BeginChild("##front_order", {right_w, total_h}, false,
+                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+    {
+        const front_order cur  = front_order_of(w, nation, view.f.key);
+        const bool        open = front_push_open(w, nation, view.f.neighbour);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Order");
+        const float bw = (ImGui::GetContentRegionAvail().x - style.ItemSpacing.x) * 0.5f;
+        const float bh = ImGui::GetFrameHeight() * 1.6f;
+
+        // A toggle pair: the active order is lit. Pressing an active Push undoes
+        // it (back to hold, the default); an active Hold has nothing beneath it.
+        auto order_button = [&](const char* label, bool active, bool enabled, const char* tip) {
+            if (active)
+            {
+                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::ColorConvertU32ToFloat4(st_col));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.08f, 0.08f, 0.10f, 1.0f));
+            }
+            ImGui::BeginDisabled(!enabled);
+            const bool pressed = ImGui::Button(label, {bw, bh});
+            ImGui::EndDisabled();
+            if (active)
+                ImGui::PopStyleColor(2);
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", tip);
+            return pressed && enabled;
+        };
+
+        const bool holding = cur == front_order::hold;
+        if (order_button("Hold##front_hold", holding, own,
+                         holding ? "Holding - the units keep their slots along the span"
+                                 : "Hold - stand on the span"))
+        {
+            if (!holding)
+            {
+                ui.pending_front_order_tile  = view.f.key;
+                ui.pending_front_order_value = 0;
+            }
+        }
+        ImGui::SameLine();
+        const bool pushing = cur == front_order::push;
+        if (order_button("Push##front_push", pushing, own && (open || pushing),
+                         pushing ? "Pushing - press to hold instead"
+                         : open  ? "Push - march into the neighbour's weakest province"
+                                 : "Not hostile - a front can only hold toward this neighbour"))
+        {
+            ui.pending_front_order_tile  = view.f.key;
+            ui.pending_front_order_value = pushing ? 0 : 1;
+        }
+        if (!open && !pushing)
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "Not hostile");
+        else
+            ImGui::TextDisabled(pushing ? "Pushing" : "Holding");
+    }
+    ImGui::EndChild();
+    return true;
+}
+
 void draw_selection_content(world& w, const recipe_registry& reg,
                             const economy_report& report, ui_state& ui)
 {
@@ -3989,6 +4255,10 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         draw_plate_selection(ui);
         return;
     }
+    // BL-1427: a FRONT, the same non-entity shape — (nation, key) in its own
+    // fields. A key whose front has gone clears itself and falls through.
+    if (ui.has_front_selection() && draw_front_selection(w, ui))
+        return;
 
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
