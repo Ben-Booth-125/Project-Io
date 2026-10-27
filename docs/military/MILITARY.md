@@ -495,8 +495,8 @@ checks, in order:
 5. The nation can pay **both** legs, else `rejected_funds`.
 
 The two payment legs. A **credit cost** of
-`hire_base_cost + hire_cost_per_power × row.power_mod` (economy.lua § military: 40 + 0.5 × power,
-so Levy Spear costs 40 and Rifle Regiment 230). Plus a **flat resource draw** of 5.0 per *gated*
+`hire_base_cost + hire_cost_per_power × row.power_mod` (economy.lua § military: 120 + 1.4 × power,
+BL-744 / NR-781, so Levy Spear costs 120, Rifle Regiment 652 and Rifle Infantry 736). Plus a **flat resource draw** of 5.0 per *gated*
 axis, **bought** off the shelves of the markets the nation's buildings sit in, lowest market id first, at each
 shelf's posted price — a hire buys its kit like any buyer (`../economy/MARKETS.md` § The shelf
 economy).
