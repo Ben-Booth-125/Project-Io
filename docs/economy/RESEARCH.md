@@ -150,9 +150,14 @@ majors as flat, and the spread between richest and median as growth-driven.
 ### What technology is for
 
 Three touchpoints the rest of the game already names: the space-access gate (*Rocketry research
-purchased*, `ERAS.md` § Era 2 → Era 3 gate); recipe unlocks (the `unlock_recipe` tech arm); and
+purchased*, `ERAS.md` § Era 1 → Era 2 gate); recipe unlocks (the `unlock_recipe` tech arm); and
 province-ceiling relief — deeper mines and denser facilities are the sanctioned reliever of the
 building ceiling (`../generation/PROVINCES.md` § The building ceiling).
+
+**Military kit is researched in the age tree (Ben, 2026-10-27)** — rifles, launchers, guns, armour,
+sensors and drones are nodes of the tree like any other technology, not a ladder of their own
+(`../military/MILITARY.md` § Land — the classes). A kit item is what a unit's design may take; a
+node that opens one names it as its unlock.
 
 ---
 

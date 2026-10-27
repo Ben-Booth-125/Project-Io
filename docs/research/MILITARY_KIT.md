@@ -193,7 +193,14 @@ outdated unit types."*
 - Once designs exist, **a design replaces its class's row on Recruit**, and marking obsolete moves to
   designs: an old design can be kept for the record and retired.
 
-## 7. The calls for Ben
+## Ruled (Ben, 2026-10-27)
+
+- **Kit is folded into the age tree** — not the kit ladder of § 4, which this ruling sets aside. How
+  the forty items fit the tree's grammar is the next pass (BL-1436, kit in the age tree).
+- **Two slots a class** (§ 1), **six goods by kind** (§ 3), **one live design per class** (§ 5).
+- **Obsolete**: every row below the modern band starts obsolete (§ 6); built now.
+
+## 7. The calls as they were put
 
 1. **Where kit is researched**: a kit ladder on military research points (proposed), or folded into
    the age tree?

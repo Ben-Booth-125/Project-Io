@@ -120,5 +120,26 @@
   "anchor": "It lives on the \\*\\*canvas\\*\\*",
   "stale": [],
   "owner": "BL-1427 (fronts)"
+ },
+ {
+  "ruling": "Military kit: two slots a class, six goods by kind, one live design per class (Ben, 2026-10-27)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Two slots a class: main and support",
+  "stale": [],
+  "owner": "BL-1434 (unit designs)"
+ },
+ {
+  "ruling": "Military kit is researched in the age tree",
+  "doc": "docs/economy/RESEARCH.md",
+  "anchor": "Military kit is researched in the age tree",
+  "stale": [],
+  "owner": "BL-1436 (kit in the age tree)"
+ },
+ {
+  "ruling": "Obsolete unit types: rows below the modern band start obsolete; Recruit hides them; rivals skip them",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Every row below the.{0,3}modern band starts obsolete",
+  "stale": [],
+  "owner": "BL-1437 (obsolete unit types)"
  }
 ]

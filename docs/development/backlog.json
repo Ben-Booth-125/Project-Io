@@ -1008,6 +1008,57 @@
    "title": "Raising a unit takes time: a muster queue at the base, like construction",
    "design": "MILITARY.md § The muster interface (Ben, 2026-10-27). hire_unit pays and queues at the base; the unit appears when its muster completes, measured like construction days. Muster time per row; the Force branch's Helicopter Lift (-10%) and Proven Readiness (-20%) read it. Save-format change. The Recruit tab shows the queue (BL-1433).",
    "delivered": "2026-10-27"
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (military kit rulings, 2026-10-27)",
+   "requires": [],
+   "id": "BL-1436",
+   "short_name": "KIT_IN_THE_AGE_TREE",
+   "category": "Research",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/economy/tech/DIGITISATION_TREE.md",
+   "files": [
+    "docs/economy/tech/digitisation_tree.json",
+    "src/world/digitisation_tree_data.hpp",
+    "docs/research/MILITARY_KIT.md"
+   ],
+   "title": "Fold the military kit into the Digitisation tree: about forty kit items as nodes",
+   "design": "Ben, 2026-10-27: kit is researched in the age tree, not a ladder of its own (RESEARCH.md § What technology is for; MILITARY.md § Land — the classes). research/MILITARY_KIT.md § 2 lists the items (two slots a class, gens 1-3). DESIGN PASS FIRST: the tree's grammar holds about fifteen nodes a branch (RESEARCH.md § The shape of an age's tree), so place the kit by subject across branches — small arms, section weapons, guns and protection in Force; armour materials in Processing; sensors, fire control, drones and networked kit in Signal & Orbit — as minors and majors in clusters, keeping each major's two-minors rule; say where the grammar must widen and put that to Ben. Then the store edit (tech_tree_store.js --check, gen_tech_tree_table.js), each node naming its kit as an unlock effect (unread until BL-1434, unit designs)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (military kit rulings, 2026-10-27)",
+   "requires": [],
+   "id": "BL-1437",
+   "short_name": "OBSOLETE_UNIT_TYPES",
+   "category": "Military",
+   "priority": "A",
+   "difficulty": 2,
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/components.hpp",
+    "src/world/world_save.cpp",
+    "src/world/corp_command.hpp",
+    "src/world/corp_command.cpp",
+    "src/world/corp_ai.cpp",
+    "src/ui/military_ledger.cpp"
+   ],
+   "title": "A nation marks unit types obsolete; Recruit hides them; pre-modern rows start obsolete",
+   "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): a per-nation obsolete flag per roster row, defaulting true below the modern band; a command verb to set it (validated, whole-or-nothing); Recruit hides obsolete rows with a show-obsolete switch; the Design tab carries the toggles; the rival scorer skips obsolete rows. Saved."
   }
  ]
 }

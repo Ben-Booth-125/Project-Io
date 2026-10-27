@@ -183,6 +183,24 @@ next unit raised and, as kit arrives, in the units already in the field (§ Land
 and manpower). The kit is a good on the shelf. Designs are made on the Military ledger's **Design**
 tab (`../ui/ledgers/military.md`).
 
+**The kit (Ben, 2026-10-27; the item list is `../research/MILITARY_KIT.md` §§ 1–2).**
+
+- **Two slots a class: main and support.** The main kit is what the class is (small arms, the
+  fighting vehicle, the main gun, the guns); the support kit is what it carries alongside, and is
+  where the swaps live — infantry's section weapon is an anti-tank launcher, a mortar, a
+  man-portable air-defence launcher or small attack drones; artillery's alongside slot is
+  counter-battery radar, anti-armour submunitions or loitering drones.
+- **Each class starts on its base kit** — the 1960 standard — with nothing researched; each later
+  item adds to the class's numbers.
+- **Kit is researched in the age tree**, not on a ladder of its own: the military kit is nodes of
+  the age's tree like any other technology (`../economy/RESEARCH.md` § What technology is for).
+- **One live design per class.** Choosing an item per slot from what is researched and saving it
+  makes it what Recruit raises for that class; named designs kept side by side are a later step.
+- **Obsolete unit types.** A nation marks a roster row obsolete, and Recruit hides it (a "show
+  obsolete" switch brings it back); units already raised are untouched. **Every row below the
+  modern band starts obsolete** for every nation, so Recruit opens on the modern types. A rival
+  nation's scorer never raises an obsolete row.
+
 | Class | Hardness | Soft | Hard | Role |
 |---|---|---|---|---|
 | Infantry | none | medium | low, raised by anti-tank missiles | Holds ground; cheapest. |
@@ -198,9 +216,11 @@ attack and draws a drone good, which is how they are used.
 
 ### Land — equipment, refit and manpower
 
-**Equipment is goods on the shelf**, bought as muster already buys (§ The muster interface):
-small arms, armoured vehicles and artillery pieces by generation, air defence systems, drones and
-ordnance. **Refit**: a wounded unit regains HP by drawing equipment and manpower each tick. A unit
+**Equipment is goods on the shelf**, bought as muster already buys (§ The muster interface).
+**Six goods, by kind, not by generation (Ben, 2026-10-27):** small arms, armoured vehicles,
+artillery pieces, guided weapons and drones, with the existing electronics; later kit needs more of
+them and adds electronics, so the economy feels each generation without a good for every rung.
+Ordnance stays every unit's per-tick draw. **Refit**: a wounded unit regains HP by drawing equipment and manpower each tick. A unit
 whose kit cannot be bought stays wounded; the economy is the war's ceiling.
 
 **Soldiers come from the labour pool** — shown, with the conscript or professional choice, on the
