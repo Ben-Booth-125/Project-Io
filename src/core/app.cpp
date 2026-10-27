@@ -3089,8 +3089,10 @@ void app::render()
         switch (r)
         {
             case corp_command_result::applied:
-                m_ui.construction.last_message = "Unit raised.";
-                m_ui.selected_entity           = hired; // inspect the new unit
+                // BL-1435: the hire is queued at the base, not raised yet — the
+                // Military ledger's Recruit tab shows it mustering.
+                m_ui.construction.last_message = "Unit mustering.";
+                (void)hired;
                 break;
             case corp_command_result::rejected_funds:
                 // Either leg: the BL-394 credit cost or the gated-axis

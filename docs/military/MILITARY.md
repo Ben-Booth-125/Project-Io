@@ -520,7 +520,11 @@ checked before either is debited, so a refusal leaves the nation wholly uncharge
 **Raising takes time (Ben, 2026-10-27).** An accepted hire enters a **muster queue** at its base, as
 a building enters construction, and becomes a unit when its muster completes; the Military
 ledger's **Recruit** tab (rail slot 7, `../ui/ledgers/military.md`) shows the queue and is the
-door to every hire. On completion: a new unit entity at the muster tile with
+door to every hire. A muster takes **90 days** for infantry, motorised infantry and light armour,
+**135** for artillery and air defence, and **180** for mechanised infantry and armour — a quarter
+a tick, so one, two or two ticks (`muster_days_for`). A hire still mustering counts against a
+rival nation's soft cap of three units. An order whose base is demolished or decommissioned is
+dropped with no unit, as a unit whose base is torn down is disbanded. On completion: a new unit entity at the muster tile with
 `count = hire_batch_manpower`, returned through `apply_corp_command`'s out-param. The verb records the base it was raised at as the unit's
 `muster_base`; where the tile carries more than one qualifying base, the **lowest entity id**
 wins, so the choice is deterministic.
