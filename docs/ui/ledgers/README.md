@@ -42,6 +42,7 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
 | [construction.md](construction.md) | Buildings | Buildings (estate by type) / Construction (queue + site ledger + build bar) | **the placement lens** while a building is chosen on the Construction view — a mode of the build flow, not an `overlay_mode` |
 | [selection.md](selection.md) | — (polymorphic by kind) | tile / province / body / building / unit / battle / market / nation | contextual (none) |
 | [tile_ledger.md](tile_ledger.md) | last-left view | Story / Chain / Ages / Tectonics | none |
+| [military.md](military.md) | Recruit | Recruit (bases + the roster, with Raise) / Design (kit per class — strawman) | none (a recruit-flow highlight is weighed) |
 
 ## Cross-doc findings (see [_critic_notes.md](_critic_notes.md))
 - **A whole-enterprise aggregate ledger does not survive the duplication test.** Its cashflow view is
