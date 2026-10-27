@@ -1719,6 +1719,22 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             }
             out["selection_kind"] = std::string(k);
         }
+        // Ben, 2026-10-27 (unit counter hover and group): the KIND the pointer
+        // resolved to (the hover pass's answer, so a script can aim at a counter
+        // without being told where one is), and whether the band shows the
+        // selected unit's group. UI state, no tile data.
+        {
+            const char* k = "none";
+            switch (ui::selection_kind_of(m_world, m_ui.hovered_entity))
+            {
+            case ui::selection_kind::tile:     k = "tile";     break;
+            case ui::selection_kind::building: k = "building"; break;
+            case ui::selection_kind::unit:     k = "unit";     break;
+            default:                           k = "none";     break;
+            }
+            out["hovered_kind"] = std::string(k);
+            out["unit_group"]   = m_ui.selection_unit_group;
+        }
         // THE TWO NON-ENTITY STRUCTURE CHANNELS (BL-664). `selection_kind` above
         // reports only what travels in `selected_entity`, and a deposit and a
         // plate deliberately do not (BL-659/BL-660, Ben's option A) — so a check
@@ -4060,6 +4076,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (type == "logistics_hub") bt = building_type::inland_logistics_hub;
             else if (type == "military_base") bt = building_type::military_base; // BL-325 S1
             else if (type == "marketplace") bt = building_type::planetary_marketplace; // BL-1269
+            // "none" leaves placement mode, so a script that placed a building can
+            // press the canvas as a player again (BL-1425's group press).
+            if (type == "none")
+                m_ui.construction.active = false;
             if (bt == building_type::none)
                 return;
             m_ui.construction.active = true;
@@ -6330,11 +6350,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // BL-1425: select the unit @p id, as a click on its counter does (a marker hit:
     // no province mirror). Non-mutating. Returns false and selects nothing for an
     // unknown id.
-    v.set_function("select_unit", [this](unsigned id) -> bool {
+    // Ben, 2026-10-27: `as_group` true selects as a COUNTER press does — the
+    // band then opens the unit's group when others of its owner share its tile.
+    v.set_function("select_unit", [this](unsigned id, sol::optional<bool> as_group) -> bool {
         const entity_id uid = static_cast<entity_id>(id);
         if (m_world.units.find(uid) == m_world.units.end())
             return false;
         m_ui.selected_entity      = uid;
+        m_ui.selection_unit_group = as_group.value_or(false);
         m_ui.selected_province    = 0;
         m_ui.province_sync_entity = uid;
         return true;

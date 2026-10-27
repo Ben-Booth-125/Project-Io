@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**65 surfaces** — 4 settled, 61 awaiting Ben's wording.
+**66 surfaces** — 4 settled, 62 awaiting Ben's wording.
 
 ---
 
@@ -386,6 +386,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 *Demanded by BL-393, BL-575, BL-1425 · `src/ui/selection_panel.cpp`, `src/ui/selection_panel.hpp`, `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp` · id `selection_unit_card`*
 
+### Selection band - Unit group (the units of one owner on one tile)
+
+**Answers:** Which units make up this counter, what does each fight as, and — for mine — how many men, how ready and how willing is each?
+
+**Because:** Ben, 2026-10-27: "We will need to add a unit group selection panel for when multiple stacked units are selected." A counter draws every unit of one owner on its tile as one rectangle with one count and summed bars, so a press on it cannot honestly open ONE unit's card: the lowest-id unit it used to open is an arbitrary member, and the others were unreachable from the map. The group element answers the question the counter raises — what is in this stack — with a header (owner, unit count, tile), the counter itself drawn large in the left quarter, and one row per unit: roster type, the land class it fights as, men over establishment, HP and readiness bars, and morale. A row is the door to that unit's card, which carries '< Group (N)' back, so the stack is a drill-through rather than a dead end (DRILL_THROUGH.md). A rival's rows say what each unit is and how many men it has, and nothing of its condition (BL-068, the counter's own rule). A counter of one unit still opens that unit's card directly.
+
+*Demanded by BL-1425 · `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp` · id `selection_unit_group`*
+
 ### Strategy readout (nav slot 12)
 
 **Answers:** What strategy is emerging from each corporation's run — what mix of verbs is it taking, which spending priorities dominate, and which reasons keep firing?
@@ -438,7 +446,7 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 **Answers:** Whose forces stand on this tile, how many units, and — for mine — how hurt and how spent are they?
 
-**Because:** MILITARY.md § Land — on the canvas (Ben, 2026-10-26): a land unit is a rectangle within its tile showing the number of units on that tile, their HP and their readiness. The two quantities the land round ends a unit on — HP (men; 0 dies) and readiness (0 retreats) — are what a player watches a front by, and a card per unit cannot show a line of them at once. So the counter carries both as bars, HP over readiness, in the colours the unit card uses for the same numbers, beside the owner's colour and the unit count. It groups per (tile, owner), replacing BL-575's per-province marker that drew a whole province's force on one tile. The bars are the player's own units' only: a rival's internals stay private (BL-068, the battle card's precedent), so a rival's counter shows owner and count (NR-1088 asks Ben whether to widen that). Sized to stay inside its hex below the centre, clear of the battle glyph that claims the centre when a fight is live.
+**Because:** MILITARY.md § Land — on the canvas (Ben, 2026-10-26): a land unit is a rectangle within its tile showing the number of units on that tile, their HP and their readiness. The two quantities the land round ends a unit on — HP (men; 0 dies) and readiness (0 retreats) — are what a player watches a front by, and a card per unit cannot show a line of them at once. So the counter carries both as two VERTICAL bars at its right edge, filling bottom-up — HP green, readiness orange (Ben, 2026-10-27) — in the colours the unit card uses for the same numbers, beside the owner's colour and the unit count. The pointer on a counter rings it in the shared hover colour, so the player knows the press will take the counter and not the ground under it; a press on a counter of several units opens their group (selection_unit_group). It groups per (tile, owner), replacing BL-575's per-province marker that drew a whole province's force on one tile. The bars are the player's own units' only: a rival's internals stay private (BL-068, the battle card's precedent), so a rival's counter shows owner and count (NR-1088 asks Ben whether to widen that). Sized to stay inside its hex below the centre, clear of the battle glyph that claims the centre when a fight is live.
 
 *Demanded by BL-1425, BL-1421, BL-575 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp`, `src/ui/ui_state.hpp`, `src/ui/presentation.hpp` · id `unit_marker`*
 

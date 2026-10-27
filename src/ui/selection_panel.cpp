@@ -1388,6 +1388,24 @@ void draw_unit_strength_page(const world& w, const recipe_registry& reg, const u
     }
 }
 
+// BL-1425: the land class a unit fights as, and its display word (MILITARY.md
+// § Land — the classes). Shared by the Roster page and the unit group's rows.
+static land_class unit_land_class(const unit_component& u)
+{
+    const std::vector<roster_row>& table = unit_roster_table();
+    return u.type < table.size() ? land_class_for(table[u.type]) : land_class::infantry;
+}
+
+static const char* land_class_display_name(land_class cls)
+{
+    static constexpr const char* k_class_names[land_class_count] = {
+        "Infantry", "Motorised infantry", "Mechanised infantry", "Armour",
+        "Light armour", "Artillery", "Air defence", "Not a land fighter",
+    };
+    const int i = static_cast<int>(cls);
+    return (i >= 0 && i < static_cast<int>(land_class_count)) ? k_class_names[i] : "\xe2\x80\x94";
+}
+
 // Roster page: type name (real lookup, see unit_roster_display_name) + owner
 // (resolved via the same corp-name lookup the building card's rival summary
 // and the tile card's Manage button already use).
@@ -1399,16 +1417,10 @@ void draw_unit_roster_page(const world& w, const unit_component& u)
     // BL-1425: the land class the row fights as, and the numbers the round reads
     // (per man, quality-scaled; MILITARY.md § Land — the classes).
     {
-        static constexpr const char* k_class_names[land_class_count] = {
-            "Infantry", "Motorised infantry", "Mechanised infantry", "Armour",
-            "Light armour", "Artillery", "Air defence", "Not a land fighter",
-        };
-        const std::vector<roster_row>& table = unit_roster_table();
-        const land_class cls = u.type < table.size() ? land_class_for(table[u.type]) : land_class::infantry;
         const land_combat_stats st = unit_land_stats(u);
         ImGui::Spacing();
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Fights as");
-        ImGui::Text("%s", k_class_names[static_cast<int>(cls)]);
+        ImGui::Text("%s", land_class_display_name(unit_land_class(u)));
         ImGui::TextDisabled("soft %d  hard %d  hardness %d%%", st.soft, st.hard, st.hardness / 10);
     }
     ImGui::Spacing();
@@ -1609,6 +1621,176 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
         tile_icon_button("##unit_reserved5", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
 
         ImGui::EndChild();
+    }
+}
+
+// THE UNIT GROUP (Ben, 2026-10-27; SELECTION.md § The unit group element): every
+// unit of @p unit's owner standing on its tile — exactly what one canvas counter
+// draws (body_surface_canvas.cpp groups per (tile, owner), skipping empty units)
+// — in ascending id, so the first is the counter's own click target. Derived from
+// the selected unit each frame, never stored. Empty for an unknown id.
+std::vector<entity_id> unit_group_of(const world& w, entity_id unit)
+{
+    std::vector<entity_id> out;
+    const auto it = w.units.find(unit);
+    if (it == w.units.end())
+        return out;
+    for (const auto& [uid, uc] : w.units)
+        if (uc.count > 0 && uc.position == it->second.position && uc.owner == it->second.owner)
+            out.push_back(uid);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+// One condition bar inside a table cell: a dim track and a filled share, centred
+// on the text line, in the canvas counter's colour for the same quantity.
+void draw_unit_cell_bar(float share, ImU32 col)
+{
+    ImDrawList*  dl = ImGui::GetWindowDrawList();
+    const ImVec2 p  = ImGui::GetCursorScreenPos();
+    const float  wd = std::max(8.0f, ImGui::GetContentRegionAvail().x);
+    const float  lh = ImGui::GetTextLineHeight();
+    const float  bh = std::max(4.0f, lh * 0.40f);
+    const float  y0 = p.y + (lh - bh) * 0.5f;
+    dl->AddRectFilled({p.x, y0}, {p.x + wd, y0 + bh}, IM_COL32(60, 64, 74, 255), 2.0f);
+    const float s = std::clamp(share, 0.0f, 1.0f);
+    if (s > 0.0f)
+        dl->AddRectFilled({p.x, y0}, {p.x + wd * s, y0 + bh}, col, 2.0f);
+    ImGui::Dummy({wd, lh});
+}
+
+// The unit group element: what a press on a counter of several units opens. A
+// header naming the owner, the count and the tile; then the 3-column band's
+// shape with the counter itself in the left quarter and one row per unit across
+// the rest — a row is the door to that unit's card, whose header carries the way
+// back. HP, readiness and morale for the player's own units only (BL-068, the
+// counter's own rule): a rival's row says what it is and how many men it has.
+void draw_unit_group_selection(const world& w, ui_state& ui, const std::vector<entity_id>& group)
+{
+    const unit_component& head = w.units.at(group.front());
+    const bool  own     = is_player_side(w, head.owner);
+    const float bar_w   = ImGui::GetContentRegionAvail().x;
+    const float frame_h = ImGui::GetFrameHeight();
+    const int   n       = static_cast<int>(group.size());
+
+    // ── Header: Owner · N units · tile col, row .................... [>] ──
+    {
+        const char* owner_name = owner_display_name(w, head.owner);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
+                           owner_name != nullptr ? owner_name : "\xe2\x80\x94");
+        ImGui::SameLine();
+        if (const auto tit = w.tiles.find(head.position); tit != w.tiles.end())
+            ImGui::TextDisabled("%d units \xc2\xb7 tile %d, %d", n,
+                                tit->second.grid_x, tit->second.grid_y);
+        else
+            ImGui::TextDisabled("%d units", n);
+        ImGui::SameLine(bar_w - frame_h);
+        if (ImGui::Button(">##unit_group_goto", {frame_h, frame_h}))
+            focus_on_entity(w, ui, group.front());
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Go to");
+    }
+    ImGui::Separator();
+
+    const float avail   = ImGui::GetContentRegionAvail().x;
+    const float total_h = ImGui::GetContentRegionAvail().y;
+    const float left_w  = avail * 0.25f;
+
+    // ── Left quarter: the counter, as the canvas draws it ──
+    {
+        long long men = 0, est = 0, ready_men = 0;
+        for (const entity_id uid : group)
+        {
+            const unit_component& u = w.units.at(uid);
+            men       += u.count;
+            est       += unit_establishment(u);
+            ready_men += static_cast<long long>(u.count) * u.readiness_permille;
+        }
+        ImDrawList*  dl = ImGui::GetWindowDrawList();
+        const ImVec2 p  = ImGui::GetCursorScreenPos();
+        const ImVec2 mx = {p.x + left_w, p.y + total_h};
+        dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
+        const entity_id player_owner = player_actor(w);
+        const ImU32 fill = palette::corp_identity_colour(
+            head.owner == player_owner ? w.player_entity : head.owner, w.player_entity);
+        const float r = std::max(6.0f, std::min(left_w / 2.6f, total_h / 1.9f));
+        icons::unit_counter(dl, {(p.x + mx.x) * 0.5f, (p.y + mx.y) * 0.5f}, r, fill, n,
+                            est > 0 ? static_cast<float>(men) / static_cast<float>(est) : 0.0f,
+                            men > 0 ? static_cast<float>(ready_men) / static_cast<float>(men) / 1000.0f : 0.0f,
+                            /*show_bars=*/own);
+        dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
+        ImGui::Dummy({left_w, total_h});
+    }
+    ImGui::SameLine();
+
+    // ── The rest: one row per unit ──
+    const ImGuiTableFlags tf = ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY
+                             | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_BordersInnerV;
+    if (ImGui::BeginTable("##unit_group_rows", 6, tf, {0.0f, total_h}))
+    {
+        ImGui::TableSetupScrollFreeze(0, 1);
+        ImGui::TableSetupColumn("Unit",      ImGuiTableColumnFlags_None, 2.0f);
+        ImGui::TableSetupColumn("Fights as", ImGuiTableColumnFlags_None, 1.4f);
+        ImGui::TableSetupColumn("Men",       ImGuiTableColumnFlags_None, 1.0f);
+        ImGui::TableSetupColumn("HP",        ImGuiTableColumnFlags_None, 1.0f);
+        ImGui::TableSetupColumn("Readiness", ImGuiTableColumnFlags_None, 1.3f);
+        ImGui::TableSetupColumn("Morale",    ImGuiTableColumnFlags_None, 1.0f);
+        ImGui::TableHeadersRow();
+
+        entity_id open = null_entity;
+        for (const entity_id uid : group)
+        {
+            const unit_component& u = w.units.at(uid);
+            ImGui::PushID(static_cast<int>(uid));
+            ImGui::TableNextRow();
+
+            ImGui::TableSetColumnIndex(0);
+            if (ImGui::Selectable(unit_roster_display_name(u.type).c_str(), false,
+                                  ImGuiSelectableFlags_SpanAllColumns))
+                open = uid;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Open this unit's card");
+
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(land_class_display_name(unit_land_class(u)));
+
+            ImGui::TableSetColumnIndex(2);
+            const int est = unit_establishment(u);
+            if (own)
+                ImGui::Text("%d / %d", u.count, est);
+            else
+                ImGui::Text("%d", u.count);
+
+            ImGui::TableSetColumnIndex(3);
+            if (own)
+                draw_unit_cell_bar(est > 0 ? static_cast<float>(u.count) / est : 0.0f, palette::unit_hp);
+            else
+                ImGui::TextDisabled("\xe2\x80\x94");
+
+            ImGui::TableSetColumnIndex(4);
+            if (own)
+                draw_unit_cell_bar(u.readiness_permille / 1000.0f, palette::unit_readiness);
+            else
+                ImGui::TextDisabled("\xe2\x80\x94");
+
+            ImGui::TableSetColumnIndex(5);
+            if (own)
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::unit_morale),
+                                   "%.0f%%", u.morale_permille / 10.0f);
+            else
+                ImGui::TextDisabled("\xe2\x80\x94");
+
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+
+        // A row opens that unit's card; the card's header carries the way back.
+        if (open != null_entity)
+        {
+            ui.selected_entity      = open;
+            ui.selection_unit_group = false;
+            ui.selection_unit_page  = 0;
+        }
     }
 }
 
@@ -3742,6 +3924,20 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         return;
     }
 
+    // A press on a counter of SEVERAL units opens their group (Ben, 2026-10-27;
+    // SELECTION.md § The unit group element). It draws its own header; one unit
+    // on the tile falls through to that unit's card.
+    std::vector<entity_id> unit_group;
+    if (kind == selection_kind::unit)
+    {
+        unit_group = unit_group_of(w, ui.selected_entity);
+        if (ui.selection_unit_group && unit_group.size() > 1)
+        {
+            draw_unit_group_selection(w, ui, unit_group);
+            return;
+        }
+    }
+
     // Frame-agnostic: this draws into whatever window the caller opened (the sticky
     // card, BL-195). Width comes from the live content region, not a fixed column —
     // so the same content renders in a card of any width. The header + per-kind
@@ -3780,6 +3976,21 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         // offset is measured from the content-left, no WindowPadding term needed.
         // No close button: the band is always open (BL-266).
         const float btn = frame_h;
+
+        // A unit standing with others of its owner carries the way back to its
+        // group (Ben, 2026-10-27), left of 'go to'.
+        if (kind == selection_kind::unit && unit_group.size() > 1)
+        {
+            char back[32];
+            std::snprintf(back, sizeof back, "< Group (%d)", static_cast<int>(unit_group.size()));
+            const float back_w = ImGui::CalcTextSize(back).x + style.FramePadding.x * 2.0f;
+            ImGui::SameLine(bar_w - btn - style.ItemSpacing.x - back_w);
+            if (ImGui::Button(back, {back_w, btn}))
+                ui.selection_unit_group = true;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Back to the %d units on this tile", static_cast<int>(unit_group.size()));
+        }
+
         ImGui::SameLine(bar_w - btn);
         if (ImGui::Button(">", {btn, btn}))
             focus_on_entity(w, ui, head_id);

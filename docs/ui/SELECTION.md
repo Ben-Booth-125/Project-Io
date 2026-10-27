@@ -458,6 +458,36 @@ card's shape is built ahead of units carrying much in the live economy (Ben's di
 
 `ui_state::selection_unit_page` is the pager index, mirroring `selection_building_page`.
 
+A unit standing with others of its owner on its tile carries a **`< Group (N)`** press in the
+card's header, left of 'go to', which returns the band to that group (§ The unit group element).
+
+### The unit group element
+
+A canvas counter draws **every unit of one owner on one tile** (ICONS.md § Unit; MILITARY.md
+§ Land — on the canvas). **A press on a counter of several units opens their group, not one
+unit's card** (Ben, 2026-10-27: *"We will need to add a unit group selection panel for when
+multiple stacked units are selected."*). A counter of one unit opens that unit's card directly.
+
+The group is **not a selection kind of its own**. `selected_entity` holds one unit of the group
+(the counter's lowest-id unit, its click target), and `ui_state::selection_unit_group` says the
+band shows the group that unit stands in. The group itself is derived every frame from that unit
+— same owner, same tile, ascending id, empty units skipped, exactly the canvas's grouping — so it
+cannot go stale. The canvas sets the flag on a press on a counter (and on the repeat-click cycle's
+unit rung); any selection made elsewhere clears it.
+
+1. **Header** — the owner, `N units`, and the tile's grid position; 'go to' on the right.
+2. **Left quarter** — the counter itself, drawn large: band, count, and the summed bars.
+3. **The rest — one row per unit**: roster type, the land class it fights as, men over
+   establishment, an HP bar and a readiness bar in the counter's colours, and morale.
+   **A row is the door to that unit's card** (DRILL_THROUGH.md), whose `< Group (N)` press
+   comes back.
+
+A rival's rows name each unit, its class and its men, and **nothing of its condition** — no HP,
+readiness or morale (BL-068, the counter's own rule).
+
+A counter stands below its hex centre and can overhang the hex beneath. A press on it takes the
+counter, never a repeat-click step on the ground under the pointer.
+
 ### The province is a section, not a selection
 
 **The province is reached through the tile element, not beside it** (Ben, 2026-08-24):

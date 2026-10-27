@@ -517,11 +517,13 @@ void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool commit
 
 /// BL-1425: a land unit COUNTER — a rectangle 2.2r wide and 1.5r tall centred on
 /// @p centre. An owner-colour band (@p fill) on its left; the number of units on
-/// the tile (@p count); and, when @p show_bars, an HP bar (@p hp, 0..1, men over
-/// establishment) over a readiness bar (@p readiness, 0..1). The count is printed
-/// only where the rectangle is tall enough to read it.
+/// the tile (@p count) in the middle; and, when @p show_bars, two VERTICAL bars at
+/// the right edge filling bottom-up — HP (@p hp, 0..1, men over establishment,
+/// `palette::unit_hp`) then readiness (@p readiness, 0..1, `palette::unit_readiness`).
+/// The count is printed only where it can be read. @p hovered rings the plate in
+/// `palette::hover` (Ben, 2026-10-27).
 void unit_counter(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count,
-                  float hp, float readiness, bool show_bars);
+                  float hp, float readiness, bool show_bars, bool hovered = false);
 
 /// Draw a settlement marker — a small skyline whose number of towers grows with
 /// @p tier (1 = outpost … 5 = metropolis) — in @p colour. The civilisation read on

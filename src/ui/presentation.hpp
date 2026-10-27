@@ -104,7 +104,7 @@ inline constexpr ImU32 negative = IM_COL32(216, 100,  96, 255); ///< Loss, defic
 
 // --- a land unit's condition (BL-1425; MILITARY.md § Land — the unit's stats) ---
 inline constexpr ImU32 unit_hp        = IM_COL32(110, 200, 120, 255); ///< Men fit to fight — `positive`'s green.
-inline constexpr ImU32 unit_readiness = IM_COL32(232, 186,  72, 255); ///< Cohesion in contact — amber, distinct from HP.
+inline constexpr ImU32 unit_readiness = IM_COL32(240, 140,  40, 255); ///< Cohesion in contact — orange (Ben, 2026-10-27), distinct from HP.
 inline constexpr ImU32 unit_morale    = IM_COL32(120, 160, 230, 255); ///< Will to fight — blue, the card only.
 inline constexpr ImU32 neutral  = IM_COL32(170, 175, 185, 255); ///< No change / not applicable.
 

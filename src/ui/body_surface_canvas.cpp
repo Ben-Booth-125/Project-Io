@@ -2793,6 +2793,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // later.
         state.clear_battle_selection();
                 state.clear_lens_region_selection();
+        // A selection made elsewhere (a group row, a ledger) is ONE unit's card.
+        state.selection_unit_group = false;
         state.province_sync_entity = state.selected_entity;
     }
 
@@ -6020,8 +6022,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                 ? static_cast<float>(grp.men) / static_cast<float>(grp.establishment) : 0.0f;
                             const float ready = grp.men > 0
                                 ? static_cast<float>(grp.ready_men) / static_cast<float>(grp.men) / 1000.0f : 0.0f;
+                            // Hover (Ben, 2026-10-27): the counter the pointer resolves
+                            // to — the hover pass's own answer (resolve_marker_hit),
+                            // one frame behind as every hover read here is. Under a
+                            // lens a marker takes no part in hover (BL-664), and the
+                            // hovered entity is then never a unit.
+                            const bool hovered = state.overlay == overlay_mode::none
+                                              && state.hovered_entity == grp.sample_unit;
                             icons::unit_counter(dl, mpos, ur, fill, grp.count, hp, ready,
-                                                /*show_bars=*/grp.owner == player_owner);
+                                                /*show_bars=*/grp.owner == player_owner, hovered);
 
                             // Hit zone (BL-031/BL-059/BL-575): the group's LOWEST-id
                             // unit is the click/hover target — same "lowest id wins"
@@ -7713,7 +7722,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // lands on a FRESH tile still goes through the marker-hit / fallback
             // precedence untouched, below. Units mostly don't exist yet in the live
             // economy (BL-393); this is built ahead of that on purpose (Ben's direction).
-            if (hovered_tile != null_entity && state.selection_cycle_tile == hovered_tile)
+            // A counter stands below its hex centre and can overhang the hex
+            // beneath (BL-1425), so the pointer can be on a unit of ANOTHER tile
+            // than the one it hovers. That press is aimed at the counter, not a
+            // cycle step on the ground under it (Ben, 2026-10-27).
+            bool unit_of_other_tile = false;
+            if (marker_hit != null_entity)
+                if (const auto mu = w.units.find(marker_hit); mu != w.units.end())
+                    unit_of_other_tile = (mu->second.position != hovered_tile);
+            if (hovered_tile != null_entity && state.selection_cycle_tile == hovered_tile
+                && !unit_of_other_tile)
             {
                 entity_id unit_here = null_entity;
                 for (const auto& [uid, uc] : w.units)
@@ -7762,6 +7780,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
                 state.selection_cycle_stage = stage;
                 state.selected_entity       = stages[stage];
+                // A unit chosen on the canvas opens its tile's GROUP when it
+                // stands with others of its owner (Ben, 2026-10-27; SELECTION.md
+                // § The unit group element). The band decides the count.
+                state.selection_unit_group  = w.units.count(state.selected_entity) != 0;
                 // The mirror: the province of the selection, which is non-zero
                 // only on the TILE rung — the one card that has province sections
                 // to show, and so the only one whose outline says anything.
@@ -7782,6 +7804,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             else
             {
                 state.selected_entity = (marker_hit != null_entity) ? marker_hit : fallback;
+                // A press on a counter opens the GROUP it draws (Ben, 2026-10-27;
+                // SELECTION.md § The unit group element); one unit, its card.
+                state.selection_unit_group = w.units.count(state.selected_entity) != 0;
                 // BL-598: the mirror, not a rival selection. A click that lands
                 // on the TILE carries its province (the tile element has the
                 // sections that read it); a marker hit does not, because a

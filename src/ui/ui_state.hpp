@@ -859,6 +859,14 @@ struct ui_state
     /// Unit Selection card accordion page index — Strength / Roster, whichever apply.
     int selection_unit_page = 0;
 
+    /// Show the selected unit's GROUP — every unit of its owner on its tile — rather
+    /// than its own card (Ben, 2026-10-27; SELECTION.md § The unit group element).
+    /// Set by a canvas press on a counter, cleared when a group row opens one unit
+    /// or any other surface selects. The group is derived from `selected_entity`
+    /// each frame, never stored, so it cannot go stale; with one unit on the tile
+    /// the band draws that unit's card whatever this says.
+    bool selection_unit_group = false;
+
     /// The province the CURRENT SELECTION stands in, or 0 when the selection is
     /// not a tile. A DERIVED MIRROR, not a selection channel (BL-598).
     ///
