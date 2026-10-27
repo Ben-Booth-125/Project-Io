@@ -520,3 +520,18 @@ bool roster_row_obsolete_by_default(const roster_row& r);
 /// nation flipped it (`nation_component::roster_obsolete_flips`). An unknown row or
 /// nation reads the default (an unknown row: obsolete).
 bool roster_row_obsolete(const world& w, entity_id nation, uint16_t row);
+
+// ---------------------------------------------------------------------------
+// Refit to a newer type (Ben, 2026-10-27; MILITARY.md § The muster interface)
+// ---------------------------------------------------------------------------
+
+/// Is roster row @p to a newer model of row @p from — the same land class
+/// (`land_class_for`), and a later band, or the same band with a higher
+/// `power_mod`? A row is never newer than itself. Unknown rows: false.
+bool refit_row_newer(uint16_t from, uint16_t to);
+
+/// The rows a unit of row @p from, owned by @p nation, may refit to now: every row
+/// `refit_row_newer` than it that `available_rows(w, nation, band)` fields, in table
+/// order. Obsolete rows are included (the seam allows them; the card lists the
+/// live ones first).
+std::vector<uint16_t> refit_targets(const world& w, entity_id nation, uint16_t from, roster_band band);

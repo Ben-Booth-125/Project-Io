@@ -189,6 +189,11 @@ enum class corp_verb : uint8_t
     // alone: an AI nation's scorer reads the flags (and their defaults) and never
     // sets them, so corp_ai.cpp issues no such verb.
     set_unit_obsolete,    ///< The seat's nation marks roster row `unit_type` obsolete (`order` = 1) or live (`order` = 0). rejected_invalid for an unknown row or any other `order`; rejected_state when the row already reads that way; rejected_not_owner unless `corp` is the seat.
+    // --- Refit to a newer type (Ben, 2026-10-27) ---
+    // Appended AFTER set_unit_obsolete, same append-only rule. MILITARY.md § The
+    // muster interface, "Refit to a newer type". No grant lets a rival refit, so
+    // corp_ai.cpp issues no such verb; any nation may refit its OWN units.
+    refit_unit,           ///< Refit unit `subject` to roster row `unit_type`: a newer model of the same land class the nation fields now (`refit_targets`). Paid now (the price difference, floored at 0, plus the target's gated goods); takes the target's muster days. rejected_not_owner / rejected_invalid / rejected_state (in a battle, already refitting) / rejected_placement (off its own ground) / rejected_funds — see `refit_check`.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -198,7 +203,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::set_unit_obsolete) + 1;
+    static_cast<uint8_t>(corp_verb::refit_unit) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.
@@ -372,6 +377,22 @@ enum class corp_command_result : uint8_t
     rejected_no_lp,           ///< BL-597: no passive Logistic Points at the source anchor for this leg.
     rejected_wrong_air,       ///< The recipe cannot run on this body's air: propellant_electrolysis only on an airless body, propellant_atmospheric only under air (Ben, 2026-10-09).
 };
+
+/// Refit to a newer type (Ben, 2026-10-27): the credits a refit of a unit of row
+/// @p from to row @p to costs — the hire price difference, `hire_cost_per_power x
+/// (to.power_mod - from.power_mod)`, floored at 0 (the base price cancels). The
+/// target's gated goods are charged on top, as a hire charges them. Unknown rows: 0.
+float refit_credit_cost(const recipe_registry& reg, uint16_t from, uint16_t to);
+
+/// Every check `refit_unit` makes, READ-ONLY, in its order — so the unit card names
+/// the same refusal the seam would give: the unit exists and is @p nation's
+/// (rejected_invalid / rejected_not_owner); @p target is a compatible row the nation
+/// fields now (rejected_invalid); the unit is not in a battle and not already
+/// refitting (rejected_state); it stands on @p nation's own ground
+/// (rejected_placement); the nation can pay the credits and the target's goods
+/// (rejected_funds). `applied` means the verb would apply.
+corp_command_result refit_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                entity_id unit, uint16_t target);
 
 /// Apply one command through the player-grade seams. Deterministic; a rejected
 /// command mutates nothing. `out_building` (optional) receives the entity id a

@@ -91,6 +91,8 @@ const VERBS = [
   'lay_track',                                         // BL-1255 -- the seat's nation lays one tile of rail track; tile + nation
   'set_logistics_shares',                              // BL-1309 -- the seat's nation shares its Logistic Points; nation + quantity (state) + floor_price (champion), order 1 clears
   'set_tax_tier',                                      // BL-1335 -- the seat's nation's tax tier; nation + order (1..5)
+  'set_unit_obsolete',                                 // BL-1437 -- the seat's nation marks a roster row obsolete; unit_type + order (0/1)
+  'refit_unit',                                        // 2026-10-27 -- refit the actor's unit subject to a newer roster row unit_type
 ];
 
 // io::dg::node_count (src/world/digitisation_tree_data.hpp, generated from
@@ -235,7 +237,7 @@ const TOOLS = [
         // could not be issued at all: the dispatch forwards args generically, so
         // an argument absent from THIS schema is an argument the model is never
         // told exists and never sends.
-        unit_type: { type: 'integer', description: 'hire_unit: index into unit_roster_table() (BL-324).' },
+        unit_type: { type: 'integer', description: 'hire_unit: index into unit_roster_table() (BL-324). set_unit_obsolete: the row to mark. refit_unit: the newer row to refit subject (a unit) to.' },
         quantity: { type: 'number', description: 'set_logistics_shares: the state share of the nation Logistic Points (0..1; with the champion share, at most 1 — other firms get the rest). place_sell_order: max units offered per tick (> 0). request_quote: units sought. dispatch_convoy: units of cargo to haul (> 0, and no more than the source pool holds).' },
         floor_price: { type: 'number', description: 'place_sell_order: minimum unit price (>= 0; 0 means accept the market price). set_logistics_shares: the champion share of the nation Logistic Points (0..1).' },
         order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks). accept_offer / abandon_contract: the mercenary offer / contract id (BL-573). queue_research: the Digitisation node index (0..159). unqueue_research: the queued node to take off with every queued entry that needs it, or -1 / omitted for the last entry (BL-1276). set_logistics_shares: 0 sets the shares, 1 clears the rule back to the mechanical default (BL-1309). set_tax_tier: the tax tier, 1..5 (I..V) (BL-1335).' },

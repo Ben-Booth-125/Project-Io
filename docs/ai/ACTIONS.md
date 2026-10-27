@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*162 entries — 39 gameplay · 26 canvas · 16 lens · 48 ledger · 33 chrome.*
+*163 entries — 40 gameplay · 26 canvas · 16 lens · 48 ledger · 33 chrome.*
 
 ---
 
@@ -716,6 +716,27 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The nation's obsolete state for that row flips (nation_component::roster_obsolete_flips holds the rows that differ from the default; every row below the modern band starts obsolete). Recruit and the base tile card hide obsolete rows; units already raised are untouched. Saved (world_save_version 60).
 
 **Reason to select.** Keep Recruit to the types you raise. Every pre-modern row starts obsolete; un-mark one if your ground cannot field better, or mark a modern type obsolete once a better one replaces it.
+
+### `gameplay.refit_unit` — The unit card's Refit press in the Selection element (the fifth action slot), for the player's own unit: a menu of the newer types it can refit to. Also a corp_verb (corp_verb::refit_unit, 40) on the command seam.
+
+**Press.** Select your unit, press Refit, and pick a type from the menu (each row shows its credit price, '+ kit' when it also buys goods, and its days; a disabled row says why). The press queues the command, applied through apply_corp_command at the frame's end. Over the seam: COMMAND corp=<nation> verb=40 subject=<unit id> unit_type=<roster row>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit to refit: one of the actor's own. |
+| `unit_type` | `uint16 (index into unit_roster_table())` | The newer roster row to refit it to. |
+
+**Valid when:**
+- The unit exists (rejected_invalid otherwise) and is the actor's own (rejected_not_owner otherwise).
+- `unit_type` is a newer model of the unit's land class - the same `land_class_for`, a later band or the same band with a higher power_mod - that the actor fields now (`available_rows`); rejected_invalid otherwise. An obsolete row is allowed.
+- The unit is not in a battle and not already refitting (rejected_state otherwise).
+- The unit stands on its own nation's ground (rejected_placement otherwise).
+- The actor can pay: the hire price difference (hire_cost_per_power x the power_mod difference, floored at 0) from its uncommitted treasury, and the target's gated goods off the shelves of its markets, both checked before either is taken (rejected_funds otherwise).
+- Rival nations' scorers never issue it: no AI grant covers a refit.
+
+**Expected output.** Paid at once (credits and goods; no refund). The unit records the target and the target's muster days (90, 135 or 180 by class) and keeps its old type, fighting as it, until each economy tick has taken a quarter's days off; then its type becomes the target, keeping its men, establishment, readiness and morale. A standing march order is cleared, and march_unit refuses it (rejected_state) while it refits. Saved (world_save_version 61).
+
+**Reason to select.** Upgrade the force you have instead of disbanding and re-hiring: the unit keeps its men and condition, and pays only the difference in price. Refit out of contact and at home, and weigh the days it cannot march.
 
 ---
 

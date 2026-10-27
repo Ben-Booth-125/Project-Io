@@ -646,6 +646,10 @@
    "The Military ledger's Design tab (nav rail slot 7), 'Unit types': one checkbox per roster row. Also a corp_verb (corp_verb::set_unit_obsolete, 39) on the command seam."
   ],
   [
+   "gameplay.refit_unit",
+   "The unit card's Refit press in the Selection element (the fifth action slot), for the player's own unit: a menu of the newer types it can refit to. Also a corp_verb (corp_verb::refit_unit, 40) on the command seam."
+  ],
+  [
    "ledger.military_show_obsolete",
    "The Military ledger's Recruit tab (nav rail slot 7): the 'Show obsolete (N)' checkbox above the roster."
   ]

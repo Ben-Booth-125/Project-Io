@@ -2048,6 +2048,23 @@ void advance_musters(world& w)
     w.musters.swap(still);
 }
 
+void advance_refits(world& w)
+{
+    // Each unit's refit is its own: no unit's outcome reads another's, so the
+    // unordered walk cannot change the result.
+    for (auto& [uid, u] : w.units)
+    {
+        if (!unit_refitting(u))
+            continue;
+        u.refit_days -= k_construction_quarter_days;
+        if (u.refit_days > 0)
+            continue;
+        u.type       = u.refit_type;
+        u.refit_type = k_no_refit;
+        u.refit_days = 0;
+    }
+}
+
 economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating)
 {
     // BL-1117: the phase clock, WRITE-ONLY (economy_system.hpp). Null
@@ -3468,6 +3485,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // their base, BEFORE the battle pass, so a unit that finishes mustering this tick
     // can be drawn into a fight that opens on its province.
     advance_musters(w);
+    advance_refits(w); // Ben, 2026-10-27: a refit completes before the battle pass too
 
     {
         const battle_tick bt = run_battles(w, reg, w.current_day_tick);

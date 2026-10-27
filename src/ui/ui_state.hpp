@@ -1120,6 +1120,12 @@ struct ui_state
     /// no refund either way (MILITARY.md § Marching), so a confirm popup, if
     /// ever wanted, is the unit card's call, not this field's.
     entity_id pending_disband_unit = null_entity;
+    /// Set by the unit card's Refit menu (Ben, 2026-10-27): the unit to refit and
+    /// the newer roster row to refit it to. `null_entity` = nothing pending.
+    /// app::render executes it through `refit_unit` (player_command) — never a
+    /// second write path — and clears it.
+    entity_id     pending_refit_unit = null_entity;
+    std::uint16_t pending_refit_type = 0;
 
     /// Spectator mode (BL-409): no human seat. Presentation-side flag only —
     /// `world/*` never reads it; the sim's copy travels as corp_ai_params

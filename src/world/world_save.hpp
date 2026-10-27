@@ -519,7 +519,16 @@ inline constexpr uint32_t world_save_magic =
 /// count, then count x u16 rows ascending). v59 is a STRICT PREFIX of v60 and is read
 /// too (`k_world_save_version_pre_obsolete`), as a world where every nation reads the
 /// defaults.
-inline constexpr uint32_t world_save_version = 60;
+///
+/// Bumped to 61 (refit to a newer type, Ben 2026-10-27; MILITARY.md § The muster
+/// interface): A TRAILING SECTION after the obsolete flips carries every REFITTING unit,
+/// ascending id, as (id, u16 target row, i32 days left), after a u32 count. v60 is a
+/// STRICT PREFIX of v61 and is read too (`k_world_save_version_pre_refit`), as a world
+/// where no unit refits.
+inline constexpr uint32_t world_save_version = 61;
+
+/// v60, a strict prefix of v61 (the refit section is v61's only addition).
+inline constexpr uint32_t k_world_save_version_pre_refit = 60;
 
 /// v59, a strict prefix of v60 (the obsolete-flips section is v60's only addition).
 inline constexpr uint32_t k_world_save_version_pre_obsolete = 59;
@@ -656,6 +665,10 @@ void write_world_snapshot_pre_muster(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1437): @p w written as a v59 stream, less the obsolete-flips
 /// section. The game never writes it.
 void write_world_snapshot_pre_obsolete(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (refit, 2026-10-27): @p w written as a v60 stream, less the refit
+/// section. The game never writes it.
+void write_world_snapshot_pre_refit(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

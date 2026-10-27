@@ -441,6 +441,7 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::set_logistics_shares: return "logistics shares"; // BL-1309
         case corp_verb::set_tax_tier:  return "tax tier"; // BL-1335
         case corp_verb::set_unit_obsolete: return "unit obsolete"; // BL-1437
+        case corp_verb::refit_unit:    return "unit refit"; // 2026-10-27: never issued by a rival
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";

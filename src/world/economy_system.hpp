@@ -577,6 +577,12 @@ struct economy_report
 /// battle pass; exposed so a harness can step it alone.
 void advance_musters(world& w);
 
+/// Refit to a newer type (Ben, 2026-10-27; MILITARY.md § The muster interface): take
+/// a quarter's days off every refitting unit; one that reaches zero takes its new
+/// type, keeping its men, establishment, readiness and morale. Called beside
+/// advance_musters; exposed so a harness can step it alone.
+void advance_refits(world& w);
+
 economy_report run_economy_step(world& w, const recipe_registry& reg,
                                 bool spectating = false);
 

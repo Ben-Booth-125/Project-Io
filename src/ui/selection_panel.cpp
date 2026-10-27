@@ -35,6 +35,7 @@
 #include "world/trade.hpp"           // building_trade_points — a trade building's method line (BL-1321)
 #include "player_side.hpp"          // BL-1406: is_player_side
 #include "world/nation_tech.hpp"     // BL-593: recipe_unlocked — the door filters what the gate would refuse
+#include "world/corp_command.hpp" // refit_check / refit_credit_cost: the unit card's Refit menu (2026-10-27)
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
 #include "rail_tool.hpp" // BL-1255: the Track / Railway Station rows
@@ -1168,6 +1169,15 @@ void glyph_halt(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
     dl->AddRectFilled({c.x + gap, c.y - bh}, {c.x + gap + bw, c.y + bh}, col);
 }
 
+// An upward chevron over a bar: the unit card's Refit glyph (Ben, 2026-10-27),
+// "a newer model", distinct from Go to's right chevron and Halt's two bars.
+void glyph_refit(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddLine({c.x - r * 0.5f, c.y + r * 0.05f}, {c.x, c.y - r * 0.45f}, col, 2.4f);
+    dl->AddLine({c.x, c.y - r * 0.45f}, {c.x + r * 0.5f, c.y + r * 0.05f}, col, 2.4f);
+    dl->AddLine({c.x - r * 0.5f, c.y + r * 0.45f}, {c.x + r * 0.5f, c.y + r * 0.45f}, col, 2.4f);
+}
+
 // A square icon button: an ImGui::Button frame with a glyph drawn over it and a
 // hover tooltip (Ben's call: icons, text only on hover). Disabled buttons dim the
 // glyph and show the reason. Returns true only on an enabled click. Shared by the
@@ -1342,6 +1352,12 @@ void draw_unit_strength_page(const world& w, const recipe_registry& reg, const u
         draw_unit_condition_bar("Readiness", u.readiness_permille / 1000.0f, palette::unit_readiness, v);
         std::snprintf(v, sizeof v, "%.0f%%", u.morale_permille / 10.0f);
         draw_unit_condition_bar("Morale", u.morale_permille / 1000.0f, palette::unit_morale, v);
+        // Refit to a newer type (Ben, 2026-10-27): shown on the card's first page too,
+        // since the action slot's tooltip does not show while it is disabled.
+        if (unit_refitting(u))
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                               "Refitting to %s \xe2\x80\x94 %d d left",
+                               unit_roster_display_name(u.refit_type).c_str(), u.refit_days);
         ImGui::Spacing();
     }
 
@@ -1413,6 +1429,12 @@ void draw_unit_roster_page(const world& w, const unit_component& u)
 {
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Type");
     ImGui::Text("%s", unit_roster_display_name(u.type).c_str());
+    // Refit to a newer type (Ben, 2026-10-27): the unit keeps its old type, and
+    // fights as it, until the refit's days pass. The player's own units only.
+    if (unit_refitting(u) && is_player_side(w, u.owner))
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                           "Refitting to %s \xe2\x80\x94 %d d left",
+                           unit_roster_display_name(u.refit_type).c_str(), u.refit_days);
 
     // BL-1425: the land class the row fights as, and the numbers the round reads
     // (per man, quality-scaled; MILITARY.md § Land — the classes).
@@ -1616,7 +1638,76 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             ImGui::EndPopup();
         }
 
-        tile_icon_button("##unit_reserved4", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        // Refit (Ben, 2026-10-27; MILITARY.md § The muster interface, "Refit to a newer
+        // type"): the player's own unit re-equips to a newer model of its class. The
+        // menu lists what the nation fields now, live types first, each with its
+        // credit price and days; a target the seam would refuse is shown disabled with
+        // the reason (`refit_check`, the verb's own checks). The press queues
+        // pending_refit_* for app::render, which sends `refit_unit`. While a refit
+        // runs the slot shows it instead of the control.
+        {
+            const unit_component& u = uit->second;
+            if (owned && unit_refitting(u))
+            {
+                char tip[128];
+                std::snprintf(tip, sizeof tip, "Refitting to %s \xe2\x80\x94 %d d left",
+                              unit_roster_display_name(u.refit_type).c_str(), u.refit_days);
+                tile_icon_button("##unit_refit", bsz, /*enabled=*/false, tip, glyph_refit);
+            }
+            else
+            {
+                const char* tip = owned ? "Refit - re-equip this unit to a newer type of its class"
+                                        : "Competitor unit - intel only";
+                if (tile_icon_button("##unit_refit", bsz, owned, tip, glyph_refit) && owned)
+                    ImGui::OpenPopup("unit_refit_menu");
+            }
+        }
+        if (ImGui::BeginPopup("unit_refit_menu"))
+        {
+            const unit_component& u      = uit->second;
+            const entity_id       nation = w.player_entity;
+            std::vector<uint16_t> targets =
+                refit_targets(w, nation, u.type, campaign_roster_band_for(reg.era()));
+            std::stable_partition(targets.begin(), targets.end(), [&](uint16_t t) {
+                return !roster_row_obsolete(w, nation, t);
+            });
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Refit to");
+            ImGui::Separator();
+            if (targets.empty())
+                ImGui::TextDisabled("No newer type of this class is fielded now.");
+            for (const uint16_t t : targets)
+            {
+                const corp_command_result why = refit_check(w, reg, nation, sel, t);
+                const bool        ok   = (why == corp_command_result::applied);
+                const roster_gate& g   = unit_roster_table()[t].gate;
+                const bool        kit  = g.ore_q > 0 || g.farm_q > 0 || g.energy_q > 0;
+                char label[160];
+                std::snprintf(label, sizeof label, "%s%s \xe2\x80\x94 %s%s, %d d##refit%u",
+                              unit_roster_display_name(t).c_str(),
+                              roster_row_obsolete(w, nation, t) ? " (obsolete)" : "",
+                              fmt::credits(refit_credit_cost(reg, u.type, t)).c_str(),
+                              kit ? " + kit" : "", muster_days_for(t), static_cast<unsigned>(t));
+                ImGui::BeginDisabled(!ok);
+                if (ImGui::Selectable(label) && ok)
+                {
+                    ui.pending_refit_unit = sel;
+                    ui.pending_refit_type = t;
+                    ImGui::CloseCurrentPopup();
+                }
+                ImGui::EndDisabled();
+                if (!ok)
+                {
+                    const char* reason =
+                          why == corp_command_result::rejected_state     ? "In a battle"
+                        : why == corp_command_result::rejected_placement ? "Not on your own ground"
+                        : why == corp_command_result::rejected_funds     ? "Cannot afford it"
+                                                                          : "Not fieldable";
+                    ImGui::SameLine();
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "%s", reason);
+                }
+            }
+            ImGui::EndPopup();
+        }
         ImGui::SameLine();
         tile_icon_button("##unit_reserved5", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
 
