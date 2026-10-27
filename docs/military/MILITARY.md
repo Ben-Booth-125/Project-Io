@@ -290,8 +290,8 @@ the rest re-space on the next tick.
 **The push target (Ben, 2026-10-27: "fronts and push use tiles too").** A push considers the
 neighbour's land tiles with a hex side onto the span. Each pushing unit marches onto the one whose
 standing stack is weakest — the summed `unit_strength` of the units on it, an empty tile weakest
-of all — nearest its own slot, ties to the lower tile id. Marching onto a held tile is an attack
-(§ Battles). A unit already standing on the neighbour's ground holds what it took. A push is open only while the nation has declared hostility
+of all — nearest its own slot, ties to the lower tile id. A tile the nation's own units already
+stand on is taken, not a target. Marching onto a held tile is an attack (§ Battles). A unit already standing on the neighbour's ground holds what it took. A push is open only while the nation has declared hostility
 toward the neighbour, which is the battle trigger's one-way test. If that hostility ends, the stored
 push acts as hold until it returns.
 
@@ -726,9 +726,10 @@ BL-314's unit verb family resolves to this seam, extended):
   goes to a tile and ends on it (Ben, 2026-10-27: "all marches go to a tile")** — the province grain
   a march once had is retired. Rejects
   `rejected_not_owner` (not the caller's unit), `rejected_invalid` (unknown unit/tile, ocean dest,
-  dest off the unit's own body, or unreachable), `rejected_state` (dest already `== position`, or
-  the unit is in a battle — `unit_in_battle`; walking away from contact is a priced withdrawal,
-  never a march).
+  dest off the unit's own body, or unreachable), `rejected_state` (dest already `== position`, the
+  unit is refitting, or the unit is in a battle — `unit_in_battle`; walking away from contact is a
+  priced withdrawal, never a march). A command that names a province and no tile names no
+  destination and is refused.
 - **`halt_unit {subject: unit}`.** Clears the order. `rejected_state` on a unit with none.
 - **`disband_unit {subject: unit}`.** Erases the unit outright. No refund — manpower walks away;
   a confirm step, if any, lives in the UI (BL-471), never in the seam.
@@ -746,6 +747,10 @@ hold is never taken as a move:
   wherever the path meets that unit — "stops and attacks it" — not only at the march's end.
 - **Toward any other nation, the step is blocked.** The march re-paths around the tile; if no path
   remains, the order clears.
+
+A unit in a battle does not march: an order it holds waits until the fight releases it. A muster
+that finishes while another nation's units stand on its base's tile waits for the tile to clear, and
+a retreat never steps onto a tile another nation holds (§ Battles).
 
 A right-click on a tile with a unit selected is a march to that tile; on another nation's stack it is
 an attack, and on a nation the player is not hostile to it first offers to declare hostility
@@ -807,8 +812,9 @@ is deliberately no second disband mechanism.
    attacker tried to step onto. The province envelope let a line of units along a province boundary
    make attack impossible; contact is now a move, not co-presence. The attacking stack fights from
    the tile it stands on, the defending stack on its own, and **adjacent stacks join (Ben,
-   2026-10-27)**: each side's units on tiles adjacent to the defended tile, out of every other
-   battle, are drawn in on their side. Units never abstract into a pool — they keep their tiles.
+   2026-10-27)**: each side's own nation's units on tiles adjacent to the defended tile, out of
+   every other battle, are drawn in on their side; an ally's stack beside the tile does not join. The
+   defending stack on the tile defends whatever else it is fighting. Units never abstract into a pool — they keep their tiles.
 2. **Terrain is one tuple for the whole battle**, exactly as the resolver takes it. Per-unit
    terrain was offered and declined. The ground is the **defended tile** — `battle_ground`,
    exposed as a named function so it can be asserted.
@@ -855,16 +861,18 @@ ground outside the province and then its own nation's — loses morale once, and
 it was in. A unit with nowhere to go stays put, out of the fight. The side's strength reading is
 then re-read over the units still in it.
 
-**Withdrawal** is `request_withdraw(w, actor, province, against)`. `against` names the fight, because
-a nation can be in more than one battle in one province; `null_entity` means "the first, in sorted
-order". The request is **honoured at the tick boundary**, before the next round batch — that delay
+**Withdrawal** is `request_withdraw(w, actor, tile, against)`, the battle named by its defended
+tile. `against` names the fight, because a nation can be in more than one battle over one tile;
+`null_entity` means "the first, in sorted order". The request is **honoured at the tick boundary**, before the next round batch — that delay
 *is* the withdrawal window. Strength is captured before the withdrawal is applied, so the parting
 cost reaches the men and not only a number. A request naming no live battle, or from a
 non-participant, returns false and mutates nothing — the seam rule for an AI-facing boundary.
 
 **The field.** A concluded battle names `field_held_by` — the side that stayed — and is erased at
 the end of the tick. **When the attacker holds the field, the stack that attacked advances onto the
-defended tile (Ben, 2026-10-27)**; adjacent stacks that joined stay where they stood. `world::province_holder` is what tracks *who currently holds a province*
+defended tile (Ben, 2026-10-27)**; adjacent stacks that joined stay where they stood. The advance
+never puts two nations on one tile: a defender with nowhere to retreat stays put, and the attacking
+stack then stays where it stood. `world::province_holder` is what tracks *who currently holds a province*
 across battles (BL-569, province holder): seeded at generation from the territorial plurality,
 moved by a decisive battle's `field_held_by`, and left untouched by a stalemate. It is deliberately
 narrow — a military fact a contract predicate can read, not a political one: `tile_to_nation` (the
@@ -874,7 +882,7 @@ still unowned work. Battle state survives a save under BL-536 (world snapshot sa
 ### Dispatches and the card
 
 A battle **reports**. `battle_tick::dispatches` carries one pure-data `battle_dispatch` per battle
-that acted this tick — province, sides, phase, rounds fought / this tick / max, both strengths and
+that acted this tick — the defended tile and its province, sides, phase, rounds fought / this tick / max, both strengths and
 swings, men lost, and for an ending the `withdrew`, `end` and `field_held_by` fields. It includes
 battles that **concluded** this tick and are already erased from `world::battles`; that is the only
 way the aftermath — who held the field, what it cost — can reach a surface at all.

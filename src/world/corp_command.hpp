@@ -72,16 +72,19 @@ enum class corp_verb : uint8_t
     // reads changed, from `tile` to `province`. Ben's grain ruling (unit
     // position and movement are province grain) collapses BL-467's
     // command-at-tile / engagement-at-province split; see NR-405.
-    march_unit,    ///< Set/replace `subject`'s (a unit) movement order toward `province`, path-marched across ticks.
+    // 2026-10-27 (Ben: "all marches go to a tile") RETURNED IT TO `tile`: the march
+    // ends on its tile, and `province` is ignored. Same value, same position.
+    march_unit,    ///< Set/replace `subject`'s (a unit) movement order to tile `tile`, path-marched across ticks and ending on it; the path avoids every tile another nation's units stand on, save `tile` itself. rejected_not_owner / rejected_invalid (unknown unit or tile, a tile the type may not enter, off the unit's body, unreachable) / rejected_state (already on `tile`, in a battle, refitting). `province` is ignored.
     halt_unit,     ///< Clear `subject`'s movement order. rejected_state if it has none.
     disband_unit,  ///< Erase `subject` (a unit) outright. No refund — manpower walks away.
     // --- BL-467: the battle seam (2026-08-21) ---
     // Appended AFTER disband_unit, same append-only rule. The engagement TRIGGER
-    // is deliberately not a verb — a battle opens because two hostile forces are
-    // in the same province, not because someone asked. Breaking off is the only
+    // is deliberately not a verb — a battle opens because a march steps onto a tile
+    // a nation it is hostile to holds (2026-10-27), not because someone asked to
+    // fight. Breaking off is the only
     // decision a commander actually has once contact is made, so it is the only
     // thing the seam exposes.
-    withdraw_from_battle, ///< `corp` breaks off the battle it is fighting in `province` against `counterparty` (null = the first in sorted order). Honoured at the tick boundary, before the next round batch; priced by the resolver's three-term withdrawal cost.
+    withdraw_from_battle, ///< `corp` breaks off the battle it is fighting over the defended tile `tile` against `counterparty` (null = the first in sorted order). Honoured at the tick boundary, before the next round batch; priced by the resolver's three-term withdrawal cost.
     // --- BL-573: the mercenary-contract seam (2026-08-23) ---
     // Appended AFTER withdraw_from_battle, same append-only rule.
     // CONTRACTS.md § The mercenary contract: "a contract is a condition_set
@@ -259,7 +262,7 @@ struct corp_command
     /// and for remove_sell_order, whose subject is `order`.
     entity_id  subject = null_entity;
 
-    entity_id     tile      = null_entity;              ///< build / place_road / hire_unit target tile. NOT march_unit's — see `province` (BL-511).
+    entity_id     tile      = null_entity;              ///< build / place_road / hire_unit target tile; march_unit's destination; withdraw_from_battle's defended tile; the front assign_front / set_front_order name.
     building_type type      = building_type::none;      ///< build only.
     resource_type target    = resource_type::iron_ore;  ///< build (extraction) AND place_sell_order: what to sell.
     uint16_t      recipe    = no_recipe;                ///< set_recipe (and build seed).
@@ -296,8 +299,11 @@ struct corp_command
     /// `quantity` the units; `order` names the convoy for `hold_convoy`.
     entity_id counterparty = null_entity;
 
-    // --- BL-511: unit movement moves to province grain (2026-08-21) ---
-    /// `march_unit`'s DESTINATION PROVINCE (a `province::id`, world.hpp's
+    // --- BL-511: unit movement moved to province grain (2026-08-21); RETIRED for
+    // the march and the withdrawal (2026-10-27: both name a tile). NO VERB READS
+    // IT NOW; it is kept so the wire's `province=` field and the play log stay
+    // parseable. The history below is why its default is `no_province`. ---
+    /// Once `march_unit`'s DESTINATION PROVINCE (a `province::id`, world.hpp's
     /// `province_partition`). Not an `entity_id`: a province id is DERIVED
     /// from its body rank / block / component (province.hpp's layout), never
     /// allocated from the entity pool, so it is its own uint32 domain and

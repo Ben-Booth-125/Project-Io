@@ -749,7 +749,7 @@ struct world
     /// the world rather than an answer someone computed. Until this existed both
     /// resolvers were compiled, harnessed and CALLED BY NOTHING.
     ///
-    /// KEPT SORTED by (province, attacker, defender) — `battle_order_less`. That
+    /// KEPT SORTED by (tile, attacker, defender) — `battle_order_less`. That
     /// is the contract, not an implementation detail, and it is load-bearing for
     /// exactly the reason the province partition's ascending-id walk is: the
     /// containers battles are DISCOVERED from (`units`, `corporations`) are
@@ -764,11 +764,8 @@ struct world
     /// exists to catch. The fold contributes nothing when the list is empty, so a
     /// world that never fights hashes as it always did.
     ///
-    /// NOT SERIALISED, deliberately and on precedent: no battle serialiser exists,
-    /// so determinism is asserted by IN-MEMORY REPLAY only, never a save
-    /// round-trip (the BL-448 precedent, which BL-467's design cites verbatim). A
-    /// save taken mid-battle therefore drops the fight — acceptable while nothing
-    /// can save mid-tick, and the thing to revisit first if that changes.
+    /// SAVED (world_save.cpp `w_battle`; BL-536), the attacking stacks in v63's
+    /// trailing section.
     std::vector<active_battle> battles;
 
     /// Proximity-glimpse stamps (BL-099) — the sim day tick at which a player convoy

@@ -17,65 +17,32 @@
 namespace {
 
 // ---------------------------------------------------------------------------
-// The terrain pair (ruling 2, settled 2026-08-19)
+// The ground (ruling 2; Ben, 2026-10-27)
 // ---------------------------------------------------------------------------
-// The envelope spans several tiles and the battle reads ONE pair. It comes from
-// the DEFENDER-side tile with the highest terrain_defence in the envelope: the
-// defender is presumed to anchor on the best ground, which is what defending
-// means, and terrain_defence already multiplies the defender only.
-//
-// Since BL-519 that reads all three axes, and the split earns its keep here —
-// a forested crag can now out-defend the bare rock beside it, which the single
-// composition slot could not express. Ties break on ASCENDING TILE ID, so the
-// choice is a pure function of the tile set and not of the order units were
-// walked in.
+// A battle is fought over ONE tile — the defended one — and reads that tile's
+// terrain. The 2026-08-19 envelope picked the defender's best tile in a
+// province; with the footprint now the tile, there is nothing to pick.
 struct terrain_pick
 {
     terrain_substrate sub     = terrain_substrate::sedimentary;
     terrain_cover     cov     = terrain_cover::grass;
     std::uint8_t      density = 150u;
     terrain_landform  lf      = terrain_landform::plains;
-    entity_id         tile    = null_entity; ///< the picked tile (BL-1145: the card frames it)
+    entity_id         tile    = null_entity; ///< the defended tile (BL-1145: the card frames it)
     bool              found   = false;
 };
 
-terrain_pick defender_ground(const world& w, const std::vector<entity_id>& defender_units)
+terrain_pick tile_ground(const world& w, entity_id tile)
 {
-    // Ascending tile id, so the argmax's tie-break is exact rather than
-    // whatever order the unit list happened to arrive in. The unit lists are
-    // already ascending by unit id, which is NOT the same ordering.
-    std::vector<entity_id> tiles;
-    tiles.reserve(defender_units.size());
-    for (const entity_id uid : defender_units)
-    {
-        const auto it = w.units.find(uid);
-        if (it != w.units.end() && it->second.position != null_entity)
-            tiles.push_back(it->second.position);
-    }
-    std::sort(tiles.begin(), tiles.end());
-    tiles.erase(std::unique(tiles.begin(), tiles.end()), tiles.end());
-
-    terrain_pick best;
-    int best_defence = -1;
-    for (const entity_id tid : tiles)
-    {
-        const auto tit = w.tiles.find(tid);
-        if (tit == w.tiles.end())
-            continue;
-        const tile_component& tc = tit->second;
-        const int d = terrain_defence(tc.substrate, tc.cover, tc.cover_density, tc.landform);
-        if (d > best_defence) // strict >, so the first (lowest) id wins a tie
-        {
-            best_defence  = d;
-            best.sub      = tc.substrate;
-            best.cov      = tc.cover;
-            best.density  = tc.cover_density;
-            best.lf       = tc.landform;
-            best.tile     = tid;
-            best.found    = true;
-        }
-    }
-    return best;
+    terrain_pick g;
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return g;
+    const tile_component& tc = tit->second;
+    g.sub = tc.substrate; g.cov = tc.cover; g.density = tc.cover_density; g.lf = tc.landform;
+    g.tile = tile;
+    g.found = true;
+    return g;
 }
 
 
@@ -163,12 +130,13 @@ void move_morale(world& w, const std::vector<entity_id>& units, int delta)
 /// Where a retreating unit goes: ONE TILE AWAY FROM THE ENEMY (MILITARY.md § Land —
 /// the unit's stats). Among the neighbours a march can step to — the four sides a
 /// cost walk crosses (`road_side_is_crossable`), never all six — land only and never
-/// a tile an enemy of the unit's owner stands on, preferring ground outside the
-/// battle's province, then the unit's own nation's ground; ties to the lowest tile id.
+/// a tile ANOTHER NATION'S units stand on, whatever its stance (one nation per tile,
+/// Ben 2026-10-27), preferring ground outside the battle's province, then the
+/// unit's own nation's ground; ties to the lowest tile id.
 /// `null_entity` if no neighbour qualifies — the unit stays where it is, out of the
 /// fight.
 entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
-                       const std::set<entity_id>& enemy_tiles)
+                       const std::set<entity_id>& foreign_tiles)
 {
     const auto here = w.tiles.find(u.position);
     if (here == w.tiles.end())
@@ -182,7 +150,7 @@ entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
         if (!road_side_is_crossable(side, row))
             continue;
         const entity_id n = road_edge_neighbour(w, u.position, side);
-        if (n == null_entity || enemy_tiles.count(n) != 0)
+        if (n == null_entity || foreign_tiles.count(n) != 0)
             continue;
         const auto tit = w.tiles.find(n);
         if (tit == w.tiles.end() || is_water(tit->second.substrate))
@@ -199,34 +167,13 @@ entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
     return best;
 }
 
-/// Every tile an ENEMY OF @p owner stands on, across every live battle @p owner is
-/// in — a unit can be in more than one fight in one province, and a retreat must not
-/// walk onto any of its foes.
-std::set<entity_id> enemy_tiles_of(const world& w, entity_id owner)
-{
-    std::set<entity_id> out;
-    auto add = [&](const std::vector<entity_id>& units) {
-        for (const entity_id uid : units)
-        {
-            const auto it = w.units.find(uid);
-            if (it != w.units.end() && it->second.count > 0 && it->second.position != null_entity)
-                out.insert(it->second.position);
-        }
-    };
-    for (const active_battle& b : w.battles)
-    {
-        if (b.attacker == owner) add(b.defender_units);
-        if (b.defender == owner) add(b.attacker_units);
-    }
-    return out;
-}
-
 /// Retreat every unit of @p units with men standing that is spent (readiness 0)
 /// or, when @p all, every one of them: each moves one tile away from its enemies,
 /// clears its order, loses morale ONCE, and leaves EVERY battle's unit list — a unit
 /// in two fights retreats from both, not twice. Dead units stay listed for the upkeep
-/// pass's orphan cleanup. The enemy tiles are read once, before anyone moves, so the
-/// order units retreat in cannot change where they go. @return units retreated.
+/// pass's orphan cleanup. The foreign-held tiles are read once, before anyone moves, so
+/// the order units retreat in cannot change where they go (a side is one nation, so
+/// its own units sharing a tile is a stack, never a breach). @return units retreated.
 int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint32_t province,
                  bool all, const campaign_battle_params& p)
 {
@@ -241,11 +188,11 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
     if (leaving.empty())
         return 0;
 
-    const std::set<entity_id> enemy_tiles = enemy_tiles_of(w, owner);
+    const std::set<entity_id> foreign = foreign_held_tiles(w, owner);
     for (const entity_id uid : leaving)
     {
         unit_component& u = w.units.at(uid);
-        if (const entity_id to = retreat_tile(w, u, province, enemy_tiles); to != null_entity)
+        if (const entity_id to = retreat_tile(w, u, province, foreign); to != null_entity)
             u.position = to;
         u.order           = movement_order{};
         u.morale_permille = std::clamp(u.morale_permille - p.morale_loss, 0, 1000);
@@ -298,19 +245,18 @@ void recover_out_of_contact(world& w, const campaign_battle_params& p)
     }
 }
 
-/// A candidate engagement found by discovery, before any battle is opened.
-struct candidate
+/// The six hex neighbours of @p tile, ascending and unique — "adjacent" for the
+/// join rule. All six sides, not the four a march crosses: a stack beside the
+/// tile is beside it whichever way the grid runs.
+std::vector<entity_id> hex_neighbours(const world& w, entity_id tile)
 {
-    uint32_t  province = 0;
-    entity_id attacker = null_entity;
-    entity_id defender = null_entity;
-};
-
-bool candidate_less(const candidate& a, const candidate& b)
-{
-    if (a.province != b.province) return a.province < b.province;
-    if (a.attacker != b.attacker) return a.attacker < b.attacker;
-    return a.defender < b.defender;
+    std::vector<entity_id> out;
+    for (int side = 0; side < 6; ++side)
+        if (const entity_id n = road_edge_neighbour(w, tile, side); n != null_entity && n != tile)
+            out.push_back(n);
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
 }
 
 } // namespace
@@ -379,11 +325,11 @@ withdrawal_price quote_withdrawal(const active_battle& b, withdrawing_side side,
     return q;
 }
 
-bool battle_ground(const world& w, const std::vector<entity_id>& defender_units,
+bool battle_ground(const world& w, entity_id tile,
                    terrain_substrate& sub, terrain_cover& cov, std::uint8_t& density,
                    terrain_landform& lf)
 {
-    const terrain_pick g = defender_ground(w, defender_units);
+    const terrain_pick g = tile_ground(w, tile);
     if (!g.found)
         return false;
     sub = g.sub; cov = g.cov; density = g.density; lf = g.lf;
@@ -406,12 +352,27 @@ bool unit_in_battle(const world& w, entity_id unit)
     return false;
 }
 
-const active_battle* find_battle(const world& w, entity_id corp, uint32_t province)
+const active_battle* find_battle(const world& w, entity_id corp, entity_id tile)
 {
     for (const active_battle& b : w.battles)
-        if (b.province == province && (b.attacker == corp || b.defender == corp))
+        if (b.tile == tile && (b.attacker == corp || b.defender == corp))
             return &b;
     return nullptr;
+}
+
+const active_battle* first_battle_at(const world& w, entity_id tile)
+{
+    const active_battle* fallback = nullptr;
+    for (const active_battle& b : w.battles)
+    {
+        if (b.tile != tile)
+            continue;
+        if (b.attacker == w.player_entity || b.defender == w.player_entity)
+            return &b;
+        if (fallback == nullptr)
+            fallback = &b;
+    }
+    return fallback;
 }
 
 const active_battle* first_battle_in(const world& w, uint32_t province)
@@ -429,14 +390,14 @@ const active_battle* first_battle_in(const world& w, uint32_t province)
     return fallback;
 }
 
-bool request_withdraw(world& w, entity_id corp, uint32_t province, entity_id against)
+bool request_withdraw(world& w, entity_id corp, entity_id tile, entity_id against)
 {
     // MUTATES NOTHING on rejection. This verb is reachable from the AI-facing
     // seam (--serve, the MCP server), where the standing rule is that a whole
     // command is rejected rather than partially applied.
     for (active_battle& b : w.battles)
     {
-        if (b.province != province)
+        if (b.tile != tile)
             continue;
         if (b.state.end != campaign_battle_end::in_progress)
             continue;
@@ -456,46 +417,123 @@ bool request_withdraw(world& w, entity_id corp, uint32_t province, entity_id aga
     return false;
 }
 
-
-bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, entity_id defender)
+std::set<entity_id> units_in_live_battles(const world& w)
 {
-    // Already fighting? Same identity rule discovery uses: a pair fights at
-    // most one battle per province at a time, in EITHER role order.
+    std::set<entity_id> out;
     for (const active_battle& b : w.battles)
     {
-        if (b.province != province)
+        if (b.state.end != campaign_battle_end::in_progress)
+            continue;
+        out.insert(b.attacker_units.begin(), b.attacker_units.end());
+        out.insert(b.defender_units.begin(), b.defender_units.end());
+    }
+    return out;
+}
+
+std::set<entity_id> foreign_held_tiles(const world& w, entity_id owner)
+{
+    std::set<entity_id> out;
+    for (const auto& [uid, u] : w.units) // a set: the walk order cannot matter
+        if (u.count > 0 && u.position != null_entity && u.owner != owner)
+            out.insert(u.position);
+    return out;
+}
+
+std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, entity_id dest,
+                                  const std::set<entity_id>& blocked)
+{
+    std::vector<entity_id> path;
+    {
+        const logistics_path& p = intra_body_path(w, body, from, dest);
+        if (p.reachable && !p.tiles.empty())
+        {
+            path = p.tiles; // copied before any call that could touch the cache
+            if (path.front() != from)
+                std::reverse(path.begin(), path.end());
+        }
+    }
+    bool clear = !path.empty();
+    for (std::size_t i = 1; clear && i + 1 < path.size(); ++i)
+        clear = blocked.count(path[i]) == 0;
+    if (clear || blocked.empty())
+        return path;
+
+    const logistics_path p = intra_body_path_avoiding(w, body, from, dest, blocked);
+    path.clear();
+    if (p.reachable && !p.tiles.empty())
+    {
+        path = p.tiles;
+        if (path.front() != from)
+            std::reverse(path.begin(), path.end());
+    }
+    return path;
+}
+
+bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, entity_id defender,
+                      const std::vector<entity_id>& attacking_units)
+{
+    if (attacker == defender || w.tiles.find(tile) == w.tiles.end())
+        return false;
+    // Already fighting over this tile? A pair fights at most one battle per tile
+    // at a time, in EITHER role order.
+    for (const active_battle& b : w.battles)
+    {
+        if (b.tile != tile)
             continue;
         if ((b.attacker == attacker && b.defender == defender)
          || (b.attacker == defender && b.defender == attacker))
             return false;
     }
 
-    // Gather each side's units standing in `province`, ascending unit id —
-    // self-contained (unlike run_battles' discovery, this does not require a
-    // pre-built by-owner-by-province map), so a caller — either trigger, or a
-    // harness with no such map to hand — can call it directly.
-    std::vector<entity_id> attacker_units, defender_units;
+    const std::set<entity_id> busy = units_in_live_battles(w);
+    const std::vector<entity_id> beside = hex_neighbours(w, tile);
+    const auto adjacent = [&](entity_id t) {
+        return std::binary_search(beside.begin(), beside.end(), t);
+    };
+
+    std::vector<entity_id> stack; // the attacking stack, ascending
+    for (const entity_id uid : attacking_units)
     {
-        std::vector<entity_id> ids;
-        ids.reserve(w.units.size());
-        for (const auto& kv : w.units)
-            ids.push_back(kv.first);
-        std::sort(ids.begin(), ids.end());
-        for (const entity_id uid : ids)
+        const auto it = w.units.find(uid);
+        if (it != w.units.end() && it->second.owner == attacker && it->second.count > 0
+            && it->second.position != null_entity && busy.count(uid) == 0)
+            stack.push_back(uid);
+    }
+    std::sort(stack.begin(), stack.end());
+    stack.erase(std::unique(stack.begin(), stack.end()), stack.end());
+    if (stack.empty())
+        return false;
+
+    // Each side, ascending unit id. The defending stack on the tile fights whatever
+    // else it is in; a stack beside the tile joins only if it is in no live battle.
+    std::vector<entity_id> ids;
+    ids.reserve(w.units.size());
+    for (const auto& kv : w.units)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    std::vector<entity_id> attacker_units, defender_units;
+    for (const entity_id uid : ids)
+    {
+        const unit_component& u = w.units.at(uid);
+        if (u.count <= 0 || u.position == null_entity)
+            continue;
+        if (u.owner == attacker)
         {
-            const unit_component& u = w.units.at(uid);
-            if (u.count <= 0 || u.owner == null_entity || u.position == null_entity)
-                continue;
-            if (w.provinces.province_of(u.position) != province)
-                continue;
-            if (u.owner == attacker)
+            if (std::binary_search(stack.begin(), stack.end(), uid)
+                || (adjacent(u.position) && busy.count(uid) == 0))
                 attacker_units.push_back(uid);
-            else if (u.owner == defender)
+        }
+        else if (u.owner == defender)
+        {
+            if (u.position == tile || (adjacent(u.position) && busy.count(uid) == 0))
                 defender_units.push_back(uid);
         }
     }
-    if (attacker_units.empty() || defender_units.empty())
-        return false;
+    bool held = false;
+    for (const entity_id uid : defender_units)
+        held = held || w.units.at(uid).position == tile;
+    if (!held)
+        return false; // nobody of the defender's stands on the tile: nothing to attack
 
     // A spent attacker starts nothing; a defender need only have men standing.
     const std::vector<land_combatant> atk = build_combatants(w, attacker_units);
@@ -503,27 +541,55 @@ bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, enti
     if (!side_can_attack(atk) || !side_has_men(def))
         return false;
 
-    const terrain_pick g = defender_ground(w, defender_units);
+    const terrain_pick g = tile_ground(w, tile);
 
     campaign_battle_identity id;
     id.attacker   = attacker;
     id.defender   = defender;
-    id.province   = province;
+    id.tile       = tile;
     id.tick       = static_cast<uint64_t>(tick);
+    // `world` carries no seed of its own; the partition's is the campaign seed it
+    // was built from and is stable for the world's lifetime.
     id.world_seed = w.provinces.seed;
 
     active_battle nb;
-    nb.province        = province;
+    nb.tile            = tile;
+    nb.province        = w.provinces.province_of(tile);
     nb.attacker        = attacker;
     nb.defender        = defender;
     nb.attacker_units  = attacker_units;
     nb.defender_units  = defender_units;
-    nb.ground_tile     = g.tile; // the ground the fight is ON, fixed at open (BL-1145 review)
+    nb.ground_tile     = tile;
+    nb.attacking_units = stack;
     nb.state = begin_campaign_battle(id, atk, def, g.sub, g.cov, g.density, g.lf);
 
     w.battles.push_back(std::move(nb));
     std::sort(w.battles.begin(), w.battles.end(), battle_order_less);
     return true;
+}
+
+int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks)
+{
+    std::sort(attacks.begin(), attacks.end(), [](const tile_attack& a, const tile_attack& b) {
+        if (a.tile != b.tile) return a.tile < b.tile;
+        if (a.attacker != b.attacker) return a.attacker < b.attacker;
+        if (a.defender != b.defender) return a.defender < b.defender;
+        return a.unit < b.unit;
+    });
+    int opened = 0;
+    for (std::size_t i = 0; i < attacks.size();)
+    {
+        std::size_t j = i;
+        std::vector<entity_id> stack;
+        while (j < attacks.size() && attacks[j].tile == attacks[i].tile
+               && attacks[j].attacker == attacks[i].attacker
+               && attacks[j].defender == attacks[i].defender)
+            stack.push_back(attacks[j++].unit);
+        if (open_tile_battle(w, tick, attacks[i].tile, attacks[i].attacker, attacks[i].defender, stack))
+            ++opened;
+        i = j;
+    }
+    return opened;
 }
 
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
@@ -532,126 +598,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
     (void)reg; // the resolver's tuning is campaign_battle_params, not the registry
     const campaign_battle_params params{};
 
-    // -----------------------------------------------------------------------
-    // 1. DISCOVERY
-    // -----------------------------------------------------------------------
-    // Walked from `corp_hostile_pairs`, which is a std::set and therefore
-    // already ordered — a deliberate choice over walking every province, since
-    // the hostile set is small and every candidate must contain a hostile pair
-    // by definition. The RESULT is sorted by (province, attacker, defender)
-    // regardless, because that is the order the ruling names and because the
-    // unit map this joins against is unordered.
-    if (!w.corp_hostile_pairs.empty() && !w.units.empty())
-    {
-        // owner -> province -> its unit ids, ascending. Built once per tick.
-        std::map<entity_id, std::map<uint32_t, std::vector<entity_id>>> by_owner;
-        {
-            std::vector<entity_id> uids;
-            uids.reserve(w.units.size());
-            for (const auto& kv : w.units)
-                uids.push_back(kv.first);
-            std::sort(uids.begin(), uids.end()); // ascending: the remainder rule depends on it
-            for (const entity_id uid : uids)
-            {
-                const unit_component& u = w.units.at(uid);
-                if (u.count <= 0 || u.owner == null_entity || u.position == null_entity)
-                    continue;
-                const uint32_t prov = w.provinces.province_of(u.position);
-                if (prov == 0)
-                    continue; // unpartitioned ground (ocean, off-body) frames no fight
-                by_owner[u.owner][prov].push_back(uid);
-            }
-        }
-
-        std::vector<candidate> candidates;
-        for (const auto& [from, to] : w.corp_hostile_pairs)
-        {
-            const auto fit = by_owner.find(from);
-            const auto tit = by_owner.find(to);
-            if (fit == by_owner.end() || tit == by_owner.end())
-                continue;
-            for (const auto& [prov, fu] : fit->second)
-            {
-                if (tit->second.find(prov) == tit->second.end())
-                    continue;
-                // DIRECTED HOSTILITY SUFFICES — the ambush property BL-448 paid
-                // two tables for. The declarer attacks; the target is drawn in
-                // regardless of what it thinks of the declarer.
-                (void)fu;
-                candidates.push_back({ prov, from, to });
-            }
-        }
-
-        // Mutual hostility would otherwise open the pair twice, once per
-        // direction, with the roles swapped — and those are DIFFERENT streams
-        // (the seed folds role order deliberately). One battle per pair per
-        // province: the direction whose ATTACKER SORTS LOWER wins, which is a
-        // property of the ids rather than of who declared first.
-        //
-        // That rule is enforced by the `exists` scan below and by this sort, NOT
-        // by a dedup pass. A std::unique over unordered-by-pair equality was
-        // tried and removed: std::unique only collapses ADJACENT equals, and
-        // with a third nation C where A < C < B the sorted order is
-        // (P,A,B), (P,A,C), (P,B,A) — the mutual pair is not adjacent, so the
-        // dedup silently did nothing in exactly the case it was written for. The
-        // sort is what makes (P,A,B) reach `exists` before (P,B,A); the scan is
-        // what refuses the second. One mechanism, and it works for any number of
-        // nations.
-        std::sort(candidates.begin(), candidates.end(), candidate_less);
-
-        for (const candidate& c : candidates)
-        {
-            bool exists = false;
-            for (const active_battle& b : w.battles)
-            {
-                if (b.province != c.province) continue;
-                if ((b.attacker == c.attacker && b.defender == c.defender)
-                 || (b.attacker == c.defender && b.defender == c.attacker))
-                {
-                    exists = true;
-                    break;
-                }
-            }
-            if (exists)
-                continue;
-
-            active_battle nb;
-            nb.province = c.province;
-            nb.attacker = c.attacker;
-            nb.defender = c.defender;
-            nb.attacker_units = by_owner[c.attacker][c.province];
-            nb.defender_units = by_owner[c.defender][c.province];
-            if (nb.attacker_units.empty() || nb.defender_units.empty())
-                continue;
-
-            // A spent attacker starts nothing; a defender need only have men
-            // standing — spent defenders are overrun (step_campaign_battle).
-            const std::vector<land_combatant> atk = build_combatants(w, nb.attacker_units);
-            const std::vector<land_combatant> def = build_combatants(w, nb.defender_units);
-            if (!side_can_attack(atk) || !side_has_men(def))
-                continue;
-
-            const terrain_pick g = defender_ground(w, nb.defender_units);
-            nb.ground_tile = g.tile; // the ground the fight is ON, fixed at open (BL-1145 review)
-
-            campaign_battle_identity id;
-            id.attacker   = c.attacker;
-            id.defender   = c.defender;
-            id.province   = c.province;
-            id.tick       = static_cast<uint64_t>(tick);
-            // `world` carries no seed of its own; the partition's is the campaign
-            // seed it was built from and is stable for the world's lifetime, which
-            // is exactly what campaign_battle_identity asks of this field ("so two
-            // worlds with equal ids still differ").
-            id.world_seed = w.provinces.seed;
-
-            nb.state = begin_campaign_battle(id, atk, def, g.sub, g.cov, g.density, g.lf);
-
-            w.battles.push_back(std::move(nb));
-            ++out.opened;
-        }
-        std::sort(w.battles.begin(), w.battles.end(), battle_order_less);
-    }
+    (void)tick; // a battle's stream was seeded when it opened (open_tile_battle)
 
     // -----------------------------------------------------------------------
     // 2. STEP — several rounds per tick (ruling 3)
@@ -745,6 +692,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             const int swing_d = b.state.defender_strength_permille - before_d;
 
             battle_dispatch d;
+            d.tile     = b.tile;
             d.province = b.province;
             d.attacker = b.attacker;
             d.defender = b.defender;
@@ -796,6 +744,30 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                 const bool atk_won = (d.field_held_by == b.attacker);
                 move_morale(w, atk_won ? b.attacker_units : b.defender_units,  params.morale_win);
                 move_morale(w, atk_won ? b.defender_units : b.attacker_units, -params.morale_loss);
+
+                // THE ADVANCE (Ben, 2026-10-27): when the attacker holds the field, the
+                // stack whose march made the attack steps onto the defended tile — the
+                // units of it still in the fight and standing. Joined stacks stay where
+                // they stood. Never onto a tile another nation still holds: a defender
+                // with nowhere to retreat to stays put, and the advance waits on it.
+                if (atk_won && !b.attacking_units.empty())
+                {
+                    bool foreign = false;
+                    for (const auto& [uid, u] : w.units) // a test, so the walk order cannot matter
+                        foreign = foreign || (u.count > 0 && u.position == b.tile && u.owner != b.attacker);
+                    if (!foreign)
+                        for (const entity_id uid : b.attacking_units)
+                        {
+                            if (std::find(b.attacker_units.begin(), b.attacker_units.end(), uid)
+                                == b.attacker_units.end())
+                                continue; // it retreated: it is not the one who took the tile
+                            const auto it = w.units.find(uid);
+                            if (it == w.units.end() || it->second.count <= 0)
+                                continue;
+                            it->second.position = b.tile;
+                            it->second.order    = movement_order{};
+                        }
+                }
             }
 
             out.dispatches.push_back(d);

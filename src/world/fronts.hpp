@@ -109,16 +109,18 @@ void reanchor_fronts(world& w);
 /// directed test). A push order toward a neighbour it is not hostile to is held.
 bool front_may_push(const world& w, const front& f);
 
-/// The neighbour province a push across `f` marches into: of the LAND provinces
-/// holding a neighbour tile with a hex side onto the span, the one whose
-/// defending strength (summed `unit_strength` of the neighbour's units standing
-/// in it) is lowest, ties to the lower province id. 0 when none. @p defence, if
-/// given, takes that strength.
-uint32_t front_push_target(const world& w, const front& f, int64_t* defence = nullptr);
+/// The weakest tile a push across `f` could march onto (Ben, 2026-10-27): of the
+/// neighbour's LAND tiles with a hex side onto the span that `f.nation`'s own units
+/// do not already stand on, the one whose standing stack (summed `unit_strength` of
+/// every other nation's units on it) is lowest — an empty tile lowest of all —
+/// ties to the lower tile id. null_entity when none. @p defence, if given, takes
+/// that strength. Each pushing unit breaks ties by its own slot (advance_fronts);
+/// this is the front-wide reading a rival's scorer weighs.
+entity_id front_push_target(const world& w, const front& f, int64_t* defence = nullptr);
 
 /// The per-tick front step (MILITARY.md § Fronts, "What a front does with its
-/// units"): assigned units take slots spaced evenly along their span and march to
-/// them; under push they march into the neighbour's weakest adjacent province.
+/// units"): assigned units take slot tiles spaced evenly along their span and march
+/// onto them; under push each marches onto the neighbour's weakest adjacent tile.
 /// Every move is a legal `march_unit` (or `halt_unit`) applied through
 /// `apply_corp_command` as the unit's own nation; a unit in battle or refitting
 /// is left alone. @p reg is what `apply_corp_command` takes.

@@ -263,10 +263,10 @@ struct construction_state
     /// `withdraw_from_battle` verb. Same deferred path as `pending_tile`, for the
     /// same reason (UI surfaces hold only `const world&`).
     ///
-    /// Both fields are needed: a corp can be in more than one battle in one
-    /// province, so the counterparty NAMES which fight is being left. 0 / null =
-    /// nothing pending.
-    uint32_t      pending_withdraw_province = 0;
+    /// Both fields are needed: a nation can be in more than one battle over one
+    /// tile, so the counterparty NAMES which fight is being left. The battle is
+    /// named by its defended tile (2026-10-27). null = nothing pending.
+    entity_id     pending_withdraw_tile     = null_entity;
     entity_id     pending_withdraw_against  = null_entity;
 
     // (BL-343's pending_law_toggle lived here until BL-480: enactment is the
@@ -1142,16 +1142,15 @@ struct ui_state
     /// is in province-picking mode for THIS unit: the next left-click on a
     /// province consumes the click (suppressing ordinary selection, exactly as
     /// `construction.active` suppresses it for build placement) and fills
-    /// `pending_march_dest_province` instead. app::render dispatches
-    /// `corp_verb::march_unit {subject: pending_march_unit, province:
-    /// pending_march_dest_province}` once both are set, then clears both.
+    /// `pending_march_dest_tile` instead. app::render dispatches
+    /// `corp_verb::march_unit {subject: pending_march_unit, tile:
+    /// pending_march_dest_tile}` once both are set, then clears both (every
+    /// march goes to a tile, 2026-10-27).
     entity_id pending_march_unit         = null_entity;
-    /// The province id the canvas wrote on the qualifying click, or `0` while
-    /// nothing has been picked yet — the same "no province" sentinel
-    /// `selected_province` uses (a real province id is never 0, province.hpp).
-    /// Kept distinct from `selected_province`: picking a march destination
-    /// must NOT also change what the Selection element is showing.
-    uint32_t  pending_march_dest_province = 0;
+    /// The tile the canvas wrote on the qualifying click, or null while nothing
+    /// has been picked yet. Kept distinct from the selection: picking a march
+    /// destination must NOT also change what the Selection element is showing.
+    entity_id pending_march_dest_tile = null_entity;
 
     /// Set by the unit card's Halt press — the unit to clear the movement
     /// order of. `null_entity` = nothing pending.

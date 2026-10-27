@@ -2970,20 +2970,20 @@ void app::render()
     // because UI surfaces hold only `const world&` — and additionally because the
     // request is HONOURED at the next tick boundary rather than applied here, so
     // the withdrawal window stays a window (battle_system.cpp).
-    if (m_ui.construction.pending_withdraw_province != 0)
+    if (m_ui.construction.pending_withdraw_tile != null_entity)
     {
         corp_command cmd;
         cmd.tick         = static_cast<int>(m_sim_loop.day_tick());
         cmd.corp         = m_world.player_entity;
         cmd.verb         = corp_verb::withdraw_from_battle;
-        cmd.province     = m_ui.construction.pending_withdraw_province;
+        cmd.tile         = m_ui.construction.pending_withdraw_tile; // the defended tile (2026-10-27)
         cmd.counterparty = m_ui.construction.pending_withdraw_against;
         const auto r = player_command(cmd);
         m_ui.construction.last_message =
             (r == corp_command_result::applied)
                 ? "Breaking off — it takes effect next tick."
                 : "Cannot break off from that battle.";
-        m_ui.construction.pending_withdraw_province = 0; // consume the request
+        m_ui.construction.pending_withdraw_tile    = null_entity; // consume the request
         m_ui.construction.pending_withdraw_against  = null_entity;
     }
 
@@ -3162,17 +3162,16 @@ void app::render()
     // routed through the SAME corp_verb seam corp_ai scores for rival units
     // (MILITARY.md § Marching); the player takes no shortcut around it. March
     // is two-step: the card press only ARMS `pending_march_unit`, and the
-    // Planetary canvas fills `pending_march_dest_province` on the qualifying
-    // province click (body_surface_canvas.cpp), so this only fires once both
-    // halves are in.
-    if (m_ui.pending_march_unit != null_entity && m_ui.pending_march_dest_province != 0)
+    // Planetary canvas fills `pending_march_dest_tile` on the qualifying tile
+    // click (body_surface_canvas.cpp), so this only fires once both halves are in.
+    if (m_ui.pending_march_unit != null_entity && m_ui.pending_march_dest_tile != null_entity)
     {
         corp_command cmd;
         cmd.tick     = static_cast<int>(m_sim_loop.day_tick());
         cmd.corp     = m_world.player_entity;
         cmd.verb     = corp_verb::march_unit;
         cmd.subject  = m_ui.pending_march_unit;
-        cmd.province = m_ui.pending_march_dest_province;
+        cmd.tile     = m_ui.pending_march_dest_tile; // every march goes to a tile (2026-10-27)
         const auto r = player_command(cmd);
         switch (r)
         {
@@ -3188,7 +3187,7 @@ void app::render()
                 m_ui.construction.last_message = "Can't march there."; break;
         }
         m_ui.pending_march_unit          = null_entity; // consume the request
-        m_ui.pending_march_dest_province = 0;
+        m_ui.pending_march_dest_tile     = null_entity;
     }
 
     if (m_ui.pending_halt_unit != null_entity)

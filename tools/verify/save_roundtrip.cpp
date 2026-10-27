@@ -84,6 +84,16 @@ std::size_t fronts_section_bytes(const world& w)
     return n;
 }
 
+/// BL-1443 (v63): the attacking-stack section after the fronts — a battle count, then
+/// each battle's stack as (count, ids).
+std::size_t stack_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const active_battle& b : w.battles)
+        n += 4 + 4 * b.attacking_units.size();
+    return n;
+}
+
 int g_failures = 0;
 
 void check(bool ok, const char* what)
@@ -538,7 +548,8 @@ int main()
         const std::size_t unit_section = 4 + 16 * wd.units.size() + 8 + 22 * wd.musters.size()
                                        + obsolete_section_bytes(wd)  // BL-1437 (v60)
                                        + refit_section_bytes(wd)     // v61
-                                       + fronts_section_bytes(wd);   // BL-1427 (v62), last
+                                       + fronts_section_bytes(wd)    // BL-1427 (v62)
+                                       + stack_section_bytes(wd);    // BL-1443 (v63), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -602,7 +613,8 @@ int main()
         const std::size_t muster_section = 8 + 22 * wu.musters.size() // BL-1435 (v59), after the units
                                          + obsolete_section_bytes(wu)  // BL-1437 (v60)
                                          + refit_section_bytes(wu)     // v61
-                                         + fronts_section_bytes(wu);   // BL-1427 (v62), last
+                                         + fronts_section_bytes(wu)    // BL-1427 (v62)
+                                         + stack_section_bytes(wu);    // BL-1443 (v63), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
@@ -1257,7 +1269,7 @@ int main()
         campaign_battle_identity id;
         id.attacker   = 11;
         id.defender   = 22;
-        id.province   = 7;
+        id.tile       = 777; // the defended tile (BL-1443)
         id.tick       = 900;
         id.world_seed = 4242;
 
@@ -1272,12 +1284,14 @@ int main()
         std::vector<land_combatant> def = { combatant(201, land_class::infantry, 350) };
 
         active_battle ab;
-        ab.province       = id.province;
+        ab.tile           = id.tile; // the identity: the defended tile (world_save_version 63)
+        ab.province       = 7;       // derived at open; carried in the record's province slot
         ab.attacker       = id.attacker;
         ab.defender       = id.defender;
         ab.attacker_units = { 101, 102 };
         ab.defender_units = { 201 };
         ab.ground_tile    = 777; // BL-1145 review (world_save_version 30): the ground, stored at open
+        ab.attacking_units = { 101 }; // BL-1443 (v63): the stack whose march made the attack
         ab.state = begin_campaign_battle(id, att, def, terrain_substrate::sedimentary,
                                          terrain_cover::grass, 150u, terrain_landform::plains);
 
@@ -1299,12 +1313,14 @@ int main()
         if (ok && after.battles.size() == 1)
         {
             const active_battle& r = after.battles[0];
-            check(r.province == ab.province && r.attacker == ab.attacker
+            check(r.tile == ab.tile && r.province == ab.province && r.attacker == ab.attacker
                       && r.defender == ab.defender && r.attacker_units == ab.attacker_units
                       && r.defender_units == ab.defender_units,
                   "P6 the battle's identity and unit membership survive");
             check(r.ground_tile == ab.ground_tile,
                   "P6 the battle's ground tile survives (BL-1145 review, world_save_version 30)");
+            check(r.attacking_units == ab.attacking_units,
+                  "P6 the battle's attacking stack survives (BL-1443, world_save_version 63)");
             check(r.state.rng_state == ab.state.rng_state
                       && r.state.stream_seed == ab.state.stream_seed
                       && r.state.rounds_fought == ab.state.rounds_fought,

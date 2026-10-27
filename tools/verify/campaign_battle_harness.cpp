@@ -114,7 +114,7 @@ campaign_battle_identity id_at(uint64_t tick)
     campaign_battle_identity id;
     id.attacker   = 11;
     id.defender   = 22;
-    id.province   = 4242; // BL-467: the envelope is a province now, not a tile
+    id.tile       = 4242; // the defended tile (2026-10-27; the province envelope is retired)
     id.tick       = tick;
     id.world_seed = 0xBEEF;
     return id;

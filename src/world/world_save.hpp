@@ -532,7 +532,20 @@ inline constexpr uint32_t world_save_magic =
 /// u8 order) after a u32 count. v61 is a STRICT PREFIX of v62 and is read too
 /// (`k_world_save_version_pre_fronts`), as a world where no unit is assigned and every
 /// front holds. Fronts themselves are derived, never saved.
-inline constexpr uint32_t world_save_version = 62;
+///
+/// Bumped to 63 (BL-1443, tile contact; MILITARY.md § Battles): a battle's identity is
+/// its DEFENDED TILE, carried in the record's existing ground-tile slot (the province
+/// slot keeps the tile's province). A TRAILING SECTION after the fronts carries each
+/// battle's attacking stack, in battle order, as (u32 count, ids ascending) after a u32
+/// battle count. v62 is a STRICT PREFIX of v63 and is read too
+/// (`k_world_save_version_pre_tile`): an old battle, keyed by its province, is re-keyed
+/// by its ground tile (or, with none, by its province id, which is the province's
+/// lowest member tile), and has no attacking stack, so it advances no one. The march
+/// order's province slot is written 0 and read past.
+inline constexpr uint32_t world_save_version = 63;
+
+/// v62, a strict prefix of v63 (the attacking-stack section is v63's only addition).
+inline constexpr uint32_t k_world_save_version_pre_tile = 62;
 
 /// v61, a strict prefix of v62 (the fronts section is v62's only addition).
 inline constexpr uint32_t k_world_save_version_pre_fronts = 61;
@@ -683,6 +696,10 @@ void write_world_snapshot_pre_refit(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1427): @p w written as a v61 stream, less the fronts section.
 /// The game never writes it.
 void write_world_snapshot_pre_fronts(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1443): @p w written as a v62 stream, less the attacking-stack
+/// section. The game never writes it.
+void write_world_snapshot_pre_tile(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///
