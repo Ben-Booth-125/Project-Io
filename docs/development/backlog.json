@@ -1160,6 +1160,30 @@
    ],
    "title": "Fronts: a neighbour with no free key tile has no front; unreachable front marches retry every tick",
    "design": "Two edge cases from the BL-1427 (fronts) cold review. (1) Keys are unique per nation and claimed smallest span first, so a span whose every tile another front already claimed has no key and is dropped: a nation touching B only at one tile it also shares with A has no front toward B, against \"Every neighbour has fronts\" (MILITARY.md § Fronts). 0 cases on the generated world; fronts_harness F1g fails if a seed hits one. Fix by naming a front by (neighbour, tile) or a tie rule that never leaves a span unnamed. (2) A front march the game refuses (the slot or push target on another landmass) is re-issued every tick, re-pathing the province each time; the rival scorer assigns idle units with no reachability check. Assign only to fronts the unit can reach, or stop re-issuing a refused march."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-10-27)",
+   "requires": [],
+   "id": "BL-1442",
+   "short_name": "POST_CAPACITY_STARVATION",
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp",
+    "tools/verify/market_viability.cpp"
+   ],
+   "title": "After construction capacity: processors finish faster than their inputs; G1 at tick 50 under its gate",
+   "design": "Ben, 2026-10-27: merge BL-1438 (retire construction capacity), keep G1t50 at 85, and treat the new starvation and decommissions as follow-on work. market_viability FULL on main at 9503aa06: G1 92.9, G1t50 78.9 (FAIL; 2106/2668), G1b 3.1, G2 186.3, G3 100.0. In the lane's 16-seed tick-50 totals, processors built 1446 -> 2762, running 1269 -> 2195, input-starved 32 -> 158, decommissioned 54 -> 209. Measure first: which recipes starve, which inputs are short, and whether the scorer now over-builds processors ahead of their extractors (no capacity throttle remains). Fix the cause in the world (input supply, build sequencing by the scorer); never lower the gate or clamp builds to pass it."
   }
  ]
 }

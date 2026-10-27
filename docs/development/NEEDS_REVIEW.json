@@ -227,8 +227,8 @@
   },
   {
    "raised": "2026-10-27",
-   "status": "open",
-   "resolution": null,
+   "status": "resolved",
+   "resolution": "Ben, 2026-10-27: merge BL-1438 and keep G1t50 at 85; the new starvation and decommissions are follow-on work, BL-1442 (post-capacity starvation). Merged at 9503aa06; FULL G1t50 78.9.",
    "id": "NR-1091",
    "kind": "question",
    "title": "Construction capacity retired: G1 at tick 50 falls under its gate",
