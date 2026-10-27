@@ -4481,6 +4481,21 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         cmd.subject      = static_cast<entity_id>(t.get_or("subject", 0u));
         cmd.counterparty = static_cast<entity_id>(t.get_or("counterparty", 0u));
         cmd.tile         = static_cast<entity_id>(t.get_or("tile", 0u));
+        // BL-1443 (every march goes to a tile): a script may name the tile by the
+        // grid position it already reads off verify.units(), on the active body.
+        // Resolved here and sent; nothing about the tile comes back to Lua.
+        // March only (cold review): no other verb gains a position oracle.
+        if (cmd.verb == corp_verb::march_unit && cmd.tile == null_entity
+            && t["col"].valid() && t["row"].valid())
+        {
+            const int col = t.get_or("col", -1), row = t.get_or("row", -1);
+            for (const auto& [tid, tc] : m_world.tiles)
+                if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
+                {
+                    cmd.tile = tid;
+                    break;
+                }
+        }
         cmd.province     = static_cast<uint32_t>(t.get_or("province",
                                static_cast<unsigned int>(no_province)));
         cmd.unit_type    = static_cast<uint16_t>(t.get_or("unit_type", 0));
