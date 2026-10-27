@@ -521,13 +521,18 @@ void reanchor_fronts(world& w)
     const auto resolve = [&](entity_id nation, entity_id key) -> entity_id {
         const auto nit = c.by_nation.find(nation);
         const std::vector<front>& now = nit != c.by_nation.end() ? nit->second : no_fronts();
-        if (front_keyed(now, key) != nullptr)
-            return key;
         // Which neighbour did it face? Only the fronts it was set against know.
         entity_id faced = null_entity;
         if (const auto oit = old.find(nation); oit != old.end())
             if (const front* of = front_keyed(oit->second, key))
                 faced = of->neighbour;
+        // Rule 1 holds only while the key still faces the SAME neighbour: keys are
+        // claimed across neighbours, so a span changing size elsewhere can hand this
+        // tile to a front toward another nation (cold review, 2026-10-27). Following
+        // it there would choose a front, and an order, the actor never chose.
+        if (const front* kf = front_keyed(now, key);
+            kf != nullptr && (faced == null_entity || kf->neighbour == faced))
+            return key;
         if (faced == null_entity)
             return null_entity;
         for (const front& f : now)
@@ -651,7 +656,7 @@ void advance_fronts(world& w, const recipe_registry& reg)
         cmd.verb      = verb;
         cmd.subject   = uid;
         cmd.province  = province;
-        (void)apply_corp_command(w, reg, cmd); // a refusal mutates nothing; next tick asks again
+        return apply_corp_command(w, reg, cmd); // a refusal mutates nothing; next tick asks again
     };
     const auto busy = [&](entity_id uid, const unit_component& u) {
         return u.count <= 0 || u.position == null_entity || unit_refitting(u) || unit_in_battle(w, uid);
@@ -670,14 +675,39 @@ void advance_fronts(world& w, const recipe_registry& reg)
                        && front_may_push(w, *f);
         const uint32_t target = push ? front_push_target(w, *f) : 0;
 
+        // HOLD: n slots spaced evenly along the span, centred in n equal stretches;
+        // unit i (ascending id) takes slot i. A unit is on its slot when it stands in
+        // the slot tile's province — a march ends on entering its province.
+        const std::size_t n = uids.size(), len = f->span.size();
+        const auto hold = [&](std::size_t i) {
+            const entity_id uid = uids[i];
+            const unit_component& u = w.units.at(uid);
+            if (busy(uid, u))
+                return;
+            const entity_id slot = f->span[((2 * i + 1) * len) / (2 * n)];
+            const uint32_t want = w.provinces.province_of(slot);
+            if (want == 0)
+                return;
+            if (w.provinces.province_of(u.position) == want)
+            {
+                if (u.order.dest != null_entity && u.order.dest_province != want)
+                    issue(uid, nk.first, corp_verb::halt_unit, no_province);
+                return;
+            }
+            if (u.order.dest != null_entity && u.order.dest_province == want)
+                return;
+            issue(uid, nk.first, corp_verb::march_unit, want);
+        };
+
         if (target != 0)
         {
             // PUSH: into the neighbour's weakest adjacent province. A unit already
             // standing in any province the push may enter holds what it took.
             raster_source rs{ w, {} };
             const std::set<uint32_t> cand = push_candidates(w, rs, *f);
-            for (const entity_id uid : uids)
+            for (std::size_t i = 0; i < n; ++i)
             {
+                const entity_id uid = uids[i];
                 const unit_component& u = w.units.at(uid);
                 if (busy(uid, u))
                     continue;
@@ -685,34 +715,15 @@ void advance_fronts(world& w, const recipe_registry& reg)
                     continue;
                 if (u.order.dest != null_entity && u.order.dest_province == target)
                     continue;
-                issue(uid, nk.first, corp_verb::march_unit, target);
+                // A unit that cannot reach the target (another landmass) holds its
+                // slot rather than standing idle (cold review, 2026-10-27).
+                if (issue(uid, nk.first, corp_verb::march_unit, target) != corp_command_result::applied)
+                    hold(i);
             }
             continue;
         }
 
-        // HOLD: n slots spaced evenly along the span, centred in n equal stretches;
-        // unit i (ascending id) takes slot i. A unit is on its slot when it stands in
-        // the slot tile's province — a march ends on entering its province.
-        const std::size_t n = uids.size(), len = f->span.size();
         for (std::size_t i = 0; i < n; ++i)
-        {
-            const entity_id uid = uids[i];
-            const unit_component& u = w.units.at(uid);
-            if (busy(uid, u))
-                continue;
-            const entity_id slot = f->span[((2 * i + 1) * len) / (2 * n)];
-            const uint32_t want = w.provinces.province_of(slot);
-            if (want == 0)
-                continue;
-            if (w.provinces.province_of(u.position) == want)
-            {
-                if (u.order.dest != null_entity && u.order.dest_province != want)
-                    issue(uid, nk.first, corp_verb::halt_unit, no_province);
-                continue;
-            }
-            if (u.order.dest != null_entity && u.order.dest_province == want)
-                continue;
-            issue(uid, nk.first, corp_verb::march_unit, want);
-        }
+            hold(i);
     }
 }

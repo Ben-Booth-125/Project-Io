@@ -3272,7 +3272,11 @@ void app::render()
                     m_ui.pending_front_order_value == 1 ? "Front ordered to push." : "Front ordered to hold.";
                 break;
             case corp_command_result::rejected_state:
-                m_ui.construction.last_message = "Can't push there: not hostile."; break;
+                // rejected_state is also "no change" (a second press in one frame).
+                m_ui.construction.last_message = m_ui.pending_front_order_value == 1
+                    ? "Can't push there: not hostile, or already pushing."
+                    : "That front already holds.";
+                break;
             default:
                 m_ui.construction.last_message = "No such front."; break;
         }
@@ -3292,7 +3296,10 @@ void app::render()
             cmd.verb    = corp_verb::assign_front;
             cmd.subject = unit;
             cmd.tile    = tile;
-            (player_command(cmd) == corp_command_result::applied ? applied : refused) += 1;
+            const corp_command_result r = player_command(cmd);
+            // A unit already where it was sent (rejected_state: no change) is not a refusal.
+            (r == corp_command_result::applied || r == corp_command_result::rejected_state
+                 ? applied : refused) += 1;
         }
         const bool unassign = m_ui.pending_front_assign.front().second == null_entity;
         if (refused == 0)

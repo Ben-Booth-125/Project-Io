@@ -2010,10 +2010,9 @@ void place_garrison(world& w, entity_id nation, uint32_t province_id, entity_id 
     uc.establishment           = count; // BL-1421: the HP bar's full mark
     uc.type                    = roster_row;
     uc.supply_factor_permille  = 1000;
-    // uc.order stays default (dest == null_entity): STATIC by ruling — "a
-    // nation that wants ground HIRES; a garrison that marched would make the
-    // nation its own mercenary" (MILITARY.md § Nation garrisons). No code
-    // path may ever hand this unit a march order.
+    // uc.order stays default (dest == null_entity): a garrison stands where it is
+    // posted until it is assigned to a front (MILITARY.md § Nation garrisons and
+    // § Fronts); only a front, through march_unit, ever moves it.
     // uc.muster_base stays null_entity HERE: no base stands yet. BL-1439 (Ben,
     // 2026-10-27): finish_campaign_world lays every capital's military base
     // (`seed_capital_military_bases`, corporation_generation.cpp) and the

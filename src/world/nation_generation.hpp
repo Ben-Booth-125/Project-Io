@@ -477,10 +477,8 @@ std::vector<int> preview_nation_carve(const nation_carve_ground& ground,
 // stub, `seed_starting_military` and `hire_unit` (MILITARY.md § The unit
 // model) — and the only one whose owner is a nation rather than a corp.
 //
-// Garrisons are STATIC: they hold their seeded tile and never march. A nation
-// that wants ground HIRES — that is the whole point of the mercenary
-// contract, and a garrison that marched would make the nation its own
-// mercenary.
+// Garrisons hold their seeded tile until assigned to a front (MILITARY.md
+// § Fronts, BL-1427); a front moves them through march_unit, and nothing else does.
 
 /// Tunable parameters for garrison sizing, treasury-scaled against BL-543's
 /// value anchor (unit equipment costs ~ 2x annual salary). PLACEHOLDER

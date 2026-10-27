@@ -1114,6 +1114,52 @@
    ],
    "title": "Every nation's capital is generated with a completed military base",
    "design": "Ben, 2026-10-27: \"make sure that the capital is generated with a military base\". At generation each nation gets a completed military_base on its own ground in its capital province (the capital garrison's province), owned by the nation (state_assets), on a tile the ordinary placement rules accept; the capital garrison records it as its muster_base. MILITARY.md § Nation garrisons and § The muster interface say so."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session",
+   "requires": [],
+   "id": "BL-1440",
+   "short_name": "R0B_BUDGET_WORLD",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "tools/verify/rival_military_seeding_harness.cpp"
+   ],
+   "title": "rival_military_seeding_harness R0b fails three rows: its budget world charters nothing",
+   "design": "Three R0b \"budget world\" rows fail on main and on 2929a347, before the capital-base work: the log reads \"no charter budget: nothing chartered, nobody seated\", so the seat-move checks never reach arming. Every other row passes. Find why the fixture spends no charter budget since corporations were retired (BL-1407), and re-point the fixture or retire the rows with a reason. Never weaken a check to pass it."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session",
+   "requires": [],
+   "id": "BL-1441",
+   "short_name": "FRONT_EDGE_CASES",
+   "category": "Military",
+   "priority": "B",
+   "difficulty": 3,
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/fronts.cpp",
+    "src/world/corp_ai.cpp",
+    "tools/verify/fronts_harness.cpp"
+   ],
+   "title": "Fronts: a neighbour with no free key tile has no front; unreachable front marches retry every tick",
+   "design": "Two edge cases from the BL-1427 (fronts) cold review. (1) Keys are unique per nation and claimed smallest span first, so a span whose every tile another front already claimed has no key and is dropped: a nation touching B only at one tile it also shares with A has no front toward B, against \"Every neighbour has fronts\" (MILITARY.md § Fronts). 0 cases on the generated world; fronts_harness F1g fails if a seed hits one. Fix by naming a front by (neighbour, tile) or a tie rule that never leaves a span unnamed. (2) A front march the game refuses (the slot or push target on another landmass) is re-issued every tick, re-pathing the province each time; the rival scorer assigns idle units with no reachability check. Assign only to fronts the unit can reach, or stop re-issuing a refused march."
   }
  ]
 }

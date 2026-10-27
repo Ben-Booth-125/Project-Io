@@ -560,6 +560,39 @@ int main()
         check(f.w.units.at(u).front == null_entity && f.w.front_orders.empty(),
               "F6d B gone from the map: no front toward B remains, assignment and order dropped");
     }
+    {
+        // F6e (cold review, 2026-10-27): keys are claimed across neighbours, so a
+        // span changing size can hand a front's key tile to the front toward ANOTHER
+        // neighbour. The assignment and the push must stay facing the neighbour
+        // they were set against. C takes one B tile under row 2 (a two-tile front
+        // toward C, claimed before B's twelve), then nearly all of row 3, so the
+        // front toward B shrinks and claims the shared tile first.
+        fixture f; build(f);
+        f.w.set_tile_nation(f.at(0, 3), f.C);
+        (void)declare_hostile(f.w, f.A, f.C);
+        reanchor_fronts(f.w);
+        const front* fc = front_toward(nation_fronts(f.w, f.A), f.C);
+        const entity_id old_key = fc != nullptr ? fc->key : null_entity;
+        const entity_id u = add_unit(f, f.A, f.at(4, 0));
+        (void)cmd_assign(f.w, reg, f.A, u, old_key);
+        (void)cmd_order(f.w, reg, f.A, old_key, 1);
+        for (int x = 1; x < W - 1; ++x)
+            f.w.set_tile_nation(f.at(x, 3), f.C);
+        reanchor_fronts(f.w);
+        const std::vector<front>& now = nation_fronts(f.w, f.A);
+        const front* fb = front_toward(now, f.B);
+        check(old_key != null_entity && fb != nullptr && fb->key == old_key,
+              "F6e the scenario holds: the front toward B now owns the old key tile");
+        const front* uf = front_named(now, f.w.units.at(u).front);
+        check(uf != nullptr && uf->neighbour == f.C,
+              "F6e the assignment still faces C, not the front that took its key");
+        bool push_on_c = false, push_on_b = false;
+        for (const front_order_entry& e : f.w.front_orders)
+            if (e.nation == f.A && e.order == front_order::push)
+                if (const front* of = front_named(now, e.key))
+                    (of->neighbour == f.C ? push_on_c : push_on_b) = true;
+        check(push_on_c && !push_on_b, "F6e the push still faces C; no push toward B was made");
+    }
 
     // -----------------------------------------------------------------------
     std::printf("\nF7 - the save\n");

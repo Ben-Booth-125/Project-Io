@@ -20,6 +20,9 @@ struct fronts_cache
     entity_id               nation    = null_entity;
     int                     day_tick  = -1;
     std::size_t             territory = ~std::size_t{0};
+    std::uint64_t           generation = ~std::uint64_t{0}; ///< world::territory_generation
+    bool                    built      = false;              ///< world::fronts_cache.built
+    std::uint64_t           assigned   = 0;                  ///< fold of the units' fronts
     std::vector<front_view> views;
 };
 
@@ -146,9 +149,21 @@ const std::vector<front_view>& fronts_of(const world& w, entity_id nation)
     // card may ask for a rival's (an intel-only card still names its fronts).
     static fronts_cache slots[2];
     static int          next = 0;
+    // An owner flip keeps the map's size, and a load or an assignment keeps the
+    // day, so the stamp also carries the world's territory generation and cache
+    // state (a load clears both) and a fold of every unit's front (cold review,
+    // 2026-10-27: a paused game's Assign otherwise showed nothing). The fold is an
+    // XOR of per-unit terms, so the unordered walk cannot reach it.
+    std::uint64_t assigned = 0;
+    for (const auto& [uid, u] : w.units)
+        if (u.front != null_entity)
+            assigned ^= (static_cast<std::uint64_t>(uid) * 0x9E3779B97F4A7C15ull)
+                      ^ (static_cast<std::uint64_t>(u.front) << 1);
     for (fronts_cache& c : slots)
         if (c.w == &w && c.nation == nation && c.day_tick == w.current_day_tick
-            && c.territory == w.tile_to_nation.size())
+            && c.territory == w.tile_to_nation.size()
+            && c.generation == w.territory_generation && c.built == w.fronts_cache.built
+            && c.assigned == assigned)
             return c.views;
 
     fronts_cache& c = slots[next];
@@ -156,7 +171,10 @@ const std::vector<front_view>& fronts_of(const world& w, entity_id nation)
     c.w         = &w;
     c.nation    = nation;
     c.day_tick  = w.current_day_tick;
-    c.territory = w.tile_to_nation.size();
+    c.territory  = w.tile_to_nation.size();
+    c.generation = w.territory_generation;
+    c.built      = w.fronts_cache.built;
+    c.assigned   = assigned;
     if (nation == null_entity)
         c.views.clear();
     else
