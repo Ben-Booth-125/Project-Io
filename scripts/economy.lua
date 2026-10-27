@@ -543,33 +543,10 @@ economy = {
         -- NR-600's first-cut-then-tune idiom: the SHAPE is the deliverable, the
         -- numbers are for playtest.
         --
-        -- BL-709 (2026-08-31) - CONSTRUCTION CAPACITY joins this table AT ZERO,
-        -- and the zero is the item's central measured finding rather than an
-        -- oversight.
-        --
-        -- The obvious shape for "construction is a rate" is a per-building
-        -- maintenance draw right here: every standing firm buys a trickle of
-        -- crews and plant, which is continuous, economy-scaled with the building
-        -- stock, and era-banded - MARKETS.md properties 1 and 2 in one row. It
-        -- was authored, and MEASURED, and it collapsed operating firms 198 of
-        -- 328 -> 33 of 317 on the ancient band. Cutting the rate five-fold moved
-        -- it to 38 of 315. A CLIFF, NOT A CURVE.
-        --
-        -- So it is not a magnitude problem and no rate here is safe: a
-        -- brand-new UNIVERSAL draw is unmet on tick 1 in every market at once,
-        -- supply_factor decays before any yard's output can reach a shelf, and
-        -- the reflex tier decommissions the firm while the market is still
-        -- catching up. BL-641's collapse arriving through the COLD START rather
-        -- than through the rate, and the same reason tools/planks/machinery
-        -- above still sit at zero.
-        --
-        -- The sector's live consumer is therefore the BUILD PROJECT alone
-        -- (economy.construction.capacity_per_build_tick), which is a draw that
-        -- arrives with the thing that causes it instead of switching on across
-        -- the whole world at once. This row is left authored at 0.0 so that
-        -- turning maintenance construction on later is a data change - and so
-        -- that the number it would need is measured, not guessed, when someone
-        -- has provisioned the yards to answer it.
+        -- BL-709 authored construction capacity into this table at ZERO (a
+        -- per-building maintenance draw measured as a cold-start cliff: operating
+        -- firms 198 of 328 -> 33 of 317 on the ancient band). The rows are gone
+        -- with the system (Ben, 2026-10-27, BL-1438 retire construction capacity).
         -- BL-738 (Ben, 2026-09-01: "Building should have upkeep too") — STAGE 1
         -- LANDED, MEASURED, AND WITHDRAWN THE SAME DAY, and the measurement is
         -- the record. Repair timber/stone rates (0.05/0.05 extraction,
@@ -591,12 +568,12 @@ economy = {
         -- round-two campaign_lapse cell.
         goods = {
             extraction_site = {
-                ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.07 / 0.15; capacity BL-709
-                industrial = { machinery = 0.0, power = 0.25, timber = 0.05, stone = 0.05, construction_capacity = 0.0 },  -- derived 0.11; power BL-708; repair BL-738 stage 2; capacity BL-709
+                ancient    = { tools = 0.0, planks = 0.0 }, -- derived 0.07 / 0.15
+                industrial = { machinery = 0.0, power = 0.25, timber = 0.05, stone = 0.05 },  -- derived 0.11; power BL-708; repair BL-738 stage 2
             },
             processing_facility = {
-                ancient    = { tools = 0.0, planks = 0.0, construction_capacity = 0.0 }, -- derived 0.14 / 0.30; capacity BL-709
-                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.08, stone = 0.08, construction_capacity = 0.0 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738 stage 2; capacity BL-709
+                ancient    = { tools = 0.0, planks = 0.0 }, -- derived 0.14 / 0.30
+                industrial = { machinery = 0.0, electronics = 0.0, power = 0.40, timber = 0.08, stone = 0.08 }, -- derived 0.15 / 0.06; power BL-708; repair BL-738 stage 2
             },
             -- BL-1266 (Ben, 2026-10-10): TRADE BUILDINGS CARRY AN UPKEEP OF FUEL
             -- AND BUILDING MATERIALS, bought off their own market's shelf like any
@@ -703,32 +680,10 @@ economy = {
     grid_goods = {
         power = { transmitted = true, stockpile_ceiling = 400.0 },
 
-        -- BL-709 (2026-08-31) - CONSTRUCTION CAPACITY is a grid good for
-        -- reasons that read differently from power's but land on exactly the
-        -- same two rules, which is the argument for the table existing at all:
-        -- no logic anywhere asks "is this power?" or "is this capacity?".
-        --
-        --   * NEVER CARGO - capacity is crews, cranes and plant, not tonnage.
-        --     There is nothing to load. `price_convoy_leg` refuses the leg, so
-        --     auto-dispatch, the player's verb and the rival scorer's directed
-        --     dispatch are all closed at the one shared seam.
-        --   * CONNECTION-GATED - a yard serves ground its network reaches and
-        --     no further, which is the same reach field
-        --     `economy.construction.max_logistics_reach` already gates
-        --     PLACEMENT on. So it should rarely bite: any legally-placed
-        --     building is within 24 cost of an anchor, hence reachable at all,
-        --     hence connected. Where it does bite it says something true - you
-        --     cannot build off the road network - and it says it as a scaled
-        --     output, never an idled firm.
-        --
-        -- THE CEILING IS THE LOAD-BEARING ONE HERE, more than it was for power.
-        -- Capacity is a RATE: an idle yard's unsold crew-hours lapse, they do
-        -- not bank. Without a ceiling a yard with no buyers would accumulate an
-        -- unsellable mountain forever and the sector would stop being a rate at
-        -- all. 150 is roughly a week of one yard's output against a band-wide
-        -- draw of ~15-25 a tick: generous enough that a yard serving a live
-        -- region never throttles, tight enough that a yard with no buyers in
-        -- reach stops within a few ticks. First cut; retune by playtest.
+        -- RETIRED SLOT (BL-709 authored it; construction capacity retired, Ben
+        -- 2026-10-27, BL-1438): nothing produces or draws it now. The row stays
+        -- so an old save's leftover shelf stock can never be hauled as cargo;
+        -- it spoils away (economy.shelf_spoilage below).
         construction_capacity = { transmitted = true, stockpile_ceiling = 150.0 },
     },
 
@@ -1613,7 +1568,7 @@ economy = {
         charcoal              = 0.10,
         propellant            = 0.10,
         power                 = 0.10,
-        construction_capacity = 0.10,
+        construction_capacity = 0.10, -- retired slot (BL-1438): spoils away any old-save stock
         -- consumable: consumer and organic goods
         consumer_goods        = 0.10,
         tobacco               = 0.10,
@@ -1748,63 +1703,10 @@ economy = {
         site_time_reach_scale    = 1.0,
         site_time_stack_discount = 0.15,
         site_time_stack_min      = 0.5,
-
-        -- BL-709 (2026-08-31) - WHAT A LIVE PROJECT DRAWS FROM THE SECTOR.
-        -- docs/economy/PRODUCTION.md § Construction as a rate: "Building
-        -- projects consume that capacity."
-        --
-        -- Units of `construction_capacity` a site under construction wants per
-        -- FULL-RATE tick, on top of its material basket. It joins the SAME
-        -- `rate` minimum every material already joins in `run_construction`, so
-        -- a market with no capacity on the shelf stretches or pauses a build
-        -- exactly as a market with no steel does - one rule, not a second one -
-        -- and a paused build registers the want, which prices capacity and
-        -- induces the yard. That loop is the whole of MARKETS.md property 3.
-        --
-        -- 0.5 is deliberately modest for a first cut. A 20-tick build consumes
-        -- 10 capacity end to end, about 30 credits at the 3.0 base - real
-        -- against the flat build_cost but not so large that the sector becomes
-        -- the binding constraint on every build in the world before it has been
-        -- played. ZERO DISABLES IT ENTIRELY, which is the pre-BL-709 behaviour
-        -- and the default a hand-built harness registry gets.
-        capacity_per_build_tick  = 0.5,
-
-        -- BL-709 - WHAT THE PRE-GAME SEEDER PROVISIONS, per standing building on
-        -- a body. Units of `construction_capacity` per tick. NOTHING IN THE TICK
-        -- READS THIS: it is a generation-time sizing target only, and that
-        -- separation is the item's central measured finding.
-        --
-        -- The obvious thing to reach for was BL-708's shape - author capacity as
-        -- an ordinary per-building UPKEEP draw in economy.building_upkeep.goods
-        -- above, and let the seeder's existing gap machinery provision for it.
-        -- MEASURED, it collapsed operating firms 198 of 328 -> 33 of 317 on the
-        -- ancient band, and cutting the rate five-fold barely moved it (38 of
-        -- 315). A CLIFF, NOT A CURVE, so it is not a magnitude problem: a
-        -- brand-new universal draw is unmet on tick 1 in every market,
-        -- supply_factor decays before any yard's output can reach a shelf, and
-        -- the reflex tier decommissions the firm while the market is still
-        -- catching up. The BL-641 collapse arriving through the COLD START
-        -- rather than through the rate.
-        --
-        -- So the sector's live consumer is the build project alone
-        -- (capacity_per_build_tick above), and this dial is how generation puts
-        -- the yards there to serve it. Generation provisions the sector; the
-        -- market decides everything downstream of it.
-        --
-        -- SIZED AGAINST WHAT BUILDS ACTUALLY DRAW, not against a guess. The
-        -- census reads 24 ancient and 9 industrial sites under construction at
-        -- the census tick, so at capacity_per_build_tick = 0.5 the real
-        -- consumption is ~12 and ~4.5 capacity a tick. Against standing stocks
-        -- of ~330 and ~405 buildings that is ~0.036 and ~0.011 per building;
-        -- 0.04 covers both with a little headroom.
-        --
-        -- LARGER TARGETS WERE TRIED AND ARE WORSE, which is why this is small.
-        -- 0.30 per building (a ~10x over-provision) was measured: it did NOT
-        -- buy the ancient band a working sector - capacity production stayed at
-        -- 0.0 - and it cost the industrial band its firms, 72 -> 9, by spending
-        -- firm slots on yards instead of on the goods a body actually eats.
-        -- First cut; retune by playtest.
-        seed_capacity_per_building = 0.04,
+        -- (No construction-capacity term: the system is retired - Ben,
+        -- 2026-10-27, BL-1438 - and the two dials that stood here,
+        -- capacity_per_build_tick and seed_capacity_per_building, are refused
+        -- by name at load.)
     },
 }
 

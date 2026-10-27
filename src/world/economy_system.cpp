@@ -693,10 +693,12 @@ building_report run_processing(world& w, const recipe_registry& reg,
     const float batches_full = processing_batches_full(reg, b, contention);
 
     // BL-1265: a processor with no market under it has no shelf to buy from or
-    // land on, so it cannot run.
-    if (body == null_entity || rcp == nullptr || batches_full <= 0.0f || market_id == null_entity)
+    // land on, so it cannot run. A RETIRED recipe slot (BL-1438: an old save's
+    // construction yard) is idle the same way: it draws nothing and makes nothing.
+    if (body == null_entity || rcp == nullptr || rcp->retired || batches_full <= 0.0f
+        || market_id == null_entity)
     {
-        rep.idle = true; // misconfigured, unstaffed, detached, or market-less
+        rep.idle = true; // misconfigured, unstaffed, detached, market-less, or retired
         return rep;
     }
 
@@ -841,7 +843,7 @@ bool top_up_processing(world& w, const recipe_registry& reg, entity_id corp,
         return false;
     const recipe* rcp = reg.get_recipe(b.recipe);
     const float batches_full = processing_batches_full(reg, b, contention);
-    if (rcp == nullptr || !(batches_full > 0.0f))
+    if (rcp == nullptr || rcp->retired || !(batches_full > 0.0f))
         return false;
     market_component& mc = w.markets.at(market_id);
     const float res_mult = reg.price_band().reservation_mult;
@@ -1205,21 +1207,16 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
 {
     const float max_stretch = reg.construction().max_stretch;
     const float pause_below  = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
-    // BL-709 — the CAPACITY a live project draws from the construction sector
-    // each full-rate tick (docs/economy/PRODUCTION.md § Construction as a rate:
-    // "Building projects consume that capacity"). Hoisted: it is a property of
-    // the registry and nothing in the loop can change it. ZERO = the pre-BL-709
-    // behaviour exactly, which is what every hand-built harness registry gets.
-    const float capacity_rate = reg.construction().capacity_per_build_tick;
-    const std::size_t cap_index =
-        static_cast<std::size_t>(resource_type::construction_capacity);
+    // No construction-capacity draw: the system is retired (Ben, 2026-10-27,
+    // BL-1438 retire construction capacity; PRODUCTION.md § Construction as a
+    // rate). A site progresses on its materials and its days alone.
 
     // CREDITS UP FRONT, MATERIALS IN ARREARS (Ben, 2026-10-25, ruling NR-1073;
     // PRODUCTION.md § Construction is measured in days). The whole flat build cost
     // was paid once, at placement (`begin_construction_on_placement`); no tick pays
     // credits. This pass, at each economy tick:
-    //   A. draws the materials (construction capacity included) for the days built
-    //      since the last tick, IN ARREARS — `build_arrears_milli`, which also holds
+    //   A. draws the materials for the days built since the last tick, IN
+    //      ARREARS — `build_arrears_milli`, which also holds
     //      any shortfall carried from the tick before, so that is drawn first: a
     //      tick draws at most one quarter of work plus what was carried;
     //   B. sets the quarter-ahead rate from the shelf LEFT after A, less the
@@ -1243,16 +1240,12 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
     // A site's row for @p share of a quarter's work — ONE expression, read by the
     // arrears draw, the forward claim and the want alike, so they cannot disagree.
     // BL-590: the material cost of THIS named building, over its duration in
-    // quarters. BL-709: construction capacity, flat per quarter of work, not
-    // divided by `duration` — a build that takes twice as long occupies the sector
-    // for twice as long.
+    // quarters.
     auto row_for = [&](const building_component& b, float duration, float share) {
         const auto& material_cost_row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
         std::array<float, resource_count> row{};
         for (std::size_t r = 0; r < resource_count; ++r)
             row[r] = material_cost_row[r] / duration * share;
-        if (capacity_rate > 0.0f)
-            row[cap_index] += capacity_rate * share;
         return row;
     };
     // The materials owed (A's need): the milli-days built and not yet drawn.
@@ -1267,29 +1260,15 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
     };
 
     // A site's FORWARD rate from what each good offers it (`avail_of`). The
-    // scarcest MATERIAL sets it and below 1/max_stretch it pauses. BL-709 —
-    // CAPACITY STRETCHES A BUILD; IT NEVER STOPS ONE: its coverage is floored at
-    // `pause_below` (a crew of one, not no crew), so a market with no yard slows
-    // a build 10x rather than deadlocking the yards that would supply it
-    // (measured: folding capacity into the minimum collapsed operating firms
-    // 198 of 328 -> 6 of 315 on the ancient band).
+    // scarcest MATERIAL sets it and below 1/max_stretch it pauses.
     auto site_rate = [&](const std::array<float, resource_count>& need_row, auto&& avail_of) {
         float rate = 1.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            if (r == cap_index)
-                continue;
             const float need = need_row[r];
             if (need <= 0.0f)
                 continue;
             rate = std::min(rate, avail_of(r) / need);
-        }
-        if (capacity_rate > 0.0f)
-        {
-            const float need  = need_row[cap_index];
-            const float avail = avail_of(cap_index);
-            const float cov   = (need > 0.0f) ? (avail / need) : 1.0f;
-            rate = std::min(rate, std::max(cov, pause_below));
         }
         rate = std::clamp(rate, 0.0f, 1.0f);
         if (rate < pause_below)
@@ -1297,14 +1276,12 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         return rate;
     };
     // The share of a DEBT the shelf settles: the scarcest owed material sets it,
-    // with no pause (any part of a debt is worth paying). Capacity never holds a
-    // debt back — it is labour already spent; its draw is capped by the shelf and
-    // a short yard's part is not billed (BL-709's asymmetry, applied to arrears).
+    // with no pause (any part of a debt is worth paying).
     auto debt_cover = [&](const std::array<float, resource_count>& need_row, auto&& avail_of) {
         float f = 1.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            if (r == cap_index || !(need_row[r] > 0.0f))
+            if (!(need_row[r] > 0.0f))
                 continue;
             f = std::min(f, avail_of(r) / need_row[r]);
         }
@@ -1437,7 +1414,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             if (!(need[r] > 0.0f))
                 continue;
             c.need[r]  = need[r];
-            c.gates[r] = (r != cap_index);
+            c.gates[r] = true;
             if (admitted_at(s, r))
             {
                 c.claim[r] = need[r];
@@ -1489,8 +1466,8 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 {
                     if (!(owed[r] > 0.0f) || !admitted_at(s, r))
                         continue; // BL-1172: over the ceiling — not drawn, not billed
-                    // Bill only what the shelf gives (capacity can be short of its
-                    // share; materials are covered by `f`).
+                    // Bill only what the shelf gives (`f` covers the materials;
+                    // the min is the shelf's own floor).
                     float drawn = std::min(owed[r] * f, std::max(0.0f, s.m->inventory[r]));
                     if (alloc != nullptr)
                     {
@@ -1513,7 +1490,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
     }
 
     // What is still OWED is claimed first: the quarter ahead reads the shelf less
-    // it (materials only — capacity never holds a debt back).
+    // it.
     held_map held;
     for (const entity_id bid : ids)
     {
@@ -1524,7 +1501,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         const std::array<float, resource_count> owed = row_for(b, s.duration, owed_share(b));
         auto& h = held[s.mid];
         for (std::size_t r = 0; r < resource_count; ++r)
-            if (r != cap_index && owed[r] > 0.0f && admitted_at(s, r))
+            if (owed[r] > 0.0f && admitted_at(s, r))
                 h[r] += owed[r];
     }
 
@@ -1583,15 +1560,14 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                 if (want_row[r] > 0.0f && (s.m == nullptr || admitted_at(s, r)))
                     want[r] += want_row[r]; // BL-1172: a material over the ceiling does not bid
             // BL-1203: the material the ceiling silenced goes to the hauler-only
-            // register instead (never `wants`, never the price). Capacity is a grid
-            // good, never cargo.
+            // register instead (never `wants`, never the price).
             if (s.m != nullptr)
             {
                 std::map<std::pair<entity_id, entity_id>,
                          std::array<float, resource_count>>::iterator hw = report.hauler_wants.end();
                 for (std::size_t r = 0; r < resource_count; ++r)
                 {
-                    if (r == cap_index || !(want_row[r] > 0.0f) || admitted_at(s, r))
+                    if (!(want_row[r] > 0.0f) || admitted_at(s, r))
                         continue;
                     if (hw == report.hauler_wants.end())
                         hw = report.hauler_wants.try_emplace(std::make_pair(s.corp, pool_key)).first;
@@ -1663,8 +1639,6 @@ std::array<float, resource_count> construction_claims_on(const world& w, const r
         return out;
     const market_component& m = mit->second;
     const int q = k_construction_quarter_days;
-    const float cap_rate  = reg.construction().capacity_per_build_tick;
-    const std::size_t cap = static_cast<std::size_t>(resource_type::construction_capacity);
     const float res_mult  = reg.price_band().reservation_mult;
     // Ascending id: the float sum replays (buildings is a hash map).
     std::vector<entity_id> ids;
@@ -1678,7 +1652,7 @@ std::array<float, resource_count> construction_claims_on(const world& w, const r
         const float duration = reg.economics(b.type).build_duration_ticks;
         if (duration <= 0.0f)
             continue;
-        // Owed (materials only — capacity never holds a debt back), and the days
+        // Owed materials, and the days
         // still to build this quarter at the rate the tick set.
         const float owed  = static_cast<float>(std::max(0, b.build_arrears_milli))
                           / (1000.0f * static_cast<float>(q));
@@ -1691,11 +1665,9 @@ std::array<float, resource_count> construction_claims_on(const world& w, const r
         {
             if (!shelf_admits(m, r, res_mult, /*off_buys=*/true))
                 continue;
-            const float per_q = (r == cap) ? 0.0f : row[r] / duration;
+            const float per_q = row[r] / duration;
             out[r] += per_q * owed + per_q * ahead;
         }
-        if (cap_rate > 0.0f && shelf_admits(m, cap, res_mult, /*off_buys=*/true))
-            out[cap] += cap_rate * ahead;
     }
     return out;
 }
@@ -1747,7 +1719,7 @@ void begin_construction_on_placement(world& w, const recipe_registry& reg, entit
     }
 
     // 2. THE RATE for the days left in this quarter: `site_rate`'s rule (the
-    // scarcest admitted material sets it, capacity only stretches it, below
+    // scarcest admitted material sets it, below
     // 1/max_stretch it pauses), read off the shelf LESS every claim already on it
     // — the materials other sites owe and the days they will build before the tick
     // (`construction_claims_on`). So a later site in the same quarter reads what
@@ -1757,8 +1729,6 @@ void begin_construction_on_placement(world& w, const recipe_registry& reg, entit
     const float qf = static_cast<float>(days) / static_cast<float>(q);
     const float max_stretch = reg.construction().max_stretch;
     const float pause_below = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
-    const float cap_rate    = reg.construction().capacity_per_build_tick;
-    const std::size_t cap   = static_cast<std::size_t>(resource_type::construction_capacity);
     const entity_id mid = market_for_tile(w, b.tile);
     const market_component* m = nullptr;
     if (mid != null_entity)
@@ -1774,16 +1744,9 @@ void begin_construction_on_placement(world& w, const recipe_registry& reg, entit
     float rate = 1.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (r == cap) continue;
         const float need = row[r] / duration * qf;
         if (need > 0.0f)
             rate = std::min(rate, avail(r) / need);
-    }
-    if (cap_rate > 0.0f)
-    {
-        const float need = cap_rate * qf;
-        const float cov  = need > 0.0f ? avail(cap) / need : 1.0f;
-        rate = std::min(rate, std::max(cov, pause_below));
     }
     rate = std::clamp(rate, 0.0f, 1.0f);
     if (rate < pause_below || rate <= 0.0f)

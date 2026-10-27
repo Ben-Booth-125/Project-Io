@@ -207,14 +207,12 @@ bool recipe_margin_obtainable(world& w, const recipe_registry& reg, input_reach&
 
 /// BL-1183 (ceiling stalls construction) — the per-tick MATERIAL draw of every
 /// site already under construction, summed per market (the site's catchment
-/// market, the shelf run_construction draws). Construction capacity is left out:
-/// it stretches a build, never pauses one (BL-709). Ascending building id, so the
+/// market, the shelf run_construction draws). Ascending building id, so the
 /// float sums are a function of the world, not of the map's layout.
 using construction_draw_map = std::map<entity_id, std::array<float, resource_count>>;
 
 construction_draw_map standing_construction_draws(const world& w, const recipe_registry& reg)
 {
-    const std::size_t cap = static_cast<std::size_t>(resource_type::construction_capacity);
     std::vector<entity_id> ids;
     for (const auto& [bid, b] : w.buildings)
         if (b.ticks_remaining > 0)
@@ -233,7 +231,7 @@ construction_draw_map standing_construction_draws(const world& w, const recipe_r
         const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
         auto& acc = out[mid];
         for (std::size_t r = 0; r < resource_count; ++r)
-            if (r != cap && row[r] > 0.0f)
+            if (row[r] > 0.0f)
                 acc[r] += row[r] / duration;
     }
     return out;
@@ -260,12 +258,11 @@ bool construction_materials_obtainable(world& w, const recipe_registry& reg, inp
     const entity_id mid = market_for_tile(w, tile);
     if (mid == null_entity)
         return true;
-    const std::size_t cap = static_cast<std::size_t>(resource_type::construction_capacity);
     const auto& row = reg.resource_build_cost_for(type, target, recipe);
     const auto  sit = standing.find(mid);
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (r == cap || !(row[r] > 0.0f))
+        if (!(row[r] > 0.0f))
             continue;
         const float need = row[r] / duration + (sit != standing.end() ? sit->second[r] : 0.0f);
         if (!input_obtainable(w, reg, ir, mid, nullptr, r, need, null_entity).obtainable)
@@ -1839,7 +1836,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // price-ceiled `electronics` at net 290 and NO rival ever built a
                 // plant, in any world, at any time. `recipe::group` is the
                 // category the design already authors (BL-434) — "Power
-                // Generation" and "Construction" are each their own — so the
+                // Generation" is its own — so the
                 // pre-filter now narrows WITHIN a group and hands every group to
                 // the scorer, which is what the scorer is for.
                 //

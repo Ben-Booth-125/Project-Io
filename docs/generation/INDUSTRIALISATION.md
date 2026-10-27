@@ -252,14 +252,16 @@ charters go to the goods in turn — one per good each pass, up to its cap — s
 good evenly. **A good that cannot be placed is skipped, not fatal (Ben, 2026-09-19, NR-903):** when a
 centre's window has no free site for a good, the turn passes that good over for this centre and moves
 on, and the centre stops only when no good in the turn can place. **When the ceiling binds, each good
-keeps an even share of it (Ben, 2026-09-19, NR-905):** the ceiling's room, less a place for each
-construction yard the body will provision, is reserved in equal parts to the goods in the turn, so a
+keeps an even share of it (Ben, 2026-09-19, NR-905):** the ceiling's room is reserved in equal parts
+to the goods in the turn, so a
 centre that skips the quarries cannot spend their share on mills before a centre that has quarries is
 reached. A share is a reservation, not a cap (NR-906): a good may take a charter beyond its share
 whenever the room left still covers every other short good's unfilled share. A share no centre
 placed by the end of the walk is counted unspent under its own reason. **A ceiling that cannot be cut
-into shares refuses the spend whole:** where the room left after the yards would not give every good
-of the turn one charter, the world places nothing from the budget. The no-budget world it used to
+into shares refuses the spend whole:** where the ceiling would not give every good of the turn one
+charter, the world places nothing from the budget. Generation provisions no construction yards: the
+construction-capacity system is retired (Ben, 2026-10-27; PRODUCTION.md § Construction as a rate). The
+no-budget world it used to
 fall back to retired with the legacy path (Ben, 2026-10-23); what such a world opens on is an open
 question (§ Open questions).
 

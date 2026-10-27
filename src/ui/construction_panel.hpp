@@ -143,8 +143,8 @@ struct construction_material
 /// A site's progress in DAYS and its materials still to draw. `days_total` is
 /// `construction_build_days` at the tile's live site multiplier, `days_done` that
 /// less `construction_days_left`; the materials are `run_construction`'s own row
-/// (`resource_build_cost_for` over the duration in quarters, plus construction
-/// capacity per quarter of work) for the days left plus the milli-days built and
+/// (`resource_build_cost_for` over the duration in quarters) for the days left
+/// plus the milli-days built and
 /// not yet drawn (`build_arrears_milli`). Each carries the site market's posted
 /// price now, which is what the draw pays for it at the tick.
 struct construction_site_reading

@@ -480,7 +480,7 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
 
 /// BL-1060 — the refusal a spend's params cannot decide alone: under
 /// `sqrt_capital`, a density ceiling that BINDS on some budgeted body and yet
-/// leaves under one firm per turn good once the yards' places come off it, so
+/// leaves under one firm per turn good, so
 /// NR-905's reservation could not be cut at all. Null when the spend may go
 /// ahead (and for an empty budget, a legacy rule, or params
 /// `charter_spend_refusal` already refuses).
@@ -561,7 +561,7 @@ int province_firm_cap_of(const std::map<std::uint32_t, int>& rungs, std::uint32_
 ///      `no_budget`: today's world, nothing else read;
 ///   2. `charter_spend_refusal` (the params) -> `refused`;
 ///   3. `charter_spend_world_refusal` (the world: a density ceiling too small for
-///      a body's turn and its yards, BL-1060) -> `refused` — ASKED ONLY WITH A
+///      a body's turn, BL-1060) -> `refused` — ASKED ONLY WITH A
 ///      REGISTRY (@p reg non-null);
 ///   4. no centre a nation owns affords a specialist (NR-910) -> `no_specialist`;
 ///   5. otherwise `budget`.
@@ -569,28 +569,15 @@ int province_firm_cap_of(const std::map<std::uint32_t, int>& rungs, std::uint32_
 /// WHY BUMP 11 PASSES NO REGISTRY, AND WHY THAT CANNOT MISLEAD IT. Generation is
 /// Lua-free and takes no recipe registry — the caller loads one from Lua after
 /// the world exists (app::load_economy, `finish_campaign_world`) — and the world
-/// refusal needs one: it reads the yards' places off the registry's construction
-/// recipe and the body's demand off its baskets. So bump 11 skips step 3.
-/// Under the SHIPPED constants step 3 cannot fire on a body serving 7 or more
-/// goods. It refuses a body only when the ceiling binds AND (ceiling -
-/// yard_places) < n_turn, with yard_places <= the per-good cap
-/// (`charter_yard_places` takes the minimum with it). The cap is
-/// max(c, isqrt(c x F / |G|)) for F the body's whole firm charters; F < 2 x
-/// `k_stockpile_price_divisor` (the firm price is the stock / the divisor,
-/// rounded down, so the stock buys fewer than twice the divisor), so with
-/// c = 8 the cap is at most isqrt(8 x 1299 / |G|), and n_turn <= |G|. The
-/// ceiling is per good served (BL-1204): floor(7.5 x |G|) under the guard. At
-/// |G| = 7, n_turn + cap <= 7 + 38 = 45 against a ceiling of 52, and past it the
-/// cap only falls while the ceiling rises, so no body serving 7+ goods is ever
-/// uncuttable. BELOW 7 THE BOUND DOES NOT HOLD (|G| = 6: 6 + 41 = 47 against
-/// 45): a body serving 1-6 goods whose budget outruns its small ceiling and
-/// whose yards' places eat it could refuse the whole spend. A budgeted body —
-/// one carrying a population centre — serves far more (its baskets alone, plus
-/// their inputs), so this is a bound on the argument, not a seen case; the
-/// harness row that would name it is landscape_search_harness's L1. A world
-/// that hit it would be one bump 11 calls a budget world and the search does
-/// not — the carve would then have read planned firms and the search's no-budget
-/// branch would lay the roster itself (so the world still gets one).
+/// refusal needs one: it reads the body's demand off its baskets. So bump 11
+/// skips step 3. Under the SHIPPED constants step 3 cannot fire at all. It
+/// refuses a body only when the ceiling binds AND ceiling < n_turn; the ceiling
+/// is per good served (BL-1204), floor(7.5 x |G|) under the guard, and
+/// n_turn <= |G|, so the ceiling always covers the turn. (While construction
+/// yards held places off the ceiling — retired with construction capacity, Ben
+/// 2026-10-27, BL-1438 — a body serving under 7 goods could in principle have
+/// refused; the harness row that would name it is landscape_search_harness's
+/// L1.)
 enum class budget_world_kind : std::uint8_t
 {
     no_budget     = 0,

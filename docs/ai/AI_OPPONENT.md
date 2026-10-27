@@ -720,7 +720,7 @@ a different altitude is the same defect.
 **decision, and it is scored as one.**
 
 `recipe::group` is what a processing facility IS — a Metal Foundry, a Power Generation plant, a
-Construction yard — and the seam has enforced this since Ben's BL-434 retraction (2026-08-16): a
+Refinery — and the seam has enforced this since Ben's BL-434 retraction (2026-08-16): a
 switch that crosses a group is **refused outright**, because "switching methods can mean changing
 to a different building type", and the only route to a different type is dismantle and rebuild.
 

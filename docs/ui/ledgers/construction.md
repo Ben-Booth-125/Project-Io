@@ -169,8 +169,8 @@ the ledger cannot tell one site two stories:
 - **Still to draw:** every material the site has yet to take off the shelf, each with the site
   market's **posted price now** — what the draw pays for it, in arrears at the tick (Ben,
   2026-10-26: costs depend on market prices; the flat credits were paid once at placement). The
-  amount is `run_construction`'s own row (`resource_build_cost_for` over the duration in quarters,
-  plus construction capacity per quarter of work) for the days left **plus** the days built and not
+  amount is `run_construction`'s own row (`resource_build_cost_for` over the duration in quarters)
+  for the days left **plus** the days built and not
   yet drawn (`build_arrears_milli`);
 - an **"!"** beside any good the market is short of, by **the construction draw's own test**: the
   shelf holds less than this quarter's draw needs (`construction_read::short_of`, set where

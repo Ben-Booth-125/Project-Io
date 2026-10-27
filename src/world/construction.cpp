@@ -83,15 +83,9 @@ float construction_capex(const world& w, const recipe_registry& reg, entity_id t
     // of fewer than 90 days draws only its days (run_construction's need row).
     const float ticks = static_cast<float>(construction_build_days(w, reg, tile, type, target))
                       / static_cast<float>(k_construction_quarter_days);
-    // BL-709 construction capacity: drawn flat per build tick, not per unit of
-    // material (run_construction's need row), so it scales with the ticks alone.
-    float capacity_cost = 0.0f;
-    if (const float cap_rate = reg.construction().capacity_per_build_tick; cap_rate > 0.0f && mkt)
-    {
-        const std::size_t ci = static_cast<std::size_t>(resource_type::construction_capacity);
-        capacity_cost = cap_rate * ticks * (mkt->price[ci] > 0.0f ? mkt->price[ci] : mkt->base_price[ci]);
-    }
-    return authored * ticks / duration + capacity_cost;
+    // No construction-capacity term: the system is retired (Ben, 2026-10-27,
+    // BL-1438) — a site costs its credits and its materials, nothing else.
+    return authored * ticks / duration;
 }
 
 int construction_build_days(const world& w, const recipe_registry& reg,

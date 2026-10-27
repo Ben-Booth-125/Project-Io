@@ -69,8 +69,9 @@ int main(int argc, char** argv)
             ++failures;
         for (const charter_body_record& b : rep.bodies)
         {
-            std::printf("  body %u: |G| %d ceiling %d yards %d share %d+%d cap %d charters %lld firms %d\n",
-                        static_cast<unsigned>(b.body), b.goods_in_g, b.density_ceiling, b.yard_places,
+            // (the `yards` column is gone: construction capacity retired, BL-1438)
+            std::printf("  body %u: |G| %d ceiling %d share %d+%d cap %d charters %lld firms %d\n",
+                        static_cast<unsigned>(b.body), b.goods_in_g, b.density_ceiling,
                         b.even_share, b.even_share_extra, b.per_good_cap,
                         static_cast<long long>(b.firm_charters), b.firms);
             std::printf("    per good:");

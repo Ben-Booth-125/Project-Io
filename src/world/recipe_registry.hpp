@@ -119,6 +119,16 @@ struct recipe
     /// methods only; validated at load as a finite rate in [0, 1] and
     /// REJECTED otherwise, never clamped.
     float qualified_workforce = 0.0f;
+    /// A RETIRED SLOT (Ben, 2026-10-27, BL-1438 retire construction capacity).
+    /// A recipe's id is its index in the registry and that id is STORED in
+    /// building_component.recipe, so a recipe the design retires cannot be
+    /// deleted from scripts/recipes.lua without repointing every later id in
+    /// every save. It stays as a slot instead: authored `retired = true`, with
+    /// no inputs and no outputs (the loader refuses a retired row that names
+    /// either). The browse path never lists it — no Build door, no scorer, no
+    /// seeder, no default — and a building an old save holds on one is idle at
+    /// the production pass: it draws nothing and makes nothing.
+    bool retired = false;
 };
 
 /// THE ONE PREDICATE every door asks of a recipe's air (Ben, 2026-10-09;
@@ -720,45 +730,12 @@ struct construction_params
     /// reaches implausibly-instant (or zero/negative) build time.
     float site_time_stack_min = 0.5f;
 
-    /// BL-709 — units of `construction_capacity` a site under construction draws
-    /// per FULL-RATE tick, on top of its material basket
-    /// (docs/economy/PRODUCTION.md § Construction as a rate: "Building projects
-    /// consume that capacity").
-    ///
-    /// It is added to the SAME per-tick need row `run_construction` already
-    /// builds from `resource_build_cost_for`, so it joins the same `rate`
-    /// minimum, the same stretch/pause thresholds and the same want register as
-    /// every material — one rule rather than a second one. A build stalled for
-    /// want of capacity therefore registers that want, which prices capacity and
-    /// induces the yard that answers it (MARKETS.md property 3).
-    ///
-    /// DEFAULTS TO ZERO = the pre-BL-709 behaviour exactly, which is what a
-    /// hand-built harness registry gets and why every construction harness that
-    /// authors no value is arithmetically untouched. scripts/economy.lua authors
-    /// the shipped value.
-    float capacity_per_build_tick = 0.0f;
-
-    /// BL-709 — how much `construction_capacity` demand the PRE-GAME SEEDER
-    /// provisions per standing building on a body, so that construction yards
-    /// exist at tick 0 (docs/economy/PRODUCTION.md § Construction as a rate:
-    /// "because generation can SEED CONSTRUCTION CAPACITY, the demand for its
-    /// inputs is non-zero from tick 0, in every market that has any").
-    ///
-    /// IT IS A GENERATION-TIME ESTIMATE, NOT A LIVE DRAW, and the distinction is
-    /// the whole reason it is a separate field from `capacity_per_build_tick`
-    /// above. Nothing in the tick reads it. The live consumer is the build
-    /// project, which is episodic by nature; the seeder cannot size against an
-    /// episodic figure that happens to read zero at generation time, so it sizes
-    /// against the STANDING BUILDING STOCK instead — the steady-state rate at
-    /// which a world of that many buildings replaces and extends itself. That is
-    /// MARKETS.md property 1's own "more buildings" scaling, read as a
-    /// provisioning target.
-    ///
-    /// Generation provisions the sector; the market decides everything
-    /// downstream of it — the same division BL-708 drew for power. ZERO means
-    /// the seeder provisions no capacity, which is the pre-BL-709 behaviour and
-    /// what a hand-built harness registry gets.
-    float seed_capacity_per_building = 0.0f;
+    // BL-709's two construction-capacity dials (`capacity_per_build_tick`, the
+    // draw a live site made on the construction sector, and
+    // `seed_capacity_per_building`, generation's yard provisioning target) are
+    // RETIRED with the system (Ben, 2026-10-27, BL-1438 retire construction
+    // capacity; PRODUCTION.md § Construction as a rate). A site progresses on
+    // its materials and its days alone. The loader refuses either key by name.
 };
 
 /// BL-430 player-facing recipe-switch tunables, authored in scripts/economy.lua under
@@ -1539,8 +1516,8 @@ private:
     {
         m_allowed.clear();
         for (std::size_t i = 0; i < m_recipes.size(); ++i)
-            if (era_permits(m_era, m_recipes[i].era))
-                m_allowed.push_back(i);
+            if (!m_recipes[i].retired && era_permits(m_era, m_recipes[i].era))
+                m_allowed.push_back(i); // a retired slot is never browsable (BL-1438)
         rebuild_depth();
     }
 

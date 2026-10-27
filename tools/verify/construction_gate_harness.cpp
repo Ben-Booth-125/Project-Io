@@ -161,14 +161,13 @@ int main()
               "C: a paused build spends nothing", 0.0, 0.0);
     }
 
-    // --- Case D (BL-1066): on a HARD site with capacity on, the capex the gate
-    // charges is exactly what the build draws to completion — flat cash, steel
-    // and construction capacity, each over the site's rounded build ticks.
+    // --- Case D (BL-1066): on a HARD site, the capex the gate charges is exactly
+    // what the build draws to completion — flat cash and steel, each over the
+    // site's days. RE-POINTED for BL-1438 (construction capacity retired, Ben
+    // 2026-10-27): it used to switch a capacity draw on and price it too; now the
+    // shelf is STOCKED with capacity and the site must draw none of it.
     {
         recipe_registry reg_d = reg;
-        construction_params cpd = cp;
-        cpd.capacity_per_build_tick = 0.5f;
-        reg_d.set_construction(cpd);
         scene s = make_scene(reg_d, /*steel_supply=*/1000.0f);
         const entity_id tile = s.w.buildings.at(s.bld).tile;
         s.w.tiles.at(tile).landform = terrain_landform::mountain; // x2.0
@@ -210,11 +209,11 @@ int main()
         const float want_steel = 24.0f * qtrs / 3.0f;
         check(std::fabs(steel - want_steel) < 1e-2f,
               "D: it drew the authored 24 steel times days / 270", steel, want_steel);
-        check(std::fabs(capacity - 0.5f * qtrs) < 1e-2f,
-              "D: it drew 0.5 capacity per quarter of days", capacity, 0.5f * qtrs);
-        const float drawn_value = cash + steel * 8.0f + capacity * 4.0f;
+        check(capacity == 0.0f && m.inventory[cap] == 1000.0f,
+              "D: it drew NO construction capacity off a shelf holding 1000 (BL-1438)", capacity, 0.0);
+        const float drawn_value = cash + steel * 8.0f;
         check(std::fabs(capex - drawn_value) < 1e-1f,
-              "D: construction_capex == cash + steel + capacity actually drawn", capex, drawn_value);
+              "D: construction_capex == cash + steel actually drawn", capex, drawn_value);
     }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
