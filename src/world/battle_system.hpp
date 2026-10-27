@@ -12,12 +12,12 @@
 //
 // THE THREE RULINGS IT IMPLEMENTS (Ben, 2026-08-19, elicitation form):
 //
-//   1. FOOTPRINT IS THE PROVINCE ENVELOPE. Hostile units standing in the same
-//      province are drawn into one battle; the province frames the fight. Units
-//      never abstract into a pool — they keep their tiles, and BL-315's
-//      tile-token ruling is untouched. The two grains answer different
-//      questions: the tile is WHERE a unit is, the province is WHO it is in a
-//      fight with.
+//   1. FOOTPRINT IS THE DEFENDED TILE (Ben, 2026-10-27, overturning the
+//      2026-08-19 province envelope, which let a line of units along a province
+//      boundary make attack impossible). A battle opens when a unit tries to
+//      march onto a tile a nation it is hostile to holds; it is fought over that
+//      tile, and each side's stacks on tiles adjacent to it, out of every other
+//      battle, join. Units never abstract into a pool — they keep their tiles.
 //   2. TERRAIN IS ONE PAIR for the whole battle, exactly as the resolver already
 //      takes it. Per-unit terrain was offered and declined.
 //   3. PACING IS SEVERAL ROUNDS PER TICK — `campaign_battle_params::
@@ -27,13 +27,13 @@
 // battle is discovered FROM are unordered (`world::units`, `world::corporations`),
 // so every stage recovers order explicitly:
 //
-//   - candidates are gathered, then SORTED by (province, attacker, defender)
-//     before any battle is opened, so creation order cannot depend on hash
-//     layout;
+//   - the attacks a march pass registers are SORTED by (tile, attacker,
+//     defender) before any battle is opened, so creation order cannot depend on
+//     visit order or hash layout;
 //   - `world::battles` is KEPT in that order, so stepping is order-independent;
 //   - participating unit ids are stored ASCENDING, because the per-unit loss
 //     remainder is assigned by ascending id;
-//   - the terrain pair is an argmax broken by ascending tile id;
+//   - the ground is the defended tile, so there is no pick to order;
 //   - and no stage consumes an RNG draw outside `step_campaign_battle`, which
 //     draws exactly twice per round in a fixed order.
 //
@@ -45,6 +45,7 @@
 #include "entity.hpp"
 
 #include <cstdint>
+#include <set>
 #include <vector>
 
 struct world;
@@ -88,7 +89,8 @@ enum class battle_phase : uint8_t
 /// any surface could read it.
 struct battle_dispatch
 {
-    uint32_t  province = 0;
+    entity_id tile     = null_entity; ///< The defended tile (the battle's identity).
+    uint32_t  province = 0;           ///< The province `tile` lies in, for the text.
     entity_id attacker = null_entity;
     entity_id defender = null_entity;
 
@@ -157,75 +159,79 @@ struct battle_tick
     std::vector<battle_dispatch> dispatches;
 };
 
-/// Discover new battles, then step every live one. Called from `run_economy_step`
-/// immediately BEFORE `run_unit_march`, so a unit that is in contact fights this
-/// tick before it can march out next tick — and before `run_unit_upkeep`, whose
-/// existing orphan cleanup is what disbands a unit this pass reduced to zero.
-/// There is deliberately no second disband mechanism.
+/// Step every live battle. Called from `run_economy_step` immediately BEFORE
+/// `run_unit_march`, so a unit that is in contact fights this tick before it can
+/// march on — and before `run_unit_upkeep`, whose existing orphan cleanup is what
+/// disbands a unit this pass reduced to zero. There is deliberately no second
+/// disband mechanism.
 ///
-/// ONE DISCOVERY TRIGGER: corp-vs-corp directed hostility
-/// (`w.corp_hostile_pairs`).
+/// THERE IS NO DISCOVERY HERE ANY MORE (Ben, 2026-10-27). The province
+/// co-presence trigger is gone: a battle opens only when a march tries to step
+/// onto a tile a nation the marcher is hostile to holds, which `run_unit_march`
+/// registers and opens through `open_tile_battles`. Standing next to an enemy, or
+/// in its province, starts nothing.
 ///
-/// THERE WERE TWO (BL-571). The second was corp-vs-nation over an active
-/// mercenary contract — no `declare_hostile` row was authored for it because
-/// the contract itself was the hostility. It went with the mercenary system
-/// (NR-731, 2026-08-30), and it had never fired: its lookup returned
-/// `null_entity` from every production state, because the contracts that would
-/// have populated it were never created. `open_battle` below still opens a
-/// corp-vs-nation fight symmetrically, so the CAPABILITY is intact and only the
-/// automatic trigger is gone. See MILITARY.md § Nation garrisons.
+/// When a battle concludes with the ATTACKER holding the field, its attacking
+/// stack (`active_battle::attacking_units`, still in the fight and standing)
+/// advances onto the defended tile — unless a unit of any other nation still
+/// stands there. Joined stacks stay where they stood.
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
 
-/// Open a battle between @p attacker's and @p defender's units standing in
-/// @p province — the existing-battle check, terrain pick and
-/// `begin_campaign_battle` call either discovery trigger performs, factored
-/// out to one place. ENTITY-ID-AGNOSTIC: @p attacker and @p defender are read
-/// only as unit owners, so this opens a corp-vs-corp, corp-vs-nation or
-/// (symmetrically) nation-vs-corp battle exactly alike.
+/// One attack a march pass registered: @p unit, of @p attacker, tried to step
+/// onto @p tile, which @p defender's units hold.
+struct tile_attack
+{
+    entity_id tile     = null_entity;
+    entity_id attacker = null_entity;
+    entity_id defender = null_entity;
+    entity_id unit     = null_entity;
+};
+
+/// Open a battle over @p tile, which @p defender's units hold, attacked by
+/// @p attacking_units of @p attacker (the stack whose march made the attack).
 ///
-/// EXPOSED so a harness can drive a corp-vs-nation battle directly — the same
-/// "expose it so it can be asserted" precedent `battle_ground` already sets.
-/// Since the mercenary trigger was removed (NR-731) this is the ONLY route to a
-/// corp-vs-nation battle, which makes the exposure load-bearing rather than a
-/// convenience.
+/// SIDES (MILITARY.md § Battles, "adjacent stacks join"): the attacking stack,
+/// plus @p attacker's units on tiles hex-adjacent to @p tile that are in no live
+/// battle; the defending stack on @p tile (whatever else it is fighting), plus
+/// @p defender's units on adjacent tiles in no live battle. EACH SIDE DRAWS ON
+/// ITS OWN NATION ONLY — an ally's stack beside the tile does not join. The
+/// ground is @p tile.
 ///
 /// Returns false and leaves `w.battles` untouched if the pair is already
-/// fighting in @p province, if either side has no standing unit there, or if
-/// no attacking unit has readiness left to start a fight (BL-1421: a spent
+/// fighting over @p tile (in either role order), if no defending unit stands on
+/// it, or if no attacking unit has readiness left to start a fight (a spent
 /// attacker starts nothing; spent defenders are still caught and overrun).
-bool open_battle(world& w, int tick, uint32_t province, entity_id attacker, entity_id defender);
+/// ENTITY-ID-AGNOSTIC: the two sides are read only as unit owners. Exposed so a
+/// harness can open a battle without a march.
+bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, entity_id defender,
+                      const std::vector<entity_id>& attacking_units);
 
-/// Request that @p corp break off a battle it is fighting in @p province.
+/// Open every battle @p attacks registered, in (tile, attacker, defender) order,
+/// each identity's units merged into one attacking stack. So two attacks onto
+/// one tile in one tick open it once, and which battle claims an adjacent stack
+/// first is a property of the ids, never of the march's visit order.
+/// @return battles opened.
+int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks);
+
+/// Request that @p corp break off the battle it is fighting over @p tile.
 ///
-/// @p against NAMES THE FIGHT, and it is not optional decoration: a corp can be
-/// in more than one battle in one province, because a third corp arriving opens
-/// its OWN battles against each existing participant rather than joining theirs.
-/// With only (corp, province) the call would leave whichever counterparty sorted
-/// lowest — deterministic, but not a decision the player made. Pass `null_entity`
-/// to mean "the first, in sorted order", which is the honest reading of an
-/// unspecified request rather than a hidden choice.
+/// @p against NAMES THE FIGHT: a nation can be in more than one battle over one
+/// tile, because a third nation attacking the same tile opens its OWN battle.
+/// Pass `null_entity` to mean "the first, in sorted order", which is the honest
+/// reading of an unspecified request rather than a hidden choice.
 ///
 /// Honoured at the TICK BOUNDARY, before the next round batch — which is what
 /// makes the withdrawal window a real window rather than a same-instant escape.
 /// Returns false and MUTATES NOTHING if there is no such battle, or if @p corp is
 /// not a participant in it: this is reachable from the AI-facing seam, where a
 /// rejection must leave the world byte-identical.
-bool request_withdraw(world& w, entity_id corp, uint32_t province,
+bool request_withdraw(world& w, entity_id corp, entity_id tile,
                       entity_id against = null_entity);
 
-/// The ground a battle would anchor on, given a defending side's units: the
-/// DEFENDER-side tile with the highest `terrain_defence` in the envelope, ties
-/// broken by ascending tile id (ruling 2, settled 2026-08-19).
-///
-/// EXPOSED SO IT CAN BE ASSERTED. The rule is load-bearing — it decides how much
-/// the defender's ground is worth in every fight — but a battle is erased the
-/// moment it concludes, and with a 1v1 at the shipped pacing that is often the
-/// same tick it opened. A rule only testable when a fight happens to run long is
-/// a rule that stops being tested quietly, so the choice is a named function
-/// rather than a private step inside discovery.
-///
-/// Returns false and touches nothing if no unit resolves to a real tile.
-bool battle_ground(const world& w, const std::vector<entity_id>& defender_units,
+/// The ground a battle over @p tile is fought on: the defended tile's own
+/// terrain (ruling 2, since 2026-10-27). Exposed so it can be asserted. Returns
+/// false and touches nothing if @p tile is not a real tile.
+bool battle_ground(const world& w, entity_id tile,
                    terrain_substrate& sub, terrain_cover& cov, std::uint8_t& density,
                    terrain_landform& lf);
 
@@ -235,16 +241,38 @@ bool battle_ground(const world& w, const std::vector<entity_id>& defender_units,
 /// a price, not a march with none.
 bool unit_in_battle(const world& w, entity_id unit);
 
-/// The battle @p corp is fighting in @p province, or nullptr. Read-side helper
-/// for the seam and the card (BL-469).
-const active_battle* find_battle(const world& w, entity_id corp, uint32_t province);
+/// The battle @p corp is fighting over @p tile, or nullptr.
+const active_battle* find_battle(const world& w, entity_id corp, entity_id tile);
 
-/// The battle a click on @p province should select, or nullptr.
+/// The battle a click on @p tile should select, or nullptr: the player's own
+/// fight first, then the sorted order.
+const active_battle* first_battle_at(const world& w, entity_id tile);
+
+/// The battle a click on @p province should select, or nullptr — every battle
+/// over a tile in @p province is a candidate (the canvas's province rung).
 ///
 /// THE PLAYER'S OWN FIGHT FIRST, then the sorted order. More than one battle can
-/// stand in one province — a third corp arriving opens its OWN battles against
-/// each participant rather than joining theirs — so "the first one" is a choice,
+/// stand in one province, so "the first one" is a choice,
 /// and this is the honest one: the fight you are in is the one you need the card
 /// for. Falling back to sorted order keeps the pick deterministic when none of
 /// them is yours. Flagged for Ben; see the review log.
 const active_battle* first_battle_in(const world& w, uint32_t province);
+
+// ---------------------------------------------------------------------------
+// One nation per tile (Ben, 2026-10-27; MILITARY.md § Marching)
+// ---------------------------------------------------------------------------
+
+/// Every live battle's units, both sides — one walk, for a pass that asks
+/// `unit_in_battle` of many units.
+std::set<entity_id> units_in_live_battles(const world& w);
+
+/// Every tile a unit (count > 0) of a nation OTHER than @p owner stands on.
+std::set<entity_id> foreign_held_tiles(const world& w, entity_id owner);
+
+/// The march path @p from -> @p dest on @p body for a unit of @p owner, in TRAVEL
+/// order (path[0] == @p from), solved around every tile in @p blocked save @p dest
+/// itself. The cached `intra_body_path` when its route crosses no blocked tile —
+/// so a world with no contact marches exactly as before — else a search around
+/// them (`intra_body_path_avoiding`). Empty if unreachable.
+std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, entity_id dest,
+                                  const std::set<entity_id>& blocked);

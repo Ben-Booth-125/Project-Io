@@ -7,23 +7,28 @@
 // (run_unit_march, src/world/economy_system.cpp) that BL-470 adds — a unit
 // no longer stays pinned to its muster tile forever (BL-393's open half).
 //
-//   M1  march_unit sets a reachable path on a valid unit/dest PROVINCE
-//       (BL-511, 2026-08-21), and rejects not-owner / invalid unit /
-//       nonexistent province / off-body province / already-in-that-province
-//       WITHOUT mutating the unit (a full snapshot compare, not just the
-//       return code — the untrusted-seam rule).
-//   M7  BL-511's UNTRUSTED INPUT BOUNDARY, exhaustively: every id in the
-//       uint32 domain that is not a built province — `no_province`, and a
-//       sweep of near-miss and single-bit-flip neighbours of a real id — is
+// RE-POINTED 2026-10-27 (BL-1443, tile contact): EVERY MARCH GOES TO A TILE and
+// ends on it (Ben: "all marches go to a tile"). The province grain BL-511 gave
+// the verb is retired, so each row that named a destination province names a
+// destination tile, and each row that asserted province-grain arrival asserts
+// arrival ON the tile. The rows themselves are unchanged in what they protect.
+//
+//   M1  march_unit sets a reachable path on a valid unit/dest TILE, and rejects
+//       not-owner / invalid unit / nonexistent tile / no tile (a province-only
+//       command) / off-body tile / already-on-that-tile WITHOUT mutating the
+//       unit (a full snapshot compare, not just the return code — the
+//       untrusted-seam rule).
+//   M7  THE UNTRUSTED INPUT BOUNDARY, exhaustively: every id in the entity
+//       domain that is not a tile — null, the top of the domain, and a sweep of
+//       near-miss and single-bit-flip neighbours of a real tile id — is
 //       rejected WHOLE, and the unit is byte-identical afterwards. Plus the
 //       APPEND-ONLY enum property: march_unit / halt_unit / disband_unit
 //       still hold the exact values BL-470 gave them, and corp_verb_count
 //       still equals disband_unit + 1.
 //   M2  run_unit_march spends per-CLASS march points against the shared
 //       traversal-cost weight, banks fractional carry-over across ticks, and
-//       clears the order (with an arrival count) once the unit ENTERS the
-//       destination province (BL-511) — not when it reaches the member tile
-//       the path happened to be solved to.
+//       clears the order (with an arrival count) once the unit stands ON its
+//       destination tile.
 //       A class authored at zero march points never moves.
 //   M3  halt_unit clears an order and rejects a halted/unordered unit;
 //       disband_unit erases the unit and rejects a non-owned or unknown one.
@@ -164,7 +169,7 @@ recipe_registry registry_with_march(float pts)
 
 bool order_equal(const movement_order& a, const movement_order& b)
 {
-    return a.dest == b.dest && a.dest_province == b.dest_province
+    return a.dest == b.dest
         && a.path == b.path && a.next_index == b.next_index
         && approx(a.progress, b.progress, 1e-6f);
 }
@@ -245,17 +250,9 @@ uint32_t absent_province_id(const world& w, uint32_t from)
 
 void m1_march_unit_legality()
 {
-    std::printf("\n-- M1  march_unit: sets a reachable path to a PROVINCE; a rejection mutates nothing --\n");
+    std::printf("\n-- M1  march_unit: sets a reachable path to a TILE; a rejection mutates nothing --\n");
 
     world w;
-    // A 12x6 GRID, not a row. The 2026-08-21 repartition put the province floor
-    // at k_province_min_tiles (7) with a merge pass that folds anything smaller
-    // into a neighbour. On a one-row body every 3x3 block is a 3-tile fragment,
-    // so the merge cascades and the entire row becomes ONE province however long
-    // it is — which made this test's premise (march from one province to
-    // another) unsatisfiable on the old fixture. The assertions below are
-    // unchanged; only the ground they stand on got tall enough to hold two
-    // provinces.
     const entity_id body = make_grid_body(w, 12, 6);
     const entity_id a    = add_corp(w, "A");
     const entity_id b    = add_corp(w, "B");
@@ -265,60 +262,45 @@ void m1_march_unit_legality()
     const entity_id unit = add_unit(w, a, t0);
     recipe_registry reg  = registry_with_march(1.0f);
 
-    const uint32_t p_start = prov_of(w, t0);
-    const uint32_t p_dest  = prov_of(w, t5);
-    // Membership, NOT `!= 0`: id 0 is a real province and is in fact the one
-    // col 0 lands in here, so a zero-test would report a correct partition as
-    // a broken one.
-    check(w.provinces.find(p_start) != nullptr && w.provinces.find(p_dest) != nullptr,
-          "the fixture partitions into real provinces");
-    check(p_start != p_dest, "start and destination are DIFFERENT provinces (fixture precondition)");
-
     // -- applied: a fresh, reachable, on-body, non-degenerate order --
     corp_command cmd;
-    cmd.corp = a; cmd.verb = corp_verb::march_unit; cmd.subject = unit; cmd.province = p_dest;
+    cmd.corp = a; cmd.verb = corp_verb::march_unit; cmd.subject = unit; cmd.tile = t5;
     const corp_command_result r = apply_corp_command(w, reg, cmd);
-    check(r == corp_command_result::applied, "march_unit applies for the owning corp to a reachable dest province");
+    check(r == corp_command_result::applied, "march_unit applies for the owning nation to a reachable dest tile");
     const unit_component& u = w.units.at(unit);
-    check(u.order.dest_province == p_dest, "order.dest_province is the commanded PROVINCE");
-    check(prov_of(w, u.order.dest) == p_dest, "order.dest is a member tile OF that province");
-    check(u.order.dest == w.provinces.find(p_dest)->tiles.front(),
-          "the solved member tile is the province's LOWEST-id one (the stable choice)");
-    check(!u.order.path.empty() && u.order.path.front() == t0 && u.order.path.back() == u.order.dest,
-          "path runs from the unit's own tile to the solved member tile");
+    check(u.order.dest == t5, "order.dest is the commanded TILE");
+    check(!u.order.path.empty() && u.order.path.front() == t0 && u.order.path.back() == t5,
+          "path runs from the unit's own tile to the commanded tile");
     check(u.order.next_index == 1, "next_index starts at 1 (path[0] is already occupied)");
     check(approx(u.order.progress, 0.0f), "progress starts at 0");
 
-    // BL-511: `tile` is no longer read by this verb. Setting it to nonsense
-    // must change nothing — the strongest single statement that the payload
-    // actually moved rather than being read from two places.
+    // `province` is no longer read by this verb (2026-10-27). Setting it to
+    // nonsense must change nothing — the strongest single statement that the
+    // payload actually moved rather than being read from two places.
     {
         world w2;
-        // Mirrors M1's own fixture exactly (12x6, (0,0) -> (10,4)) so the only
-        // difference between the two commands is the garbage `tile`.
         const entity_id b2 = make_grid_body(w2, 12, 6);
         const entity_id c2 = add_corp(w2, "A");
         const entity_id s2 = grid_tile_at(w2, b2, 0, 0), d2 = grid_tile_at(w2, b2, 10, 4);
         partition(w2);
         const entity_id u2 = add_unit(w2, c2, s2);
         corp_command c; c.corp = c2; c.verb = corp_verb::march_unit; c.subject = u2;
-        c.province = prov_of(w2, d2);
-        c.tile     = static_cast<entity_id>(987654); // garbage; unread by this verb now
+        c.tile     = d2;
+        c.province = 987654u; // garbage; unread by this verb now
         check(apply_corp_command(w2, reg, c) == corp_command_result::applied,
-              "march_unit ignores `tile` entirely — a garbage tile does not affect it");
+              "march_unit ignores `province` entirely — a garbage province does not affect it");
         const movement_order& o2 = w2.units.at(u2).order;
-        check(o2.dest_province == prov_of(w2, d2) && o2.dest == w2.provinces.find(o2.dest_province)->tiles.front()
-                  && o2.path.front() == s2 && o2.path.back() == o2.dest,
-              "  ...and produces exactly the order the province alone specifies");
+        check(o2.dest == d2 && o2.path.front() == s2 && o2.path.back() == d2,
+              "  ...and produces exactly the order the tile alone specifies");
     }
 
     const movement_order snapshot = u.order;
 
-    // -- rejected_not_owner: caller names a corp that does not own the unit --
+    // -- rejected_not_owner: caller names a nation that does not own the unit --
     {
-        corp_command bad = cmd; bad.corp = b; bad.province = prov_of(w, tile_at(w, body, 2));
+        corp_command bad = cmd; bad.corp = b; bad.tile = grid_tile_at(w, body, 2, 0);
         const auto rr = apply_corp_command(w, reg, bad);
-        check(rr == corp_command_result::rejected_not_owner, "march_unit rejects a non-owning corp");
+        check(rr == corp_command_result::rejected_not_owner, "march_unit rejects a non-owning nation");
         check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
     }
     // -- rejected_invalid: unknown unit --
@@ -328,47 +310,28 @@ void m1_march_unit_legality()
         check(rr == corp_command_result::rejected_invalid, "march_unit rejects an unknown unit");
         check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
     }
-    // -- rejected_invalid: a province id that is not in the partition --
+    // -- rejected_invalid: a tile id that is not a tile --
     {
-        corp_command bad = cmd; bad.province = absent_province_id(w, 0xFF000000u);
+        corp_command bad = cmd; bad.tile = static_cast<entity_id>(0x7FFFFF00u);
         const auto rr = apply_corp_command(w, reg, bad);
-        check(rr == corp_command_result::rejected_invalid, "march_unit rejects a nonexistent province id");
+        check(rr == corp_command_result::rejected_invalid, "march_unit rejects a nonexistent tile id");
         check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
     }
-    // -- rejected_invalid: the unset default --
-    // THIS ROW WAS NARROWED BY BL-515 (2026-08-21), not deleted. It used to
-    // assert that province id 0 IS a real id — true under the block layout
-    // (body rank 0 | block 0 | component 0), and the original reason
-    // `corp_command::province` defaults to `no_province` rather than 0.
-    // BL-515 derives an id from its LOWEST MEMBER TILE, and no tile carries
-    // `null_entity` (0), so 0 became STRUCTURALLY unreachable as a province id.
-    // The old assertion is therefore not merely failing, it is contrary to the
-    // new contract — so it is replaced by the assertion that now carries the
-    // claim, and the BEHAVIOUR it protected (an omitted field is not a
-    // destination) is unchanged and still checked below.
+    // -- rejected_invalid: the unset default, and a province-only command --
     {
-        check(w.provinces.find(0u) == nullptr,
-              "province id 0 is unreachable (BL-515: ids derive from a tile id, never null_entity)");
-        corp_command bad = cmd; bad.province = no_province;
+        corp_command bad = cmd; bad.tile = null_entity;
         const auto rr = apply_corp_command(w, reg, bad);
         check(rr == corp_command_result::rejected_invalid,
-              "march_unit rejects the unset default (no_province) — an omitted field is not a destination");
+              "march_unit rejects the unset default (null tile) — an omitted field is not a destination");
         check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
 
-        corp_command unset; unset.corp = a; unset.verb = corp_verb::march_unit; unset.subject = unit;
-        check(apply_corp_command(w, reg, unset) == corp_command_result::rejected_invalid,
-              "a march_unit command with NO province field set at all is rejected");
+        corp_command prov_only; prov_only.corp = a; prov_only.verb = corp_verb::march_unit;
+        prov_only.subject = unit; prov_only.province = prov_of(w, t5);
+        check(apply_corp_command(w, reg, prov_only) == corp_command_result::rejected_invalid,
+              "a march_unit naming only a PROVINCE (the retired grain) names no tile and is rejected");
         check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
     }
-    // -- WATER NEEDS ITS OWN TEST AGAIN, and this row is NARROWED BY BL-516
-    //    (2026-08-21) rather than deleted. It used to assert that an ocean tile
-    //    belongs to no province at all — true while the partition was land-only,
-    //    and the reason march_unit could carry no water check. BL-516 draws
-    //    provinces over the water, so that claim is now contrary to the
-    //    contract; what protects the verb is an EXPLICIT rejection, which is
-    //    what is asserted here instead. The BEHAVIOUR the old row guarded — a
-    //    unit cannot be marched into the sea — is unchanged and is now checked
-    //    directly rather than inferred from an absence.
+    // -- WATER: a tile in a water province is refused for a land row --
     {
         world w3; // a separate world — re-partitioning `w` mid-test would move its ids
         const entity_id ob = w3.create_entity();
@@ -378,36 +341,28 @@ void m1_march_unit_legality()
         w3.tiles[ot3] = otc3;
         partition(w3);
         const uint32_t sea_pid = prov_of(w3, ot3);
-        check(sea_pid != 0, "an ocean tile now HAS a province (BL-516 draws provinces over water)");
+        check(sea_pid != 0, "an ocean tile HAS a province (BL-516 draws provinces over water)");
         check(province_kind_of(w3, sea_pid) != province_kind::land,
               "  ...and that province is not a land province");
 
-        // The rejection itself, on the real world: marching into a water
-        // province is refused, and mutates nothing.
-        uint32_t water_pid = 0;
+        entity_id water_tile = null_entity;
         for (const province& p : w.provinces.provinces)
-            if (province_kind_of(w, p) != province_kind::land)
+            if (province_kind_of(w, p) != province_kind::land && !p.tiles.empty())
             {
-                water_pid = p.id;
+                water_tile = p.tiles.front();
                 break;
             }
-        if (water_pid != 0)
+        if (water_tile != null_entity)
         {
-            corp_command wet = cmd; wet.province = water_pid;
+            corp_command wet = cmd; wet.tile = water_tile;
             check(apply_corp_command(w, reg, wet) == corp_command_result::rejected_invalid,
-                  "march_unit rejects a WATER province outright (units are land-bound)");
+                  "march_unit rejects a tile of a WATER province outright (units are land-bound)");
             check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
         }
     }
-    // -- rejected_invalid: province on a different body --
+    // -- rejected_invalid: a tile on a different body --
     {
         world w4;
-        // A ROW body is still the right shape HERE, and deliberately so: this
-        // row needs only ONE province per body, and since the 2026-08-21
-        // repartition a short row reliably yields exactly one (every 3x3 block
-        // over a one-row body is a 3-tile fragment, and the merge pass folds
-        // them together). What it must NOT be used for is any row asserting a
-        // march BETWEEN provinces — see make_grid_body's comment.
         const entity_id home  = make_row_body(w4, 6);
         const entity_id other = make_row_body(w4, 6);
         const entity_id c4    = add_corp(w4, "A");
@@ -416,19 +371,18 @@ void m1_march_unit_legality()
         partition(w4);
         const entity_id u4 = add_unit(w4, c4, h0);
         corp_command bad; bad.corp = c4; bad.verb = corp_verb::march_unit; bad.subject = u4;
-        bad.province = prov_of(w4, o5);
-        check(w4.provinces.find(bad.province) != nullptr, "  (the off-body province exists — fixture precondition)");
+        bad.tile = o5;
         const auto rr = apply_corp_command(w4, reg, bad);
         check(rr == corp_command_result::rejected_invalid,
-              "march_unit rejects a province off the unit's own body");
+              "march_unit rejects a tile off the unit's own body");
         check(w4.units.at(u4).order.dest == null_entity, "  ...and mutates nothing");
     }
-    // -- rejected_state: the unit is already IN the commanded province --
+    // -- rejected_state: the unit already stands on the commanded tile --
     {
-        corp_command bad = cmd; bad.province = prov_of(w, u.position);
+        corp_command bad = cmd; bad.tile = u.position;
         const auto rr = apply_corp_command(w, reg, bad);
         check(rr == corp_command_result::rejected_state,
-              "march_unit rejects the province the unit already occupies");
+              "march_unit rejects the tile the unit already stands on");
         check(order_equal(w.units.at(unit).order, snapshot), "  ...and mutates nothing");
     }
 }
@@ -456,15 +410,10 @@ void m2_resolution_and_carry_over()
     const entity_id unit = add_unit(w, a, t0);
     recipe_registry reg   = registry_with_march(1.5f); // 1.5 pts/tick, plains costs 1.0/hop
 
-    // BL-511: name the destination by a tile IN the target province. Col 8 is
-    // chosen (not col 4) so the destination province cannot possibly contain
-    // the tick-1 / tick-2 positions a 2x2 block might otherwise sweep in —
+    // The destination is col 8: far enough that ticks 1 and 2 are mid-march, so
     // the points arithmetic below is about carry-over, not about arrival.
     const entity_id t8 = tile_at(w, body, 8);
-    const uint32_t p8 = prov_of(w, t8);
-    check(w.provinces.find(p8) != nullptr && p8 != prov_of(w, t1) && p8 != prov_of(w, t3),
-          "the destination province holds neither tick-1 nor tick-2's tile (fixture precondition)");
-    corp_command cmd; cmd.corp = a; cmd.verb = corp_verb::march_unit; cmd.subject = unit; cmd.province = p8;
+    corp_command cmd; cmd.corp = a; cmd.verb = corp_verb::march_unit; cmd.subject = unit; cmd.tile = t8;
     check(apply_corp_command(w, reg, cmd) == corp_command_result::applied, "order placed (fixture setup)");
 
     const unit_march_tick r1 = run_unit_march(w, reg);
@@ -477,25 +426,18 @@ void m2_resolution_and_carry_over()
     check(approx(w.units.at(unit).order.progress, 0.0f), "tick 2: carry-over exactly exhausted");
     check(r2.arrived == 0, "tick 2: not yet arrived");
 
-    // Run to arrival. BL-511: the unit stops the moment it ENTERS p8 — it
-    // does not continue to the member tile the path was solved to, which is
-    // the whole behavioural difference this ruling makes.
+    // Run to arrival: every march goes to a tile and ends ON it (2026-10-27).
     int arrivals = 0, ticks_run = 0;
-    const entity_id solved_dest = w.units.at(unit).order.dest;
     while (w.units.at(unit).order.dest != null_entity && ticks_run < 30)
     {
         arrivals += run_unit_march(w, reg).arrived;
         ++ticks_run;
     }
     const entity_id final_pos = w.units.at(unit).position;
-    check(prov_of(w, final_pos) == p8,
-          "the unit ends IN the destination province — arrival is province-grain (BL-511)");
+    check(final_pos == t8, "the unit ends ON its destination tile — arrival is tile-grain");
     check(w.units.at(unit).order.dest == null_entity, "the order clears itself on arrival");
-    check(w.units.at(unit).order.dest_province == 0, "dest_province clears with the order");
     check(arrivals == 1, "arrival is counted exactly once");
-    check(final_pos == w.provinces.find(p8)->tiles.front() || final_pos != solved_dest
-              || solved_dest == w.provinces.find(p8)->tiles.front(),
-          "the unit stopped on entering the province, not on reaching a particular member tile");
+    (void)t4;
 
     // A class authored at zero march points never moves.
     {
@@ -507,9 +449,8 @@ void m2_resolution_and_carry_over()
         // ...force the CLASS the resolver reads to naval (0 pts) directly on
         // the order, bypassing march_unit (which only needs a valid roster
         // row): what is under test is the per-class GATE, not the seam.
-        // A RAW order with dest_province == 0 — deliberately the legacy tile
-        // path (BL-511's back-compat case), because what is under test here
-        // is the per-class points gate, not the grain.
+        // A RAW tile order, built by hand: what is under test here is the
+        // per-class points gate, not the seam.
         movement_order mo; mo.dest = s2; mo.path = {s0, tile_at(w2, body2, 1), s2}; mo.next_index = 1;
         w2.units.at(cav).order = mo;
         recipe_registry reg0; // every class defaults to 0.0 march points
@@ -536,13 +477,12 @@ void m3_halt_and_disband()
     const entity_id a = add_corp(w, "A"), b = add_corp(w, "B");
     const entity_id t0 = grid_tile_at(w, body, 1, 1), t3 = grid_tile_at(w, body, 5, 5);
     partition(w);
-    check(w.provinces.province_of(t0) != w.provinces.province_of(t3),
-          "start and march target are in different provinces (fixture precondition)");
+    check(t0 != t3, "start and march target are different tiles (fixture precondition)");
     const entity_id unit = add_unit(w, a, t0);
     recipe_registry reg = registry_with_march(1.0f);
 
     corp_command march; march.corp = a; march.verb = corp_verb::march_unit; march.subject = unit;
-    march.province = prov_of(w, t3);
+    march.tile = t3;
     check(apply_corp_command(w, reg, march) == corp_command_result::applied, "order placed (fixture setup)");
 
     corp_command halt; halt.corp = a; halt.verb = corp_verb::halt_unit; halt.subject = unit;
@@ -602,7 +542,9 @@ void m4_war_flips_the_queue()
     // than assuming it.
     const entity_id body = make_grid_body(w, 9, 9);
     const entity_id tA = grid_tile_at(w, body, 1, 1), tC = grid_tile_at(w, body, 5, 1);
-    const entity_id destA = grid_tile_at(w, body, 5, 5), destC = destA;
+    // Two DIFFERENT tiles: two nations never share one (2026-10-27), so a shared
+    // destination tile would leave whichever arrived second blocked short of it.
+    const entity_id destA = grid_tile_at(w, body, 5, 5), destC = grid_tile_at(w, body, 6, 5);
     partition(w);
     // b (mobilised) gets a HIGHER entity id than c (peaceful)'s unit below,
     // so ascending-unit-id order alone would visit c's unit first; the
@@ -611,17 +553,14 @@ void m4_war_flips_the_queue()
     const entity_id unit_c = add_unit(w, c, tC);
     recipe_registry reg = registry_with_march(1.0f);
 
-    const uint32_t pA = prov_of(w, destA), pC = prov_of(w, destC);
-    check(w.provinces.find(pA) != nullptr && pA != prov_of(w, tA) && pC != prov_of(w, tC),
-          "both units start OUTSIDE their destination province (fixture precondition)");
-    corp_command mb; mb.corp = b; mb.verb = corp_verb::march_unit; mb.subject = unit_b; mb.province = pA;
-    corp_command mc; mc.corp = c; mc.verb = corp_verb::march_unit; mc.subject = unit_c; mc.province = pC;
+    corp_command mb; mb.corp = b; mb.verb = corp_verb::march_unit; mb.subject = unit_b; mb.tile = destA;
+    corp_command mc; mc.corp = c; mc.verb = corp_verb::march_unit; mc.subject = unit_c; mc.tile = destC;
     check(apply_corp_command(w, reg, mb) == corp_command_result::applied, "b's order placed (fixture setup)");
     check(apply_corp_command(w, reg, mc) == corp_command_result::applied, "c's order placed (fixture setup)");
 
     for (int i = 0; i < 20; ++i) run_unit_march(w, reg);
-    check(prov_of(w, w.units.at(unit_b).position) == pA, "b's (mobilised) unit still reaches its destination province");
-    check(prov_of(w, w.units.at(unit_c).position) == pC, "c's (peaceful) unit still reaches its destination province");
+    check(w.units.at(unit_b).position == destA, "b's (mobilised) unit still reaches its destination tile");
+    check(w.units.at(unit_c).position == destC, "c's (peaceful) unit still reaches its destination tile");
 }
 
 // ---------------------------------------------------------------------------
@@ -666,12 +605,8 @@ void m5_determinism_replay()
 
     recipe_registry reg = registry_with_march(1.3f);
 
-    const uint32_t pdest = prov_of(t1.w, t1.u_to);
-    check(t1.w.provinces.find(pdest) != nullptr && pdest == prov_of(t2.w, t2.u_to),
-          "twin worlds derive the SAME destination province id — the partition is a pure fold");
-    check(pdest != prov_of(t1.w, t1.u_from), "start and destination provinces differ (fixture precondition)");
-    corp_command m1; m1.corp = t1.corp; m1.verb = corp_verb::march_unit; m1.subject = t1.unit; m1.province = pdest;
-    corp_command m2; m2.corp = t2.corp; m2.verb = corp_verb::march_unit; m2.subject = t2.unit; m2.province = pdest;
+    corp_command m1; m1.corp = t1.corp; m1.verb = corp_verb::march_unit; m1.subject = t1.unit; m1.tile = t1.u_to;
+    corp_command m2; m2.corp = t2.corp; m2.verb = corp_verb::march_unit; m2.subject = t2.unit; m2.tile = t2.u_to;
     // The result is ASSERTED, not discarded. If the order is refused — which
     // is exactly what the 2026-08-21 repartition did to this fixture's old
     // one-row body — the loop below still runs eight ticks with nothing
@@ -706,9 +641,8 @@ void m5_determinism_replay()
     std::printf("    unit held a live order for %d of 8 ticks\n", ticks_in_flight);
     check(ticks_in_flight >= 3,
           "the unit was genuinely mid-march across multiple hash checkpoints, not arrived on tick 1");
-    check(prov_of(t1.w, t1.w.units.at(t1.unit).position) == pdest
-              && prov_of(t2.w, t2.w.units.at(t2.unit).position) == pdest,
-          "both units actually reached the destination province by the end of the replay");
+    check(t1.w.units.at(t1.unit).position == t1.u_to && t2.w.units.at(t2.unit).position == t2.u_to,
+          "both units actually reached the destination tile by the end of the replay");
 }
 
 // ---------------------------------------------------------------------------
@@ -735,7 +669,7 @@ unit_march_tick run_corrupted_recompute(world& w, entity_id& out_unit, entity_id
     const entity_id unit = add_unit(w, corp, start);
 
     corp_command cmd; cmd.corp = corp; cmd.verb = corp_verb::march_unit; cmd.subject = unit;
-    cmd.province = w.provinces.province_of(dest);
+    cmd.tile = dest;
     check(apply_corp_command(w, reg, cmd) == corp_command_result::applied,
           "the order to corrupt was actually placed (fixture setup)");
     check(w.units.at(unit).order.path.size() > w.units.at(unit).order.next_index,
@@ -775,11 +709,9 @@ void m6_recompute_determinism()
     // Run both to completion and confirm the recovered path still reaches
     // the (unchanged) destination — the block did not strand the unit.
     for (int i = 0; i < 10; ++i) { run_unit_march(w1, reg); run_unit_march(w2, reg); }
-    const uint32_t pd1 = w1.provinces.province_of(d1), pd2 = w2.provinces.province_of(d2);
-    check(w1.provinces.find(pd1) != nullptr && pd1 == pd2, "both runs name the same destination province");
-    check(w1.provinces.province_of(w1.units.at(u1).position) == pd1
-              && w2.provinces.province_of(w2.units.at(u2).position) == pd2,
-          "recovery from the block still reaches the original destination PROVINCE on both runs");
+    check(d1 == d2, "both runs name the same destination tile");
+    check(w1.units.at(u1).position == d1 && w2.units.at(u2).position == d2,
+          "recovery from the block still reaches the original destination TILE on both runs");
 }
 
 
@@ -787,15 +719,15 @@ void m6_recompute_determinism()
 // M7 — BL-511: the untrusted input boundary, and the append-only enum
 // ---------------------------------------------------------------------------
 //
-// A province id can arrive over `--serve` from outside the process. The
+// A destination tile id can arrive over `--serve` from outside the process. The
 // standing rule (io-standing-rules.md) is that it must be validated as the
 // value that LANDS in the destination, that a violation rejects the WHOLE
 // command, and that a rejection mutates NOTHING. There are TWO gates and they
 // are not interchangeable:
 //
-//   * the WIRE gate (agent_protocol.cpp) proves the value FITS uint32 without
-//     a narrowing cast truncating or wrapping it into a different province;
-//   * the SEAM gate (province_partition::find) proves the value EXISTS.
+//   * the WIRE gate (agent_protocol.cpp) proves the value FITS an entity_id
+//     without a narrowing cast truncating or wrapping it into a different tile;
+//   * the SEAM gate (the world's tile store) proves the value IS A TILE.
 //
 // This test owns the second. It sweeps the whole in-range-but-absent space it
 // can reach — 0, UINT32_MAX, and every near-miss neighbour of a real id — and
@@ -804,7 +736,7 @@ void m6_recompute_determinism()
 
 void m7_untrusted_boundary_and_enum()
 {
-    std::printf("\n-- M7  BL-511: an out-of-domain province rejects whole and mutates nothing --\n");
+    std::printf("\n-- M7  an out-of-domain destination tile rejects whole and mutates nothing --\n");
 
     // --- the append-only enum property -----------------------------------
     // BL-511 retargeted march_unit's PAYLOAD. The verb is serialised, so its
@@ -844,15 +776,15 @@ void m7_untrusted_boundary_and_enum()
     const entity_id unit = add_unit(w, a, t0);
     recipe_registry reg  = registry_with_march(1.0f);
 
-    const uint32_t good = prov_of(w, t9);
-    check(w.provinces.find(good) != nullptr, "the fixture has a real destination province (precondition)");
+    const entity_id good = t9;
+    check(w.tiles.count(good) != 0, "the fixture has a real destination tile (precondition)");
 
     // Put a LIVE order on the unit first: a rejection that mutates nothing is
     // only meaningfully tested against state that COULD be clobbered. An
     // untouched default order would pass a "mutates nothing" check even if the
     // seam wrote a fresh default over it.
     corp_command ok_cmd;
-    ok_cmd.corp = a; ok_cmd.verb = corp_verb::march_unit; ok_cmd.subject = unit; ok_cmd.province = good;
+    ok_cmd.corp = a; ok_cmd.verb = corp_verb::march_unit; ok_cmd.subject = unit; ok_cmd.tile = good;
     check(apply_corp_command(w, reg, ok_cmd) == corp_command_result::applied, "a live order is in place (fixture setup)");
 
     const movement_order before_order = w.units.at(unit).order;
@@ -864,10 +796,10 @@ void m7_untrusted_boundary_and_enum()
     // confused agent actually produces. Only ids genuinely absent from the
     // partition are asserted on; a near-miss that happens to BE a province is
     // skipped rather than turned into a false pass.
-    std::vector<uint32_t> candidates;
-    candidates.push_back(no_province);
-    candidates.push_back(std::numeric_limits<uint32_t>::max() - 1u);
-    candidates.push_back(0u); // skipped by the guard below when 0 is real, which it is here
+    std::vector<entity_id> candidates;
+    candidates.push_back(null_entity);
+    candidates.push_back(std::numeric_limits<entity_id>::max());
+    candidates.push_back(std::numeric_limits<entity_id>::max() - 1u);
     for (uint32_t d = 1; d <= 64; ++d)
     {
         candidates.push_back(good + d);
@@ -880,12 +812,12 @@ void m7_untrusted_boundary_and_enum()
         candidates.push_back(good ^ (1u << bit));
 
     int tried = 0, wrong_code = 0, mutated = 0;
-    for (const uint32_t bad_id : candidates)
+    for (const entity_id bad_id : candidates)
     {
-        if (w.provinces.find(bad_id) != nullptr)
-            continue; // a real province — not a rejection case
+        if (w.tiles.count(bad_id) != 0)
+            continue; // a real tile — not a rejection case
         ++tried;
-        corp_command bad = ok_cmd; bad.province = bad_id;
+        corp_command bad = ok_cmd; bad.tile = bad_id;
         if (apply_corp_command(w, reg, bad) != corp_command_result::rejected_invalid)
             ++wrong_code;
         const unit_component& u = w.units.at(unit);
@@ -893,14 +825,14 @@ void m7_untrusted_boundary_and_enum()
             || w.units.size() != before_units)
             ++mutated;
     }
-    std::printf("    swept %d out-of-domain province ids\n", tried);
+    std::printf("    swept %d out-of-domain tile ids\n", tried);
     check(tried >= 32, "the sweep actually covered a meaningful number of absent ids");
-    check(wrong_code == 0, "EVERY out-of-domain province id is rejected_invalid — none is coerced");
+    check(wrong_code == 0, "EVERY out-of-domain tile id is rejected_invalid — none is coerced");
     check(mutated == 0, "EVERY such rejection leaves the unit byte-identical — order, position, roster");
 
     // And the live order still works afterwards: the sweep proved rejection,
     // not paralysis.
-    check(w.units.at(unit).order.dest_province == good, "the pre-existing valid order survived the whole sweep");
+    check(w.units.at(unit).order.dest == good, "the pre-existing valid order survived the whole sweep");
 }
 
 int main()

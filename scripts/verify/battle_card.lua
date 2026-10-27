@@ -59,7 +59,7 @@ verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = player_corp,  counterpa
 verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = theirs.owner, counterparty = player_corp }
 
 verify.corp_command{ verb = VERB_MARCH_UNIT, corp = player_corp,
-                     subject = mine.id, province = target_province }
+                     subject = mine.id, col = theirs.col, row = theirs.row } -- BL-1443: march onto their tile; contact is the attack
 
 -- Step until contact. A generous budget: the march is path-marched across ticks
 -- on the shared traversal-cost metric, so how long it takes is a function of the

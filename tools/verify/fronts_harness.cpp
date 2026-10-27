@@ -16,10 +16,13 @@
 //   F4  HOLD: assigned units reach slots spaced evenly along the span; a killed
 //       unit's gap is refilled; a retreated unit returns; a unit in a battle or
 //       refitting is left alone.
-//   F5  PUSH marches into the weakest adjacent province, only while hostile.
+//   F5  PUSH marches onto the neighbour's weakest adjacent TILE (empty weakest),
+//       nearest the unit's slot, only while hostile; a held tile is an attack
+//       (BL-1443, tile contact: re-pointed from the province grain).
 //   F6  REANCHOR survives a tile flip, and drops a front that is gone.
 //   F7  SAVE: assignments and orders round-trip by value; a v61 stream reads as
-//       none; a row naming nothing is refused.
+//       none; a row naming nothing is refused. (Offsets from the stream's end
+//       step over v63's attacking-stack section, BL-1443.)
 //   F8  RIVALS (real world): the scorer assigns only its own units to its own
 //       fronts, never the player's; deterministic; ticks and a mid-run save/load
 //       replay identically.
@@ -477,9 +480,8 @@ int main()
         check(f.w.units.at(us[2]).order.dest == null_entity, "F4e a refitting unit is given no order");
         r.refit_type = k_no_refit; r.refit_days = 0;
         advance_fronts(f.w, reg);
-        check(f.w.units.at(us[2]).order.dest != null_entity
-                  && f.w.units.at(us[2]).order.dest_province == f.w.provinces.province_of(s2[1]),
-              "F4f free again, it is sent to its slot's province (a legal march_unit)");
+        check(f.w.units.at(us[2]).order.dest == s2[1],
+              "F4f free again, it is sent to its slot TILE (a legal march_unit; every march goes to a tile)");
         // Unassigned: never moved by a front.
         const entity_id loose = add_unit(f, f.A, f.at(4, 0));
         step(f.w, reg, 3);
@@ -488,15 +490,15 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nF5 - push: the weakest adjacent province, only while hostile\n");
+    std::printf("\nF5 - push: the weakest adjacent tile, only while hostile\n");
     {
         fixture f; build(f);
         reanchor_fronts(f.w);
-        // B's four provinces defended by 30, 10, 20, 40 men: block 1 is the weakest,
+        // B holds every tile of row 3 — the tiles with a hex side onto A's span —
+        // with 30 men, save (4,3) with 10 and (1,3) with 20: (4,3) is the weakest,
         // and NOT the lowest id, so the pick is the rule's and not a tie-break's.
-        const int men[4] = { 30, 10, 20, 40 };
-        for (int k = 0; k < 4; ++k)
-            (void)add_unit(f, f.B, f.at(3 * k + 1, 4), men[k]);
+        for (int x = 0; x < W; ++x)
+            (void)add_unit(f, f.B, f.at(x, 3), x == 4 ? 10 : x == 1 ? 20 : 30);
         std::vector<entity_id> us;
         for (int x : { 2, 6, 10 })
             us.push_back(add_unit(f, f.A, f.at(x, 0)));
@@ -505,23 +507,31 @@ int main()
         const front fr = nation_fronts(f.w, f.A).front();
         int64_t want_def = 0;
         for (const auto& [id, u] : f.w.units)
-            if (u.owner == f.B && f.w.provinces.province_of(u.position) == f.block(1))
+            if (u.owner == f.B && u.position == f.at(4, 3))
                 want_def += unit_strength(f.w, u);
         int64_t def = -1;
-        check(front_push_target(f.w, fr, &def) == f.block(1) && def == want_def && want_def > 0,
-              "F5a the push target is B's block 1 (10 men), with its defence");
+        check(front_push_target(f.w, fr, &def) == f.at(4, 3) && def == want_def && want_def > 0,
+              "F5a the push target is B's weakest adjacent tile (4,3) (10 men), with its defence");
         step(f.w, reg, 2);
         bool held = true;
         for (const entity_id u : us)
             held = held && owner(f.w, f.w.units.at(u).position) == f.A;
-        check(held, "F5b while it holds, nobody enters B's ground");
+        check(held && f.w.battles.empty(), "F5b while it holds, nobody enters B's ground and nothing is attacked");
         (void)declare_hostile(f.w, f.A, f.B);
         check(cmd_order(f.w, reg, f.A, fr.key, 1) == corp_command_result::applied, "F5c push applies once hostile");
         step(f.w, reg, 8);
-        bool in = true;
+        // Every row-3 tile is held, so marching onto the weakest is an ATTACK: the
+        // march stops short and a battle opens over (4,3), A attacking B.
+        bool attacked = false;
+        for (const active_battle& b : f.w.battles)
+            attacked = attacked || (b.tile == f.at(4, 3) && b.attacker == f.A && b.defender == f.B
+                                    && !b.attacking_units.empty());
+        bool none_in = true;
         for (const entity_id u : us)
-            in = in && f.w.provinces.province_of(f.w.units.at(u).position) == f.block(1);
-        check(in, "F5d every assigned unit marched into the weakest province (block 1)");
+            none_in = none_in && owner(f.w, f.w.units.at(u).position) == f.A;
+        check(attacked && none_in,
+              "F5d the push ATTACKS the weakest tile: a battle over (4,3), A on B, no A unit stepped onto B's ground");
+        f.w.battles.clear(); // the fight is battle_engagement's; release the units
         (void)return_to_neutral(f.w, f.A, f.B);
         step(f.w, reg, 10);
         const std::vector<entity_id> s3 = expected_slots(fr, 3);
@@ -529,6 +539,32 @@ int main()
         for (std::size_t i = 0; i < 3; ++i) back = back && f.w.units.at(us[i]).position == s3[i];
         check(back && front_order_of(f.w, f.A, fr.key) == front_order::push,
               "F5e hostility ended: the stored push holds, and the units walk back to their slots");
+    }
+    {
+        // EMPTY IS WEAKEST, and the tie goes to the tile nearest the unit's slot.
+        // One unit: its slot is span[6]. B holds row 3 save two empty tiles — the one
+        // straight below the slot, and one five columns on. Both are empty (equal
+        // strength), so the nearer wins; the unit marches onto it with no fight and
+        // holds what it took.
+        fixture f; build(f);
+        reanchor_fronts(f.w);
+        const entity_id u = add_unit(f, f.A, f.at(5, 0));
+        (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+        const front fr = nation_fronts(f.w, f.A).front();
+        const entity_id slot = expected_slots(fr, 1)[0];
+        const int sx = f.w.tiles.at(slot).grid_x;
+        const int far_x = (sx + 5) % W;
+        for (int x = 0; x < W; ++x)
+            if (x != sx && x != far_x)
+                (void)add_unit(f, f.B, f.at(x, 3), 30);
+        (void)declare_hostile(f.w, f.A, f.B);
+        (void)cmd_order(f.w, reg, f.A, fr.key, 1);
+        step(f.w, reg, 10);
+        check(f.w.units.at(u).position == f.at(sx, 3) && f.w.battles.empty(),
+              "F5f an EMPTY tile is weakest: the unit marched onto the empty tile nearest its slot, with no fight");
+        step(f.w, reg, 3);
+        check(f.w.units.at(u).position == f.at(sx, 3) && f.w.units.at(u).order.dest == null_entity,
+              "F5g ...and holds what it took (no further order while it stands on B's ground)");
     }
 
     // -----------------------------------------------------------------------
@@ -626,24 +662,25 @@ int main()
         world old;
         bool none = from_bytes(v61, old) && stamped == k_world_save_version_pre_fronts && old.front_orders.empty();
         for (const auto& [id, uu] : old.units) none = none && uu.front == null_entity;
-        check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9),
-              "F7c a v61 stream (the section's 33 bytes shorter) reads as no fronts");
+        check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9) - 4,
+              "F7c a v61 stream (the section's 33 bytes, and v63's 4-byte stack count, shorter) reads as no fronts");
 
         // A row naming nothing: the first assignment's key -> a ghost tile.
         std::string bad = bytes;
-        const std::size_t key0 = bytes.size() - (4 + 9) - 2 * 8 + 4;
+        const std::size_t tail = 4; // v63's attacking-stack section: a zero battle count
+        const std::size_t key0 = bytes.size() - tail - (4 + 9) - 2 * 8 + 4;
         const entity_id ghost = 0x7FFFFFF0u;
         std::memcpy(&bad[key0], &ghost, sizeof ghost);
         world s1;
         check(!from_bytes(bad, s1) && s1.units.empty(), "F7d an assignment naming no tile is REFUSED, destination untouched");
         // An order naming a nation that is not in the stream.
         std::string bad2 = bytes;
-        std::memcpy(&bad2[bytes.size() - 9], &ghost, sizeof ghost);
+        std::memcpy(&bad2[bytes.size() - tail - 9], &ghost, sizeof ghost);
         world s2;
         check(!from_bytes(bad2, s2) && s2.units.empty(), "F7e an order naming no nation is REFUSED, destination untouched");
         // A stored hold (never written) is refused.
         std::string bad3 = bytes;
-        bad3[bytes.size() - 1] = 0;
+        bad3[bytes.size() - tail - 1] = 0;
         world s3;
         check(!from_bytes(bad3, s3) && s3.units.empty(), "F7f a stored HOLD is REFUSED (hold is never stored)");
     }
@@ -821,8 +858,10 @@ int main()
         fixture f; build(f);
         f.w.player_entity = f.C; // A and B are rivals
         (void)declare_hostile(f.w, f.A, f.B);
-        for (int k = 0; k < 4; ++k)
-            (void)add_unit(f, f.B, f.at(3 * k + 1, 4), k == 1 ? b_men : 200);
+        // B stands on every tile of row 3 (the tiles with a side onto the span), so
+        // the push target is a held tile: (4,3) with b_men, the rest with 200.
+        for (int x = 0; x < W; ++x)
+            (void)add_unit(f, f.B, f.at(x, 3), x == 4 ? b_men : 200);
         std::vector<entity_id> us;
         for (int x : { 2, 6, 10 })
             us.push_back(add_unit(f, f.A, f.at(x, 0)));
@@ -839,7 +878,7 @@ int main()
         const bool want_push = b_men == 10; // 3 x 40 men against 10: past 3:2; against 200: not
         char what[200];
         std::snprintf(what, sizeof what,
-                      "F8%s weakest province %d men: A assigns its three units and sets %s; the seat's unit untouched; twins agree",
+                      "F8%s weakest tile %d men: A assigns its three units and sets %s; the seat's unit untouched; twins agree",
                       want_push ? "h" : "i", b_men, want_push ? "PUSH" : "HOLD");
         check(all_a && front_order_of(f.w, f.A, key) == (want_push ? front_order::push : front_order::hold)
                   && f.w.units.at(c_unit).front == null_entity && f.w.state_hash(2) == twin.state_hash(2),

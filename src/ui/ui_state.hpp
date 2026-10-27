@@ -263,10 +263,10 @@ struct construction_state
     /// `withdraw_from_battle` verb. Same deferred path as `pending_tile`, for the
     /// same reason (UI surfaces hold only `const world&`).
     ///
-    /// Both fields are needed: a corp can be in more than one battle in one
-    /// province, so the counterparty NAMES which fight is being left. 0 / null =
-    /// nothing pending.
-    uint32_t      pending_withdraw_province = 0;
+    /// Both fields are needed: a nation can be in more than one battle over one
+    /// tile, so the counterparty NAMES which fight is being left. The battle is
+    /// named by its defended tile (2026-10-27). null = nothing pending.
+    entity_id     pending_withdraw_tile     = null_entity;
     entity_id     pending_withdraw_against  = null_entity;
 
     // (BL-343's pending_law_toggle lived here until BL-480: enactment is the
@@ -1142,16 +1142,46 @@ struct ui_state
     /// is in province-picking mode for THIS unit: the next left-click on a
     /// province consumes the click (suppressing ordinary selection, exactly as
     /// `construction.active` suppresses it for build placement) and fills
-    /// `pending_march_dest_province` instead. app::render dispatches
-    /// `corp_verb::march_unit {subject: pending_march_unit, province:
-    /// pending_march_dest_province}` once both are set, then clears both.
+    /// `pending_march_dest_tile` instead. app::render dispatches
+    /// `corp_verb::march_unit {subject: pending_march_unit, tile:
+    /// pending_march_dest_tile}` once both are set, then clears both (every
+    /// march goes to a tile, 2026-10-27).
     entity_id pending_march_unit         = null_entity;
-    /// The province id the canvas wrote on the qualifying click, or `0` while
-    /// nothing has been picked yet — the same "no province" sentinel
-    /// `selected_province` uses (a real province id is never 0, province.hpp).
-    /// Kept distinct from `selected_province`: picking a march destination
+    /// The DESTINATION TILE the March pick named (BL-1443, tile contact orders:
+    /// every march goes to a tile — MILITARY.md § Marching), or null while nothing
+    /// has been picked. Kept distinct from the selection: picking a destination
     /// must NOT also change what the Selection element is showing.
-    uint32_t  pending_march_dest_province = 0;
+    entity_id pending_march_dest_tile = null_entity;
+
+    // --- Right-click orders (BL-1443; SELECTION.md § Right-click orders) ----
+    // With the player's own unit or group selected, a right-click on land marches
+    // every unit of it there; on another nation's stack it is the attack (a march
+    // onto its tile), and toward a nation the player is not hostile to it first
+    // asks to declare hostility. The canvas only fills these; app::render sends
+    // them through player_command and clears them.
+
+    /// The units to order, ascending id. Empty = nothing pending.
+    std::vector<entity_id> pending_unit_order_units;
+    /// The tile they march to.
+    entity_id pending_unit_order_tile     = null_entity;
+    /// A nation to declare hostility toward BEFORE the march (the confirm popup's
+    /// "Declare and attack"), or null_entity.
+    entity_id pending_unit_order_declare  = null_entity;
+    /// True when the order is an attack (another nation's stack on the tile):
+    /// only the status line's wording reads it.
+    bool      pending_unit_order_attack   = false;
+
+    /// The declare-hostility confirm, open while `unit_order_confirm_nation` is
+    /// set: the order it would send, and where it stands on screen.
+    entity_id              unit_order_confirm_nation = null_entity;
+    entity_id              unit_order_confirm_tile   = null_entity;
+    std::vector<entity_id> unit_order_confirm_units;
+    ImVec2                 unit_order_confirm_pos{};
+
+    /// What a right-click on the hovered tile would do this frame — written by the
+    /// canvas every frame, read by the verify API. 0 none, 1 move, 2 attack,
+    /// 3 declare hostility and attack.
+    int unit_order_hover = 0;
 
     /// Set by the unit card's Halt press — the unit to clear the movement
     /// order of. `null_entity` = nothing pending.

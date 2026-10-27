@@ -1,41 +1,33 @@
 // ---------------------------------------------------------------------------
 // BL-467 — battle state in world: the engagement trigger and the step. No SDL/Lua
 // ---------------------------------------------------------------------------
-// THE ROW THAT MATTERS IS B1, and it is worth saying why before the list.
+// RE-POINTED 2026-10-27 (BL-1443, tile contact; MILITARY.md § Battles). The
+// province co-presence trigger these rows were written against is gone: a battle
+// now opens when a march tries to step onto a tile a hostile nation's units hold,
+// and it is fought over that DEFENDED tile. So the fixture stands the two forces
+// on ADJACENT tiles, not on one (two nations never share a tile), and a battle is
+// opened by a march (B1) or by `open_tile_battle` directly (the rest — the march
+// that makes the attack is tile_contact_harness's subject). Every row still
+// asserts what it asserted; where it named the province key it names the tile.
 //
-// Before this item both battle resolvers were compiled, harnessed and CALLED BY
-// NOTHING — MILITARY.md's "what is absent" said so outright. Every existing
-// battle assertion in this project calls a resolver DIRECTLY, which proves the
-// arithmetic and proves nothing about whether a fight can ever happen. So B1
-// deliberately does not call a resolver at all: it stands two hostile forces in
-// one province, runs the REAL tick entry point, and asserts that men died. That
-// row could not have been written before this item, because `world::battles` did
-// not exist to assert on.
-//
-//   B1  A FIGHT ACTUALLY HAPPENS, through run_economy_step.
-//   B2  DISCOVERY IS ORDER-INDEPENDENT. The containers battles are discovered
-//       from are unordered; twin worlds must produce identical battle sets.
-//   B3  ONE BATTLE PER CORP PAIR PER PROVINCE, and a third corp does not join.
-//   B4  THE SEED FOLDS THE PROVINCE, and role order still matters.
+//   B1  A FIGHT ACTUALLY HAPPENS: a march onto the defender's tile opens it, and
+//       the real tick (run_economy_step) kills men.
+//   B1c ...and a march toward a NON-hostile stack opens nothing.
+//   B2  OPENING IS ORDER-INDEPENDENT: twin worlds produce identical battle sets.
+//   B3  ONE BATTLE PER NATION PAIR PER TILE; mutual hostility does not open two.
+//   B4  THE SEED FOLDS THE TILE, and role order still matters.
 //   B5  PER-UNIT HITS CONSERVE: distributed losses equal the requested total.
-//   B6  DETERMINISM BY IN-MEMORY REPLAY ONLY — the BL-448 precedent verbatim,
-//       because no battle serialiser exists and asserting a save round-trip
-//       would be asserting something that is not there.
-//   B7  THE TERRAIN PAIR IS THE DEFENDER'S BEST GROUND, ties by ascending tile.
-//   B8  WITHDRAWAL IS PRICED, AND A REJECTED REQUEST MUTATES NOTHING.
-//   B9  A UNIT IN CONTACT CANNOT MARCH — the gap BL-470 left named.
-//   B15 BL-569: A DECISIVE CLOSE MOVES world::province_holder to the winner.
-//   B16 BL-569: A STALEMATE LEAVES IT UNTOUCHED. B15/B16 hand-build the
-//       active_battle's state (rounds_fought and starting strengths already
-//       past the swing draw's reach of the outcome) rather than trust a live
-//       fight to land on a specific ending — the swing is genuinely random
-//       per round, so an assertion tied to which ending a natural fight
-//       happens to reach would be exactly the kind of test that stops
-//       testing quietly the day the RNG stream shifts.
-//   B17 BL-571: A CORP-VS-NATION BATTLE OPENS AND RESOLVES. Drives
-//       `open_battle` directly rather than through the second trigger, which
-//       is a stub until BL-573 (contract templates, Wave 4) lands — see
-//       battle_system.hpp's own comment on `active_mercenary_contract_for`.
+//   B6  DETERMINISM BY IN-MEMORY REPLAY.
+//   B7  THE GROUND IS THE DEFENDED TILE — not the defender's best tile nearby.
+//   B8  WITHDRAWAL IS NAMED BY TILE, AND A REJECTED REQUEST MUTATES NOTHING.
+//   B9  A UNIT IN CONTACT CANNOT MARCH.
+//   B10-B14 the dispatch record and its text.
+//   B15 BL-569: A DECISIVE CLOSE MOVES world::province_holder (the defended
+//       tile's province) to the winner.
+//   B16 BL-569: A STALEMATE LEAVES IT UNTOUCHED.
+//   B17 open_tile_battle is ENTITY-ID-AGNOSTIC: it opens a battle with no stance
+//       row (the capability the retired mercenary trigger used).
+//   B18-B22 retreat, morale, recovery, a quiet world, a unit in two battles.
 //
 // Run: battle_engagement_harness
 // ---------------------------------------------------------------------------
@@ -109,18 +101,6 @@ entity_id add_corp(world& w, const char* name)
     return c;
 }
 
-/// BL-571: a nation, for the corp-vs-nation battle case (B17). No territory,
-/// no budget — the battle mechanics under test read a unit's OWNER, never
-/// `nation_component`'s own fields.
-entity_id add_nation(world& w, const char* name)
-{
-    const entity_id n = w.create_entity();
-    nation_component nc{};
-    nc.name    = name;
-    w.nations[n] = nc;
-    return n;
-}
-
 entity_id add_unit(world& w, entity_id corp, entity_id tile, int count = 500)
 {
     const entity_id u = w.create_entity();
@@ -140,15 +120,16 @@ entity_id tile_at(world& w, entity_id body, int c, int r)
     return g[static_cast<std::size_t>(r * gw + c)];
 }
 
-/// A body with two hostile corps standing in the SAME province. Returns the
-/// province they share, so a caller can name it without re-deriving it.
+/// A body with two nations' units on ADJACENT tiles: the attacker's at (2,2), the
+/// defender's at (3,2) — a step a march takes. `tile` is the defended tile.
 struct fixture
 {
     world     w;
     entity_id body = null_entity;
     entity_id att = null_entity, def = null_entity;
     entity_id ua = null_entity, ub = null_entity;
-    uint32_t  province = 0;
+    entity_id tile = null_entity;   ///< the defender's tile: the battle's identity and ground
+    uint32_t  province = 0;         ///< the province that tile lies in
 };
 
 void build_fixture(fixture& f, bool declare = true)
@@ -157,17 +138,32 @@ void build_fixture(fixture& f, bool declare = true)
     build_province_partition(f.w, PARTITION_SEED);
     f.att = add_corp(f.w, "Attacker");
     f.def = add_corp(f.w, "Defender");
-
-    // Both forces on the SAME tile, so they are trivially in the same province
-    // whatever the partition did with this grid — the fixture must not depend on
-    // the partition's shape, which is a different item's business.
-    const entity_id t = tile_at(f.w, f.body, 2, 2);
-    f.ua = add_unit(f.w, f.att, t);
-    f.ub = add_unit(f.w, f.def, t);
-    f.province = f.w.provinces.province_of(t);
-
+    f.ua   = add_unit(f.w, f.att, tile_at(f.w, f.body, 2, 2));
+    f.tile = tile_at(f.w, f.body, 3, 2);
+    f.ub   = add_unit(f.w, f.def, f.tile);
+    f.province = f.w.provinces.province_of(f.tile);
     if (declare)
         declare_hostile(f.w, f.att, f.def);
+}
+
+/// Open the fixture's battle the way a march's attack does — `ua` attacking `tile`.
+bool engage(fixture& f, int tick = 0)
+{
+    return open_tile_battle(f.w, tick, f.tile, f.att, f.def, { f.ua });
+}
+
+/// The authored per-class march points (scripts/economy.lua; MILITARY.md §
+/// Marching) — a default registry carries zeros, which marches nothing.
+recipe_registry make_registry()
+{
+    recipe_registry reg;
+    military_capability_params mp = reg.military();
+    mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = 1.0f;
+    mp.march_points_per_class[static_cast<std::size_t>(unit_class::cavalry)]  = 1.5f;
+    mp.march_points_per_class[static_cast<std::size_t>(unit_class::ranged)]   = 1.0f;
+    mp.march_points_per_class[static_cast<std::size_t>(unit_class::siege)]    = 0.5f;
+    reg.set_military(mp);
+    return reg;
 }
 
 int total_men(const world& w)
@@ -177,86 +173,104 @@ int total_men(const world& w)
     return n;
 }
 
+corp_command march_cmd(entity_id corp, entity_id unit, entity_id tile)
+{
+    corp_command cmd{};
+    cmd.corp = corp; cmd.as_nation = corp;
+    cmd.verb = corp_verb::march_unit; cmd.subject = unit; cmd.tile = tile;
+    return cmd;
+}
+
 } // namespace
 
 int main()
 {
-    std::printf("=== battle engagement (BL-467) ===\n");
-    const recipe_registry reg{};
+    std::printf("=== battle engagement (BL-467; tile contact, BL-1443) ===\n");
+    const recipe_registry reg = make_registry();
 
     // -----------------------------------------------------------------------
-    std::printf("\nB1 — a fight actually happens, through the real tick\n");
+    std::printf("\nB1 — a fight actually happens: a march onto the defender's tile, then the real tick\n");
     {
         fixture f;
         build_fixture(f);
         const int before = total_men(f.w);
-        check(f.province != 0, "B1 setup: both forces resolve to a real province");
-        check(f.w.battles.empty(), "B1 setup: no battle exists before the tick");
-
+        check(f.w.battles.empty(), "B1 setup: no battle exists before the march");
+        check(apply_corp_command(f.w, reg, march_cmd(f.att, f.ua, f.tile)) == corp_command_result::applied,
+              "B1 setup: the attacker is ordered onto the defender's tile");
+        // The march pass with no Logistic Point resolve handed in (the fixture's
+        // nations make none); the real tick then steps the battle it opened.
+        const unit_march_tick mt = run_unit_march(f.w, reg, nullptr);
+        check(mt.attacks == 1 && mt.battles_opened == 1 && f.w.battles.size() == 1
+                  && f.w.battles.front().tile == f.tile,
+              "B1a THE TRIGGER FIRED — the step onto a hostile stack's tile opened a battle over it");
+        check(f.w.units.at(f.ua).position == tile_at(f.w, f.body, 2, 2),
+              "B1b ...and the attacker stopped on its own tile (two nations never share one)");
         run_economy_step(f.w, reg);
-
-        check(!f.w.battles.empty() || total_men(f.w) < before,
-              "B1a THE TRIGGER FIRED — a battle opened from hostility + shared province alone");
         const int after = total_men(f.w);
         std::printf("        men %d -> %d over one tick\n", before, after);
         check(after < before,
-              "B1b MEN DIED. Losses reached unit_component::count through the tick, not a direct resolver call");
+              "B1c MEN DIED. Losses reached unit_component::count through the tick, not a direct resolver call");
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB1c — and it does NOT fire without hostility\n");
+    std::printf("\nB1d — and it does NOT fire without hostility\n");
     {
         fixture f;
         build_fixture(f, /*declare=*/false);
         const int before = total_men(f.w);
+        (void)apply_corp_command(f.w, reg, march_cmd(f.att, f.ua, f.tile));
+        const unit_march_tick mt = run_unit_march(f.w, reg, nullptr);
         run_economy_step(f.w, reg);
-        check(f.w.battles.empty() && total_men(f.w) == before,
-              "B1c two neutral corps sharing a province do not fight (the trigger is stance, not proximity)");
+        check(f.w.battles.empty() && total_men(f.w) == before && mt.attacks == 0 && mt.blocked == 1
+                  && f.w.units.at(f.ua).position != f.tile,
+              "B1d a march onto a NEUTRAL stack is blocked, not an attack (the trigger is stance, not contact)");
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB2 — discovery is order-independent\n");
+    std::printf("\nB2 — opening is order-independent\n");
     {
         fixture a, b;
         build_fixture(a);
         build_fixture(b);
+        engage(a); engage(b);
         run_economy_step(a.w, reg);
         run_economy_step(b.w, reg);
         bool same = a.w.battles.size() == b.w.battles.size();
         for (std::size_t i = 0; same && i < a.w.battles.size(); ++i)
-            same = a.w.battles[i].province == b.w.battles[i].province
+            same = a.w.battles[i].tile == b.w.battles[i].tile
                 && a.w.battles[i].attacker == b.w.battles[i].attacker
                 && a.w.battles[i].defender == b.w.battles[i].defender;
         check(same, "B2  twin worlds produce the same battle set, in the same order");
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB3 — one battle per corp pair per province\n");
+    std::printf("\nB3 — one battle per nation pair per tile\n");
     {
         fixture f;
         build_fixture(f);
-        // A second unit for each side in the same province must NOT open a
-        // second battle; and mutual hostility must not open one per direction.
-        const entity_id t = tile_at(f.w, f.body, 2, 2);
-        add_unit(f.w, f.att, t);
-        add_unit(f.w, f.def, t);
+        // A second unit for each side, and mutual hostility, must not open a second
+        // battle over the tile — in either role order.
+        const entity_id ua2 = add_unit(f.w, f.att, tile_at(f.w, f.body, 2, 2));
+        add_unit(f.w, f.def, f.tile);
         declare_hostile(f.w, f.def, f.att); // now mutual
-        run_economy_step(f.w, reg);
-        check(f.w.battles.size() <= 1,
-              "B3a mutual hostility and four units still open exactly one battle");
-        run_economy_step(f.w, reg);
-        check(f.w.battles.size() <= 1,
-              "B3b a second tick does not open a duplicate alongside the live one");
+        check(engage(f), "B3 setup: the first attack opens");
+        check(!open_tile_battle(f.w, 0, f.tile, f.att, f.def, { ua2 }) && f.w.battles.size() == 1,
+              "B3a a second attack onto the same tile by the same pair does not reopen");
+        check(!open_tile_battle(f.w, 0, f.tile, f.def, f.att, { ua2 }) && f.w.battles.size() == 1,
+              "B3b ...nor does the reverse direction");
+        const active_battle& b = f.w.battles.front();
+        check(b.attacker_units.size() == 2 && b.defender_units.size() == 2,
+              "B3c the stack on the tile defends whole, and the attacker's stack beside it joined");
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB4 — the seed folds the province, and role order still matters\n");
+    std::printf("\nB4 — the seed folds the tile, and role order still matters\n");
     {
-        campaign_battle_identity a; a.attacker = 7; a.defender = 9; a.province = 11; a.tick = 3; a.world_seed = 5;
-        campaign_battle_identity b = a; b.province = 12;
+        campaign_battle_identity a; a.attacker = 7; a.defender = 9; a.tile = 11; a.tick = 3; a.world_seed = 5;
+        campaign_battle_identity b = a; b.tile = 12;
         campaign_battle_identity c = a; std::swap(c.attacker, c.defender);
         check(campaign_battle_seed(a) != campaign_battle_seed(b),
-              "B4a two battles differing only in PROVINCE are different streams");
+              "B4a two battles differing only in TILE are different streams");
         check(campaign_battle_seed(a) != campaign_battle_seed(c),
               "B4b swapping attacker and defender is a different stream (role order preserved)");
     }
@@ -264,15 +278,9 @@ int main()
     // -----------------------------------------------------------------------
     std::printf("\nB5 — per-unit hits conserve\n");
     {
-        // Losses must equal the drop in men exactly: the pass must neither mint
-        // nor destroy. Run several ticks so a long fight compounds.
-        // Called through run_battles rather than run_economy_step for this row
-        // ONLY, because the pass's own report is what makes conservation an
-        // EQUALITY rather than an inequality. B1 already proved the real tick
-        // path reaches here, so this is a finer instrument on a proven seam, not
-        // a way round it.
         fixture f;
         build_fixture(f);
+        engage(f);
         int before = total_men(f.w);
         int reported = 0, drift = 0;
         for (int i = 0; i < 6; ++i)
@@ -295,102 +303,77 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB6 — determinism, by in-memory replay only\n");
+    std::printf("\nB6 — determinism, by in-memory replay\n");
     {
-        // NEVER a save round-trip: no battle serialiser exists, and asserting one
-        // would assert something that is not there (BL-448's precedent).
         fixture a, b;
         build_fixture(a);
         build_fixture(b);
+        engage(a); engage(b);
         for (int i = 0; i < 5; ++i) { run_economy_step(a.w, reg); run_economy_step(b.w, reg); }
         check(total_men(a.w) == total_men(b.w),
               "B6a same fixture, five ticks, twice: identical surviving strength");
         check(a.w.state_hash(5) == b.w.state_hash(5),
-              "B6b ...and identical state_hash, which now folds the battle list");
+              "B6b ...and identical state_hash, which folds the battle list");
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB7 — the terrain pair is the defender's best ground\n");
+    std::printf("\nB7 — the ground is the defended tile\n");
     {
         fixture f;
         build_fixture(f);
-        // Give the defender two tiles of different ground and check the battle
-        // takes the better one. A forested crag out-defends bare soil since
-        // BL-519 — which is the axis split paying off inside combat.
-        const entity_id t_soft = tile_at(f.w, f.body, 2, 2);
-        // Find a SECOND tile genuinely in the same province rather than assuming
-        // a neighbour is — the partition's shape is BL-515's business, and a row
-        // that silently skips itself when the guess is wrong is a row that stops
-        // testing without saying so.
-        entity_id t_hard = null_entity;
-        if (const province* pv = f.w.provinces.find(f.province))
-            for (const entity_id cand : pv->tiles)
-                if (cand != t_soft) { t_hard = cand; break; }
-        check(t_hard != null_entity, "B7 setup: the province holds a second tile to anchor on");
-        if (t_hard == null_entity) t_hard = t_soft;
+        // The defender also stands BESIDE the tile on far better ground. Under the
+        // retired envelope the battle anchored on the defender's best tile; now it is
+        // fought over the tile attacked, whatever lies next to it.
+        const entity_id t_hard = tile_at(f.w, f.body, 4, 2);
         auto& hard = f.w.tiles.at(t_hard);
         hard.substrate = terrain_substrate::rocky;
         hard.cover = terrain_cover::forest; hard.cover_density = 205;
         hard.landform = terrain_landform::mountain;
-        const int d_soft = terrain_defence(f.w.tiles.at(t_soft).substrate, f.w.tiles.at(t_soft).cover,
-                                           f.w.tiles.at(t_soft).cover_density, f.w.tiles.at(t_soft).landform);
-        const int d_hard = terrain_defence(hard.substrate, hard.cover, hard.cover_density, hard.landform);
-        std::printf("        defence: soft ground %d, hard ground %d\n", d_soft, d_hard);
-        check(d_hard > d_soft, "B7a the hard tile really is better ground (the axes reach combat)");
-
-        // Asserted through `battle_ground` rather than through a live battle:
-        // at the shipped pacing a 1v1 often concludes in the tick it opens, and
-        // the record is erased with it, so a row that only fires when a fight
-        // happens to run long is a row that stops testing without saying so.
         add_unit(f.w, f.def, t_hard);
-        std::vector<entity_id> def_units;
-        for (const auto& kv : f.w.units)
-            if (kv.second.owner == f.def) def_units.push_back(kv.first);
-        std::sort(def_units.begin(), def_units.end());
+        const tile_component& soft = f.w.tiles.at(f.tile);
+        const int d_soft = terrain_defence(soft.substrate, soft.cover, soft.cover_density, soft.landform);
+        const int d_hard = terrain_defence(hard.substrate, hard.cover, hard.cover_density, hard.landform);
+        std::printf("        defence: defended tile %d, the defender's tile beside it %d\n", d_soft, d_hard);
+        check(d_hard > d_soft, "B7a the tile beside really is better ground");
 
         terrain_substrate gs{}; terrain_cover gc{}; std::uint8_t gd{}; terrain_landform gl{};
-        const bool got = battle_ground(f.w, def_units, gs, gc, gd, gl);
-        check(got, "B7b the defending side resolves to real ground");
-        check(got && terrain_defence(gs, gc, gd, gl) == d_hard,
-              "B7c the battle anchors on the defender's BEST tile, not its first or its last");
-
-        // The tie-break, asserted rather than assumed: two tiles of IDENTICAL
-        // defence must resolve to the lower tile id, or the pick depends on the
-        // order units were walked in — which is unordered.
-        auto& hard2 = f.w.tiles.at(t_soft);
-        hard2.substrate = hard.substrate; hard2.cover = hard.cover;
-        hard2.cover_density = hard.cover_density; hard2.landform = hard.landform;
-        terrain_substrate ts{}; terrain_cover tc2{}; std::uint8_t td{}; terrain_landform tl{};
-        const bool tied = battle_ground(f.w, def_units, ts, tc2, td, tl);
-        check(tied && terrain_defence(ts, tc2, td, tl) == d_hard,
-              "B7d with two tiles of equal defence the pick is stable (ties break on ascending tile id)");
+        const bool got = battle_ground(f.w, f.tile, gs, gc, gd, gl);
+        check(got && terrain_defence(gs, gc, gd, gl) == d_soft,
+              "B7b battle_ground is the defended tile's own terrain");
+        check(engage(f), "B7 setup: the attack opens");
+        const active_battle& b = f.w.battles.front();
+        check(b.ground_tile == f.tile && b.state.terrain_lf == soft.landform
+                  && b.state.terrain_cov == soft.cover && b.state.terrain_sub == soft.substrate,
+              "B7c THE BATTLE IS FOUGHT ON THE DEFENDED TILE, not on the better ground its joiner holds");
+        check(!battle_ground(f.w, 0x7FFFFFF0u, gs, gc, gd, gl),
+              "B7d a tile that does not exist has no ground");
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB8 — withdrawal is priced, and a rejection mutates nothing\n");
+    std::printf("\nB8 — withdrawal is named by tile, and a rejection mutates nothing\n");
     {
         fixture f;
         build_fixture(f);
-        run_economy_step(f.w, reg); // open and fight
+        engage(f);
+        run_economy_step(f.w, reg); // fight
 
-        // A request naming a province with no battle must change NOTHING. This
-        // verb is reachable from --serve, where a rejected command may not leave
-        // a partial mutation behind.
         const uint64_t h_before = f.w.state_hash(1);
-        const bool bogus = request_withdraw(f.w, f.att, 0xFFFFFFFFu);
+        const bool bogus = request_withdraw(f.w, f.att, 0x7FFFFFF0u);
         check(!bogus && f.w.state_hash(1) == h_before,
-              "B8a a withdraw naming no live battle is refused and leaves the world byte-identical");
+              "B8a a withdraw naming no live battle's tile is refused and leaves the world byte-identical");
+        const bool wrong = request_withdraw(f.w, f.att, tile_at(f.w, f.body, 2, 2));
+        check(!wrong && f.w.state_hash(1) == h_before,
+              "B8a2 ...so is one naming the attacker's own tile (the battle is named by the DEFENDED tile)");
 
-        // And one naming a battle the corp is not in.
         const entity_id stranger = add_corp(f.w, "Stranger");
         const uint64_t h2 = f.w.state_hash(1);
-        const bool notmine = request_withdraw(f.w, stranger, f.province);
+        const bool notmine = request_withdraw(f.w, stranger, f.tile);
         check(!notmine && f.w.state_hash(1) == h2,
               "B8b a non-participant cannot withdraw someone else's force");
 
         if (!f.w.battles.empty())
         {
-            const bool ok = request_withdraw(f.w, f.att, f.province);
+            const bool ok = request_withdraw(f.w, f.att, f.tile);
             check(ok, "B8c a participant's withdraw request is accepted");
             const int rounds_before = f.w.battles.front().state.rounds_fought;
             run_economy_step(f.w, reg); // honoured at the tick boundary
@@ -403,27 +386,16 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB9 — a unit in contact cannot march (the gap BL-470 left named)\n");
+    std::printf("\nB9 — a unit in contact cannot march\n");
     {
         fixture f;
         build_fixture(f);
-        run_economy_step(f.w, reg);
-        if (!f.w.battles.empty())
-        {
-            check(unit_in_battle(f.w, f.ua), "B9a the attacking unit reads as in-battle");
-            corp_command cmd{};
-            cmd.corp     = f.att;
-            cmd.verb     = corp_verb::march_unit;
-            cmd.subject  = f.ua;
-            cmd.province = f.province;
-            const auto r = apply_corp_command(f.w, reg, cmd);
-            check(r == corp_command_result::rejected_state,
-                  "B9b march_unit is refused for a unit in contact — walking away is a priced withdrawal");
-        }
-        else
-        {
-            std::printf("        (battle concluded within one tick; B9 not exercised)\n");
-        }
+        engage(f);
+        check(unit_in_battle(f.w, f.ua), "B9a the attacking unit reads as in-battle");
+        const uint64_t h = f.w.state_hash(1);
+        const auto r = apply_corp_command(f.w, reg, march_cmd(f.att, f.ua, tile_at(f.w, f.body, 0, 0)));
+        check(r == corp_command_result::rejected_state && f.w.state_hash(1) == h,
+              "B9b march_unit is refused for a unit in contact — walking away is a priced withdrawal");
     }
 
     // -----------------------------------------------------------------------
@@ -431,14 +403,15 @@ int main()
     {
         fixture f;
         build_fixture(f);
+        engage(f);
         const battle_tick t1 = run_battles(f.w, reg, 0);
         check(!t1.dispatches.empty(),
               "B10a a battle that fought emits a dispatch record");
         if (!t1.dispatches.empty())
         {
             const battle_dispatch& d = t1.dispatches.front();
-            check(d.province == f.province && d.attacker == f.att && d.defender == f.def,
-                  "B10b the record names the fight (province, attacker, defender)");
+            check(d.tile == f.tile && d.province == f.province && d.attacker == f.att && d.defender == f.def,
+                  "B10b the record names the fight (tile, attacker, defender) and the tile's province");
             check(d.rounds_this_tick > 0 && d.max_rounds > 0,
                   "B10c it carries round/max so a surface need not know campaign_battle_params");
             check(d.stream_seed != 0,
@@ -455,6 +428,7 @@ int main()
         // cost" is the one line a player most needs.
         fixture f;
         build_fixture(f);
+        engage(f);
         bool saw_conclusion = false;
         for (int i = 0; i < 10 && !saw_conclusion; ++i)
         {
@@ -483,6 +457,7 @@ int main()
         // the charge rather than against arithmetic repeated in the test.
         fixture f;
         build_fixture(f);
+        engage(f);
         run_battles(f.w, reg, 0);
         if (!f.w.battles.empty())
         {
@@ -522,6 +497,7 @@ int main()
         fixture a, b;
         build_fixture(a);
         build_fixture(b);
+        engage(a); engage(b);
         std::vector<battle_dispatch> da, db;
         for (int i = 0; i < 5; ++i)
         {
@@ -532,7 +508,7 @@ int main()
         }
         bool same = da.size() == db.size();
         for (std::size_t i = 0; same && i < da.size(); ++i)
-            same = da[i].province == db[i].province
+            same = da[i].tile == db[i].tile
                 && da[i].phase == db[i].phase
                 && da[i].rounds_fought == db[i].rounds_fought
                 && da[i].attacker_men_lost == db[i].attacker_men_lost
@@ -553,6 +529,7 @@ int main()
         // bank, a hole where a name should be, a line crediting the wrong side.
         fixture f;
         build_fixture(f);
+        engage(f);
         std::vector<battle_dispatch> seen;
         for (int i = 0; i < 10; ++i)
         {
@@ -623,7 +600,9 @@ int main()
         // not by luck.
         f.w.units.at(f.ub).readiness_permille = 0;
         active_battle b;
+        b.tile            = f.tile;
         b.province        = f.province;
+        b.ground_tile     = f.tile;
         b.attacker        = f.att;
         b.defender        = f.def;
         b.attacker_units  = { f.ua };
@@ -645,7 +624,7 @@ int main()
                   "B15b the defender broke -- guaranteed by its spent unit, not the swing draw");
             check(d.field_held_by == f.att, "B15c the attacker held the field");
             check(province_holder_for(f.w, f.province) == f.att,
-                  "B15d THE PROVINCE HOLDER MOVED to the winner");
+                  "B15d THE PROVINCE HOLDER MOVED to the winner (the defended tile's province)");
         }
     }
 
@@ -673,7 +652,9 @@ int main()
         // a whole parity fight spending 1000 over six), so neither side can be
         // spent by round 6 and it concludes as a stalemate by construction.
         active_battle b;
+        b.tile            = f.tile;
         b.province        = f.province;
+        b.ground_tile     = f.tile;
         b.attacker        = f.att;
         b.defender        = f.def;
         b.attacker_units  = { f.ua };
@@ -699,61 +680,40 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB17 — BL-571: a corp-vs-nation battle opens and resolves\n");
+    std::printf("\nB17 — open_tile_battle is entity-id-agnostic: no stance row needed\n");
     {
-        // No declare_hostile row, by design (MILITARY.md § Nation garrisons):
-        // the second trigger's whole point is that an ACTIVE MERCENARY
-        // CONTRACT is the hostility, not a stance row. That trigger is stubbed
-        // today (active_mercenary_contract_for always returns null_entity —
-        // BL-573, contract templates, is Wave 4 and has not landed), so this
-        // case drives `open_battle` DIRECTLY — exactly the call the trigger
-        // would make once the stub has a real answer — to prove the
-        // MECHANICS work for a nation defender: the battle is opened,
-        // stepped and resolved through the same code path as any corp pair.
-        world w;
-        const entity_id body = make_grid_body(w, 6, 6);
-        build_province_partition(w, PARTITION_SEED);
-        const entity_id corp    = add_corp(w, "Mercenary");
-        const entity_id nation  = add_nation(w, "GarrisonNation");
-        const entity_id t       = tile_at(w, body, 2, 2);
-        const entity_id ua      = add_unit(w, corp, t);
-        const entity_id ud      = add_unit(w, nation, t);
-        const uint32_t province = w.provinces.province_of(t);
-
-        // BL-1407: the mercenary-contract stub retired with the corporation;
-        // the attacker is a nation with no stance row.
-        check(w.battles.empty(), "B17 setup: no battle exists before opening one");
-
-        const bool opened = open_battle(w, 0, province, corp, nation);
-        check(opened, "B17a open_battle opens a corp-vs-nation battle");
-        check(w.battles.size() == 1, "B17b exactly one battle is live");
-        if (!w.battles.empty())
+        // The capability the retired mercenary trigger used (NR-731): a battle
+        // between two owners with NO declare_hostile row, opened directly. The
+        // march only ever opens one toward a nation it is hostile to; the opener
+        // itself reads the sides as unit owners and nothing else.
+        fixture f;
+        build_fixture(f, /*declare=*/false);
+        check(f.w.battles.empty(), "B17 setup: no battle exists before opening one");
+        const bool opened = engage(f);
+        check(opened, "B17a open_tile_battle opens a battle with no stance row");
+        check(f.w.battles.size() == 1, "B17b exactly one battle is live");
+        if (!f.w.battles.empty())
         {
-            const active_battle& b = w.battles.front();
-            check(b.attacker == corp && b.defender == nation,
-                  "B17c the corp is the attacker, the nation-owned garrison the defender");
-            check(b.attacker_units == std::vector<entity_id>{ ua }
-                      && b.defender_units == std::vector<entity_id>{ ud },
-                  "B17d each side carries exactly the one unit that stands there");
+            const active_battle& b = f.w.battles.front();
+            check(b.attacker == f.att && b.defender == f.def && b.tile == f.tile,
+                  "B17c the attacker and defender are the owners named, over the tile named");
+            check(b.attacker_units == std::vector<entity_id>{ f.ua }
+                      && b.defender_units == std::vector<entity_id>{ f.ub }
+                      && b.attacking_units == std::vector<entity_id>{ f.ua },
+                  "B17d each side carries exactly its one unit; the attacking stack is the attacker's");
         }
-
-        // Step it to a conclusion, the same ten-tick idiom B11 uses — the
-        // swing is genuinely random per round, so this loops rather than
-        // asserting a specific ending.
-        const int before = total_men(w);
+        const int before = total_men(f.w);
         bool concluded = false;
         for (int i = 0; i < 10 && !concluded; ++i)
         {
-            const battle_tick bt = run_battles(w, reg, i);
+            const battle_tick bt = run_battles(f.w, reg, i);
             for (const battle_dispatch& d : bt.dispatches)
                 if (d.end != campaign_battle_end::in_progress)
                     concluded = true;
         }
-        check(concluded, "B17e the corp-vs-nation battle RESOLVED within ten ticks");
-        check(w.battles.empty(), "B17f ...and is erased, exactly as a corp-vs-corp conclusion is");
-        const int after = total_men(w);
-        check(after < before,
-              "B17g men died through the real step -- conservation and combat both hold for a nation side");
+        check(concluded, "B17e the battle RESOLVED within ten ticks");
+        check(f.w.battles.empty(), "B17f ...and is erased on conclusion");
+        check(total_men(f.w) < before, "B17g men died through the real step");
     }
 
     // -----------------------------------------------------------------------
@@ -761,6 +721,7 @@ int main()
     {
         fixture f;
         build_fixture(f);
+        engage(f);
         const entity_id start = f.w.units.at(f.ua).position;
         bool retreated = false;
         int morale_after = 1000;
@@ -797,7 +758,7 @@ int main()
         f.w.units.at(f.ub).morale_permille = 800;
         f.w.units.at(f.ub).readiness_permille = 0;
         active_battle b;
-        b.province = f.province; b.attacker = f.att; b.defender = f.def;
+        b.tile = f.tile; b.province = f.province; b.attacker = f.att; b.defender = f.def;
         b.attacker_units = { f.ua }; b.defender_units = { f.ub };
         b.state.end = campaign_battle_end::in_progress;
         b.state.stream_seed = 0xB1421u; b.state.rng_state = b.state.stream_seed;
@@ -873,11 +834,12 @@ int main()
         build_fixture(f, /*declare=*/false);
         const entity_id third = add_corp(f.w, "Third");
         const entity_id t = f.w.units.at(f.ua).position;
-        const entity_id uc = add_unit(f.w, third, t);
+        const entity_id uc = add_unit(f.w, third, tile_at(f.w, f.body, 2, 3)); // its own tile
         f.w.units.at(f.ua).readiness_permille = 0;
         auto battle_vs = [&](entity_id def, entity_id du, uint64_t seed) {
             active_battle b;
-            b.province = f.province; b.attacker = f.att; b.defender = def;
+            b.tile = f.w.units.at(du).position; b.province = f.province;
+            b.attacker = f.att; b.defender = def;
             b.attacker_units = { f.ua }; b.defender_units = { du };
             b.state.end = campaign_battle_end::in_progress;
             b.state.stream_seed = seed; b.state.rng_state = seed;

@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*168 entries — 42 gameplay · 27 canvas · 16 lens · 50 ledger · 33 chrome.*
+*171 entries — 42 gameplay · 29 canvas · 16 lens · 51 ledger · 33 chrome.*
 
 ---
 
@@ -121,7 +121,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Expected output.** The hire is PAID NOW and QUEUED (BL-1435; MILITARY.md § The muster interface): the credit cost is debited and each gated axis draws its flat resource cost, and a muster_order joins world::musters at the base with the row's muster days (90 for infantry, motorised and light armour, 135 for artillery and air defence, 180 for mechanised and armour). No unit exists yet and the out-param is null_entity. Each economy tick takes 90 days off; at zero a unit appears on the base's tile, owned by the acting nation, with count and establishment hire_batch_manpower and `type` the roster index. An order whose base is demolished or decommissioned is dropped with no unit. An agency_event::kind::hired is reported.
 
-**Reason to select.** You want force in the field, and this is the only verb that creates it. Units now FIGHT: a declared hostility and a shared province open a battle (MILITARY.md § Battles; the soft/hard land round), so force decides who holds a province. Weigh three costs: the base it needs (a completed military_base on your own ground), the wait (one or two quarters before the unit stands), and that soldiers are men the economy no longer has once the labour pool lands (BL-1424). Raise modern types: every pre-modern row starts obsolete (gameplay.set_unit_obsolete).
+**Reason to select.** You want force in the field, and this is the only verb that creates it. Units now FIGHT: a march onto a tile a nation you are hostile to holds opens a battle over it (MILITARY.md § Battles; the soft/hard land round), so force decides who holds a province. Weigh three costs: the base it needs (a completed military_base on your own ground), the wait (one or two quarters before the unit stands), and that soldiers are men the economy no longer has once the labour pool lands (BL-1424). Raise modern types: every pre-modern row starts obsolete (gameplay.set_unit_obsolete).
 
 ### `gameplay.idle` — Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Mothball' (a box with a line through it). A toggle: the same button reads 'Reopen' once mothballed.
 
@@ -522,27 +522,28 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `gameplay.march_unit` — The unit card's March press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23 — BL-471 was the placeholder item name; this batch folded it in). Select a unit (its own on-canvas marker, BL-575, or the repeat-click cycle), press March. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
-**Press.** Select a unit, press 'March' — this ARMS province-picking mode (the button shows the accent-ring 'primed' state the tile card's Construct press uses; pressing March again while armed CANCELS the pick, per the standing toggle rule), then click a province on the Planetary canvas to send the unit there. A click that misses every province (open ocean, off-body) is ignored and the mode stays armed. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> province=<province id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
+**Press.** Select a unit, press 'March' — this ARMS destination-picking mode (the button shows the accent-ring 'primed' state the tile card's Construct press uses; pressing March again while armed CANCELS the pick, per the standing toggle rule), then click a tile on the Planetary canvas to send the unit there. A click that misses every tile is ignored and the mode stays armed. Over the seam: COMMAND corp=<id> verb=21 subject=<unit id> tile=<tile id>. The command is applied through apply_corp_command, which recomputes every precondition itself — a stale destination or a unit that has since been disbanded is refused, not applied.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `subject` | `entity_id` | The unit to order. Must exist in world.units and be owned by the acting corporation. NOTE the field: units use `subject`, not `tile` — `tile` is the build/place_road/hire_unit convention and this verb does not read it at all. |
-| `province` | `uint32 (province::id)` | The DESTINATION PROVINCE (BL-511, 2026-08-21 — this replaced a destination tile; the verb kept its value 21 because the enum is serialised and append-only, only the field it reads changed). A province id is NOT an entity_id: it is derived from (body rank | block raster index | component index), so it lives in its own uint32 domain. The default is `no_province` (0xFFFFFFFF) and an omitted field is rejected — id 0 is a REAL province (the first block of the first body), so it cannot serve as an absent-value sentinel. |
+| `subject` | `entity_id` | The unit to order. Must exist in world.units and be owned by the acting nation. |
+| `tile` | `entity_id (tile)` | The DESTINATION TILE (Ben, 2026-10-27: "all marches go to a tile"); the march ends on it. The province grain BL-511 gave the verb is retired: `province` is ignored, and a command naming only a province names no tile and is refused. The wire range-checks the id as an entity_id; only the world's tile store decides whether it is a tile. |
 
 **Valid when:**
 - BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - `subject` names a real unit (rejected_invalid otherwise).
-- That unit is owned by the acting corporation (rejected_not_owner otherwise).
-- `province` is a province in the world's built partition — checked with province_partition::find, which is the authoritative domain test. Any uint32 that is not a built province, including the `no_province` default, is rejected (rejected_invalid otherwise). A wire range gate proves the value FITS; it does not prove it EXISTS, and both checks run.
-- That province is on the SAME BODY as the unit's current tile — intra-body path march only, BL-470's ruling 1 (rejected_invalid otherwise).
-- The unit is not already in that province — marching to where you already stand is not a move; halt_unit is the stop verb (rejected_state otherwise).
-- At least one member tile of the province is reachable from the unit's current tile by intra_body_path (rejected_invalid otherwise).
-- Water needs no separate check: the province partition covers LAND ONLY by construction, so no province id can ever name ocean.
-- The unit is NOT in a live battle (rejected_state otherwise) — BL-467. Walking away from contact is a priced withdrawal, not a free move; use withdraw_from_battle.
+- That unit is owned by the acting nation (rejected_not_owner otherwise).
+- The unit is NOT in a live battle (rejected_state otherwise) — walking away from contact is a priced withdrawal, not a free move; use withdraw_from_battle.
+- The unit is not refitting (rejected_state otherwise).
+- `tile` is a real tile (rejected_invalid otherwise) — the null default of an omitted field included.
+- The unit's type may enter the tile's domain (MILITARY.md § Domains and traversal): a land type may enter coastal water its own nation holds and no other water (rejected_invalid otherwise).
+- The tile is on the SAME BODY as the unit — intra-body path march only, BL-470's ruling 1 (rejected_invalid otherwise).
+- The unit is not already on the tile — halt_unit is the stop verb (rejected_state otherwise).
+- The tile is reachable by a path that steps on no tile another nation's units stand on, save the destination itself (rejected_invalid otherwise).
 
-**Expected output.** The unit's movement_order is REPLACED (not queued behind an existing one): dest_province is the commanded province, dest is the province's lowest-id reachable member tile, path is the solved intra-body route with path[0] the tile the unit already occupies, next_index is 1 and progress is 0. The route is computed ONCE, here — never re-Dijkstra'd per tick, only on an actual block. Movement then resolves across ticks in run_unit_march, spending the unit's per-class march_points_per_class against the shared terrain traversal cost and banking the fractional remainder. The order CLEARS ITSELF the tick the unit enters the destination province — it does not walk on to `dest` once it is already inside. A rejection mutates nothing at all.
+**Expected output.** The unit's movement_order is REPLACED (not queued behind an existing one): dest is the commanded tile, path the solved route with path[0] the tile the unit stands on, next_index 1, progress 0. The route is solved around every tile another nation's units stand on, save the destination. Movement then resolves across ticks in run_unit_march, spending the unit's per-class march points against the shared traversal cost. ONE NATION PER TILE: a step onto a tile another nation's units hold is never taken as a move — toward a nation the marcher has declared hostility to it is an ATTACK (the march stops on the tile it stands on, its order clears, and a battle opens over the defender's tile), toward any other nation the step is blocked and the march re-paths round it, clearing if no path remains. The order clears itself when the unit reaches its tile. A rejection mutates nothing at all.
 
-**Reason to select.** The only verb that moves a unit. Until it is issued, a hired unit is pinned to its muster tile forever. Two things an agent should weigh. First, movement is not free of the economy: a unit beyond the reach field loses supply_factor_permille each tick in the upkeep pass, which lowers its derived strength in the resolver — marching away from your road network makes an army measurably weaker, not merely further away. Second, ARRIVING NOW HAS A CONSEQUENCE (BL-467, 2026-08-21): standing in a province where a corp you are hostile to also has units opens a battle on the next tick, with no verb issued by anyone. Position is no longer free. And the reverse follows — this verb is REFUSED (rejected_state) for a unit already in contact, because leaving a fight is withdraw_from_battle, which is priced, not a march, which is not.
+**Reason to select.** The only verb that moves a unit, and since 2026-10-27 the only way a fight starts: marching onto a tile a nation you are hostile to holds is an attack, wherever on the path you meet it. Standing next to an enemy starts nothing, and nor does sharing its province. Movement is not free of the economy: a unit beyond the reach field loses supply each tick, which weakens it in the resolver. This verb is REFUSED (rejected_state) for a unit already in contact, because leaving a fight is withdraw_from_battle, which is priced.
 
 ### `gameplay.halt_unit` — The unit card's Halt press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23). Select a unit, press Halt. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
@@ -582,24 +583,24 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `gameplay.withdraw_from_battle` — The BATTLE CARD in the Selection element (BL-469, landed 2026-08-21): select a live battle and its 'Break off' press sits under the withdrawal price, with a confirm popup. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
-**Press.** Click the province a fight stands in (rung 0 of the repeat-click cycle — a battle selects ahead of unit, building and province), read the phase word and the three-term withdrawal price, press 'Break off', then confirm. 'Cancel' backs out. Over the seam: COMMAND corp=<id> verb=24 province=<province id> counterparty=<opposing corp id>. Applied through apply_corp_command, which recomputes every precondition itself.
+**Press.** Click the tile a fight stands on (rung 0 of the repeat-click cycle — a battle selects ahead of unit, building and province), read the phase word and the three-term withdrawal price, press 'Break off', then confirm. 'Cancel' backs out. Over the seam: COMMAND corp=<id> verb=24 tile=<the defended tile> counterparty=<the opposing nation's id>. Applied through apply_corp_command, which recomputes every precondition itself.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `province` | `uint32 (province::id)` | The province the battle is being fought in — the ENVELOPE, since BL-467 frames a fight by province rather than by tile. Default is `no_province` (0xFFFFFFFF) and an omitted field is refused: there is no battle in a province that does not exist, so the request finds nothing and mutates nothing. |
-| `counterparty` | `entity_id` | WHICH fight to leave. A corp can be in more than one battle in one province, because a third corp arriving opens its OWN battles against each existing participant rather than joining theirs. Pass null_entity to mean 'the first, in sorted order' — deterministic, but it is not a choice you made. |
+| `tile` | `entity_id (tile)` | The battle's DEFENDED TILE — its identity since 2026-10-27 (the province envelope is retired). A tile with no live battle, the null default of an omitted field included, names nothing: the request finds nothing and mutates nothing. |
+| `counterparty` | `entity_id` | WHICH fight to leave. A nation can be in more than one battle over one tile, because a third nation attacking the same tile opens its OWN battle. Pass null_entity to mean 'the first, in sorted order' — deterministic, but it is not a choice you made. |
 
 **Valid when:**
 - BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): REFUSED ON THE WIRE (rejected_invalid, before the seam, mutating nothing) once the world is folded - which is every campaign start. It is a firm's verb and the seam admits no nation acting as itself on it; the seat corporation it would need holds nothing after the fold. An unfolded world (a fixture) keeps the corporation actor.
-- A battle exists in `province` (rejected_state otherwise).
-- The acting corporation is a PARTICIPANT in it — attacker or defender (rejected_state otherwise). A third party cannot order someone else's force off the field.
+- A live battle is fought over `tile` (rejected_state otherwise).
+- The acting nation is a PARTICIPANT in it — attacker or defender (rejected_state otherwise). A third party cannot order someone else's force off the field.
 - That battle is still in progress; a concluded one is erased at the end of the tick it ended (rejected_state otherwise).
-- `counterparty`, when not null_entity, names the opposing corp in that battle (rejected_state otherwise).
+- `counterparty`, when not null_entity, names the opposing nation in that battle (rejected_state otherwise).
 - BL-1406: KNOWN GAP - in the app the press is still filed as the seat corporation, but the fold re-owned the convoy / unit / battle side to the nation, so the seam refuses it until the verb admits a nation acting as itself (world-side work, after BL-1407).
 
 **Expected output.** The withdrawal is RECORDED, not applied. It is honoured at the START of the next tick's battle pass, before that tick's round batch — which is what makes the window a real window rather than a same-instant escape. When honoured, the resolver's three-term cost (a flat base, plus a term per round already fought, plus a pursuit term scaled by how far behind the withdrawing side is) reduces that side's strength, the loss is distributed across its units proportional to count with the remainder by ascending unit id, and the side that stayed holds the field. A rejection mutates nothing at all.
 
-**Reason to select.** The ONLY decision a commander has once contact is made — a battle opens because two hostile forces share a province, not because anyone asked for it, so there is no 'attack' verb to weigh against this one. Weigh it on the cost curve rather than on the odds alone: the price rises with every round already fought AND with how badly you are losing, and the rounds themselves have already cost their own attrition, so a late withdrawal compounds twice. Breaking off early from a fight you are losing is cheap; breaking off late from one you are losing badly is where armies die. At the shipped pacing (3 rounds a tick, 6 to a stalemate) a full battle spans two ticks, so there is exactly ONE real opportunity to use this. THE CARD QUOTES THE PRICE BEFORE YOU PAY IT — base, per-round and pursuit shown separately, taken from the resolver's own arithmetic — so the cost curve is readable rather than something to infer from the rules.
+**Reason to select.** The ONLY decision a commander has once contact is made — a battle opens when a march steps onto a tile a nation it is hostile to holds — the attack is march_unit — and once it has, this is the only lever left. Weigh it on the cost curve rather than on the odds alone: the price rises with every round already fought AND with how badly you are losing, and the rounds themselves have already cost their own attrition, so a late withdrawal compounds twice. Breaking off early from a fight you are losing is cheap; breaking off late from one you are losing badly is where armies die. At the shipped pacing (3 rounds a tick, 6 to a stalemate) a full battle spans two ticks, so there is exactly ONE real opportunity to use this. THE CARD QUOTES THE PRICE BEFORE YOU PAY IT — base, per-round and pursuit shown separately, taken from the resolver's own arithmetic — so the cost curve is readable rather than something to infer from the rules.
 
 ### `gameplay.raze_centre` — Seam-only for now (BL-616, centre promotion and decline): a corp_verb issued against the corp-command seam (ProjectIo --serve, COMMAND opcode). No UI press exists yet — the occupation surface that would host one belongs to the conquest consequence item (BL-518).
 
@@ -752,7 +753,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - A non-null `tile` lies in one of the actor's own fronts (rejected_invalid otherwise).
 - The assignment changes something: not the same front again, not unassigning an unassigned unit (rejected_state otherwise).
 
-**Expected output.** The unit stores the front's key (unit_component::front). From the next economy tick the front moves it: to an evenly spaced slot along the span under hold, or into the neighbour's weakest adjacent province under push, each move a legal march_unit. A manual march on an assigned unit is overridden; unassign to march by hand. The assignment follows the front as the border moves and drops when the front is gone. Saved (world_save_version 62). Rival nations' scorers issue it for their own units (AI_OPPONENT.md § 11, 'Rival nations use fronts').
+**Expected output.** The unit stores the front's key (unit_component::front). From the next economy tick the front moves it: onto an evenly spaced slot TILE along the span under hold (it is on its slot when it stands on it), or under push onto the neighbour's weakest adjacent land tile (an empty tile weakest, then nearest its slot, ties to the lower tile id — marching onto a held tile is an attack), each move a legal march_unit. A manual march on an assigned unit is overridden; unassign to march by hand. The assignment follows the front as the border moves and drops when the front is gone. Saved (world_save_version 62). Rival nations' scorers issue it for their own units (AI_OPPONENT.md § 11, 'Rival nations use fronts').
 
 **Reason to select.** Hold a border without placing every unit by hand: the front spreads its units along the span and refills gaps as units die or fall back.
 
@@ -770,9 +771,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - Push only toward a neighbour the actor has declared hostility to, one direction (is_hostile(actor, neighbour)); rejected_state otherwise.
 - The order changes (rejected_state otherwise).
 
-**Expected output.** Push is stored in world::front_orders under the front's key; hold erases the entry, since hold is the default and never stored. Under push the front's units march into the neighbour's adjacent land province with the lowest defence (the summed unit_strength of the neighbour's units there, ties to the lower province id). A unit already in one of those provinces holds what it took. If the hostility ends, the stored push acts as hold. Saved (world_save_version 62). Rival nations' scorers issue it for their own fronts.
+**Expected output.** Push is stored in world::front_orders under the front's key; hold erases the entry, since hold is the default and never stored. Under push each of the front's units marches onto the neighbour's land tile with a hex side onto the span whose standing stack is weakest (the summed unit_strength of the units on it, an empty tile weakest of all), nearest its own slot, ties to the lower tile id; marching onto a held tile is an attack. A unit already standing on the neighbour's ground holds what it took. If the hostility ends, the stored push acts as hold. Saved (world_save_version 62). Rival nations' scorers issue it for their own fronts.
 
-**Reason to select.** Push where your assigned force clearly outweighs the weakest province across the border; hold everywhere else.
+**Reason to select.** Push where your assigned force clearly outweighs the weakest tile across the border; hold everywhere else.
 
 ---
 
@@ -1144,6 +1145,36 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The FRONT is selected - pointer_target().selection_kind becomes 'front' - and the Selection band shows the front card (neighbour, span, assigned units, Hold / Push). Every other selection channel clears. Nothing in the world changes.
 
 **Reason to select.** The only route to a front: the card it opens is where its order is set and its assigned units are read back.
+
+### `canvas.unit_right_click_move` — The Planetary canvas, with the player's own unit or unit group selected (BL-1443, tile contact orders; SELECTION.md § Right-click orders).
+
+**Press.** Hover a land tile: it outlines green and the cursor line reads 'Right-click: move'. Right-click it. Every unit of the selection (one unit, or the whole group) is sent gameplay.march_unit to that tile, in ascending id; a unit assigned to a front is first sent gameplay.assign_front with a null tile (unassigned), then marched.
+
+**Valid when:**
+- The player's own unit is selected (its card), or the group of the player's units on one tile (the unit group element). A rival's unit or group, or no unit, orders nothing.
+- The tile is land, and not the tile the units already stand on (water and the units' own tile show no outline and the press does nothing).
+- No other nation's units stand on the tile (else canvas.unit_right_click_attack).
+- The March cell is not armed (an armed March pick takes the left-click instead).
+- Placement mode and an armed road are off.
+- The verb's own preconditions apply per unit (gameplay.march_unit); a refusal mutates nothing for that unit.
+
+**Expected output.** Each unit's movement order is set toward the tile. Status line: 'N marching', 'N marching, M refused', or 'Can't march there.' when every unit was refused.
+
+**Reason to select.** The quickest way to move a unit or a whole stack: point at the ground.
+
+### `canvas.unit_right_click_attack` — The Planetary canvas, with the player's own unit or unit group selected, hovering another nation's stack (BL-1443; SELECTION.md § Right-click orders).
+
+**Press.** Hover a tile another nation's units stand on. Toward a nation the player is hostile to, it outlines red with the battle glyph and the cursor line reads 'Right-click: attack <nation>'; right-click it to march every unit of the selection onto that tile — the attack (the world opens the battle on contact; there is no attack verb). Toward a nation the player is not hostile to it outlines orange and reads 'Right-click: declare hostility and attack <nation>'; the right-click opens ledger.unit_order_declare_confirm instead of sending anything.
+
+**Valid when:**
+- The player's own unit is selected (its card), or the group of the player's units on one tile (the unit group element). A rival's unit or group, or no unit, orders nothing.
+- Another nation's units stand on the hovered land tile (one nation per tile, so the stack names one nation).
+- The March cell is not armed; placement mode and an armed road are off.
+- The march preconditions apply per unit (gameplay.march_unit).
+
+**Expected output.** Hostile target: each unit marches onto the tile (front-assigned units unassigned first). Status line: 'N attacking', 'N attacking, M refused', or 'Can't attack there.'. Not hostile: the declare confirm opens.
+
+**Reason to select.** Attack an enemy stack directly from the map.
 
 ---
 
@@ -2037,7 +2068,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Expected output.** The front's order is set; the lit button moves. Status line: 'Front ordered to push.' / 'Front ordered to hold.', or 'Can't push there: not hostile.' / 'No such front.' on a refusal.
 
-**Reason to select.** Push sends the front's units into the neighbour's weakest adjacent province; hold keeps them spread along the span (MILITARY.md § Fronts).
+**Reason to select.** Push marches the front's units onto the neighbour's weakest adjacent tile (marching onto a held tile is an attack); hold keeps them spread along the span (MILITARY.md § Fronts).
 
 ### `ledger.selection_assign_front` — Selection band: the unit card's action grid, sixth cell (a flag glyph, tooltip 'Assign to front'), and the unit group's header button 'Assign to front' (the player's own groups only).
 
@@ -2051,6 +2082,18 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Each unit's front is set (or cleared); the cell wears the primed ring while the unit is assigned and the Strength page reads 'Front: <label>'. The front line's count plate moves. Status line: 'Assigned to the front.' / 'Unassigned.', or how many were refused.
 
 **Reason to select.** A front does nothing without units on it: assigned units spread along the span, fill gaps and push when ordered.
+
+### `ledger.unit_order_declare_confirm` — The small confirm a right-click attack on a nation the player is not hostile to opens beside the cursor (BL-1443; SELECTION.md § Right-click orders).
+
+**Press.** It reads 'Declare hostility toward <nation> and attack?'. 'Declare and attack' sends gameplay.declare_hostile toward the nation, then the march of every unit of the selection onto the tile (as canvas.unit_right_click_attack), in that order in one frame. 'Cancel', Escape, or any other press on the canvas closes it and sends nothing.
+
+**Valid when:**
+- Opened by canvas.unit_right_click_attack on a nation the player is not hostile to.
+- declare_hostile's own preconditions apply; if it is refused (other than 'already hostile') no march is sent.
+
+**Expected output.** The player is hostile toward the nation (every stance surface reads it), and the units march onto the tile. Status line as canvas.unit_right_click_attack, or "Couldn't declare hostility.".
+
+**Reason to select.** Start a war with a nation by attacking its stack — with a deliberate second press, since hostility is a stance change.
 
 ---
 

@@ -471,7 +471,7 @@ uint64_t world::state_hash(int tick) const
         fnv1a_u32(h, static_cast<uint32_t>(battles.size()));
         for (const active_battle& b : battles)
         {
-            fnv1a_u32(h, b.province);
+            fnv1a_u32(h, b.tile); // the identity: the defended tile (2026-10-27)
             fnv1a_u32(h, b.attacker);
             fnv1a_u32(h, b.defender);
             fnv1a_i32(h, b.state.rounds_fought);
@@ -484,6 +484,7 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, static_cast<uint32_t>(b.state.rng_state >> 32));
             for (const entity_id u : b.attacker_units) fnv1a_u32(h, u);
             for (const entity_id u : b.defender_units) fnv1a_u32(h, u);
+            for (const entity_id u : b.attacking_units) fnv1a_u32(h, u);
         }
     }
 

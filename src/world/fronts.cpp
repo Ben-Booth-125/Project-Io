@@ -404,11 +404,11 @@ void warm_rasters(world& w)
         (void)body_tile_grid(w, b);
 }
 
-/// The LAND provinces holding a tile of `f.neighbour` with a hex side onto `f`'s
-/// span, ascending id.
-std::set<uint32_t> push_candidates(const world& w, raster_source& rs, const front& f)
+/// The push's candidate tiles (Ben, 2026-10-27: "fronts and push use tiles too"):
+/// the LAND tiles of `f.neighbour` with a hex side onto `f`'s span, ascending id.
+std::set<entity_id> push_candidates(const world& w, raster_source& rs, const front& f)
 {
-    std::set<uint32_t> out;
+    std::set<entity_id> out;
     for (const entity_id t : f.span)
     {
         const auto tit = w.tiles.find(t);
@@ -419,12 +419,41 @@ std::set<uint32_t> push_candidates(const world& w, raster_source& rs, const fron
             const entity_id n = neighbour_of(w, rs, tit->second, side);
             if (n == null_entity || owner_of(w, n) != f.neighbour)
                 continue;
-            const uint32_t p = w.provinces.province_of(n);
-            if (p != 0 && province_kind_of(w, p) == province_kind::land)
-                out.insert(p);
+            const auto nit = w.tiles.find(n);
+            if (nit != w.tiles.end() && !is_water(nit->second.substrate))
+                out.insert(n);
         }
     }
     return out;
+}
+
+/// The standing stack on each of @p cand, as the push reads it: the summed
+/// `unit_strength` of the units of any nation but @p nation on it (an empty tile
+/// is 0, the weakest of all). Integer strengths, so the unordered walk cannot
+/// reach the sums. Tiles @p nation's own units already stand on are dropped —
+/// they are taken, not targets.
+std::map<entity_id, int64_t> push_strengths(const world& w, entity_id nation,
+                                            const std::set<entity_id>& cand)
+{
+    std::map<entity_id, int64_t> held;
+    for (const entity_id t : cand)
+        held[t] = 0;
+    std::set<entity_id> ours;
+    for (const auto& [uid, u] : w.units)
+    {
+        if (u.count <= 0)
+            continue;
+        const auto it = held.find(u.position);
+        if (it == held.end())
+            continue;
+        if (u.owner == nation)
+            ours.insert(u.position);
+        else
+            it->second += unit_strength(w, u);
+    }
+    for (const entity_id t : ours)
+        held.erase(t);
+    return held;
 }
 
 } // namespace
@@ -597,35 +626,21 @@ bool front_may_push(const world& w, const front& f)
     return is_hostile(w, f.nation, f.neighbour);
 }
 
-uint32_t front_push_target(const world& w, const front& f, int64_t* defence)
+entity_id front_push_target(const world& w, const front& f, int64_t* defence)
 {
     if (defence != nullptr)
         *defence = 0;
     raster_source rs{ w, {} };
-    const std::set<uint32_t> cand = push_candidates(w, rs, f);
-    if (cand.empty())
-        return 0;
-    std::map<uint32_t, int64_t> held;
-    for (const uint32_t p : cand)
-        held[p] = 0;
-    // Integer strengths: the sum cannot depend on the unordered walk.
-    for (const auto& [uid, u] : w.units)
-    {
-        if (u.owner != f.neighbour || u.count <= 0)
-            continue;
-        const auto it = held.find(w.provinces.province_of(u.position));
-        if (it != held.end())
-            it->second += unit_strength(w, u);
-    }
-    uint32_t best = 0;
+    const std::map<entity_id, int64_t> held = push_strengths(w, f.nation, push_candidates(w, rs, f));
+    entity_id best = null_entity;
     int64_t best_s = std::numeric_limits<int64_t>::max();
-    for (const auto& [p, s] : held) // ascending: the first at the lowest strength wins
+    for (const auto& [t, s] : held) // ascending: the first at the lowest strength wins
         if (s < best_s)
         {
             best_s = s;
-            best   = p;
+            best   = t;
         }
-    if (defence != nullptr)
+    if (defence != nullptr && best != null_entity)
         *defence = best_s;
     return best;
 }
@@ -648,14 +663,14 @@ void advance_fronts(world& w, const recipe_registry& reg)
             groups[{ w.units.at(uid).owner, w.units.at(uid).front }].push_back(uid);
     }
 
-    const auto issue = [&](entity_id uid, entity_id owner, corp_verb verb, uint32_t province) {
+    const auto issue = [&](entity_id uid, entity_id owner, corp_verb verb, entity_id tile) {
         corp_command cmd;
         cmd.tick      = w.current_econ_tick;
         cmd.corp      = owner;
         cmd.as_nation = owner;
         cmd.verb      = verb;
         cmd.subject   = uid;
-        cmd.province  = province;
+        cmd.tile      = tile; // every march goes to a tile (2026-10-27)
         return apply_corp_command(w, reg, cmd); // a refusal mutates nothing; next tick asks again
     };
     const auto busy = [&](entity_id uid, const unit_component& u) {
@@ -673,47 +688,67 @@ void advance_fronts(world& w, const recipe_registry& reg)
 
         const bool push = front_order_of(w, nk.first, nk.second) == front_order::push
                        && front_may_push(w, *f);
-        const uint32_t target = push ? front_push_target(w, *f) : 0;
 
         // HOLD: n slots spaced evenly along the span, centred in n equal stretches;
-        // unit i (ascending id) takes slot i. A unit is on its slot when it stands in
-        // the slot tile's province — a march ends on entering its province.
+        // unit i (ascending id) takes slot i. A unit is on its slot when it stands
+        // ON the slot tile — every march ends on its tile (2026-10-27).
         const std::size_t n = uids.size(), len = f->span.size();
+        const auto slot_of = [&](std::size_t i) { return f->span[((2 * i + 1) * len) / (2 * n)]; };
         const auto hold = [&](std::size_t i) {
             const entity_id uid = uids[i];
             const unit_component& u = w.units.at(uid);
             if (busy(uid, u))
                 return;
-            const entity_id slot = f->span[((2 * i + 1) * len) / (2 * n)];
-            const uint32_t want = w.provinces.province_of(slot);
-            if (want == 0)
-                return;
-            if (w.provinces.province_of(u.position) == want)
+            const entity_id slot = slot_of(i);
+            if (u.position == slot)
             {
-                if (u.order.dest != null_entity && u.order.dest_province != want)
-                    issue(uid, nk.first, corp_verb::halt_unit, no_province);
+                if (u.order.dest != null_entity)
+                    issue(uid, nk.first, corp_verb::halt_unit, null_entity);
                 return;
             }
-            if (u.order.dest != null_entity && u.order.dest_province == want)
+            if (u.order.dest == slot)
                 return;
-            issue(uid, nk.first, corp_verb::march_unit, want);
+            issue(uid, nk.first, corp_verb::march_unit, slot);
         };
 
-        if (target != 0)
+        if (push)
         {
-            // PUSH: into the neighbour's weakest adjacent province. A unit already
-            // standing in any province the push may enter holds what it took.
+            // PUSH: each unit marches onto the neighbour's land tile with a hex side
+            // onto the span whose standing stack is weakest (an empty tile weakest of
+            // all), nearest its own slot, ties to the lower tile id. Marching onto a
+            // held tile is an attack (run_unit_march). A unit already standing on the
+            // neighbour's ground holds what it took.
             raster_source rs{ w, {} };
-            const std::set<uint32_t> cand = push_candidates(w, rs, *f);
+            const std::map<entity_id, int64_t> held =
+                push_strengths(w, nk.first, push_candidates(w, rs, *f));
             for (std::size_t i = 0; i < n; ++i)
             {
                 const entity_id uid = uids[i];
                 const unit_component& u = w.units.at(uid);
                 if (busy(uid, u))
                     continue;
-                if (cand.count(w.provinces.province_of(u.position)) != 0)
+                if (owner_of(w, u.position) == f->neighbour)
+                    continue; // on the neighbour's ground: it holds what it took
+                const entity_id slot = slot_of(i);
+                entity_id target = null_entity;
+                int64_t   best_s = std::numeric_limits<int64_t>::max();
+                int       best_d = std::numeric_limits<int>::max();
+                for (const auto& [t, st] : held) // ascending id: the first of a tie wins
+                {
+                    const int d = hex_distance(w, slot, t);
+                    if (st < best_s || (st == best_s && d < best_d))
+                    {
+                        target = t;
+                        best_s = st;
+                        best_d = d;
+                    }
+                }
+                if (target == null_entity)
+                {
+                    hold(i); // nothing left to push onto: hold the slot
                     continue;
-                if (u.order.dest != null_entity && u.order.dest_province == target)
+                }
+                if (u.order.dest == target)
                     continue;
                 // A unit that cannot reach the target (another landmass) holds its
                 // slot rather than standing idle (cold review, 2026-10-27).

@@ -26,6 +26,7 @@
 #include <memory>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -1995,6 +1996,19 @@ void advance_musters(world& w)
         m.days_remaining -= k_construction_quarter_days;
         if (m.days_remaining > 0)
         {
+            still.push_back(m);
+            continue;
+        }
+        // ONE NATION PER TILE (Ben, 2026-10-27): a base's tile is the nation's own
+        // ground, but another nation's stack may be marching through it. The
+        // finished muster waits — at zero days, so it completes the first tick the
+        // tile is clear — rather than raise a unit onto a foreign stack.
+        bool foreign = false;
+        for (const auto& [uid, u] : w.units) // a test: the walk order cannot matter
+            foreign = foreign || (u.count > 0 && u.position == bit->second.tile && u.owner != m.owner);
+        if (foreign)
+        {
+            m.days_remaining = 0;
             still.push_back(m);
             continue;
         }
@@ -4423,11 +4437,14 @@ std::vector<lp_march_claim> collect_march_claims(const world& w, const recipe_re
         return claims;
     const auto& table = unit_roster_table();
     const military_capability_params& mil = reg.military();
+    const std::set<entity_id> fighting = units_in_live_battles(w);
     for (const entity_id id : march_visit_order(w))
     {
         const unit_component& u = w.units.at(id);
         if (u.order.dest == null_entity)
             continue; // halted / never ordered: nothing to ask for
+        if (fighting.count(id) != 0)
+            continue; // in a battle: it holds, and asks for nothing (run_unit_march)
         const unit_class cls = (u.type < table.size()) ? table[u.type].cls : unit_class::infantry;
         const float base_points = mil.march_points_per_class[static_cast<std::size_t>(cls)];
         if (base_points <= 0.0f)
@@ -4463,11 +4480,52 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
     const auto& table = unit_roster_table();
     const military_capability_params& mil = reg.military();
 
+    // A unit in a live battle does not march: walking away from contact is a
+    // priced withdrawal, never a march (MILITARY.md § Marching). Its order, if it
+    // has one, waits until the fight releases it.
+    const std::set<entity_id> fighting = units_in_live_battles(w);
+
+    // ONE NATION PER TILE (Ben, 2026-10-27). Who stands where, kept current as units
+    // step: tile -> owner -> standing units there. Built in ascending unit id.
+    std::map<entity_id, std::map<entity_id, int>> occupancy;
+    for (const auto& [uid, uu] : w.units)
+        if (uu.count > 0 && uu.position != null_entity)
+            ++occupancy[uu.position][uu.owner];
+    const auto foreign_holder = [&](entity_id tile, entity_id owner, bool hostile_first) {
+        // The nation holding @p tile against @p owner: one nation per tile, so at
+        // most one in a world that keeps the rule; should two ever stand there, a
+        // hostile one answers first, then the lowest id.
+        entity_id found = null_entity;
+        const auto it = occupancy.find(tile);
+        if (it == occupancy.end())
+            return found;
+        for (const auto& [o, n] : it->second)
+        {
+            if (o == owner || n <= 0)
+                continue;
+            if (!hostile_first || is_hostile(w, owner, o))
+                return o;
+            if (found == null_entity)
+                found = o;
+        }
+        return found;
+    };
+    const auto blocked_for = [&](entity_id owner) {
+        std::set<entity_id> out;
+        for (const auto& [t, owners] : occupancy)
+            for (const auto& [o, n] : owners)
+                if (o != owner && n > 0) { out.insert(t); break; }
+        return out;
+    };
+    std::vector<tile_attack> attacks;
+
     for (const entity_id id : ids)
     {
         unit_component& u = w.units.at(id);
         if (u.order.dest == null_entity)
             continue; // halted / never ordered
+        if (fighting.count(id) != 0)
+            continue; // in a battle: it holds
 
         ++out.marching;
 
@@ -4573,8 +4631,7 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
                     break;
                 }
                 movement_order mo;
-                mo.dest          = u.order.dest;
-                mo.dest_province = u.order.dest_province; // BL-511: a recompute must not silently drop the grain
+                mo.dest = u.order.dest;
                 mo.path = rp.tiles;
                 if (mo.path.front() != u.position)
                     std::reverse(mo.path.begin(), mo.path.end());
@@ -4582,6 +4639,39 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
                 mo.progress   = 0.0f;
                 u.order = mo;
                 continue; // re-evaluate the loop condition against the fresh path
+            }
+
+            // ONE NATION PER TILE (Ben, 2026-10-27; MILITARY.md § Marching). A step
+            // onto a tile another nation's units hold is never taken as a move.
+            if (const entity_id holder = foreign_holder(next_id, u.owner, true); holder != null_entity)
+            {
+                if (is_hostile(w, u.owner, holder))
+                {
+                    // AN ATTACK, wherever on the path it meets the stack: the march
+                    // stops on the tile it stands on, and the battle opens over the
+                    // defender's tile once every unit has moved (open_tile_battles).
+                    attacks.push_back({ next_id, u.owner, holder, id });
+                    u.order = movement_order{};
+                    ++out.attacks;
+                    break;
+                }
+                // BLOCKED: re-path around every foreign stack, once; with no path
+                // (or none whose next step is clear) the order clears.
+                ++out.recomputed;
+                ++out.blocked;
+                const std::vector<entity_id> rp =
+                    march_path(w, cur_it->second.body, u.position, u.order.dest, blocked_for(u.owner));
+                if (rp.size() < 2 || foreign_holder(rp[1], u.owner, false) != null_entity)
+                {
+                    u.order = movement_order{};
+                    break;
+                }
+                const entity_id dest = u.order.dest;
+                u.order            = movement_order{};
+                u.order.dest       = dest;
+                u.order.path       = rp;
+                u.order.next_index = 1;
+                continue; // the banked points are spent below, against the fresh path
             }
 
             // THE ONE HOP PRICE the floods use (`edge_traversal_cost`, BL-1340): the mean
@@ -4594,21 +4684,16 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
             if (step_cost <= 0.0f || points + 1e-6f >= step_cost)
             {
                 points -= step_cost;
+                if (u.count > 0)
+                {
+                    --occupancy[u.position][u.owner];
+                    ++occupancy[next_id][u.owner];
+                }
                 u.position = next_id;
                 ++u.order.next_index;
-
-                // BL-511: the march ends on ENTERING the destination province,
-                // not on reaching the member tile the path was solved to. A
-                // unit's position IS a province under Ben's 2026-08-21 grain
-                // ruling, so walking on to a particular hex inside a province
-                // the unit already occupies would be movement with no
-                // meaning. Legacy / harness-built orders carry
-                // dest_province == 0 and keep the pure tile behaviour.
-                if (u.order.dest_province != 0
-                    && w.provinces.province_of(u.position) == u.order.dest_province)
-                {
-                    break; // the arrival check below clears the order and counts it
-                }
+                // Every march goes to a TILE and ends on it (Ben, 2026-10-27): the
+                // province grain BL-511 gave the march is retired, so the arrival
+                // check below is the path's end and nothing else.
             }
             else
             {
@@ -4617,16 +4702,18 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
             }
         }
 
-        const bool in_dest_province =
-            u.order.dest_province != 0
-            && w.provinces.province_of(u.position) == u.order.dest_province;
-        if (u.order.dest != null_entity
-            && (in_dest_province || u.order.next_index >= u.order.path.size()))
+        if (u.order.dest != null_entity && u.order.next_index >= u.order.path.size())
         {
             u.order = movement_order{}; // arrived — order clears itself
             ++out.arrived;
         }
     }
+
+    // THE ATTACKS THIS PASS REGISTERED open now, after every unit has moved, in
+    // (tile, attacker, defender) order — so which battle claims an adjacent stack
+    // first is a property of the ids, never of the visit order.
+    if (!attacks.empty())
+        out.battles_opened = open_tile_battles(w, w.current_day_tick, std::move(attacks));
 
     return out;
 }

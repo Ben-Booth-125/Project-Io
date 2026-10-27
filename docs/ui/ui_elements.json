@@ -2004,6 +2004,24 @@
    "checks": [
     "fronts"
    ]
+  },
+  {
+   "id": "UI-131",
+   "name": "Right-click unit orders",
+   "kind": "control",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/SELECTION.md § Right-click orders",
+    "docs/military/MILITARY.md § Marching",
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/app.cpp"
+   ],
+   "summary": "With the player's own unit or group selected, the hovered land tile previews the order (green move, red attack, orange declare hostility and attack, with a line at the cursor) and a right-click sends it: a march for every unit, the attack on another nation's stack, or a confirm before declaring hostility. A front-assigned unit is unassigned first.",
+   "interesting_question": "One press, three meanings. Does the preview make the difference legible before the press, and does a stack report one honest line for many commands?",
+   "resolution": "The preview is the hover's job and the press's meaning never differs from it (both read one resolver, resolve_unit_order). The stack's commands run in ascending id and report 'N marching' or 'N marching, M refused'.",
+   "checks": [
+    "unit_orders"
+   ]
   }
  ]
 }

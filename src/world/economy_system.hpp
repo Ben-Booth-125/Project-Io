@@ -860,6 +860,12 @@ struct unit_march_tick
     /// recomputed counter style rather than inventing a narration pathway
     /// (nothing narrates unit movement today; see the doc comment below).
     int refused_no_lp = 0;
+
+    /// One nation per tile (Ben, 2026-10-27; MILITARY.md § Marching): steps
+    /// refused because another nation's units held the next tile.
+    int attacks        = 0; ///< ...toward a nation the marcher is hostile to: the march stopped and attacked.
+    int blocked        = 0; ///< ...toward any other nation: the march re-pathed or cleared.
+    int battles_opened = 0; ///< Battles the registered attacks opened (open_tile_battles).
 };
 
 /// NR-344's mobilisation test — see run_unit_march's doc comment. Exposed

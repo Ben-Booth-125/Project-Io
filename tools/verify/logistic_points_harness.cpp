@@ -184,10 +184,9 @@ entity_id add_unit(world& w, entity_id corp, entity_id tile, int count = 50,
     return u;
 }
 
-/// A RAW legacy-grain order (dest_province == 0 — the back-compat tile path
-/// unit_march_harness.cpp's own M2 uses), so this file needs no province
-/// partition at all: what is under test here is the points gate, not march_unit
-/// or the province seam.
+/// A RAW tile order, built by hand (every march goes to a tile since 2026-10-27),
+/// so this file needs no province partition at all: what is under test here is
+/// the points gate, not march_unit.
 void order_along_row(world& w, entity_id unit, entity_id body, int from_col, int to_col)
 {
     std::vector<entity_id> path;
@@ -221,7 +220,7 @@ recipe_registry make_registry(float march_pts, float credit_per_unit_dist)
 
 bool order_equal(const movement_order& a, const movement_order& b)
 {
-    return a.dest == b.dest && a.dest_province == b.dest_province
+    return a.dest == b.dest
         && a.path == b.path && a.next_index == b.next_index
         && approx(a.progress, b.progress, 1e-6f);
 }

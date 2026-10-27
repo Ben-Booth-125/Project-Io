@@ -49,20 +49,12 @@ struct campaign_battle_identity
 {
     entity_id attacker      = null_entity; ///< Commanding force / corp entity.
     entity_id defender      = null_entity;
-    /// THE ENVELOPE THE FIGHT IS FRAMED BY — the province id since BL-467
-    /// (Ben's ruling 1, 2026-08-19: "hostile units standing in the same province
-    /// are drawn into one battle; the province frames the fight").
-    ///
-    /// It replaces the tile index in the same slot of the same fold, deliberately:
-    /// BL-467's design says to fold the province WHERE campaign_battle_identity
-    /// folds tile_index today, same splitmix64 shape, role order preserved. Doing
-    /// it in place rather than appending a field keeps the stream one field wide
-    /// and keeps the asymmetry argument below unchanged.
-    ///
-    /// Units still stand on TILES — BL-315's tile-token ruling is untouched. The
-    /// two grains answer different questions: the tile is where a unit is, the
-    /// province is who it is in a fight with.
-    uint32_t  province      = 0;
+    /// THE DEFENDED TILE (Ben, 2026-10-27, overturning the 2026-08-19 province
+    /// envelope): a battle is fought over the tile the defender stands on, which
+    /// the attacker tried to step onto (MILITARY.md § Battles). It sits in the
+    /// slot of the fold the province (and before it the tile index) held, same
+    /// splitmix64 shape, role order preserved.
+    entity_id tile          = null_entity;
     uint64_t  tick          = 0;           ///< Campaign tick the battle opened.
     uint32_t  world_seed    = 0;           ///< So two worlds with equal ids still differ.
 };
@@ -294,13 +286,18 @@ struct campaign_battle_state
 /// struct is that ownership: it is what makes a battle a thing in the world with
 /// a duration, rather than an answer somebody computed.
 ///
-/// IDENTITY is (province, attacker, defender). A corp pair fights at most one
-/// battle per province at a time — a third corp arriving opens its own battles
-/// against each of them rather than joining or splitting this one.
+/// IDENTITY is (tile, attacker, defender), the tile being the DEFENDED one
+/// (Ben, 2026-10-27). A nation pair fights at most one battle per tile at a time
+/// — a third nation attacking the same tile opens its own battle rather than
+/// joining or splitting this one.
 struct active_battle
 {
-    uint32_t  province = 0;            ///< The envelope. Ruling 1: the province frames the fight.
-    entity_id attacker = null_entity;  ///< The corp whose hostility opened it.
+    entity_id tile     = null_entity;  ///< The defended tile: identity and ground (MILITARY.md § Battles).
+    /// The province `tile` lies in, DERIVED at open (and read from the stream on
+    /// load) — kept for the province holder, the dispatch text and the card,
+    /// which still speak of provinces. Never part of the identity.
+    uint32_t  province = 0;
+    entity_id attacker = null_entity;  ///< The nation whose attack opened it.
     entity_id defender = null_entity;
 
     /// Participating unit ids per side, ASCENDING. Ascending because the
@@ -309,16 +306,19 @@ struct active_battle
     std::vector<entity_id> attacker_units;
     std::vector<entity_id> defender_units;
 
-    /// The ground the fight is ON: the defender-side tile whose terrain the
-    /// resolver was handed at open (battle_system.cpp `defender_ground`, ruling
-    /// 2 — highest terrain_defence, ties to the lowest tile id). STORED at open
-    /// rather than re-derived, because the units it was picked from move and
-    /// die while the terrain the battle reads does not (BL-1145 review): the
-    /// battle card frames this tile. `null_entity` only if no defending unit
-    /// resolved to a real tile — never for a battle discovery opens, whose
-    /// units all stand in the province.
-    /// Saved (world_save_version 30).
+    /// The ground the fight is ON: the defended tile, always equal to `tile`
+    /// (ruling 2 since 2026-10-27). Kept as its own field because the battle card
+    /// frames it and the stream has carried it since world_save_version 30; the
+    /// identity tile is SAVED in this slot (v63), so a pre-v63 battle's key is
+    /// its ground tile.
     entity_id ground_tile = null_entity;
+
+    /// THE ATTACKING STACK, ascending: the units whose march made the attack. A
+    /// subset of `attacker_units` — the rest joined from adjacent tiles. When the
+    /// attacker holds the field these advance onto `tile`; joined stacks stay
+    /// (Ben, 2026-10-27). Saved (world_save_version 63); empty for a pre-v63
+    /// battle, which therefore advances no one.
+    std::vector<entity_id> attacking_units;
 
     /// The resolver's own state: strengths, the stream, rounds fought, and the
     /// per-round trace. Held whole rather than copied field-by-field so the
@@ -333,13 +333,13 @@ struct active_battle
     withdrawing_side withdraw_requested = withdrawing_side::none;
 };
 
-/// Ordering for `world::battles` — (province, attacker, defender), ascending.
+/// Ordering for `world::battles` — (tile, attacker, defender), ascending.
 /// The container is kept sorted by this so a walk over live battles is
 /// order-independent, which matters because the corp and unit containers the
 /// battles were discovered from are UNORDERED.
 inline bool battle_order_less(const active_battle& a, const active_battle& b)
 {
-    if (a.province != b.province) return a.province < b.province;
+    if (a.tile != b.tile) return a.tile < b.tile;
     if (a.attacker != b.attacker) return a.attacker < b.attacker;
     return a.defender < b.defender;
 }

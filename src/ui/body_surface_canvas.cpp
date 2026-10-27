@@ -13,6 +13,7 @@
 #include "tile_inspector.hpp"   // history_view_tectonics (BL-660 routing)
 #include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
+#include "player_side.hpp"     // is_player_side / owner_display_name (BL-1443 right-click orders)
 #include "presentation.hpp"
 #include "road_tool.hpp"        // BL-1370: the crossings an armed road press may reach
 #include "shell_metrics.hpp"     // right chrome column + minimap rect (BL-533 legend home)
@@ -23,6 +24,7 @@
 #include "world/logistic_points.hpp" // BL-1352: the Throughput lens reads the REAL sources
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
+#include "world/stance.hpp"           // is_hostile: right-click attack vs declare (BL-1443)
 #include "world/river_generation.hpp"   // BL-1340: hex_side_for_offset — a road draws across its edge
 #include "world/survey_system.hpp"   // survey_tile_visible (region mask, BL-067)
 #include "world/workforce.hpp"       // workforce_efficiency (Population lens, BL-069)
@@ -1936,6 +1938,70 @@ entity_id resolve_structure_hit(const std::vector<structure_hit_zone>& zones,
     return best;
 }
 
+// --- Right-click orders (BL-1443; SELECTION.md § Right-click orders) ---------
+
+/// The player's own units a right-click orders: the selected unit, or every unit
+/// of its group when the band shows the group (the same grouping the counter and
+/// `unit_group_of` use — same owner, same tile, empty units skipped). Ascending
+/// id. Empty when the selection is not a unit of the player's.
+std::vector<entity_id> order_units_of(const world& w, const ui_state& state)
+{
+    std::vector<entity_id> out;
+    const auto it = w.units.find(state.selected_entity);
+    if (it == w.units.end() || !is_player_side(w, it->second.owner))
+        return out;
+    if (!state.selection_unit_group)
+    {
+        out.push_back(state.selected_entity);
+        return out;
+    }
+    for (const auto& [uid, uc] : w.units)
+        if (uc.count > 0 && uc.position == it->second.position && uc.owner == it->second.owner)
+            out.push_back(uid);
+    if (out.empty())
+        out.push_back(state.selected_entity);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+/// What a right-click on @p tile would order @p units to do.
+struct unit_order_target
+{
+    int       kind   = 0;           ///< 0 none, 1 move, 2 attack, 3 declare hostility and attack.
+    entity_id nation = null_entity; ///< The nation whose stack stands on the tile (2, 3).
+};
+
+unit_order_target resolve_unit_order(const world& w, const std::vector<entity_id>& units,
+                                     entity_id tile)
+{
+    unit_order_target t;
+    if (units.empty() || tile == null_entity)
+        return t;
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end() || is_water(tit->second.substrate))
+        return t; // a land march only: water is ignored
+    bool all_here = true;
+    for (entity_id u : units)
+        if (const auto uit = w.units.find(u); uit == w.units.end() || uit->second.position != tile)
+            all_here = false;
+    if (all_here)
+        return t; // already there: nothing to order
+    // One nation per tile (MILITARY.md § Marching): the lowest-id foreign unit names it.
+    entity_id lowest = null_entity;
+    for (const auto& [uid, uc] : w.units)
+        if (uc.count > 0 && uc.position == tile && !is_player_side(w, uc.owner)
+            && (lowest == null_entity || uid < lowest))
+        {
+            lowest   = uid;
+            t.nation = uc.owner;
+        }
+    if (t.nation == null_entity)
+        t.kind = 1;
+    else
+        t.kind = is_hostile(w, player_actor(w), t.nation) ? 2 : 3;
+    return t;
+}
+
 } // namespace
 
 // BEFORE THE FIRST ECONOMY STEP the report holds no resolve, and a world that has
@@ -2819,12 +2885,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     static std::unordered_map<entity_id, int>            tile_bld_count;
     // BL-1145 (a province's readers take its anchor, not its lowest tile): the
     // tile each (province, owner) unit group DRAWS on — its lowest-id unit's own
-    // tile, so the marker sits where the army stands — and the tile each
-    // province's battle glyph draws on, its ANCHOR (`province_anchor_tile`; the
-    // lowest-id tile only for a province with no centre). Keyed on the same
-    // stamp: a centre changes only on a tick, which day_tick catches.
+    // tile, so the marker sits where the army stands. Keyed on the same stamp.
+    // (The battle glyph's tile is no longer cached here: a battle is keyed by
+    // the DEFENDED TILE — BL-1443 — and draws on its `ground_tile`, read per
+    // frame below.)
     static std::unordered_map<entity_id, std::vector<unit_marker_summary>> tile_units;
-    static std::unordered_map<uint32_t, entity_id> province_mark_tile;
     const body_frame_stamp marker_stamp = make_body_frame_stamp(w, state.active_body);
     if (!(marker_stamp == s_marker_stamp))
     {
@@ -2911,14 +2976,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
 
-        // The battle glyph's tile per province of this body: its anchor.
-        province_mark_tile.clear();
-        {
-            const std::map<uint32_t, province_anchor> anchors = province_anchors(w);
-            for (const province& pv : w.provinces.provinces)
-                if (pv.body == state.active_body)
-                    province_mark_tile[pv.id] = province_anchor_tile(anchors, pv);
-        }
     }
 
     // Spatial index (BL-268): the per-body raster logistics already caches on
@@ -3320,6 +3377,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // both maps are small, so a miss on every other tile was the whole cost.
     static std::vector<float>   vision_raster;
     static std::vector<uint8_t> tile_flags; // bit 0 built, bit 1 owned
+    // The battle drawn on each defended tile this frame (BL-1443), filled below.
+    static std::unordered_map<entity_id, const active_battle*> battle_mark;
     vision_raster.assign(raster_ok ? raster.size() : 0u, 0.0f);
     tile_flags.assign(raster_ok ? raster.size() : 0u, 0u);
     const auto raster_index_of = [&](entity_id tid) -> int {
@@ -3354,10 +3413,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         for (const auto& [tid, groups] : tile_units)
             if (const int ri = raster_index_of(tid); ri >= 0)
                 tile_flags[static_cast<std::size_t>(ri)] |= 4u;
-        if (!w.battles.empty())
-            for (const auto& [pid, tid] : province_mark_tile)
-                if (const int ri = raster_index_of(tid); ri >= 0)
-                    tile_flags[static_cast<std::size_t>(ri)] |= 8u;
+        // Bit 3: a battle's defended tile (BL-1443). The player's own fight wins
+        // a tile two battles share; otherwise the first in `world::battles`'
+        // sorted order, so the pick is stable.
+        battle_mark.clear();
+        for (const active_battle& b : w.battles)
+        {
+            if (b.ground_tile == null_entity)
+                continue;
+            const bool mine = is_player_side(w, b.attacker) || is_player_side(w, b.defender);
+            const auto [it, fresh] = battle_mark.try_emplace(b.ground_tile, &b);
+            if (!fresh && mine && !is_player_side(w, it->second->attacker)
+                && !is_player_side(w, it->second->defender))
+                it->second = &b;
+            if (const int ri = raster_index_of(b.ground_tile); ri >= 0)
+                tile_flags[static_cast<std::size_t>(ri)] |= 8u;
+        }
         if (state.overlay == overlay_mode::throughput)
             for (const ui_state::lp_anchor& a : state.lp_anchors)
                 if (const int ri = raster_index_of(a.tile); ri >= 0)
@@ -5952,9 +6023,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 icons::convoy(dl, {cx, cy}, gr, supply_col);
             }
 
-            // BATTLE MARKER (BL-469). Drawn on the ANCHOR tile of a province a
-            // fight is in — once per battle, not once per tile, or a large
-            // province would read as a dozen battles.
+            // BATTLE MARKER (BL-469). Drawn on the battle's DEFENDED TILE, its
+            // `ground_tile` (BL-1443, tile contact orders: a battle is fought over
+            // the tile the defender stands on — MILITARY.md § Battles — so the
+            // province-anchor placement the old envelope wanted is overturned).
             //
             // It is an alert rather than a label, which is what earns it a place
             // the deleted unit chevron (BL-294) did not have: a battle is
@@ -5967,23 +6039,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // so the two read apart at a glance.
             if ((tflags & 8u) && !w.battles.empty() && draw_r >= 6.0f)
             {
-                const uint32_t pid = w.provinces.province_of(id);
-                if (pid != 0)
+                if (const auto bm = battle_mark.find(id); bm != battle_mark.end())
                 {
-                    const auto mt = province_mark_tile.find(pid);
-                    if (mt != province_mark_tile.end() && mt->second == id)
-                    {
-                        if (const active_battle* b = first_battle_in(w, pid))
-                        {
-                            const bool mine = (b->attacker == player_owner
-                                            || b->defender == player_owner
-                                            || b->attacker == w.player_entity
-                                            || b->defender == w.player_entity); // BL-1406
-                            const ImU32 col = mine ? IM_COL32(255, 120, 90, 235)
-                                                   : IM_COL32(190, 170, 160, 190);
-                            icons::battle(dl, {cx, cy}, std::max(3.0f, draw_r * 0.42f), col);
-                        }
-                    }
+                    const active_battle* b = bm->second;
+                    const bool mine = (b->attacker == player_owner
+                                    || b->defender == player_owner
+                                    || b->attacker == w.player_entity
+                                    || b->defender == w.player_entity); // BL-1406
+                    const ImU32 col = mine ? IM_COL32(255, 120, 90, 235)
+                                           : IM_COL32(190, 170, 160, 190);
+                    icons::battle(dl, {cx, cy}, std::max(3.0f, draw_r * 0.42f), col);
                 }
             }
 
@@ -6126,15 +6191,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                                        prov_hovered, /*pinned=*/false);
                 if (ph != highlight::none)
                 {
-                    // March-picking mode (BL-575): the hovered province reads as a
-                    // destination candidate, not a selection candidate, while a
-                    // march is armed — a distinct green rather than the ordinary
-                    // hover tint, so the live click-through pass has a visible
-                    // "you are picking a destination" cue.
-                    const bool march_picking = state.pending_march_unit != null_entity
-                                             && prov_hovered && ph != highlight::selected;
-                    const ImU32 pc = march_picking ? IM_COL32(90, 230, 120, 235)
-                                   : (ph == highlight::selected) ? palette::selection
+                    // March-picking mode (BL-575) no longer greens the province: a
+                    // march goes to a TILE (BL-1443), so the green destination cue
+                    // is the hovered hex's own outline (the unit-order preview below
+                    // the tile loop), and the province keeps its ordinary hover.
+                    const ImU32 pc = (ph == highlight::selected) ? palette::selection
                                                                  : palette::hover;
                     for (int s = 0; s < 6; ++s)
                     {
@@ -7150,6 +7211,72 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // UNIT ORDERS (BL-1443; SELECTION.md § Right-click orders). With the player's
+    // own unit or group selected, the hovered hex says what a right-click would
+    // do: a green outline to move, a red one with the battle glyph to attack, an
+    // orange one to declare hostility and attack — and a line at the cursor says
+    // it in words. The armed March pick (BL-575) shows the same green outline,
+    // since its click now names the tile too. Reads only; the press is below.
+    const std::vector<entity_id> order_units =
+        (state.construction.active || state.construction.road_arm_tile != null_entity)
+            ? std::vector<entity_id>{}
+            : order_units_of(w, state);
+    unit_order_target order_target;
+    if (have_hover && hovered_tile != null_entity)
+    {
+        if (state.pending_march_unit != null_entity)
+        {
+            const std::vector<entity_id> armed{ state.pending_march_unit };
+            order_target = resolve_unit_order(w, armed, hovered_tile);
+            if (order_target.kind != 0)
+                order_target.kind = 1; // the pick's own green: the card press marches
+        }
+        else
+        {
+            order_target = resolve_unit_order(w, order_units, hovered_tile);
+        }
+    }
+    // While the declare confirm is up it owns the order: no second preview.
+    if (state.unit_order_confirm_nation != null_entity)
+        order_target = unit_order_target{};
+    state.unit_order_hover = order_target.kind;
+    if (order_target.kind != 0)
+    {
+        const ImU32 oc = order_target.kind == 1 ? palette::order_move
+                       : order_target.kind == 2 ? palette::order_attack
+                                                : palette::order_declare;
+        for (int s = 0; s < 6; ++s)
+            dl->AddLine(hover_verts[s], hover_verts[(s + 1) % 6], oc, 3.0f);
+        if (order_target.kind != 1)
+        {
+            float gx = 0.0f, gy = 0.0f;
+            for (const ImVec2& v : hover_verts) { gx += v.x; gy += v.y; }
+            icons::battle(dl, {gx / 6.0f, gy / 6.0f - draw_r * 0.30f},
+                          std::max(4.0f, draw_r * 0.34f), oc);
+        }
+
+        char line[160];
+        const char* who = (order_target.nation != null_entity)
+                        ? owner_display_name(w, order_target.nation) : nullptr;
+        if (who == nullptr) who = "them";
+        if (state.pending_march_unit != null_entity)
+            std::snprintf(line, sizeof line, "Click: march here");
+        else if (order_target.kind == 1)
+            std::snprintf(line, sizeof line, "Right-click: move");
+        else if (order_target.kind == 2)
+            std::snprintf(line, sizeof line, "Right-click: attack %s", who);
+        else
+            std::snprintf(line, sizeof line, "Right-click: declare hostility and attack %s", who);
+        ImDrawList* fdl = ImGui::GetForegroundDrawList();
+        const ImVec2 ts  = ImGui::CalcTextSize(line);
+        const float  pad = 4.0f;
+        const ImVec2 tl { mouse.x + 16.0f, mouse.y + 16.0f };
+        const ImVec2 br { tl.x + ts.x + pad * 2.0f, tl.y + ts.y + pad * 2.0f };
+        fdl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
+        fdl->AddRect(tl, br, oc, 3.0f, 0, 1.5f);
+        fdl->AddText({ tl.x + pad, tl.y + pad }, IM_COL32(230, 230, 235, 255), line); // fit-exempt: the card is sized to its measured text
+    }
+
     // Building-placement ghost preview. When construction mode is active and a tile
     // is hovered, draw a translucent-intent marker of the chosen building type at the
     // hovered copy's centre, tinted green when the placement-rules seam accepts the
@@ -7249,6 +7376,49 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_trade_flow_key(dl, state, tf_max_rate, static_cast<int>(tf_arrows.size()),
                             static_cast<int>(tf_markers.size()));
     v_key_end = dl->VtxBuffer.Size;
+
+    // THE DECLARE CONFIRM (BL-1443): a right-click on the stack of a nation the
+    // player is not hostile to asks before it declares — hostility is a stance
+    // change every other surface reads, not a thing to do by mis-click (the
+    // withdraw confirm's precedent). Drawn before the input gate so it stays up
+    // while the pointer is over it. Escape, Cancel, or another press on the
+    // canvas closes it.
+    if (state.unit_order_confirm_nation != null_entity)
+    {
+        const auto close_confirm = [&state]() {
+            state.unit_order_confirm_nation = null_entity;
+            state.unit_order_confirm_tile   = null_entity;
+            state.unit_order_confirm_units.clear();
+        };
+        const char* who = owner_display_name(w, state.unit_order_confirm_nation);
+        if (who == nullptr) who = "this nation";
+        ImGui::SetNextWindowPos(state.unit_order_confirm_pos, ImGuiCond_Always);
+        const ImGuiWindowFlags cf = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize
+                                  | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove;
+        bool send = false, cancel = ImGui::IsKeyPressed(ImGuiKey_Escape);
+        if (ImGui::Begin("##unit_order_confirm", nullptr, cf))
+        {
+            ImGui::Text("Declare hostility toward %s and attack?", who);
+            if (ImGui::Button("Declare and attack"))
+                send = true;
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel"))
+                cancel = true;
+        }
+        ImGui::End();
+        if (send)
+        {
+            state.pending_unit_order_units    = state.unit_order_confirm_units;
+            state.pending_unit_order_tile     = state.unit_order_confirm_tile;
+            state.pending_unit_order_declare  = state.unit_order_confirm_nation;
+            state.pending_unit_order_attack   = true;
+            close_confirm();
+        }
+        else if (cancel)
+        {
+            close_confirm();
+        }
+    }
 
     if (!input_enabled)
     {
@@ -7529,7 +7699,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // construction placement mode does: the unit card's March press ARMED
         // `pending_march_unit`, so this click's whole job is to name a
         // destination province, not to select or build anything.
-        // app::render reads both fields once `pending_march_dest_province` is
+        // app::render reads both fields once `pending_march_dest_tile` is
         // non-zero, dispatches `corp_verb::march_unit`, and clears both — the
         // same deferred-mutation path every other canvas gesture takes (this
         // canvas holds only `const world&`). A click that misses every
@@ -7561,10 +7731,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
         else if (state.pending_march_unit != null_entity)
         {
-            const uint32_t march_prov = (hovered_tile != null_entity)
-                                        ? w.provinces.province_of(hovered_tile) : 0u;
-            if (march_prov != 0)
-                state.pending_march_dest_province = march_prov;
+            // BL-1443: the pick names the hovered TILE (every march goes to a
+            // tile). Land only: a press on water stays armed, as a miss did.
+            const std::vector<entity_id> armed{ state.pending_march_unit };
+            if (hovered_tile != null_entity && resolve_unit_order(w, armed, hovered_tile).kind != 0)
+            {
+                state.pending_march_dest_tile = hovered_tile;
+            }
         }
         else if (!state.construction.active)
         {
@@ -8041,6 +8214,40 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.construction.pending_tile   = hovered_tile;
             state.construction.pending_type   = state.construction.type;
             state.construction.pending_target = state.construction.target;
+        }
+    }
+
+    // RIGHT-CLICK ORDERS (BL-1443; SELECTION.md § Right-click orders). With the
+    // player's own unit or group selected, a right-click on land is the order the
+    // hover preview above named: a march there for every unit of the selection
+    // (a front-assigned unit is unassigned first — app::render does it), the
+    // attack when another nation's hostile stack holds the tile, or the declare
+    // confirm when the player is not hostile to it. Anything else — nothing of
+    // the player's selected, water, the units' own tile — is ignored. A canvas
+    // press while the confirm is up closes it.
+    if ((ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
+        && state.unit_order_confirm_nation != null_entity)
+    {
+        state.unit_order_confirm_nation = null_entity;
+        state.unit_order_confirm_tile   = null_entity;
+        state.unit_order_confirm_units.clear();
+    }
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && state.pending_march_unit == null_entity
+        && order_target.kind != 0 && !order_units.empty())
+    {
+        if (order_target.kind == 3)
+        {
+            state.unit_order_confirm_nation = order_target.nation;
+            state.unit_order_confirm_tile   = hovered_tile;
+            state.unit_order_confirm_units  = order_units;
+            state.unit_order_confirm_pos    = { mouse.x + 12.0f, mouse.y + 12.0f };
+        }
+        else
+        {
+            state.pending_unit_order_units    = order_units;
+            state.pending_unit_order_tile     = hovered_tile;
+            state.pending_unit_order_declare  = null_entity;
+            state.pending_unit_order_attack   = (order_target.kind == 2);
         }
     }
 
