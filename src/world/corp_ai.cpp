@@ -3045,6 +3045,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             int owned_units = 0;
             for (const auto& [uid, u] : w.units)
                 if (u.owner == corp) ++owned_units;
+            // BL-1435: a hire that is still mustering counts against the cap, or a
+            // nation would queue a hire every evaluation until the first one landed.
+            for (const muster_order& m : w.musters)
+                if (m.owner == corp) ++owned_units;
 
             if (muster_tile != null_entity && owned_units < max_units_per_corp)
             {

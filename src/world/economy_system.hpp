@@ -572,6 +572,11 @@ struct economy_report
 /// BL-1352: the step resolves this tick's Logistic Points itself — the marching
 /// claims first, then production's grants on what is left — so no caller hands it a
 /// pool any more. The legacy per-anchor pool (`lp_pool_map`) is gone with it.
+/// BL-1435 (muster queue): advance every muster a quarter's days and raise the ones
+/// that complete as units at their base. Called from run_economy_step before the
+/// battle pass; exposed so a harness can step it alone.
+void advance_musters(world& w);
+
 economy_report run_economy_step(world& w, const recipe_registry& reg,
                                 bool spectating = false);
 

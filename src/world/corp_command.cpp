@@ -115,10 +115,7 @@ bool debit_hire_cost(world& w, entity_id corp, const roster_row& row)
     return true;
 }
 
-/// The batch size one hire_unit command raises — matches the campaign's
-/// original Kepler unit stub (hard_coded_world.cpp), which used the same
-/// figure before BL-324 gave hiring a real seam.
-constexpr int hire_batch_manpower = 50;
+// hire_batch_manpower lives in unit_roster.hpp (BL-1435: the muster pass raises the unit).
 
 // BL-1407: the procurement helpers (BL-350 / BL-392: supplier capacity,
 // throughput and input access, the buyer's delivery body) and the whole-firm
@@ -556,24 +553,21 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 return corp_command_result::rejected_funds;
             *purse_of(w, cmd.corp) -= hire_cost; // the actor exists: proven at the seam's top
 
-            const entity_id unit = w.create_entity();
-            // BL-459: no `strength` — it was set to the same value as `count`,
-            // a literal duplicate kept in sync by hand. Strength is derived
-            // (unit_strength, unit_roster.hpp) from count x the row's quality x
-            // the supply factor, so a heavy row is genuinely worth more than a
-            // levy at equal headcount and an unsupplied army is measurably
-            // weaker in the resolver.
-            w.units[unit] = unit_component{
-                .position = cmd.tile,
-                .owner    = cmd.corp,
-                .count    = hire_batch_manpower,
-                .type     = cmd.unit_type,
-                .supply_factor_permille = 1000, // raised fully supplied (BL-454)
-                .muster_base            = muster_base,
-                .establishment          = hire_batch_manpower, // BL-1421: the HP bar's full mark
-            };
+            // BL-1435: RAISING TAKES TIME (Ben, 2026-10-27; MILITARY.md § The muster
+            // interface). The hire is paid now and QUEUED at the base; the unit
+            // appears when its muster completes (advance_musters, economy_system).
+            // So there is no unit to hand back: `out_building` is cleared.
+            const int days = muster_days_for(cmd.unit_type);
+            muster_order m;
+            m.id             = w.next_muster_id++;
+            m.base           = muster_base;
+            m.owner          = cmd.corp;
+            m.unit_type      = cmd.unit_type;
+            m.days_total     = days;
+            m.days_remaining = days;
+            w.musters.push_back(m);
             if (out_building)
-                *out_building = unit;
+                *out_building = null_entity;
             return corp_command_result::applied;
         }
 

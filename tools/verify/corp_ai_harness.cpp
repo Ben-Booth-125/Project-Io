@@ -677,7 +677,7 @@ int main()
             shelve(s.w, k_home, resource_type::steel, 3.0f);
             shelve(s.w, k_hidden, resource_type::steel, 4.0f);
             const auto r = hire(s, iron_foot);
-            check(r == corp_command_result::applied && s.w.units.size() == 1,
+            check(r == corp_command_result::applied && s.w.musters.size() == 1 && s.w.units.empty(),
                   "BL-352 R4: goods on the corp's shelves make the gated row hireable through the seam");
             // The lower id drains first: 3 from home then 2 of hidden's 4, or
             // all 4 of hidden then 1 of home's 3.
@@ -717,7 +717,7 @@ int main()
             add_muster_base(s);
             shelve(s.w, s.market, resource_type::steel, 7.0f);
             const auto r = hire(s, levy);
-            check(r == corp_command_result::applied && s.w.units.size() == 1 &&
+            check(r == corp_command_result::applied && s.w.musters.size() == 1 && s.w.units.empty() &&
                   s.w.markets.at(s.market).inventory[ri(resource_type::steel)] == 7.0f,
                   "BL-352 R4: an ungated row hires without touching the pools");
         }
@@ -846,7 +846,7 @@ int main()
                     "BL-498 R5: axis " + std::to_string(ax) + " candidate " +
                     std::to_string(static_cast<int>(cand)) +
                     " gates row '" + row.name + "' open AND pays for it in that resource";
-                check(r == corp_command_result::applied && s.w.units.size() == 1 && left == 0.0f,
+                check(r == corp_command_result::applied && s.w.musters.size() == 1 && left == 0.0f,
                       label.c_str());
             }
         }

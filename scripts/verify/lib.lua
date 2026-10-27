@@ -345,6 +345,9 @@ function raise_player_force(corp)
         local r = verify.corp_command{ verb = VERB_HIRE_UNIT, tile = base.tile, unit_type = row }
         if r == "applied" then
             verify.set_balance(verify.player_balance() - LOAN) -- repay
+            -- BL-1435: a hire QUEUES at the base and becomes a unit when its muster
+            -- completes (90-180 days, one or two ticks), so step until it has.
+            verify.econ_step(2)
             return player_unit(corp)
         end
         -- Carry the REASONS into the failure. A bare "nothing worked" sent this

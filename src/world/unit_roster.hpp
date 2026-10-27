@@ -500,3 +500,14 @@ uint16_t campaign_opening_unit_row();
 /// row's quality (`roster_type_quality_permille`). Hardness is the class's own.
 /// An unknown row fights as infantry, as `unit_to_stack_entry` reads it.
 land_combat_stats unit_land_stats(const unit_component& u);
+
+/// BL-1435 (muster queue; MILITARY.md § The muster interface): the days a hire of
+/// roster row @p roster_type takes to muster, by the land class it fights as —
+/// foot and trucks a quarter, guns and air defence a quarter and a half, tracked
+/// vehicles two quarters. An unknown row musters as infantry.
+int muster_days_for(uint16_t roster_type);
+
+/// The batch size one hire raises — matches the campaign's original unit stub. Shared
+/// by hire_unit (corp_command.cpp) and the muster pass that raises the unit
+/// (economy_system.cpp, BL-1435).
+inline constexpr int hire_batch_manpower = 50;

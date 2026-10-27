@@ -2010,6 +2010,44 @@ economy_step_phase_clock*& economy_step_phase_clock_sink()
     return sink;
 }
 
+void advance_musters(world& w)
+{
+    // BL-1435 (muster queue; MILITARY.md § The muster interface). Each order takes a
+    // quarter's days (one economy tick) off its count; one that reaches zero becomes
+    // a unit on its base's tile, raised exactly as a hire used to raise it. Walked in
+    // ISSUE order — the vector's own order — so the entity ids the completed units
+    // take are a pure function of the queue. An order whose base is gone or
+    // decommissioned is dropped with no unit: the force had nowhere to muster, as a
+    // unit whose base is torn down is disbanded (§ Upkeep, orphan cleanup).
+    if (w.musters.empty())
+        return;
+    std::vector<muster_order> still;
+    still.reserve(w.musters.size());
+    for (muster_order m : w.musters)
+    {
+        const auto bit = w.buildings.find(m.base);
+        if (bit == w.buildings.end() || bit->second.decommissioned)
+            continue;
+        m.days_remaining -= k_construction_quarter_days;
+        if (m.days_remaining > 0)
+        {
+            still.push_back(m);
+            continue;
+        }
+        const entity_id unit = w.create_entity();
+        w.units[unit] = unit_component{
+            .position = bit->second.tile,
+            .owner    = m.owner,
+            .count    = hire_batch_manpower,
+            .type     = m.unit_type,
+            .supply_factor_permille = 1000, // raised fully supplied (BL-454)
+            .muster_base            = m.base,
+            .establishment          = hire_batch_manpower, // BL-1421: the HP bar's full mark
+        };
+    }
+    w.musters.swap(still);
+}
+
 economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating)
 {
     // BL-1117: the phase clock, WRITE-ONLY (economy_system.hpp). Null
@@ -3426,6 +3464,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // not exist NOW EXISTS, and it runs immediately before this line — which is
     // what makes the sentence "a unit in contact this tick fights before it can
     // march out next tick" true rather than aspirational.
+    // BL-1435: musters advance a quarter's days each tick and complete into units at
+    // their base, BEFORE the battle pass, so a unit that finishes mustering this tick
+    // can be drawn into a fight that opens on its province.
+    advance_musters(w);
+
     {
         const battle_tick bt = run_battles(w, reg, w.current_day_tick);
         // Carried out on the report, not dropped: a concluded battle is erased

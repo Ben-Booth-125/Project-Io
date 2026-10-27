@@ -445,6 +445,23 @@ uint16_t campaign_opening_unit_row()
     return i >= 0 ? static_cast<uint16_t>(i) : uint16_t{0};
 }
 
+int muster_days_for(uint16_t roster_type)
+{
+    const roster_row* row = row_or_null(roster_type);
+    switch (row ? land_class_for(*row) : land_class::infantry)
+    {
+        case land_class::infantry:     return 90;
+        case land_class::motorised:    return 90;
+        case land_class::light_armour: return 90;
+        case land_class::artillery:    return 135;
+        case land_class::air_defence:  return 135;
+        case land_class::mechanised:   return 180;
+        case land_class::armour:       return 180;
+        case land_class::none:         return 90;
+    }
+    return 90;
+}
+
 land_combat_stats unit_land_stats(const unit_component& u)
 {
     const roster_row* row = row_or_null(u.type);
