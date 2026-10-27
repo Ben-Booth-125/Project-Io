@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*168 entries — 42 gameplay · 27 canvas · 16 lens · 50 ledger · 33 chrome.*
+*171 entries — 42 gameplay · 29 canvas · 16 lens · 51 ledger · 33 chrome.*
 
 ---
 
@@ -1145,6 +1145,36 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** The only route to a front: the card it opens is where its order is set and its assigned units are read back.
 
+### `canvas.unit_right_click_move` — The Planetary canvas, with the player's own unit or unit group selected (BL-1443, tile contact orders; SELECTION.md § Right-click orders).
+
+**Press.** Hover a land tile: it outlines green and the cursor line reads 'Right-click: move'. Right-click it. Every unit of the selection (one unit, or the whole group) is sent gameplay.march_unit to that tile, in ascending id; a unit assigned to a front is first sent gameplay.assign_front with a null tile (unassigned), then marched.
+
+**Valid when:**
+- The player's own unit is selected (its card), or the group of the player's units on one tile (the unit group element). A rival's unit or group, or no unit, orders nothing.
+- The tile is land, and not the tile the units already stand on (water and the units' own tile show no outline and the press does nothing).
+- No other nation's units stand on the tile (else canvas.unit_right_click_attack).
+- The March cell is not armed (an armed March pick takes the left-click instead).
+- Placement mode and an armed road are off.
+- The verb's own preconditions apply per unit (gameplay.march_unit); a refusal mutates nothing for that unit.
+
+**Expected output.** Each unit's movement order is set toward the tile. Status line: 'N marching', 'N marching, M refused', or 'Can't march there.' when every unit was refused.
+
+**Reason to select.** The quickest way to move a unit or a whole stack: point at the ground.
+
+### `canvas.unit_right_click_attack` — The Planetary canvas, with the player's own unit or unit group selected, hovering another nation's stack (BL-1443; SELECTION.md § Right-click orders).
+
+**Press.** Hover a tile another nation's units stand on. Toward a nation the player is hostile to, it outlines red with the battle glyph and the cursor line reads 'Right-click: attack <nation>'; right-click it to march every unit of the selection onto that tile — the attack (the world opens the battle on contact; there is no attack verb). Toward a nation the player is not hostile to it outlines orange and reads 'Right-click: declare hostility and attack <nation>'; the right-click opens ledger.unit_order_declare_confirm instead of sending anything.
+
+**Valid when:**
+- The player's own unit is selected (its card), or the group of the player's units on one tile (the unit group element). A rival's unit or group, or no unit, orders nothing.
+- Another nation's units stand on the hovered land tile (one nation per tile, so the stack names one nation).
+- The March cell is not armed; placement mode and an armed road are off.
+- The march preconditions apply per unit (gameplay.march_unit).
+
+**Expected output.** Hostile target: each unit marches onto the tile (front-assigned units unassigned first). Status line: 'N attacking', 'N attacking, M refused', or 'Can't attack there.'. Not hostile: the declare confirm opens.
+
+**Reason to select.** Attack an enemy stack directly from the map.
+
 ---
 
 ## Lenses — re-skinning the map to answer a question
@@ -2051,6 +2081,18 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Each unit's front is set (or cleared); the cell wears the primed ring while the unit is assigned and the Strength page reads 'Front: <label>'. The front line's count plate moves. Status line: 'Assigned to the front.' / 'Unassigned.', or how many were refused.
 
 **Reason to select.** A front does nothing without units on it: assigned units spread along the span, fill gaps and push when ordered.
+
+### `ledger.unit_order_declare_confirm` — The small confirm a right-click attack on a nation the player is not hostile to opens beside the cursor (BL-1443; SELECTION.md § Right-click orders).
+
+**Press.** It reads 'Declare hostility toward <nation> and attack?'. 'Declare and attack' sends gameplay.declare_hostile toward the nation, then the march of every unit of the selection onto the tile (as canvas.unit_right_click_attack), in that order in one frame. 'Cancel', Escape, or any other press on the canvas closes it and sends nothing.
+
+**Valid when:**
+- Opened by canvas.unit_right_click_attack on a nation the player is not hostile to.
+- declare_hostile's own preconditions apply; if it is refused (other than 'already hostile') no march is sent.
+
+**Expected output.** The player is hostile toward the nation (every stance surface reads it), and the units march onto the tile. Status line as canvas.unit_right_click_attack, or "Couldn't declare hostility.".
+
+**Reason to select.** Start a war with a nation by attacking its stack — with a deliberate second press, since hostility is a stance change.
 
 ---
 

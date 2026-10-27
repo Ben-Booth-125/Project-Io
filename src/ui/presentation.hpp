@@ -114,6 +114,11 @@ inline constexpr ImU32 front_hostile  = IM_COL32(232,  84,  72, 255); ///< Hosti
 inline constexpr ImU32 front_neutral  = IM_COL32(236, 206, 112, 255); ///< Neither hostile nor friends: hold only.
 inline constexpr ImU32 front_friendly = IM_COL32(120, 206, 150, 255); ///< An accepted friendship: hold only.
 
+// --- a unit order's target (BL-1443; SELECTION.md § Right-click orders) ---
+inline constexpr ImU32 order_move    = IM_COL32( 90, 230, 120, 235); ///< A march to this tile (the March pick's green).
+inline constexpr ImU32 order_attack  = IM_COL32(232,  84,  72, 240); ///< A march onto a hostile stack: the attack (front_hostile's red).
+inline constexpr ImU32 order_declare = IM_COL32(240, 150,  60, 240); ///< An attack that first asks to declare hostility.
+
 // --- the placement lens (Ben, 2026-10-25; LENSES.md § The placement lens) ---
 // A site the chosen building may take, a site with no Logistic Points operating
 // (amber: it will build, but it will not run until a source reaches it), and the

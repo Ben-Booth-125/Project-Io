@@ -96,12 +96,13 @@
    "status": "drafted"
   },
   "battle_marker": {
-   "surface": "Battle marker (Planetary canvas, province anchor tile)",
+   "surface": "Battle marker (Planetary canvas, the defended tile)",
    "answers": "Where on this body is someone actually fighting?",
-   "because": "A battle is a province-grain event drawn on a tile-grain canvas, so without a mark it has no position at all — the units are visible but nothing says they are in contact rather than merely adjacent. Drawn on the province anchor tile only, once per battle, because the fight IS the province envelope (BL-467 ruling 1) and scattering a glyph across every participating tile would say the opposite. The glyph is two crossed blades with cross-guards, deliberately not an X: X is already the 'close this' affordance everywhere else in the chrome, and a mark meaning 'a fight is here' must not read as a button meaning 'dismiss this'.",
+   "because": "A battle is an event with no entity of its own drawn on a tile-grain canvas, so without a mark it has no position at all — the units are visible but nothing says they are in contact rather than merely adjacent. Drawn on the battle's DEFENDED TILE (`active_battle::ground_tile`), once per battle, because a fight is tile contact: the attacker tried to step onto the tile the defender holds (BL-1443, tile contact orders; Ben 2026-10-27, overturning the province envelope that put this mark on the province's anchor tile). Scattering a glyph across every participating tile would say the opposite — that the joined stacks around it are each a battle. The glyph is two crossed blades with cross-guards, deliberately not an X: X is already the 'close this' affordance everywhere else in the chrome, and a mark meaning 'a fight is here' must not read as a button meaning 'dismiss this'.",
    "backlog_item": [
     "BL-469",
-    "BL-467"
+    "BL-467",
+    "BL-1443"
    ],
    "files": [
     "src/ui/body_surface_canvas.cpp",
@@ -516,13 +517,14 @@
   },
   "selection_unit_card": {
    "surface": "Selection band - Unit (Soldier) card (3-column band)",
-   "answers": "What is this unit, how hurt, how spent and how willing is it, what does it fight as, who owns it, can I do anything with it, and can I re-equip it to a newer type, and which front does it hold?",
-   "because": "selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking. BL-575 (unit marker + march UI, 2026-08-23) answers the \"can I do anything with it\" half for real: the action grid gained March (arms province-picking on the Planetary canvas, then dispatches corp_verb::march_unit on the qualifying province click), Halt (clears the standing order) and Disband (permanent, confirm popup, no refund — MILITARY.md § Marching) alongside the existing Go to, replacing three of the five reserved slots. All three route through the SAME corp-command seam corp_ai scores for rival units, so the player takes no shortcut around it. BL-1425 puts the fight's state first on the Strength page — HP (men over establishment), readiness and morale, each a bar in the canvas counter's colours — because those are the numbers the land round reads and a player decides a retreat or a refit by; and the Roster page names the land class the row fights as, with its soft attack, hard attack and hardness. The condition bars are the player's own units' only (BL-068). Refit (Ben, 2026-10-27: \"refitting a unit's type from selection to a newer compatible model ... can also serve as upgrading units\") takes the fifth action slot: the menu lists the newer models of the unit's land class the nation fields now, live types first, each with its credit price (the hire price difference) and its days, and a target the seam would refuse is shown disabled with the reason (not on your own ground, in a battle, cannot afford) - read from the verb's own checks, so the card cannot disagree with the seam. While a refit runs, the slot and the Roster page show \"Refitting to <type> - N d left\" instead of the control. It earns the slot because without it the only upgrade path is disband and re-hire, which throws away the men, readiness and morale the unit has. Assign to front (BL-1427; MILITARY.md § Fronts, Ben 2026-10-27: 'the unit card, and the stack panel for a stack, carries Assign to front') takes the sixth and last reserved action slot: a flag glyph opening a menu of the unit's own nation's fronts, each named by neighbour and span ('Varneth - 14 tiles', with north/south or 'n of m' where one neighbour has more than one front), plus Unassign; the current front is checked, and pressing it again unassigns (the toggle rule). The slot wears the primed ring while the unit is assigned, and the Strength page names the front it holds. It earns the slot because a front with no way to put units on it is a line that does nothing.",
+   "answers": "What is this unit, how hurt, how spent and how willing is it, what does it fight as, who owns it, can I do anything with it, and can I re-equip it to a newer type, and which front does it hold, and where do I send it?",
+   "because": "selection_kind::unit existed but fell through to the generic action/facts split with a bare Go to button - the only selection kind still on that path once the tile (BL-123) and building (BL-431 rework) cards moved to the 3-column band shape. BL-393 (UNITS_ARE_WRITE_ONLY_AND_INERT) already flags that units are largely inert in the live economy; Ben's direction was to build the CARD shape now anyway rather than wait on combat, so a unit selected today reads real unit_component fields (strength, count, roster type, owner) in the same picture/pager/actions shape as everything else, instead of standing out as the one kind that still looks unfinished. Paired with a repeat-click tile-cycle (Soldier -> Building -> Tile) in body_surface_canvas.cpp so a tile carrying a unit is actually reachable by clicking. BL-575 (unit marker + march UI, 2026-08-23) answers the \"can I do anything with it\" half for real: the action grid gained March (arms province-picking on the Planetary canvas, then dispatches corp_verb::march_unit on the qualifying province click), Halt (clears the standing order) and Disband (permanent, confirm popup, no refund — MILITARY.md § Marching) alongside the existing Go to, replacing three of the five reserved slots. All three route through the SAME corp-command seam corp_ai scores for rival units, so the player takes no shortcut around it. BL-1425 puts the fight's state first on the Strength page — HP (men over establishment), readiness and morale, each a bar in the canvas counter's colours — because those are the numbers the land round reads and a player decides a retreat or a refit by; and the Roster page names the land class the row fights as, with its soft attack, hard attack and hardness. The condition bars are the player's own units' only (BL-068). Refit (Ben, 2026-10-27: \"refitting a unit's type from selection to a newer compatible model ... can also serve as upgrading units\") takes the fifth action slot: the menu lists the newer models of the unit's land class the nation fields now, live types first, each with its credit price (the hire price difference) and its days, and a target the seam would refuse is shown disabled with the reason (not on your own ground, in a battle, cannot afford) - read from the verb's own checks, so the card cannot disagree with the seam. While a refit runs, the slot and the Roster page show \"Refitting to <type> - N d left\" instead of the control. It earns the slot because without it the only upgrade path is disband and re-hire, which throws away the men, readiness and morale the unit has. Assign to front (BL-1427; MILITARY.md § Fronts, Ben 2026-10-27: 'the unit card, and the stack panel for a stack, carries Assign to front') takes the sixth and last reserved action slot: a flag glyph opening a menu of the unit's own nation's fronts, each named by neighbour and span ('Varneth - 14 tiles', with north/south or 'n of m' where one neighbour has more than one front), plus Unassign; the current front is checked, and pressing it again unassigns (the toggle rule). The slot wears the primed ring while the unit is assigned, and the Strength page names the front it holds. It earns the slot because a front with no way to put units on it is a line that does nothing. Right-click orders (BL-1443, tile contact orders; Ben 2026-10-27: \"all marches go to a tile\"): with the unit selected, a right-click on land marches it there, a right-click on another nation's stack attacks it, and toward a nation the player is not hostile to it first asks to declare hostility; a unit on a front is unassigned and obeys. The hover says which before the press (green move, red attack, orange declare, and a line at the cursor). The March cell stays as the two-step route and now picks a TILE too, with the same green outline. They earn the gesture because a march is the commonest thing a player does with a unit, and the card press plus a pick is two presses and a trip to the band for it.",
    "backlog_item": [
     "BL-393",
     "BL-575",
     "BL-1425",
-    "BL-1427"
+    "BL-1427",
+    "BL-1443"
    ],
    "files": [
     "src/ui/selection_panel.cpp",
@@ -531,22 +533,25 @@
     "src/ui/body_surface_canvas.cpp",
     "src/core/app.cpp",
     "src/ui/front_view.cpp",
-    "src/ui/front_view.hpp"
+    "src/ui/front_view.hpp",
+    "src/ui/presentation.hpp"
    ],
    "status": "drafted"
   },
   "selection_unit_group": {
    "surface": "Selection band - Unit group (the units of one owner on one tile)",
-   "answers": "Which units make up this counter, what does each fight as, and — for mine — how many men, how ready and how willing is each?",
-   "because": "Ben, 2026-10-27: \"We will need to add a unit group selection panel for when multiple stacked units are selected.\" A counter draws every unit of one owner on its tile as one rectangle with one count and summed bars, so a press on it cannot honestly open ONE unit's card: the lowest-id unit it used to open is an arbitrary member, and the others were unreachable from the map. The group element answers the question the counter raises — what is in this stack — with a header (owner, unit count, tile), the counter itself drawn large in the left quarter, and one row per unit: roster type, the land class it fights as, men over establishment, HP and readiness bars, and morale. A row is the door to that unit's card, which carries '< Group (N)' back, so the stack is a drill-through rather than a dead end (DRILL_THROUGH.md). A rival's rows say what each unit is and how many men it has, and nothing of its condition (BL-068, the counter's own rule). A counter of one unit still opens that unit's card directly. The header carries 'Assign to front' for the player's own group (BL-1427, MILITARY.md § Fronts): the same menu as the unit card's, assigning every unit of the stack in one press.",
+   "answers": "Which units make up this counter, what does each fight as, and — for mine — how many men, how ready and how willing is each, and where do I send the stack?",
+   "because": "Ben, 2026-10-27: \"We will need to add a unit group selection panel for when multiple stacked units are selected.\" A counter draws every unit of one owner on its tile as one rectangle with one count and summed bars, so a press on it cannot honestly open ONE unit's card: the lowest-id unit it used to open is an arbitrary member, and the others were unreachable from the map. The group element answers the question the counter raises — what is in this stack — with a header (owner, unit count, tile), the counter itself drawn large in the left quarter, and one row per unit: roster type, the land class it fights as, men over establishment, HP and readiness bars, and morale. A row is the door to that unit's card, which carries '< Group (N)' back, so the stack is a drill-through rather than a dead end (DRILL_THROUGH.md). A rival's rows say what each unit is and how many men it has, and nothing of its condition (BL-068, the counter's own rule). A counter of one unit still opens that unit's card directly. The header carries 'Assign to front' for the player's own group (BL-1427, MILITARY.md § Fronts): the same menu as the unit card's, assigning every unit of the stack in one press. Right-click orders (BL-1443): with the group shown, a right-click on land orders EVERY unit of the stack — a march there, the attack on another nation's stack, the declare confirm toward a nation the player is not hostile to — one command per unit in ascending id, reported as one status line ('3 marching', '2 marching, 1 refused'). The group is the order's subject because the counter is what the player sees as one army.",
    "backlog_item": [
     "BL-1425",
-    "BL-1427"
+    "BL-1427",
+    "BL-1443"
    ],
    "files": [
     "src/ui/selection_panel.cpp",
     "src/ui/ui_state.hpp",
-    "src/ui/body_surface_canvas.cpp"
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/app.cpp"
    ],
    "status": "drafted"
   },
@@ -1100,6 +1105,21 @@
     "src/ui/front_view.hpp",
     "src/ui/presentation.hpp",
     "src/ui/ui_state.hpp"
+   ],
+   "status": "drafted"
+  },
+  "unit_right_click_orders": {
+   "surface": "Right-click unit orders (Planetary canvas: hover preview, the press, the declare confirm)",
+   "answers": "If I right-click this tile with my units selected, will they move there, attack the stack on it, or start a war?",
+   "because": "Ben, 2026-10-27 (BL-1443, tile contact orders): every march goes to a tile, one nation stands on a tile, and an attack is a march onto the defender's tile. That makes the right-click the natural order: the player points at ground and the selected unit or stack goes there. The preview earns its space because the same press means three different things — a move, an attack, or a declaration of hostility that every other surface reads — and the player must know which BEFORE pressing: a green hex outline for a move, a red one with the battle glyph for an attack, an orange one for a declare, and a line at the cursor naming the target nation. The confirm earns its space because declaring hostility changes a stance, not just a position, and is not a thing to do by mis-click (the withdraw confirm's precedent): 'Declare hostility toward <nation> and attack?' with Declare and attack / Cancel. Water, the units' own tile, and a selection that is not the player's show nothing and the press does nothing.",
+   "backlog_item": [
+    "BL-1443"
+   ],
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/ui_state.hpp",
+    "src/ui/presentation.hpp",
+    "src/core/app.cpp"
    ],
    "status": "drafted"
   }

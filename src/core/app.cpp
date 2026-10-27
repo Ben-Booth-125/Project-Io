@@ -3165,14 +3165,15 @@ void app::render()
     // Planetary canvas fills `pending_march_dest_province` on the qualifying
     // province click (body_surface_canvas.cpp), so this only fires once both
     // halves are in.
-    if (m_ui.pending_march_unit != null_entity && m_ui.pending_march_dest_province != 0)
+    if (m_ui.pending_march_unit != null_entity && m_ui.pending_march_dest_tile != null_entity)
     {
         corp_command cmd;
         cmd.tick     = static_cast<int>(m_sim_loop.day_tick());
         cmd.corp     = m_world.player_entity;
         cmd.verb     = corp_verb::march_unit;
         cmd.subject  = m_ui.pending_march_unit;
-        cmd.province = m_ui.pending_march_dest_province;
+        cmd.tile     = m_ui.pending_march_dest_tile; // BL-1443: every march goes to a tile
+        cmd.province = m_ui.pending_march_dest_province; // BL-1443: drop once the world lane lands
         const auto r = player_command(cmd);
         switch (r)
         {
@@ -3189,6 +3190,73 @@ void app::render()
         }
         m_ui.pending_march_unit          = null_entity; // consume the request
         m_ui.pending_march_dest_province = 0;
+        m_ui.pending_march_dest_tile     = null_entity;
+    }
+
+    // Right-click orders (BL-1443; SELECTION.md § Right-click orders): the canvas
+    // queued a march to one tile for every unit of the player's selection. In this
+    // order, through the one seam: `declare_hostile` first when the confirm asked
+    // for it, then per unit (ascending id) `assign_front` with a null tile when the
+    // unit is on a front — a hand order overrides the front — and `march_unit`.
+    // An attack is only a march onto the enemy stack's tile; the world opens the
+    // battle. One status line reports the whole stack.
+    if (!m_ui.pending_unit_order_units.empty() && m_ui.pending_unit_order_tile != null_entity)
+    {
+        const int tick = static_cast<int>(m_sim_loop.day_tick());
+        bool go = true;
+        if (m_ui.pending_unit_order_declare != null_entity)
+        {
+            corp_command cmd;
+            cmd.tick         = tick;
+            cmd.corp         = m_world.player_entity;
+            cmd.verb         = corp_verb::declare_hostile;
+            cmd.counterparty = m_ui.pending_unit_order_declare;
+            const corp_command_result r = player_command(cmd);
+            // rejected_state = already hostile: the attack still stands.
+            go = (r == corp_command_result::applied || r == corp_command_result::rejected_state);
+            if (!go)
+                m_ui.construction.last_message = "Couldn't declare hostility.";
+        }
+        if (go)
+        {
+            int marching = 0, refused = 0;
+            for (const entity_id unit : m_ui.pending_unit_order_units)
+            {
+                const auto uit = m_world.units.find(unit);
+                if (uit != m_world.units.end() && uit->second.front != null_entity)
+                {
+                    corp_command un;
+                    un.tick    = tick;
+                    un.corp    = m_world.player_entity;
+                    un.verb    = corp_verb::assign_front;
+                    un.subject = unit;
+                    un.tile    = null_entity; // unassign: the hand order wins
+                    (void)player_command(un);
+                }
+                corp_command cmd;
+                cmd.tick     = tick;
+                cmd.corp     = m_world.player_entity;
+                cmd.verb     = corp_verb::march_unit;
+                cmd.subject  = unit;
+                cmd.tile     = m_ui.pending_unit_order_tile;
+                cmd.province = m_ui.pending_unit_order_province; // BL-1443: drop once the world lane lands
+                (player_command(cmd) == corp_command_result::applied ? marching : refused) += 1;
+            }
+            const char* verb = m_ui.pending_unit_order_attack ? " attacking" : " marching";
+            if (marching == 0)
+                m_ui.construction.last_message = m_ui.pending_unit_order_attack
+                    ? "Can't attack there." : "Can't march there.";
+            else if (refused == 0)
+                m_ui.construction.last_message = std::to_string(marching) + verb;
+            else
+                m_ui.construction.last_message = std::to_string(marching) + verb + ", "
+                                               + std::to_string(refused) + " refused";
+        }
+        m_ui.pending_unit_order_units.clear(); // consume the request
+        m_ui.pending_unit_order_tile     = null_entity;
+        m_ui.pending_unit_order_province = 0;
+        m_ui.pending_unit_order_declare  = null_entity;
+        m_ui.pending_unit_order_attack   = false;
     }
 
     if (m_ui.pending_halt_unit != null_entity)

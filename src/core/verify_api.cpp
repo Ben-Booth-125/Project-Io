@@ -1745,6 +1745,16 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             out["hovered_kind"] = std::string(k);
             out["unit_group"]   = m_ui.selection_unit_group;
         }
+        // BL-1443 (right-click orders): what a right-click on the hovered tile would
+        // order — the canvas preview's own word — whether the declare confirm is up,
+        // and the status line the last press wrote. UI state, no tile data.
+        {
+            static const char* k_order[] = { "none", "move", "attack", "declare" };
+            const int ok = m_ui.unit_order_hover;
+            out["unit_order"]     = std::string((ok >= 0 && ok <= 3) ? k_order[ok] : "none");
+            out["order_confirm"]  = (m_ui.unit_order_confirm_nation != null_entity);
+            out["status_message"] = m_ui.construction.last_message;
+        }
         // THE TWO NON-ENTITY STRUCTURE CHANNELS (BL-664). `selection_kind` above
         // reports only what travels in `selected_entity`, and a deposit and a
         // plate deliberately do not (BL-659/BL-660, Ben's option A) — so a check
@@ -6138,6 +6148,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["type"]  = static_cast<int>(u.type);
             // BL-1425: whose unit — the counter draws its bars for the player's own.
             row["player"] = (u.owner == player_actor(m_world) || u.owner == m_world.player_entity);
+            // BL-1443: whether the unit holds a movement order, and whether it is on a
+            // front — the two facts a right-click order changes. Booleans only.
+            row["marching"] = (u.order.dest != null_entity);
+            row["on_front"] = (u.front != null_entity);
             if (const auto tit = m_world.tiles.find(u.position); tit != m_world.tiles.end())
             {
                 row["col"] = tit->second.grid_x;
