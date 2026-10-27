@@ -497,14 +497,14 @@ preference is derived in the history (`docs/generation/EXPLORATION.md` § A good
 preference) and seeded at the epoch (`docs/generation/INDUSTRIALISATION.md` § 1. A dense industrial web,
 and markets that stock what their people want).
 
-**6. Two channels are settled by the power and construction design** (Ben, 2026-08-31), and both
-are worth naming here because they change what the register measures.
+**6. One channel is settled by the power design** (Ben, 2026-08-31), and it is worth naming here
+because it changes what the register measures.
 
-**Construction stops being episodic.** It becomes a *sector* with a throughput that draws its
-method's goods as upkeep every tick, rather than a per-project lump that fires only while something
-is building — which is why the channel currently measures 0.000 in the industrial band. Seeded
-capacity gives it a non-zero reading from tick 0. `docs/economy/PRODUCTION.md` § Construction as a
-rate owns it.
+**Construction stays episodic.** The 2026-08-31 design made it a *sector* with a throughput that
+drew its method's goods every tick; that system is retired (Ben, 2026-10-27, "it will hopefully make
+building smoother"). Construction demand is the build sites' own material bids, so the channel reads
+non-zero only while something is building. `docs/economy/PRODUCTION.md` § Construction as a rate
+owns it.
 
 **Power is a BOUGHT good, and it is the Industry channel's first viable entry** (Ben, 2026-08-31:
 *"it has to be a bought good when it is taken as upkeep. Therefore corporations can buy power from

@@ -189,5 +189,24 @@
    "no\\s+`muster_base`\\s+\\(a nation raises no base\\)"
   ],
   "owner": "BL-1439 (capital military base)"
+ },
+ {
+  "ruling": "Construction capacity is retired: a build site progresses on its materials and its days alone; no construction yard, no capacity good, no generation seeding (Ben, 2026-10-27)",
+  "doc": "docs/economy/PRODUCTION.md",
+  "anchor": "Construction has no sector and no capacity",
+  "stale": [
+   "Building projects consume that capacity",
+   "seed construction capacity",
+   "construction capacity included",
+   "construction capacity always stretches",
+   "construction sector.s product",
+   "plus construction capacity per quarter",
+   "with construction capacity in the row",
+   "less a place for each",
+   "room left after the yards",
+   "Construction stops being episodic",
+   "Construction yard — and the seam"
+  ],
+  "owner": "BL-1438 (retire construction capacity)"
  }
 ]

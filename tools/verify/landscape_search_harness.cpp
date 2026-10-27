@@ -630,19 +630,19 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
             if (!sc.l1b) ++failures;
 
             // THE WORLD REFUSAL'S MARGIN, measured (read_budget_world's header):
-            // per body, n_turn + the per-good cap, and + the yards' places, against
-            // the ceiling. The refusal needs n_turn + yard_places > the ceiling.
+            // per body, n_turn + the per-good cap, and n_turn alone, against the
+            // ceiling. The refusal needs n_turn > the ceiling. (The yards' places
+            // that once came off the ceiling too are retired with construction
+            // capacity — Ben, 2026-10-27, BL-1438 — so `turn_plus_yards` keeps
+            // its slot in the machine line and now reads n_turn.)
             for (const charter_body_record& b : crep.bodies)
             {
-                int n_turn = 0;
-                for (const std::uint16_t g : b.goods)
-                    if (g != static_cast<std::uint16_t>(resource_type::construction_capacity))
-                        ++n_turn;
+                const int n_turn = static_cast<int>(b.goods.size());
                 sc.turn_plus_cap   = std::max(sc.turn_plus_cap, n_turn + b.per_good_cap);
-                sc.turn_plus_yards = std::max(sc.turn_plus_yards, n_turn + b.yard_places);
+                sc.turn_plus_yards = std::max(sc.turn_plus_yards, n_turn);
                 sc.ceiling         = std::max(sc.ceiling, b.density_ceiling);
                 sc.min_body_margin = std::min(sc.min_body_margin,
-                                              b.density_ceiling - n_turn - b.yard_places);
+                                              b.density_ceiling - n_turn);
                 sc.min_goods_in_g  = std::min(sc.min_goods_in_g, b.goods_in_g);
             }
         }
@@ -817,8 +817,8 @@ seed_curve run_seed(lua_state& lua, std::uint32_t seed, int rounds, int check_k,
         std::printf("  planned vs CHARTERED (the winner's web): specialists %lld -> %lld, firms %lld -> %lld; "
                     "%d nations chartered more firms than planned (+%lld); sum |gap| over nations %lld  "
                     "|  L1b %s\n"
-                    "  the world refusal's margin: max per body n_turn + cap %d, n_turn + yard places %d, "
-                    "against a ceiling of %d (max); per body, min ceiling - (n_turn + yards) %d, min |G| %d\n",
+                    "  the world refusal's margin: max per body n_turn + cap %d, n_turn %d, "
+                    "against a ceiling of %d (max); per body, min ceiling - n_turn %d, min |G| %d\n",
                     sc.ledger_specialists, sc.chartered_specialists, sc.ledger_firms, sc.chartered_firms,
                     sc.nations_over_plan, sc.firms_over_plan, sc.nation_gap_abs,
                     sc.l1b ? "PASS" : "FAIL", sc.turn_plus_cap, sc.turn_plus_yards, sc.ceiling,

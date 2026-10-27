@@ -448,8 +448,10 @@ tradeable, and `resolve_price` / the clearing pass ignore everything else
 - **The habitability tranche**: clean water 7.7, consumer goods 61.0, medical supplies 14.0.
 - **Ordnance** 140.8 (ancient 113.0).
 - **Propellant** 64.0 — derived below.
-- **Power** 2.6 and **construction capacity** 6.6 — the grid good and the
-  construction sector's product (`docs/economy/PRODUCTION.md`).
+- **Power** 2.6 — the grid good (`docs/economy/PRODUCTION.md`).
+- **Construction capacity** 6.6 — a **retired slot** (Ben, 2026-10-27): the enumerator keeps saved
+  per-resource arrays aligned, but nothing produces or consumes it (`docs/economy/PRODUCTION.md`
+  § Construction as a rate). The price stands only so an old save's leftover stock reads finite.
 
 **Propellant has a base price (Ben, 2026-10-08; BL-1217, inputs reach processors).** It is made in a Chemical Plant and
 bought off the source shelf for every launch a trade makes; the nation's space programme buys it — so

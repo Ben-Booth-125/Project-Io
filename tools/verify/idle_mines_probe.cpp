@@ -257,8 +257,6 @@ void classify_uc(const world& w, const recipe_registry& reg, const building_comp
 {
     const float max_stretch = reg.construction().max_stretch;
     const float pause_below = max_stretch > 1.0f ? 1.0f / max_stretch : 0.0f;
-    const float cap_rate = reg.construction().capacity_per_build_tick;
-    const std::size_t ci = static_cast<std::size_t>(resource_type::construction_capacity);
     const float res_mult = reg.price_band().reservation_mult;
     const float duration = reg.economics(b.type).build_duration_ticks;
     s.cls = u_run; s.solo_rate = 1.0f; s.bind = 0; s.bind_ratio = 0;
@@ -271,21 +269,14 @@ void classify_uc(const world& w, const recipe_registry& reg, const building_comp
     std::array<float, resource_count> need{};
     const auto& row = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
     for (std::size_t r = 0; r < resource_count; ++r) need[r] = row[r] / duration;
-    if (cap_rate > 0.0f) need[ci] += cap_rate;
+    // (no construction-capacity term: retired, BL-1438)
     float rate = 1.0f; std::size_t bind = resource_count;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (r == ci || !(need[r] > 0.0f)) continue;
+        if (!(need[r] > 0.0f)) continue;
         const float avail = shelf_admits(m, r, res_mult, true) ? std::max(0.0f, m.inventory[r]) : 0.0f;
         const float c = avail / need[r];
         if (c < rate) { rate = c; bind = r; }
-    }
-    if (cap_rate > 0.0f)
-    {
-        const float avail = shelf_admits(m, ci, res_mult, true) ? std::max(0.0f, m.inventory[ci]) : 0.0f;
-        const float cov = need[ci] > 0.0f ? avail / need[ci] : 1.0f;
-        const float c = std::max(cov, pause_below);
-        if (c < rate) { rate = c; bind = ci; }
     }
     rate = std::clamp(rate, 0.0f, 1.0f);
     if (rate < pause_below) rate = 0.0f;

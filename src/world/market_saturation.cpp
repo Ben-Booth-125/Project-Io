@@ -163,14 +163,9 @@ classify_resources(const world& w, const recipe_registry& reg)
         }
     }
 
-    // BL-709: the sector's own draw is a construction sink too, and a
-    // STRUCTURAL one — it applies to every building under construction whatever
-    // its type or recipe, so it is not expressible as a row in any of the
-    // baskets enumerated above. Read from the same registry dial
-    // `run_construction` reads, so zeroing it un-substantiates this sink by
-    // name rather than leaving a comment claiming one.
-    if (reg.construction().capacity_per_build_tick > 0.0f)
-        c[static_cast<std::size_t>(resource_type::construction_capacity)].sink_construct = true;
+    // BL-709's structural construction sink (every live site's capacity draw) is
+    // gone with the system (Ben, 2026-10-27, BL-1438): `construction_capacity`
+    // has no sink and no source, so nothing marks it here.
 
     // --- is it priced on any market? ---------------------------------------
     for (const auto& [mid, mc] : w.markets)

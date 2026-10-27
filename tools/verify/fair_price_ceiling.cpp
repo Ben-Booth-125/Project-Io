@@ -347,30 +347,10 @@ void c_construction()
               "C2 nothing billed, no exchange row");
     }
 
-    // C3: construction capacity STRETCHES past a thin yard rather than pausing
-    // (BL-709) — and is billed only for what the shelf actually held, never for
-    // capacity that was not there. Need 0.5 a tick, shelf 0.1.
-    {
-        uint16_t sid = 0;
-        recipe_registry reg = make_registry(k_shipped_reservation, sid);
-        construction_params cp = reg.construction();
-        cp.capacity_per_build_tick = 0.5f;
-        reg.set_construction(cp);
-        scene s = make_scene(k_iron_base, under, 1000.0f);
-        const std::size_t cap = ri(resource_type::construction_capacity);
-        s.w.markets.at(s.market).base_price[cap] = 4.0f;
-        s.w.markets.at(s.market).price[cap]      = 4.0f;
-        s.w.markets.at(s.market).inventory[cap]  = 0.1f;
-        const entity_id b = site(s);
-        const entity_id c = add_corp(s, b, 0.0f);
-        economy_report rep = run_economy_step(s.w, reg);
-        check(s.w.buildings.at(b).construction_progress > 0.0f || s.w.buildings.at(b).ticks_remaining < 3,
-              "C3 a thin yard stretches the build, it does not pause it");
-        check(near(fill_of(rep, c, s.market, resource_type::construction_capacity), 0.1f),
-              "C3 capacity drawn is what the shelf held (0.1), not the 0.5 the tick wanted",
-              fill_of(rep, c, s.market, resource_type::construction_capacity), 0.1);
-        check(near(s.w.markets.at(s.market).inventory[cap], 0.0f), "C3 the capacity shelf is emptied, never negative");
-    }
+    // C3 RETIRED (BL-1438, construction capacity retired, Ben 2026-10-27): it
+    // checked that a thin construction yard stretched a build and was billed
+    // only what its shelf held. No site draws capacity now, so its subject is
+    // gone; construction_gate_harness D checks a site draws none.
 }
 
 void s_shared_shelf()

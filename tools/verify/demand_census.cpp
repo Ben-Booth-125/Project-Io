@@ -178,7 +178,7 @@ const char* const k_resource_names[] = {
     "ceramics", "dressed_stone", "planks", "tools",
     "hides", "fibre", "leather", "cloth", "rigging",
     "power", // BL-708 — the grid good
-    "construction_capacity", // BL-709 — the construction sector's product
+    "construction_capacity", // BL-709; a retired slot since BL-1438 (nothing makes or draws it)
 };
 constexpr std::size_t k_named = sizeof(k_resource_names) / sizeof(k_resource_names[0]);
 
@@ -815,17 +815,9 @@ band_result run_band(const char* band_name, era_band band, uint32_t seed,
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (row[r] > 0.0f && bids_for(r))
                     out.construction[r] += static_cast<double>(row[r] / econ.build_duration_ticks);
-            // BL-709: the sector's own draw is part of THIS channel, and it has
-            // to be counted here or the reconciliation below misattributes it.
-            // `processing` is derived by subtraction (wants_folded less this
-            // half less the upkeep half), so a construction want the census does
-            // not recognise does not vanish — it silently reappears as a
-            // processor's input bid, which is a worse lie than a missing row.
-            // Mirrors `run_construction`'s own expression exactly: flat per
-            // tick, NOT divided by build_duration_ticks.
-            if (bids_for(static_cast<std::size_t>(resource_type::construction_capacity)))
-                out.construction[static_cast<std::size_t>(resource_type::construction_capacity)] +=
-                    static_cast<double>(reg.construction().capacity_per_build_tick);
+            // (BL-709's flat construction-capacity draw was counted here; it is
+            // retired with the system — Ben, 2026-10-27, BL-1438 — so a site's
+            // want is its material row alone, exactly as run_construction's.)
         }
     }
 

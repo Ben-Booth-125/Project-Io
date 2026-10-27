@@ -150,8 +150,8 @@ price is at or under the ceiling, and is billed at it, with one exchange row at 
 price the tick goes on to resolve is never what the draw pays. Above the ceiling the good is not
 drawn **and not bid for**, so its want leaves the price and the price can ease: a unit or
 building goes short and takes the shortfall rule, a processor idles on that input, a trade ships
-none of that good, a construction site pauses for want of that material (construction capacity over the ceiling
-stretches the build instead, as an empty yard does), and a nation buys elsewhere or not at all.
+none of that good, a construction site pauses for want of that material, and a nation buys
+elsewhere or not at all.
 What a draw is billed is only what the shelf gave.
 
 **The cost of listings-only supply, stated (at k = 0, Ben 2026-10-03).** While

@@ -816,54 +816,45 @@ the prototype does not open on would be work without a reading behind it.
 
 ---
 
-## Construction as a rate (Ben, 2026-08-31)
+## Construction as a rate (retired, Ben 2026-10-27)
 
-**Construction becomes a sector with a throughput, not a per-building lump sum.** A **construction
-building** exists, runs a **production method**, draws that method's goods as upkeep, and produces
-construction capacity. Building projects consume that capacity.
+**Construction has no sector and no capacity.** A build site progresses on its **materials and its
+days alone**: the material-supply rate and the stretch/pause rule below set its pace, and nothing
+else does. There is no construction building, no construction production method, and no
+construction-capacity good drawn by a site, by building upkeep, or seeded by generation.
 
-Ben's reason, and it is the strongest argument for the change:
+Ben's ruling, retiring the 2026-08-31 design:
 
-> *"This makes it easy to start with some construction of a certain method, and gives us an initial
-> demand for those construction goods."*
+> *"I've had a look at the construction capacity mechanic... We are going to retire that system,
+> and it will hopefully make building smoother."*
 
-### The channel it fixes
+**What it was, so the retirement reads.** The 2026-08-31 ruling made construction a sector: a
+construction yard ran one of five era-banded production methods (timber frame, stone and brick,
+iron frame, steel frame, reinforced concrete), drew that method's goods, and produced construction
+capacity; every site drew capacity beside its materials, and generation seeded yards so the
+methods' inputs had demand from tick 0. Its aim was a continuous, economy-scaled construction
+channel (MARKETS.md property 1) in place of an episodic one.
 
-Construction demand in the industrial band measures **0.000**, because `run_construction` fires only
-where something is actively building. It is episodic: nothing under construction, no demand. A sector
-makes it **continuous and economy-scaled** — capacity exists, draws its inputs every tick, and grows
-with the world. That is MARKETS.md property 1 satisfied by construction rather than asserted of it.
+**Why it goes.** It made building rough rather than smooth: a second scarce input every site waited
+on, a yard every market had to stand before anything could build there, and a provisioning step
+generation had to run and reserve room for. Its own measurements recorded the cost — a capacity
+draw folded into the build rate collapsed operating firms, so capacity was made to stretch and never
+pause; a maintenance draw collapsed them on a cold start, so it shipped at zero; and the seeder had
+to be bounded by a count of yards because yards that could not run never raised production. The
+channel it was meant to make continuous is still served: every site bids its materials on the
+shelf, a stalled site registers its want, and that want is visible to the price signal.
 
-And because generation can **seed construction capacity**, the demand for its inputs is non-zero from
-tick 0, in every market that has any. That is MARKETS.md property 5's *"every chain terminates in
-every market"* delivered by the generator rather than by authoring a basket.
+**What stays, as slots.** `construction_capacity` stays in the resource enumeration and the five
+methods stay in the recipe table, because both index saved data — a resource indexes every saved
+per-resource array, and a recipe's id is stored in each processing building. They are retired in
+name and comment: nothing produces or consumes the good, and no door, scorer or seeder lists the
+methods. A yard an old save still holds is idle: it draws nothing and makes nothing. Its leftover
+shelf stock spoils away. The two dials that tuned the system (`capacity_per_build_tick`,
+`seed_capacity_per_building`) are refused by name if authored.
 
-### The methods
-
-Five, era-banded exactly as recipes are (property 2):
-
-| Method | Band | Draws |
-|---|---|---|
-| Timber frame | ancient | timber, planks |
-| Stone and brick | ancient | stone, dressed stone, clay |
-| Iron frame | industrial | iron, timber |
-| Steel frame | industrial | steel |
-| Reinforced concrete | industrial | steel, stone, sand |
-
-Exact baskets and rates are a balance question and are **measured against the census**, never
-guessed. The ladder deliberately spans both bands, so the ancient band gains continuous construction
-demand too — it currently measures 56.3, better than industrial's zero and still episodic.
-
-### What it touches, and the debt it must clear
-
-This is a structural change, not an additive one: it reaches `construct_building`, placement, the
-build door, and **the AI scorer's capex model**.
-
-**NR-592 gets fixed here, on Ben's call.** `corp_ai.cpp` never prices `resource_build_cost` when
-scoring a build — a candidate scores on cash alone, and the seam refuses it at apply time if the
-materials are absent. Under a lump-sum model that is a missed opportunity. Under a **shared capacity
-pool it becomes a correctness problem**, because capacity is contended: a scorer that cannot see it
-will propose builds the pool cannot serve, every evaluation, for as long as the pool is short.
+**NR-592's point survives the retirement.** The scorer must still price `resource_build_cost` when
+scoring a build. A candidate that scores on cash alone proposes builds the shelf cannot serve
+(`corp_ai.cpp`'s construction-materials gate).
 
 Construction is a **market-gated** process, not an instant purchase (BL-095, construction pacing).
 Placing a building gates on affordability (the nation's treasury must afford the whole build to
@@ -902,13 +893,12 @@ placement's site multiplier (§ Construction site time), rounded to a whole day.
   it; a site the treasury cannot afford is refused, never placed in debt. A founding site, which
   generation stands complete, is priced by generation instead.
 - **Materials are drawn in arrears, at the tick (Ben, 2026-10-25).** Each day built is owed its
-  materials, construction capacity included. Each economy tick draws, off the market's shelf, the
+  materials. Each economy tick draws, off the market's shelf, the
   materials for the days built since the last tick, and buys them from the market then, at the
   shelf's posted price — a build's cost depends on market prices (Ben, 2026-10-26). A tick draws
   at most one quarter's materials plus any shortfall carried from before. Whatever part the shelf
   cannot cover stays owed and is drawn first at the next tick. A building that completes still owing
-  materials pays them at the ticks after. Capacity never holds a debt: a short yard stretches a build
-  and its missing part is not billed, as construction capacity always stretches rather than pauses.
+  materials pays them at the ticks after.
 - **The rate for the quarter ahead is a claim on the shelf.** At each tick, after the draw, a site's
   supply rate — full, stretched or paused — is set from the shelf that is left, less the materials
   still owed by every site there. That rate times the quarter's days is the progress it makes: a

@@ -262,8 +262,8 @@ function raise_player_force(corp)
     end
 
     -- 1b. Stock the base's own shelf (BL-1319, Ben 2026-10-17: option A). A site
-    --     draws its materials and construction capacity off its market's shelf
-    --     only, and measured 2026-10-16 the opening economy is short of both:
+    --     draws its materials off its market's shelf
+    --     only, and measured 2026-10-16 the opening economy is short of them:
     --     107 of 149 sites short at handoff on seed 0 (construction_stall), so the
     --     base paused for want of steel past any bound. The fixture stocks THIS
     --     market's shelf with the base's whole need — never every shelf on the
@@ -276,7 +276,7 @@ function raise_player_force(corp)
                   .. ") stands in no market's catchment, so nothing can stock its shelf")
         end
         verify.stock_market(mkt, "steel", 120.0)                -- 35 at up to ~3x site time
-        verify.stock_market(mkt, "construction_capacity", 200.0)
+        -- (no construction_capacity: retired, Ben 2026-10-27, BL-1438)
     end
 
     -- 2. Wait for it. Construction is durative and pay-as-you-build, so the tick

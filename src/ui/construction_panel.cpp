@@ -43,8 +43,9 @@ namespace ui {
 // no progress for multiple quarters"):
 //   1. they read `m->supply[r]`, the per-tick FLOW the clear resets, where the
 //      sim draws `m->inventory[r]`, the persistent STOCK;
-//   2. they left `construction().capacity_per_build_tick` out of the need row,
-//      so a capacity-starved build read as on schedule;
+//   2. they left construction capacity out of the need row, so a
+//      capacity-starved build read as on schedule (the capacity draw itself is
+//      retired since — Ben, 2026-10-27, BL-1438);
 //   3. they ignored `shelf_admits` — BL-1172's fair-price ceiling — so a good
 //      priced over `reservation_mult x base` read as available when the sim
 //      sees nothing there at all;
@@ -74,18 +75,13 @@ construction_read read_construction(const world& w, const recipe_registry& reg,
         return out;
     }
 
-    // THE NEED ROW, exactly `need_row_for`: the material cost of THIS named
-    // building (BL-590) spread over its duration, plus a FLAT per-tick draw of
-    // construction capacity (BL-709 — not divided by the duration, because a
-    // longer build occupies the sector for longer).
+    // THE NEED ROW, exactly `row_for`: the material cost of THIS named
+    // building (BL-590) spread over its duration. No construction capacity —
+    // retired (Ben, 2026-10-27, BL-1438).
     const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
-    const std::size_t cap_index = static_cast<std::size_t>(resource_type::construction_capacity);
-    const float capacity_rate   = reg.construction().capacity_per_build_tick;
     std::array<float, resource_count> need{};
     for (std::size_t r = 0; r < resource_count; ++r)
         need[r] = material_cost_row[r] / duration * qf;
-    if (capacity_rate > 0.0f)
-        need[cap_index] += capacity_rate * qf;
 
     const market_component* m = nullptr;
     const entity_id mid = market_for_tile(w, tile);
@@ -111,14 +107,13 @@ construction_read read_construction(const world& w, const recipe_registry& reg,
     const float max_stretch = reg.construction().max_stretch;
     const float pause_below = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
 
-    // `site_rate`: the scarcest MATERIAL sets the rate and can pause the build;
-    // CAPACITY only stretches it, its coverage floored at `pause_below`.
+    // `site_rate`: the scarcest MATERIAL sets the rate and can pause the build.
     float rate     = 1.0f;
     float worst    = 1.0f; // the lowest coverage seen, for the binding good
     bool  have_bad = false;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (r == cap_index || !(need[r] > 0.0f))
+        if (!(need[r] > 0.0f))
             continue;
         const float cov = avail_of(r) / need[r];
         out.short_of[r] = (cov < 1.0f); // the draw's own test, per good (Ben, 2026-10-26)
@@ -134,20 +129,6 @@ construction_read read_construction(const world& w, const recipe_registry& reg,
                 // Priced out rather than short: the shelf HAS it, the ceiling refuses it.
                 out.binding_priced_out = (m != nullptr && !admitted(r) && m->inventory[r] > 0.0f);
             }
-        }
-    }
-    if (capacity_rate > 0.0f)
-    {
-        const float cov = (need[cap_index] > 0.0f) ? (avail_of(cap_index) / need[cap_index]) : 1.0f;
-        out.short_of[cap_index] = (cov < 1.0f);
-        const float eff = std::max(cov, pause_below);
-        if (eff < rate)
-        {
-            rate                   = eff;
-            out.has_binding        = true;
-            out.binding            = resource_type::construction_capacity;
-            out.binding_priced_out = (m != nullptr && !admitted(cap_index)
-                                      && m->inventory[cap_index] > 0.0f);
         }
     }
     rate = std::clamp(rate, 0.0f, 1.0f);
@@ -443,17 +424,13 @@ construction_site_reading read_construction_site(const world& w, const recipe_re
     const float share = (static_cast<float>(std::max(0, out.days_left))
                          + static_cast<float>(std::max(0, b.build_arrears_milli)) / 1000.0f) / q;
     const auto& cost_row   = reg.resource_build_cost_for(b.type, b.target_resource, b.recipe);
-    const std::size_t cap  = static_cast<std::size_t>(resource_type::construction_capacity);
-    const float cap_rate   = reg.construction().capacity_per_build_tick;
     const market_component* m = nullptr;
     if (const entity_id mid = market_for_tile(w, b.tile); mid != null_entity)
         if (const auto mit = w.markets.find(mid); mit != w.markets.end())
             m = &mit->second;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        float left = cost_row[r] / duration * share;
-        if (r == cap && cap_rate > 0.0f)
-            left += cap_rate * share;
+        const float left = cost_row[r] / duration * share;
         if (!(left > 0.0f))
             continue;
         construction_material cm{static_cast<resource_type>(r), left, out.rd.short_of[r]};

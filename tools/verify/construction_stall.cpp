@@ -16,8 +16,8 @@
 //              (shelf_admits false) — split by whether the shelf HELD the
 //              tick's need (stocked) or not (empty)
 //   short      admitted, but the shelf holds < need / max_stretch (pause)
-//   ok         every material clears the pause line (capacity stretches,
-//              never pauses — BL-709)
+//   ok         every material clears the pause line
+//              (construction capacity is retired — BL-1438)
 // A site's first blocking material (lowest resource index) names the cause;
 // "ceiling" outranks "short" (a ceiling block is the BL-1172 mechanism).
 //
@@ -130,7 +130,6 @@ void after_lap(const world& w, int lap, void* vctx)
     const float max_stretch = reg.construction().max_stretch;
     const float pause_below = max_stretch > 1.0f ? 1.0f / max_stretch : 0.0f;
     const float res_mult    = reg.price_band().reservation_mult;
-    const std::size_t cap = static_cast<std::size_t>(resource_type::construction_capacity);
     std::vector<entity_id> ids;
     for (const auto& [bid, b] : w.buildings) if (b.ticks_remaining > 0) ids.push_back(bid);
     std::sort(ids.begin(), ids.end());
@@ -153,7 +152,6 @@ void after_lap(const world& w, int lap, void* vctx)
         float rate = 1.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            if (r == cap) continue;
             const float need = row[r] / duration;
             if (need <= 0.0f) continue;
             const float inv  = std::max(0.0f, inv_row[r]);
@@ -185,7 +183,6 @@ void after_lap(const world& w, int lap, void* vctx)
         if (rate > 0.0f)
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                if (r == cap) continue;
                 const float need = row[r] / duration;
                 if (need <= 0.0f) continue;
                 inv_row[r] -= std::min(need * rate, std::max(0.0f, inv_row[r]));
