@@ -2274,7 +2274,7 @@ void seed_nation_garrisons(world& w, const nation_garrison_params& params)
                 post = garrison_border_post(w, *pr, best_neighbour);
             if (post == null_entity) // the capital province, or (defensively) no facing tile
                 post = province_anchor_tile(anchors, *pr);
-            place_garrison(w, nid, prov, post, count, params.roster_row);
+            place_garrison(w, nid, prov, post, count, campaign_opening_unit_row());
         }
     }
 }

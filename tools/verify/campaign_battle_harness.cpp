@@ -32,6 +32,7 @@
 #include "world/components.hpp"
 #include "world/unit_roster.hpp"
 
+#include <array>
 #include <algorithm>
 #include <cstdio>
 #include <vector>
@@ -342,13 +343,42 @@ int main()
     {
         // Every roster row fights as SOME land class, and only a naval row as none.
         bool mapped = true;
+        std::array<int, land_class_count> reached{};
+        bool modern_declared = true, modern_one_each = true;
+        std::array<int, land_class_count> modern_per_class{};
         for (const roster_row& r : unit_roster_table())
         {
             const land_class c = land_class_for(r);
-            if (static_cast<int>(c) >= land_class_count) mapped = false;
+            if (static_cast<int>(c) >= land_class_count) { mapped = false; continue; }
             if ((c == land_class::none) != (r.cls == unit_class::naval)) mapped = false;
+            ++reached[static_cast<std::size_t>(c)];
+            if (r.band == roster_band::modern)
+            {
+                if (r.land == k_land_class_from_cls) modern_declared = false;
+                ++modern_per_class[static_cast<std::size_t>(c)];
+            }
         }
         check(mapped, "C5 every roster row maps to a land class; only naval rows fight as none");
+
+        // BL-1422: all seven land classes are reachable from some row, and the
+        // modern band carries exactly one declared row per land class.
+        bool all_seven = true;
+        for (int c = 0; c < land_class_count; ++c)
+        {
+            if (static_cast<land_class>(c) == land_class::none) continue;
+            std::printf("      land class %d: %d row(s), %d modern\n", c, reached[static_cast<std::size_t>(c)],
+                        modern_per_class[static_cast<std::size_t>(c)]);
+            if (reached[static_cast<std::size_t>(c)] == 0) all_seven = false;
+            if (modern_per_class[static_cast<std::size_t>(c)] != 1) modern_one_each = false;
+        }
+        check(all_seven, "C5 all seven land classes are reachable from some roster row");
+        check(modern_declared && modern_one_each,
+              "C5 the modern band declares exactly one row per land class");
+        check(modern_row_for(land_class::infantry) >= 0
+                  && campaign_opening_unit_row() == static_cast<uint16_t>(modern_row_for(land_class::infantry)),
+              "C5 the campaign opening unit row is the modern infantry row");
+        check(roster_band_for_capacity(6) != roster_band::modern,
+              "C5 no Era -1 ladder capacity reaches the modern band");
 
         const std::vector<land_combatant> tanks = side_of(land_class::armour,   500);
         const std::vector<land_combatant> foot  = side_of(land_class::infantry, 500, 201);

@@ -14,9 +14,11 @@
 // (docs/development/req/requirements.json):
 //
 //   R1 every non-background corp (player + named rivals) ends generation
-//      owning exactly one military_base and one unit_component (roster index
-//      0, 50 manpower), placed on the nearest valid land tile to its HQ. A
-//      background firm owns neither.
+//      owning exactly one military_base and one unit_component (50 manpower),
+//      placed on the nearest valid land tile to its HQ. A background firm owns
+//      neither. BL-1422: the unit is the MODERN INFANTRY row
+//      (`campaign_opening_unit_row`, a modern-band row of land class infantry),
+//      no longer roster index 0 (Levy Spear).
 //   R2 two same-seed generation runs produce identical seeding (same tiles,
 //      same unit fields) for every corp.
 //   R3 a land-poor nation with no valid placement tile is skipped gracefully
@@ -37,6 +39,7 @@
 #include "world/stockpile_budget.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/world_gen_config.hpp"
+#include "world/unit_roster.hpp"
 #include "harness_params.hpp"
 #include "world/world.hpp"
 
@@ -241,6 +244,13 @@ int main()
 
         int seeded = 0, land_poor_skips = 0;
         bool all_ok = true;
+        bool all_modern_infantry = true;
+        int  typed = 0;
+        const uint16_t opening = campaign_opening_unit_row();
+        const roster_row& opening_row = unit_roster_table()[opening];
+        check(opening_row.band == roster_band::modern && land_class_for(opening_row) == land_class::infantry,
+              "R1 the opening unit row is a modern-band row fighting as infantry");
+        check(opening != 0, "R1 the opening unit row is no longer roster index 0 (Levy Spear)");
         for (entity_id cid : corp_ids)
         {
             const nation_component& cc = w.nations.at(cid);
@@ -255,6 +265,12 @@ int main()
             if (bases == 1 && units == 1)
             {
                 ++seeded;
+                for (const auto& [uid, uc] : w.units)
+                    if (uc.owner == cid && uc.muster_base != null_entity)
+                    {
+                        ++typed;
+                        if (uc.type != opening) all_modern_infantry = false;
+                    }
             }
             else if (bases == 0 && units == 0)
             {
@@ -279,6 +295,10 @@ int main()
                                     "non-background corp (player + rivals)");
         check(seeded >= 2, "R1 at least the player and one rival were actually seeded "
                             "(Kepler is not land-poor)");
+        std::printf("  seeded unit rows: %d checked, opening row %u \"%s\"\n",
+                    typed, static_cast<unsigned>(opening), opening_row.name);
+        check(typed > 0 && all_modern_infantry,
+              "R1 every seeded unit is the modern infantry row (BL-1422), looked up by land class");
 
         bool bg_clean = true;
         for (entity_id cid : bg_ids)

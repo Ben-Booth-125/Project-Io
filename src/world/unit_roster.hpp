@@ -57,9 +57,24 @@ enum class roster_band : uint8_t
     medieval   = 1, ///< Ladder T2-T3. Stirrup heavy cavalry, fortress, crossbow/plate.
     gunpowder  = 2, ///< Ladder T4. Flintlock line, artillery fortress, broadside fleet.
     industrial = 3, ///< Ladder T5-T6. Rifle, ironclad -> armour, airpower.
+
+    /// CAMPAIGN ONLY (BL-1422). The modern rows, one per land class
+    /// (MILITARY.md § The roster). No ladder capacity maps here —
+    /// `roster_band_for_capacity` tops out at `industrial` — so the Era -1 sim,
+    /// which reaches the roster only through that function and the
+    /// region-gated `available_rows`, can never field a modern row. Only
+    /// `campaign_roster_band_for` returns it.
+    modern     = 4,
 };
 
+/// The ERA -1 band count: the four ladder bands the history sim's per-band
+/// counters (`units_by_band`, `works_by_band`) are sized by. Deliberately NOT
+/// widened for `modern`, which the sim never reaches; a band index at or above
+/// this is out of the sim's range by construction (its own bounds checks drop it).
 inline constexpr int roster_band_count = 4;
+
+/// Every band the campaign can see, `modern` included.
+inline constexpr int campaign_roster_band_count = 5;
 
 /// BL-461: the campaign roster band, DERIVED from the registry's era band
 /// rather than fixed. BL-324 (2026-08-08) hard-coded this to `industrial`
@@ -70,10 +85,10 @@ inline constexpr int roster_band_count = 4;
 /// `era_band` is a coarse two-way split (ancient / industrial —
 /// recipe_registry.hpp), so this maps onto the roster's finer four-band grain
 /// at its two ends: ancient opens at the roster's lowest band (`classical`),
-/// industrial at its highest. Bands are cumulative (available_rows), so an
-/// ancient campaign still sees classical rows and nothing above; an
-/// industrial one sees every band up to and including industrial, exactly
-/// the pre-BL-461 behaviour for the 1960 arc.
+/// industrial at its highest — which, since BL-1422, is the campaign-only
+/// `modern` band. Bands are cumulative (available_rows), so an ancient
+/// campaign still sees classical rows and nothing above; an industrial one
+/// sees every band, the Era -1 rows and the modern rows alike.
 /// Defined in unit_roster.cpp, not inline here — the body needs era_band's
 /// full definition (recipe_registry.hpp), which cannot be #included from
 /// this header without the cycle noted above.
@@ -119,6 +134,35 @@ inline constexpr traversal_mask k_domains_land =
 inline constexpr traversal_mask k_domains_naval =
     domain_bit(traversal_domain::coastal_water) | domain_bit(traversal_domain::open_ocean);
 
+// ---------------------------------------------------------------------------
+// Land classes (BL-1421; MILITARY.md § Land — the classes)
+// ---------------------------------------------------------------------------
+//
+// The campaign's land fight scores soft and hard attack against hardness, and
+// absorbs with defence (defending) or breakthrough (attacking). The stats belong
+// to a LAND CLASS, not to a roster row: a row maps to one class
+// (`land_class_for`), and its quality scales the class's numbers, which is how an
+// equipment generation shows in the next fight. The Era -1 sim never reads this.
+
+enum class land_class : uint8_t
+{
+    infantry     = 0, ///< Holds ground; cheapest.
+    motorised    = 1, ///< Infantry in trucks.
+    mechanised   = 2, ///< Infantry in fighting vehicles.
+    armour       = 3, ///< The main battle tank line.
+    light_armour = 4, ///< Fast reconnaissance.
+    artillery    = 5, ///< Fights from the second line.
+    air_defence  = 6, ///< Shoots aircraft; next to nothing in a ground fight.
+    none         = 7, ///< Not a land fighter (a ship ashore): no attack, token defence.
+};
+
+inline constexpr int land_class_count = 8;
+
+/// A row's `land` when it declares none: `land_class_for` derives the class from
+/// the row's `unit_class` and band (every Era -1 row). Not a class — never an
+/// index into the stat table.
+inline constexpr land_class k_land_class_from_cls = static_cast<land_class>(0xFF);
+
 /// What a row needs from the ground before a polity can field it. Each is a
 /// threshold on a region endowment window (0-1000); zero means "no gate".
 struct roster_gate
@@ -148,6 +192,11 @@ struct roster_row
     /// BL-778. Which domains this type may cross. Authored per row; see
     /// `row_can_traverse` for the owned-coastal-water asymmetry.
     traversal_mask domains = k_domains_land;
+
+    /// BL-1422. The land class this row fights as, declared explicitly — every
+    /// `modern` row carries one. Left at `k_land_class_from_cls`, the class is
+    /// derived from `cls` and `band` (`land_class_for`), which is every Era -1 row.
+    land_class land = k_land_class_from_cls;
 };
 
 /// May @p r cross @p d? @p owned_by_mover says whether the water in question
@@ -339,7 +388,7 @@ struct unit_upkeep_params
     float credits_per_head = 0.0f;
 
     /// Credits per head per tick, scaled by the roster row's `power_mod`
-    /// (per-mille, 0..420 across the shipped table) — the same "floor plus a
+    /// (per-mille, 0..500 across the shipped table) — the same "floor plus a
     /// power-scaled component" shape BL-394 gave the hire cost, so a heavy row
     /// costs more to keep as well as more to raise.
     float credits_per_head_per_power = 0.0f;
@@ -426,37 +475,26 @@ int64_t unit_strength(const world& w, const unit_component& u);
 /// `unit_strength`.
 army_stack_entry unit_to_stack_entry(const world& w, const unit_component& u);
 
-// ---------------------------------------------------------------------------
-// Land classes and their combat stats (BL-1421; MILITARY.md § Land — the classes)
-// ---------------------------------------------------------------------------
-//
-// The campaign's land fight scores soft and hard attack against hardness, and
-// absorbs with defence (defending) or breakthrough (attacking). The stats belong
-// to a LAND CLASS, not to a roster row: a row maps to one class
-// (`land_class_for`), and its quality scales the class's numbers, which is how an
-// equipment generation shows in the next fight. The Era -1 sim never reads this.
-
-enum class land_class : uint8_t
-{
-    infantry     = 0, ///< Holds ground; cheapest.
-    motorised    = 1, ///< Infantry in trucks.
-    mechanised   = 2, ///< Infantry in fighting vehicles.
-    armour       = 3, ///< The main battle tank line.
-    light_armour = 4, ///< Fast reconnaissance.
-    artillery    = 5, ///< Fights from the second line.
-    air_defence  = 6, ///< Shoots aircraft; next to nothing in a ground fight.
-    none         = 7, ///< Not a land fighter (a ship ashore): no attack, token defence.
-};
-
-inline constexpr int land_class_count = 8;
+// Land-class lookups (BL-1421). The enum is declared above roster_row.
 
 /// The authored stats of @p c (land_combat_stats.hpp).
 const land_combat_stats& land_class_stats(land_class c);
 
-/// The land class a roster row fights as. An industrial cavalry row is
-/// mechanised; an earlier one light armour (fast, soft-hitting); siege is
+/// The land class a roster row fights as. A row that declares one (`land`, every
+/// `modern` row) fights as that. Otherwise it is derived: an industrial cavalry
+/// row is mechanised; an earlier one light armour (fast, soft-hitting); siege is
 /// artillery; ranged fights as infantry; naval is `none`.
 land_class land_class_for(const roster_row& r);
+
+/// BL-1422. The roster index of the first `modern` row that fights as @p c, or
+/// -1 if none does. The seeded forces (nation garrisons, a nation's opening
+/// unit) look their row up through this, never by a hard-coded index.
+int modern_row_for(land_class c);
+
+/// The row every seeded campaign force opens with: modern infantry
+/// (`modern_row_for(land_class::infantry)`). Falls back to row 0 only if the
+/// table were ever to lose that row — a data problem, not a reason to seed nothing.
+uint16_t campaign_opening_unit_row();
 
 /// @p u's stats: its row's class, attacks, defence and breakthrough scaled by the
 /// row's quality (`roster_type_quality_permille`). Hardness is the class's own.
