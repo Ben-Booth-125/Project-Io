@@ -360,6 +360,14 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_i32(h, u.readiness_permille);
                 fnv1a_i32(h, u.morale_permille);
             }
+            // Refit to a newer type (Ben, 2026-10-27): folded only while the unit
+            // refits, behind its own marker, so a world nobody refits keeps every hash.
+            if (unit_refitting(u))
+            {
+                fnv1a_u32(h, 0x52454649u); // "REFI"
+                fnv1a_u32(h, u.refit_type);
+                fnv1a_i32(h, u.refit_days);
+            }
         }
     }
 

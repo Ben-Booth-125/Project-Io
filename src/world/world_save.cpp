@@ -1516,9 +1516,9 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 60 (BL-1437): THE OBSOLETE-ROW FLIPS, the last section — every
-    // nation holding any, ascending id, as (id, count, rows).
-    if (version == world_save_version)
+    // world_save_version 60 (BL-1437): THE OBSOLETE-ROW FLIPS — every nation holding
+    // any, ascending id, as (id, count, rows).
+    if (version >= k_world_save_version_pre_refit)
     {
         std::vector<entity_id> ids;
         for (const auto& [nid, nc] : w.nations)
@@ -1534,6 +1534,31 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             for (const uint16_t r : v) w_u16(out, r);
         }
     }
+
+    // world_save_version 61 (Ben, 2026-10-27): THE REFITS, the last section — every
+    // refitting unit, ascending id, as (id, target row, days left).
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [uid, u] : w.units)
+            if (unit_refitting(u))
+                ids.push_back(uid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id uid : ids)
+        {
+            const unit_component& u = w.units.at(uid);
+            w_id(out, uid);
+            w_u16(out, u.refit_type);
+            w_i32(out, u.refit_days);
+        }
+    }
+}
+
+void write_world_snapshot_pre_refit(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (refit, 2026-10-27): the v60 stream shape — no refit section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_refit);
 }
 
 void write_world_snapshot_pre_obsolete(const world& w, std::ostream& out)
@@ -1647,7 +1672,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_days       // v56: days derived from ticks (Ben, 2026-10-24)
             && version != k_world_save_version_pre_combat     // BL-1421: v57, full readiness and morale
             && version != k_world_save_version_pre_muster     // BL-1435: v58, an empty muster queue
-            && version != k_world_save_version_pre_obsolete)) // BL-1437: v59, every nation on the defaults
+            && version != k_world_save_version_pre_obsolete   // BL-1437: v59, every nation on the defaults
+            && version != k_world_save_version_pre_refit))    // 2026-10-27: v60, no unit refitting
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2304,7 +2330,10 @@ bool read_world_snapshot(world& w, std::istream& in)
     // readiness and morale in [0, 1000]. Refused whole otherwise. A v57 (and older)
     // stream ends before it: its units keep the struct defaults — no establishment
     // recorded (`unit_establishment` reads the count), full readiness and morale.
-    if (version == world_save_version)
+    // Read from EVERY stream that carries it (v58 on), as the writer writes it: the
+    // gate was `== world_save_version`, which left a v58/v59/v60 stream's unit rows
+    // unread and misread the sections after them (fixed with v61).
+    if (version >= k_world_save_version_pre_muster)
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count != s.units.size())
@@ -2363,7 +2392,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // each in the stream, each with 1..roster-size rows strictly ascending and every
     // row a real roster index. Refused whole otherwise. A v59 (and older) stream ends
     // before it: every nation reads the defaults.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_refit)
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.nations.size())
@@ -2386,6 +2415,35 @@ bool read_world_snapshot(world& w, std::istream& in)
                 if (!r_u16(in, v[i]) || v[i] >= rows || (i > 0 && v[i] <= v[i - 1]))
                     return false;
             nit->second.roster_obsolete_flips = std::move(v);
+        }
+    }
+
+    // v61 (refit to a newer type, Ben 2026-10-27): the refits. Untrusted: units strictly
+    // ascending, each in the stream; the target a real roster row other than the unit's
+    // own; days left in [1, 3650]. Refused whole otherwise. A v60 (and older) stream
+    // ends before it: no unit refits.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        const std::size_t rows = unit_roster_table().size();
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            uint16_t target = 0;
+            int32_t days = 0;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev)
+                || !r_u16(in, target) || !r_i32(in, days))
+                return false;
+            prev = uid;
+            const auto uit = s.units.find(uid);
+            if (uit == s.units.end() || target >= rows || target == uit->second.type
+                || days < 1 || days > 3650)
+                return false;
+            uit->second.refit_type = target;
+            uit->second.refit_days = days;
         }
     }
 

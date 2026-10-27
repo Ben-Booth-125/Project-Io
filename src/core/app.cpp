@@ -3228,6 +3228,32 @@ void app::render()
         m_ui.pending_disband_unit = null_entity; // consume the request
     }
 
+    // Refit to a newer type (Ben, 2026-10-27): the unit card's Refit menu, through the
+    // same seam any caller uses (`refit_unit`). A refusal mutates nothing.
+    if (m_ui.pending_refit_unit != null_entity)
+    {
+        corp_command cmd;
+        cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::refit_unit;
+        cmd.subject   = m_ui.pending_refit_unit;
+        cmd.unit_type = m_ui.pending_refit_type;
+        switch (player_command(cmd))
+        {
+            case corp_command_result::applied:
+                m_ui.construction.last_message = "Refit begun."; break;
+            case corp_command_result::rejected_funds:
+                m_ui.construction.last_message = "Can't afford that refit."; break;
+            case corp_command_result::rejected_placement:
+                m_ui.construction.last_message = "Refit only on your own ground."; break;
+            case corp_command_result::rejected_state:
+                m_ui.construction.last_message = "Can't refit — in a fight, or already refitting."; break;
+            default:
+                m_ui.construction.last_message = "Can't refit to that type."; break;
+        }
+        m_ui.pending_refit_unit = null_entity; // consume the request
+    }
+
     // Ledger presses (BL-293; the trade presses since BL-1269) — same
     // seam-consuming shape as the survey dispatch above, applied through
     // apply_corp_command so the player's press and a rival corp's command share

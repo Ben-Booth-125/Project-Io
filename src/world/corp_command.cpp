@@ -165,6 +165,7 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::hire_unit:
         case corp_verb::march_unit:
         case corp_verb::halt_unit: // march's stop verb: a nation that may march may halt
+        case corp_verb::refit_unit: // Ben, 2026-10-27: a nation refits its own units
         case corp_verb::place_road:
         case corp_verb::set_trade:
         case corp_verb::clear_trade:
@@ -450,6 +451,64 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
 }
 
 } // namespace
+
+// ---------------------------------------------------------------------------
+// Refit to a newer type (Ben, 2026-10-27; MILITARY.md § The muster interface)
+// ---------------------------------------------------------------------------
+
+float refit_credit_cost(const recipe_registry& reg, uint16_t from, uint16_t to)
+{
+    const auto& table = unit_roster_table();
+    if (from >= table.size() || to >= table.size())
+        return 0.0f;
+    // The hire price is base + per_power x power_mod; the base cancels.
+    const float diff = reg.military().hire_cost_per_power
+        * static_cast<float>(table[to].power_mod - table[from].power_mod);
+    return std::max(0.0f, diff);
+}
+
+corp_command_result refit_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                entity_id unit, uint16_t target)
+{
+    const auto uit = w.units.find(unit);
+    if (uit == w.units.end())
+        return corp_command_result::rejected_invalid;
+    const unit_component& u = uit->second;
+    if (u.owner != nation)
+        return corp_command_result::rejected_not_owner;
+
+    // Compatible: a newer model of the unit's land class that the nation fields
+    // NOW — the live gate, re-checked rather than trusting a caller's list.
+    const auto& table = unit_roster_table();
+    if (target >= table.size())
+        return corp_command_result::rejected_invalid;
+    const std::vector<uint16_t> ok =
+        refit_targets(w, nation, u.type, campaign_roster_band_for(reg.era()));
+    if (std::find(ok.begin(), ok.end(), target) == ok.end())
+        return corp_command_result::rejected_invalid;
+
+    // Re-equipping is done out of contact, once at a time.
+    if (unit_in_battle(w, unit) || unit_refitting(u))
+        return corp_command_result::rejected_state;
+
+    // On the nation's own ground: the kit is delivered where the state can reach it.
+    const auto own = w.tile_to_nation.find(u.position);
+    if (own == w.tile_to_nation.end() || own->second != nation)
+        return corp_command_result::rejected_placement;
+
+    // Both legs checked before either is taken: the credits, and every gated
+    // goods axis of the target row (debit_hire_cost's own all-or-nothing test).
+    if (purse_room_of(w, nation) < refit_credit_cost(reg, u.type, target))
+        return corp_command_result::rejected_funds;
+    const roster_row& row = table[target];
+    for (std::size_t i = 0; i < hire_axis_count; ++i)
+    {
+        const hire_axis axis = static_cast<hire_axis>(i);
+        if (gate_axis_q(row.gate, axis) > 0 && !corp_can_afford_axis(w, nation, axis))
+            return corp_command_result::rejected_funds;
+    }
+    return corp_command_result::applied;
+}
 
 // BL-1407: the acquisition price (BL-628) and firm exit (BL-743) are DELETED
 // with the corporation (FINANCE.md § Whole-firm acquisition, § Firm exit:
@@ -806,6 +865,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // fact to live, and a second place to forget to clear.
             if (unit_in_battle(w, cmd.subject))
                 return corp_command_result::rejected_state;
+            // A unit refitting to a newer type re-equips in place (Ben, 2026-10-27).
+            if (unit_refitting(uit->second))
+                return corp_command_result::rejected_state;
 
             // BL-511: the destination is a PROVINCE, not a tile. THIS is the
             // domain check the untrusted-input rule asks for and the one a
@@ -910,6 +972,26 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             mo.next_index = 1; // path[0] is the tile the unit already occupies
             mo.progress   = 0.0f;
             uit->second.order = mo;
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::refit_unit:
+        {
+            // Ben, 2026-10-27 (MILITARY.md § The muster interface, "Refit to a newer
+            // type"). Every check first (`refit_check`), so a refusal mutates nothing.
+            const corp_command_result r = refit_check(w, reg, cmd.corp, cmd.subject, cmd.unit_type);
+            if (r != corp_command_result::applied)
+                return r;
+            unit_component& u = w.units.at(cmd.subject);
+            const float credits = refit_credit_cost(reg, u.type, cmd.unit_type);
+            // The goods leg is the hire's own path; its affordability was proven above.
+            if (!debit_hire_cost(w, cmd.corp, unit_roster_table()[cmd.unit_type]))
+                return corp_command_result::rejected_funds;
+            *purse_of(w, cmd.corp) -= credits; // the actor exists: proven at the seam's top
+            u.refit_type = cmd.unit_type;
+            u.refit_days = muster_days_for(cmd.unit_type);
+            // Re-equipping is done in place: a standing march order is cleared.
+            u.order = movement_order{};
             return corp_command_result::applied;
         }
 

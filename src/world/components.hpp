@@ -1888,7 +1888,27 @@ struct unit_component
     /// Will to fight, per-mille. Scales the unit's attack and caps its readiness.
     /// Moved by a battle's result and, out of contact, toward its supply.
     int32_t   morale_permille = 1000;
+
+    // Refit to a newer type (Ben, 2026-10-27; MILITARY.md § The muster interface,
+    // "Refit to a newer type"). `refit_unit` sets both; each economy tick takes a
+    // quarter's days off `refit_days`, and at zero `type` becomes `refit_type`.
+    // While refitting the unit keeps its old type, fights as it, and may not march.
+
+    /// The roster row the unit is refitting to, or `k_no_refit` when it is not.
+    uint16_t  refit_type = 0xFFFFu;
+
+    /// Days left on the refit; 0 when not refitting.
+    int32_t   refit_days = 0;
 };
+
+/// `unit_component::refit_type`'s "not refitting" sentinel. Never a roster index.
+inline constexpr uint16_t k_no_refit = 0xFFFFu;
+
+/// Is @p u refitting to a newer type?
+inline bool unit_refitting(const unit_component& u)
+{
+    return u.refit_type != k_no_refit;
+}
 
 /// A hire waiting to become a unit (BL-1435, muster queue; MILITARY.md § The
 /// muster interface — "raising takes time", Ben 2026-10-27). `hire_unit` pays and

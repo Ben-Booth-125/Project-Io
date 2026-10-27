@@ -494,3 +494,29 @@ land_combat_stats unit_land_stats(const unit_component& u)
     s.breakthrough = scale(s.breakthrough);
     return s;
 }
+
+bool refit_row_newer(uint16_t from, uint16_t to)
+{
+    const roster_row* a = row_or_null(from);
+    const roster_row* b = row_or_null(to);
+    if (a == nullptr || b == nullptr || from == to)
+        return false;
+    if (land_class_for(*a) != land_class_for(*b))
+        return false;
+    const int ba = static_cast<int>(a->band), bb = static_cast<int>(b->band);
+    return bb > ba || (bb == ba && b->power_mod > a->power_mod);
+}
+
+std::vector<uint16_t> refit_targets(const world& w, entity_id nation, uint16_t from, roster_band band)
+{
+    std::vector<uint16_t> out;
+    const std::vector<roster_row>& t = unit_roster_table();
+    const std::vector<const roster_row*> avail = available_rows(w, nation, band);
+    for (const roster_row* r : avail)
+    {
+        const uint16_t idx = static_cast<uint16_t>(r - t.data());
+        if (refit_row_newer(from, idx))
+            out.push_back(idx);
+    }
+    return out;
+}

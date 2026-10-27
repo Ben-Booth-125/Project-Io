@@ -582,6 +582,19 @@ unconditional extra action every evaluation. Availability is decided by the stoc
 the markets the nation's buildings sit in alone; the credit cost is subject to the solvency gate like every other spend
 (Ben, 2026-08-13, NR-218).
 
+**Refit to a newer type (Ben, 2026-10-27).** A unit can be re-equipped to a newer model of its
+own land class, which is how a nation upgrades the force it already has. The target is a roster
+row of the same class (`land_class_for`), newer — a later band, or the same band with a higher
+`power_mod` — and one the nation can field now; an obsolete row is allowed, listed after the live
+ones. The unit must be the nation's own, out of battle, not already refitting, and standing on its
+own nation's ground. It pays at once: the hire price difference, floored at zero, plus the target's
+gated goods off the shelf as a hire buys them. It takes the target's muster days, a quarter a tick.
+Until then the unit keeps its old type, fights as it and is drawn into battles as it, but does not
+march: re-equipping is done in place, so a standing march order is cleared. On completion it takes
+the new type and keeps its men, establishment, readiness and morale. The press is on the unit card
+(`refit_unit`). Rival nations do not refit; no AI grant covers it. This is distinct from the
+**Refit** of § Land — equipment, refit and manpower, which refills a wounded unit's HP.
+
 ### The roster
 
 `src/world/unit_roster.{hpp,cpp}` (BL-274, era-keyed unit rosters). An authored **table**, not a

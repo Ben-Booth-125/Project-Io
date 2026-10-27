@@ -217,6 +217,7 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::set_logistics_shares: return "set_logistics_shares";
         case corp_verb::set_tax_tier:         return "set_tax_tier";
         case corp_verb::set_unit_obsolete:    return "set_unit_obsolete"; // BL-1437
+        case corp_verb::refit_unit:           return "refit_unit";
     }
     return "verb?";
 }
