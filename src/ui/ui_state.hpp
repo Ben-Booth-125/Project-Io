@@ -336,6 +336,13 @@ struct military_ledger_state
     /// (`construction.last_message`, written by app). Cleared on close.
     bool      raise_pressed = false;
 
+    /// BL-1437: Recruit hides obsolete unit types unless this is on (a view filter,
+    /// per session). The Design tab's per-type toggle queues one change here, which
+    /// app::render executes through `set_unit_obsolete` — never a second write path.
+    bool      show_obsolete          = false;
+    int       pending_obsolete_row   = -1;    ///< -1 = nothing pending; else a roster row.
+    bool      pending_obsolete_value = false; ///< The state that row should take.
+
     // Published each frame the ledger draws; x < 0 = absent.
     float     tab_x[2] = {-1.0f, -1.0f}, tab_y[2] = {-1.0f, -1.0f};
     float     no_base_x = -1.0f, no_base_y = -1.0f; ///< "Find a site" press, Recruit's empty state.

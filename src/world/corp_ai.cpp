@@ -440,6 +440,7 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::lay_track:     return "track laying"; // BL-1255
         case corp_verb::set_logistics_shares: return "logistics shares"; // BL-1309
         case corp_verb::set_tax_tier:  return "tax tier"; // BL-1335
+        case corp_verb::set_unit_obsolete: return "unit obsolete"; // BL-1437
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";
@@ -3057,6 +3058,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 for (const roster_row* row : avail)
                 {
                     const auto idx = static_cast<std::size_t>(row - table.data());
+                    // BL-1437: a nation never raises a row it holds obsolete — by
+                    // default every row below the modern band (MILITARY.md § Land —
+                    // the classes), so a rival stops raising levies in 1960.
+                    if (roster_row_obsolete(w, corp, static_cast<uint16_t>(idx)))
+                        continue;
                     candidate c;
                     c.cmd.tick      = tick; c.cmd.corp = corp;
                     c.cmd.verb      = corp_verb::hire_unit;

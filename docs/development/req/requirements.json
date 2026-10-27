@@ -7649,6 +7649,59 @@
      "notes": "corp_ai.cpp: owned_units counts w.musters for the corp. Not asserted by a harness."
     }
    ]
+  },
+  {
+   "brief": "obsolete-unit-types",
+   "title": "BL-1437 - A nation marks unit types obsolete; Recruit hides them; pre-modern rows start obsolete",
+   "difficulty": 2,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1437 - sprint 58 (Ben, 2026-10-27: \"we should be able to mark unit types as obsolete\")",
+   "batch": "sprint-58",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: obsolete_units"
+     ],
+     "requirement": "Every roster row below the modern band starts obsolete for every nation; the modern rows start live.",
+     "notes": "obsolete_units O1 (14/0)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: obsolete_units"
+     ],
+     "requirement": "set_unit_obsolete flips one row for the seat's nation and back; refuses an unknown row, a bad order, a no-op and a non-seat nation, mutating nothing.",
+     "notes": "obsolete_units O2, O3."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: obsolete_units",
+      "headless: save_roundtrip",
+      "headless: world_determinism"
+     ],
+     "requirement": "The flips are saved (v60; v59 reads the defaults) and hashed only when a nation holds any.",
+     "notes": "obsolete_units O4."
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "visual: military_ledger",
+      "live"
+     ],
+     "requirement": "Recruit and the base tile card hide obsolete rows, with a \"Show obsolete (N)\" switch on Recruit; the Design tab lists every type with an obsolete toggle; a rival nation's scorer skips obsolete rows.",
+     "notes": "military_ledger_recruit: \"Show obsolete (19)\" and the seven modern rows; the Design tab's Unit types toggles sit below the class list. The scorer skip is code (corp_ai.cpp hire candidates), not asserted by a harness. Live click owed."
+    }
+   ]
   }
  ]
 }

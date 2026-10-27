@@ -4960,9 +4960,16 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             }
         }
         const auto& table = unit_roster_table();
-        const auto  avail = has_muster_base
+        auto avail = has_muster_base
             ? available_rows(w, player_actor(w), campaign_roster_band_for(reg.era()))
             : std::vector<const roster_row*>{};
+        // BL-1437: the tile card hides obsolete types as the Military ledger's Recruit
+        // does (MILITARY.md § Land — the classes).
+        avail.erase(std::remove_if(avail.begin(), avail.end(), [&](const roster_row* r) {
+                        return roster_row_obsolete(w, player_actor(w),
+                                                   static_cast<std::uint16_t>(r - table.data()));
+                    }),
+                    avail.end());
         if (!avail.empty())
         {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Hire");

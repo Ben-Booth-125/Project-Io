@@ -2389,6 +2389,13 @@ struct nation_component
     /// a major stays a major once its champion is folded away. SERIALISED in the
     /// v55 trailing section; a v54 stream derives it from the champions.
     bool is_major = false;
+
+    /// BL-1437 (obsolete unit types; MILITARY.md § Land — the classes, Ben 2026-10-27):
+    /// the roster rows whose obsolete state this nation has FLIPPED from the default
+    /// (`roster_row_obsolete_by_default`: every row below the modern band starts
+    /// obsolete). Ascending, no duplicates. Empty for a nation that never touched it.
+    /// Saved (world_save_version 60).
+    std::vector<uint16_t> roster_obsolete_flips;
 };
 
 // ---------------------------------------------------------------------------

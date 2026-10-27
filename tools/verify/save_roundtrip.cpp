@@ -51,6 +51,16 @@
 
 namespace {
 
+/// BL-1437 (v60): the obsolete-flips section's bytes — a count, then (id, n, n rows).
+std::size_t obsolete_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.roster_obsolete_flips.empty())
+            n += 4 + 4 + 2 * nc.roster_obsolete_flips.size();
+    return n;
+}
+
 int g_failures = 0;
 
 void check(bool ok, const char* what)
@@ -502,7 +512,8 @@ int main()
         // BL-1421 (v58): today's stream carries the unit combat-state section AFTER
         // the days, 4 bytes + 16 a unit, so the days section ends that far from the tail.
         // BL-1435 (v59): the muster section follows it — next id and count, 8 bytes, 22 a row.
-        const std::size_t unit_section = 4 + 16 * wd.units.size() + 8 + 22 * wd.musters.size();
+        const std::size_t unit_section = 4 + 16 * wd.units.size() + 8 + 22 * wd.musters.size()
+                                       + obsolete_section_bytes(wd); // BL-1437 (v60), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -563,7 +574,8 @@ int main()
                 ok57 = ok57 && u.establishment == 0 && u.readiness_permille == 1000
                     && u.morale_permille == 1000;
         check(ok57, "P24 a v57 stream reads, its units with no establishment and full readiness and morale");
-        const std::size_t muster_section = 8 + 22 * wu.musters.size(); // BL-1435 (v59), after the units
+        const std::size_t muster_section = 8 + 22 * wu.musters.size() // BL-1435 (v59), after the units
+                                         + obsolete_section_bytes(wu); // BL-1437 (v60), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 

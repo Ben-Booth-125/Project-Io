@@ -183,6 +183,12 @@ enum class corp_verb : uint8_t
     // IS the seat and the nation's champion; an AI nation's tier is set by its
     // own scorer (run_nation_tax_ai, the 2026-08-18 grant), never by corp_ai.
     set_tax_tier,         ///< Nation `as_nation`'s tax tier := `order` (1..5, I..V). rejected_invalid on any other `order`, or with no `as_nation`; rejected_not_owner unless `corp` is the seat and the nation's champion.
+    // --- BL-1437: obsolete unit types join the seam (2026-10-27) ---
+    // Appended AFTER set_tax_tier, same append-only rule. MILITARY.md § Land — the
+    // classes: a nation marks a roster row obsolete and Recruit hides it. The seat's
+    // alone: an AI nation's scorer reads the flags (and their defaults) and never
+    // sets them, so corp_ai.cpp issues no such verb.
+    set_unit_obsolete,    ///< The seat's nation marks roster row `unit_type` obsolete (`order` = 1) or live (`order` = 0). rejected_invalid for an unknown row or any other `order`; rejected_state when the row already reads that way; rejected_not_owner unless `corp` is the seat.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -192,7 +198,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::set_tax_tier) + 1;
+    static_cast<uint8_t>(corp_verb::set_unit_obsolete) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

@@ -445,6 +445,26 @@ uint16_t campaign_opening_unit_row()
     return i >= 0 ? static_cast<uint16_t>(i) : uint16_t{0};
 }
 
+bool roster_row_obsolete_by_default(const roster_row& r)
+{
+    return r.band != roster_band::modern;
+}
+
+bool roster_row_obsolete(const world& w, entity_id nation, uint16_t row)
+{
+    const roster_row* r = row_or_null(row);
+    if (r == nullptr)
+        return true;
+    bool obsolete = roster_row_obsolete_by_default(*r);
+    if (const auto nit = w.nations.find(nation); nit != w.nations.end())
+    {
+        const std::vector<uint16_t>& flips = nit->second.roster_obsolete_flips;
+        if (std::binary_search(flips.begin(), flips.end(), row))
+            obsolete = !obsolete;
+    }
+    return obsolete;
+}
+
 int muster_days_for(uint16_t roster_type)
 {
     const roster_row* row = row_or_null(roster_type);

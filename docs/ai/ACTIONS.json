@@ -141,8 +141,8 @@
     "That tile carries a military_base owned by the acting corporation, COMPLETE (ticks_remaining <= 0) and not decommissioned. A base still under construction does not qualify — BL-325 S2 moved hire onto the base and superseded BL-324's hire-anywhere (rejected_placement otherwise).",
     "The corporation can pay the row's hire cost, BOTH legs (rejected_funds otherwise): a credit cost of hire_base_cost + hire_cost_per_power × the row's power_mod (economy.lua § military, BL-394 — a floor, so even an ungated row is never free), plus a flat resource draw per gated axis of the row's gate from the corp's (corp, market) pools — corp-wide, lowest pool key first. A refusal on either leg leaves the corporation wholly uncharged."
    ],
-   "expected_output": "A new unit entity at the muster tile, owned by the acting corporation, with count and strength both set to hire_batch_manpower and `type` set to the roster index. The corporation's balance is debited the row's credit cost, and each gated axis of the row draws its flat resource cost from the corp's pools. The new entity id is returned through apply_corp_command's out-param (the same channel a `build` uses). An `agency_event::kind::hired` is reported for the chat feed and an `agency` entry is appended to the world history log.",
-   "reason_to_select": "You want force in the field, and this is currently the only verb that creates any. Two honest caveats an agent should weigh. First, it is gated behind infrastructure: you need a completed military_base on the tile (open to every nation since BL-1273 retired its tech gate), so hiring is the END of a chain rather than a quick move. Second — and this is the one that should hold most policies back — the 1960 campaign has NO CONSUMER for units. resolve_battle's only caller is the Era -1 history simulation, and the two condition subjects that read w.units (military_units, military_strength) have no authored producers. A hired unit today is an entity that costs money, sits on a tile, and does nothing. Raise them to satisfy a condition_set that counts them, or because a future conflict layer will want them; do not raise them expecting to fight."
+   "expected_output": "The hire is PAID NOW and QUEUED (BL-1435; MILITARY.md § The muster interface): the credit cost is debited and each gated axis draws its flat resource cost, and a muster_order joins world::musters at the base with the row's muster days (90 for infantry, motorised and light armour, 135 for artillery and air defence, 180 for mechanised and armour). No unit exists yet and the out-param is null_entity. Each economy tick takes 90 days off; at zero a unit appears on the base's tile, owned by the acting nation, with count and establishment hire_batch_manpower and `type` the roster index. An order whose base is demolished or decommissioned is dropped with no unit. An agency_event::kind::hired is reported.",
+   "reason_to_select": "You want force in the field, and this is the only verb that creates it. Units now FIGHT: a declared hostility and a shared province open a battle (MILITARY.md § Battles; the soft/hard land round), so force decides who holds a province. Weigh three costs: the base it needs (a completed military_base on your own ground), the wait (one or two quarters before the unit stands), and that soldiers are men the economy no longer has once the labour pool lands (BL-1424). Raise modern types: every pre-modern row starts obsolete (gameplay.set_unit_obsolete)."
   },
   {
    "id": "gameplay.idle",
@@ -2718,6 +2718,43 @@
    ],
    "expected_output": "Opens the Construction ledger on its Buildings view AIMED at this building: its type group expanded and the building selected, so its method lever and its workforce reading are on screen in one press. A DOOR, not a toggle - a second press does not close it, because the button carries no visible active state. Nothing in the world changes.",
    "reason_to_select": "The route from a building found on the MAP to its operating controls. The card's centre presents data and never holds levers, so this is how a map selection reaches them."
+  },
+  {
+   "id": "gameplay.set_unit_obsolete",
+   "family": "gameplay",
+   "surface": "The Military ledger's Design tab (nav rail slot 7), 'Unit types': one checkbox per roster row. Also a corp_verb (corp_verb::set_unit_obsolete, 39) on the command seam.",
+   "press": "Open the Military ledger, Design tab. Tick a unit type to mark it obsolete, untick to mark it live. The press queues the command, applied through apply_corp_command at the frame's end.",
+   "args": [
+    {
+     "name": "unit_type",
+     "type": "uint16 (index into unit_roster_table())",
+     "meaning": "The roster row to mark."
+    },
+    {
+     "name": "order",
+     "type": "uint32 (0 or 1)",
+     "meaning": "1 marks the row obsolete, 0 marks it live."
+    }
+   ],
+   "preconditions": [
+    "The actor is the seat (the player's nation); any other nation is rejected_not_owner. An AI nation's scorer reads the flags and their defaults and never sets them.",
+    "`unit_type` indexes unit_roster_table() and `order` is 0 or 1 (rejected_invalid otherwise).",
+    "The row does not already read that way (rejected_state otherwise — a repeated press changes nothing)."
+   ],
+   "expected_output": "The nation's obsolete state for that row flips (nation_component::roster_obsolete_flips holds the rows that differ from the default; every row below the modern band starts obsolete). Recruit and the base tile card hide obsolete rows; units already raised are untouched. Saved (world_save_version 60).",
+   "reason_to_select": "Keep Recruit to the types you raise. Every pre-modern row starts obsolete; un-mark one if your ground cannot field better, or mark a modern type obsolete once a better one replaces it."
+  },
+  {
+   "id": "ledger.military_show_obsolete",
+   "family": "ledger",
+   "surface": "The Military ledger's Recruit tab (nav rail slot 7): the 'Show obsolete (N)' checkbox above the roster.",
+   "press": "Tick it to list obsolete unit types (dimmed, '(obsolete)') among the roster; untick to hide them. A view filter for this session, not saved and not a command.",
+   "args": [],
+   "preconditions": [
+    "The Military ledger is open on Recruit."
+   ],
+   "expected_output": "Obsolete roster rows appear (or disappear) in Recruit. Nothing in the world changes.",
+   "reason_to_select": "To raise a type you have marked obsolete without un-marking it."
   }
  ]
 }

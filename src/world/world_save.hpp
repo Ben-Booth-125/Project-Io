@@ -513,7 +513,16 @@ inline constexpr uint32_t world_save_magic =
 /// queue in issue order, each as (id u32, base id, owner id, unit_type u16, days_total
 /// i32, days_remaining i32). v58 is a STRICT PREFIX of v59 and is read too
 /// (`k_world_save_version_pre_muster`), as a world with an empty queue.
-inline constexpr uint32_t world_save_version = 59;
+///
+/// Bumped to 60 (BL-1437, obsolete unit types): A TRAILING SECTION after the muster
+/// queue carries every nation with obsolete-row flips, ascending id, as (id, u32
+/// count, then count x u16 rows ascending). v59 is a STRICT PREFIX of v60 and is read
+/// too (`k_world_save_version_pre_obsolete`), as a world where every nation reads the
+/// defaults.
+inline constexpr uint32_t world_save_version = 60;
+
+/// v59, a strict prefix of v60 (the obsolete-flips section is v60's only addition).
+inline constexpr uint32_t k_world_save_version_pre_obsolete = 59;
 
 /// v58, a strict prefix of v59 (the muster section is v59's only addition).
 inline constexpr uint32_t k_world_save_version_pre_muster = 58;
@@ -643,6 +652,10 @@ void write_world_snapshot_pre_combat(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1435): @p w written as a v58 stream — today's stream less the
 /// muster section — so the v58 reader has a real producer. The game never writes it.
 void write_world_snapshot_pre_muster(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1437): @p w written as a v59 stream, less the obsolete-flips
+/// section. The game never writes it.
+void write_world_snapshot_pre_obsolete(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

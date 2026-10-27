@@ -253,6 +253,30 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
     // (run_nation_tax_ai), which writes through the same door,
     // set_nation_tax_tier. `order` is the tier, validated as the value that
     // lands (1..5) before anything mutates; out of range is rejected whole.
+    // BL-1437 (MILITARY.md § Land — the classes): the seat marks a roster row
+    // obsolete or live. Validated as the value that lands before anything mutates;
+    // a no-op is refused (rejected_state) so a repeated press changes nothing.
+    if (cmd.verb == corp_verb::set_unit_obsolete)
+    {
+        if (!seat)
+            return corp_command_result::rejected_not_owner;
+        if (cmd.unit_type >= unit_roster_table().size() || cmd.order > 1u)
+            return corp_command_result::rejected_invalid;
+        const bool want = (cmd.order == 1u);
+        if (roster_row_obsolete(w, nation, cmd.unit_type) == want)
+            return corp_command_result::rejected_state;
+        const auto nit = w.nations.find(nation);
+        if (nit == w.nations.end())
+            return corp_command_result::rejected_invalid;
+        std::vector<uint16_t>& flips = nit->second.roster_obsolete_flips;
+        const auto at = std::lower_bound(flips.begin(), flips.end(), cmd.unit_type);
+        if (at != flips.end() && *at == cmd.unit_type)
+            flips.erase(at);          // back to the default
+        else
+            flips.insert(at, cmd.unit_type);
+        return corp_command_result::applied;
+    }
+
     if (cmd.verb == corp_verb::set_tax_tier)
     {
         if (!seat)

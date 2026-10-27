@@ -640,6 +640,14 @@
   [
    "ledger.selection_open_in_buildings",
    "Selection band, the expanded building card's right-hand 2x3 action grid (select the building on the canvas, or press its button in the tile card - the band then draws the host tile's card with that building expanded, and the grid retargets to it): 'Open in ledger' (a panel outline with one row picked out)"
+  ],
+  [
+   "gameplay.set_unit_obsolete",
+   "The Military ledger's Design tab (nav rail slot 7), 'Unit types': one checkbox per roster row. Also a corp_verb (corp_verb::set_unit_obsolete, 39) on the command seam."
+  ],
+  [
+   "ledger.military_show_obsolete",
+   "The Military ledger's Recruit tab (nav rail slot 7): the 'Show obsolete (N)' checkbox above the roster."
   ]
  ]
 }

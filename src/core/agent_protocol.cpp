@@ -172,6 +172,7 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::lay_track:
         case corp_verb::set_logistics_shares:
         case corp_verb::set_tax_tier:
+        case corp_verb::set_unit_obsolete: // BL-1437
         // BL-1407: every player verb is sent as the nation, these included.
         case corp_verb::survey:
         case corp_verb::hold_convoy:

@@ -11,6 +11,11 @@ quick tier before and after. A cold `code-reviewer` pass with a fix round budget
 **Re-bless held to sprint end** (Ben, 2026-10-27): BL-1422's Rifle Infantry seeding moves the
 world digests (D_land onward); they stay red until the sprint's one re-bless.
 
+### BL-1437 (obsolete unit types) — Delivery Full, group `obsolete-unit-types`
+- [x] **T1** Per-nation flips, `roster_row_obsolete`, the `set_unit_obsolete` verb (39), save v60, hash; `obsolete_units` harness.
+- [x] **T2** Recruit and the tile card hide obsolete rows; the Design tab's toggles; the scorer skips them; ACTIONS entries.
+- [ ] **T3** Ben's live click.
+
 ### BL-1433 (military ledger) + BL-1435 (muster queue) — Delivery Full, groups `military-ledger`, `muster-queue`
 - [x] **T1** The muster contract: `muster_order`, `world::musters`, save v59, hash (f4d31c12).
 - [x] **T2** hire_unit queues; `advance_musters` raises; the scorer's cap counts the queue; `muster_queue` harness (08648aca).

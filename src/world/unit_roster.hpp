@@ -511,3 +511,12 @@ int muster_days_for(uint16_t roster_type);
 /// by hire_unit (corp_command.cpp) and the muster pass that raises the unit
 /// (economy_system.cpp, BL-1435).
 inline constexpr int hire_batch_manpower = 50;
+
+/// BL-1437 (obsolete unit types): a row starts obsolete when it sits below the modern
+/// band — Recruit opens on the modern types (Ben, 2026-10-27).
+bool roster_row_obsolete_by_default(const roster_row& r);
+
+/// Whether @p nation holds roster row @p row obsolete: the default, flipped if the
+/// nation flipped it (`nation_component::roster_obsolete_flips`). An unknown row or
+/// nation reads the default (an unknown row: obsolete).
+bool roster_row_obsolete(const world& w, entity_id nation, uint16_t row);

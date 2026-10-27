@@ -3074,6 +3074,19 @@ void app::render()
         m_ui.construction.pending_station_tile = null_entity;
     }
 
+    // BL-1437: execute an obsolete-type toggle queued by the Military ledger's Design
+    // tab, through the same seam any caller uses (`set_unit_obsolete`).
+    if (m_ui.military.pending_obsolete_row >= 0)
+    {
+        corp_command cmd;
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::set_unit_obsolete;
+        cmd.unit_type = static_cast<std::uint16_t>(m_ui.military.pending_obsolete_row);
+        cmd.order     = m_ui.military.pending_obsolete_value ? 1u : 0u;
+        player_command(cmd, nullptr);
+        m_ui.military.pending_obsolete_row = -1; // consume the request
+    }
+
     // Execute any hire-unit request queued this frame by the build front door's
     // Hire affordance (BL-324). Routes through the same corp_verb seam corp_ai
     // scores for rival corps — the player takes no shortcut around it.

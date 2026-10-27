@@ -363,6 +363,28 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // BL-1437: each nation's obsolete-row flips, folded only for a nation that has
+    // any (sorted walk; nations is unordered), so a world nobody touched hashes as
+    // it did.
+    {
+        std::vector<entity_id> flipped;
+        for (const auto& [nid, nc] : nations)
+            if (!nc.roster_obsolete_flips.empty())
+                flipped.push_back(nid);
+        if (!flipped.empty())
+        {
+            std::sort(flipped.begin(), flipped.end());
+            fnv1a_u32(h, 0x4F42534Cu); // "OBSL"
+            for (const entity_id nid : flipped)
+            {
+                const std::vector<uint16_t>& v = nations.at(nid).roster_obsolete_flips;
+                fnv1a_u32(h, nid);
+                fnv1a_u32(h, static_cast<uint32_t>(v.size()));
+                for (const uint16_t r : v) fnv1a_u32(h, r);
+            }
+        }
+    }
+
     // BL-1435: the muster queue, folded only when non-empty (the battles
     // precedent) so a world that never hires hashes as it did.
     if (!musters.empty())

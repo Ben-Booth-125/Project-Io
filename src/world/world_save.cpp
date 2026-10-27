@@ -5,7 +5,8 @@
 #include "logistics.hpp"        // BL-1340: road_edges_mirrored — the mirror is checked on load
 #include "river_generation.hpp"  // BL-1340: hex_side_for_offset — the pre-v53 migration
 #include "history_log.hpp" // write_history_log / read_history_log -- the embedded section
-#include "state_industry.hpp" // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
+#include "state_industry.hpp"
+#include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <algorithm>
 #include <cmath> // std::isfinite -- the sentiment record's own rejection (BL-546)
@@ -1498,9 +1499,9 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 59 (BL-1435): THE MUSTER QUEUE, the last section —
-    // next_muster_id, then every order in issue order.
-    if (version == world_save_version)
+    // world_save_version 59 (BL-1435): THE MUSTER QUEUE — next_muster_id, then every
+    // order in issue order.
+    if (version >= k_world_save_version_pre_obsolete)
     {
         w_u32(out, w.next_muster_id);
         w_u32(out, static_cast<uint32_t>(w.musters.size()));
@@ -1514,6 +1515,31 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, m.days_remaining);
         }
     }
+
+    // world_save_version 60 (BL-1437): THE OBSOLETE-ROW FLIPS, the last section — every
+    // nation holding any, ascending id, as (id, count, rows).
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [nid, nc] : w.nations)
+            if (!nc.roster_obsolete_flips.empty())
+                ids.push_back(nid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id nid : ids)
+        {
+            const std::vector<uint16_t>& v = w.nations.at(nid).roster_obsolete_flips;
+            w_id(out, nid);
+            w_u32(out, static_cast<uint32_t>(v.size()));
+            for (const uint16_t r : v) w_u16(out, r);
+        }
+    }
+}
+
+void write_world_snapshot_pre_obsolete(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1437): the v59 stream shape — no obsolete-flips section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_obsolete);
 }
 
 void write_world_snapshot_pre_muster(const world& w, std::ostream& out)
@@ -1620,7 +1646,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_books      // BL-1407: v55, corporations folded
             && version != k_world_save_version_pre_days       // v56: days derived from ticks (Ben, 2026-10-24)
             && version != k_world_save_version_pre_combat     // BL-1421: v57, full readiness and morale
-            && version != k_world_save_version_pre_muster))   // BL-1435: v58, an empty muster queue
+            && version != k_world_save_version_pre_muster     // BL-1435: v58, an empty muster queue
+            && version != k_world_save_version_pre_obsolete)) // BL-1437: v59, every nation on the defaults
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2307,7 +2334,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // next_muster_id; base and owner real (the base a building, the owner a nation);
     // days_total in [1, 3650], days_remaining in [-90, days_total]. Refused whole
     // otherwise. A v58 (and older) stream ends before it: the queue is empty.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_obsolete)
     {
         uint32_t next = 0, count = 0;
         if (!r_u32(in, next) || next == 0 || !r_u32(in, count) || count > 100000)
@@ -2329,6 +2356,36 @@ bool read_world_snapshot(world& w, std::istream& in)
                 return false;
             prev = m.id;
             s.musters.push_back(m);
+        }
+    }
+
+    // v60 (BL-1437): the obsolete-row flips. Untrusted: nations strictly ascending,
+    // each in the stream, each with 1..roster-size rows strictly ascending and every
+    // row a real roster index. Refused whole otherwise. A v59 (and older) stream ends
+    // before it: every nation reads the defaults.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        const std::size_t rows = unit_roster_table().size();
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            uint32_t n = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev) || !r_u32(in, n)
+                || n == 0 || n > rows)
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            std::vector<uint16_t> v(n);
+            for (uint32_t i = 0; i < n; ++i)
+                if (!r_u16(in, v[i]) || v[i] >= rows || (i > 0 && v[i] <= v[i - 1]))
+                    return false;
+            nit->second.roster_obsolete_flips = std::move(v);
         }
     }
 

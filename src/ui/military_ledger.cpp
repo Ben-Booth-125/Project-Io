@@ -194,10 +194,25 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
         return static_cast<int>(table[a].band) > static_cast<int>(table[b].band);
     });
 
+    // BL-1437: obsolete unit types are hidden unless the player asks to see them
+    // (MILITARY.md § Land — the classes; by default every row below the modern band).
+    int hidden = 0;
+    for (const std::uint16_t idx : order)
+        if (roster_row_obsolete(w, actor, idx))
+            ++hidden;
+    {
+        char label[64];
+        std::snprintf(label, sizeof label, "Show obsolete (%d)", hidden);
+        ImGui::Checkbox(label, &m.show_obsolete);
+    }
+
     const float btn_w = ImGui::CalcTextSize("Raise").x + ImGui::GetStyle().FramePadding.x * 2.0f;
     for (const std::uint16_t idx : order)
     {
         const roster_row& row = table[idx];
+        const bool obsolete = roster_row_obsolete(w, actor, idx);
+        if (obsolete && !m.show_obsolete)
+            continue;
         ImGui::PushID(static_cast<int>(idx));
 
         const bool fieldable = std::find(avail.begin(), avail.end(), &row) != avail.end();
@@ -219,8 +234,9 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
         // Line 1: name, then price and Raise at the right edge.
         const float line_x = ImGui::GetCursorPosX();
         const float avail_w = ImGui::GetContentRegionAvail().x;
-        if (fieldable) ImGui::TextUnformatted(row.name);
-        else           ImGui::TextDisabled("%s", row.name);
+        if (fieldable && !obsolete) ImGui::TextUnformatted(row.name);
+        else if (obsolete)          ImGui::TextDisabled("%s (obsolete)", row.name);
+        else                        ImGui::TextDisabled("%s", row.name);
         const std::string price_s = fmt::credits(price);
         const float price_w = ImGui::CalcTextSize(price_s.c_str()).x;
         ImGui::SameLine(line_x + avail_w - btn_w - price_w - ImGui::GetStyle().ItemSpacing.x);
@@ -296,7 +312,7 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
     }
 }
 
-void draw_design()
+void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
 {
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("Each class fields its base kit. Kit choices open as military research lands.");
@@ -314,6 +330,41 @@ void draw_design()
         ImGui::TextDisabled("%s", stats);
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
+    }
+
+    // BL-1437: UNIT TYPES — which the nation still raises. A ticked type is
+    // obsolete and hidden from Recruit; the defaults mark every type below the
+    // modern band. The press queues `set_unit_obsolete`, which app executes.
+    ImGui::Separator();
+    ImGui::TextUnformatted("Unit types");
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("Tick a type to mark it obsolete: Recruit hides it and it is no longer raised.");
+    ImGui::PopTextWrapPos();
+    const entity_id actor = player_actor(w);
+    const std::vector<roster_row>& table = unit_roster_table();
+    const roster_band band = campaign_roster_band_for(reg.era());
+    std::vector<std::uint16_t> order;
+    for (std::size_t i = 0; i < table.size(); ++i)
+        if (static_cast<int>(table[i].band) <= static_cast<int>(band))
+            order.push_back(static_cast<std::uint16_t>(i));
+    std::stable_sort(order.begin(), order.end(), [&](std::uint16_t a, std::uint16_t b) {
+        return static_cast<int>(table[a].band) > static_cast<int>(table[b].band);
+    });
+    military_ledger_state& m = s.military;
+    for (const std::uint16_t idx : order)
+    {
+        ImGui::PushID(static_cast<int>(idx) + 0x10000);
+        bool obsolete = roster_row_obsolete(w, actor, idx);
+        if (m.pending_obsolete_row == static_cast<int>(idx))
+            obsolete = m.pending_obsolete_value; // shows the press before the tick applies it
+        if (ImGui::Checkbox(table[idx].name, &obsolete))
+        {
+            m.pending_obsolete_row   = static_cast<int>(idx);
+            m.pending_obsolete_value = obsolete;
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", land_class_label(land_class_for(table[idx])));
+        ImGui::PopID();
     }
 }
 
@@ -357,7 +408,7 @@ void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& 
     if (open)
     {
         if (m.view == 0) draw_recruit(w, reg, s);
-        else             draw_design();
+        else             draw_design(w, reg, s);
     }
     else
         m.raise_pressed = false;
