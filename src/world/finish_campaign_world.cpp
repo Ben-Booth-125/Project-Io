@@ -432,6 +432,13 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // and before the opening reserve, so the bill and the settle read a world in which
     // every building is a nation's.
     print_fold(fold_to_ground(w));
+    // BL-1439 (Ben, 2026-10-27; MILITARY.md § Nation garrisons) -- EVERY CAPITAL HAS A
+    // MILITARY BASE: one completed base per nation in its capital province, the capital
+    // garrison's muster base. After the fold (every building is a nation's, so the
+    // opening force's base is adopted rather than doubled) and BEFORE the reserve, which
+    // bills its maintenance, and the second site-road call below, which roads it.
+    out.capital_bases = seed_capital_military_bases(w);
+    print_capital_bases(out.capital_bases);
     // BL-1382 economy follow-up (NATION_GENERATION.md § Pass 7, Ben 2026-10-19:
     // no major leaves generation on a zero treasury) -- THE FOUNDINGS KEEP THE
     // SETTLE AND A YEAR OF THE STATE BILL, counted from the opening (BL-1386:

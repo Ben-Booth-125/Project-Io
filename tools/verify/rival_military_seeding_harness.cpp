@@ -15,7 +15,8 @@
 //
 //   R1 every non-background corp (player + named rivals) ends generation
 //      owning exactly one military_base and one unit_component (50 manpower),
-//      placed on the nearest valid land tile to its HQ. A background firm owns
+//      placed by the capital-base tile rule (BL-1439: the capital province's
+//      legal tile nearest the capital post). A background firm owns
 //      neither. BL-1422: the unit is the MODERN INFANTRY row
 //      (`campaign_opening_unit_row`, a modern-band row of land class infantry),
 //      no longer roster index 0 (Levy Spear).
@@ -112,7 +113,7 @@ int count_generation_seeded_units(const world& w, entity_id corp_id)
 {
     int n = 0;
     for (const auto& [uid, uc] : w.units)
-        if (uc.owner == corp_id && uc.muster_base != null_entity)
+        if (uc.owner == corp_id && unit_is_raised(uid, uc)) // BL-1439: never a garrison
             ++n;
     return n;
 }

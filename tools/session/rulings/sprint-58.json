@@ -178,5 +178,16 @@
   "anchor": "Rival nations use fronts",
   "stale": [],
   "owner": "BL-1427 (fronts)"
+ },
+ {
+  "ruling": "Every nation's capital is generated with a completed military base, the capital garrison's muster base (Ben, 2026-10-27)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Every capital is generated with a military base \\(Ben, 2026-10-27\\)",
+  "stale": [
+   "which nations open with one is open",
+   "a nation raises no base",
+   "no\\s+`muster_base`\\s+\\(a nation raises no base\\)"
+  ],
+  "owner": "BL-1439 (capital military base)"
  }
 ]

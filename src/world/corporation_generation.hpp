@@ -166,13 +166,17 @@ int remove_specialist_roster(world& w);
 /// BL-1154 (Ben, 2026-10-01, NR-963 A; MILITARY.md § "BL-476 rivals start
 /// armed") — THE OPENING FORCE: rivals start armed, the seat opens unarmed.
 ///   * `arm_rivals`: every non-background corporation but `w.player_entity`
-///     without a military base gets one beside its HQ and a 50-head unit
+///     whose nation holds no unit raised at a base gets a 50-head unit at its
+///     nation's capital base, laying that base when none stands (BL-1439: the
+///     capital-base tile rule, so the opening base IS the capital base)
 ///     (`seed_starting_military`), in ascending corporation id. Background
 ///     firms stay unarmed. Draws no randomness.
 ///   * `arm_corporation`: the same for one corporation (no-op for a background
 ///     firm or one already armed).
-///   * `disarm_corporation`: removes a corporation's units and military bases
-///     (buildings, stockpiles and asset entries), ascending id.
+///   * `disarm_corporation`: removes a corporation's units RAISED at a base
+///     (`unit_is_raised`) and every military base no surviving garrison records
+///     (buildings, stockpiles and asset entries), ascending id — so a nation's
+///     capital base, once its capital garrison records it, stays (BL-1439).
 /// Generation arms the rivals where it charters (`generate_corporations`,
 /// `charter_web_from_budget`); `repoint_player` (spawn_seat.cpp) disarms the
 /// seat when the Begin pick moves it, and arms the corporation it leaves.
@@ -225,6 +229,40 @@ int seat_release_dial_idled(world& w, entity_id nation);
 void arm_rivals(world& w);
 void arm_corporation(world& w, entity_id corp);
 void disarm_corporation(world& w, entity_id corp);
+
+/// BL-1439 — was unit @p uid RAISED at its muster base? True when it records a
+/// base and was created after it (every hire, every opening force); false for a
+/// unit with no base and for a garrison, which was posted before any base stood
+/// and adopted its capital base. The opening force is the raised units; the
+/// garrisons are the rest (`disarm_corporation`, `corporation_has_opening_force`).
+bool unit_is_raised(entity_id uid, const unit_component& u);
+
+/// BL-1439 (Ben, 2026-10-27; MILITARY.md § Nation garrisons) — EVERY NATION'S
+/// CAPITAL IS GENERATED WITH A MILITARY BASE. For each nation in ascending id:
+/// a completed `military_base` it already owns on its own ground in its capital
+/// province is adopted (lowest id; the opening force's base is laid by the same
+/// tile rule, so it is never doubled); else one is laid, completed, owned by the
+/// nation (`state_assets`), on the legal tile nearest the capital garrison's
+/// tile (own ground, `can_place`, an empty tile first, else one the ordinary
+/// stacking rule has room on; ties to the lowest tile id). A capital
+/// province with no legal tile falls back to a base the nation already owns on
+/// its own ground, then to the nearest legal own tile anywhere; with none at
+/// all the nation is counted in `none` and gets no base. The capital garrison
+/// then records the base as its `muster_base`. Draw-free and deterministic.
+/// Run by `finish_campaign_world` after the fold to ground and before the
+/// opening reserve (so the reserve bills its maintenance) and the second
+/// site-road call (which roads it).
+struct capital_base_report
+{
+    int nations                  = 0; ///< Nations with ground.
+    int laid                     = 0; ///< Bases laid by this pass.
+    int adopted                  = 0; ///< Bases already standing, adopted.
+    int outside_capital_province = 0; ///< Capital provinces with no legal tile (the fallback ran).
+    int none                     = 0; ///< Nations with no legal tile at all: no base.
+    int garrisons_recorded       = 0; ///< Capital garrisons given the base as muster_base.
+};
+capital_base_report seed_capital_military_bases(world& w);
+void print_capital_bases(const capital_base_report& r);
 
 /// BL-1032 — CHARTER THE WEB FROM A PER-CENTRE BUDGET (INDUSTRIALISATION.md § 1;
 /// CORPORATION_GENERATION.md Pass 1 and Pass 6, both AMENDED FORWARD). Lays

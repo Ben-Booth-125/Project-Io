@@ -429,11 +429,15 @@ by entity id), which is what keeps the container's iteration order off the deter
   starting base (BL-331, starting military presence; BL-476, rivals start armed), count 50, the
   modern infantry row (§ The roster), recorded with that base as its `muster_base`. Its subject was every non-background
   corporation, placed by the HQ; the corporations and the HQ are retired (Ben, 2026-10-23), so the
-  unit and base are a nation's, on its own ground, and which nations open with one is open.
+  unit is a nation's, on its own ground. **Every nation opens with a military base at its capital
+  (Ben, 2026-10-27)** — § Nation garrisons — and the opening unit musters there: its base is the
+  capital base, never a second one. Which nations also open with the unit is the opening-force
+  rule: every rival major does, the seat does not.
 - `src/world/corp_command.cpp` — the `hire_unit` verb, count `hire_batch_manpower` = 50. Records
   the tile's qualifying base, lowest entity id first.
-- `src/world/nation_generation.cpp` — a nation's garrisons, owner set to the nation entity, no
-  `muster_base` (a nation raises no base). See § Nation garrisons, below.
+- `src/world/nation_generation.cpp` — a nation's garrisons, owner set to the nation entity. A
+  garrison is posted, not raised: the **capital** garrison records its capital's military base as
+  its `muster_base`, and a border garrison records none. See § Nation garrisons, below.
 
 **The bridge from a unit to the campaign resolver** is the `land_combatant` `run_battles` builds
 from each participating unit: its men, readiness, morale and supply, and `unit_land_stats` — its
@@ -575,8 +579,9 @@ the press (BL-405, hire price on screen).
 
 **Rival nations hire through the same verb** (the BL-324 widening of the AI-agency exception,
 carried to the nation unchanged, Ben 2026-10-23; `../ai/AI_OPPONENT.md` § 11). The build scorer
-(`src/world/corp_ai.cpp`) scores hiring alongside build, demolish, survey and road; a nation with no
-completed base has no muster tile and must build one first on its own ground, priced by the ordinary
+(`src/world/corp_ai.cpp`) scores hiring alongside build, demolish, survey and road. Every nation
+opens with a completed base at its capital (Ben, 2026-10-27; § Nation garrisons); a nation that has
+lost it has no muster tile and must build one first on its own ground, priced by the ordinary
 build-candidate machinery. A soft cap of three units per nation keeps hiring from becoming an
 unconditional extra action every evaluation. Availability is decided by the stock on the shelves of
 the markets the nation's buildings sit in alone; the credit cost is subject to the solvency gate like every other spend
@@ -845,7 +850,21 @@ the member tile with the most hex sides onto that neighbour's ground, ties to th
 garrison is read as border force only through its own tile's neighbours, so one posted deep inside
 its province would guard nothing. A capital province that is also a border province takes the
 capital rule. Neither post is the province's lowest-id tile, which is its id rather than its place
-(BL-1145, a province's readers take its anchor). This joins the existing three unit writers (§ The unit model)
+(BL-1145, a province's readers take its anchor).
+
+**Every capital is generated with a military base (Ben, 2026-10-27).** Each nation, major or minor,
+opens owning one completed `military_base` on its own ground in its capital province, on the legal
+tile nearest its capital garrison: one `can_place` accepts, an empty tile before one the stacking
+rule still has room on, ties to the lowest tile id. A capital province with no legal tile takes the
+nearest legal tile of the nation's own ground anywhere; a nation with no legal tile at all opens
+with no base. The capital garrison records that base as its `muster_base`, so the nation can hire
+from its first day and the orphan rule (§ Upkeep) holds the garrison to its base. A border garrison
+records none. The opening unit (`seed_starting_military`) musters at the same base, so a nation
+opens with one base, never two. A seat moved at Begin keeps its capital base and its garrisons and
+loses only the unit raised there. A garrison is told from a raised unit by its id: it was posted
+before its base stood and adopted it; every hire is created after the base it musters at.
+
+This joins the existing three unit writers (§ The unit model)
 as a fourth, generation-time source, alongside the hard-coded stub, `seed_starting_military`, and
 `hire_unit`.
 
@@ -947,8 +966,9 @@ been erased, and a unit a battle reduced to zero. It runs **last** in the econom
 torn down this tick orphans its units in the same tick rather than leaving them live for one. It
 reports the count as `unit_upkeep_tick::disbanded`.
 
-`muster_base == null_entity` means "no base recorded" — the hard-coded world's stub unit — and is
-never orphaned.
+`muster_base == null_entity` means "no base recorded" — the hard-coded world's stub unit, or a
+border garrison — and is never orphaned. A capital garrison records its capital base (§ Nation
+garrisons), so it is held to that base like any unit raised there.
 
 **Supply is measurably real in the resolver, not merely expensive.** The land round reads each
 unit's `supply_factor_permille`, so an unsupplied army is weaker where it counts.
@@ -1065,6 +1085,12 @@ ends generation owning exactly one `military_base` and one unit (the modern infa
 manpower); its
 corporation-and-HQ reading retired with the corporations (Ben, 2026-10-23). R2: two same-seed runs
 seed identically.
+
+**`capital_military_base.cpp`** — every capital's base, over the library seeds on the shipped
+start. C1: every nation owns exactly one completed `military_base`, in its capital province, on its
+own ground, on a tile `can_place` accepts. C2: it stands on the road network. C3: the capital
+garrison records it as `muster_base`; no border garrison records one. C5: a picked seat keeps its
+capital base and garrison and loses the unit raised there; the seat it left is armed at its own.
 
 **`stance_determinism.cpp`** — the stance tables that gate all of the above replay identically.
 

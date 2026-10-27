@@ -116,6 +116,7 @@ struct finish_campaign_result
     rail_handover_report    rail;  ///< BL-1255: the rail handover at the fold
     colonial_port_report    colonial_ports; ///< ports in history (Ben, 2026-10-26)
     lp_seed_report          lp;    ///< BL-1309: the Logistic Point sources seeded at the fold
+    capital_base_report     capital_bases; ///< BL-1439: every capital's military base
     /// BL-1347: the crossings laid to the sites the WINNER's charters, the state handover
     /// and the hub/station seeding stamped -- summed over every body that holds a
     /// building. Generation ran its own pass at its tail; this is the second, for what

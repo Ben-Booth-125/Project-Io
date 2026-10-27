@@ -386,6 +386,9 @@ inline shipped_landscape apply_shipped_landscape(
                 std::sort(fp->treasury_after.begin(), fp->treasury_after.end());
             }
         }
+        // BL-1439: finish_campaign_world's capital military bases, verbatim, right
+        // after the fold and before the reserve.
+        print_capital_bases(seed_capital_military_bases(w));
         // BL-1382 economy follow-up: finish_campaign_world's state reserve and
         // the seeding's reading at the gate, verbatim, right after it.
         out.reserve = reserve_state_first_tick(w, reg, out.state);
