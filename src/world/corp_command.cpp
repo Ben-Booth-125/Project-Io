@@ -517,6 +517,116 @@ corp_command_result refit_check(const world& w, const recipe_registry& reg, enti
 // with the corporation (FINANCE.md § Whole-firm acquisition, § Firm exit:
 // retired). A nation is never bought and never goes insolvent.
 
+corp_command_result march_check(world& w, entity_id actor, entity_id unit, entity_id tile,
+                                entity_id assume_hostile, std::vector<entity_id>* out_path)
+{
+    const auto uit = w.units.find(unit);
+    if (uit == w.units.end())
+        return corp_command_result::rejected_invalid;
+    if (uit->second.owner != actor)
+        return corp_command_result::rejected_not_owner;
+
+    // BL-467 (2026-08-21) FILLED THE GAP THIS COMMENT RESERVED. The
+    // "reject march while in-battle" rule from BL-470's design was
+    // unreachable while nothing recorded that a unit was in contact;
+    // `world::battles` now does. A unit in a fight may not be given a
+    // new movement order — walking away from contact is a WITHDRAWAL,
+    // which is priced, not a march, which is not. The verb for it is
+    // corp_verb::withdraw_from_battle.
+    //
+    // Note the state is on the BATTLE, not on unit_component: the flag
+    // that comment predicted would have been a second place for the same
+    // fact to live, and a second place to forget to clear.
+    if (unit_in_battle(w, unit))
+        return corp_command_result::rejected_state;
+    // A unit refitting to a newer type re-equips in place (Ben, 2026-10-27).
+    if (unit_refitting(uit->second))
+        return corp_command_result::rejected_state;
+
+    // EVERY MARCH GOES TO A TILE (Ben, 2026-10-27: "all marches go to a
+    // tile"). The destination is `tile`, and the march ends on it.
+    // `cmd.province` is IGNORED: the province grain BL-511 gave the march is
+    // retired, and a command naming only a province names no tile, so it is
+    // refused below as an unknown tile. This is the domain check the
+    // untrusted-input rule asks for: the wire proves the id fits an
+    // entity_id, and only `w.tiles` knows whether it is a tile.
+    const auto dit = w.tiles.find(tile);
+    if (dit == w.tiles.end())
+        return corp_command_result::rejected_invalid;
+    const uint32_t dprov = w.provinces.province_of(tile);
+    const province* dp   = w.provinces.find(dprov);
+
+    // BL-778: MAY THIS TYPE BE THERE. A unit type declares the domains it
+    // may cross (docs/military/MILITARY.md § Domains and traversal). A land
+    // type may enter coastal water its OWN polity holds and no other water.
+    // The tile's domain is its province's kind; a tile no province holds is
+    // read off its substrate (water is the open ocean, at any price).
+    {
+        traversal_domain dest_domain = traversal_domain::land;
+        if (dp != nullptr)
+        {
+            const province_kind pk = province_kind_of(w, *dp);
+            dest_domain = (pk == province_kind::open_ocean)    ? traversal_domain::open_ocean
+                        : (pk == province_kind::coastal_water) ? traversal_domain::coastal_water
+                                                               : traversal_domain::land;
+        }
+        else if (is_water(dit->second.substrate))
+            dest_domain = traversal_domain::open_ocean;
+
+        const std::vector<roster_row>& rows = unit_roster_table();
+        if (uit->second.type >= rows.size())
+            return corp_command_result::rejected_invalid; // no such row to ask
+
+        bool owned_by_mover = false;
+        if (dest_domain == traversal_domain::coastal_water)
+        {
+            // BL-1402: owner-generic — a corporation's home nation, or the
+            // nation itself when it marches as itself.
+            const entity_id home = owner_home_nation(w, actor);
+            owned_by_mover = (home != null_entity) && (province_holder_for(w, dprov) == home);
+        }
+        if (!row_can_traverse(rows[uit->second.type], dest_domain, owned_by_mover))
+            return corp_command_result::rejected_invalid;
+    }
+
+    const auto sit = w.tiles.find(uit->second.position);
+    if (sit == w.tiles.end())
+        return corp_command_result::rejected_invalid; // unit's own tile is gone
+
+    if (dit->second.body != sit->second.body)
+        return corp_command_result::rejected_invalid; // BL-470's ruling 1: intra-body path march only
+
+    if (uit->second.position == tile)
+        return corp_command_result::rejected_state; // already there — halt_unit is the stop verb
+
+    // A SPENT UNIT CANNOT ATTACK (MILITARY.md § Battles: a spent attacker starts
+    // nothing). A march whose destination a nation the actor is hostile to holds is
+    // an attack, and `open_tile_battle` would refuse it on contact, so the verb
+    // refuses it here, honestly, rather than accept an order that can only bump.
+    // @p assume_hostile reads one nation as hostile already, for a caller that will
+    // declare before it marches (the right-click "declare and attack").
+    if (uit->second.readiness_permille <= 0)
+        for (const auto& [vid, v] : w.units)
+            if (v.count > 0 && v.position == tile && v.owner != uit->second.owner
+                && (v.owner == assume_hostile || is_hostile(w, uit->second.owner, v.owner)))
+                return corp_command_result::rejected_state;
+
+    // ONE NATION PER TILE (Ben, 2026-10-27): the path is solved around every
+    // tile another nation's units stand on, save the destination itself —
+    // marching onto a held destination is an attack (toward a nation the
+    // actor is hostile to) or a block, decided as the march steps
+    // (run_unit_march). Read-only: nothing is written until the single
+    // `order` assignment in apply_corp_command, so a refusal mutates nothing.
+    const std::vector<entity_id> path =
+        march_path(w, sit->second.body, uit->second.position, tile,
+                   foreign_held_tiles(w, uit->second.owner));
+    if (path.size() < 2)
+        return corp_command_result::rejected_invalid; // unreachable
+    if (out_path != nullptr)
+        *out_path = path;
+    return corp_command_result::applied;
+}
+
 corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                                        const corp_command& cmd,
                                        entity_id* out_building)
@@ -849,103 +959,19 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
         case corp_verb::march_unit:
         {
-            const auto uit = w.units.find(cmd.subject);
-            if (uit == w.units.end())
-                return corp_command_result::rejected_invalid;
-            if (uit->second.owner != cmd.corp)
-                return corp_command_result::rejected_not_owner;
-
-            // BL-467 (2026-08-21) FILLED THE GAP THIS COMMENT RESERVED. The
-            // "reject march while in-battle" rule from BL-470's design was
-            // unreachable while nothing recorded that a unit was in contact;
-            // `world::battles` now does. A unit in a fight may not be given a
-            // new movement order — walking away from contact is a WITHDRAWAL,
-            // which is priced, not a march, which is not. The verb for it is
-            // corp_verb::withdraw_from_battle.
-            //
-            // Note the state is on the BATTLE, not on unit_component: the flag
-            // that comment predicted would have been a second place for the same
-            // fact to live, and a second place to forget to clear.
-            if (unit_in_battle(w, cmd.subject))
-                return corp_command_result::rejected_state;
-            // A unit refitting to a newer type re-equips in place (Ben, 2026-10-27).
-            if (unit_refitting(uit->second))
-                return corp_command_result::rejected_state;
-
-            // EVERY MARCH GOES TO A TILE (Ben, 2026-10-27: "all marches go to a
-            // tile"). The destination is `cmd.tile`, and the march ends on it.
-            // `cmd.province` is IGNORED: the province grain BL-511 gave the march is
-            // retired, and a command naming only a province names no tile, so it is
-            // refused below as an unknown tile. This is the domain check the
-            // untrusted-input rule asks for: the wire proves the id fits an
-            // entity_id, and only `w.tiles` knows whether it is a tile.
-            const auto dit = w.tiles.find(cmd.tile);
-            if (dit == w.tiles.end())
-                return corp_command_result::rejected_invalid;
-            const uint32_t dprov = w.provinces.province_of(cmd.tile);
-            const province* dp   = w.provinces.find(dprov);
-
-            // BL-778: MAY THIS TYPE BE THERE. A unit type declares the domains it
-            // may cross (docs/military/MILITARY.md § Domains and traversal). A land
-            // type may enter coastal water its OWN polity holds and no other water.
-            // The tile's domain is its province's kind; a tile no province holds is
-            // read off its substrate (water is the open ocean, at any price).
-            {
-                traversal_domain dest_domain = traversal_domain::land;
-                if (dp != nullptr)
-                {
-                    const province_kind pk = province_kind_of(w, *dp);
-                    dest_domain = (pk == province_kind::open_ocean)    ? traversal_domain::open_ocean
-                                : (pk == province_kind::coastal_water) ? traversal_domain::coastal_water
-                                                                       : traversal_domain::land;
-                }
-                else if (is_water(dit->second.substrate))
-                    dest_domain = traversal_domain::open_ocean;
-
-                const std::vector<roster_row>& rows = unit_roster_table();
-                if (uit->second.type >= rows.size())
-                    return corp_command_result::rejected_invalid; // no such row to ask
-
-                bool owned_by_mover = false;
-                if (dest_domain == traversal_domain::coastal_water)
-                {
-                    // BL-1402: owner-generic — a corporation's home nation, or the
-                    // nation itself when it marches as itself.
-                    const entity_id home = owner_home_nation(w, cmd.corp);
-                    owned_by_mover = (home != null_entity) && (province_holder_for(w, dprov) == home);
-                }
-                if (!row_can_traverse(rows[uit->second.type], dest_domain, owned_by_mover))
-                    return corp_command_result::rejected_invalid;
-            }
-
-            const auto sit = w.tiles.find(uit->second.position);
-            if (sit == w.tiles.end())
-                return corp_command_result::rejected_invalid; // unit's own tile is gone
-
-            if (dit->second.body != sit->second.body)
-                return corp_command_result::rejected_invalid; // BL-470's ruling 1: intra-body path march only
-
-            if (uit->second.position == cmd.tile)
-                return corp_command_result::rejected_state; // already there — halt_unit is the stop verb
-
-            // ONE NATION PER TILE (Ben, 2026-10-27): the path is solved around every
-            // tile another nation's units stand on, save the destination itself —
-            // marching onto a held destination is an attack (toward a nation the
-            // actor is hostile to) or a block, decided as the march steps
-            // (run_unit_march). Read-only: nothing is written until the single
-            // `order` assignment below, so a refusal mutates nothing.
-            const std::vector<entity_id> path =
-                march_path(w, sit->second.body, uit->second.position, cmd.tile,
-                           foreign_held_tiles(w, uit->second.owner));
-            if (path.size() < 2)
-                return corp_command_result::rejected_invalid; // unreachable
-
+            // Every check first (`march_check`, read-only but for the path cache), so a
+            // refusal mutates nothing; the single `order` assignment below applies it.
+            std::vector<entity_id> path;
+            const corp_command_result r =
+                march_check(w, cmd.corp, cmd.subject, cmd.tile, null_entity, &path);
+            if (r != corp_command_result::applied)
+                return r;
             movement_order mo;
             mo.dest       = cmd.tile;
             mo.path       = path; // travel order: path[0] is the tile the unit occupies
             mo.next_index = 1;
             mo.progress   = 0.0f;
-            uit->second.order = mo;
+            w.units.at(cmd.subject).order = mo;
             return corp_command_result::applied;
         }
 

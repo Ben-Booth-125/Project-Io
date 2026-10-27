@@ -3173,15 +3173,33 @@ void app::render()
         cmd.subject  = m_ui.pending_march_unit;
         cmd.tile     = m_ui.pending_march_dest_tile; // BL-1443: every march goes to a tile
         const auto r = player_command(cmd);
+        // Parity with the right-click (Ben, 2026-10-27: a front unit is unassigned and
+        // obeys): once the march is accepted, a unit on a front leaves it, so the next
+        // tick's front step cannot re-order it. A refused march leaves it on its front.
+        if (r == corp_command_result::applied)
+        {
+            const auto uit = m_world.units.find(cmd.subject);
+            if (uit != m_world.units.end() && uit->second.front != null_entity)
+            {
+                corp_command un;
+                un.tick    = cmd.tick;
+                un.corp    = m_world.player_entity;
+                un.verb    = corp_verb::assign_front;
+                un.subject = cmd.subject;
+                un.tile    = null_entity; // unassign: the hand order wins
+                (void)player_command(un);
+            }
+        }
         switch (r)
         {
             case corp_command_result::applied:
                 m_ui.construction.last_message = "Marching."; break;
             case corp_command_result::rejected_state:
-                // Already there, or in a battle — MILITARY.md § Marching's
-                // "walking away from contact is a priced withdrawal, never a
-                // march" (withdraw_from_battle is the card's separate press).
-                m_ui.construction.last_message = "Can't march — already there, or in a fight.";
+                // Already there, in a battle, refitting, or spent and aimed at an
+                // enemy — MILITARY.md § Marching's "walking away from contact is a
+                // priced withdrawal, never a march" (withdraw_from_battle is the
+                // card's separate press); a spent unit starts no fight.
+                m_ui.construction.last_message = "Can't march — already there, in a fight, refitting, or too spent to attack.";
                 break;
             default:
                 m_ui.construction.last_message = "Can't march there."; break;
@@ -3192,16 +3210,34 @@ void app::render()
 
     // Right-click orders (BL-1443; SELECTION.md § Right-click orders): the canvas
     // queued a march to one tile for every unit of the player's selection. In this
-    // order, through the one seam: `declare_hostile` first when the confirm asked
-    // for it, then per unit (ascending id) `assign_front` with a null tile when the
-    // unit is on a front — a hand order overrides the front — and `march_unit`.
-    // An attack is only a march onto the enemy stack's tile; the world opens the
-    // battle. One status line reports the whole stack.
+    // order, through the one seam: when the confirm asked for a declare, every unit's
+    // march is CHECKED first (`march_check`, read-only, reading the declare's target
+    // as hostile already) and the declare is filed only if at least one would be
+    // accepted — a declare-and-attack whose every march is refused declares nothing.
+    // Then `declare_hostile`, then per unit (ascending id) `march_unit`, and, once a
+    // march is accepted, `assign_front` with a null tile when the unit is on a front
+    // (a hand order overrides the front). The declare goes BEFORE the marches, not
+    // after the first accepted one, because the verb's spent-attacker refusal reads
+    // hostility: a march filed before the declare would be judged as a march onto a
+    // neutral stack. An attack is only a march onto the enemy stack's tile; the
+    // world opens the battle. One status line reports the whole stack.
     if (!m_ui.pending_unit_order_units.empty() && m_ui.pending_unit_order_tile != null_entity)
     {
         const int tick = static_cast<int>(m_sim_loop.day_tick());
         bool go = true;
         if (m_ui.pending_unit_order_declare != null_entity)
+        {
+            bool any = false;
+            for (const entity_id unit : m_ui.pending_unit_order_units)
+                any = any || march_check(m_world, m_world.player_entity, unit, m_ui.pending_unit_order_tile,
+                                         m_ui.pending_unit_order_declare) == corp_command_result::applied;
+            if (!any)
+            {
+                go = false;
+                m_ui.construction.last_message = "Can't attack there.";
+            }
+        }
+        if (go && m_ui.pending_unit_order_declare != null_entity)
         {
             corp_command cmd;
             cmd.tick         = tick;

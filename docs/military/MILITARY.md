@@ -744,7 +744,11 @@ hold is never taken as a move:
 - **Toward a nation the marcher is hostile to, it is an attack (Ben, 2026-10-27: "attacks should take
   place when an attacking unit attempts to move into a defending unit's current tile").** The march
   stops on the tile it stands on and a battle opens on the defender's tile (§ Battles). This holds
-  wherever the path meets that unit — "stops and attacks it" — not only at the march's end.
+  wherever the path meets that unit — "stops and attacks it" — not only at the march's end. The
+  march's order is spent only by the battle it opens: if no battle opens with the unit — the stack
+  walked off in the same tick, or the unit was drawn into another battle first — it keeps its order
+  and carries on. A spent unit (readiness 0) starts no fight, so a march that would be an attack by
+  one is refused when it is given.
 - **Toward any other nation, the step is blocked.** The march re-paths around the tile; if no path
   remains, the order clears.
 
@@ -754,7 +758,14 @@ a retreat never steps onto a tile another nation holds (§ Battles).
 
 A right-click on a tile with a unit selected is a march to that tile; on another nation's stack it is
 an attack, and on a nation the player is not hostile to it first offers to declare hostility
-(`../ui/SELECTION.md`). A right-click on a unit assigned to a front unassigns it and obeys.
+(`../ui/SELECTION.md`). A unit assigned to a front that is given a hand march — by right-click or
+by the unit card's March — is unassigned once the march is accepted, and obeys. A declare-and-attack
+in which no unit's march would be accepted declares nothing.
+
+A world saved before this rule may hold two nations on one tile. On load each such tile is resolved:
+the nation of the lowest-id unit standing there keeps it, every other nation's units step off by the
+retreat rule (one crossable land tile no other nation holds, preferring their own nation's ground),
+and a unit with nowhere to step is disbanded.
 
 **Movement is a path march, not a hop.** `march_unit` computes the path ONCE, via
 `intra_body_path` (`src/world/logistics.hpp`) — the same terrain-weighted A* the convoy system and
