@@ -157,5 +157,26 @@
   "anchor": "Units are assigned from their selection",
   "stale": [],
   "owner": "BL-1427 (fronts)"
+ },
+ {
+  "ruling": "Every neighbour has fronts; at peace a front can only hold (Ben, 2026-10-27)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Every neighbour has fronts",
+  "stale": [],
+  "owner": "BL-1427 (fronts)"
+ },
+ {
+  "ruling": "A front's order is set on its front card, reached by clicking its line",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Clicking the line selects the front",
+  "stale": [],
+  "owner": "BL-1427 (fronts)"
+ },
+ {
+  "ruling": "Rival nations use fronts — granted",
+  "doc": "docs/ai/AI_OPPONENT.md",
+  "anchor": "Rival nations use fronts",
+  "stale": [],
+  "owner": "BL-1427 (fronts)"
  }
 ]

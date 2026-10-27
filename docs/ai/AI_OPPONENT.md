@@ -2292,3 +2292,11 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   unit the player did not assign; choosing a front, an order, a war or a target for the player's
   nation; a campaign planned beyond the next move. Pure, seeded, deterministic, replayable, legal
   verbs only, never a planner.
+
+  **Rival nations use fronts — granted (Ben, 2026-10-27, resolving NR-1083; `../military/MILITARY.md`
+  § Fronts).** A rival nation's scorer may assign its OWN units to its own fronts and choose each
+  front's order — hold, or push toward a neighbour it is hostile to — over the same legal verbs the
+  player's front card issues; its assigned units then move as the player's do, every move a legal
+  `march_unit`. **Not admitted:** any unit or front of another nation, the player's included;
+  declaring the hostility a push needs (that stays the stance scorer's, BL-450); a campaign planned
+  beyond the next order. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.

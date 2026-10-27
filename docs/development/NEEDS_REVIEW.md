@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*7 entries — 7 open, 0 resolved.*
+*7 entries — 6 open, 1 resolved.*
 
 ---
 
@@ -42,19 +42,6 @@ the work happens, and that is the durable record. What stays here is what is sti
 > **Recommendation:** (1) B; (2) A. The seat screen is a pre-play pick, so it may show treasuries.
 
 *Files: `docs/ui/DISCOVERY.md`, `docs/economy/FINANCE.md`, `docs/ui/LENSES.md`*
-
-### NR-1083 — May rival nations use fronts?
-*question · raised 2026-10-26 · from sprint 58 military design*
-
-Ben granted fronts for the player's assigned units (AI_OPPONENT.md § 11). Whether a rival nation may assign its own units to fronts and score hold or push is a separate subject, so it was not written into the grant.
-
-**Why it matters.** Fronts are the cheapest way for a scorer to use an army without a planner. Without this grant, rivals have no way to fight a war beyond march_unit.
-
-- A: grant rivals fronts, hold and push scored by the nation layer; B: rivals hold only; C: no rival fronts yet
-
-> **Recommendation:** A, on the standing terms. It is what makes BL-1427 (fronts) worth building for v0.3.0's AI half.
-
-*Files: `docs/ai/AI_OPPONENT.md`, `docs/military/MILITARY.md`*
 
 ### NR-1084 — Four combat calls taken in writing the land model
 *decision taken on your behalf · raised 2026-10-26 · from sprint 58 military design*
@@ -125,4 +112,19 @@ The counter and the unit card show HP, readiness and morale for the player's own
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
+
+### NR-1083 — May rival nations use fronts?
+*question · raised 2026-10-26 · from sprint 58 military design*
+
+Ben granted fronts for the player's assigned units (AI_OPPONENT.md § 11). Whether a rival nation may assign its own units to fronts and score hold or push is a separate subject, so it was not written into the grant.
+
+**Why it matters.** Fronts are the cheapest way for a scorer to use an army without a planner. Without this grant, rivals have no way to fight a war beyond march_unit.
+
+- A: grant rivals fronts, hold and push scored by the nation layer; B: rivals hold only; C: no rival fronts yet
+
+> **Recommendation:** A, on the standing terms. It is what makes BL-1427 (fronts) worth building for v0.3.0's AI half.
+
+> **RESOLVED.** Ben, 2026-10-27: A — rivals assign their own units to their own fronts and choose hold or push. Written as a grant in AI_OPPONENT.md § 11 and in MILITARY.md § Fronts.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `docs/military/MILITARY.md`*
 

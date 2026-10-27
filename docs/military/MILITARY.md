@@ -248,13 +248,16 @@ time.
 **A front is one contiguous span of a nation's border with one neighbour (Ben, 2026-10-27).** A
 nation's **border tiles** toward neighbour B are its own tiles with at least one hex side onto B's
 ground. Those tiles, joined wherever two of them touch, fall into one or more **spans**; each span
-is a front. A border that runs unbroken is one front; a border that the sea or a third nation cuts
+is a front. **Every neighbour has fronts (Ben, 2026-10-27)** — at peace as at war; a front toward a
+neighbour the nation is not hostile to can only **hold**. A border that runs unbroken is one front; a border that the sea or a third nation cuts
 in two is two. Fronts are **derived** from the territory map (`world::tile_to_nation`) and
 re-derived whenever it changes, so a front follows a border as provinces change hands.
 
 **A front lives on the canvas**, not in a ledger (Ben, 2026-10-27): drawn as a line along the shared
 border edges of its span, coloured by the stance toward its neighbour, with the number of units
-assigned to it.
+assigned to it. **Clicking the line selects the front**, and the Selection band shows a **front
+card** — its neighbour and span, its assigned units, and its order (hold or push), which is where
+the order is set (Ben, 2026-10-27).
 
 **Units are assigned from their selection (Ben, 2026-10-27).** The unit card, and the stack panel for
 a stack, carries **Assign to front**: the fronts of the unit's own nation, each named by its
@@ -267,8 +270,9 @@ retreats, and return to the span after a retreat. A front has two orders: **hold
 and **push** — open only toward a neighbour the nation is hostile to — which marches the front's
 units into the neighbour's province with the weakest defence against the front's attack. Fights
 still happen in the province envelope (§ Battles); a front decides only who stands where, and every
-move is a legal `march_unit`. Moving the player's assigned units is a granted auto-action
-(`../ai/AI_OPPONENT.md` § 11).
+move is a legal `march_unit`. Moving the player's assigned units is a granted auto-action, and
+**rival nations use fronts too** — assigning their own units and choosing hold or push by their
+scorer (Ben, 2026-10-27; both grants are `../ai/AI_OPPONENT.md` § 11).
 
 ### Air
 

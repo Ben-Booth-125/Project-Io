@@ -76,7 +76,7 @@
    "title": "May rival nations use fronts?",
    "raised": "2026-10-26",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "sprint 58 military design",
    "what": "Ben granted fronts for the player's assigned units (AI_OPPONENT.md § 11). Whether a rival nation may assign its own units to fronts and score hold or push is a separate subject, so it was not written into the grant.",
    "why_it_matters": "Fronts are the cheapest way for a scorer to use an army without a planner. Without this grant, rivals have no way to fight a war beyond march_unit.",
@@ -88,7 +88,7 @@
     "docs/ai/AI_OPPONENT.md",
     "docs/military/MILITARY.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-27: A — rivals assign their own units to their own fronts and choose hold or push. Written as a grant in AI_OPPONENT.md § 11 and in MILITARY.md § Fronts."
   },
   {
    "id": "NR-1084",
