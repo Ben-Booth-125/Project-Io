@@ -7764,6 +7764,70 @@
      "notes": "fronts.lua: one front drawn at play zoom, hover, a press selects it (selection_kind=front), the card shows neighbour, 57 tiles, Neutral, Hold lit, Push disabled with \"Not hostile\". The unit-card capture shows the front card again (no unit selected), so Assign to front is unseen. Live click owed."
     }
    ]
+  },
+  {
+   "brief": "tile-contact-orders",
+   "title": "BL-1443 - Tile-contact attacks and right-click unit orders",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1443 - sprint 58 (Ben, 2026-10-27)",
+   "batch": "sprint-58",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: tile_contact_harness"
+     ],
+     "requirement": "march_unit takes a destination tile and the march ends on it; its path avoids tiles another nation's units hold, save its own destination; a non-hostile foreign stack on the next step blocks and re-paths, and with no path the order clears. Units of two nations never share a tile.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: tile_contact_harness",
+      "headless: battle_engagement_harness"
+     ],
+     "requirement": "A unit whose nation is hostile to a stack on its next step stops on its own tile and a battle opens over the defender's tile, wherever on the path that happens; standing adjacent opens nothing. Identity is (tile, attacker, defender); each side's stacks adjacent to the defended tile, out of other battles, join; the ground is the defended tile.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: tile_contact_harness",
+      "headless: campaign_battle_harness",
+      "headless: world_determinism"
+     ],
+     "requirement": "When the attacker holds the field, the attacking stack advances onto the defended tile; joined stacks stay. Retreat, withdrawal, conservation and determinism hold as before.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: fronts_harness",
+      "headless: save_roundtrip"
+     ],
+     "requirement": "Fronts: slots are tiles and a unit is on its slot on the tile; push marches each unit onto the neighbour's weakest adjacent tile (empty weakest), an attack where a stack stands. Rivals issue tile marches. Saves round-trip the new battle identity.",
+     "notes": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "visual: unit_orders",
+      "live"
+     ],
+     "requirement": "With an own unit or stack selected, a right-click on a tile marches it there (every own unit in a stack); on another nation's stack it attacks; toward a nation the player is not hostile to it first offers to declare hostility; a front-assigned unit is unassigned and obeys. The hover shows move vs attack.",
+     "notes": null
+    }
+   ]
   }
  ]
 }

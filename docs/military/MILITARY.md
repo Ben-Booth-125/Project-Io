@@ -268,9 +268,8 @@ elsewhere, or its front disappears.
 slot tile spaced along the span in walk order — march to their slots, fill a gap when a unit dies or
 retreats, and return to the span after a retreat. A front has two orders: **hold** (the default),
 and **push** — open only toward a neighbour the nation is hostile to — which marches the front's
-units into the neighbour's province with the weakest defence against the front's attack. Fights
-still happen in the province envelope (§ Battles); a front decides only who stands where, and every
-move is a legal `march_unit`. Moving the player's assigned units is a granted auto-action, and
+units onto the neighbour's tiles across the span, attacking what stands there (§ Battles). A front
+decides only who stands where and what it marches onto; every move is a legal `march_unit`. Moving the player's assigned units is a granted auto-action, and
 **rival nations use fronts too** — assigning their own units and choosing hold or push by their
 scorer (Ben, 2026-10-27; both grants are `../ai/AI_OPPONENT.md` § 11).
 
@@ -282,16 +281,17 @@ farthest from that end. A span that closes on itself, ringing an enclave, runs o
 side. Tiles off that line sit beside their nearest line tile. Every tie goes to the lower tile id.
 
 **Slots.** A front with *n* assigned units cuts its span into *n* equal stretches. Unit *i*, in
-ascending unit id, takes the middle tile of stretch *i*. A unit is on its slot once it stands in
-the slot tile's province, because a march ends on entering its province (§ Marching). The front
-re-issues a march whenever a unit's order points anywhere else. To move an assigned unit by hand,
+ascending unit id, takes the middle tile of stretch *i*. A unit is on its slot once it stands on
+the slot tile; a march ends on its tile (§ Marching). The front re-issues a march whenever a unit's
+order points anywhere else. To move an assigned unit by hand,
 unassign it first. A unit in a battle or refitting is left alone. A dead unit frees its slot, and
 the rest re-space on the next tick.
 
-**The push target.** A push considers the land provinces holding a neighbour tile with a hex side
-onto the span. It marches into the one whose defence is lowest: the summed `unit_strength` of the
-neighbour's units standing in it, ties to the lower province id. A unit already standing in any of
-those provinces holds what it took. A push is open only while the nation has declared hostility
+**The push target (Ben, 2026-10-27: "fronts and push use tiles too").** A push considers the
+neighbour's land tiles with a hex side onto the span. Each pushing unit marches onto the one whose
+standing stack is weakest — the summed `unit_strength` of the units on it, an empty tile weakest
+of all — nearest its own slot, ties to the lower tile id. Marching onto a held tile is an attack
+(§ Battles). A unit already standing on the neighbour's ground holds what it took. A push is open only while the nation has declared hostility
 toward the neighbour, which is the battle trigger's one-way test. If that hostility ends, the stored
 push acts as hold until it returns.
 
@@ -722,7 +722,9 @@ A unit is not pinned to its muster tile. Three `corp_verb` rows extend the **sam
 seam every other action goes through — there is no parallel `unit_command` type (BL-470 ruling 2;
 BL-314's unit verb family resolves to this seam, extended):
 
-- **`march_unit {subject: unit, tile: dest}`.** Sets/replaces the unit's `movement_order`. Rejects
+- **`march_unit {subject: unit, tile: dest}`.** Sets/replaces the unit's `movement_order`. **Every march
+  goes to a tile and ends on it (Ben, 2026-10-27: "all marches go to a tile")** — the province grain
+  a march once had is retired. Rejects
   `rejected_not_owner` (not the caller's unit), `rejected_invalid` (unknown unit/tile, ocean dest,
   dest off the unit's own body, or unreachable), `rejected_state` (dest already `== position`, or
   the unit is in a battle — `unit_in_battle`; walking away from contact is a priced withdrawal,
@@ -732,6 +734,22 @@ BL-314's unit verb family resolves to this seam, extended):
   a confirm step, if any, lives in the UI (BL-471), never in the seam.
 
 Merge/split and garrison/scout are formation verbs, owned by BL-472 (formations).
+
+**One nation per tile, always (Ben, 2026-10-27).** Units of one nation stack freely; units of two
+nations never share a tile, whatever their stance. A march path is solved around tiles another
+nation's units stand on, save its own destination. A step onto a tile that another nation's units
+hold is never taken as a move:
+
+- **Toward a nation the marcher is hostile to, it is an attack (Ben, 2026-10-27: "attacks should take
+  place when an attacking unit attempts to move into a defending unit's current tile").** The march
+  stops on the tile it stands on and a battle opens on the defender's tile (§ Battles). This holds
+  wherever the path meets that unit — "stops and attacks it" — not only at the march's end.
+- **Toward any other nation, the step is blocked.** The march re-paths around the tile; if no path
+  remains, the order clears.
+
+A right-click on a tile with a unit selected is a march to that tile; on another nation's stack it is
+an attack, and on a nation the player is not hostile to it first offers to declare hostility
+(`../ui/SELECTION.md`). A right-click on a unit assigned to a front unassigns it and obeys.
 
 **Movement is a path march, not a hop.** `march_unit` computes the path ONCE, via
 `intra_body_path` (`src/world/logistics.hpp`) — the same terrain-weighted A* the convoy system and
@@ -784,28 +802,32 @@ is deliberately no second disband mechanism.
 
 **Three rulings** (Ben, 2026-08-19):
 
-1. **Footprint is the province envelope.** Hostile units standing in the same province are drawn
-   into one battle; the province frames the fight ([`PROVINCES.md`](../generation/PROVINCES.md)).
-   Units never abstract into a pool — they keep their tiles.
+1. **Footprint is the defended tile (Ben, 2026-10-27, overturning the 2026-08-19 province
+   envelope).** A battle is fought over one tile: the tile the defender stands on, which the
+   attacker tried to step onto. The province envelope let a line of units along a province boundary
+   make attack impossible; contact is now a move, not co-presence. The attacking stack fights from
+   the tile it stands on, the defending stack on its own, and **adjacent stacks join (Ben,
+   2026-10-27)**: each side's units on tiles adjacent to the defended tile, out of every other
+   battle, are drawn in on their side. Units never abstract into a pool — they keep their tiles.
 2. **Terrain is one tuple for the whole battle**, exactly as the resolver takes it. Per-unit
-   terrain was offered and declined. The ground is the **defender-side tile with the highest
-   `terrain_defence`** in the envelope, ties broken by ascending tile id — `battle_ground`,
+   terrain was offered and declined. The ground is the **defended tile** — `battle_ground`,
    exposed as a named function so it can be asserted.
 3. **Pacing is several rounds per tick** — `campaign_battle_params::rounds_per_tick`.
 
-**The trigger.** A battle opens when a nation with a **directed** hostility toward another has units
-in a province where the target also has units. Directed suffices — the ambush property stance
-pays two tables for: the declarer attacks, the target is drawn in regardless of what it thinks.
-Two neutral nations sharing a province do not fight; the trigger is stance, not proximity. Friendship
+**The trigger.** A battle opens when a unit whose nation holds a **directed** hostility toward
+another tries to march onto a tile that nation's units stand on (§ Marching). Directed suffices —
+the declarer attacks, the target is drawn in regardless of what it thinks. Standing next to an enemy
+starts nothing; the trigger is a move, not proximity, and a defender never opens a battle by
+sitting still. Friendship
 permits what BL-549 (friendship permits two things) names; it gates nothing here. A
 retired second trigger, which opened over an active mercenary contract rather than a declared
 hostility, is § Nation
 garrisons, below.
 
-**Identity is (province, attacker, defender).** A nation pair fights at most one battle per province
-at a time; mutual hostility opens the pair once, in the direction whose attacker sorts lower — a
-property of the ids, not of who declared first. A third nation arriving opens its **own** battles
-against each existing participant rather than joining theirs. **Membership is snapshotted at
+**Identity is (tile, attacker, defender)**, the tile being the defended one. A nation pair fights at
+most one battle per tile at a time; two attacks onto one tile in one tick open it once, in the
+direction whose attacker sorts lower — a property of the ids, not of who moved first. A third
+nation attacking the same tile opens its **own** battle rather than joining. **Membership is snapshotted at
 open** — a unit marching in after the first round reinforces nothing — and the participating unit
 ids are stored ascending per side.
 
@@ -815,7 +837,7 @@ Supply, morale and quality reach the round per unit (§ The campaign force model
 unit is weaker with no second mechanism. The round reads no doctrine and no season.
 
 **What makes it deterministic.** The containers a battle is discovered from are unordered, so every
-stage recovers order explicitly: candidates are sorted by (province, attacker, defender) before any
+stage recovers order explicitly: candidates are sorted by (tile, attacker, defender) before any
 battle opens; `world::battles` is kept in that order (`battle_order_less`); unit ids are ascending;
 the terrain pick is an argmax broken by tile id; and no stage consumes a draw outside
 `step_campaign_battle`. `state_hash` folds the battle list.
@@ -841,7 +863,8 @@ cost reaches the men and not only a number. A request naming no live battle, or 
 non-participant, returns false and mutates nothing — the seam rule for an AI-facing boundary.
 
 **The field.** A concluded battle names `field_held_by` — the side that stayed — and is erased at
-the end of the tick. `world::province_holder` is what tracks *who currently holds a province*
+the end of the tick. **When the attacker holds the field, the stack that attacked advances onto the
+defended tile (Ben, 2026-10-27)**; adjacent stacks that joined stay where they stood. `world::province_holder` is what tracks *who currently holds a province*
 across battles (BL-569, province holder): seeded at generation from the territorial plurality,
 moved by a decisive battle's `field_held_by`, and left untouched by a stalemate. It is deliberately
 narrow — a military fact a contract predicate can read, not a political one: `tile_to_nation` (the

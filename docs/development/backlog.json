@@ -1184,6 +1184,39 @@
    ],
    "title": "After construction capacity: processors finish faster than their inputs; G1 at tick 50 under its gate",
    "design": "Ben, 2026-10-27: merge BL-1438 (retire construction capacity), keep G1t50 at 85, and treat the new starvation and decommissions as follow-on work. market_viability FULL on main at 9503aa06: G1 92.9, G1t50 78.9 (FAIL; 2106/2668), G1b 3.1, G2 186.3, G3 100.0. In the lane's 16-seed tick-50 totals, processors built 1446 -> 2762, running 1269 -> 2195, input-starved 32 -> 158, decommissioned 54 -> 209. Measure first: which recipes starve, which inputs are short, and whether the scorer now over-builds processors ahead of their extractors (no capacity throttle remains). Fix the cause in the world (input supply, build sequencing by the scorer); never lower the gate or clamp builds to pass it."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-10-27)",
+   "requires": [
+    "BL-1427"
+   ],
+   "id": "BL-1443",
+   "short_name": "TILE_CONTACT_ORDERS",
+   "category": "Military",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/battle_system.cpp",
+    "src/world/campaign_battle.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/fronts.cpp",
+    "src/world/corp_ai.cpp",
+    "src/world/world_save.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/core/app.cpp"
+   ],
+   "title": "Tile-contact attacks and right-click unit orders: every march goes to a tile; stepping onto a hostile stack is an attack",
+   "design": "Ben, 2026-10-27: \"If a unit is selected, we should be able to right click a tile to give a move or attack order\" and \"attacks should take place when an attacking unit attempts to move into a defending unit's current tile\". Settled in MILITARY.md § Marching (tile grain; one nation per tile; hostile contact stops and attacks; non-hostile blocks and re-paths), § Battles (footprint is the defended tile, adjacent stacks join, identity (tile, attacker, defender), the attacking stack advances on a win) and § Fronts (slots are tiles; push marches onto the neighbour's weakest adjacent tile). Right-click: march to the tile; another nation's stack is an attack; a nation not hostile is offered a declaration; a front-assigned unit is unassigned and obeys; a selected stack orders every own unit."
   }
  ]
 }

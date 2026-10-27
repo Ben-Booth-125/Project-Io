@@ -208,5 +208,27 @@
    "Construction yard — and the seam"
   ],
   "owner": "BL-1438 (retire construction capacity)"
+ },
+ {
+  "ruling": "Attacks are tile contact: a battle opens when a unit tries to step onto a hostile unit's tile; the province envelope is overturned (Ben, 2026-10-27)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Footprint is the defended tile",
+  "stale": [
+   "Footprint is the province envelope",
+   "in a province where the target also has units",
+   "Identity is \\(province, attacker, defender\\)",
+   "Fights\\s+still happen in the province envelope"
+  ],
+  "owner": "BL-1443 (tile contact orders)"
+ },
+ {
+  "ruling": "Every march goes to a tile and ends on it; one nation per tile (Ben, 2026-10-27)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "One nation per tile, always",
+  "stale": [
+   "a march ends on entering its province",
+   "stands in\\s+the slot tile's province"
+  ],
+  "owner": "BL-1443 (tile contact orders)"
  }
 ]

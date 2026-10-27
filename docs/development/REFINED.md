@@ -11,6 +11,14 @@ quick tier before and after. A cold `code-reviewer` pass with a fix round budget
 **Re-bless held to sprint end** (Ben, 2026-10-27): BL-1422's Rifle Infantry seeding moves the
 world digests (D_land onward); they stay red until the sprint's one re-bless.
 
+### BL-1443 (tile contact orders) — Delivery Full, group `tile-contact-orders`
+- [ ] **T1** World lane: tile-grain march_unit, one nation per tile, hostile contact opens a tile battle, adjacent stacks join, advance on a win, fronts on tiles, rival tile marches, save, `tile_contact_harness`. (R1-R4)
+- [ ] **T2** UI lane: right-click move/attack, the declare-hostility offer, stack orders, the March button picks a tile, battle mark on the defended tile. (R5)
+- [ ] **T3** Merge, cold review, gates, Ben's live click.
+
+### BL-1442 (post-capacity starvation) — Delivery Full
+- [ ] **T1** Economy lane: measure which recipes starve and why, fix the cause; market_viability FULL G1t50 >= 85 without lowering the gate.
+
 ### BL-1427 (fronts) — Delivery Full, group `fronts`
 Starts after the refit lane merges (both move the unit record, the save version and the verb enum).
 - [x] **T1** Contract on main: `fronts.hpp` (front, derive_fronts, front_key), the assignment on the unit, the order store, the two verbs' enum slots, the save section. (R1, R2)
