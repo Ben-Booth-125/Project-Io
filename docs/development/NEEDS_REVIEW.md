@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*9 entries — 8 open, 1 resolved.*
+*13 entries — 12 open, 1 resolved.*
 
 ---
 
@@ -134,6 +134,64 @@ MILITARY.md § Land — equipment, refit and manpower already uses "refit" for r
 > **Recommendation:** A. The button on the unit card already reads Refit, and replenish is the military term for refilling men and kit.
 
 *Files: `docs/military/MILITARY.md`, `docs/GLOSSARY.md`*
+
+### NR-1091 — Construction capacity retired: G1 at tick 50 falls under its gate
+*question · raised 2026-10-27 · from BL-1438 (retire construction capacity) lane, branch worktree-agent-acf7de32610de4ed0 @ 7737c801, held unmerged*
+
+market_viability FULL, 16 seeds: G1t50 87.8 -> 79.5 (target 85, FAIL); G1 93.4 -> 92.8, G1b 3.7 -> 3.5, G2 143.7 -> 192.3, G3 100 -> 100. Building is faster: processors built by tick 50 1446 -> 2762, running 1269 -> 2195 (+73%), still under construction 956 -> 181. The gate counts only finished buildings, whose count nearly doubled; input-starved 32 -> 158, decommissioned 54 -> 209.
+
+**Why it matters.** The ruling asked for smoother building, and it is: far more runs at tick 50. But more of what finishes now starves, and the merge gate fails.
+
+- A: accept and re-set G1t50 (measure the new floor)
+- B: merge, and open work on the new starvation and decommissions with G1t50 kept at 85
+- C: hold the merge until the starvation is fixed
+
+> **Recommendation:** B. The retirement is what you asked for; the starvation is a real follow-on, not a reason to keep stalled sites.
+
+*Files: `docs/economy/PRODUCTION.md`, `tools/verify/market_viability.cpp`*
+
+### NR-1092 — Fronts: the calls taken on your behalf
+*decision · raised 2026-10-27 · from BL-1427 (fronts) lanes and cold review*
+
+Slots: unit i of n takes span[(2i+1)L/2n]; "on slot" is the slot tile's province. A hand march on an assigned unit is overridden by its front; unassign to march by hand. Push enters the neighbour's adjacent land province with the least summed unit strength. Re-anchor keeps a key only while it faces the same neighbour, else the nearest front toward that neighbour, else drops. Rivals assign only idle units outside their capital province (the capital garrison stays home), to the front with fewest units per span tile, and push only when hostile and stronger 3:2. A push the march refuses holds instead.
+
+**Why it matters.** Each shapes how wars feel; the capital-stays-home and hand-march-overridden rules are not in the grant text.
+
+- A: keep all as built
+- B: change one (say which)
+
+> **Recommendation:** A.
+
+*Files: `docs/military/MILITARY.md`, `src/world/fronts.cpp`, `src/world/corp_ai.cpp`*
+
+### NR-1093 — Capital base: the calls taken on your behalf
+*decision · raised 2026-10-27 · from BL-1439 (capital military base) lane*
+
+The base goes on the legal own tile nearest the capital garrison, empty before stacked. 592 of 593 nations on the 16 library seeds get one; seed 25's Lainka owns one tile already full and gets none. The opening unit now musters at the capital base, so a nation has one base. A seat moved at Begin keeps its base and garrisons and loses only its opening unit. A garrison is told from a hired unit by entity-id order (no saved flag). The capital garrison records the base, so demolishing the base disbands it (the orphan rule, which never ran until today's fix).
+
+**Why it matters.** The garrison-dies-with-its-base rule is new in effect; the id-order test is an implicit invariant.
+
+- A: keep all
+- B: garrisons are never orphaned by their base
+- C: add a saved garrison flag instead of id order
+
+> **Recommendation:** A, with C if garrisons ever get hired-in replacements.
+
+*Files: `docs/military/MILITARY.md`, `src/world/corporation_generation.cpp`, `src/world/economy_system.cpp`*
+
+### NR-1094 — A retired recipe slot is a new pattern
+*novel-work · raised 2026-10-27 · from BL-1438 (retire construction capacity) lane*
+
+Recipe ids are list positions saved in every building, so the five capacity-yard recipes cannot be deleted. They stay in recipes.lua with retired = true and no inputs or outputs; the loader refuses a retired recipe that names any; a building running one idles but still pays wages. The capacity resource keeps its enum slot, price and spoilage so old stock decays.
+
+**Why it matters.** No doc owns retiring a recipe; the next retirement will copy this.
+
+- A: write the pattern into PRODUCTION.md as the rule
+- B: also demolish or refund retired-recipe buildings on load
+
+> **Recommendation:** A now; B only if old saves matter before v1.0.
+
+*Files: `scripts/recipes.lua`, `docs/economy/PRODUCTION.md`*
 
 ---
 
