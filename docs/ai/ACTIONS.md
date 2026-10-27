@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*163 entries — 40 gameplay · 26 canvas · 16 lens · 48 ledger · 33 chrome.*
+*165 entries — 42 gameplay · 26 canvas · 16 lens · 48 ledger · 33 chrome.*
 
 ---
 
@@ -737,6 +737,42 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Paid at once (credits and goods; no refund). The unit records the target and the target's muster days (90, 135 or 180 by class) and keeps its old type, fighting as it, until each economy tick has taken a quarter's days off; then its type becomes the target, keeping its men, establishment, readiness and morale. A standing march order is cleared, and march_unit refuses it (rejected_state) while it refits. Saved (world_save_version 61).
 
 **Reason to select.** Upgrade the force you have instead of disbanding and re-hiring: the unit keeps its men and condition, and pays only the difference in price. Refit out of contact and at home, and weigh the days it cannot march.
+
+### `gameplay.assign_front` — Assign to front on the unit card (and the stack panel for a stack) in the Selection element, for the player's own unit: the fronts of its nation, each named by its neighbour and span. Also a corp_verb (corp_verb::assign_front, 41) on the command seam.
+
+**Press.** Select your unit, press Assign to front, and pick a front (or Unassign). The press queues the command, applied through apply_corp_command at the frame's end. Over the seam: COMMAND corp=<nation> verb=41 subject=<unit id> tile=<a tile of the front's span, normally its key; 0 unassigns>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit to assign: one of the actor's own. |
+| `tile` | `entity_id (tile)` | Names the front: its key, or any tile of its span (the front keyed by the tile wins where a tile is in two spans). null_entity (0) unassigns. |
+
+**Valid when:**
+- The unit exists (rejected_invalid otherwise) and is the actor's own (rejected_not_owner otherwise).
+- A non-null `tile` lies in one of the actor's own fronts (rejected_invalid otherwise).
+- The assignment changes something: not the same front again, not unassigning an unassigned unit (rejected_state otherwise).
+
+**Expected output.** The unit stores the front's key (unit_component::front). From the next economy tick the front moves it: to an evenly spaced slot along the span under hold, or into the neighbour's weakest adjacent province under push, each move a legal march_unit. A manual march on an assigned unit is overridden; unassign to march by hand. The assignment follows the front as the border moves and drops when the front is gone. Saved (world_save_version 62). Rival nations' scorers issue it for their own units (AI_OPPONENT.md § 11, 'Rival nations use fronts').
+
+**Reason to select.** Hold a border without placing every unit by hand: the front spreads its units along the span and refills gaps as units die or fall back.
+
+### `gameplay.set_front_order` — The front card's Hold and Push presses in the Selection element, after clicking one of the player's fronts on the canvas. Also a corp_verb (corp_verb::set_front_order, 42) on the command seam.
+
+**Press.** Click a front's line on the canvas and press Hold or Push on its card. Over the seam: COMMAND corp=<nation> verb=42 tile=<the front's key, or any tile of its span> order=<0 hold, 1 push>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `entity_id (tile)` | Names the front: its key, or any tile of its span. |
+| `order` | `uint32 (0 or 1)` | 0 hold, 1 push. |
+
+**Valid when:**
+- `tile` lies in one of the actor's own fronts and `order` is 0 or 1 (rejected_invalid otherwise).
+- Push only toward a neighbour the actor has declared hostility to, one direction (is_hostile(actor, neighbour)); rejected_state otherwise.
+- The order changes (rejected_state otherwise).
+
+**Expected output.** Push is stored in world::front_orders under the front's key; hold erases the entry, since hold is the default and never stored. Under push the front's units march into the neighbour's adjacent land province with the lowest defence (the summed unit_strength of the neighbour's units there, ties to the lower province id). A unit already in one of those provinces holds what it took. If the hostility ends, the stored push acts as hold. Saved (world_save_version 62). Rival nations' scorers issue it for their own fronts.
+
+**Reason to select.** Push where your assigned force clearly outweighs the weakest province across the border; hold everywhere else.
 
 ---
 

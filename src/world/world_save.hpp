@@ -525,7 +525,17 @@ inline constexpr uint32_t world_save_magic =
 /// ascending id, as (id, u16 target row, i32 days left), after a u32 count. v60 is a
 /// STRICT PREFIX of v61 and is read too (`k_world_save_version_pre_refit`), as a world
 /// where no unit refits.
-inline constexpr uint32_t world_save_version = 61;
+///
+/// Bumped to 62 (BL-1427, fronts; MILITARY.md § Fronts): A TRAILING SECTION after the
+/// refits carries every unit with a front assignment, ascending id, as (id, key) after a
+/// u32 count, then the stored front orders in (nation, key) order as (nation id, key id,
+/// u8 order) after a u32 count. v61 is a STRICT PREFIX of v62 and is read too
+/// (`k_world_save_version_pre_fronts`), as a world where no unit is assigned and every
+/// front holds. Fronts themselves are derived, never saved.
+inline constexpr uint32_t world_save_version = 62;
+
+/// v61, a strict prefix of v62 (the fronts section is v62's only addition).
+inline constexpr uint32_t k_world_save_version_pre_fronts = 61;
 
 /// v60, a strict prefix of v61 (the refit section is v61's only addition).
 inline constexpr uint32_t k_world_save_version_pre_refit = 60;
@@ -669,6 +679,10 @@ void write_world_snapshot_pre_obsolete(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (refit, 2026-10-27): @p w written as a v60 stream, less the refit
 /// section. The game never writes it.
 void write_world_snapshot_pre_refit(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1427): @p w written as a v61 stream, less the fronts section.
+/// The game never writes it.
+void write_world_snapshot_pre_fronts(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

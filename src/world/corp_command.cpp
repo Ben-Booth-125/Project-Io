@@ -7,6 +7,7 @@
 #include "construction.hpp"
 #include "corporation_generation.hpp" // BL-1154: move_seat_force (take_seat)
 #include "economy_system.hpp" // BL-430: try_switch_recipe, the shared recipe-switch gate
+#include "fronts.hpp" // BL-1427: assign_front / set_front_order
 #include "nation_tech.hpp" // BL-1276: the research-queue verbs
 #include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set); intra_body_path (BL-470)
 // BL-470 included placement_rules.hpp here for is_water_tile, march_unit's old
@@ -998,10 +999,65 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
         }
 
         case corp_verb::assign_front:
+        {
+            // BL-1427 (fronts; MILITARY.md § Fronts). Every check first, against the
+            // fronts as they stand (`current_fronts`, pure), so a refusal mutates
+            // nothing — not even a re-anchor.
+            const auto uit = w.units.find(cmd.subject);
+            if (uit == w.units.end())
+                return corp_command_result::rejected_invalid;
+            if (uit->second.owner != cmd.corp)
+                return corp_command_result::rejected_not_owner;
+            entity_id key = null_entity; // a null tile unassigns
+            if (cmd.tile != null_entity)
+            {
+                const std::vector<front> fr = current_fronts(w, cmd.corp);
+                const front* f = front_named(fr, cmd.tile);
+                if (f == nullptr)
+                    return corp_command_result::rejected_invalid; // no front of the actor's holds it
+                key = f->key;
+            }
+            if (uit->second.front == key)
+                return corp_command_result::rejected_state; // already so: nothing to change
+            uit->second.front = key;
+            return corp_command_result::applied;
+        }
+
         case corp_verb::set_front_order:
-            // BL-1427 (fronts) T1: the slots exist; the world lane (T2) gives them
-            // their checks and effects. Until then every press is refused, whole.
-            return corp_command_result::rejected_invalid;
+        {
+            // BL-1427. `order` 0 = hold, 1 = push; push only toward a neighbour the
+            // actor is hostile to (the battle trigger's directed test). Hold is the
+            // default and is never stored, so setting hold erases the entry.
+            if (cmd.order > 1)
+                return corp_command_result::rejected_invalid;
+            if (cmd.tile == null_entity)
+                return corp_command_result::rejected_invalid;
+            const std::vector<front> fr = current_fronts(w, cmd.corp);
+            const front* f = front_named(fr, cmd.tile);
+            if (f == nullptr)
+                return corp_command_result::rejected_invalid;
+            const front_order want = cmd.order == 1 ? front_order::push : front_order::hold;
+            if (want == front_order::push && !front_may_push(w, *f))
+                return corp_command_result::rejected_state;
+            if (front_order_of(w, cmd.corp, f->key) == want)
+                return corp_command_result::rejected_state;
+            std::vector<front_order_entry>& v = w.front_orders;
+            v.erase(std::remove_if(v.begin(), v.end(),
+                                   [&](const front_order_entry& e) {
+                                       return e.nation == cmd.corp && e.key == f->key;
+                                   }),
+                    v.end());
+            if (want == front_order::push)
+            {
+                const front_order_entry e{ cmd.corp, f->key, want };
+                const auto at = std::lower_bound(v.begin(), v.end(), e,
+                    [](const front_order_entry& x, const front_order_entry& y) {
+                        return x.nation != y.nation ? x.nation < y.nation : x.key < y.key;
+                    });
+                v.insert(at, e);
+            }
+            return corp_command_result::applied;
+        }
 
         case corp_verb::halt_unit:
         {

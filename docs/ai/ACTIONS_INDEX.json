@@ -650,6 +650,14 @@
    "The unit card's Refit press in the Selection element (the fifth action slot), for the player's own unit: a menu of the newer types it can refit to. Also a corp_verb (corp_verb::refit_unit, 40) on the command seam."
   ],
   [
+   "gameplay.assign_front",
+   "Assign to front on the unit card (and the stack panel for a stack) in the Selection element, for the player's own unit: the fronts of its nation, each named by its neighbour and span. Also a corp_verb (corp_verb::assign_front, 41) on the command seam."
+  ],
+  [
+   "gameplay.set_front_order",
+   "The front card's Hold and Push presses in the Selection element, after clicking one of the player's fronts on the canvas. Also a corp_verb (corp_verb::set_front_order, 42) on the command seam."
+  ],
+  [
    "ledger.military_show_obsolete",
    "The Military ledger's Recruit tab (nav rail slot 7): the 'Show obsolete (N)' checkbox above the roster."
   ]

@@ -1018,6 +1018,7 @@ void clear_derived_state(world& w)
     w.lp_sea_fields.clear();    // BL-1396: a port's sea field, same footing
     w.power_grid_of_province.clear(); // BL-1230: the power grid, same footing
     w.power_grid_built = false;
+    w.fronts_cache = front_cache{}; // BL-1427: rebuilt from the territory on the next re-anchor
     bump_logistics_cache_generation(w); // BL-1195: view-only stamp, never serialised
 
     // The market index carries its own staleness stamps; zeroing them is what
@@ -1535,9 +1536,9 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 61 (Ben, 2026-10-27): THE REFITS, the last section — every
-    // refitting unit, ascending id, as (id, target row, days left).
-    if (version == world_save_version)
+    // world_save_version 61 (Ben, 2026-10-27): THE REFITS — every refitting unit,
+    // ascending id, as (id, target row, days left).
+    if (version >= k_world_save_version_pre_fronts)
     {
         std::vector<entity_id> ids;
         for (const auto& [uid, u] : w.units)
@@ -1553,6 +1554,37 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, u.refit_days);
         }
     }
+
+    // world_save_version 62 (BL-1427, fronts): THE FRONTS, the last section — every
+    // unit with a front, ascending id, as (id, key); then every stored front order
+    // in its (nation, key) order, as (nation, key, u8 order).
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [uid, u] : w.units)
+            if (u.front != null_entity)
+                ids.push_back(uid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id uid : ids)
+        {
+            w_id(out, uid);
+            w_id(out, w.units.at(uid).front);
+        }
+        w_u32(out, static_cast<uint32_t>(w.front_orders.size()));
+        for (const front_order_entry& e : w.front_orders)
+        {
+            w_id(out, e.nation);
+            w_id(out, e.key);
+            w_u8(out, static_cast<uint8_t>(e.order));
+        }
+    }
+}
+
+void write_world_snapshot_pre_fronts(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1427): the v61 stream shape — no fronts section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_fronts);
 }
 
 void write_world_snapshot_pre_refit(const world& w, std::ostream& out)
@@ -1673,7 +1705,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_combat     // BL-1421: v57, full readiness and morale
             && version != k_world_save_version_pre_muster     // BL-1435: v58, an empty muster queue
             && version != k_world_save_version_pre_obsolete   // BL-1437: v59, every nation on the defaults
-            && version != k_world_save_version_pre_refit))    // 2026-10-27: v60, no unit refitting
+            && version != k_world_save_version_pre_refit      // 2026-10-27: v60, no unit refitting
+            && version != k_world_save_version_pre_fronts))   // BL-1427: v61, no fronts
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2422,7 +2455,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // ascending, each in the stream; the target a real roster row other than the unit's
     // own; days left in [1, 3650]. Refused whole otherwise. A v60 (and older) stream
     // ends before it: no unit refits.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_fronts)
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.units.size())
@@ -2445,6 +2478,56 @@ bool read_world_snapshot(world& w, std::istream& in)
             uit->second.refit_type = target;
             uit->second.refit_days = days;
         }
+    }
+
+    // v62 (BL-1427, fronts): the assignments, then the orders. Untrusted: units strictly
+    // ascending, each in the stream, each key a tile the unit's own nation holds; orders
+    // strictly ascending by (nation, key), each nation in the stream, each key a tile it
+    // holds, each order push (hold is never stored). Refused whole otherwise. A v61 (and
+    // older) stream ends before it: no unit is assigned and every front holds.
+    if (version == world_save_version)
+    {
+        const auto held_by = [&](entity_id tile, entity_id nation) {
+            const auto it = s.tile_to_nation.find(tile);
+            return nation != null_entity && s.tiles.count(tile) != 0
+                && it != s.tile_to_nation.end() && it->second == nation;
+        };
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity, key = null_entity;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev) || !r_id(in, key))
+                return false;
+            prev = uid;
+            const auto uit = s.units.find(uid);
+            if (uit == s.units.end() || !held_by(key, uit->second.owner))
+                return false;
+            uit->second.front = key;
+        }
+        uint32_t orders = 0;
+        if (!r_u32(in, orders) || orders > s.tiles.size())
+            return false;
+        std::vector<front_order_entry> v;
+        v.reserve(orders);
+        for (uint32_t k = 0; k < orders; ++k)
+        {
+            front_order_entry e;
+            uint8_t o = 0;
+            if (!r_id(in, e.nation) || !r_id(in, e.key) || !r_u8(in, o))
+                return false;
+            if (o != static_cast<uint8_t>(front_order::push) || s.nations.count(e.nation) == 0
+                || !held_by(e.key, e.nation))
+                return false;
+            if (!v.empty() && (e.nation < v.back().nation
+                               || (e.nation == v.back().nation && e.key <= v.back().key)))
+                return false;
+            e.order = front_order::push;
+            v.push_back(e);
+        }
+        s.front_orders = std::move(v);
     }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct

@@ -274,6 +274,39 @@ move is a legal `march_unit`. Moving the player's assigned units is a granted au
 **rival nations use fronts too** — assigning their own units and choosing hold or push by their
 scorer (Ben, 2026-10-27; both grants are `../ai/AI_OPPONENT.md` § 11).
 
+**How a front is named and walked.** A front is named by a **key**: a tile in its span, normally
+its lowest tile id. Keys are unique within a nation. One tile can border two neighbours, so spans
+claim keys smallest first; each takes its lowest tile that no earlier span took. A span runs
+**end to end**: from the tile farthest from its lowest tile, along the shortest path to the tile
+farthest from that end. A span that closes on itself, ringing an enclave, runs on round the other
+side. Tiles off that line sit beside their nearest line tile. Every tie goes to the lower tile id.
+
+**Slots.** A front with *n* assigned units cuts its span into *n* equal stretches. Unit *i*, in
+ascending unit id, takes the middle tile of stretch *i*. A unit is on its slot once it stands in
+the slot tile's province, because a march ends on entering its province (§ Marching). The front
+re-issues a march whenever a unit's order points anywhere else. To move an assigned unit by hand,
+unassign it first. A unit in a battle or refitting is left alone. A dead unit frees its slot, and
+the rest re-space on the next tick.
+
+**The push target.** A push considers the land provinces holding a neighbour tile with a hex side
+onto the span. It marches into the one whose defence is lowest: the summed `unit_strength` of the
+neighbour's units standing in it, ties to the lower province id. A unit already standing in any of
+those provinces holds what it took. A push is open only while the nation has declared hostility
+toward the neighbour, which is the battle trigger's one-way test. If that hostility ends, the stored
+push acts as hold until it returns.
+
+**When the border moves.** Fronts re-derive from the territory map. An assignment or order follows
+its key. If the key no longer names a front, it moves to the front toward the **same neighbour**
+whose span now holds the key tile. Failing that, it goes to the front toward that neighbour nearest
+the key tile, in hex steps, ties to the lower key. If no front toward that neighbour remains, it is
+dropped. When two fronts merge, the merged front keeps the first stored order.
+
+**A rival's fronts.** A rival assigns its idle units: its own, unassigned, unordered, out of
+battle and not refitting. The capital province's units stay home. Each goes to the front with the
+fewest assigned units per span tile, taken in ascending id. A rival pushes where it is hostile to
+the neighbour and its assigned strength exceeds 3:2 over the push target's defence. Otherwise it
+holds. It never declares the hostility a push needs.
+
 ### Air
 
 An air wing is **based** at an airbase and **assigned** to provinces in range with a mission —
@@ -865,8 +898,8 @@ as a fourth, generation-time source, alongside the hard-coded stub, `seed_starti
 **Sizing is treasury-scaled against the value anchor.** BL-543's (value anchor) unit-equipment-
 costs-twice-annual-salary anchor prices a garrison's count off the nation's own
 `nation_component::treasury`, so a rich nation fields a bigger standing force and a poor one a
-token one — no separate garrison-strength dial. Garrisons are **static** in this slice: they hold
-their seeded tile and do not march.
+token one — no separate garrison-strength dial. A garrison holds its seeded tile until it is
+assigned to a front (§ Fronts). A rival assigns its border garrisons and keeps its capital's home.
 
 **There is ONE battle trigger: nation-vs-nation directed hostility** (§ Battles, above).
 
