@@ -492,6 +492,40 @@ readiness or morale (BL-068, the counter's own rule).
 A counter stands below its hex centre and can overhang the hex beneath. A press on it takes the
 counter, never a repeat-click step on the ground under the pointer.
 
+### Right-click orders
+
+**With the player's own unit or group selected, a right-click on a tile is an order** (Ben,
+2026-10-27; `../military/MILITARY.md` § Marching — every march goes to a tile, one nation per tile).
+The subject is what the band shows: the unit's card orders that unit, the unit group element orders
+every unit of the group, one command each in ascending id.
+
+| Right-clicked tile | Order |
+|---|---|
+| Land, empty or holding the player's own units | **Move** — `march_unit` to the tile. |
+| Another nation's stack, toward which the player is hostile | **Attack** — the same march onto that tile; contact opens the battle (MILITARY.md § Battles). There is no attack verb. |
+| Another nation's stack, toward which the player is not hostile | **Declare and attack** — a confirm opens: *Declare hostility toward ‹nation› and attack?* with **Declare and attack** / **Cancel**. Confirming sends `declare_hostile`, then the march. |
+| Water, or the tile the units already stand on | Nothing. |
+
+**A unit assigned to a front is unassigned and obeys**: `assign_front` with a null tile goes first,
+then the march (§ The front element). A right-click with nothing of the player's selected does
+nothing; nor does one while placement mode, an armed road or an armed March pick owns the canvas.
+
+**The hover says which before the press.** While the order would apply, the hovered hex is outlined
+in the order's colour — green for a move (`palette::order_move`, the March pick's green), red with
+the battle glyph for an attack, orange for a declare — and a line at the cursor names it:
+*Right-click: move*, *Right-click: attack ‹nation›*, *Right-click: declare hostility and attack
+‹nation›*. The preview and the press read one resolver, so they cannot disagree.
+
+**One status line reports the stack**: *3 marching*, *2 marching, 1 refused*, *2 attacking*. A
+refusal is the verb's own (`march_unit`'s preconditions) and mutates nothing for that unit.
+
+The confirm closes on **Cancel**, **Escape**, or any other press on the canvas, and sends nothing.
+It earns the second press because hostility is a stance every other surface reads, not just a
+position — the withdraw confirm's precedent (§ The battle element).
+
+The unit card's **March** cell remains the two-step route: the press arms the pick, the next
+left-click on a land tile names the destination, with the same green outline.
+
 ### The front element
 
 A **front** (`../military/MILITARY.md` § Fronts) is one contiguous span of a nation's border with
@@ -558,11 +592,11 @@ knowing what they wanted to know.
   worth no space.
 
 **The consequence, stated rather than discovered.** After this, **no gesture selects a province
-without also selecting a tile.** The province is still the march target and the render unit, and
-both are unaffected: the march destination has always travelled in its own field
-(`ui_state::pending_march_dest_province`, deliberately kept distinct so that picking a
-destination does not change what the Selection element shows), and the canvas resolves a
-destination province from the *hovered* tile, never from the selection.
+without also selecting a tile.** The province is still the render unit, and the march is
+unaffected: a march goes to a tile (MILITARY.md § Marching), its destination travels in its own
+field (`ui_state::pending_march_dest_tile`, deliberately kept distinct so that picking a
+destination does not change what the Selection element shows), and the canvas resolves it from
+the *hovered* tile, never from the selection.
 
 | Field | Meaning |
 |---|---|
@@ -604,11 +638,12 @@ Like a province, a battle is not an entity, so it travels in its own fields:
 stale battle selection on the same arm it reconciles a stale province one, and the battle sits at
 **rung 0** of the repeat-click cycle (see below).
 
-**More than one battle can stand in one province.** A third side arriving opens its **own** battles
-against each existing participant rather than joining theirs, so "the battle here" is a choice.
-`first_battle_in()` makes it deliberately: **the player's own fight first**, then sorted
-`(province, attacker, defender)` order when none of them is the player's — the fight you are in is
-the one you need the card for (NR-468).
+**A battle is keyed by the tile it defends** (MILITARY.md § Battles: identity is *(tile, attacker,
+defender)*), and its glyph draws on that tile, `active_battle::ground_tile`. **More than one battle
+can stand on one tile**: a third nation attacking it opens its **own** battle rather than joining,
+so "the battle here" is a choice. It is made deliberately: **the player's own fight first**, then
+sorted `(tile, attacker, defender)` order when none of them is the player's — the fight you are in
+is the one you need the card for (NR-468).
 
 #### What the card carries, and why each part earns its place
 

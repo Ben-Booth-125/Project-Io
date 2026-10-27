@@ -672,6 +672,18 @@
   [
    "ledger.selection_assign_front",
    "Selection band: the unit card's action grid, sixth cell (a flag glyph, tooltip 'Assign to front'), and the unit group's header button 'Assign to front' (the player's own groups only)."
+  ],
+  [
+   "canvas.unit_right_click_move",
+   "The Planetary canvas, with the player's own unit or unit group selected (BL-1443, tile contact orders; SELECTION.md § Right-click orders)."
+  ],
+  [
+   "canvas.unit_right_click_attack",
+   "The Planetary canvas, with the player's own unit or unit group selected, hovering another nation's stack (BL-1443; SELECTION.md § Right-click orders)."
+  ],
+  [
+   "ledger.unit_order_declare_confirm",
+   "The small confirm a right-click attack on a nation the player is not hostile to opens beside the cursor (BL-1443; SELECTION.md § Right-click orders)."
   ]
  ]
 }

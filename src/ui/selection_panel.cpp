@@ -1667,8 +1667,8 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
         {
             const bool  armed = owned && (ui.pending_march_unit == sel);
             const char* tip   = !owned ? "Competitor unit - intel only"
-                               : armed ? "March - click a province to send this unit (click again to cancel)"
-                                       : "March - pick a destination province";
+                               : armed ? "March - click a tile to send this unit (click again to cancel)"
+                                       : "March - pick a destination tile (or right-click one on the map)";
             if (armed)
             {
                 const ImVec2 pmin = ImGui::GetCursorScreenPos();

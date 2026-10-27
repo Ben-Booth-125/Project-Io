@@ -1147,10 +1147,41 @@ struct ui_state
     /// pending_march_dest_tile}` once both are set, then clears both (every
     /// march goes to a tile, 2026-10-27).
     entity_id pending_march_unit         = null_entity;
-    /// The tile the canvas wrote on the qualifying click, or null while nothing
-    /// has been picked yet. Kept distinct from the selection: picking a march
-    /// destination must NOT also change what the Selection element is showing.
+    /// The DESTINATION TILE the March pick named (BL-1443, tile contact orders:
+    /// every march goes to a tile — MILITARY.md § Marching), or null while nothing
+    /// has been picked. Kept distinct from the selection: picking a destination
+    /// must NOT also change what the Selection element is showing.
     entity_id pending_march_dest_tile = null_entity;
+
+    // --- Right-click orders (BL-1443; SELECTION.md § Right-click orders) ----
+    // With the player's own unit or group selected, a right-click on land marches
+    // every unit of it there; on another nation's stack it is the attack (a march
+    // onto its tile), and toward a nation the player is not hostile to it first
+    // asks to declare hostility. The canvas only fills these; app::render sends
+    // them through player_command and clears them.
+
+    /// The units to order, ascending id. Empty = nothing pending.
+    std::vector<entity_id> pending_unit_order_units;
+    /// The tile they march to.
+    entity_id pending_unit_order_tile     = null_entity;
+    /// A nation to declare hostility toward BEFORE the march (the confirm popup's
+    /// "Declare and attack"), or null_entity.
+    entity_id pending_unit_order_declare  = null_entity;
+    /// True when the order is an attack (another nation's stack on the tile):
+    /// only the status line's wording reads it.
+    bool      pending_unit_order_attack   = false;
+
+    /// The declare-hostility confirm, open while `unit_order_confirm_nation` is
+    /// set: the order it would send, and where it stands on screen.
+    entity_id              unit_order_confirm_nation = null_entity;
+    entity_id              unit_order_confirm_tile   = null_entity;
+    std::vector<entity_id> unit_order_confirm_units;
+    ImVec2                 unit_order_confirm_pos{};
+
+    /// What a right-click on the hovered tile would do this frame — written by the
+    /// canvas every frame, read by the verify API. 0 none, 1 move, 2 attack,
+    /// 3 declare hostility and attack.
+    int unit_order_hover = 0;
 
     /// Set by the unit card's Halt press — the unit to clear the movement
     /// order of. `null_entity` = nothing pending.
