@@ -7717,41 +7717,41 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: fronts_harness"
      ],
      "requirement": "A nation's fronts are derived from tile_to_nation: per neighbour, each contiguous span of its border tiles is one front; a border cut in two is two fronts; fronts re-derive when territory changes. Same world, same fronts, same order.",
-     "notes": null
+     "notes": "fronts_harness F1-F2 (65/0 on main at b8cde345): 58 nations with land borders, 219 fronts over 2728 span tiles; spans own, bordering, contiguous, disjoint; a cut border gives two fronts; derivation repeats identically."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: fronts_harness",
       "headless: save_roundtrip"
      ],
      "requirement": "assign_front assigns the actor's own unit to one of its nation's fronts (named by a tile in the span) or unassigns it; set_front_order sets hold or push, push only toward a hostile neighbour; every refusal mutates nothing. Assignments and orders are saved and re-anchored when spans change.",
-     "notes": null
+     "notes": "fronts_harness F3 (every refusal hash-identical, push refused when only the neighbour is hostile) and F6 (reanchor; F6e: a key handed to another neighbour's front keeps the assignment and push facing the old neighbour, fails without the fix); F7 and save_roundtrip OK (v62 section)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: fronts_harness"
      ],
      "requirement": "Each tick, a front's assigned units are given slots spaced evenly along its span and march to them (legal march_unit); a gap left by a dead or retreated unit is refilled; units in battle are left alone. Under push, the units march into the neighbour's weakest adjacent province.",
-     "notes": null
+     "notes": "fronts_harness F4-F5: assigned units reach evenly spaced slots, a gap is refilled, push marches into the weakest adjacent province only while hostile and walks back when it ends; an unreachable push target holds instead."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: fronts_harness",
       "headless: world_determinism"
      ],
      "requirement": "A rival nation's scorer assigns its own units to its own fronts and chooses hold or push, deterministically; it never touches another nation's units or fronts.",
-     "notes": null
+     "notes": "fronts_harness F8 (rivals assign only their own idle units, push/hold on the fixture, deterministic) and world_determinism ALL PASS. market_viability quick on main with fronts + the capital base: G1 93.1 G1t50 85.9 G1b 4.4 G2 149.6 G3 100.0, all PASS."
     },
     {
      "id": "R5",
@@ -7761,7 +7761,7 @@
       "live"
      ],
      "requirement": "The canvas draws the player's fronts along their border edges, coloured by stance, with the assigned count; clicking a front selects it and the front card shows its neighbour, span, units and order with Hold and Push; the unit card and the stack panel carry Assign to front.",
-     "notes": null
+     "notes": "fronts.lua: one front drawn at play zoom, hover, a press selects it (selection_kind=front), the card shows neighbour, 57 tiles, Neutral, Hold lit, Push disabled with \"Not hostile\". The unit-card capture shows the front card again (no unit selected), so Assign to front is unseen. Live click owed."
     }
    ]
   }
