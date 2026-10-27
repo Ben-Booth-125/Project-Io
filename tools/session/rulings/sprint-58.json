@@ -141,5 +141,21 @@
   "anchor": "starts obsolete.{0,4} for every nation",
   "stale": [],
   "owner": "BL-1437 (obsolete unit types)"
+ },
+ {
+  "ruling": "A front is one contiguous span of a nation's border with one neighbour (Ben, 2026-10-27)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A front is one contiguous span of a nation",
+  "stale": [
+   "line between two hostile nations' held ground"
+  ],
+  "owner": "BL-1427 (fronts)"
+ },
+ {
+  "ruling": "Units are assigned to fronts from their selection",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Units are assigned from their selection",
+  "stale": [],
+  "owner": "BL-1427 (fronts)"
  }
 ]

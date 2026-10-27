@@ -245,13 +245,29 @@ time.
 
 ### Fronts
 
-A **front** is the line between two hostile nations' held ground. It lives on the **canvas**, not
-in a ledger (Ben, 2026-10-27). Units the player **assigns** to
-a front spread along its border tiles, fill gaps, and fall back to the next line on retreat. A front
-has two orders: **hold**, and **push** into the enemy province with the weakest defence against
-the front's attack. Fights still happen in the province envelope (§ Battles); a front decides only
-who stands where. The placement is the border-garrison rule (§ Nation garrisons) run along every
-border province. Moving the player's assigned units is a granted auto-action
+**A front is one contiguous span of a nation's border with one neighbour (Ben, 2026-10-27).** A
+nation's **border tiles** toward neighbour B are its own tiles with at least one hex side onto B's
+ground. Those tiles, joined wherever two of them touch, fall into one or more **spans**; each span
+is a front. A border that runs unbroken is one front; a border that the sea or a third nation cuts
+in two is two. Fronts are **derived** from the territory map (`world::tile_to_nation`) and
+re-derived whenever it changes, so a front follows a border as provinces change hands.
+
+**A front lives on the canvas**, not in a ledger (Ben, 2026-10-27): drawn as a line along the shared
+border edges of its span, coloured by the stance toward its neighbour, with the number of units
+assigned to it.
+
+**Units are assigned from their selection (Ben, 2026-10-27).** The unit card, and the stack panel for
+a stack, carries **Assign to front**: the fronts of the unit's own nation, each named by its
+neighbour and its span. An assigned unit keeps its assignment until it is unassigned, assigned
+elsewhere, or its front disappears.
+
+**What a front does with its units.** Assigned units spread **evenly along the span** — each takes a
+slot tile spaced along the span in walk order — march to their slots, fill a gap when a unit dies or
+retreats, and return to the span after a retreat. A front has two orders: **hold** (the default),
+and **push** — open only toward a neighbour the nation is hostile to — which marches the front's
+units into the neighbour's province with the weakest defence against the front's attack. Fights
+still happen in the province envelope (§ Battles); a front decides only who stands where, and every
+move is a legal `march_unit`. Moving the player's assigned units is a granted auto-action
 (`../ai/AI_OPPONENT.md` § 11).
 
 ### Air
