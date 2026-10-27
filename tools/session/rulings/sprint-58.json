@@ -87,5 +87,38 @@
    "§ The two scalars"
   ],
   "owner": "BL-1432 (alarm as sentiment)"
+ },
+ {
+  "ruling": "A unit is raised to a design: a land class with researched kit in each slot (Ben, 2026-10-27)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A unit is raised to a DESIGN",
+  "stale": [
+   "class × equipment generation\\*\\*, never a free design"
+  ],
+  "owner": "BL-1434 (unit designs)"
+ },
+ {
+  "ruling": "Raising a unit takes time: a muster queue at the base",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Raising takes time",
+  "stale": [],
+  "owner": "BL-1435 (muster queue)"
+ },
+ {
+  "ruling": "The Military ledger holds rail slot 7; Corp. Strategy retires",
+  "doc": "docs/ui/MENU.md",
+  "anchor": "holds slot 7",
+  "stale": [
+   "Corp. Strategy and Diplomacy are reserved",
+   "Conflict has no broad ledger"
+  ],
+  "owner": "BL-1433 (military ledger)"
+ },
+ {
+  "ruling": "Fronts live on the canvas, not in a ledger",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "It lives on the \\*\\*canvas\\*\\*",
+  "stale": [],
+  "owner": "BL-1427 (fronts)"
  }
 ]

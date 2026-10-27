@@ -15,7 +15,7 @@ The **navigation pane** is a fixed, full-height **icon rail** pinned to the left
 
 ## Structure
 
-- A vertical strip of **twelve square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **nine curated player slots** below, then a **three-slot developer / observability tail** (§ The tail), which is the foot of the rail. Of the nine, **six carry their own subject** — Nation overview, Budget, Construction, Market Ledger, Convoys, History; **Diplomacy** lost its corporation stance surface (Ben, 2026-10-23). **Acquisitions** retired with the buyout (Ben, 2026-10-23), and its slot is not on the rail: every slot after it moved up one (Ben, 2026-10-24). **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **Corp. Strategy and Diplomacy are reserved** — disabled, but each carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
+- A vertical strip of **twelve square icon slots** (`nav_pane.cpp`, `tab_count`; the rail's legibility model is BL-174, nav-rail legibility): the **nine curated player slots** below, then a **three-slot developer / observability tail** (§ The tail), which is the foot of the rail. Of the nine, **six carry their own subject** — Nation overview, Budget, Construction, Market Ledger, Convoys, History; **Diplomacy** lost its corporation stance surface (Ben, 2026-10-23). **Acquisitions** retired with the buyout (Ben, 2026-10-23), and its slot is not on the rail: every slot after it moved up one (Ben, 2026-10-24). **One carries a provisional occupant** — a surface standing in for the slot's subject, because that surface would otherwise have no door: Research hosts the **tech-tree design mock** (BL-310, tech-tree mock). It keeps its real subject's name and glyph, lit like any other live slot, so the rail does not teach the wrong vocabulary; the tooltip says what the slot holds for now. **Military** holds slot 7 (Ben, 2026-10-27), where the reserved Corp. Strategy stood — its subject, a corporation's standing strategy, retired with the corporations. **Diplomacy is reserved** — disabled, but carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a blank.
 - Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label; the slot's name plus a one-line blurb is shown in a wrapping hover tooltip. The rail is deliberately narrow — the profile above keeps its own (wider) `profile_panel_width` rather than matching the rail.
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent — the same idiom as the minimap lens bar, so the two icon strips read as one vocabulary.
 - Opened menus **fold out into the shell column** to the rail's right (`foldout_begin`, `src/ui/foldout_column.hpp` — see `LAYOUT.md` § Ledger windows). **Nothing floats and there is no ✕**: closing is the toggle — re-click the slot, re-click the active sub-view tab (the toggle rule, `.claude/rules/io-standing-rules.md`), or open another slot (accordion, `close_all_panels`).
@@ -37,7 +37,7 @@ Slots 10–12 sit after the curated player slots and never displace them; the ta
 | 11 | **AI decisions** (`icons::strategy`, lit) | the rival scorer's rationale — what each AI nation decided and how close the call was (BL-407, decision feed) |
 | 12 | **Strategy readout** (`icons::readout`) | the feed's aggregate companion — verb mix, spend buckets and reason tally per nation over the recent run (BL-411, emergent strategy readout) |
 
-Slot 11 borrows the pennant glyph slot 7 draws dim, because its subject is exactly the strategic decision that slot is reserved for; slot 12 has its own glyph because two *lit* slots must not share a silhouette.
+Slot 11 draws the pennant glyph the retired Corp. Strategy slot drew dim, because its subject is the strategic decision that slot was reserved for; slot 7, **Military**, draws the filled shield — the military base's own glyph (`icons::building`) — so the ledger and the building it raises force at share a silhouette. Slot 12 has its own glyph because two *lit* slots must not share a silhouette.
 
 ### Appending versus inserting
 
@@ -93,19 +93,21 @@ each slot's position in the SYSTEMS.md tier list, so the curation is auditable.
 | 4 | **Research** *(provisionally hosts the tech-tree mock)* | 7 | Research |
 | 5 | **Market Ledger** | 1 | Trade ([A4]) |
 | 6 | **Convoys** | — | Supply (`SUPPLY.md`; added 2026-08-29, see below) |
-| 7 | **Corp. Strategy** *(reserved)* | 8 | Policy |
+| 7 | **Military** | 5 | Conflict (`../military/MILITARY.md`; Ben, 2026-10-27, see below) |
 | 8 | **Diplomacy** *(reserved)* | 9 | Diplomacy |
 | 9 | **History** | 6 | Environment |
 
-Three slots are **named more broadly than their source ledger** — Budget (not Balance Ledger),
-Corp. Strategy (not Policy), History (not Tile Ledger); each widening is settled by Q&A
-(2026-06-15) and recorded per-slot below.
+Two slots are **named more broadly than their source ledger** — Budget (not Balance Ledger) and
+History (not Tile Ledger); each widening is settled by Q&A (2026-06-15) and recorded per-slot
+below. A third, Corp. Strategy (not Policy), retired with the corporations; Military took its slot.
 
 Notes on the mapping:
 
 - **Resources, Supply, Conflict and Workforce/Population do not get their own slot.** Resource
   detail lives in the Market ledger and the Selection element; Supply folds into
-  Construction/Market; Conflict has no broad ledger; the labour read is a roll-up on the
+  Construction/Market; Conflict's broad ledger is **Military** (slot 7: what force can be raised,
+where, at what cost, and with what kit — Ben, 2026-10-27), while where units stand and how they
+fare stays on the canvas; the labour read is a roll-up on the
   Nation overview dashboard (slot 1) rather than a rail subject of its own. The rail scales
   with *systems that have a broad surface*, per the menus-are-broad-ledgers rule.
 
@@ -156,9 +158,10 @@ Notes on the mapping:
   read in the two places a player cares about them: **own buildings** ("good for me") in the
   **Nation overview dashboard** (slot 1); **competitors' buildings** ("competition") in the
   **Market Ledger**. Slot 3 is construction *in progress*, not a buildings inventory.
-- **Corp. Strategy** is a reserved placeholder. **Diplomacy** is reserved again: the
+- **Military** (slot 7; Ben, 2026-10-27) is two tabs, **Recruit** and **Design**
+  (`ledgers/military.md`). **Diplomacy** is reserved again: the
   corporation stance surface it hosted retired with the corporation (Ben, 2026-10-23;
-  `ledgers/corporation.md` § Slot 8). Both follow the *ledgers-start-closed* convention above.
+  `ledgers/corporation.md` § Slot 8). It follows the *ledgers-start-closed* convention above.
 - **Scope-widening names (settled by Q&A 2026-06-15).**
   — **Convoys** (slot 6): **cargo in transit** — one row per convoy in flight, its route, its ETA
     in qtr and the haulage it has cost. Added 2026-08-29 on Ben's call, lifted out of the Market
@@ -173,9 +176,9 @@ Notes on the mapping:
     (sales, input purchases, maintenance, wages) **plus budget allocation** across research /
     military / workforce contracts, not just the running treasury. Same money-loop data as the
     [A4] "Balance Ledger", wider remit.
-  — **Corp. Strategy** (slot 7): a **standing-strategy** surface — the player's "laws" / pre-set
-    options, with **wage levels** and **military posture** the archetypal levers, and possibly a
-    goal / quest system later. Scope deliberately left **open** beyond the standing-rules core.
+  — **Corp. Strategy** (slot 7) **retired** with the corporations (Ben, 2026-10-27): its slot went
+    to **Military**. Its standing-strategy levers have homes elsewhere — wage and tax levels in the
+    Budget, military posture on the Military ledger.
   — **History** (slot 9): **generation history**, not a live event log (BL-211, player-facing
     history ledger). It surfaces the **procedural generation as a number-crunch** — the world as
     generated — in two views, **Story / Chain**: the body's dated biography, and the generation

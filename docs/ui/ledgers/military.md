@@ -1,7 +1,7 @@
 # Military — design Q&A
 
 > **Working design doc** for the ledger-mockup pass. Strawman answers — Ben revises.
-> Menu slot: **proposed** (open question 1) · Source: none yet (hire lives on the military base's
+> Menu slot: **rail slot 7** (Ben, 2026-10-27) · Source: none yet (hire lives on the military base's
 > tile card, `selection_panel.cpp` § Hire) · Mock table(s): none yet.
 > Host: shell fold-out column, ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
@@ -14,9 +14,9 @@ need to have two tabs, one for recruiting and another for design."* The force mo
 **"What force can I raise, where, at what cost — and what is it raised with?"**
 
 It earns a rail slot under `../MENU.md` § Menus are broad ledgers because both halves are broad:
-every base the nation holds, and every unit type it may field. That reverses MENU.md's standing
-line that *"Conflict has no broad ledger"* — the line was true while hiring was one press on one
-base's tile card, and stops being true once force is a system with types, costs and kit.
+every base the nation holds, and every unit type it may field. MENU.md used to say Conflict had
+no broad ledger — true while hiring was one press on one base's tile card, and not once force is
+a system with types, costs and kit.
 
 **What it is NOT.** It does not answer "where are my units and how are they doing" — the canvas
 counters and the unit and stack cards answer that, and a list of every unit would be a second
@@ -30,7 +30,7 @@ Two views behind a `nav_button` strip, inside `foldout_begin("Military")`.
 | View | Answers (one question) | Content |
 |---|---|---|
 | **Recruit** *(default)* | "What can I raise, where, and what will it cost?" | A **base picker** — the nation's completed military bases, each with its province and the units standing there. Below it, the **roster**: one row per unit type the nation may field (`available_rows`), each carrying its land class, its numbers (soft, hard, hardness, defence), its hire price in credits and the kit it buys off the shelf, and a **Raise** press that hires at the chosen base. A type the nation cannot field yet is listed dimmed with **why** (the missing good, or the technology it waits on), so the roster shows the ladder, not only the rungs in reach. |
-| **Design** | "What is each kind of unit raised with?" | **Strawman — open question 2.** One row per land class: which **equipment generation** that class musters with, what that kit costs per unit, and what it gives (the class's numbers at that generation). Choosing a generation is a standing order for every unit raised after it; units in the field refit to it as kit arrives (BL-1423). Generations open by technology (`DG-ST-FO`, the Force branch). |
+| **Design** | "What is each kind of unit raised with?" | **Designs, one per land class to start** (Ben, 2026-10-27): each class's **kit slots** with the researched choice in each — infantry's rifles or anti-tank launchers, artillery's guns with drones or anti-armour alongside — what the kit costs per unit, and what the design gives (its soft, hard and hardness). A slot offers only researched kit; a class with nothing researched for a slot fields its base kit. Saving a design makes it the one Recruit raises; units in the field refit to it as kit arrives (BL-1423). Kit opens by military research. |
 
 **Why Recruit is the default.** It is the act the ledger exists for; Design is set once and
 revisited when a technology lands.
@@ -67,7 +67,19 @@ Standard: the rail icon toggles the ledger; re-clicking the active tab closes it
 a view change. The base picker is a target selector (exempt from the toggle rule, like the body
 and market combos). **Raise is a press, not a toggle** — it has no active state.
 
-## Open questions for Ben
+## Settled (Ben, 2026-10-27)
+
+- **Slot 7**, where the reserved Corp. Strategy stood; Corp. Strategy retires.
+- **Design is kit per class, made from researched kit.** *"Design will be more useful as military
+  tech is researched, i.e. better weapons, munitions and armour divisions need to have their kit
+  researched and units designed before deployment. We can also swap things like rifles / RPGs, and
+  artillery units can field drones / anti-armour alongside artillery."* Reading A, extended with
+  swappable slots — not templates (B) and not a free designer (C).
+- **Raising takes time**: a muster queue at the base, shown on Recruit like Construction's queue.
+- **Fronts live on the canvas**, not in this ledger.
+- **Manpower shows on Recruit**: the labour pool and the conscript or professional choice.
+
+## The questions as they were put
 
 1. **Which rail slot?** Slots 7 (Corp. Strategy) and 8 (Diplomacy) are reserved and disabled.
    Strawman: **Military takes slot 7**, after Convoys — force follows supply in the curated order —

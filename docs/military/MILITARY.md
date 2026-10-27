@@ -174,8 +174,14 @@ check**: hardness alone carries "infantry cannot hurt tanks".
 
 ### Land — the classes
 
-A unit is a **class × equipment generation**, never a free design. The class fixes the role; the
-generation is a good on the shelf, so a technology shows in the next fight.
+**A unit is raised to a DESIGN (Ben, 2026-10-27).** A design is a land class with a choice of kit
+in each of its slots: the class fixes the role, and the kit is what research has made available —
+better weapons, munitions and armour. Slots swap: infantry fields rifles or anti-tank launchers;
+artillery fields its guns and, alongside them, drones or anti-armour. **Kit is researched before it
+can enter a design, and a unit is designed before it can be raised**, so a technology shows in the
+next unit raised and, as kit arrives, in the units already in the field (§ Land — equipment, refit
+and manpower). The kit is a good on the shelf. Designs are made on the Military ledger's **Design**
+tab (`../ui/ledgers/military.md`).
 
 | Class | Hardness | Soft | Hard | Role |
 |---|---|---|---|---|
@@ -197,7 +203,8 @@ small arms, armoured vehicles and artillery pieces by generation, air defence sy
 ordnance. **Refit**: a wounded unit regains HP by drawing equipment and manpower each tick. A unit
 whose kit cannot be bought stays wounded; the economy is the war's ceiling.
 
-**Soldiers come from the labour pool.** Every soldier is drawn from the same `(nation, body)`
+**Soldiers come from the labour pool** — shown, with the conscript or professional choice, on the
+Military ledger's **Recruit** tab (Ben, 2026-10-27). Every soldier is drawn from the same `(nation, body)`
 labour pool buildings staff from (`../economy/POPULATION.md`), so a mobilised army is an emptied
 factory. A nation chooses **conscript** or **professional** service: conscripts are cheap per head
 and drain labour widely; professionals cost wages and are fewer and better.
@@ -218,7 +225,8 @@ time.
 
 ### Fronts
 
-A **front** is the line between two hostile nations' held ground. Units the player **assigns** to
+A **front** is the line between two hostile nations' held ground. It lives on the **canvas**, not
+in a ledger (Ben, 2026-10-27). Units the player **assigns** to
 a front spread along its border tiles, fill gaps, and fall back to the next line on retreat. A front
 has two orders: **hold**, and **push** into the enemy province with the weakest defence against
 the front's attack. Fights still happen in the province envelope (§ Battles); a front decides only
@@ -509,8 +517,11 @@ The credit base is a **floor**: row 0's gate is all-zero, so the resource leg al
 spend nothing, and the cheapest rows would be free and unbounded for any seam caller. Both legs are
 checked before either is debited, so a refusal leaves the nation wholly uncharged.
 
-On success: a new unit entity at the muster tile with `count = hire_batch_manpower`, returned
-through `apply_corp_command`'s out-param. The verb records the base it was raised at as the unit's
+**Raising takes time (Ben, 2026-10-27).** An accepted hire enters a **muster queue** at its base, as
+a building enters construction, and becomes a unit when its muster completes; the Military
+ledger's **Recruit** tab (rail slot 7, `../ui/ledgers/military.md`) shows the queue and is the
+door to every hire. On completion: a new unit entity at the muster tile with
+`count = hire_batch_manpower`, returned through `apply_corp_command`'s out-param. The verb records the base it was raised at as the unit's
 `muster_base`; where the tile carries more than one qualifying base, the **lowest entity id**
 wins, so the choice is deterministic.
 

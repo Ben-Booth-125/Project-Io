@@ -627,8 +627,8 @@
    "design": "Found by the sprint 57 re-bless across all 16 library seeds (Ben carried them to sprint 58, 2026-10-26). DEFECTS: (1) seeds 40 and 12 each have a port with a partner within 50 and no laned water beside it; (2) seeds 13 and 10 have 3 colonial lane ends on a coast with no port. MISSING CHECKS: (a) nothing asserts zero unconnectable consumers - lp_coverage_census rule 3 excuses them; (b) port_lane_probe lists colonial portless coast ends but does not count them as defects. THE WORK: make both claims committed checks first, then fix the defects so they pass on all 16 seeds."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 58,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
@@ -650,7 +650,8 @@
     "tools/verify/campaign_battle_harness.cpp"
    ],
    "title": "Land units carry HP, readiness and morale; the campaign round scores soft and hard attack against hardness",
-   "design": "MILITARY.md § The campaign force model (Ben, 2026-10-26). unit_component gains HP, readiness and morale (save-format change). Each round every unit deals soft_attack*(1-hardness)+hard_attack*hardness, scaled by morale and supply; the target absorbs up to defence or breakthrough plus terrain; landed damage splits HP/readiness with readiness taking the larger share. HP 0 = the unit dies; readiness 0 = it retreats one tile from the enemy. resolve_campaign_battle stops calling resolve_battle (Era -1 keeps it). Withdrawal stays priced. Deterministic: integer arithmetic, ascending unit ids, draws only in step_campaign_battle. Harness: campaign_battle_harness rewritten against the new arithmetic, C4's monotone sweep kept as a prediction."
+   "design": "MILITARY.md § The campaign force model (Ben, 2026-10-26). unit_component gains HP, readiness and morale (save-format change). Each round every unit deals soft_attack*(1-hardness)+hard_attack*hardness, scaled by morale and supply; the target absorbs up to defence or breakthrough plus terrain; landed damage splits HP/readiness with readiness taking the larger share. HP 0 = the unit dies; readiness 0 = it retreats one tile from the enemy. resolve_campaign_battle stops calling resolve_battle (Era -1 keeps it). Withdrawal stays priced. Deterministic: integer arithmetic, ascending unit ids, draws only in step_campaign_battle. Harness: campaign_battle_harness rewritten against the new arithmetic, C4's monotone sweep kept as a prediction.",
+   "delivered": "2026-10-27"
   },
   {
    "status": "proposed",
@@ -735,8 +736,8 @@
    "design": "MILITARY.md § Land — equipment, refit and manpower; POPULATION.md § The labour pool. A unit's men are labour taken from the (nation, body) pool before buildings staff, so mobilisation empties factories. A national choice between conscript (cheap per head, wide labour drain, lower quality) and professional (wages, fewer, better). Measure the labour effect on market_viability before tuning."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 58,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
@@ -757,7 +758,8 @@
     "src/ui/icons.cpp"
    ],
    "title": "A land unit is a rectangle in its tile: unit count, HP bar, readiness bar, class glyph",
-   "design": "MILITARY.md § Land — on the canvas. Replaces the current unit marker on the Planetary canvas. Needs a question_log entry and a live click before complete."
+   "design": "MILITARY.md § Land — on the canvas. Replaces the current unit marker on the Planetary canvas. Needs a question_log entry and a live click before complete.",
+   "delivered": "2026-10-27"
   },
   {
    "status": "proposed",
@@ -927,6 +929,83 @@
    ],
    "title": "Alarm is a third sentiment dimension that rivals read and the player can watch",
    "design": "RELATIONS.md § 6 (Ben, 2026-10-26: the Era catastrophe retired, Alarm kept as a relations quantity). Add Alarm beside Access and Trust per (observer, subject) nation, with its factors (visible capability, severed trade, posture, unrest), decay to neutral, and the tree effects that read 'Alarm toward you' wired to it. A rival nation's scorer reads its own Alarm toward a nation when weighing embargo, coalition or war; it never declares on Alarm alone. A surface shows the player every nation's Alarm toward them. Also: industrialisation_sim_harness reading [13] still prints 'Catastrophe lean'; rename it 'Alarm lean' (INDUSTRIALISATION.md acceptance table). Whether the rival scorer reading Alarm needs its own grant is a check against AI_OPPONENT.md § 11 before building."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (military ledger design, 2026-10-27)",
+   "requires": [],
+   "id": "BL-1433",
+   "short_name": "MILITARY_LEDGER",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/ui/ledgers/military.md",
+   "files": [
+    "src/ui/nav_pane.cpp",
+    "src/ui/military_ledger.cpp",
+    "src/ui/military_ledger.hpp",
+    "docs/ui/MENU.md"
+   ],
+   "title": "The Military ledger on rail slot 7: a Recruit tab and a Design tab",
+   "design": "ledgers/military.md (Ben, 2026-10-27; settled). Slot 7 takes the filled shield glyph; Corp. Strategy leaves the rail. RECRUIT (default): base picker (the nation's completed military bases), the roster with each row's class, numbers, hire price and kit, Raise through the existing hire_unit verb, the muster queue (BL-1435), and the labour pool with the conscript/professional choice (BL-1424). Rows the nation cannot field are dimmed with why. DESIGN: the designs per class (BL-1434). No military base -> Recruit offers the site finder pre-set to the base. Question log entry; ACTIONS.json for Raise; live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (military ledger design, 2026-10-27)",
+   "requires": [
+    "BL-1422"
+   ],
+   "id": "BL-1434",
+   "short_name": "UNIT_DESIGNS",
+   "category": "Military",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/unit_roster.hpp",
+    "src/world/unit_roster.cpp",
+    "src/world/components.hpp",
+    "src/world/world_save.cpp"
+   ],
+   "title": "A unit is raised to a design: a land class with researched kit in each slot",
+   "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): kit is researched before it enters a design, a unit is designed before it is raised. Each class has kit slots (infantry: rifles or anti-tank launchers; artillery: guns with drones or anti-armour alongside); a slot offers only researched kit (military research nodes); a design's stats are its class's plus its kit's; a unit records its design and refits to it as kit arrives. Kit is goods (BL-1422's kit half). Designs are saved (save-format change). Needs the military research nodes named: the Force branch (DG-ST-FO) holds few today."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 58,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-27",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (military ledger design, 2026-10-27)",
+   "requires": [],
+   "id": "BL-1435",
+   "short_name": "MUSTER_QUEUE",
+   "category": "Military",
+   "priority": "A",
+   "difficulty": 3,
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/corp_command.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/components.hpp",
+    "src/world/world_save.cpp"
+   ],
+   "title": "Raising a unit takes time: a muster queue at the base, like construction",
+   "design": "MILITARY.md § The muster interface (Ben, 2026-10-27). hire_unit pays and queues at the base; the unit appears when its muster completes, measured like construction days. Muster time per row; the Force branch's Helicopter Lift (-10%) and Proven Readiness (-20%) read it. Save-format change. The Recruit tab shows the queue (BL-1433)."
   }
  ]
 }

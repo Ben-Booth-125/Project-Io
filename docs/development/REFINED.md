@@ -8,6 +8,8 @@ readiness and morale; soft and hard attack against hardness; retreat on spent re
 **Gates.** The item's harnesses (`campaign_battle_harness`, `battle_engagement_harness`),
 `world_determinism`, `save_roundtrip`. A world mover only where battles occur: `market_viability`
 quick tier before and after. A cold `code-reviewer` pass with a fix round budgeted.
+**Re-bless held to sprint end** (Ben, 2026-10-27): BL-1422's Rifle Infantry seeding moves the
+world digests (D_land onward); they stay red until the sprint's one re-bless.
 
 ### BL-1425 (unit counter render) — Delivery Full, group `unit-counter-render`
 - [x] **T1** `icons::unit_counter` — the rectangle: owner band, count, HP bar, readiness bar (`icons.{hpp,cpp}`, ICONS.md). (R1, R3)
