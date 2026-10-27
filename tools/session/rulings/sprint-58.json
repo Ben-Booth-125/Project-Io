@@ -138,7 +138,7 @@
  {
   "ruling": "Obsolete unit types: rows below the modern band start obsolete; Recruit hides them; rivals skip them",
   "doc": "docs/military/MILITARY.md",
-  "anchor": "Every row below the.{0,3}modern band starts obsolete",
+  "anchor": "starts obsolete.{0,4} for every nation",
   "stale": [],
   "owner": "BL-1437 (obsolete unit types)"
  }
