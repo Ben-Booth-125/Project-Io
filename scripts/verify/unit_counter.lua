@@ -63,6 +63,14 @@ verify.mouse(-1, -1)
 verify.frames(2)
 verify.capture("unit_counter_own")
 
+-- At a MIDDLE zoom (3; the game opens at 4/3, where no counter draws below a 6 px
+-- hex radius): the counter keeps its 9 px
+-- floor here so its bars still read (Ben, 2026-10-27: "I'm not seeing the hp /
+-- readiness").
+verify.center_tile(mine.col, mine.row, 3.0)
+verify.capture("unit_counter_play_zoom")
+verify.center_tile(mine.col, mine.row, 10.0)
+
 -- 2. The same counter hovered: the hover ring.
 local at = find_counter(mine.col, mine.row)
 if at then

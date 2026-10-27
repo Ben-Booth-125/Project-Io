@@ -6005,7 +6005,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         // hex centre, its lower corners meet the hex's slanted sides
                         // (half-width 0.40 r at 0.77 r down). Several owners on one
                         // tile stand side by side and may then overhang it.
-                        const float ur      = std::max(3.0f, draw_r * 0.36f);
+                        //
+                        // A FLOOR OF 9 PX (Ben, 2026-10-27: "I'm not seeing the hp /
+                        // readiness"): below a hex radius of 25 px the counter would
+                        // shrink until its bars were a pixel or two, so at play zoom
+                        // it keeps a 20 x 14 px plate — bars and count readable — and
+                        // overhangs its hex rather than vanishing.
+                        const float ur      = std::max(9.0f, draw_r * 0.36f);
                         const float spacing = ur * 2.45f;
                         const float uy      = cy + draw_r * 0.50f;
                         const float start_x = cx - spacing * (static_cast<float>(groups.size() - 1) * 0.5f);

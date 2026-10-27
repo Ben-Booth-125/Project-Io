@@ -1274,16 +1274,18 @@ void unit_counter(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count,
     const float hw = r * 1.10f, hh = r * 0.75f;
     const ImVec2 tl{ centre.x - hw, centre.y - hh };
     const ImVec2 br{ centre.x + hw, centre.y + hh };
-    const float  rounding = std::max(1.0f, r * 0.12f);
+    const float  rounding = 0.0f; // square corners (Ben, 2026-10-27)
     dl->AddRectFilled(tl, br, IM_COL32(18, 20, 26, 235), rounding);
 
-    const float band_w = hw * 2.0f * 0.22f;
-    dl->AddRectFilled(tl, { tl.x + band_w, br.y }, fill, rounding, ImDrawFlags_RoundCornersLeft);
+    // Ben, 2026-10-27: half the first cut's 0.22 — with a 3 px floor, because at the
+    // counter's 9 px minimum 11% is 2 px and the 1 px outline would leave a hairline.
+    const float band_w = std::max(3.0f, hw * 2.0f * 0.11f);
+    dl->AddRectFilled(tl, { tl.x + band_w, br.y }, fill);
 
     // The bars: HP then readiness, left to right against the right edge, each a
     // dim track and a share filled from the bottom.
     const float pad    = std::max(1.0f, r * 0.12f);
-    const float bar_w  = std::max(2.0f, r * 0.26f);
+    const float bar_w  = std::max(3.0f, r * 0.26f);
     const float gap    = std::max(1.0f, r * 0.08f);
     const float bar_t  = tl.y + pad;
     const float bar_b  = br.y - pad;
@@ -1336,7 +1338,7 @@ void unit_counter(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count,
     {
         const float o = std::max(1.5f, r * 0.12f);
         dl->AddRect({ tl.x - o, tl.y - o }, { br.x + o, br.y + o }, palette::hover,
-                    rounding + o, 0, 2.0f);
+                    0.0f, 0, 2.0f); // square, as the plate
     }
 }
 
