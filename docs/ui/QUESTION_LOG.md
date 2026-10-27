@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**66 surfaces** — 4 settled, 62 awaiting Ben's wording.
+**67 surfaces** — 4 settled, 63 awaiting Ben's wording.
 
 ---
 
@@ -241,6 +241,14 @@ THE POTENTIAL TRADE IS ONE PRESS FROM A REAL ONE, BUT NOT THE PRESS ITSELF. Its 
 THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (both markets must trade the good; the corporation's trades are capped at 64) and a refusal mutates nothing; the player is told why under the form. THE HISTORY COLUMN IS STILL REVENUE, NEVER PROFIT (no cost basis exists anywhere in the model), and an absent counterparty is still the market.
 
 *Demanded by BL-687, BL-1269 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/ui/selection_panel.cpp`, `src/core/app.cpp` · id `market_ledger_trades`*
+
+### Military ledger (nav rail slot 7): Recruit and Design tabs
+
+**Answers:** What force can I raise, where, at what cost - and what is it raised with?
+
+**Because:** Force became a system with types, prices and kit, and hiring was one press on one base's tile card: a player could not see every base and every unit type side by side, nor what a type they cannot field is waiting on. Recruit is the act the ledger exists for - a base picker over the nation's completed military bases with the units standing at each, the roster with each type's land class, numbers and price, dimmed rows saying the goods or port they lack so the roster shows the ladder rather than only the rungs in reach, a Raise press that is a door onto the hire_unit verb rather than a second hire path, and the muster queue (raising takes time, Ben 2026-10-27). Design is set once and revisited when a technology lands: one row per land class with its base numbers until military research opens kit choices. It takes slot 7, where the reserved Corp. Strategy stood, because both halves are broad - MENU.md's test for a rail slot - and Conflict had no broad ledger (Ben, 2026-10-27; docs/ui/ledgers/military.md).
+
+*Demanded by BL-1433 · `src/ui/military_ledger.cpp`, `src/ui/nav_pane.cpp` · id `military_ledger`*
 
 ### National border band (Planetary canvas, plain-canvas chrome)
 

@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*157 entries — 38 gameplay · 26 canvas · 16 lens · 44 ledger · 33 chrome.*
+*160 entries — 38 gameplay · 26 canvas · 16 lens · 47 ledger · 33 chrome.*
 
 ---
 
@@ -102,7 +102,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Frees a capacity-capped tile for a better use — the press when the tile is worth more re-purposed than the building is worth running. For a merely loss-making building, idle is the better press: demolition is irreversible and refundless.
 
-### `gameplay.hire_unit` — The 'Hire' block of the Selection info element, shown when the selected tile carries the player's own COMPLETED military base (src/ui/selection_panel.cpp). Also a corp_verb, so an agent issues it against the corp-command seam and a rival corp's scorer issues it too (BL-324, widened by the standing-rules exception).
+### `gameplay.hire_unit` — The 'Hire' block of the Selection info element, shown when the selected tile carries the player's own COMPLETED military base (src/ui/selection_panel.cpp), and the Military ledger's Raise press (nav rail slot 7, Recruit tab; ledger.military_raise). Also a corp_verb, so an agent issues it against the corp-command seam and a rival corp's scorer issues it too (BL-324, widened by the standing-rules exception).
 
 **Press.** Select a tile carrying your completed military base. The Selection band shows a 'Hire' list, one row per roster row currently available to your corporation under the campaign roster band (industrial). Click 'Hire' on a row. The button queues a corp_command applied at the frame's end through apply_corp_command — the same call an agent makes, with the same re-validation.
 
@@ -1679,6 +1679,46 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Toggles the Convoys ledger open in the fold-out column; re-click closes; opening closes any other ledger AND ARMS THE supply_routes LENS -- the lane overlay is the map twin of this list. Closing disarms it if it is still the supply_routes lens; a lens the player chose meanwhile is kept. Open, it lists one row per convoy of your corp in flight, soonest arrival first: cargo and quantity, origin -> destination and mode, a progress bar carrying the ETA in qtr (or 'held' / 'stalled'), and the haul cost already paid. One flat view; NO Body/Market selectors, because a convoy is a route between two places and is not scoped by the market you are looking at.
 
 **Reason to select.** Answers 'what is on its way, and what is it costing me?'. It is the only surface reporting TICKS TO ARRIVAL: convoys are drawn on three canvases and listed nowhere else, and since travel time became load-bearing a long haul takes several quarters, with the cargo out of your pool for all of it. Read it before planning a build against stock you think you have.
+
+### `ledger.nav_military` — Nav rail, slot 7 (the filled shield - the military base's own glyph), after Convoys. Slot 7 was the reserved Corp. Strategy, retired with the corporations (Ben, 2026-10-27).
+
+**Press.** Click the shield on the left icon rail
+
+**Valid when:**
+- In-game
+
+**Expected output.** Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed with the goods or port it lacks; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base'. DESIGN: one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its base numbers, under the line that kit choices open as military research lands. Read-only: Design has no presses yet.
+
+**Reason to select.** Answers 'what force can I raise, where, at what cost - and what is it raised with?'. It is the broad door to every hire: every base and every unit type on one surface, where the tile card's Hire list shows one base's rows only.
+
+### `ledger.military_raise` — Military ledger (nav rail slot 7), Recruit tab, a roster row's 'Raise' press
+
+**Press.** Choose a base in the picker, then click 'Raise' on a roster row
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `unit_type` | `uint16 (index into unit_roster_table())` | The row pressed. |
+| `tile` | `entity_id` | The chosen base's tile. |
+
+**Valid when:**
+- A completed military base of yours is chosen in the picker (Raise is muted with 'No military base to raise it at.' otherwise)
+- Your nation can field the row (dimmed with the goods or port it lacks otherwise)
+- The row's credit price is within your treasury room (muted with 'The treasury cannot cover it.' otherwise)
+
+**Expected output.** Issues gameplay.hire_unit with {tile, unit_type} - the same pending request the tile card's Hire press makes, executed at the frame's end through the corp-command seam with its full live re-validation. Not a second hire path. The seam's answer is shown above the roster: 'Unit raised.', 'Can't afford or supply it.' (either payment leg) or 'Hiring failed.'.
+
+**Reason to select.** You want a unit and know where it should stand: Raise from the ledger rather than hunting for the base on the canvas. See gameplay.hire_unit for the verb's gates and the honest caveats about what a unit does today.
+
+### `ledger.military_find_base_site` — Military ledger (nav rail slot 7), Recruit tab, 'Find a site for a base' - shown only when your nation has no completed military base
+
+**Press.** Click 'Find a site for a base'
+
+**Valid when:**
+- Your nation holds no completed, non-decommissioned military base
+
+**Expected output.** Closes the Military ledger and opens the Construction ledger on its Construction view with the site finder armed on the Military Base: every tile of your ground that takes one, ranked, and the site lens on the canvas. No world change.
+
+**Reason to select.** A base is the door to every hire, so with none the next move is to place one.
 
 ### `ledger.selection_body_goto_surface` — Selection band, body kind's action column, 'Go to surface' button
 

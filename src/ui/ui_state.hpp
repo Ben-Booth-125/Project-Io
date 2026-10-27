@@ -322,6 +322,38 @@ struct ui_grid_col
     float       y = -1.0f;
 };
 
+/// The Military ledger's view state (rail slot 7; docs/ui/ledgers/military.md),
+/// plus where its controls landed this frame so a verify script presses the REAL
+/// control. VIEW state, not serialised.
+struct military_ledger_state
+{
+    /// 0 = Recruit (default: the act the ledger exists for), 1 = Design.
+    int       view = 0;
+    /// The chosen base (a `military_base` building id). A target selector, exempt
+    /// from the toggle rule; re-validated every frame, falling back to the lowest id.
+    entity_id base = null_entity;
+    /// Set by a Raise press: the Recruit tab then shows the hire seam's answer
+    /// (`construction.last_message`, written by app). Cleared on close.
+    bool      raise_pressed = false;
+
+    // Published each frame the ledger draws; x < 0 = absent.
+    float     tab_x[2] = {-1.0f, -1.0f}, tab_y[2] = {-1.0f, -1.0f};
+    float     no_base_x = -1.0f, no_base_y = -1.0f; ///< "Find a site" press, Recruit's empty state.
+    struct drawn_base  { entity_id id = null_entity; float x = -1.0f, y = -1.0f; int units = 0; };
+    struct drawn_raise
+    {
+        std::uint16_t row = 0;       ///< unit_roster_table() index.
+        float         x = -1.0f, y = -1.0f;
+        bool          fieldable = false; ///< In available_rows for the player.
+        bool          enabled   = false; ///< The Raise press is live.
+        float         price     = 0.0f;
+        std::string   reason;            ///< Why the row is dimmed or Raise is off; empty when live.
+    };
+    std::vector<drawn_base>  bases;
+    std::vector<drawn_raise> raises; ///< One per roster row, drawn order.
+    int       queue_rows = 0;        ///< Muster orders drawn.
+};
+
 /// Where the Construction ledger's own controls landed on screen this frame, so a
 /// verify script can press the REAL control rather than a computed guess.
 ///
@@ -768,6 +800,10 @@ struct ui_state
     /// give it that, since opening the Market ledger armed the price wash.
     bool show_convoys_ledger = false;
 
+    /// Whether the Military ledger is open — nav-rail slot 7 (Ben, 2026-10-27),
+    /// where the reserved Corp. Strategy stood. Recruit and Design tabs.
+    bool show_military_ledger = false;
+
     // BL-1406: the Company ledger, its firm payload and the corporations table's
     // aimed row retired with the company and the corporation (Ben, 2026-10-23).
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
@@ -784,6 +820,10 @@ struct ui_state
     /// The site finder (Ben, 2026-10-25): the building chosen first, the tiles that
     /// take it, and the ledger's sort. See `site_finder_state`.
     site_finder_state site_finder;
+
+    /// The Military ledger (rail slot 7, Ben 2026-10-27; docs/ui/ledgers/military.md).
+    /// See `military_ledger_state`.
+    military_ledger_state military;
 
 
     // THE CONTRACTS LEDGER'S VIEW STATE IS GONE (BL-693). The mercenary

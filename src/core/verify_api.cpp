@@ -33,6 +33,7 @@
 #include "ui/detail_level.hpp"
 #include "ui/foldout_column.hpp"
 #include "ui/nav_pane.hpp"
+#include "world/unit_roster.hpp"   // unit_roster_table — military_ledger() names its rows
 #include "ui/fonts.hpp"
 #include "ui/frame_stats.hpp"
 #include "ui/market_ledger.hpp"
@@ -1801,6 +1802,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // an unnamed surface is a slot the renumber check cannot cover
             // (NR-716 is exactly this blindness one level up).
             else if (m_ui.show_convoys_ledger)      panel = "convoys";
+            else if (m_ui.show_military_ledger)     panel = "military"; // slot 7
             else if (m_ui.show_generation_ledger)   panel = "generation_ledger";
             else if (m_ui.show_decision_feed)       panel = "decisions";
             else if (m_ui.show_strategy_readout)    panel = "strategy";
@@ -2925,6 +2927,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // capture the ledger against whatever lens it chose. A check that wants
         // the pairing asserts it through the rail press instead.
         else if (name == "convoys")      m_ui.show_convoys_ledger = open;
+        else if (name == "military")     m_ui.show_military_ledger = open; // slot 7
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         // "build" is the tile-selection BUILD BAR, which is a section of the
@@ -2969,6 +2972,52 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         if (!ui::nav_slot_centre(slot, x, y))
             return sol::nullopt;
         return std::make_tuple(x, y);
+    });
+
+    // The Military ledger (slot 7) reporting what it drew: its tabs, the bases in
+    // the picker, every roster row's Raise press (where it landed, whether it is
+    // live, the price and the reason it is not), the muster rows drawn, and the
+    // hire seam's last answer. Everything here is on screen already; a script
+    // presses the REAL control at the published point.
+    v.set_function("military_ledger", [this]() {
+        sol::state& st = m_lua.state();
+        const auto& m = m_ui.military;
+        sol::table out = st.create_table();
+        out["open"]       = m_ui.show_military_ledger;
+        out["view"]       = m.view;
+        out["base"]       = static_cast<unsigned>(m.base);
+        out["tab_recruit_x"] = m.tab_x[0];
+        out["tab_recruit_y"] = m.tab_y[0];
+        out["tab_design_x"]  = m.tab_x[1];
+        out["tab_design_y"]  = m.tab_y[1];
+        out["no_base_x"]  = m.no_base_x;
+        out["no_base_y"]  = m.no_base_y;
+        out["queue_rows"] = m.queue_rows;
+        out["message"]    = m.raise_pressed ? m_ui.construction.last_message : std::string();
+        sol::table bases = st.create_table();
+        int k = 0;
+        for (const auto& b : m.bases)
+        {
+            sol::table e = st.create_table();
+            e["id"] = static_cast<unsigned>(b.id);
+            e["x"] = b.x; e["y"] = b.y; e["units"] = b.units;
+            bases[++k] = e;
+        }
+        out["bases"] = bases;
+        sol::table raises = st.create_table();
+        k = 0;
+        for (const auto& r : m.raises)
+        {
+            sol::table e = st.create_table();
+            e["row"] = static_cast<int>(r.row);
+            e["name"] = std::string(unit_roster_table()[r.row].name);
+            e["x"] = r.x; e["y"] = r.y;
+            e["fieldable"] = r.fieldable; e["enabled"] = r.enabled;
+            e["price"] = r.price; e["reason"] = r.reason;
+            raises[++k] = e;
+        }
+        out["raises"] = raises;
+        return out;
     });
 
     v.set_function("spectate", [this](bool on) { m_ui.spectating = on; });
@@ -3055,6 +3104,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "ages_year")     m_ui.ages_year = view;
         else if (name == "market")        m_ui.market_ledger_view = view;
         else if (name == "tech_tree")     m_ui.tech_tree_view = view;   // 0 = Inspect, 1 = Plan (BL-1276)
+        else if (name == "military")      m_ui.military.view = view;    // 0 = Recruit, 1 = Design
     });
 
     // The research panel (BL-1276). `tech_tree_node(id)` answers the screen
@@ -3173,6 +3223,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // instance of the same silence, found only because half 2 of the fix
         // above made the names worth checking against the actual call sites.
         else if (name == "construction")         target = "Construction";
+        else if (name == "military")             target = "Military"; // slot 7: foldout_begin("Military")
         // The tile's building list scrolls in its own child (BL-1255: the rail
         // rows sit at the road ladder's foot and inside Infrastructure).
         else if (name == "build_list")           target = "##build_list";

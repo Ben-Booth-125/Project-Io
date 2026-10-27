@@ -60,6 +60,7 @@ void close_all_panels(ui_state& state)
     state.show_balance_ledger    = false;
     state.show_market_ledger     = false;
     state.show_convoys_ledger    = false; // Convoys ledger (BL-689), slot 6
+    state.show_military_ledger   = false; // Military ledger, slot 7 (Ben, 2026-10-27)
     state.show_construction_panel = false;
     state.show_tile_ledger       = false;
     state.show_generation_ledger = false;
@@ -78,6 +79,7 @@ bool any_panel_open(const ui_state& state)
     return state.show_corporation_panel ||
            state.show_balance_ledger    ||
            state.show_market_ledger     || state.show_convoys_ledger ||
+           state.show_military_ledger   ||
            state.show_construction_panel ||
            state.show_tile_ledger       ||
            state.show_generation_ledger || state.show_tech_tree ||
@@ -122,7 +124,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // NINE curated slots from MENU.md § Menu set and ordering, then a
     // three-slot developer/observability tail (10-12). The tail is the foot of
     // the rail; nothing is appended below it.
-    // Live slots toggle their panel. Corp. Strategy is the one still-disabled
+    // Live slots toggle their panel. Diplomacy is the one still-disabled
     // slot, and it carries its OWN glyph so the rail teaches the shape of the
     // game rather than showing a row of identical blanks (BL-174). Research and
     // Diplomacy are unbuilt subjects whose slots provisionally host a homeless
@@ -194,7 +196,8 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // now: Market 5, Convoys 6, Corp. Strategy 7, Diplomacy 8, History 9, the
     // developer tail 10-12. Nothing persists a slot index (saves carry no UI
     // state; verify presses by `nav_slot`), so no old index needs mapping.
-    // Diplomacy (now 8) stays as the dim reserved slot it was.
+    // Diplomacy (now 8) stays as the dim reserved slot it was. Corp. Strategy
+    // retired with the corporations; Military took slot 7 (Ben, 2026-10-27).
     //
     // The rail is twelve slots: nine curated, plus the 10-12 developer tail.
     constexpr int tab_count = 12;
@@ -320,11 +323,16 @@ void draw_nav_pane(ui_state& state, float top_offset)
             slot_tooltip("Convoys",
                          "What is on its way, and what it is costing you.", false);
             break;
-        case 7: // Corp. Strategy — placeholder
-            ImGui::BeginDisabled();
-            ImGui::Selectable(id, false, 0, {slot_size, slot_size});
-            ImGui::EndDisabled();
-            slot_tooltip("Corp. Strategy", "Standing policy - wage levels, military posture.", true);
+        // Military (Ben, 2026-10-27) — where the reserved Corp. Strategy stood;
+        // that subject retired with the corporations. Recruit and Design tabs
+        // (docs/ui/ledgers/military.md). No lens on open (§ 3).
+        case 7:
+            if (ImGui::Selectable(id, state.show_military_ledger, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_military_ledger;
+                close_all_panels(state);
+                state.show_military_ledger = !was_open;
+            }
+            slot_tooltip("Military", "What force you can raise, where, and at what cost - and what it is raised with.", false);
             break;
         // The Diplomacy slot (8 since slot 5 retired, 2026-10-24) STOPPED BEING
         // PROVISIONAL on 2026-08-29. It used to host the
@@ -413,20 +421,21 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // lists share a silhouette (convoys.md § 5). No new glyph: BL-174 asks
         // each slot for its own shape, and this one already exists and already
         // means exactly this. It cannot collide with slot 5's market bars or
-        // slot 7's dim strategy pennant at rail radius.
+        // slot 7's shield at rail radius.
         case 6: icons::convoy(dl, centre, r, lit(state.show_convoys_ledger));          break;
-        case 7: icons::strategy(dl, centre, r, dim);     break;  // Corp. Strategy (reserved)
+        // Slot 7 draws the military base's own filled shield, so the ledger and
+        // the building it raises force at share a silhouette (MENU.md § The tail).
+        case 7: icons::building(dl, centre, r, building_type::military_base, resource_type::iron_ore,
+                                lit(state.show_military_ledger));                break;  // Military
         case 8: icons::diplomacy(dl, centre, r, dim); break;  // Diplomacy (reserved, BL-1406)
         case 9: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
         // The plate glyph: this ledger's subject is the generated ground itself,
         // and the Continent lens already teaches that shape as "how the surface
         // came to be" rather than as a live economic read.
         case 10: icons::continent(dl, centre, r, lit(state.show_generation_ledger));   break;
-        // Slot 11 borrows the strategy glyph, which slot 7 draws DIM as its
-        // reserved Corp. Strategy placeholder. The two never collide visually —
-        // one is always dim, one lights — and the shape is right: this ledger's
-        // subject is exactly the strategic decision that slot is reserved for,
-        // read rather than set. Revisit if slot 7 is ever built.
+        // Slot 11 draws the pennant the retired Corp. Strategy slot drew dim: its
+        // subject is the strategic decision that slot was reserved for, read
+        // rather than set. Slot 7 is Military now, with the shield.
         case 11: icons::strategy(dl, centre, r, lit(state.show_decision_feed));        break;
         // The readout gets its OWN glyph (the axis-and-tally-bars readout mark)
         // rather than a third borrow of `strategy` — slot 11 already lights that

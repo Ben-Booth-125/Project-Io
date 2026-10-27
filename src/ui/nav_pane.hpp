@@ -10,10 +10,10 @@ namespace ui {
 /// vertical strip of twelve square icon slots. Each slot will eventually open one of
 /// the game's menus or ledgers; the slot shows a vector glyph (see
 /// ui::icons) rather than a worded label, with the menu name in a hover tooltip.
-/// For Layer 2 only one slot is wired — the Tile Ledger — and it toggles
-/// state.show_tile_ledger; the remaining nine are reserved placeholders.
+/// Every slot but Diplomacy (8, reserved) toggles its ledger's `show_*` flag;
+/// docs/ui/MENU.md holds the slot table.
 ///
-/// @param state      Shared UI state; the Tile Ledger tab toggles show_tile_ledger.
+/// @param state      Shared UI state; each live slot toggles its ledger's show_* flag.
 /// @param top_offset Y position of the pane's top edge, in pixels. The profile
 ///                   panel occupies the top-left corner, so the pane starts
 ///                   below it.

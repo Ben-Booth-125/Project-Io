@@ -19,7 +19,7 @@
   ],
   [
    "gameplay.hire_unit",
-   "The 'Hire' block of the Selection info element, shown when the selected tile carries the player's own COMPLETED military base (src/ui/selection_panel.cpp). Also a corp_verb, so an agent issues it against the corp-command seam and a rival corp's scorer issues it too (BL-324, widened by the standing-rules exception)."
+   "The 'Hire' block of the Selection info element, shown when the selected tile carries the player's own COMPLETED military base (src/ui/selection_panel.cpp), and the Military ledger's Raise press (nav rail slot 7, Recruit tab; ledger.military_raise). Also a corp_verb, so an agent issues it against the corp-command seam and a rival corp's scorer issues it too (BL-324, widened by the standing-rules exception)."
   ],
   [
    "gameplay.idle",
@@ -372,6 +372,18 @@
   [
    "ledger.nav_convoys",
    "Nav rail, slot 6 (Convoys icon), directly after Market"
+  ],
+  [
+   "ledger.nav_military",
+   "Nav rail, slot 7 (the filled shield - the military base's own glyph), after Convoys. Slot 7 was the reserved Corp. Strategy, retired with the corporations (Ben, 2026-10-27)."
+  ],
+  [
+   "ledger.military_raise",
+   "Military ledger (nav rail slot 7), Recruit tab, a roster row's 'Raise' press"
+  ],
+  [
+   "ledger.military_find_base_site",
+   "Military ledger (nav rail slot 7), Recruit tab, 'Find a site for a base' - shown only when your nation has no completed military base"
   ],
   [
    "ledger.selection_body_goto_surface",

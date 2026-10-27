@@ -21,6 +21,7 @@
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
 #include "ui/convoys_ledger.hpp"
+#include "ui/military_ledger.hpp"
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
@@ -2811,6 +2812,10 @@ void app::render()
     // rather than being re-homed because a convoy is cargo in transit and belongs
     // to SUPPLY.md, not to the doc that owns clearing and the order book.
     ui::draw_convoys_ledger(m_world, m_ui, m_ui.show_convoys_ledger);
+    // Military ledger — nav slot 7 (Ben, 2026-10-27). Recruit and Design; its
+    // Raise press queues the same pending hire the tile card's Hire does, which
+    // the hire block below executes through `hire_unit`.
+    ui::draw_military_ledger(m_world, m_registry, m_ui, m_ui.show_military_ledger);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;
         // the rank table's change column reads the ranking from ~4 econ ticks back.
