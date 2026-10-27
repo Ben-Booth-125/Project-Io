@@ -7544,6 +7544,111 @@
      "notes": "Capture unit_counter_rival: a rival counter shows owner band and count, no bars; rival rows in the group panel show type, class and men only (BL-068). Whether to widen this is NR-1088."
     }
    ]
+  },
+  {
+   "brief": "military-ledger",
+   "title": "BL-1433 - The Military ledger on rail slot 7: a Recruit tab and a Design tab",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1433 - sprint 58 (Ben, 2026-10-27). Rows written at close: the lifecycle's requirement-first step was skipped when the build began.",
+   "batch": "sprint-58",
+   "resolved": "2026-10-27",
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "visual: military_ledger",
+      "live"
+     ],
+     "requirement": "Rail slot 7 is Military (the military base's shield), toggling its ledger; Corp. Strategy is off the rail.",
+     "notes": "military_ledger.lua captures slot 7 lit; re-pressing the active tab closes the ledger. LIVE: Ben, 2026-10-27, release build at 95a68a7b+: \"The Military ledger and muster queue work as I want\"."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "visual: military_ledger",
+      "live"
+     ],
+     "requirement": "Recruit lists the player's completed bases and the roster with class, numbers and price; Raise hires through the existing hire_unit path; unfieldable rows dim with what they lack; no base offers the site finder set to the military base.",
+     "notes": "Captures military_ledger_recruit, _raise, _no_base, _no_base_door. The dimmed-row and price-muted paths were not on screen (the test world could field and afford everything). LIVE: Ben, 2026-10-27, release build at 95a68a7b+: \"The Military ledger and muster queue work as I want\"."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "visual: military_ledger",
+      "live"
+     ],
+     "requirement": "Recruit shows the player's muster queue with time left.",
+     "notes": "military_ledger_queue after a Raise: \"Rifle Infantry at Takai — 90 d left\". LIVE: Ben, 2026-10-27, release build at 95a68a7b+: \"The Military ledger and muster queue work as I want\"."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "visual: military_ledger"
+     ],
+     "requirement": "Design lists the seven land classes with their base numbers until kit can be chosen.",
+     "notes": "military_ledger_design. LIVE: Ben, 2026-10-27, release build at 95a68a7b+: \"The Military ledger and muster queue work as I want\"."
+    }
+   ]
+  },
+  {
+   "brief": "muster-queue",
+   "title": "BL-1435 - Raising a unit takes time: a muster queue at the base, like construction",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1435 - sprint 58 (Ben, 2026-10-27). Rows written at close.",
+   "batch": "sprint-58",
+   "resolved": "2026-10-27",
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "complete",
+     "verification": [
+      "headless: muster_queue"
+     ],
+     "requirement": "hire_unit pays and queues a muster_order with the row's days (90/135/180 by class); no unit until it completes; a refused hire queues nothing.",
+     "notes": "muster_queue Q1, Q3, Q5 (18/0); corp_ai_harness R4 reads the queue (its 4 failures are pre-existing on the base)."
+    },
+    {
+     "id": "R2",
+     "status": "complete",
+     "verification": [
+      "headless: muster_queue"
+     ],
+     "requirement": "Each tick takes 90 days off; at zero the order becomes a unit on the base's tile as a hire raised it; an order whose base is gone is dropped.",
+     "notes": "muster_queue Q2, Q3, Q4."
+    },
+    {
+     "id": "R3",
+     "status": "complete",
+     "verification": [
+      "headless: muster_queue",
+      "headless: save_roundtrip",
+      "headless: world_determinism"
+     ],
+     "requirement": "The queue is saved (v59, v58 reads empty) and hashed only when non-empty; same seed, same world.",
+     "notes": "muster_queue Q6, Q7; save_roundtrip OK; world_determinism ALL PASS on the muster branch."
+    },
+    {
+     "id": "R4",
+     "status": "complete",
+     "verification": [
+      "code"
+     ],
+     "requirement": "A rival nation's soft cap counts queued hires.",
+     "notes": "corp_ai.cpp: owned_units counts w.musters for the corp. Not asserted by a harness."
+    }
+   ]
   }
  ]
 }

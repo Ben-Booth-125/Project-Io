@@ -931,8 +931,8 @@
    "design": "RELATIONS.md § 6 (Ben, 2026-10-26: the Era catastrophe retired, Alarm kept as a relations quantity). Add Alarm beside Access and Trust per (observer, subject) nation, with its factors (visible capability, severed trade, posture, unrest), decay to neutral, and the tree effects that read 'Alarm toward you' wired to it. A rival nation's scorer reads its own Alarm toward a nation when weighing embargo, coalition or war; it never declares on Alarm alone. A surface shows the player every nation's Alarm toward them. Also: industrialisation_sim_harness reading [13] still prints 'Catastrophe lean'; rename it 'Alarm lean' (INDUSTRIALISATION.md acceptance table). Whether the rival scorer reading Alarm needs its own grant is a check against AI_OPPONENT.md § 11 before building."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 58,
    "version_goal": "v0.3.0",
    "written": "2026-10-27",
@@ -953,7 +953,8 @@
     "docs/ui/MENU.md"
    ],
    "title": "The Military ledger on rail slot 7: a Recruit tab and a Design tab",
-   "design": "ledgers/military.md (Ben, 2026-10-27; settled). Slot 7 takes the filled shield glyph; Corp. Strategy leaves the rail. RECRUIT (default): base picker (the nation's completed military bases), the roster with each row's class, numbers, hire price and kit, Raise through the existing hire_unit verb, the muster queue (BL-1435), and the labour pool with the conscript/professional choice (BL-1424). Rows the nation cannot field are dimmed with why. DESIGN: the designs per class (BL-1434). No military base -> Recruit offers the site finder pre-set to the base. Question log entry; ACTIONS.json for Raise; live click."
+   "design": "ledgers/military.md (Ben, 2026-10-27; settled). Slot 7 takes the filled shield glyph; Corp. Strategy leaves the rail. RECRUIT (default): base picker (the nation's completed military bases), the roster with each row's class, numbers, hire price and kit, Raise through the existing hire_unit verb, the muster queue (BL-1435), and the labour pool with the conscript/professional choice (BL-1424). Rows the nation cannot field are dimmed with why. DESIGN: the designs per class (BL-1434). No military base -> Recruit offers the site finder pre-set to the base. Question log entry; ACTIONS.json for Raise; live click.",
+   "delivered": "2026-10-27"
   },
   {
    "status": "proposed",
@@ -983,8 +984,8 @@
    "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): kit is researched before it enters a design, a unit is designed before it is raised. Each class has kit slots (infantry: rifles or anti-tank launchers; artillery: guns with drones or anti-armour alongside); a slot offers only researched kit (military research nodes); a design's stats are its class's plus its kit's; a unit records its design and refits to it as kit arrives. Kit is goods (BL-1422's kit half). Designs are saved (save-format change). Needs the military research nodes named: the Force branch (DG-ST-FO) holds few today."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 58,
    "version_goal": "v0.3.0",
    "written": "2026-10-27",
@@ -1005,7 +1006,8 @@
     "src/world/world_save.cpp"
    ],
    "title": "Raising a unit takes time: a muster queue at the base, like construction",
-   "design": "MILITARY.md § The muster interface (Ben, 2026-10-27). hire_unit pays and queues at the base; the unit appears when its muster completes, measured like construction days. Muster time per row; the Force branch's Helicopter Lift (-10%) and Proven Readiness (-20%) read it. Save-format change. The Recruit tab shows the queue (BL-1433)."
+   "design": "MILITARY.md § The muster interface (Ben, 2026-10-27). hire_unit pays and queues at the base; the unit appears when its muster completes, measured like construction days. Muster time per row; the Force branch's Helicopter Lift (-10%) and Proven Readiness (-20%) read it. Save-format change. The Recruit tab shows the queue (BL-1433).",
+   "delivered": "2026-10-27"
   }
  ]
 }

@@ -11,6 +11,12 @@ quick tier before and after. A cold `code-reviewer` pass with a fix round budget
 **Re-bless held to sprint end** (Ben, 2026-10-27): BL-1422's Rifle Infantry seeding moves the
 world digests (D_land onward); they stay red until the sprint's one re-bless.
 
+### BL-1433 (military ledger) + BL-1435 (muster queue) — Delivery Full, groups `military-ledger`, `muster-queue`
+- [x] **T1** The muster contract: `muster_order`, `world::musters`, save v59, hash (f4d31c12).
+- [x] **T2** hire_unit queues; `advance_musters` raises; the scorer's cap counts the queue; `muster_queue` harness (08648aca).
+- [x] **T3** Rail slot 7, the Recruit and Design tabs, `military_ledger.lua` (8a04fc72).
+- [x] **T4** Integrated build, captures, Ben's live click (2026-10-27).
+
 ### BL-1425 (unit counter render) — Delivery Full, group `unit-counter-render`
 - [x] **T1** `icons::unit_counter` — the rectangle: owner band, count, HP bar, readiness bar (`icons.{hpp,cpp}`, ICONS.md). (R1, R3)
 - [x] **T2** The canvas groups units per (tile, owner) with men, establishment and readiness, and draws the counter; hit zone on it (`body_surface_canvas.cpp`, `ui_state.hpp`). (R1, R3)
