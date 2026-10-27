@@ -7437,10 +7437,10 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1421 (with BL-1422 T1 class stats, BL-1423 T1 recovery) - sprint 58 (Ben, 2026-10-26: \"build the land combat infrastructure\")",
    "batch": "sprint-58",
-   "resolved": null,
+   "resolved": "2026-10-27",
    "resolution": null,
    "rows": [
     {
@@ -7491,14 +7491,14 @@
     },
     {
      "id": "R6",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "headless: save_roundtrip",
       "headless: battle_engagement_harness"
      ],
      "requirement": "Same seed twice is byte-identical; a save round-trips establishment, readiness and morale; a v57 stream loads with full readiness and morale; a world whose units never fight and are fully supplied keeps its state_hash (an unsupplied unit's morale drifts toward its supply by design, so its hash moves; and the v58 stream moves every snapshot-byte digest, which is the sprint's re-bless to take).",
-     "notes": "world_determinism ALL PASS; save_roundtrip OK incl. P24 (v58 round-trip by value, v57 reads with defaults, readiness 1001 refused) and P6 (a mid-fight battle continues identically after load); battle_engagement_harness B21a (a fully supplied world that never fights hashes as before) and B21b (an unsupplied unit's morale drift moves the hash, by design). market_viability FULL 16 seeds identical to the BL-1408 reading on 71e32545: G1 93.4 G1t50 86.6 G1b 3.7 G2 144.4 G3 100.0. OWED: player_seed_sweep --digest-check fails 16/16 on D_land, D_settle and D_seat. D_land is taken before any tick, so its move is the v58 stream itself (version byte and unit section); D_settle/D_seat may also carry morale drift toward supply. Re-bless is Ben's call."
+     "notes": "world_determinism ALL PASS; save_roundtrip OK incl. P24 (v58 round-trip by value, v57 reads with defaults, readiness 1001 refused) and P6 (a mid-fight battle continues identically after load); battle_engagement_harness B21a (a fully supplied world that never fights hashes as before) and B21b (an unsupplied unit's morale drift moves the hash, by design). market_viability FULL 16 seeds identical to the BL-1408 reading on 71e32545: G1 93.4 G1t50 86.6 G1b 3.7 G2 144.4 G3 100.0. OWED: player_seed_sweep --digest-check fails 16/16 on D_land, D_settle and D_seat. D_land is taken before any tick, so its move is the v58 stream itself (version byte and unit section); D_settle/D_seat may also carry morale drift toward supply. Re-bless is Ben's call. RE-BLESSED 2026-10-27 on Ben's go after the shape probe: rebless_shape_probe ROW and MIX lines identical on all 16 seeds between e205c8f0 (before) and 9f68dcff (after); the 16 player_seed_sweep pins re-pinned (D_search unmoved on 16; D_land, D_settle, D_seat moved by the v58 stream and morale drift). Recheck: par_seeds --digest-check, 16 of 16 rows PASS (each shard 1/1 PASS; its exit 3 is the harness's partial-coverage code for a one-seed run)."
     }
    ]
   }
