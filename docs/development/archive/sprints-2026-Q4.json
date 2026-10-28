@@ -350,6 +350,47 @@
           "Ruling register 26 of 26 pass on the committed docs."
         ]
       }
+    },
+    "59": {
+      "id": "59",
+      "theme": "unit designs and the designer",
+      "state": "landed",
+      "status_line": "CLOSED 2026-10-28 at v0.2.3 (Ben: \"Looks pretty good. We can close sprint 59 and cut a new version release.\"). Unit designs and the full-canvas unit designer landed: per-class kit slots, a 71-item kit catalogue, one live design per class. BL-1445 (move by days) is built on a branch and held for four calls; it carries to sprint 60 with BL-1442 (post-capacity starvation). One re-bless at the close, a save-format bump.",
+      "opened_date": "2026-10-28",
+      "author": "Ben (2026-10-28)",
+      "goal": "A nation designs its land units: each class carries its own kit slots, a design is chosen in a full-canvas designer, and hires and refits read it. Units march by the day at class speed.",
+      "planned": [
+        "BL-1442 (post-capacity starvation) first, then the sprint 58 carries.",
+        "BL-1434 (unit designs), then BL-1446 (unit designer) over it.",
+        "BL-1445 (move by days): marches and battles on the day grain."
+      ],
+      "risk": "BL-1434 and BL-1445 both move the unit record and the save version; the designer needs the design store underneath it.",
+      "done_when": "unit_designs_harness, unit_designer.lua, world_determinism and save_roundtrip pass; Ben looks at the designer in the running game; one re-bless at the close.",
+      "notes": "Rulings 2026-10-28: slots are per class (overturning two slots a class); one live design per class, hires buy it and units refit to it; the designer opens full canvas from a unit type; units march by the day at class speed and battles step daily. Register sprint-59: 6 of 6 pass.",
+      "closed_date": "2026-10-28",
+      "retro": {
+        "landed": [
+          "DESIGNS: BL-1434 (unit designs): per-class kit slots; a 71-item kit catalogue, the 1960 base kit open and 51 later items locked until BL-1436 (kit in the age tree) names their nodes; one live design per class; hires buy and carry it; units refit to it; save v64.",
+          "DESIGNER: BL-1446 (unit designer): full canvas from a Design-tab class or a unit card's type name; a placeholder class image with a box per slot and leader lines; each pick saves. Ben looked at it in the release build (\"Looks pretty good\")."
+        ],
+        "carried": [
+          "To sprint 60, leading: BL-1445 (move by days), built on worktree-agent-a4b3adc73d38bd51c @ 96fab14f and held for four calls (orders waiting a quarter for a Logistic Point grant; the march's cost to G1t50, quick 85.0 -> 80.2; recovery quarterly or daily; dead units removed daily). Group move-by-days stays pending.",
+          "To sprint 60: BL-1442 (post-capacity starvation), G1t50 79.8 against 85.",
+          "To sprint 60: BL-1440 (R0b budget world), BL-1441 (front edge cases), BL-1422 (land classes and kit), BL-1423 (refit and retreat), BL-1424 (soldiers from labour), BL-1426 (bunkers), BL-1436 (kit in the age tree), BL-1444 (battle card march stall).",
+          "To sprint 60, unstarted: BL-1413..BL-1420."
+        ],
+        "feedback": [
+          "The doc leads the build: MILITARY.md already states daily movement on main while BL-1445 waits on its calls.",
+          "Ben overturned two slots a class mid-sprint; the ruling went into MILITARY.md § The kit table before the lane.",
+          "The designer needed an image path the app did not have; a small in-tree PNG decoder was written (NR-1095)."
+        ],
+        "gates": [
+          "No economy change: rivals keep base kit, so designs move no generated world. market_viability was not re-run for it.",
+          "unit_designs_harness 46/46; scripts/verify/unit_designer.lua 0 failures; save_roundtrip OK (v64 designs section).",
+          "One re-bless at the sprint end, by the main session: a save-format bump, the world expected unchanged.",
+          "Ruling register 6 of 6 pass."
+        ]
+      }
     }
   }
 }

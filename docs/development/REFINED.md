@@ -1,15 +1,41 @@
 # REFINED — active worklist
 
-## Sprint 59 (opened 2026-10-28)
+## Sprint 60 (opened 2026-10-28)
+
+- BL-1447 (kit goods priced): hire and refit check goods by price; PNG inflate cap; refit menu wording (cold review of unit designs, 2026-10-28).
+
+**Target.** v0.2.4. `sprints.json` `next_up` holds the line.
+
+**Carried from sprint 59.**
+- BL-1445 (move by days): built on `worktree-agent-a4b3adc73d38bd51c` @ 96fab14f, held unmerged on four calls Ben has not answered: mid-quarter orders waiting up to a quarter for a Logistic Point grant; the march's Logistic Point cost to G1t50 (quick 85.0 -> 80.2); recovery quarterly or daily; dead units removed daily. Group `move-by-days` pending.
+- BL-1442 (post-capacity starvation): G1t50 79.8 against 85; measure the starving recipes, fix the cause, keep the gate.
+- BL-1440 (R0b budget world): rival_military_seeding_harness R0b fails three rows.
+- BL-1441 (front edge cases): no front without a free key tile; unreachable fronts.
+- BL-1422 (land classes and kit): the roster half is done; kit as goods remains.
+- BL-1423 (refit and retreat): wounded units refit from the shelf.
+- BL-1424 (soldiers from labour): conscript or professional, from the labour pool.
+- BL-1426 (bunkers): defence and hardness for the units on a tile.
+- BL-1436 (kit in the age tree): name the research nodes that unlock the 51 locked kit items.
+- BL-1444 (battle card march stall): battle_card.lua's march is accepted but the unit never moves.
+- BL-1413 (re-curate six seeds): six library seeds no longer serve their purpose.
+- BL-1414 (Trade-flow room without rivals): no-room ignores rivals' cargo in flight.
+- BL-1415 (header NET excludes refunds): the header shows operating net.
+- BL-1416 (drop the identity wash): keep the outline.
+- BL-1417 (no nation emblem): the profile and Selection header still draw it.
+- BL-1418 (embargo bars goods): an embargo bars a nation's goods from your markets.
+- BL-1419 (Industry lens fills): it shows other nations' plants.
+- BL-1420 (lane and port defects and checks): five defects, two missing checks.
+
+## Sprint 59 (opened 2026-10-28, CLOSED 2026-10-28 at v0.2.3)
 
 ### BL-1445 (move by days) — Delivery Full, group `move-by-days`
-- [ ] **T1** World lane: the daily march and battle pass, class speeds in economy.lua, quarterly LP grant spent daily, `move_by_days_harness`, re-pointed battle and march harnesses. (R1-R3)
-- [ ] **T2** Merge, cold review, gates, Ben's live click. (R4)
+- [ ] **T1** (carried to sprint 60; built on worktree-agent-a4b3adc73d38bd51c @ 96fab14f, held for four calls) World lane: the daily march and battle pass, class speeds in economy.lua, quarterly LP grant spent daily, `move_by_days_harness`, re-pointed battle and march harnesses. (R1-R3)
+- [ ] **T2** (carried to sprint 60) Merge, cold review, gates, Ben's live click. (R4)
 
 ### BL-1434 (unit designs) + BL-1446 (unit designer) — Delivery Full, group `unit-designer`
-- [ ] **T1** World lane: the design store, kit catalogue per class slot, `set_unit_design`, hires and refit read the design, save, `unit_designs_harness`. (R1-R2)
-- [ ] **T2** UI lane: the full-canvas designer, placeholder class PNGs with slot anchors, entry from the Design tab and the unit card. (R3)
-- [ ] **T3** Merge, cold review, Ben's live click.
+- [x] **T1** World lane: the design store, kit catalogue per class slot, `set_unit_design`, hires and refit read the design, save, `unit_designs_harness`. (R1-R2)
+- [x] **T2** UI lane: the full-canvas designer, placeholder class PNGs with slot anchors, entry from the Design tab and the unit card. (R3)
+- [x] **T3** Merge, cold review, Ben's live click (release build, 2026-10-28).
 
 **Target.** v0.2.3 (Ben, 2026-10-28). `sprints.json` `next_up` holds the line.
 

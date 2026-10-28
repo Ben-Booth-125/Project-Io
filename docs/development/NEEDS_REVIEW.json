@@ -247,6 +247,50 @@
     "scripts/recipes.lua",
     "docs/economy/PRODUCTION.md"
    ]
+  },
+  {
+   "raised": "2026-10-28",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1095",
+   "kind": "novel-work",
+   "title": "A PNG decoder in src/ui/png_decode.cpp",
+   "source": "BL-1446 (unit designer) lane",
+   "what": "The designer draws a class image, and the app links no image library: SDL 3.2 loads BMP only and ImGui bundles no stb_image. The lane wrote an in-tree decoder (~340 lines): a full zlib inflate plus 8-bit grey, grey+alpha, RGB, RGBA and palette PNGs, non-interlaced; anything else is refused with a reason.",
+   "why_it_matters": "No doc owns image loading. Every later authored image (unit art, emblems, icons as files) will reach for this, and an in-tree decoder is code to maintain against untrusted-looking input.",
+   "options": [
+    "A: keep it, and name it in TECH_FOUNDATIONS.md as the one image path",
+    "B: replace it with a vendored stb_image",
+    "C: keep it designer-only until real art lands"
+   ],
+   "recommendation": "A. It is small, pure and refuses what it cannot read; a vendored library is a bigger surface for a handful of files.",
+   "files": [
+    "src/ui/png_decode.cpp",
+    "src/ui/png_decode.hpp",
+    "docs/tech/TECH_FOUNDATIONS.md"
+   ]
+  },
+  {
+   "raised": "2026-10-28",
+   "status": "open",
+   "resolution": null,
+   "id": "NR-1096",
+   "kind": "question",
+   "title": "Designer: a pick saves at once; the fitted item is disabled rather than a toggle",
+   "source": "BL-1446 (unit designer) lane",
+   "what": "Two UI calls the lane made. (1) Each pick in a slot list sends set_unit_design at once: there is no draft, confirm or revert, so a misclick changes the live design for every new hire. (2) The fitted item in a slot list is disabled (\"Fitted now\"), not a toggle: pressing it again does not return the slot to base kit.",
+   "why_it_matters": "The toggle rule says a control whose active state is visible undoes on a second press. The fitted badge is a visible active state, so (2) reads as an exception the rule does not list. (1) follows military.md § The designer (\"Saving is the pick\") but has no undo.",
+   "options": [
+    "A: keep both as built",
+    "B: make the fitted item a toggle back to base kit",
+    "C: add a draft with a Save button",
+    "D: B and C"
+   ],
+   "recommendation": "A. The slot is a selector of one-of-n, like the exempt combos; base kit is one press away in the same list.",
+   "files": [
+    "src/ui/unit_designer.cpp",
+    "docs/ui/ledgers/military.md"
+   ]
   }
  ]
 }

@@ -10601,6 +10601,104 @@
         "title",
         "design"
       ]
+    },
+    "BL-1434": {
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 59,
+      "version_goal": "v0.2.3",
+      "written": "2026-10-27",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (military ledger design, 2026-10-27)",
+      "requires": [
+        "BL-1422"
+      ],
+      "id": "BL-1434",
+      "short_name": "UNIT_DESIGNS",
+      "category": "Military",
+      "priority": "A",
+      "difficulty": 4,
+      "authority_doc": "docs/military/MILITARY.md",
+      "files": [
+        "src/world/unit_roster.hpp",
+        "src/world/unit_roster.cpp",
+        "src/world/components.hpp",
+        "src/world/world_save.cpp"
+      ],
+      "title": "A unit is raised to a design: a land class with researched kit in each slot",
+      "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): kit is researched before it enters a design, a unit is designed before it is raised. Each class has kit slots (infantry: rifles or anti-tank launchers; artillery: guns with drones or anti-armour alongside); a slot offers only researched kit (military research nodes); a design's stats are its class's plus its kit's; a unit records its design and refits to it as kit arrives. Kit is goods (BL-1422's kit half). Designs are saved (save-format change). Needs the military research nodes named: the Force branch (DG-ST-FO) holds few today. Slots are per class (Ben, 2026-10-28; MILITARY.md § The kit table), overturning two slots a class. For v0.2.3 (BL-1446, unit designer): the design store, one live design per class, a kit catalogue per class slot (the base kit open, later kit locked until BL-1436 names its research nodes), the set-design verb, the save section, and hires/refit reading the design.",
+      "delivered": "2026-10-28",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "short_name",
+        "category",
+        "priority",
+        "difficulty",
+        "authority_doc",
+        "files",
+        "title",
+        "design",
+        "delivered"
+      ]
+    },
+    "BL-1446": {
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 59,
+      "version_goal": "v0.2.3",
+      "written": "2026-10-28",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (Ben, 2026-10-28)",
+      "requires": [
+        "BL-1434"
+      ],
+      "id": "BL-1446",
+      "short_name": "UNIT_DESIGNER",
+      "category": "UI",
+      "priority": "A",
+      "difficulty": 4,
+      "authority_doc": "docs/ui/ledgers/military.md",
+      "files": [
+        "src/ui/military_ledger.cpp",
+        "src/ui/unit_designer.cpp",
+        "src/ui/selection_panel.cpp",
+        "assets/units/"
+      ],
+      "title": "The unit designer: a full-canvas view of a class with a box per equipment slot",
+      "design": "Ben, 2026-10-28: \"click a unit type to open the designer (full canvas). This should display an image of the unit type taking up the centre of the canvas space, with boxes for each changeable piece of equipment, linked back to the corresponding space on the unit.\" Settled in docs/ui/ledgers/military.md § The designer: opened from a Design-tab type or a unit card's type name; an authored PNG per class (placeholder until art); one box per class slot (MILITARY.md § The kit table) joined to its anchor on the image; saving sets the class's one live design (new hires use it, units refit to it). Needs BL-1434 (unit designs) underneath it.",
+      "delivered": "2026-10-28",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "short_name",
+        "category",
+        "priority",
+        "difficulty",
+        "authority_doc",
+        "files",
+        "title",
+        "design",
+        "delivered"
+      ]
     }
   }
 }

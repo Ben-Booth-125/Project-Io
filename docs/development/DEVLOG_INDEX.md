@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 236 entries across 2 volume(s).
+One line per session, newest first — 237 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-10-28 | [Sprint 59: unit designs and the designer — version 0.2.3](DEVLOG.md) | BL-1434 BL-1436 BL-1442 BL-1445 BL-1446 | DEVLOG.md |
 | 2026-10-14 | [Sprint 54: UI improvements, run beside sprint 53](DEVLOG.md) | BL-1277 BL-1300 BL-1312 BL-1313 BL-1314 BL-1315 BL-1316 BL-1317 BL-1318 BL-1319 BL-1320 BL-1321 BL-1322 BL-1323 | DEVLOG.md |
 | 2026-10-11 | [Sprint 53 designed; sprints 50 and 52 onto main and cut — version 0.1.30](DEVLOG.md) | BL-1245 BL-1277 BL-1278 BL-1284 BL-1285 BL-1286 BL-1290 BL-1291 BL-1294 BL-1295 | DEVLOG.md |
 | 2026-10-10 | [Sprint 51 closes: the ground you can read — version 0.1.29](DEVLOG.md) | BL-1215 BL-1218 BL-1239 BL-1240 BL-1241 BL-1242 BL-1243 BL-1244 BL-1246 BL-1247 BL-1250 BL-1251 BL-1253 BL-1254 BL-1255 BL-1256 BL-1257 BL-1258 BL-1259 BL-1260 BL-1261 BL-1291 BL-1292 BL-1293 | DEVLOG.md |

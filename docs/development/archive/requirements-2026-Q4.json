@@ -2479,6 +2479,39 @@
         }
       ]
     },
+    "unit-designer": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: unit_designs_harness",
+            "headless: save_roundtrip"
+          ],
+          "requirement": "Each nation holds one live design per land class: a kit item per class slot (the MILITARY.md § The kit table); the base kit opens every slot; later kit is locked until researched. set_unit_design changes one slot for the seat's nation; refusals mutate nothing; designs save and hash.",
+          "notes": "unit_designs_harness 46/46 on main (merge 2d2afd2a): 71 kit items over the per-class slots, the 1960 base kit open, 51 later items locked until BL-1436 (kit in the age tree) names their nodes; set_unit_design refusals hash-identical; save v64 designs section round-trips (save_roundtrip OK), v63 reads as base kit."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: unit_designs_harness"
+          ],
+          "requirement": "A hire is raised to its class's live design, and refit brings an existing unit to it; a design's stats are its class's plus its kit's.",
+          "notes": "unit_designs_harness 46/46: a hire records its class's live design and buys its kit goods; combat stats read the design (class plus kit); a stale unit refits to the live design, buying only the changed slots' kit."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "visual: unit_designer",
+            "live"
+          ],
+          "requirement": "Clicking a Design-tab unit type or a unit card's type name opens the designer on the full canvas: the class image centred, one box per slot joined by a leader line to its anchor, the fitted kit shown and the researched choices offered; saving sets the live design; the toggle rule and Escape close it.",
+          "notes": "scripts/verify/unit_designer.lua 0 failures (merge 11bc6ad6): opens from a Design-tab class and a unit card's type name; placeholder class image, one box per slot with a leader line, per-pick save; the same press and Esc close it. Live check: Ben looked at the designer in the release build, 2026-10-28 (\"Looks pretty good\")."
+        }
+      ]
+    },
     "wharf-placed-on-shore": {
       "rows": [
         {

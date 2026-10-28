@@ -7575,42 +7575,11 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1434, BL-1446 - sprint 59 (Ben, 2026-10-28)",
    "batch": "sprint-59",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: unit_designs_harness",
-      "headless: save_roundtrip"
-     ],
-     "requirement": "Each nation holds one live design per land class: a kit item per class slot (the MILITARY.md § The kit table); the base kit opens every slot; later kit is locked until researched. set_unit_design changes one slot for the seat's nation; refusals mutate nothing; designs save and hash.",
-     "notes": null
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: unit_designs_harness"
-     ],
-     "requirement": "A hire is raised to its class's live design, and refit brings an existing unit to it; a design's stats are its class's plus its kit's.",
-     "notes": null
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "visual: unit_designer",
-      "live"
-     ],
-     "requirement": "Clicking a Design-tab unit type or a unit card's type name opens the designer on the full canvas: the class image centred, one box per slot joined by a leader line to its anchor, the fitted kit shown and the researched choices offered; saving sets the live design; the toggle rule and Escape close it.",
-     "notes": null
-    }
-   ]
+   "resolved": "2026-10-28",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   }
  ]
 }

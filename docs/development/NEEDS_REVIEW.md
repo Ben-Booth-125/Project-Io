@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*10 entries — 10 open, 0 resolved.*
+*12 entries — 12 open, 0 resolved.*
 
 ---
 
@@ -163,6 +163,37 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 > **Recommendation:** A now; B only if old saves matter before v1.0.
 
 *Files: `scripts/recipes.lua`, `docs/economy/PRODUCTION.md`*
+
+### NR-1095 — A PNG decoder in src/ui/png_decode.cpp
+*novel-work · raised 2026-10-28 · from BL-1446 (unit designer) lane*
+
+The designer draws a class image, and the app links no image library: SDL 3.2 loads BMP only and ImGui bundles no stb_image. The lane wrote an in-tree decoder (~340 lines): a full zlib inflate plus 8-bit grey, grey+alpha, RGB, RGBA and palette PNGs, non-interlaced; anything else is refused with a reason.
+
+**Why it matters.** No doc owns image loading. Every later authored image (unit art, emblems, icons as files) will reach for this, and an in-tree decoder is code to maintain against untrusted-looking input.
+
+- A: keep it, and name it in TECH_FOUNDATIONS.md as the one image path
+- B: replace it with a vendored stb_image
+- C: keep it designer-only until real art lands
+
+> **Recommendation:** A. It is small, pure and refuses what it cannot read; a vendored library is a bigger surface for a handful of files.
+
+*Files: `src/ui/png_decode.cpp`, `src/ui/png_decode.hpp`, `docs/tech/TECH_FOUNDATIONS.md`*
+
+### NR-1096 — Designer: a pick saves at once; the fitted item is disabled rather than a toggle
+*question · raised 2026-10-28 · from BL-1446 (unit designer) lane*
+
+Two UI calls the lane made. (1) Each pick in a slot list sends set_unit_design at once: there is no draft, confirm or revert, so a misclick changes the live design for every new hire. (2) The fitted item in a slot list is disabled ("Fitted now"), not a toggle: pressing it again does not return the slot to base kit.
+
+**Why it matters.** The toggle rule says a control whose active state is visible undoes on a second press. The fitted badge is a visible active state, so (2) reads as an exception the rule does not list. (1) follows military.md § The designer ("Saving is the pick") but has no undo.
+
+- A: keep both as built
+- B: make the fitted item a toggle back to base kit
+- C: add a draft with a Save button
+- D: B and C
+
+> **Recommendation:** A. The slot is a selector of one-of-n, like the exempt combos; base kit is one press away in the same list.
+
+*Files: `src/ui/unit_designer.cpp`, `docs/ui/ledgers/military.md`*
 
 ---
 

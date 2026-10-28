@@ -10,6 +10,32 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-28 — Sprint 59: unit designs and the designer — version 0.2.3
+
+**Runtime:** one day; Design from Ben's rulings in the morning, then Delivery Full in worktree lanes,
+closed on Ben's look at the release build.
+
+**What was built.**
+- **Designs:** BL-1434 (unit designs).
+  - Each land class has its own kit slots (Ben, 2026-10-28, overturning two slots a class).
+  - A kit catalogue of 71 items: the 1960 base kit open, 51 later items locked until BL-1436 (kit in the age tree) names their nodes.
+  - One live design per class; a hire buys and carries it; a unit refits to it. Save v64.
+- **Designer:** BL-1446 (unit designer). Full canvas from a Design-tab class or a unit card's type name: a placeholder class image, a box per slot with leader lines, each pick saved.
+
+**Decisions.** Every ruling is in its owning doc; the register (`tools/session/rulings/sprint-59.json`)
+passes 6 of 6. Ben looked at the designer in the release build: "Looks pretty good". Filed: NR-1095
+(the in-tree PNG decoder, novel work) and NR-1096 (two designer UI calls).
+
+**Re-bless.** One, at the sprint end, by the main session: a save-format bump (the v64 designs
+section), the world expected unchanged.
+
+**Gates at close.** No economy change: rivals keep base kit, so designs move no generated world;
+market_viability was not re-run for it. unit_designs_harness 46/46; unit_designer.lua 0 failures.
+
+**Left open.** BL-1445 (move by days) is built on a branch and held for four calls; it leads sprint 60.
+The doc leads the build: MILITARY.md already states daily movement. BL-1442 (post-capacity
+starvation) carries, G1t50 79.8 against 85.
+
 ## 2026-10-26 to 2026-10-28 — Sprint 58: the land combat core — version 0.2.2
 
 **Runtime:** about three days; Design on Ben's walks, then Delivery Full in worktree lanes, closed

@@ -12,6 +12,29 @@ release.
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-10-28
+
+*Unit designs and the designer. Each land class carries its own kit slots, and a nation keeps one
+live design per class: hires are raised to it and units refit to it. A full-canvas designer shows
+the class with a box per slot. Units marching by the day is designed and held: it carries to
+sprint 60, as does G1 at tick 50 (79.8 against 85).*
+
+### Added
+
+- **Unit designs** (BL-1434 (unit designs)). Each land class has its own equipment slots, and
+  each nation one live design per class. A hire buys and carries its class's design; a unit on an
+  older design refits to the live one, buying only the changed slots' kit. Saved at version 64.
+- **A kit catalogue**: 71 items across the class slots. The 1960 base kit is open; the 51 later
+  items are listed but locked until their research nodes are named in the age tree.
+- **The unit designer** (BL-1446 (unit designer)): opened full canvas from a Design-tab class or
+  a unit card's type name. A placeholder class image sits in the centre, with a box per slot
+  joined by a leader line to its place on the unit. A box lists its kit, locked items included,
+  with stat changes and goods; each pick saves at once.
+
+### Changed
+
+- **Equipment slots are per class**, overturning two slots a class (Ben, 2026-10-28).
+
 ## [0.2.2] — 2026-10-28
 
 *The land combat core. Units carry HP, readiness and morale and fight by soft and hard attack;
@@ -1736,7 +1759,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.32...v0.2.0
