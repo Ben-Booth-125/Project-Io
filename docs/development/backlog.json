@@ -1019,6 +1019,28 @@
    ],
    "title": "Hire and refit check goods by price as well as quantity; the PNG inflate gets an output cap",
    "design": "Cold review of unit designs, 2026-10-28. (1) HIGH, latent until later kit unlocks (BL-1436): hire_goods_affordable counts shelf quantity only, while buy_from_corp_shelves charges the posted price capped by purse_room_of, and debit_kit_goods ignores how much it bought. A design refit (0 credits) with a committed treasury gets its kit free; a hire at exact room drops the treasury below its commitments. The row-goods leg had the flaw already. Fix: the affordability check sums qty x posted price plus the credit cost against purse_room_of, and apply asserts the bought amount. (2) LOW: hire_goods_affordable prices each row axis at its first candidate without the kit draw on the same resource, so an affordable hire can be refused. (3) LOW: png_decode.cpp inflate has no output cap; stop once out exceeds h x (stride+1). (4) LOW: the refit menu labels a design refit with the row gate (+ kit) and omits the changed slots goods; an obsolete own row moves the (live design) entry to the end."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-28",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben ruling on NR-1096)",
+   "requires": [],
+   "id": "BL-1448",
+   "short_name": "DESIGNER_DRAFT_SAVE",
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "authority_doc": "docs/ui/ledgers/military.md",
+   "files": [
+    "src/ui/unit_designer.cpp"
+   ],
+   "title": "Designer picks draft; Save commits the live design, Revert drops the draft",
+   "design": "Ben, 2026-10-28 (NR-1096 option C). The design is written in docs/ui/ledgers/military.md § The designer: a pick changes the draft only; changed slots are marked; Save sends set_unit_design for each changed slot; Revert drops the draft; closing with an unsaved draft asks save or discard; the fitted item stays disabled. UI-only: set_unit_design is unchanged. Needs a live click."
   }
  ]
 }

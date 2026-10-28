@@ -45,5 +45,56 @@
   "anchor": "A newer design is a newer model \\(Ben, 2026-10-28\\)",
   "stale": [],
   "owner": "BL-1434 (unit designs)"
+ },
+ {
+  "ruling": "Movement takes no Logistic Points (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Movement takes no Logistic Points \\(Ben, 2026-10-28\\)",
+  "stale": [
+   "a march spends its\\s+grant day by day",
+   "a march spends its points against",
+   "a march draw is its march\\s+points"
+  ],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "A unit's supply draws LP once a quarter at its tile (Ben, 2026-10-28)",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "A unit's supply draws on the pool, and claims first",
+  "stale": [
+   "A march draws on the nation's pool too",
+   "the march draws Logistic Points\\s+before"
+  ],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "Supply is drawn where the unit stands (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Supply is drawn where the unit stands \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "Readiness and morale recover daily; a killed unit is removed that day (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Out of contact, readiness and morale recover daily",
+  "stale": [],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "Authored images load through one in-tree PNG decoder (Ben, 2026-10-28)",
+  "doc": "docs/tech/TECH_FOUNDATIONS.md",
+  "anchor": "Authored images load through one in-tree PNG decoder",
+  "stale": [],
+  "owner": "BL-1446 (unit designer)"
+ },
+ {
+  "ruling": "A designer pick drafts; Save commits (Ben, 2026-10-28)",
+  "doc": "docs/ui/ledgers/military.md",
+  "anchor": "A pick drafts; Save commits",
+  "stale": [
+   "Saving is the pick"
+  ],
+  "owner": "BL-1448 (designer draft and Save)"
  }
 ]
