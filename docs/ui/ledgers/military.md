@@ -43,6 +43,26 @@ revisited when a technology lands.
 - **A base, nothing affordable** → the roster still lists every type; each Raise is disabled with its
   reason (`rejected_funds`, a missing good), the same idiom as the tile card's disabled build rows.
 
+### The designer (Ben, 2026-10-28)
+
+Clicking a **unit type** — a row of the Design tab, or the type name on a unit card — opens the
+**designer on the full canvas** (`../DRILL_THROUGH.md`, the full-canvas rung). It answers "what is
+this kind of unit carrying, and what can it carry instead?"
+
+- **The unit, centred.** An authored image of the class fills the middle of the canvas: one PNG
+  per land class, a placeholder until the art lands.
+- **One box per changeable piece of equipment**, placed around the image, each joined by a leader
+  line to the point on the unit that piece sits. **The boxes are the class's own slots (Ben,
+  2026-10-28)**: a tank shows armament, armour and tracks; foot infantry shows weapon and armour
+  (`../../military/MILITARY.md` § The kit has the table). Each class's image carries one anchor
+  point per slot. A box shows the kit fitted and, opened, the researched choices.
+  A class with nothing researched for a slot shows its base kit and no choices.
+- **Saving** makes it the class's **one live design**: new hires are raised with it, and units
+  already in the field take it by refit (§ Design above; `../../military/MILITARY.md` § The
+  muster interface, "Refit to a newer type").
+- Closing the designer (the toggle rule, or Escape) returns to the ledger or card it was opened
+  from.
+
 ## 3. Lens on open
 
 **None by default.** A strawman worth weighing: with Recruit open and a base chosen, the canvas

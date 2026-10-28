@@ -2,6 +2,15 @@
 
 ## Sprint 59 (opened 2026-10-28)
 
+### BL-1445 (move by days) — Delivery Full, group `move-by-days`
+- [ ] **T1** World lane: the daily march and battle pass, class speeds in economy.lua, quarterly LP grant spent daily, `move_by_days_harness`, re-pointed battle and march harnesses. (R1-R3)
+- [ ] **T2** Merge, cold review, gates, Ben's live click. (R4)
+
+### BL-1434 (unit designs) + BL-1446 (unit designer) — Delivery Full, group `unit-designer`
+- [ ] **T1** World lane: the design store, kit catalogue per class slot, `set_unit_design`, hires and refit read the design, save, `unit_designs_harness`. (R1-R2)
+- [ ] **T2** UI lane: the full-canvas designer, placeholder class PNGs with slot anchors, entry from the Design tab and the unit card. (R3)
+- [ ] **T3** Merge, cold review, Ben's live click.
+
 **Target.** v0.2.3 (Ben, 2026-10-28). `sprints.json` `next_up` holds the line.
 
 **Carried from sprint 58.**

@@ -185,11 +185,23 @@ tab (`../ui/ledgers/military.md`).
 
 **The kit (Ben, 2026-10-27; the item list is `../research/MILITARY_KIT.md` §§ 1–2).**
 
-- **Two slots a class: main and support.** The main kit is what the class is (small arms, the
-  fighting vehicle, the main gun, the guns); the support kit is what it carries alongside, and is
-  where the swaps live — infantry's section weapon is an anti-tank launcher, a mortar, a
-  man-portable air-defence launcher or small attack drones; artillery's alongside slot is
-  counter-battery radar, anti-armour submunitions or loitering drones.
+- **Each class has its own slots (Ben, 2026-10-28, overturning two slots a class).** *"Tanks might
+  have armament / armour / tracks, while foot soldiers only have weapon / armour."* A slot is one
+  changeable piece of equipment:
+
+  | Class | Slots |
+  |---|---|
+  | Infantry | Weapon · Armour |
+  | Motorised infantry | Weapon · Armour · Vehicle |
+  | Mechanised infantry | Weapon · Armour · Vehicle |
+  | Light armour | Armament · Armour · Wheels |
+  | Medium armour | Armament · Armour · Tracks |
+  | Artillery | Gun · Munitions · Tow |
+  | Air defence | Launcher · Fire control · Vehicle |
+
+  The swaps Ben named live in these slots: infantry's weapon is rifles or an anti-tank launcher;
+  artillery's munitions are shells, anti-armour submunitions or loitering drones. A class's speed
+  stays its class's (§ Marching) until kit changes it.
 - **Each class starts on its base kit** — the 1960 standard — with nothing researched; each later
   item adds to the class's numbers.
 - **Kit is researched in the age tree**, not on a ladder of its own: the military kit is nodes of
@@ -774,14 +786,18 @@ and a unit with nowhere to step is disbanded.
 never changes post-generation, so the guard is defensive, and the determinism harness exercises it
 directly.
 
-**March points are per-CLASS, authored data.** `economy.military.march_points_per_class`
-(`scripts/economy.lua`), keyed by the roster row's `cls`. Spent per tick against the per-tile
-traversal-cost weight (`logistics::tile_traversal_cost`, the same plains=1.0/mountain=2.0 table
-road placement discounts), with fractional remainder banked in `order.progress` across ticks.
-Defaults: infantry 1.0, cavalry 1.5, ranged 1.0, siege 0.5, naval 0.0 — **and the zero is not
-a claim that fleets cannot move.** A sea unit moves on coast and ocean tiles under § The campaign
-force model's Sea, not on this land table. A composite unit (BL-472, formations)
-reads its **slowest** component's class entry.
+**Units march by the day, at their class's speed (Ben, 2026-10-28).** A march no longer waits on the
+quarterly economy tick: it advances every day. Each land class takes an authored number of **days
+to cross one plains tile** — foot infantry 3, motorised infantry 1, mechanised infantry 1, light
+armour 1, medium armour 1.5, towed artillery 2, air defence 1.5 — so trucks and tracks are what make
+a force fast. Terrain multiplies the days by the tile's traversal cost
+(`logistics::tile_traversal_cost`, plains 1.0, mountain 2.0) and a road divides them, as it does
+for every other traveller. Partial progress banks in `order.progress` from day to day. The speed
+is the **class's**; a design's transport kit does not change it until kit exists (BL-1436, kit in
+the age tree). A sea unit moves on coast and ocean tiles under § The campaign force model's Sea,
+not on this land table. A composite unit (BL-472, formations) moves at its **slowest** component's
+speed. Logistic Points are still granted once a quarter (§ One reach field); a march spends its
+grant day by day, and a unit whose grant is spent halts until the next quarter's grant.
 
 **Traversal cost over water is uniform.** `logistics::tile_traversal_cost` prices land by
 landform, and water has no landform to price — so a sea leg costs the same per tile wherever it
@@ -829,7 +845,9 @@ is deliberately no second disband mechanism.
 2. **Terrain is one tuple for the whole battle**, exactly as the resolver takes it. Per-unit
    terrain was offered and declined. The ground is the **defended tile** — `battle_ground`,
    exposed as a named function so it can be asserted.
-3. **Pacing is several rounds per tick** — `campaign_battle_params::rounds_per_tick`.
+3. **Pacing is by the day (Ben, 2026-10-28).** Battles step every day, and contact is checked every
+   day — the day a march meets a hostile stack is the day the battle opens. The round's damage is
+   calibrated to that day grain.
 
 **The trigger.** A battle opens when a unit whose nation holds a **directed** hostility toward
 another tries to march onto a tile that nation's units stand on (§ Marching). Directed suffices —

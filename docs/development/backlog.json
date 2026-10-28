@@ -854,7 +854,7 @@
    "status": "proposed",
    "glyph": "○",
    "sprint": 59,
-   "version_goal": "v0.3.0",
+   "version_goal": "v0.2.3",
    "written": "2026-10-27",
    "parked": false,
    "blocked_on": null,
@@ -875,7 +875,7 @@
     "src/world/world_save.cpp"
    ],
    "title": "A unit is raised to a design: a land class with researched kit in each slot",
-   "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): kit is researched before it enters a design, a unit is designed before it is raised. Each class has kit slots (infantry: rifles or anti-tank launchers; artillery: guns with drones or anti-armour alongside); a slot offers only researched kit (military research nodes); a design's stats are its class's plus its kit's; a unit records its design and refits to it as kit arrives. Kit is goods (BL-1422's kit half). Designs are saved (save-format change). Needs the military research nodes named: the Force branch (DG-ST-FO) holds few today."
+   "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): kit is researched before it enters a design, a unit is designed before it is raised. Each class has kit slots (infantry: rifles or anti-tank launchers; artillery: guns with drones or anti-armour alongside); a slot offers only researched kit (military research nodes); a design's stats are its class's plus its kit's; a unit records its design and refits to it as kit arrives. Kit is goods (BL-1422's kit half). Designs are saved (save-format change). Needs the military research nodes named: the Force branch (DG-ST-FO) holds few today. Slots are per class (Ben, 2026-10-28; MILITARY.md § The kit table), overturning two slots a class. For v0.2.3 (BL-1446, unit designer): the design store, one live design per class, a kit catalogue per class slot (the base kit open, later kit locked until BL-1436 names its research nodes), the set-design verb, the save section, and hires/refit reading the design."
   },
   {
    "status": "proposed",
@@ -992,6 +992,62 @@
    ],
    "title": "battle_card.lua: the march is accepted but the unit never moves in the verify world",
    "design": "SPRINT 58 CLOSE, 2026-10-28. scripts/verify/battle_card.lua fails: march_unit is accepted, but the unit sits at (250,76) for 120 ticks, state \"marching\". Likely refused each step by the Logistic Point gate, which the verify world does not feed. It was broken before sprint 58 (it died at its first line); the sprint's fix let it run far enough to show this. THE WORK: name why the march does not advance in the verify world (LP gate, path, or fixture), fix the cause or stage the fixture, and get the capture to a battle card. Do not weaken the check."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 59,
+   "version_goal": "v0.2.3",
+   "written": "2026-10-28",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-10-28)",
+   "requires": [
+    "BL-1443"
+   ],
+   "id": "BL-1445",
+   "short_name": "MOVE_BY_DAYS",
+   "category": "Military",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/battle_system.cpp",
+    "src/world/campaign_battle.hpp",
+    "scripts/economy.lua",
+    "src/core/app.cpp",
+    "src/core/sim_loop.cpp"
+   ],
+   "title": "Units march by the day at their class speed; battles step and contact is checked daily",
+   "design": "Ben, 2026-10-28: \"It should instead take a smaller number of days to move one tile, and this should be based on unit speed.\" Settled in MILITARY.md § Marching (days per plains tile by class: foot infantry 3, motorised 1, mechanised 1, light armour 1, medium armour 1.5, towed artillery 2, air defence 1.5; terrain multiplies, a road divides; class speed only until kit, BL-1436; Logistic Points granted quarterly, spent day by day) and § Battles ruling 3 (battles step daily, contact checked daily, round damage calibrated to the day grain)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 59,
+   "version_goal": "v0.2.3",
+   "written": "2026-10-28",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-10-28)",
+   "requires": [
+    "BL-1434"
+   ],
+   "id": "BL-1446",
+   "short_name": "UNIT_DESIGNER",
+   "category": "UI",
+   "priority": "A",
+   "difficulty": 4,
+   "authority_doc": "docs/ui/ledgers/military.md",
+   "files": [
+    "src/ui/military_ledger.cpp",
+    "src/ui/unit_designer.cpp",
+    "src/ui/selection_panel.cpp",
+    "assets/units/"
+   ],
+   "title": "The unit designer: a full-canvas view of a class with a box per equipment slot",
+   "design": "Ben, 2026-10-28: \"click a unit type to open the designer (full canvas). This should display an image of the unit type taking up the centre of the canvas space, with boxes for each changeable piece of equipment, linked back to the corresponding space on the unit.\" Settled in docs/ui/ledgers/military.md § The designer: opened from a Design-tab type or a unit card's type name; an authored PNG per class (placeholder until art); one box per class slot (MILITARY.md § The kit table) joined to its anchor on the image; saving sets the class's one live design (new hires use it, units refit to it). Needs BL-1434 (unit designs) underneath it."
   }
  ]
 }

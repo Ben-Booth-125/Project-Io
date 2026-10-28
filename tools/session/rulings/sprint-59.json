@@ -1,0 +1,28 @@
+[
+ {
+  "ruling": "Units march by the day at their class speed (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Units march by the day, at their class",
+  "stale": [
+   "March points are per-CLASS, authored data",
+   "Spent per tick against the per-tile"
+  ],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "Battles step daily; contact is checked daily (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Pacing is by the day",
+  "stale": [
+   "Pacing is several rounds per tick"
+  ],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "The unit designer opens full canvas from a unit type (Ben, 2026-10-28)",
+  "doc": "docs/ui/ledgers/military.md",
+  "anchor": "The designer \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1446 (unit designer)"
+ }
+]

@@ -122,10 +122,12 @@
   "owner": "BL-1427 (fronts)"
  },
  {
-  "ruling": "Military kit: two slots a class, six goods by kind, one live design per class (Ben, 2026-10-27)",
+  "ruling": "Military kit: each land class has its own slots (Ben, 2026-10-28, overturning two slots a class, 2026-10-27)",
   "doc": "docs/military/MILITARY.md",
-  "anchor": "Two slots a class: main and support",
-  "stale": [],
+  "anchor": "Each class has its own slots",
+  "stale": [
+   "Two slots a class: main and support"
+  ],
   "owner": "BL-1434 (unit designs)"
  },
  {
