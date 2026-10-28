@@ -444,6 +444,9 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::assign_front:  return "front assignment"; // BL-1427
         case corp_verb::set_front_order: return "front order";    // BL-1427
         case corp_verb::set_unit_design: return "unit design";    // BL-1434: never issued by a rival
+        case corp_verb::hire_wing:       return "hire wing";      // BL-1449
+        case corp_verb::assign_air_mission: return "air mission"; // BL-1449
+        case corp_verb::set_air_design:  return "air design";     // BL-1449: never issued by a rival
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";
@@ -4061,6 +4064,35 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
                              static_cast<double>(w.provinces.province_of(u.order.dest)), 1.0f,
                              fact_provenance::own_asset);
                 }
+            }
+        }
+
+        // BL-1449 (air combat): the corp's OWN wings — base, class row, HP, mission
+        // and its provinces — and the hostile units its air has REVEALED (superiority
+        // or recon over their province). No unit fog consumes the reveal set yet, so
+        // this export (and the verify API) is its reader. Own facts only, as above.
+        {
+            for (const auto& [wid, wg] : w.wings) // ascending id
+            {
+                if (wg.owner != corp)
+                    continue;
+                add_fact(bb, tick, wid, "wing_airbase", static_cast<double>(wg.airbase), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, wid, "wing_type", static_cast<double>(wg.type), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, wid, "wing_hp_ppm", static_cast<double>(wg.hp_ppm), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, wid, "wing_muster_days", static_cast<double>(wg.muster_days), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, wid, "wing_mission", static_cast<double>(wg.mission), 1.0f, fact_provenance::own_asset);
+                for (const uint32_t p : wg.provinces)
+                    add_fact(bb, tick, wid, "wing_province", static_cast<double>(p), 1.0f, fact_provenance::own_asset);
+            }
+            for (const auto& [viewer, uid] : w.air_revealed) // ordered
+            {
+                if (viewer != corp)
+                    continue;
+                const auto uit = w.units.find(uid);
+                if (uit == w.units.end())
+                    continue;
+                add_fact(bb, tick, uid, "revealed_unit_tile", static_cast<double>(uit->second.position),
+                         1.0f, fact_provenance::rival_visible);
             }
         }
     }

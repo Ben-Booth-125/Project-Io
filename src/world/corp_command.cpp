@@ -25,6 +25,7 @@
 #include "survey_system.hpp"
 #include "unit_roster.hpp"
 #include "unit_designs.hpp" // BL-1434: the live design a hire and a refit read
+#include "air_combat.hpp"   // BL-1449: hire_wing / assign_air_mission / set_air_design
 #include "world.hpp"
 
 #include <algorithm>
@@ -203,6 +204,8 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::refit_unit: // Ben, 2026-10-27: a nation refits its own units
         case corp_verb::assign_front:    // BL-1427: a nation's own units and fronts
         case corp_verb::set_front_order: // BL-1427
+        case corp_verb::hire_wing:          // BL-1449: a nation's own airbase
+        case corp_verb::assign_air_mission: // BL-1449: a nation's own wing
         case corp_verb::place_road:
         case corp_verb::set_trade:
         case corp_verb::clear_trade:
@@ -335,6 +338,28 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
                                }),
                 v.end());
         if (kit_variant_of(cmd.unit_type) != 0)
+            v.insert(std::lower_bound(v.begin(), v.end(), cmd.unit_type), cmd.unit_type);
+        return corp_command_result::applied;
+    }
+
+    // BL-1449 (MILITARY.md § Air): the seat fits one air kit item into one slot of its
+    // live air design, as set_unit_design does for a land class. Every check first.
+    if (cmd.verb == corp_verb::set_air_design)
+    {
+        const corp_command_result r =
+            air_design_check(w, nation, cmd.order, cmd.recipe, cmd.unit_type);
+        if (r != corp_command_result::applied)
+            return r;
+        const std::vector<air_kit_item>& cat = air_kit_catalogue();
+        const air_kit_item& it = cat[cmd.unit_type];
+        std::vector<uint16_t>& v = w.nations.at(nation).air_design_kit;
+        v.erase(std::remove_if(v.begin(), v.end(),
+                               [&](uint16_t id) {
+                                   return id < cat.size() && cat[id].cls == it.cls
+                                       && cat[id].slot == it.slot;
+                               }),
+                v.end());
+        if (air_kit_variant_of(cmd.unit_type) != 0)
             v.insert(std::lower_bound(v.begin(), v.end(), cmd.unit_type), cmd.unit_type);
         return corp_command_result::applied;
     }
@@ -857,6 +882,56 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             w.musters.push_back(m);
             if (out_building)
                 *out_building = null_entity;
+            return corp_command_result::applied;
+        }
+
+        // --- BL-1449: air combat (MILITARY.md § Air) ---------------------------
+        case corp_verb::hire_wing:
+        {
+            // The airbase is the one door: every placement check first, read-only.
+            entity_id base = null_entity;
+            const corp_command_result r = hire_wing_check(w, cmd.corp, cmd.tile, cmd.unit_type, &base);
+            if (r != corp_command_result::applied)
+                return r;
+            const air_class cls = air_roster_table()[cmd.unit_type].cls;
+            const air_class_stats& cs = reg.military().air.cls[static_cast<std::size_t>(cls)];
+            // Both legs checked before either is taken: the class's credits, and its
+            // hire goods with its live air design's kit goods, off the shelves.
+            if (purse_room_of(w, cmd.corp) < cs.hire_cost)
+                return corp_command_result::rejected_funds;
+            const unit_design design = air_design_of(w, cmd.corp, cls);
+            std::array<float, resource_count> goods = air_kit_goods(cls, design);
+            for (std::size_t g = 0; g < resource_count; ++g)
+                goods[g] += cs.hire_goods[g];
+            if (!hire_goods_affordable(w, cmd.corp, nullptr, goods))
+                return corp_command_result::rejected_funds;
+            debit_kit_goods(w, cmd.corp, goods);
+            *purse_of(w, cmd.corp) -= cs.hire_cost;
+
+            const entity_id wid = w.create_entity();
+            air_wing wg;
+            wg.owner       = cmd.corp;
+            wg.airbase     = base;
+            wg.type        = cmd.unit_type;
+            wg.muster_days = cs.muster_days;
+            wg.kit         = design;
+            w.wings.emplace(wid, std::move(wg));
+            if (out_building)
+                *out_building = wid;
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::assign_air_mission:
+        {
+            std::vector<uint32_t> set;
+            const corp_command_result r =
+                air_mission_check(w, reg, cmd.corp, cmd.subject, cmd.order, cmd.air_provinces.data(),
+                                  cmd.air_provinces.size(), &set);
+            if (r != corp_command_result::applied)
+                return r;
+            air_wing& wg = w.wings.at(cmd.subject);
+            wg.mission   = static_cast<air_mission>(cmd.order);
+            wg.provinces = std::move(set);
             return corp_command_result::applied;
         }
 

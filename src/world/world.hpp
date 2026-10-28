@@ -397,6 +397,28 @@ struct world
     std::vector<muster_order> musters;
     uint32_t                  next_muster_id = 1; ///< The id the next hire takes.
 
+    /// BL-1449 (air combat; MILITARY.md § Air): every air wing, keyed by its entity
+    /// id. ORDERED, so every walk is ascending id. Deliberately NOT in `units`: a
+    /// wing never stands on a tile, and no land pass may see it. Saved (v65).
+    std::map<entity_id, air_wing> wings;
+
+    /// BL-1449: each nation's AIR SUPERIORITY power over each province as the last
+    /// air day flew it, keyed (province, nation), milli-HP of air attack a day. The
+    /// share it gives (`air_share_permille`) scales a side's bombing, slows its
+    /// march and reveals its units. Only nonzero entries are kept. Saved (v65).
+    std::map<std::pair<uint32_t, entity_id>, int32_t> air_superiority;
+
+    /// BL-1449: the units the last air day REVEALED, as (viewer nation, unit) — a
+    /// unit of a nation hostile to the viewer, in a province where the viewer holds
+    /// air superiority or flies recon. No unit fog exists to consume it yet, so it
+    /// is read by the blackboard and the verify API only. Saved (v65).
+    std::set<std::pair<entity_id, entity_id>> air_revealed;
+
+    /// BL-1449: tactical hits banked against a unit between days, as (milli-hits of
+    /// HP damage, milli-hits of readiness damage) — a day's hits are often less than
+    /// one man, so the remainder carries. Pruned when the unit goes. Saved (v65).
+    std::map<entity_id, std::pair<int32_t, int32_t>> air_hit_bank;
+
     /// BL-1427 (fronts): every front order that is not hold, sorted by (nation, key).
     /// Fronts themselves are derived (fronts.hpp), never stored.
     std::vector<front_order_entry> front_orders;
