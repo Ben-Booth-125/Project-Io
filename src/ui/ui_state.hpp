@@ -360,6 +360,51 @@ struct military_ledger_state
     std::vector<drawn_base>  bases;
     std::vector<drawn_raise> raises; ///< One per roster row, drawn order.
     int       queue_rows = 0;        ///< Muster orders drawn.
+    /// Design tab: each land class row's press (opens the designer), drawn order.
+    struct drawn_class { int cls = 0; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_class> class_rows;
+};
+
+/// The unit designer (docs/ui/ledgers/military.md § The designer): the full-canvas
+/// takeover `detail_surface::unit_designer`, keyed by land class. Which class is
+/// open lives in `ui_state::expanded`; this holds the rest of its view state, the
+/// one queued pick, and where its controls landed so a verify script presses the
+/// REAL control. VIEW state, not serialised.
+struct unit_designer_state
+{
+    int  slot_open = -1;    ///< The slot whose item list is open; -1 = none.
+    int  open_cls  = -1;    ///< The class the state above belongs to (a class change resets it).
+
+    /// A pick queued for app::render, which sends `set_unit_design` (one slot per press).
+    int           pending_cls  = -1; ///< -1 = nothing pending.
+    int           pending_slot = 0;
+    std::uint16_t pending_item = 0;
+    std::string   last_message;      ///< The seam's answer to the last pick (app writes it).
+
+    // Published each frame the designer draws; x < 0 = absent.
+    struct drawn_box
+    {
+        int         slot = 0;
+        std::string name, fitted;
+        float       x = -1.0f, y = -1.0f;         ///< The box's centre (its press).
+        float       anchor_x = -1.0f, anchor_y = -1.0f;
+    };
+    struct drawn_item
+    {
+        std::uint16_t item = 0;
+        std::string   name;
+        float         x = -1.0f, y = -1.0f;
+        bool          fitted = false, enabled = false, locked = false;
+        std::string   reason; ///< Why the pick is refused; empty when it is live.
+    };
+    std::vector<drawn_box>  boxes;
+    std::vector<drawn_item> items;    ///< The open slot's list, drawn order.
+    float back_x = -1.0f, back_y = -1.0f;
+    int   stale_units = 0;            ///< Field units of the class on an older design.
+    int   drawn_cls   = -1;           ///< The class drawn this frame; -1 = closed.
+
+    /// The unit card's type-name press (opens the designer for the unit's class).
+    float card_type_x = -1.0f, card_type_y = -1.0f;
 };
 
 /// Where the Construction ledger's own controls landed on screen this frame, so a
@@ -832,6 +877,7 @@ struct ui_state
     /// The Military ledger (rail slot 7, Ben 2026-10-27; docs/ui/ledgers/military.md).
     /// See `military_ledger_state`.
     military_ledger_state military;
+    unit_designer_state   designer; ///< The full-canvas unit designer (military.md § The designer).
 
 
     // THE CONTRACTS LEDGER'S VIEW STATE IS GONE (BL-693). The mercenary

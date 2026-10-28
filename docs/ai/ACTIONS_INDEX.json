@@ -647,7 +647,7 @@
   ],
   [
    "gameplay.refit_unit",
-   "The unit card's Refit press in the Selection element (the fifth action slot), for the player's own unit: a menu of the newer types it can refit to. Also a corp_verb (corp_verb::refit_unit, 40) on the command seam."
+   "The unit card's Refit press in the Selection element (the fifth action slot), for the player's own unit: a menu of the newer types it can refit to - led, when the unit's recorded design differs from its class's live design, by its own type marked '(live design)', a design refit. Also a corp_verb (corp_verb::refit_unit, 40) on the command seam."
   ],
   [
    "gameplay.assign_front",
@@ -659,7 +659,19 @@
   ],
   [
    "gameplay.set_unit_design",
-   "The Military ledger's Design tab (nav rail slot 7), the designer: per land class, one choice of kit per slot. Also a corp_verb (corp_verb::set_unit_design, 43) on the command seam."
+   "The unit designer, a full-canvas takeover opened from a land class row in the Military ledger's Design tab (ledger.military_open_designer) or from the type name on the player's unit card (ledger.selection_unit_type_designer): per land class, one choice of kit per slot. Also a corp_verb (corp_verb::set_unit_design, 43) on the command seam."
+  ],
+  [
+   "ledger.military_open_designer",
+   "Military ledger (nav rail slot 7), Design tab: a land class row (Infantry, Motorised infantry, Mechanised infantry, Armour, Light armour, Artillery, Air defence), its name a press with its live design's numbers under it."
+  ],
+  [
+   "canvas.designer_slot_pick",
+   "The unit designer (full canvas): a slot's box, and the item list it opens beside it."
+  ],
+  [
+   "ledger.selection_unit_type_designer",
+   "Selection band, the unit card's Roster page (the card's second page): the unit type's name under 'Type', for the player's own unit."
   ],
   [
    "ledger.military_show_obsolete",

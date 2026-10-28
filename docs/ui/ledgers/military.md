@@ -49,19 +49,32 @@ Clicking a **unit type** — a row of the Design tab, or the type name on a unit
 **designer on the full canvas** (`../DRILL_THROUGH.md`, the full-canvas rung). It answers "what is
 this kind of unit carrying, and what can it carry instead?"
 
-- **The unit, centred.** An authored image of the class fills the middle of the canvas: one PNG
-  per land class, a placeholder until the art lands.
+- **The unit, centred.** An authored image of the class fills the middle of the canvas, scaled to
+  it with its aspect kept: one PNG per land class, `assets/units/<class>.png`, a placeholder until
+  the art lands (`tools/art/make_unit_placeholders.py` draws the placeholders).
 - **One box per changeable piece of equipment**, placed around the image, each joined by a leader
   line to the point on the unit that piece sits. **The boxes are the class's own slots (Ben,
   2026-10-28)**: a tank shows armament, armour and tracks; foot infantry shows weapon and armour
   (`../../military/MILITARY.md` § The kit has the table). Each class's image carries one anchor
-  point per slot. A box shows the kit fitted and, opened, the researched choices.
-  A class with nothing researched for a slot shows its base kit and no choices.
-- **Saving** makes it the class's **one live design**: new hires are raised with it, and units
-  already in the field take it by refit (§ Design above; `../../military/MILITARY.md` § The
-  muster interface, "Refit to a newer type").
-- Closing the designer (the toggle rule, or Escape) returns to the ledger or card it was opened
-  from.
+  point per slot, in `assets/units/<class>.anchors` beside the image (one line per slot, image-
+  relative), so new art moves its anchors without a code change. A box takes the side of the
+  image its anchor is nearer, and hovering it lights its anchor. A box shows the slot, the kit
+  fitted and its stat change.
+- **Opened, a box lists the slot's kit**, base first: each item with its stat change against the
+  fitted item and its goods per unit. **Locked kit is listed, not hidden**: it carries a LOCKED
+  badge and names the research node that opens it, and its numbers stay readable, because what
+  research would buy is half of what the screen is for. A pick the seam refuses is disabled with
+  its reason. Pressing the box again closes its list.
+- **The summary** under the image is the design's soft attack, hard attack, defence, breakthrough
+  and hardness and its kit goods per unit; hovering an item previews them with it fitted. There is
+  no speed: speed is the class's alone (Ben, 2026-10-28).
+- **Saving is the pick.** Each pick sets that slot of the class's **one live design** at once
+  (`set_unit_design`, one slot per press): new hires are raised with it, and units already in the
+  field take it by refit (§ Design above; `../../military/MILITARY.md` § The muster interface,
+  "Refit to a newer type"). The summary counts the units in the field still on an older design;
+  their unit card offers the refit.
+- Closing the designer (the toggle rule — the press that opened it — its return control, or
+  Escape) returns to the ledger or card it was opened from, which the takeover never covered.
 
 ## 3. Lens on open
 
@@ -79,7 +92,7 @@ recruit flow, as the placement lens is of the build flow, not an `overlay_mode`.
 | A row's numbers | `unit_land_stats` / `land_class_stats` (`src/world/unit_roster.hpp`) |
 | Hire price | `hire_base_cost + hire_cost_per_power x power_mod` (`scripts/economy.lua` § military), plus the shelf draw per gated axis |
 | Raise | the existing `hire_unit` verb — the ledger is a door onto it, never a second hire path |
-| Design rows | **not backed yet**: equipment generations are goods that do not exist (BL-1422, land classes and kit) |
+| Design rows | the player nation's live design per class — `design_of` / `design_stats`, the kit catalogue and its lock (`src/world/unit_designs.hpp`); a pick's refusal is `unit_design_check` |
 
 ## 5. Toggle / close semantics
 

@@ -3036,8 +3036,66 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             raises[++k] = e;
         }
         out["raises"] = raises;
+        // The Design tab's class rows: each one's press opens the unit designer.
+        sol::table classes = st.create_table();
+        k = 0;
+        for (const auto& c : m.class_rows)
+        {
+            sol::table e = st.create_table();
+            e["cls"] = c.cls; e["x"] = c.x; e["y"] = c.y;
+            classes[++k] = e;
+        }
+        out["classes"] = classes;
         return out;
     });
+
+    // The unit designer (military.md § The designer): what it drew this frame — the
+    // class open, each slot box (its press and its leader line's anchor), the open
+    // slot's item list (each pick's press, whether it is live, and the seam's
+    // reason when not), the return control, the stale-unit count and the seam's
+    // last answer — plus the unit card's type-name press. All of it is on screen;
+    // a script presses the REAL control at the published point. UI state only.
+    v.set_function("unit_designer", [this]() {
+        sol::state& st = m_lua.state();
+        const auto& d = m_ui.designer;
+        sol::table out = st.create_table();
+        out["open"]        = d.drawn_cls >= 0;
+        out["cls"]         = d.drawn_cls;
+        out["slot_open"]   = d.slot_open;
+        out["back_x"]      = d.back_x;
+        out["back_y"]      = d.back_y;
+        out["stale_units"] = d.stale_units;
+        out["message"]     = d.last_message;
+        out["card_type_x"] = d.card_type_x;
+        out["card_type_y"] = d.card_type_y;
+        sol::table boxes = st.create_table();
+        int k = 0;
+        for (const auto& b : d.boxes)
+        {
+            sol::table e = st.create_table();
+            e["slot"] = b.slot; e["name"] = b.name; e["fitted"] = b.fitted;
+            e["x"] = b.x; e["y"] = b.y; e["anchor_x"] = b.anchor_x; e["anchor_y"] = b.anchor_y;
+            boxes[++k] = e;
+        }
+        out["boxes"] = boxes;
+        sol::table items = st.create_table();
+        k = 0;
+        for (const auto& i : d.items)
+        {
+            sol::table e = st.create_table();
+            e["item"] = static_cast<int>(i.item); e["name"] = i.name;
+            e["x"] = i.x; e["y"] = i.y;
+            e["fitted"] = i.fitted; e["enabled"] = i.enabled; e["locked"] = i.locked;
+            e["reason"] = i.reason;
+            items[++k] = e;
+        }
+        out["items"] = items;
+        return out;
+    });
+
+    // Turn the unit card's accordion to page @p n (0 = strength, 1 = roster), as
+    // its own arrows do. UI state only.
+    v.set_function("unit_card_page", [this](int n) { m_ui.selection_unit_page = n; });
 
     v.set_function("spectate", [this](bool on) { m_ui.spectating = on; });
 
@@ -3316,6 +3374,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (n == "history_chain")    s = detail_surface::history_chain;
         else if (n == "generation_stage") s = detail_surface::generation_stage;
         else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
+        else if (n == "unit_designer")    s = detail_surface::unit_designer; // key = land class
         if (s == detail_surface::none) ui::fold(m_ui);
         else                           ui::expand(m_ui, s, key.value_or(0));
     });

@@ -1,0 +1,4 @@
+# Infantry - one line per kit slot: slot x y, image-relative (0..1 from top-left).
+# Written by tools/art/make_unit_placeholders.py; edit with the art.
+0 0.586 0.430  # Weapon
+1 0.469 0.512  # Armour

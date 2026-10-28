@@ -45,8 +45,10 @@ std::vector<unit_page> unit_pages(const world& w, entity_id id);
 /// Draw one unit accordion page's content, dispatched by kind. Read-only —
 /// unlike the building card, nothing on this placeholder card mutates the
 /// unit. Takes the registry since BL-454, for the strength page's upkeep line.
+/// @p ui, when given, lets the roster page's type name open the unit designer
+/// (view state only); null draws the name as plain text.
 void draw_unit_page(const world& w, const recipe_registry& reg,
-                    entity_id id, unit_page_kind kind);
+                    entity_id id, unit_page_kind kind, ui_state* ui = nullptr);
 
 /// Draw the **Selection content** — the polymorphic detail of the current
 /// selection (ui_state::selected_entity), emitted into whatever window the caller

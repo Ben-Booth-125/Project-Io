@@ -37,6 +37,8 @@
 #include "player_side.hpp"          // BL-1406: is_player_side
 #include "world/nation_tech.hpp"     // BL-593: recipe_unlocked — the door filters what the gate would refuse
 #include "world/corp_command.hpp" // refit_check / refit_credit_cost: the unit card's Refit menu (2026-10-27)
+#include "unit_designer.hpp"     // the unit card's type name opens the designer
+#include "world/unit_designs.hpp" // unit_land_class, unit_design_stale
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
 #include "rail_tool.hpp" // BL-1255: the Track / Railway Station rows
@@ -1410,14 +1412,10 @@ void draw_unit_strength_page(const world& w, const recipe_registry& reg, const u
     }
 }
 
-// BL-1425: the land class a unit fights as, and its display word (MILITARY.md
-// § Land — the classes). Shared by the Roster page and the unit group's rows.
-static land_class unit_land_class(const unit_component& u)
-{
-    const std::vector<roster_row>& table = unit_roster_table();
-    return u.type < table.size() ? land_class_for(table[u.type]) : land_class::infantry;
-}
-
+// BL-1425: the land class a unit fights as (world/unit_designs.hpp's
+// `unit_land_class`, the same rule this file once kept a copy of), and its display
+// word (MILITARY.md § Land — the classes). Shared by the Roster page and the unit
+// group's rows.
 static const char* land_class_display_name(land_class cls)
 {
     static constexpr const char* k_class_names[land_class_count] = {
@@ -1431,10 +1429,30 @@ static const char* land_class_display_name(land_class cls)
 // Roster page: type name (real lookup, see unit_roster_display_name) + owner
 // (resolved via the same corp-name lookup the building card's rival summary
 // and the tile card's Manage button already use).
-void draw_unit_roster_page(const world& w, const unit_component& u)
+void draw_unit_roster_page(const world& w, const unit_component& u, ui_state* ui)
 {
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Type");
-    ImGui::Text("%s", unit_roster_display_name(u.type).c_str());
+    // The type name is the designer's second door (military.md § The designer) on
+    // the player's own unit: it opens the designer for the unit's class, lit while
+    // open, and pressing it again closes it. A rival's unit shows the name only —
+    // the designer edits the player's own designs.
+    if (ui != nullptr && is_player_side(w, u.owner) && kit_slot_count(unit_land_class(u)) > 0)
+    {
+        const land_class  lc = unit_land_class(u);
+        const std::string nm = unit_roster_display_name(u.type);
+        if (ImGui::Selectable((nm + "##unit_type_designer").c_str(), unit_designer_open_on(*ui, lc), 0,
+                              {ImGui::CalcTextSize(nm.c_str()).x, 0.0f}))
+            toggle_unit_designer(*ui, lc);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Open the designer for this class");
+        ui->designer.card_type_x = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
+        ui->designer.card_type_y = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+        if (unit_design_stale(w, u))
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::research_warning),
+                               "On an older design \xe2\x80\x94 refit to take the live one");
+    }
+    else
+        ImGui::Text("%s", unit_roster_display_name(u.type).c_str());
     // Refit to a newer type (Ben, 2026-10-27): the unit keeps its old type, and
     // fights as it, until the refit's days pass. The player's own units only.
     if (unit_refitting(u) && is_player_side(w, u.owner))
@@ -1457,7 +1475,8 @@ void draw_unit_roster_page(const world& w, const unit_component& u)
     ImGui::Text("%s", owner_name != nullptr ? owner_name : "\xe2\x80\x94");
 }
 
-void draw_unit_page(const world& w, const recipe_registry& reg, entity_id id, unit_page_kind kind)
+void draw_unit_page(const world& w, const recipe_registry& reg, entity_id id, unit_page_kind kind,
+                    ui_state* ui)
 {
     const auto uit = w.units.find(id);
     if (uit == w.units.end())
@@ -1469,7 +1488,7 @@ void draw_unit_page(const world& w, const recipe_registry& reg, entity_id id, un
     {
         // BL-454: the strength page now reads the registry, for the upkeep line.
         case unit_page_kind::strength: draw_unit_strength_page(w, reg, uit->second); break;
-        case unit_page_kind::roster:   draw_unit_roster_page(w, uit->second);        break;
+        case unit_page_kind::roster:   draw_unit_roster_page(w, uit->second, ui);    break;
     }
 }
 
@@ -1629,7 +1648,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             ImGui::Spacing();
             ImGui::BeginChild("##unit_page_body", {0.0f, 0.0f}, false,
                               ImGuiWindowFlags_NoSavedSettings);
-            draw_unit_page(w, reg, sel, up.kind);
+            draw_unit_page(w, reg, sel, up.kind, &ui);
             ImGui::EndChild();
         }
 
@@ -1747,7 +1766,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             const unit_component& u      = uit->second;
             const entity_id       nation = w.player_entity;
             std::vector<uint16_t> targets =
-                refit_targets(w, nation, u.type, campaign_roster_band_for(reg.era()));
+                refit_targets(w, nation, u, campaign_roster_band_for(reg.era())); // BL-1434: own row first when its design is stale
             std::stable_partition(targets.begin(), targets.end(), [&](uint16_t t) {
                 return !roster_row_obsolete(w, nation, t);
             });
@@ -1762,8 +1781,9 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
                 const roster_gate& g   = unit_roster_table()[t].gate;
                 const bool        kit  = g.ore_q > 0 || g.farm_q > 0 || g.energy_q > 0;
                 char label[160];
-                std::snprintf(label, sizeof label, "%s%s \xe2\x80\x94 %s%s, %d d##refit%u",
+                std::snprintf(label, sizeof label, "%s%s%s \xe2\x80\x94 %s%s, %d d##refit%u",
                               unit_roster_display_name(t).c_str(),
+                              t == u.type ? " (live design)" : "",
                               roster_row_obsolete(w, nation, t) ? " (obsolete)" : "",
                               fmt::credits(refit_credit_cost(reg, u.type, t)).c_str(),
                               kit ? " + kit" : "", muster_days_for(t), static_cast<unsigned>(t));

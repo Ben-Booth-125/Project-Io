@@ -169,6 +169,7 @@ On the ladder, with what each one's takeover shows:
 | History ledger — Chain (per stage) | that stage's title, explainer and charts | the **whole round** — every stage open, scrolled |
 | New World wizard — chain stages | that stage's title, explainer and charts | the **whole round**, scrolled (window-wide; no shell yet) |
 | Nation overview (`corporation_dashboard.cpp`) — roll-ups | that card's chart or rows | **every** roll-up, headed and scrolled |
+| Unit designer (`unit_designer.cpp`, `ledgers/military.md` § The designer) | — (no folded form) | the class's image, its slot boxes and its kit; opened by the class row or the unit card's type name, which is the press that closes it |
 
 The three accordions — History Chain, wizard stages, Nation overview roll-ups — show everything in a
 takeover: a surface that has taken the largest rectangle available has no excuse for showing

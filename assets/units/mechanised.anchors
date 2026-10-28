@@ -1,0 +1,5 @@
+# Mechanised infantry - one line per kit slot: slot x y, image-relative (0..1 from top-left).
+# Written by tools/art/make_unit_placeholders.py; edit with the art.
+0 0.262 0.574  # Weapon
+1 0.188 0.626  # Armour
+2 0.672 0.625  # Vehicle

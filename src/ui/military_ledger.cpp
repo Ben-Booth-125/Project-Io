@@ -5,7 +5,9 @@
 #include "format.hpp"             // fmt::credits
 #include "nav_pane.hpp"           // close_all_panels — the no-base door takes the column
 #include "presentation.hpp"
+#include "unit_designer.hpp"      // the Design tab's class rows open it
 
+#include "world/unit_designs.hpp" // design_stats — a class row shows its live design
 #include "world/unit_roster.hpp"
 
 #include <imgui.h>
@@ -315,17 +317,28 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
 void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
 {
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("Each class fields its base kit. Kit choices open as military research lands.");
+    ImGui::TextDisabled("Press a class to open its designer. Kit choices open as military research lands.");
     ImGui::PopTextWrapPos();
     ImGui::Separator();
+    const entity_id nation = player_nation(w);
     for (int c = 0; c < land_class_count; ++c)
     {
         const land_class lc = static_cast<land_class>(c);
         if (lc == land_class::none)
             continue;
+        // The design's numbers — the class's plus its live kit's (BL-1434).
         char stats[128];
-        stats_line(stats, sizeof stats, land_class_stats(lc));
-        ImGui::TextUnformatted(land_class_label(lc));
+        stats_line(stats, sizeof stats, design_stats(w, nation, lc));
+        // The designer's door (military.md § The designer). Lit while the designer
+        // is open on this class, and a toggle: pressing the lit row closes it.
+        ImGui::PushID(c + 0x20000);
+        if (ImGui::Selectable(land_class_label(lc), unit_designer_open_on(s, lc)))
+            toggle_unit_designer(s, lc);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Open the designer for %s", land_class_label(lc));
+        s.military.class_rows.push_back({c, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                                         (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
+        ImGui::PopID();
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextDisabled("%s", stats);
         ImGui::PopTextWrapPos();
@@ -377,6 +390,7 @@ void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& 
     m.no_base_x = m.no_base_y = -1.0f;
     m.bases.clear();
     m.raises.clear();
+    m.class_rows.clear();
     m.queue_rows = 0;
 
     if (!open)
