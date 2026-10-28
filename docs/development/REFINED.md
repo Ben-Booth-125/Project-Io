@@ -17,7 +17,7 @@ world digests (D_land onward); they stay red until the sprint's one re-bless.
 - [ ] **T3** Merge, cold review, gates, Ben's live click.
 
 ### BL-1442 (post-capacity starvation) — Delivery Full
-- [ ] **T1** Economy lane: measure which recipes starve and why, fix the cause; market_viability FULL G1t50 >= 85 without lowering the gate.
+- [ ] **T1** (carried to sprint 59, Ben 2026-10-28; own-market ceiling rule merged, G1t50 79.8) Economy lane: measure which recipes starve and why, fix the cause; market_viability FULL G1t50 >= 85 without lowering the gate.
 
 ### BL-1427 (fronts) — Delivery Full, group `fronts`
 Starts after the refit lane merges (both move the unit record, the save version and the verb enum).

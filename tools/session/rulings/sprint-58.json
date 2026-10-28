@@ -230,5 +230,12 @@
    "stands in\\s+the slot tile's province"
   ],
   "owner": "BL-1443 (tile contact orders)"
+ },
+ {
+  "ruling": "A won tile battle moves the province holder only when the beaten side has no unit left in the province (Ben, 2026-10-27)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "moves the holder only when the beaten side has no unit left",
+  "stale": [],
+  "owner": "BL-1443 (tile contact orders)"
  }
 ]

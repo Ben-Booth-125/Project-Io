@@ -824,7 +824,20 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             if (b.state.end != campaign_battle_end::in_progress
                 && b.state.end != campaign_battle_end::stalemate)
             {
-                if (const province* pr = w.provinces.find(b.province))
+                // A battle is one tile now (Ben, 2026-10-27): the holder moves only
+                // when the beaten side has NO unit left standing anywhere in the
+                // province. Winning one tile against a nation with other stacks in
+                // the province takes the tile, not the province.
+                const entity_id loser = (d.field_held_by == b.attacker) ? b.defender : b.attacker;
+                bool loser_remains = false;
+                for (const auto& [uid, u] : w.units) // a pure any-of: walk order cannot reach it
+                    if (u.owner == loser && u.count > 0
+                        && w.provinces.province_of(u.position) == b.province)
+                    {
+                        loser_remains = true;
+                        break;
+                    }
+                if (const province* pr = w.provinces.find(b.province); pr != nullptr && !loser_remains)
                 {
                     const auto idx = static_cast<std::size_t>(pr - w.provinces.provinces.data());
                     if (idx < w.province_holder.size())

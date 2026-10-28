@@ -1164,7 +1164,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "version_goal": "v0.3.0",
    "written": "2026-10-27",
    "parked": false,
@@ -1183,7 +1183,7 @@
     "tools/verify/market_viability.cpp"
    ],
    "title": "After construction capacity: processors finish faster than their inputs; G1 at tick 50 under its gate",
-   "design": "Ben, 2026-10-27: merge BL-1438 (retire construction capacity), keep G1t50 at 85, and treat the new starvation and decommissions as follow-on work. market_viability FULL on main at 9503aa06: G1 92.9, G1t50 78.9 (FAIL; 2106/2668), G1b 3.1, G2 186.3, G3 100.0. In the lane's 16-seed tick-50 totals, processors built 1446 -> 2762, running 1269 -> 2195, input-starved 32 -> 158, decommissioned 54 -> 209. Measure first: which recipes starve, which inputs are short, and whether the scorer now over-builds processors ahead of their extractors (no capacity throttle remains). Fix the cause in the world (input supply, build sequencing by the scorer); never lower the gate or clamp builds to pass it."
+   "design": "Ben, 2026-10-27: merge BL-1438 (retire construction capacity), keep G1t50 at 85, and treat the new starvation and decommissions as follow-on work. market_viability FULL on main at 9503aa06: G1 92.9, G1t50 78.9 (FAIL; 2106/2668), G1b 3.1, G2 186.3, G3 100.0. In the lane's 16-seed tick-50 totals, processors built 1446 -> 2762, running 1269 -> 2195, input-starved 32 -> 158, decommissioned 54 -> 209. Measure first: which recipes starve, which inputs are short, and whether the scorer now over-builds processors ahead of their extractors (no capacity throttle remains). Fix the cause in the world (input supply, build sequencing by the scorer); never lower the gate or clamp builds to pass it. CARRIED to sprint 59 (Ben, 2026-10-28: cut with G1t50 failing). Main at 302bba15: market_viability FULL G1 93.3 G1t50 79.8 (FAIL) G1b 2.8 G2 191.0 G3 100.0 after the own-market ceiling rule. The remaining gap: power plants over-built into glutted grids (the held bl1232 scorer gate), state buildings left unfunded, remote spare the trade pass does not move, household goods priced over the ceiling; construction draws push steel over the ceiling where steel-using plants stand."
   },
   {
    "status": "proposed",

@@ -627,6 +627,43 @@ int main()
                   "B15d THE PROVINCE HOLDER MOVED to the winner (the defended tile's province)");
         }
     }
+    {
+        // B15e (Ben, 2026-10-27): a battle is one tile, so the holder moves only
+        // when the beaten side has NO unit left in the province. Same hand-pushed
+        // win as B15, with a second defender stack elsewhere in the province.
+        fixture f;
+        build_fixture(f, /*declare=*/false);
+        seed_province_holders(f.w);
+        entity_id other = null_entity;
+        if (const province* pr = f.w.provinces.find(f.province))
+            for (const entity_id t : pr->tiles)
+                if (t != f.tile && t != f.w.units.at(f.ua).position)
+                {
+                    other = t;
+                    break;
+                }
+        check(other != null_entity, "B15e setup: the province has a third tile for a second defender stack");
+        if (other != null_entity)
+        {
+            add_unit(f.w, f.def, other);
+            f.w.units.at(f.ub).readiness_permille = 0;
+            active_battle b;
+            b.tile = f.tile; b.province = f.province; b.ground_tile = f.tile;
+            b.attacker = f.att; b.defender = f.def;
+            b.attacker_units = { f.ua }; b.defender_units = { f.ub };
+            b.state.attacker_strength_permille = 1000;
+            b.state.defender_strength_permille = 0;
+            b.state.end         = campaign_battle_end::in_progress;
+            b.state.stream_seed = 0xB569D1u;
+            b.state.rng_state   = b.state.stream_seed;
+            f.w.battles.assign(1, b);
+            const battle_tick t = run_battles(f.w, reg, 0);
+            check(!t.dispatches.empty() && t.dispatches.front().field_held_by == f.att,
+                  "B15e the attacker held the field");
+            check(province_holder_for(f.w, f.province) == null_entity,
+                  "B15e the holder did NOT move: a defender stack still stands in the province");
+        }
+    }
 
     // -----------------------------------------------------------------------
     std::printf("\nB16 — BL-569: a stalemate leaves the province holder untouched\n");

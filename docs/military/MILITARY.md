@@ -885,7 +885,10 @@ defended tile (Ben, 2026-10-27)**; adjacent stacks that joined stay where they s
 never puts two nations on one tile: a defender with nowhere to retreat stays put, and the attacking
 stack then stays where it stood. `world::province_holder` is what tracks *who currently holds a province*
 across battles (BL-569, province holder): seeded at generation from the territorial plurality,
-moved by a decisive battle's `field_held_by`, and left untouched by a stalemate. It is deliberately
+moved by a decisive battle's `field_held_by`, and left untouched by a stalemate. **A won battle
+moves the holder only when the beaten side has no unit left anywhere in the province (Ben,
+2026-10-27)**: a battle is one tile, so beating one stack takes that tile, and the province changes
+hands when its last defending stack falls. It is deliberately
 narrow — a military fact a contract predicate can read, not a political one: `tile_to_nation` (the
 territorial map) does not follow the holder, so what holding a province does *beyond* that fact is
 still unowned work. Battle state survives a save under BL-536 (world snapshot save).
