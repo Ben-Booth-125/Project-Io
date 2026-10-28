@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**70 surfaces** — 4 settled, 66 awaiting Ben's wording.
+**71 surfaces** — 4 settled, 67 awaiting Ben's wording.
 
 ---
 
@@ -465,6 +465,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** The dispatcher decides where the player's surplus goes every pass, and before this lens that decision surfaced only as its result: Supply shows convoys in flight and Supply-routes the lanes they carved, but neither says what was NOT sent or why. A market short of a good the player holds in surplus reads, without this, as a dispatcher that is broken; with it, as one of eight named reasons (no lane, price gate, no route, costly, no propellant, no room, no funds, room) -- each of which points at a different lever (a port, a road, a price, fuel, cash, a lane). Ben, 2026-10-07 (the lens form): a player lens over the player's own flows only; the whole-world diagnosis stays headless. It is off the strip, keyboard-cycle only, so it takes no slot from the first-sight lenses. A FLOW RIDES THE NETWORK (Ben, 2026-10-26: 'render the paths from one market to another over the actual network'): a chord from centre to centre crossed sea and mountain the cargo never touched, so it could not say WHICH road or port a flow depends on - the lever the refusal classes point at. Drawn along the newest shipment's priced route, with chevrons for direction and width for volume, it shows the road a flow would lose if that road were cut. THE HEAD LANDS ON THE MARKET (Ben, 2026-10-26: arrowheads ended on ordinary tiles): the head was the offset path's end trimmed half a hex back, so at the whole-body rung it sat on the tile before the destination and read as a flow to nowhere; it now runs into the destination centre's own tile, so the answer to 'going where' is the market itself.
 
 *Demanded by BL-1222 · `src/ui/body_surface_canvas.cpp`, `src/world/supply_system.cpp`, `src/world/world.hpp`, `src/world/trade.cpp` · id `trade_flow_lens`*
+
+### Unit designer - full-canvas takeover opened from a land class row in the Military ledger's Design tab, or the type name on the player's unit card
+
+**Answers:** What is this kind of unit carrying, and what can it carry instead?
+
+**Because:** Ben, 2026-10-28: "click a unit type to open the designer (full canvas). This should display an image of the unit type taking up the centre of the canvas space, with boxes for each changeable piece of equipment, linked back to the corresponding space on the unit." A design is a land class with one kit item per slot (MILITARY.md § The kit), and the choice is spatial - armament, armour, tracks are parts of one machine - so the image with a leader line from each slot box to its part answers 'which piece is this' without a legend. The column was the wrong size: a class has up to three slots of up to five items, each item with a stat delta, goods per unit and a research node, and comparing them wants the canvas (DRILL_THROUGH.md, the full-canvas rung). A box shows the slot, the fitted item and its deltas; pressing it lists the slot's kit base first, each with its change against the fitted item, its goods per unit, and a LOCKED badge naming the research node when the nation lacks it - locked kit stays readable, because seeing what research would buy is half of why the screen exists. A pick the seam refuses is disabled with its reason. The summary under the image is the design's soft and hard attack, defence, breakthrough, hardness and kit goods, previewing a hovered pick; there is no speed, which is the class's alone (Ben, 2026-10-28). A pick is the class's one live design at once (set_unit_design, one slot per press), and the summary counts the units in the field still on an older design, which the unit card refits.
+
+*Demanded by BL-1446 · `src/ui/unit_designer.cpp`, `src/ui/unit_art.cpp`, `src/ui/military_ledger.cpp`, `src/ui/selection_panel.cpp` · id `unit_designer`*
 
 ### Unit counter (Planetary canvas, one per tile and owner)
 

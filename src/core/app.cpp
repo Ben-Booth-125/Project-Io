@@ -22,6 +22,8 @@
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
 #include "ui/convoys_ledger.hpp"
 #include "ui/military_ledger.hpp"
+#include "ui/unit_art.hpp"        // the unit designer's class art, loaded once
+#include "ui/unit_designer.hpp"   // the full-canvas unit designer
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
@@ -261,6 +263,9 @@ app::app()
     // the atlas on the first NewFrame.
     ui::load_ui_font();
 
+    // The unit designer's class art (assets/units/, military.md § The designer).
+    ui::unit_art_load(m_renderer);
+
 #ifndef NDEBUG
     // BL-215: the text-overflow ledger records in Debug builds (and always under
     // --verify, armed in run_verify); off in Release interactive.
@@ -297,6 +302,7 @@ app::~app()
     join_workers(/*on_screen=*/false);
 
     m_ground.shutdown(); // baked-ground textures die before their renderer
+    ui::unit_art_release();
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
@@ -2817,6 +2823,10 @@ void app::render()
     // Raise press queues the same pending hire the tile card's Hire does, which
     // the hire block below executes through `hire_unit`.
     ui::draw_military_ledger(m_world, m_registry, m_ui, m_ui.show_military_ledger);
+    // The unit designer (military.md § The designer): a full-canvas takeover the
+    // Design tab's class rows and the unit card's type name open. Its picks queue
+    // `designer.pending_*`, sent below as `set_unit_design`.
+    ui::draw_unit_designer(m_world, m_ui);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;
         // the rank table's change column reads the ranking from ~4 econ ticks back.
@@ -2862,6 +2872,7 @@ void app::render()
         const ui::shell_rect band = ui::selection_band_rect(disp);
         const ImVec2 band_origin = { band.x, band.y };
         const ImVec2 band_size   = { band.w, band.h };
+        m_ui.designer.card_type_x = m_ui.designer.card_type_y = -1.0f; // the unit card republishes it
         ui::draw_selection_band(m_world, m_registry, m_last_econ_report,
                                 m_ui, band_origin, band_size);
     }
@@ -3330,6 +3341,32 @@ void app::render()
             m_ui.construction.last_message = "Couldn't disband that.";
         }
         m_ui.pending_disband_unit = null_entity; // consume the request
+    }
+
+    // The unit designer's pick (military.md § The designer; BL-1434): one slot per
+    // press, through the same seam any caller uses (`set_unit_design`). The pick is
+    // at once the class's live design. A refusal mutates nothing.
+    if (m_ui.designer.pending_cls >= 0)
+    {
+        corp_command cmd;
+        cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::set_unit_design;
+        cmd.order     = static_cast<uint32_t>(m_ui.designer.pending_cls);
+        cmd.recipe    = static_cast<uint16_t>(m_ui.designer.pending_slot);
+        cmd.unit_type = m_ui.designer.pending_item;
+        switch (player_command(cmd))
+        {
+            case corp_command_result::applied:
+                m_ui.designer.last_message = "Saved: new units are raised with this design."; break;
+            case corp_command_result::rejected_tech_locked:
+                m_ui.designer.last_message = "Not researched yet."; break;
+            case corp_command_result::rejected_state:
+                m_ui.designer.last_message = "Already fitted."; break;
+            default:
+                m_ui.designer.last_message = "That kit does not fit this slot."; break;
+        }
+        m_ui.designer.pending_cls = -1; // consume the request
     }
 
     // Refit to a newer type (Ben, 2026-10-27): the unit card's Refit menu, through the

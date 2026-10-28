@@ -1,0 +1,5 @@
+# Light armour - one line per kit slot: slot x y, image-relative (0..1 from top-left).
+# Written by tools/art/make_unit_placeholders.py; edit with the art.
+0 0.695 0.500  # Armament
+1 0.375 0.650  # Armour
+2 0.516 0.762  # Wheels

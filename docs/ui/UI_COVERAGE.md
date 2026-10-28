@@ -8,18 +8,18 @@
 
 ## Headline
 
-**111 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**115 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**51 of 111 elements can be changed without any check going red.**
+**54 of 115 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 57 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 58 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 13 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 30 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **CAPTURE-ONLY** | 33 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (57)
+## ASSERTED (58)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -72,7 +72,7 @@ and so is the safety net.
 | `UI-093` New World wizard > Wizard planetology round (System or Life) | sub-element | `planetology_generation`, `life_to_people` | 9 | 1 | 0 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 10 | 0 | 1 |
-| `UI-098` Lens system (overlay_mode family) > Logistics lens | sub-element | `logistics_lens`, `logistics_chain`, `lens_strip_and_fields` | 46 | 0 | 2 |
+| `UI-098` Lens system (overlay_mode family) > Logistics lens | sub-element | `logistics_lens`, `logistics_chain`, `lens_strip_and_fields` | 50 | 0 | 2 |
 | `UI-122` Lens system (overlay_mode family) > Nations lens | sub-element | `nations_lens` | 4 | 0 | 1 |
 | `UI-100` Nation overview | ledger | `corp_dashboard`, `nation_seat_ui` | 19 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
@@ -89,8 +89,9 @@ and so is the safety net.
 | `UI-124` Nation selection screen (Begin, before play) | view | `nation_select`, `seat_pick`, `quick_start` | 45 | 0 | 3 |
 | `UI-125` Nation selection screen (Begin, before play) > Nation card (seven parts) | sub-element | `nation_select` | 11 | 0 | 0 |
 | `UI-126` Construction Ledger > Rail rows | sub-element | `rail_construction` | 17 | 0 | 4 |
-| `UI-127` Construction Ledger > Site ledger (the site finder) | sub-element | `construction_sites` | 16 | 0 | 1 |
-| `UI-128` Planetary Canvas > Placement lens | sub-element | `construction_sites` | 16 | 0 | 1 |
+| `UI-127` Construction Ledger > Site ledger (the site finder) | sub-element | `construction_sites` | 29 | 0 | 1 |
+| `UI-128` Planetary Canvas > Placement lens | sub-element | `construction_sites` | 29 | 0 | 1 |
+| `UI-132` Unit designer | view | `unit_designer` | 2 | 0 | 12 |
 
 ## CLIP-ONLY (13)
 
@@ -110,7 +111,7 @@ and so is the safety net.
 | `UI-116` History Ledger (Story/Chain/Ages/Tectonics) > Ages view | view | `ages_replay` | 0 | 1 | 0 |
 | `UI-115` History Ledger (Story/Chain/Ages/Tectonics) > Tectonics view | view | `ledger_pass` | 0 | 1 | 0 |
 
-## CAPTURE-ONLY (30)
+## CAPTURE-ONLY (33)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -144,6 +145,9 @@ and so is the safety net.
 | `UI-107` Strategy readout | ledger | `strategy_readout` | 0 | 0 | 0 |
 | `UI-109` Frame-budget HUD | element | `frame_budget_hud` | 0 | 0 | 0 |
 | `UI-110` Selection band > Battle card | sub-element | `battle_card` | 0 | 0 | 0 |
+| `UI-129` Planetary Canvas > Front line | sub-element | `fronts` | 0 | 0 | 1 |
+| `UI-130` Selection band > Front card | sub-element | `fronts` | 0 | 0 | 1 |
+| `UI-131` Planetary Canvas > Right-click unit orders | control | `unit_orders` | 0 | 0 | 6 |
 
 ## NONE (8)
 
@@ -185,6 +189,7 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `history_lapse_works` (8 captures, 8 expects) — THE WORKS AND THE RUNG ON ROUND 6 (BL-1099, BL-1100; Ben, 2026-09-24,
 - `lens_strip_glyphs` (7 captures, 3 expects) — BL-1225 (every lens on strip): every built lens sits in at least one rung row
 - `logistics_unpaint_perf` (0 captures, 0 expects) — What arming the Logistics lens costs the FRAME, on the play path (Ben, 2026-10-25:
+- `military_ledger` (6 captures, 0 expects) — Verify the Military ledger (rail slot 7; docs/ui/ledgers/military.md).
 - `names_and_voice` (6 captures, 10 expects) — BL-1106 -- THE TICKER AND BOARD SPEAK THE HISTORY'S WORDS.
 - `pan_perf` (0 captures, 0 expects) — Pan-cost measurement (the "stutter while panning" report, 2026-08-02).
 - `realm_identity` (11 captures, 20 expects) — A realm keeps its identity across the wizard's seams (BL-1087 colour,
@@ -199,7 +204,8 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `terrain_variants` (1 captures, 0 expects) — BL-1243 (terrain variant families) — RENDERING.md § Mountains, rivers and
 - `towns_denser` (3 captures, 4 expects) — TOWNS DENSER (BL-1258; Ben, 2026-10-10: towns should read like the it3 C-F
 - `trade_flow_lens` (8 captures, 5 expects) — Visual verification for the Trade-flow lens (overlay_mode::trade_flow, BL-1222).
-- `trade_flow_routed` (6 captures, 5 expects) — The Trade-flow lens draws a flow ALONG THE ROUTE IT RIDES (Ben, 2026-10-26: "render the
+- `trade_flow_routed` (12 captures, 8 expects) — The Trade-flow lens draws a flow ALONG THE ROUTE IT RIDES (Ben, 2026-10-26: "render the
 - `turbulence_lean` (5 captures, 1 expects) — Verification for BL-839 — the historical turbulence lean, in the wizard.
+- `unit_counter` (8 captures, 0 expects) — Verify the land unit counter, the unit card and the unit group (BL-1425 R1-R3,
 - `wharf_on_shore` (5 captures, 0 expects) — BL-1218 (wharf placed on shore): the construction ledger offers a Fishing
 

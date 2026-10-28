@@ -2022,6 +2022,26 @@
    "checks": [
     "unit_orders"
    ]
+  },
+  {
+   "id": "UI-132",
+   "name": "Unit designer",
+   "kind": "view",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/military.md § The designer",
+    "docs/military/MILITARY.md § The kit",
+    "docs/ui/DRILL_THROUGH.md",
+    "src/ui/unit_designer.cpp",
+    "src/ui/unit_art.cpp",
+    "assets/units/"
+   ],
+   "summary": "A full-canvas takeover (detail_surface::unit_designer, keyed by land class) opened from a class row in the Military ledger's Design tab or the type name on the player's unit card. The class's image fills the middle; one box per kit slot sits beside it with a leader line to the slot's anchor on the image. A box press lists the slot's kit, base first, each with its change against the fitted item, goods per unit and a LOCKED badge naming the research node; a pick set_unit_design refuses is disabled with the reason. The summary is the design's stats and kit goods, previewing a hovered pick, and the count of field units on an older design. The opening press, the return control, or Esc closes it.",
+   "interesting_question": "Every later kit item is locked until its research node is in the age tree. Does a screen of nothing but locked choices still earn the canvas?",
+   "resolution": "Yes, because a locked item stays fully readable - its stat change, its goods and the node that opens it - so the designer is where a player learns what military research would buy. Only the pick is refused, with the seam's own reason.",
+   "checks": [
+    "unit_designer"
+   ]
   }
  ]
 }

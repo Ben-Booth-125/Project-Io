@@ -16,8 +16,9 @@ namespace ui {
 ///   military bases, the roster (every row the campaign band admits, dimmed with
 ///   why where the nation cannot field it), each with a **Raise** press, and the
 ///   muster queue (`world::musters`, the player's own orders).
-/// - **Design**: one row per land class with its base numbers; kit choices open
-///   as military research lands. No interaction yet.
+/// - **Design**: one row per land class with its live design's numbers; a row
+///   press opens the full-canvas unit designer for that class (unit_designer.hpp),
+///   and pressing the lit row again closes it. Below, the obsolete-type toggles.
 ///
 /// RAISE IS NOT A SECOND HIRE PATH. The press writes `construction.pending_hire_tile`
 /// / `pending_hire_unit_type`, which `app::render` executes through the

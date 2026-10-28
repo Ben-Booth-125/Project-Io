@@ -1,0 +1,5 @@
+# Armour - one line per kit slot: slot x y, image-relative (0..1 from top-left).
+# Written by tools/art/make_unit_placeholders.py; edit with the art.
+0 0.898 0.520  # Armament
+1 0.469 0.562  # Armour
+2 0.531 0.838  # Tracks

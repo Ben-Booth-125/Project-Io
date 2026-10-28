@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*172 entries — 43 gameplay · 29 canvas · 16 lens · 51 ledger · 33 chrome.*
+*175 entries — 43 gameplay · 30 canvas · 16 lens · 53 ledger · 33 chrome.*
 
 ---
 
@@ -719,7 +719,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Keep Recruit to the types you raise. Every pre-modern row starts obsolete; un-mark one if your ground cannot field better, or mark a modern type obsolete once a better one replaces it.
 
-### `gameplay.refit_unit` — The unit card's Refit press in the Selection element (the fifth action slot), for the player's own unit: a menu of the newer types it can refit to. Also a corp_verb (corp_verb::refit_unit, 40) on the command seam.
+### `gameplay.refit_unit` — The unit card's Refit press in the Selection element (the fifth action slot), for the player's own unit: a menu of the newer types it can refit to - led, when the unit's recorded design differs from its class's live design, by its own type marked '(live design)', a design refit. Also a corp_verb (corp_verb::refit_unit, 40) on the command seam.
 
 **Press.** Select your unit, press Refit, and pick a type from the menu (each row shows its credit price, '+ kit' when it also buys goods, and its days; a disabled row says why). The press queues the command, applied through apply_corp_command at the frame's end. Over the seam: COMMAND corp=<nation> verb=40 subject=<unit id> unit_type=<roster row>.
 
@@ -776,9 +776,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Push where your assigned force clearly outweighs the weakest tile across the border; hold everywhere else.
 
-### `gameplay.set_unit_design` — The Military ledger's Design tab (nav rail slot 7), the designer: per land class, one choice of kit per slot. Also a corp_verb (corp_verb::set_unit_design, 43) on the command seam.
+### `gameplay.set_unit_design` — The unit designer, a full-canvas takeover opened from a land class row in the Military ledger's Design tab (ledger.military_open_designer) or from the type name on the player's unit card (ledger.selection_unit_type_designer): per land class, one choice of kit per slot. Also a corp_verb (corp_verb::set_unit_design, 43) on the command seam.
 
-**Press.** Open the Military ledger, Design tab, pick a class and choose an item in one of its slots; locked kit is shown but cannot be chosen. Over the seam: COMMAND corp=<nation> verb=43 order=<land class> recipe=<slot> unit_type=<kit catalogue id>.
+**Press.** Open the designer for a class, press a slot's box, and choose an item in its list (canvas.designer_slot_pick); locked kit is shown but cannot be chosen. Over the seam: COMMAND corp=<nation> verb=43 order=<land class> recipe=<slot> unit_type=<kit catalogue id>.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1152,6 +1152,23 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The NATION is selected — `selection_kind` becomes `nation` and the Selection element shows its card, which is the route to a nation's ledger. The province mirror clears, as it does for every entity selection. Hovering the corridor names the nation at the cursor immediately, well short of the hover card's dwell delay, so the target is readable before the click commits.
 
 **Reason to select.** This is the ONLY route to a nation. It replaced the Country lens, which used to own it: under that lens a hovered tile resolved to its owning nation. Ben, 2026-08-24 — 'National borders should not diffuse together, instead they should borders extending their colour inwards. With this, we can drop the nation lens' and, on what replaces the route, 'click the border itself'. The border is what carries the nation on screen now, so it is the thing that opens it.
+
+### `canvas.designer_slot_pick` — The unit designer (full canvas): a slot's box, and the item list it opens beside it.
+
+**Press.** Click a slot's box to open its item list (click it again to close the list). The list holds the slot's kit, base first: each row names the item, its stat change against the fitted item, its goods per unit, and - when your nation lacks its research node - a LOCKED badge with the node named. Click a live row to fit it. Hovering a row previews the design's stats and goods with it fitted.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `slot` | `0-based slot index` | The box pressed. |
+| `item` | `kit catalogue id` | The row pressed. |
+
+**Valid when:**
+- The designer is open on a class.
+- A row is live only when unit_design_check would apply it: the item is researched and not already fitted. A locked row is disabled with 'Locked: needs research <node>'; the fitted row is marked 'Fitted'. Every later item is locked until its kit node is in the age tree.
+
+**Expected output.** Issues gameplay.set_unit_design {order = class, recipe = slot, unit_type = item} at the frame's end through the player's seat - one slot per press. The pick IS the class's live design at once (there is no separate save): new hires are raised with it and buy its kit goods; units in the field keep their recorded design until refitted (gameplay.refit_unit to their own row). The designer shows the seam's answer: 'Saved: new units are raised with this design.', 'Not researched yet.', 'Already fitted.' or 'That kit does not fit this slot.'.
+
+**Reason to select.** Fit the best researched kit in each slot of the classes you raise, weighing its goods against what your shelves hold.
 
 ### `canvas.front_select` — A front line on the Planetary canvas: the player nation's fronts, drawn along the shared hex edges between each span and the neighbour's ground, in the colour of the player's stance toward that neighbour (hostile red, neutral gold, friendly green), with the number of units assigned on a small plate at the span's middle edge. Plain canvas only, like the border band.
 
@@ -1828,7 +1845,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed with the goods or port it lacks; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base'. DESIGN: one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its base numbers, under the line that kit choices open as military research lands. Read-only: Design has no presses yet.
+**Expected output.** Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed with the goods or port it lacks; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base'. DESIGN: one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its live design's numbers; pressing a class opens the unit designer on the full canvas (ledger.military_open_designer). Below, every unit type with its obsolete toggle (gameplay.set_unit_obsolete).
 
 **Reason to select.** Answers 'what force can I raise, where, at what cost - and what is it raised with?'. It is the broad door to every hire: every base and every unit type on one surface, where the tile card's Hire list shows one base's rows only.
 
@@ -2066,6 +2083,32 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Opens the Construction ledger on its Buildings view AIMED at this building: its type group expanded and the building selected, so its method lever and its workforce reading are on screen in one press. A DOOR, not a toggle - a second press does not close it, because the button carries no visible active state. Nothing in the world changes.
 
 **Reason to select.** The route from a building found on the MAP to its operating controls. The card's centre presents data and never holds levers, so this is how a map selection reaches them.
+
+### `ledger.military_open_designer` — Military ledger (nav rail slot 7), Design tab: a land class row (Infantry, Motorised infantry, Mechanised infantry, Armour, Light armour, Artillery, Air defence), its name a press with its live design's numbers under it.
+
+**Press.** Click the class name. Clicking the lit row of the class the designer is open on closes it (the toggle rule); clicking another class switches the designer to it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `class` | `land_class (0 infantry .. 6 air defence)` | The row pressed. |
+
+**Valid when:**
+- The Military ledger is open on Design.
+
+**Expected output.** The unit designer takes the canvas region (the full-canvas rung; the ledger column, header, Selection band and minimap stay). The class's image fills the middle; one box per kit slot (infantry 2, every other class 3) sits beside it with a leader line to the slot's point on the image; each box shows the slot, the fitted item and its stat change. Under the image: the design's soft attack, hard attack, defence, breakthrough and hardness, its kit goods per unit, and how many of your units in the field are on an older design. It closes on the same press, its top-left return control, or Esc. Nothing in the world changes.
+
+**Reason to select.** Answers 'what is this kind of unit carrying, and what can it carry instead?'. Open it to see what each slot holds, what research would open, and to change the class's live design.
+
+### `ledger.selection_unit_type_designer` — Selection band, the unit card's Roster page (the card's second page): the unit type's name under 'Type', for the player's own unit.
+
+**Press.** Click the type name. Clicking it again while the designer is open on that unit's class closes it (the toggle rule).
+
+**Valid when:**
+- A unit of your own nation is selected and its card is on the Roster page. A rival's unit shows its type as plain text: the designer edits your own designs.
+
+**Expected output.** Opens the unit designer on the full canvas for the land class the unit fights as (as ledger.military_open_designer). When the unit's recorded design differs from the class's live design, the page also says it is on an older design and the Refit menu offers its own type as '(live design)'. Nothing in the world changes.
+
+**Reason to select.** To see or change what this kind of unit carries, straight from a unit in front of you.
 
 ### `ledger.military_show_obsolete` — The Military ledger's Recruit tab (nav rail slot 7): the 'Show obsolete (N)' checkbox above the roster.
 
