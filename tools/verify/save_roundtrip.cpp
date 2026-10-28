@@ -94,6 +94,24 @@ std::size_t stack_section_bytes(const world& w)
     return n;
 }
 
+/// BL-1434 (v64): the designs section, the stream's last — three counts, then
+/// (id, n, n ids) per designed nation, (id, 3 + 3 variants) per unit off base kit and
+/// (id, 3 variants) per muster off base kit.
+std::size_t designs_section_bytes(const world& w)
+{
+    std::size_t n = 12;
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.unit_design_kit.empty())
+            n += 4 + 4 + 2 * nc.unit_design_kit.size();
+    for (const auto& [uid, u] : w.units)
+        if (!u.kit.is_base() || !u.refit_kit.is_base())
+            n += 4 + 6;
+    for (const muster_order& m : w.musters)
+        if (!m.kit.is_base())
+            n += 4 + 3;
+    return n;
+}
+
 int g_failures = 0;
 
 void check(bool ok, const char* what)
@@ -549,7 +567,8 @@ int main()
                                        + obsolete_section_bytes(wd)  // BL-1437 (v60)
                                        + refit_section_bytes(wd)     // v61
                                        + fronts_section_bytes(wd)    // BL-1427 (v62)
-                                       + stack_section_bytes(wd);    // BL-1443 (v63), last
+                                       + stack_section_bytes(wd)     // BL-1443 (v63)
+                                       + designs_section_bytes(wd);  // BL-1434 (v64), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -614,7 +633,8 @@ int main()
                                          + obsolete_section_bytes(wu)  // BL-1437 (v60)
                                          + refit_section_bytes(wu)     // v61
                                          + fronts_section_bytes(wu)    // BL-1427 (v62)
-                                         + stack_section_bytes(wu);    // BL-1443 (v63), last
+                                         + stack_section_bytes(wu)     // BL-1443 (v63)
+                                         + designs_section_bytes(wu);  // BL-1434 (v64), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 

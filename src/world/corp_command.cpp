@@ -24,6 +24,7 @@
 #include "trade.hpp" // BL-1266: trade_is_valid (set_trade)
 #include "survey_system.hpp"
 #include "unit_roster.hpp"
+#include "unit_designs.hpp" // BL-1434: the live design a hire and a refit read
 #include "world.hpp"
 
 #include <algorithm>
@@ -114,6 +115,39 @@ bool debit_hire_cost(world& w, entity_id corp, const roster_row& row)
             debit_from_corp(w, corp, hire_axis_resource(w, corp, axis), hire_axis_cost);
     }
     return true;
+}
+
+/// BL-1434 (unit designs): can @p nation buy @p row's gated goods (when @p row is
+/// named) AND the kit goods @p kit, together? The row's axes are priced at the
+/// resource `debit_hire_cost` would spend, so a resource both legs draw is counted
+/// once, as the sum. With no kit this is exactly debit_hire_cost's own test.
+bool hire_goods_affordable(const world& w, entity_id nation, const roster_row* row,
+                           const std::array<float, resource_count>& kit)
+{
+    std::array<float, resource_count> need = kit;
+    if (row != nullptr)
+        for (std::size_t i = 0; i < hire_axis_count; ++i)
+        {
+            const hire_axis axis = static_cast<hire_axis>(i);
+            if (gate_axis_q(row->gate, axis) <= 0)
+                continue;
+            if (!corp_can_afford_axis(w, nation, axis))
+                return false;
+            need[static_cast<std::size_t>(hire_axis_resource(w, nation, axis))] += hire_axis_cost;
+        }
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (need[r] > 0.0f && corp_stockpile_total(w, nation, static_cast<resource_type>(r)) < need[r])
+            return false;
+    return true;
+}
+
+/// BL-1434: buy the kit goods @p kit off @p nation's shelves, ascending resource.
+/// Only called once `hire_goods_affordable` has passed.
+void debit_kit_goods(world& w, entity_id nation, const std::array<float, resource_count>& kit)
+{
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (kit[r] > 0.0f)
+            debit_from_corp(w, nation, static_cast<resource_type>(r), kit[r]);
 }
 
 // hire_batch_manpower lives in unit_roster.hpp (BL-1435: the muster pass raises the unit).
@@ -278,6 +312,30 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
             flips.erase(at);          // back to the default
         else
             flips.insert(at, cmd.unit_type);
+        return corp_command_result::applied;
+    }
+
+    // BL-1434 (unit designs; MILITARY.md § The kit): the seat fits one kit item into
+    // one slot of its live design for one class. Every check first
+    // (`unit_design_check`), so a refusal mutates nothing; a slot going back to its
+    // base kit erases the slot's entry (the default is stored as nothing).
+    if (cmd.verb == corp_verb::set_unit_design)
+    {
+        const corp_command_result r =
+            unit_design_check(w, nation, cmd.order, cmd.recipe, cmd.unit_type);
+        if (r != corp_command_result::applied)
+            return r;
+        const std::vector<kit_item>& cat = kit_catalogue();
+        const kit_item& it = cat[cmd.unit_type];
+        std::vector<uint16_t>& v = w.nations.at(nation).unit_design_kit;
+        v.erase(std::remove_if(v.begin(), v.end(),
+                               [&](uint16_t id) {
+                                   return id < cat.size() && cat[id].cls == it.cls
+                                       && cat[id].slot == it.slot;
+                               }),
+                v.end());
+        if (kit_variant_of(cmd.unit_type) != 0)
+            v.insert(std::lower_bound(v.begin(), v.end(), cmd.unit_type), cmd.unit_type);
         return corp_command_result::applied;
     }
 
@@ -485,8 +543,9 @@ corp_command_result refit_check(const world& w, const recipe_registry& reg, enti
     const auto& table = unit_roster_table();
     if (target >= table.size())
         return corp_command_result::rejected_invalid;
+    // BL-1434: the unit's own targets — its own row too when its design is stale.
     const std::vector<uint16_t> ok =
-        refit_targets(w, nation, u.type, campaign_roster_band_for(reg.era()));
+        refit_targets(w, nation, u, campaign_roster_band_for(reg.era()));
     if (std::find(ok.begin(), ok.end(), target) == ok.end())
         return corp_command_result::rejected_invalid;
 
@@ -499,17 +558,40 @@ corp_command_result refit_check(const world& w, const recipe_registry& reg, enti
     if (own == w.tile_to_nation.end() || own->second != nation)
         return corp_command_result::rejected_placement;
 
-    // Both legs checked before either is taken: the credits, and every gated
-    // goods axis of the target row (debit_hire_cost's own all-or-nothing test).
+    // Every leg checked before any is taken: the credits; every gated goods axis of
+    // the target row, unless the refit keeps the row (a design refit buys no new
+    // unit type); and, BL-1434, the kit goods of each slot the live design changes —
+    // the goods legs together (`hire_goods_affordable`).
     if (purse_room_of(w, nation) < refit_credit_cost(reg, u.type, target))
         return corp_command_result::rejected_funds;
-    const roster_row& row = table[target];
-    for (std::size_t i = 0; i < hire_axis_count; ++i)
-    {
-        const hire_axis axis = static_cast<hire_axis>(i);
-        if (gate_axis_q(row.gate, axis) > 0 && !corp_can_afford_axis(w, nation, axis))
-            return corp_command_result::rejected_funds;
-    }
+    const land_class lc = unit_land_class(u);
+    const std::array<float, resource_count> kit =
+        kit_refit_goods(lc, u.kit, design_of(w, nation, lc));
+    if (!hire_goods_affordable(w, nation, target == u.type ? nullptr : &table[target], kit))
+        return corp_command_result::rejected_funds;
+    return corp_command_result::applied;
+}
+
+corp_command_result unit_design_check(const world& w, entity_id nation, uint32_t cls,
+                                      uint16_t slot, uint16_t item)
+{
+    // The seat's alone: no grant lets a rival design (AI_OPPONENT.md § 11).
+    if (w.nations.find(nation) == w.nations.end() || nation != player_nation(w))
+        return corp_command_result::rejected_not_owner;
+    if (cls >= static_cast<uint32_t>(land_class_count))
+        return corp_command_result::rejected_invalid;
+    const land_class lc = static_cast<land_class>(cls);
+    if (kit_slot_count(lc) == 0 || slot >= kit_slot_count(lc))
+        return corp_command_result::rejected_invalid;
+    const std::vector<kit_item>& cat = kit_catalogue();
+    if (item >= cat.size())
+        return corp_command_result::rejected_invalid;
+    if (cat[item].cls != lc || cat[item].slot != slot)
+        return corp_command_result::rejected_invalid; // the item does not fit that slot
+    if (!kit_item_researched(w, nation, item))
+        return corp_command_result::rejected_tech_locked;
+    if (design_fitted(w, nation, lc, slot) == item)
+        return corp_command_result::rejected_state; // no change
     return corp_command_result::applied;
 }
 
@@ -745,8 +827,18 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (purse_room_of(w, cmd.corp) < hire_cost)
                 return corp_command_result::rejected_funds;
 
+            // BL-1434 (unit designs): the hire is raised to its class's LIVE design and
+            // buys that design's kit goods (none for base kit) beside the row's gated
+            // goods — both legs proven affordable together before either is taken.
+            const land_class lc      = land_class_for(row);
+            const unit_design design = design_of(w, cmd.corp, lc);
+            const std::array<float, resource_count> kit = kit_goods(lc, design);
+            if (!hire_goods_affordable(w, cmd.corp, &row, kit))
+                return corp_command_result::rejected_funds;
+
             if (!debit_hire_cost(w, cmd.corp, row))
                 return corp_command_result::rejected_funds;
+            debit_kit_goods(w, cmd.corp, kit);
             *purse_of(w, cmd.corp) -= hire_cost; // the actor exists: proven at the seam's top
 
             // BL-1435: RAISING TAKES TIME (Ben, 2026-10-27; MILITARY.md § The muster
@@ -761,6 +853,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             m.unit_type      = cmd.unit_type;
             m.days_total     = days;
             m.days_remaining = days;
+            m.kit            = design; // BL-1434: recorded by the unit at completion
             w.musters.push_back(m);
             if (out_building)
                 *out_building = null_entity;
@@ -984,10 +1077,19 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 return r;
             unit_component& u = w.units.at(cmd.subject);
             const float credits = refit_credit_cost(reg, u.type, cmd.unit_type);
+            // BL-1434: every refit brings the unit to its class's live design, and buys
+            // the kit of each slot that changes.
+            const land_class lc    = unit_land_class(u);
+            const unit_design live = design_of(w, cmd.corp, lc);
+            const std::array<float, resource_count> kit = kit_refit_goods(lc, u.kit, live);
             // The goods leg is the hire's own path; its affordability was proven above.
-            if (!debit_hire_cost(w, cmd.corp, unit_roster_table()[cmd.unit_type]))
+            // A design refit keeps the row, so it buys no row goods.
+            if (cmd.unit_type != u.type
+                && !debit_hire_cost(w, cmd.corp, unit_roster_table()[cmd.unit_type]))
                 return corp_command_result::rejected_funds;
+            debit_kit_goods(w, cmd.corp, kit);
             *purse_of(w, cmd.corp) -= credits; // the actor exists: proven at the seam's top
+            u.refit_kit  = live;
             u.refit_type = cmd.unit_type;
             u.refit_days = muster_days_for(cmd.unit_type);
             // Re-equipping is done in place: a standing march order is cleared.

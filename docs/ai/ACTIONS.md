@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*171 entries — 42 gameplay · 29 canvas · 16 lens · 51 ledger · 33 chrome.*
+*172 entries — 43 gameplay · 29 canvas · 16 lens · 51 ledger · 33 chrome.*
 
 ---
 
@@ -736,7 +736,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The actor can pay: the hire price difference (hire_cost_per_power x the power_mod difference, floored at 0) from its uncommitted treasury, and the target's gated goods off the shelves of its markets, both checked before either is taken (rejected_funds otherwise).
 - Rival nations' scorers never issue it: no AI grant covers a refit.
 
-**Expected output.** Paid at once (credits and goods; no refund). The unit records the target and the target's muster days (90, 135 or 180 by class) and keeps its old type, fighting as it, until each economy tick has taken a quarter's days off; then its type becomes the target, keeping its men, establishment, readiness and morale. A standing march order is cleared, and march_unit refuses it (rejected_state) while it refits. Saved (world_save_version 61).
+**Expected output.** Paid at once (credits and goods; no refund). The unit records the target and the target's muster days (90, 135 or 180 by class) and keeps its old type, fighting as it, until each economy tick has taken a quarter's days off; then its type becomes the target, keeping its men, establishment, readiness and morale. A standing march order is cleared, and march_unit refuses it (rejected_state) while it refits. Saved (world_save_version 61). A unit whose recorded design differs from its class's live design may also refit to its OWN row (a design refit, no credits, no row goods); every refit brings the unit to the live design and buys the kit goods of each slot that changes (BL-1434).
 
 **Reason to select.** Upgrade the force you have instead of disbanding and re-hiring: the unit keeps its men and condition, and pays only the difference in price. Refit out of contact and at home, and weigh the days it cannot march.
 
@@ -775,6 +775,26 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Push is stored in world::front_orders under the front's key; hold erases the entry, since hold is the default and never stored. Under push each of the front's units marches onto the neighbour's land tile with a hex side onto the span whose standing stack is weakest (the summed unit_strength of the units on it, an empty tile weakest of all), nearest its own slot, ties to the lower tile id; marching onto a held tile is an attack. A unit already standing on the neighbour's ground holds what it took. If the hostility ends, the stored push acts as hold. Saved (world_save_version 62). Rival nations' scorers issue it for their own fronts.
 
 **Reason to select.** Push where your assigned force clearly outweighs the weakest tile across the border; hold everywhere else.
+
+### `gameplay.set_unit_design` — The Military ledger's Design tab (nav rail slot 7), the designer: per land class, one choice of kit per slot. Also a corp_verb (corp_verb::set_unit_design, 43) on the command seam.
+
+**Press.** Open the Military ledger, Design tab, pick a class and choose an item in one of its slots; locked kit is shown but cannot be chosen. Over the seam: COMMAND corp=<nation> verb=43 order=<land class> recipe=<slot> unit_type=<kit catalogue id>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32 (a land_class: 0 infantry, 1 motorised, 2 mechanised, 3 armour, 4 light armour, 5 artillery, 6 air defence)` | The class whose live design changes. |
+| `recipe` | `uint16 (0-based slot index, < kit_slot_count(class))` | The slot: infantry Weapon/Armour; motorised and mechanised Weapon/Armour/Vehicle; light armour Armament/Armour/Wheels; armour Armament/Armour/Tracks; artillery Gun/Munitions/Tow; air defence Launcher/Fire control/Vehicle. |
+| `unit_type` | `uint16 (index into kit_catalogue(), unit_designs.hpp)` | The kit item to fit. A slot's base item puts it back to its base kit. |
+
+**Valid when:**
+- The actor is the seat (the player's nation); any other nation is rejected_not_owner. No grant lets a rival design, so rival nations keep base kit and their scorers never issue it.
+- The class has slots, the slot is one of them, and the item is a catalogue item that fits that (class, slot) (rejected_invalid otherwise).
+- The item is researched: base kit always is; a later item when the nation holds its research node (rejected_tech_locked otherwise). The kit nodes are not yet in the age tree, so every later item is locked.
+- The slot does not already hold the item (rejected_state otherwise — a repeated press changes nothing).
+
+**Expected output.** The nation's live design for that class fits the item (nation_component::unit_design_kit holds the non-base items; base kit is stored as nothing). New hires of the class are raised to it and buy its kit goods; units already raised keep the design they recorded until refitted to it (gameplay.refit_unit to their own row). A design's stats are its class's plus its kit's. Saved (world_save_version 64).
+
+**Reason to select.** Fit the best researched kit in each slot of the classes you raise, weighing its goods against what your shelves hold: a design whose kit cannot be bought cannot be hired.
 
 ---
 

@@ -196,13 +196,19 @@ enum class corp_verb : uint8_t
     // Appended AFTER set_unit_obsolete, same append-only rule. MILITARY.md § The
     // muster interface, "Refit to a newer type". No grant lets a rival refit, so
     // corp_ai.cpp issues no such verb; any nation may refit its OWN units.
-    refit_unit,           ///< Refit unit `subject` to roster row `unit_type`: a newer model of the same land class the nation fields now (`refit_targets`). Paid now (the price difference, floored at 0, plus the target's gated goods); takes the target's muster days. rejected_not_owner / rejected_invalid / rejected_state (in a battle, already refitting) / rejected_placement (off its own ground) / rejected_funds — see `refit_check`.
+    refit_unit,           ///< Refit unit `subject` to roster row `unit_type`: a newer model of the same land class the nation fields now (`refit_targets`). Paid now (the price difference, floored at 0, plus the target's gated goods); takes the target's muster days. BL-1434: `unit_type` may also be the unit's OWN row when its recorded design differs from its class's live design (a design refit); every refit brings the unit to the live design and buys the kit of each slot that changes. rejected_not_owner / rejected_invalid / rejected_state (in a battle, already refitting) / rejected_placement (off its own ground) / rejected_funds — see `refit_check`.
     // --- BL-1427: fronts (Ben, 2026-10-27) ---
     // Appended AFTER refit_unit, same append-only rule. MILITARY.md § Fronts. Any
     // nation on its OWN units and fronts; rivals issue both by the grant in
     // AI_OPPONENT.md § 11 ("Rival nations use fronts").
     assign_front,         ///< Assign unit `subject` to the actor's front whose span holds `tile` (the front KEYED `tile` first: `front_named`), or unassign it when `tile` is null_entity. The unit stores the front's key. rejected_invalid (no such unit, or no such front of the actor's) / rejected_not_owner (not the actor's unit) / rejected_state (already so — the same front, or already unassigned).
     set_front_order,      ///< Set the actor's front whose span holds `tile` (`front_named`) to `order` (0 hold, 1 push). rejected_invalid (no such front, or another order) / rejected_state (push toward a neighbour the actor is not hostile to, or no change).
+    // --- BL-1434: unit designs (Ben, 2026-10-27/28) ---
+    // Appended AFTER set_front_order, same append-only rule. MILITARY.md § The kit:
+    // one live design per land class per nation; a slot offers only researched kit.
+    // The SEAT's alone: no grant lets a rival design (AI_OPPONENT.md § 11), so rivals
+    // keep base kit and corp_ai.cpp never issues it.
+    set_unit_design,      ///< The seat's nation fits kit item `unit_type` (a kit catalogue id, unit_designs.hpp) into slot `recipe` (0-based) of its live design for land class `order` (a `land_class` value). rejected_not_owner unless `corp` is the seat; rejected_invalid for an unknown class (or `none`), slot or item, or an item that does not fit that (class, slot); rejected_tech_locked when the item is not researched; rejected_state when the slot already holds it. See `unit_design_check`.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -212,7 +218,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::set_front_order) + 1;
+    static_cast<uint8_t>(corp_verb::set_unit_design) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.
@@ -265,7 +271,7 @@ struct corp_command
     entity_id     tile      = null_entity;              ///< build / place_road / hire_unit target tile; march_unit's destination; withdraw_from_battle's defended tile; the front assign_front / set_front_order name.
     building_type type      = building_type::none;      ///< build only.
     resource_type target    = resource_type::iron_ore;  ///< build (extraction) AND place_sell_order: what to sell.
-    uint16_t      recipe    = no_recipe;                ///< set_recipe (and build seed).
+    uint16_t      recipe    = no_recipe;                ///< set_recipe (and build seed). set_unit_design: the SLOT index (BL-1434) — the default, no_recipe, names no slot and is refused.
     int           workforce = 100;                      ///< set_workforce value [0, 100] (BL-1322).
     uint8_t       road_tier = 1;                        ///< place_road tier (1–3).
     /// place_road: the hex SIDE of `tile` the road crosses (BL-1340 — a road is an edge
@@ -274,7 +280,7 @@ struct corp_command
     /// neighbour deterministically. 0-5 or 0xFF; any other value is rejected at the
     /// untrusted seam (agent_protocol.cpp), whole, mutating nothing.
     uint8_t       road_side = k_road_side_auto;
-    uint16_t      unit_type = 0;                        ///< hire_unit: index into unit_roster_table().
+    uint16_t      unit_type = 0;                        ///< hire_unit: index into unit_roster_table(). set_unit_design: the kit catalogue id (BL-1434).
 
     // --- BL-293 order-book args ---
     float    quantity    = 0.0f; ///< place_sell_order: max units offered per tick (> 0). Also request_quote.
@@ -399,12 +405,24 @@ float refit_credit_cost(const recipe_registry& reg, uint16_t from, uint16_t to);
 /// Every check `refit_unit` makes, READ-ONLY, in its order — so the unit card names
 /// the same refusal the seam would give: the unit exists and is @p nation's
 /// (rejected_invalid / rejected_not_owner); @p target is a compatible row the nation
-/// fields now (rejected_invalid); the unit is not in a battle and not already
+/// fields now, or its own row when its design is stale (`refit_targets` of the unit,
+/// BL-1434) (rejected_invalid); the unit is not in a battle and not already
 /// refitting (rejected_state); it stands on @p nation's own ground
-/// (rejected_placement); the nation can pay the credits and the target's goods
+/// (rejected_placement); the nation can pay the credits and the target's goods and the
+/// changed slots' kit goods
 /// (rejected_funds). `applied` means the verb would apply.
 corp_command_result refit_check(const world& w, const recipe_registry& reg, entity_id nation,
                                 entity_id unit, uint16_t target);
+
+/// BL-1434 (unit designs): every check `set_unit_design` makes, READ-ONLY, in its
+/// order — so the designer names the refusal the seam would give, and can grey a
+/// locked item. @p nation is the seat (rejected_not_owner otherwise); @p cls a land
+/// class with slots (rejected_invalid); @p slot one of its slots (rejected_invalid);
+/// @p item a catalogue id that fits (@p cls, @p slot) (rejected_invalid); researched
+/// by @p nation (rejected_tech_locked); not already fitted (rejected_state).
+/// `applied` means the verb would apply.
+corp_command_result unit_design_check(const world& w, entity_id nation, uint32_t cls,
+                                      uint16_t slot, uint16_t item);
 
 /// Every check `march_unit` makes, READ-ONLY save for the logistics path cache the
 /// route search warms, in its order — so a caller can ask before it acts (the

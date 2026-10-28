@@ -2,6 +2,7 @@
 
 #include "recipe_registry.hpp" // era_band — BL-461
 #include "settlement.hpp"
+#include "unit_designs.hpp" // BL-1434: kit_stats, the unit's recorded design
 #include "world.hpp"
 
 #include <algorithm>
@@ -485,7 +486,9 @@ int muster_days_for(uint16_t roster_type)
 land_combat_stats unit_land_stats(const unit_component& u)
 {
     const roster_row* row = row_or_null(u.type);
-    land_combat_stats s = land_class_stats(row ? land_class_for(*row) : land_class::infantry);
+    // BL-1434 (unit designs): the class's stats plus the kit of the design the unit
+    // recorded, before the row's quality scale. Base kit adds nothing.
+    land_combat_stats s = kit_stats(row ? land_class_for(*row) : land_class::infantry, u.kit);
     const int64_t q = roster_type_quality_permille(u.type);
     auto scale = [q](int v) { return static_cast<int>(static_cast<int64_t>(v) * q / 1000); };
     s.soft         = scale(s.soft);
@@ -518,5 +521,16 @@ std::vector<uint16_t> refit_targets(const world& w, entity_id nation, uint16_t f
         if (refit_row_newer(from, idx))
             out.push_back(idx);
     }
+    return out;
+}
+
+std::vector<uint16_t> refit_targets(const world& w, entity_id nation, const unit_component& u,
+                                    roster_band band)
+{
+    std::vector<uint16_t> out;
+    if (u.owner == nation && unit_design_stale(w, u))
+        out.push_back(u.type); // BL-1434: a design refit, in place
+    const std::vector<uint16_t> newer = refit_targets(w, nation, u.type, band);
+    out.insert(out.end(), newer.begin(), newer.end());
     return out;
 }

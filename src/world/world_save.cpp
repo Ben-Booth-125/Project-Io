@@ -7,6 +7,7 @@
 #include "river_generation.hpp"  // BL-1340: hex_side_for_offset — the pre-v53 migration
 #include "history_log.hpp" // write_history_log / read_history_log -- the embedded section
 #include "state_industry.hpp"
+#include "unit_designs.hpp" // BL-1434: the designs section's range checks
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <algorithm>
@@ -1594,14 +1595,66 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 63 (BL-1443, tile contact): THE ATTACKING STACKS, the last
-    // section — each battle's, in battle order, as (count, ids ascending).
-    if (version == world_save_version)
+    // world_save_version 63 (BL-1443, tile contact): THE ATTACKING STACKS — each
+    // battle's, in battle order, as (count, ids ascending).
+    if (version >= k_world_save_version_pre_designs)
     {
         w_u32(out, static_cast<uint32_t>(w.battles.size()));
         for (const active_battle& b : w.battles)
             w_ids(out, b.attacking_units);
     }
+
+    // world_save_version 64 (BL-1434, unit designs): THE DESIGNS, the last section —
+    // nations with a non-base design (id, n, n ids); units off base kit (id, kit,
+    // refit kit); muster orders off base kit (order id, kit). Only deviations.
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+            if (!nc.unit_design_kit.empty())
+                nids.push_back(nid);
+        std::sort(nids.begin(), nids.end());
+        w_u32(out, static_cast<uint32_t>(nids.size()));
+        for (const entity_id nid : nids)
+        {
+            const std::vector<uint16_t>& v = w.nations.at(nid).unit_design_kit;
+            w_id(out, nid);
+            w_u32(out, static_cast<uint32_t>(v.size()));
+            for (const uint16_t id : v) w_u16(out, id);
+        }
+
+        std::vector<entity_id> uids;
+        for (const auto& [uid, u] : w.units)
+            if (!u.kit.is_base() || !u.refit_kit.is_base())
+                uids.push_back(uid);
+        std::sort(uids.begin(), uids.end());
+        w_u32(out, static_cast<uint32_t>(uids.size()));
+        for (const entity_id uid : uids)
+        {
+            const unit_component& u = w.units.at(uid);
+            w_id(out, uid);
+            for (const uint8_t v : u.kit.fit) w_u8(out, v);
+            for (const uint8_t v : u.refit_kit.fit) w_u8(out, v);
+        }
+
+        uint32_t musters = 0;
+        for (const muster_order& m : w.musters)
+            musters += m.kit.is_base() ? 0u : 1u;
+        w_u32(out, musters);
+        for (const muster_order& m : w.musters)
+        {
+            if (m.kit.is_base())
+                continue;
+            w_u32(out, m.id);
+            for (const uint8_t v : m.kit.fit) w_u8(out, v);
+        }
+    }
+}
+
+void write_world_snapshot_pre_designs(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1434): the v63 stream shape — no designs section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_designs);
 }
 
 void write_world_snapshot_pre_tile(const world& w, std::ostream& out)
@@ -1736,7 +1789,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_obsolete   // BL-1437: v59, every nation on the defaults
             && version != k_world_save_version_pre_refit      // 2026-10-27: v60, no unit refitting
             && version != k_world_save_version_pre_fronts     // BL-1427: v61, no fronts
-            && version != k_world_save_version_pre_tile))     // BL-1443: v62, battles keyed by province
+            && version != k_world_save_version_pre_tile       // BL-1443: v62, battles keyed by province
+            && version != k_world_save_version_pre_designs))  // BL-1434: v63, every design base kit
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2512,7 +2566,11 @@ bool read_world_snapshot(world& w, std::istream& in)
                 return false;
             prev = uid;
             const auto uit = s.units.find(uid);
-            if (uit == s.units.end() || target >= rows || target == uit->second.type
+            // BL-1434: from v64 a DESIGN refit keeps its row (checked against its refit
+            // design once the designs section is read); before v64 a refit always
+            // changed the row.
+            if (uit == s.units.end() || target >= rows
+                || (target == uit->second.type && version < world_save_version)
                 || days < 1 || days > 3650)
                 return false;
             uit->second.refit_type = target;
@@ -2574,7 +2632,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // per battle, each strictly ascending and a subset of that battle's attacker units.
     // Refused whole otherwise. A v62 (and older) stream ends before it: no battle has
     // an attacking stack, so none advances.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_designs)
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count != s.battles.size())
@@ -2590,6 +2648,96 @@ bool read_world_snapshot(world& w, std::istream& in)
                            == b.attacker_units.end())
                     return false;
             b.attacking_units = std::move(v);
+        }
+    }
+
+    // v64 (BL-1434, unit designs): nations' designs, units' kit, musters' kit.
+    // Untrusted: nations strictly ascending and in the stream, each with 1..catalogue
+    // ids strictly ascending, every id a NON-BASE catalogue item, at most one per
+    // (class, slot); units strictly ascending and in the stream, each off base kit,
+    // its kit a design its class can hold and its refit design one only while it
+    // refits; muster orders in issue order, each a real order, off base kit, holding
+    // a design its row's class can hold. Refused whole otherwise. A v63 (and older)
+    // stream ends before it: every nation and unit fields base kit.
+    if (version == world_save_version)
+    {
+        const std::vector<kit_item>& cat = kit_catalogue();
+        const std::vector<roster_row>& table = unit_roster_table();
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            uint32_t n = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev) || !r_u32(in, n)
+                || n == 0 || n > cat.size())
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            std::vector<uint16_t> v(n);
+            std::set<std::pair<int, int>> slots;
+            for (uint32_t i = 0; i < n; ++i)
+            {
+                if (!r_u16(in, v[i]) || v[i] >= cat.size() || (i > 0 && v[i] <= v[i - 1])
+                    || kit_variant_of(v[i]) == 0
+                    || !slots.insert({static_cast<int>(cat[v[i]].cls), cat[v[i]].slot}).second)
+                    return false;
+            }
+            nit->second.unit_design_kit = std::move(v);
+        }
+
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            unit_design kit, refit;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev))
+                return false;
+            for (uint8_t& v : kit.fit) if (!r_u8(in, v)) return false;
+            for (uint8_t& v : refit.fit) if (!r_u8(in, v)) return false;
+            prev = uid;
+            const auto uit = s.units.find(uid);
+            if (uit == s.units.end() || (kit.is_base() && refit.is_base()))
+                return false;
+            unit_component& u = uit->second;
+            if (u.type >= table.size() || !design_valid(land_class_for(table[u.type]), kit))
+                return false;
+            if (!refit.is_base()
+                && (!unit_refitting(u) || u.refit_type >= table.size()
+                    || !design_valid(land_class_for(table[u.refit_type]), refit)))
+                return false;
+            u.kit       = kit;
+            u.refit_kit = refit;
+        }
+        // A refit that keeps its row must change the design, or it changes nothing.
+        for (const auto& [uid, u] : s.units)
+            if (unit_refitting(u) && u.refit_type == u.type && u.refit_kit == u.kit)
+                return false;
+
+        if (!r_u32(in, count) || count > s.musters.size())
+            return false;
+        std::size_t at = 0; // musters are matched in issue order
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            uint32_t id = 0;
+            unit_design kit;
+            if (!r_u32(in, id))
+                return false;
+            for (uint8_t& v : kit.fit) if (!r_u8(in, v)) return false;
+            while (at < s.musters.size() && s.musters[at].id != id)
+                ++at;
+            if (at == s.musters.size() || kit.is_base())
+                return false;
+            muster_order& m = s.musters[at++];
+            if (m.unit_type >= table.size() || !design_valid(land_class_for(table[m.unit_type]), kit))
+                return false;
+            m.kit = kit;
         }
     }
 

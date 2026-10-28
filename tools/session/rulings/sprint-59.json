@@ -24,5 +24,26 @@
   "anchor": "The designer \\(Ben, 2026-10-28\\)",
   "stale": [],
   "owner": "BL-1446 (unit designer)"
+ },
+ {
+  "ruling": "Each land class has its own kit slots; one live design per class (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "One live design per class \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1434 (unit designs)"
+ },
+ {
+  "ruling": "A slot offers only researched kit; nothing researched fields the base kit (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "The lock rule \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1434 (unit designs)"
+ },
+ {
+  "ruling": "Units in the field refit to the live design (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A newer design is a newer model \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1434 (unit designs)"
  }
 ]

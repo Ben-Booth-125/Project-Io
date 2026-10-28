@@ -375,6 +375,19 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, 0x46524E54u); // "FRNT"
                 fnv1a_u32(h, u.front);
             }
+            // BL-1434 (unit designs): the recorded design and a refit's target design,
+            // each folded only when not base kit, behind its own marker, so a world of
+            // base-kit units keeps every hash.
+            if (!u.kit.is_base())
+            {
+                fnv1a_u32(h, 0x4B495444u); // "KITD"
+                for (const uint8_t v : u.kit.fit) fnv1a_u32(h, v);
+            }
+            if (!u.refit_kit.is_base())
+            {
+                fnv1a_u32(h, 0x524B4954u); // "RKIT"
+                for (const uint8_t v : u.refit_kit.fit) fnv1a_u32(h, v);
+            }
         }
     }
 
@@ -430,6 +443,33 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, m.unit_type);
             fnv1a_i32(h, m.days_total);
             fnv1a_i32(h, m.days_remaining);
+            if (!m.kit.is_base()) // BL-1434: only off base kit
+            {
+                fnv1a_u32(h, 0x4B495444u); // "KITD"
+                for (const uint8_t v : m.kit.fit) fnv1a_u32(h, v);
+            }
+        }
+    }
+
+    // BL-1434 (unit designs): each nation's live designs (its non-base kit ids),
+    // folded only for a nation that has any (sorted walk; nations is unordered), so
+    // a world where every nation fields base kit hashes as it did.
+    {
+        std::vector<entity_id> designed;
+        for (const auto& [nid, nc] : nations)
+            if (!nc.unit_design_kit.empty())
+                designed.push_back(nid);
+        if (!designed.empty())
+        {
+            std::sort(designed.begin(), designed.end());
+            fnv1a_u32(h, 0x44534749u); // "DSGI"
+            for (const entity_id nid : designed)
+            {
+                const std::vector<uint16_t>& v = nations.at(nid).unit_design_kit;
+                fnv1a_u32(h, nid);
+                fnv1a_u32(h, static_cast<uint32_t>(v.size()));
+                for (const uint16_t r : v) fnv1a_u32(h, r);
+            }
         }
     }
 

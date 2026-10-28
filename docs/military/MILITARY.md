@@ -206,8 +206,30 @@ tab (`../ui/ledgers/military.md`).
   item adds to the class's numbers.
 - **Kit is researched in the age tree**, not on a ladder of its own: the military kit is nodes of
   the age's tree like any other technology (`../economy/RESEARCH.md` § What technology is for).
-- **One live design per class.** Choosing an item per slot from what is researched and saving it
-  makes it what Recruit raises for that class; named designs kept side by side are a later step.
+- **One live design per class (Ben, 2026-10-28).** Choosing an item per slot from what is
+  researched and saving it makes it what Recruit raises for that class; named designs kept side by
+  side are a later step. A nation's design is its own: the seat sets it (`set_unit_design`), and
+  rival nations field base kit, since no AI grant lets a rival design.
+- **The kit catalogue.** Every slot of every class lists its items: the **base item** first — the
+  1960 standard, adding nothing and costing no goods — then **two to four later items**. A later
+  item carries a **stat delta** (soft attack, hard attack, hardness, defence, breakthrough), its
+  **goods** and the **research node** that opens it. A design's stats are its class's plus its
+  kit's deltas, before the roster row's quality scale; hardness stays inside 0..1000. The catalogue
+  is validated where it is authored, so a slot without a base item, or an item that fits no slot,
+  never reaches play. Its item names come from `../research/MILITARY_KIT.md` § 2.
+- **The lock rule (Ben, 2026-10-28).** A slot offers only researched kit. Base kit is always open;
+  a later item opens when the nation holds its research node. A class with nothing researched
+  fields its base kit. The kit's nodes are placed in the age tree by BL-1436 (kit in the age
+  tree); a node the tree does not hold is held by no nation, so its item stays locked.
+- **Kit is goods (Ben, 2026-10-27).** A hire buys the kit goods of its design's later items beside
+  its row's gated goods, both checked before either is taken; a hire whose kit the shelves cannot
+  supply is refused. Until the six kit goods by kind exist (§ Land — equipment, refit and
+  manpower), an item names the goods they are made of — steel, machinery, alloys, electronics and
+  ordnance — later items more of them.
+- **A unit records its design (Ben, 2026-10-28).** A hire is raised to its class's live design as
+  it stood when the hire was paid, and the unit keeps that design: changing the live design leaves
+  units in the field on their old kit until they **refit to it** (§ The muster interface, "Refit
+  to a newer type"). The unit fights on the kit it recorded.
 - **Obsolete unit types.** A nation marks a roster row obsolete, and Recruit hides it (a "show
   obsolete" switch brings it back); units already raised are untouched. **Every row below the
   modern band starts obsolete** for every nation, so Recruit opens on the modern types. A rival
@@ -642,7 +664,14 @@ gated goods off the shelf as a hire buys them. It takes the target's muster days
 Until then the unit keeps its old type, fights as it and is drawn into battles as it, but does not
 march: re-equipping is done in place, so a standing march order is cleared. On completion it takes
 the new type and keeps its men, establishment, readiness and morale. The press is on the unit card
-(`refit_unit`). Rival nations do not refit; no AI grant covers it. This is distinct from the
+(`refit_unit`).
+
+**A newer design is a newer model (Ben, 2026-10-28).** A unit whose recorded design differs from
+its class's live design may refit to its **own row**: a design refit, under the same conditions,
+which pays no credits and no row goods. Every refit, to a newer row or the same one, brings the
+unit to the live design as it stood when the refit was ordered, and buys the kit goods of each slot
+whose item changes; a slot going back to its base kit buys nothing. It takes the row's muster days,
+and the unit fights on its old kit until it completes. Rival nations do not refit; no AI grant covers it. This is distinct from the
 **Refit** of § Land — equipment, refit and manpower, which refills a wounded unit's HP.
 
 ### The roster
