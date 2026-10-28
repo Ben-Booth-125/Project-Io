@@ -595,6 +595,13 @@ that same shelf (Ben, 2026-09-15: the market, not the body, is the unit). A nati
 in two catchments on one body sells into and buys from two markets, and moving goods between them
 is a trade (`TRADE.md`).
 
+**A plant is fed only through its own shelf, at its own shelf's price.** A processor draws an
+input only where its own market's posted price for it is at or under the fair-price ceiling
+(`MARKETS.md`); output standing in another market reaches it only by landing on that shelf. So a
+nation does not start a new processor whose input is already priced over the ceiling on the
+plant's own market. That market is short of the input past what a plant pays, and the new plant
+would only starve beside the plants already there (`../ai/AI_OPPONENT.md` § Build only what runs).
+
 **Landing is selling.** At the tick's clear the owner is paid the quantity landed at that tick's
 clearing price, the market the counterparty whether or not anyone bids, and the goods move onto
 the shelf (`MARKETS.md` § The clearing tick). A glut drives that price to the floor, and the maker
