@@ -68,8 +68,12 @@ this kind of unit carrying, and what can it carry instead?"
 - **The summary** under the image is the design's soft attack, hard attack, defence, breakthrough
   and hardness and its kit goods per unit; hovering an item previews them with it fitted. There is
   no speed: speed is the class's alone (Ben, 2026-10-28).
-- **Saving is the pick.** Each pick sets that slot of the class's **one live design** at once
-  (`set_unit_design`, one slot per press): new hires are raised with it, and units already in the
+- **A pick drafts; Save commits (Ben, 2026-10-28, NR-1096).** A pick changes the open design's
+  **draft** only — the boxes and summary show the draft, and a slot whose draft differs from the
+  live design is marked changed. **Save** sends the draft as the class's **one live design**
+  (`set_unit_design`, each changed slot); **Revert** drops the draft. Closing with an unsaved draft
+  asks to save or discard. The fitted item stays disabled in its list ("Fitted"), since the slot is
+  a one-of-n selector. Once saved, new hires are raised with it, and units already in the
   field take it by refit (§ Design above; `../../military/MILITARY.md` § The muster interface,
   "Refit to a newer type"). The summary counts the units in the field still on an older design;
   their unit card offers the refit.

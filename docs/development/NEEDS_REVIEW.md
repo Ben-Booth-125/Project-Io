@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*12 entries — 12 open, 0 resolved.*
+*12 entries — 10 open, 2 resolved.*
 
 ---
 
@@ -164,6 +164,13 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 
 *Files: `scripts/recipes.lua`, `docs/economy/PRODUCTION.md`*
 
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-1095 — A PNG decoder in src/ui/png_decode.cpp
 *novel-work · raised 2026-10-28 · from BL-1446 (unit designer) lane*
 
@@ -176,6 +183,8 @@ The designer draws a class image, and the app links no image library: SDL 3.2 lo
 - C: keep it designer-only until real art lands
 
 > **Recommendation:** A. It is small, pure and refuses what it cannot read; a vendored library is a bigger surface for a handful of files.
+
+> **RESOLVED.** Ben, 2026-10-28: A - keep it as the one image path. Written into TECH_FOUNDATIONS.md § Framework - SDL3. The output cap is BL-1447 (kit goods priced)'s tail.
 
 *Files: `src/ui/png_decode.cpp`, `src/ui/png_decode.hpp`, `docs/tech/TECH_FOUNDATIONS.md`*
 
@@ -193,12 +202,7 @@ Two UI calls the lane made. (1) Each pick in a slot list sends set_unit_design a
 
 > **Recommendation:** A. The slot is a selector of one-of-n, like the exempt combos; base kit is one press away in the same list.
 
+> **RESOLVED.** Ben, 2026-10-28: C - a pick drafts and Save commits; the fitted item stays disabled. Written into docs/ui/ledgers/military.md § The designer; the work is BL-1448 (designer draft and Save).
+
 *Files: `src/ui/unit_designer.cpp`, `docs/ui/ledgers/military.md`*
-
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
 

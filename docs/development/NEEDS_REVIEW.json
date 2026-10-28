@@ -250,8 +250,8 @@
   },
   {
    "raised": "2026-10-28",
-   "status": "open",
-   "resolution": null,
+   "status": "resolved",
+   "resolution": "Ben, 2026-10-28: A - keep it as the one image path. Written into TECH_FOUNDATIONS.md § Framework - SDL3. The output cap is BL-1447 (kit goods priced)'s tail.",
    "id": "NR-1095",
    "kind": "novel-work",
    "title": "A PNG decoder in src/ui/png_decode.cpp",
@@ -272,8 +272,8 @@
   },
   {
    "raised": "2026-10-28",
-   "status": "open",
-   "resolution": null,
+   "status": "resolved",
+   "resolution": "Ben, 2026-10-28: C - a pick drafts and Save commits; the fitted item stays disabled. Written into docs/ui/ledgers/military.md § The designer; the work is BL-1448 (designer draft and Save).",
    "id": "NR-1096",
    "kind": "question",
    "title": "Designer: a pick saves at once; the fitted item is disabled rather than a toggle",

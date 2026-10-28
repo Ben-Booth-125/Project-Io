@@ -995,20 +995,15 @@ not how far*, distance priced in credits and only in credits (§ Three rules tha
 constraint 3), the rule NR-620 measured at a 73% collapse in convoy traffic when a distance draw
 was tried.
 
-**A march draws on the nation's pool too, and claims first (Ben, 2026-10-16).** Movement a
-player or rival directs draws the same points production and trade do, so guns, butter and freight
-compete in one currency. **The march claims before the others** — Ben's 2026-09-24 ruling (NR-917),
-kept, and with trade drawing again it keeps its original subject: the front is supplied, and the
-trade and the factories behind it wait. A campaign visibly starving its own industry is the
-intended, legible cost of marching.
-
-**The march claims the quarter ahead, and spends it by the day (Ben, 2026-10-28; MILITARY.md
-§ Marching).** Units march every day, but the pool resolves once a quarter. So at each economy tick a
-marching unit claims the traversal cost of the path it can walk in the next ninety days at its
-class's speed, capped by what its order still needs; it is granted that whole or refused, before
-production claims. The grant is spent a point per unit of traversal cost as each hop is crossed, and
-the next tick's grant replaces what is left of it. A unit whose grant does not cover its next hop
-halts until the next grant.
+**A unit's supply draws on the pool, and claims first (Ben, 2026-10-28, overturning the
+2026-10-16 march draw).** Movement draws no points: a march is paid in days
+(`../military/MILITARY.md` § Marching). What draws is a unit's **supply** — food, ammunition, the
+weaponry lost to attrition and the recruits and equipment that refill it — requested once a quarter
+**at the tile the unit stands on** and served by that tile's routed cover like any building's
+request. Guns, butter and freight still compete in one currency. **The supply draw claims before the
+others** — Ben's 2026-09-24 ruling (NR-917), kept with its original subject: the front is supplied,
+and the trade and the factories behind it wait. A campaign visibly starving its own industry is the
+intended, legible cost of keeping an army in the field.
 
 **A shipment draws points again (Ben, 2026-10-16).** The cap retired in BL-1309's cut is
 reinstated: a shipment draws **by cargo quantity**.
@@ -1074,9 +1069,9 @@ Neither replaces the other.
 > supplying items."*
 
 The cap/price split holds. What changes is **which side of the game pays**. A convoy pays credits
-per unit-distance. A marching unit spends Logistic Points against the traversal cost of each hop it
-crosses, and **that march is priced in credits by active LP**, charged hop by hop as it is crossed — so moving an army is not free, which was never a decision anyone
-made.
+per unit-distance. An army in the field is **priced in credits by active LP** — so keeping an army
+supplied is not free, which was never a decision anyone made. Since 2026-10-28 the active draw is a
+unit's quarterly supply at its tile, not its march (§ A unit's supply draws on the pool).
 
 So: **passive LP caps trade, which is already priced; active LP caps force, which this ruling
 prices.** Read that way it is a widening of the existing rule rather than an exception to it. The
@@ -1124,10 +1119,10 @@ Each rejected an earlier cut. Two are structural.
    cache happens to hold.
 3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
-   **Settled (Ben, 2026-08-25): a convoy draw is its cargo quantity; a march draw is its march
-   points** — one point per unit of traversal cost crossed, however many days the class takes over
-   it (MILITARY.md § Marching). One rate serves both, so a unit of goods and a march-point's worth of movement burden
-   an anchor equally — the implicit exchange rate, kept as settled (Ben, 2026-10-23, NR-1049).
+   **Settled (Ben, 2026-08-25): a convoy draw is its cargo quantity.** **A unit's draw is its
+   supplies' quantity (Ben, 2026-10-28, replacing "a march draw is its march points")**, so one rate
+   serves both and a unit of goods burdens an anchor equally whether it is freight or an army's
+   ration — the exchange rate kept as settled (Ben, 2026-10-23, NR-1049).
    **For a shipment, distance now counts too (Ben, 2026-10-23, NR-1060):** it pays for its whole
    route (§ A shipment draws points again), which overturns the old rule that only cargo, never
    distance, decides the draw.
@@ -1173,8 +1168,8 @@ LP is what makes that priority explicit, and it is the strongest argument for it
   its consumer (settled rule 3, applied per half). Rates for both halves are first-cut in the
   landing items, argued against BL-543's (value anchor) unit-cost anchor and flagged for tuning
   rather than ruled ahead (NR-600).
-- **Armies claim first (Ben, 2026-09-24, NR-917).** Within a tick the march draws Logistic Points
-  before the trade pass does, so when an anchor is contended the front is supplied and the trade
+- **Armies claim first (Ben, 2026-09-24, NR-917).** Within a tick an army's supply draws Logistic
+  Points before the trade pass does, so when an anchor is contended the front is supplied and the trade
   waits. That is a chosen priority, not a phase-order accident: an army's supply is the more urgent
   draw, and starving trade to feed a war is a legible cost a player can read and plan around.
 

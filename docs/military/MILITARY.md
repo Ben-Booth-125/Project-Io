@@ -829,8 +829,16 @@ for every other traveller. Partial progress banks in `order.progress` from day t
 is the **class's**; a design's transport kit does not change it until kit exists (BL-1436, kit in
 the age tree). A sea unit moves on coast and ocean tiles under § The campaign force model's Sea,
 not on this land table. A composite unit (BL-472, formations) moves at its **slowest** component's
-speed. Logistic Points are still granted once a quarter (§ One reach field); a march spends its
-grant day by day, and a unit whose grant is spent halts until the next quarter's grant.
+speed.
+
+**Movement takes no Logistic Points (Ben, 2026-10-28).** A march is paid in days, never in points, so
+an order given mid-quarter moves at once. What a unit costs the network is its **supply**: once a
+quarter it draws Logistic Points at the tile it stands on (§ Upkeep — supply is drawn where the unit
+stands).
+
+**Out of contact, readiness and morale recover daily (Ben, 2026-10-28)**, on the same day step as the
+march and the battle, and **a unit a battle kills is removed that same day** — it does not stand on
+its tile, blocking a step, until the quarter ends.
 
 The days are authored data: `economy.military.march_days_per_tile`, keyed by land class, and
 `economy.military.march_days_per_tile_by_cls` for a **pre-modern row**, which declares no land
@@ -1138,6 +1146,17 @@ reports the count as `unit_upkeep_tick::disbanded`.
 border garrison — and is never orphaned. A capital garrison records its capital base (§ Nation
 garrisons), so it is held to that base like any unit raised there.
 
+**Supply is drawn where the unit stands (Ben, 2026-10-28).** Once a quarter each unit asks the
+Logistic Points its supplies need, **scored on its current tile**: a request on that tile, served by
+the tile's routed cover from the nation's pool exactly as a building's is
+([`LOGISTICS.md`](../economy/LOGISTICS.md) § A unit's supply draws on the pool). The supplies are
+everything that keeps a unit in the field: food upkeep, ammunition resupply, the weaponry it lost to
+attrition, and the recruits and equipment that refill its HP (§ Land — equipment, refit and
+manpower). The request is the quantity of those goods, as a convoy's draw is its cargo. Where the
+tile's cover meets only part of it, the unit is supplied at that share, and the one decay rule above
+moves its supply factor toward it — a third trigger of the same rule, not a second rule. An army
+deep past its roads is an army its network cannot feed.
+
 **Supply is measurably real in the resolver, not merely expensive.** The land round reads each
 unit's `supply_factor_permille`, so an unsupplied army is weaker where it counts.
 
@@ -1162,8 +1181,9 @@ Its anchors are cities, and built active ports and inland logistics hubs
 nothing**, which is why it earns no exemption from the reach rule that governs its own placement.
 
 **To project force further, you extend the same road and hub network everyone else uses.** There is
-one distance metric in the game and armies pay it: a march spends its points against the same
-traversal cost a convoy does, and a unit beyond the envelope takes the upkeep pass's decay
+one distance metric in the game and armies pay it: a march spends its days against the same
+traversal cost a convoy does, a unit's quarterly supply is drawn on that network at its tile, and a
+unit beyond the envelope takes the upkeep pass's decay
 (§ Upkeep — `run_unit_upkeep` calls `body_reach_field` and `tile_reach_cost`, and a unit whose tile
 cost exceeds `out_of_supply_reach`, or is unreachable outright, loses supply each tick). This is
 verified rather than merely asserted: `buildings_rework_harness` R6/R7 assert that a completed base

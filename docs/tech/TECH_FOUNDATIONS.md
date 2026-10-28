@@ -77,6 +77,8 @@ SDL3 was chosen over SFML and raylib for three reasons. First, it sits at exactl
 
 SFML was ruled out due to slower evolution and a C++ OOP API that works against a data-oriented simulation model. Raylib was ruled out because its built-in main loop and camera abstractions create friction when building a custom engine with a separate simulation tick and multiple distinct view systems.
 
+**Authored images load through one in-tree PNG decoder (Ben, 2026-10-28, NR-1095).** SDL3 loads BMP only and ImGui bundles no image loader, so `src/ui/png_decode.cpp` is the one image path: zlib inflate plus 8-bit grey, grey+alpha, RGB, RGBA and palette PNGs, non-interlaced, with any other file refused with a reason. Every authored image (unit art, emblems, icons as files) loads through it; a vendored image library is not added beside it. It caps its output size, because a file is input it did not write.
+
 ### Lua embedding — sol2
 Lua is embedded via **sol2 (v3)**. sol2 provides the highest-ergonomics C++ ↔ Lua binding available: automatic type conversion, clean class registration, and thorough documentation. The cost is heavier compile-time metaprogramming; this is acceptable given that Lua's role in the prototype is limited to data definitions and balance values, not hot-path simulation code.
 
