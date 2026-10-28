@@ -443,6 +443,7 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::refit_unit:    return "unit refit"; // 2026-10-27: never issued by a rival
         case corp_verb::assign_front:  return "front assignment"; // BL-1427
         case corp_verb::set_front_order: return "front order";    // BL-1427
+        case corp_verb::set_unit_design: return "unit design";    // BL-1434: never issued by a rival
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";

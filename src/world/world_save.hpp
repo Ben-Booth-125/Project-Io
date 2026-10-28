@@ -542,7 +542,19 @@ inline constexpr uint32_t world_save_magic =
 /// by its ground tile (or, with none, by its province id, which is the province's
 /// lowest member tile), and has no attacking stack, so it advances no one. The march
 /// order's province slot is written 0 and read past.
-inline constexpr uint32_t world_save_version = 63;
+///
+/// Bumped to 64 (BL-1434, unit designs; MILITARY.md § The kit): A TRAILING SECTION
+/// after the attacking stacks carries, each after a u32 count: every nation with a
+/// non-base design, ascending id, as (id, u32 n, n x u16 kit catalogue ids ascending);
+/// every unit whose recorded design or refit design is not base kit, ascending id, as
+/// (id, 3 x u8 kit variants, 3 x u8 refit variants); and every muster order whose
+/// design is not base kit, in issue order, as (u32 order id, 3 x u8 variants). v63 is a
+/// STRICT PREFIX of v64 and is read too (`k_world_save_version_pre_designs`), as a world
+/// where every nation and every unit fields base kit.
+inline constexpr uint32_t world_save_version = 64;
+
+/// v63, a strict prefix of v64 (the designs section is v64's only addition).
+inline constexpr uint32_t k_world_save_version_pre_designs = 63;
 
 /// v62, a strict prefix of v63 (the attacking-stack section is v63's only addition).
 inline constexpr uint32_t k_world_save_version_pre_tile = 62;
@@ -700,6 +712,9 @@ void write_world_snapshot_pre_fronts(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1443): @p w written as a v62 stream, less the attacking-stack
 /// section. The game never writes it.
 void write_world_snapshot_pre_tile(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1434): @p w as a v63 stream — no designs section.
+void write_world_snapshot_pre_designs(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

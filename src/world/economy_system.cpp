@@ -2021,6 +2021,7 @@ void advance_musters(world& w)
             .supply_factor_permille = 1000, // raised fully supplied (BL-454)
             .muster_base            = m.base,
             .establishment          = hire_batch_manpower, // BL-1421: the HP bar's full mark
+            .kit                    = m.kit, // BL-1434: the design the hire paid for
         };
     }
     w.musters.swap(still);
@@ -2038,7 +2039,9 @@ void advance_refits(world& w)
         if (u.refit_days > 0)
             continue;
         u.type       = u.refit_type;
+        u.kit        = u.refit_kit; // BL-1434: the design the refit paid for
         u.refit_type = k_no_refit;
+        u.refit_kit  = unit_design{};
         u.refit_days = 0;
     }
 }

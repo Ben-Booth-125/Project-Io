@@ -1812,6 +1812,29 @@ struct movement_order
     float                   progress   = 0.0f;
 };
 
+/// BL-1434 (unit designs; MILITARY.md § The kit): the kit fitted to a land class's
+/// slots, as one VARIANT per slot — the item's place in that slot's list of the kit
+/// catalogue (unit_designs.hpp), where 0 is the slot's BASE kit (the 1960 standard).
+/// So a zero-initialised design is all base kit, which is every design a nation
+/// starts on and every unit raised before designs existed. Slots past the class's
+/// own count are always 0. The catalogue owns what a variant names.
+inline constexpr std::size_t k_kit_slot_max = 3;
+
+struct unit_design
+{
+    std::array<uint8_t, k_kit_slot_max> fit{};
+
+    /// True when every slot holds its base kit.
+    bool is_base() const
+    {
+        for (const uint8_t v : fit)
+            if (v != 0) return false;
+        return true;
+    }
+    bool operator==(const unit_design& o) const { return fit == o.fit; }
+    bool operator!=(const unit_design& o) const { return fit != o.fit; }
+};
+
 struct unit_component
 {
     entity_id position;      ///< Tile the unit currently occupies (BL-157: tile-canonical).
@@ -1878,6 +1901,19 @@ struct unit_component
     /// its span, normally the lowest; unique per nation — fronts.hpp), or `null_entity` when unassigned.
     /// Set by `assign_front`; kept on its span by `reanchor_fronts`.
     entity_id front = null_entity;
+
+    /// BL-1434 (unit designs): the design the unit was raised or last refitted to —
+    /// a SNAPSHOT of its class's live design at that moment, not a reference to it,
+    /// so a later change to the live design leaves the unit on its old kit until it
+    /// refits (`unit_design_stale`). Its combat stats read it (`unit_land_stats`).
+    /// Base kit for every unit that predates designs. Saved (world_save_version 64)
+    /// and hashed only when not base.
+    unit_design kit{};
+
+    /// BL-1434: the design a refit brings the unit to, set with `refit_type` by
+    /// `refit_unit` (the live design when the refit was ordered, its kit paid for
+    /// then) and taken into `kit` when the refit completes. Base when not refitting.
+    unit_design refit_kit{};
 };
 
 /// `unit_component::refit_type`'s "not refitting" sentinel. Never a roster index.
@@ -1901,6 +1937,10 @@ struct muster_order
     uint16_t  unit_type      = 0;           ///< Roster row index, as unit_component::type.
     int32_t   days_total     = 0;           ///< The muster's length, for the queue's progress bar.
     int32_t   days_remaining = 0;           ///< Days left; <= 0 completes on the next tick.
+    /// BL-1434: the class's live design when the hire was paid — its kit was bought
+    /// then — which the unit records when the muster completes. Saved (v64) only
+    /// when not base.
+    unit_design kit{};
 };
 
 /// BL-1427 (fronts; MILITARY.md § Fronts): a front's order. Hold is the default and
@@ -2411,6 +2451,14 @@ struct nation_component
     /// obsolete). Ascending, no duplicates. Empty for a nation that never touched it.
     /// Saved (world_save_version 60).
     std::vector<uint16_t> roster_obsolete_flips;
+
+    /// BL-1434 (unit designs; MILITARY.md § The kit): this nation's live designs, as
+    /// the kit catalogue ids (unit_designs.hpp) of every NON-BASE item it has fitted —
+    /// at most one per (class, slot). A slot with no entry holds its base kit, so the
+    /// default (all base, every class) is the empty vector and is not stored.
+    /// Ascending, no duplicates. Read through `design_of`; written only by
+    /// `set_unit_design`. Saved (world_save_version 64) and hashed only when non-empty.
+    std::vector<uint16_t> unit_design_kit;
 };
 
 // ---------------------------------------------------------------------------

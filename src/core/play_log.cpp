@@ -220,6 +220,7 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::refit_unit:           return "refit_unit";
         case corp_verb::assign_front:         return "assign_front";    // BL-1427
         case corp_verb::set_front_order:      return "set_front_order"; // BL-1427
+        case corp_verb::set_unit_design:      return "set_unit_design"; // BL-1434
     }
     return "verb?";
 }

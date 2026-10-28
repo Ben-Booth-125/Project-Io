@@ -496,8 +496,10 @@ int modern_row_for(land_class c);
 /// table were ever to lose that row — a data problem, not a reason to seed nothing.
 uint16_t campaign_opening_unit_row();
 
-/// @p u's stats: its row's class, attacks, defence and breakthrough scaled by the
-/// row's quality (`roster_type_quality_permille`). Hardness is the class's own.
+/// @p u's stats: its row's class plus the kit of the design it recorded
+/// (`kit_stats(class, u.kit)`, unit_designs.hpp — BL-1434), then attacks, defence and
+/// breakthrough scaled by the row's quality (`roster_type_quality_permille`).
+/// Hardness is the class's plus its kit's, unscaled.
 /// An unknown row fights as infantry, as `unit_to_stack_entry` reads it.
 land_combat_stats unit_land_stats(const unit_component& u);
 
@@ -535,3 +537,11 @@ bool refit_row_newer(uint16_t from, uint16_t to);
 /// order. Obsolete rows are included (the seam allows them; the card lists the
 /// live ones first).
 std::vector<uint16_t> refit_targets(const world& w, entity_id nation, uint16_t from, roster_band band);
+
+/// BL-1434 (unit designs): the refit targets of unit @p u itself — its own row first
+/// when its recorded design differs from its owner's live design for its class (a
+/// DESIGN refit: "a newer compatible model" includes a newer design), then
+/// `refit_targets(w, nation, u.type, band)`. A refit to any target brings the unit to
+/// the live design.
+std::vector<uint16_t> refit_targets(const world& w, entity_id nation, const unit_component& u,
+                                    roster_band band);

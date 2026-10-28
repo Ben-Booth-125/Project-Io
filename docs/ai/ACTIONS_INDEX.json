@@ -658,6 +658,10 @@
    "The front card's Hold and Push presses in the Selection element, after clicking one of the player's fronts on the canvas. Also a corp_verb (corp_verb::set_front_order, 42) on the command seam."
   ],
   [
+   "gameplay.set_unit_design",
+   "The Military ledger's Design tab (nav rail slot 7), the designer: per land class, one choice of kit per slot. Also a corp_verb (corp_verb::set_unit_design, 43) on the command seam."
+  ],
+  [
    "ledger.military_show_obsolete",
    "The Military ledger's Recruit tab (nav rail slot 7): the 'Show obsolete (N)' checkbox above the roster."
   ],
