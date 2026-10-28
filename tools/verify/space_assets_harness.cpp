@@ -436,7 +436,8 @@ int main()
         };
         const std::size_t tail = 4 + w.space_assets.size() * rec + (world_save_tax_section_bytes(w) - 4)
                                + world_save_major_section_bytes(w) + world_save_books_section_bytes(w)
-                               + 12; // BL-1434 (v64): the designs section, three empty counts
+                               + 12  // BL-1434 (v64): the designs section, three empty counts
+                               + 4;  // BL-1445 (v65): the march-grant section, an empty count
         const std::string b55 = v55_of(w);
         std::string v50 = b55.substr(0, b55.size() - tail55_of(w));
         const std::uint32_t pre = k_world_save_version_pre_space;

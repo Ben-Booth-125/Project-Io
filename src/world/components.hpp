@@ -1796,8 +1796,14 @@ struct population_centre_component
 /// per tick. `next_index` is the index into `path` of the next tile the unit
 /// has not yet reached (`path[0]` is the tile the unit stood on when the
 /// order was placed, so a fresh order starts at `next_index == 1`).
-/// `progress` banks fractional march points toward the next hop's cost
-/// across tick boundaries — see run_unit_march (economy_system.cpp).
+/// `progress` banks fractional movement toward the next hop's cost, in units of
+/// TRAVERSAL COST (a plains tile is 1.0), from DAY to day: each day a unit gains
+/// 1 / its class's days-per-plains-tile (BL-1445, move by days; MILITARY.md
+/// § Marching) and steps when the bank covers the hop. The field's unit is the
+/// one it always had - a march point is one unit of traversal cost - so an old
+/// save's banked fraction reads as the same partial tile; only the rate it
+/// fills at moved, from once a quarter to once a day. See run_unit_march
+/// (economy_system.cpp).
 ///
 /// EVERY MARCH GOES TO A TILE AND ENDS ON IT (Ben, 2026-10-27: "all marches go
 /// to a tile"). `dest` is the commanded tile; the march ends when the path is
@@ -1914,6 +1920,16 @@ struct unit_component
     /// `refit_unit` (the live design when the refit was ordered, its kit paid for
     /// then) and taken into `kit` when the refit completes. Base when not refitting.
     unit_design refit_kit{};
+
+    /// BL-1445 (move by days; MILITARY.md § Marching): the Logistic Points this unit
+    /// was GRANTED at the last economy tick and has not yet spent. Logistic Points are
+    /// granted once a quarter (`apply_march_grants`, from the resolve's
+    /// `lp_tick::march_granted`; the next grant REPLACES what is left, never adds to
+    /// it) and spent day by day, one point per unit of traversal cost crossed; a unit
+    /// whose next hop costs more than this halts until the next grant. Read only by a
+    /// GATED march (the economy step and the app's day loop). SERIALISED (world_save
+    /// v65's trailing march-grant section) and folded into state_hash when non-zero.
+    float march_grant = 0.0f;
 };
 
 /// `unit_component::refit_type`'s "not refitting" sentinel. Never a roster index.

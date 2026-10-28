@@ -158,10 +158,20 @@ recipe_registry make_registry()
 {
     recipe_registry reg;
     military_capability_params mp = reg.military();
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = 1.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::cavalry)]  = 1.5f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::ranged)]   = 1.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::siege)]    = 0.5f;
+    // BL-1445 (move by days): a class is authored as DAYS PER PLAINS TILE and the march
+    // steps once a DAY. This fixture keeps the per-call speeds its rows were written
+    // against (infantry 1.0 of traversal cost a call, cavalry 1.5, ranged 1.0, siege
+    // 0.5), so one run_unit_march call - one day - moves a unit as one call always did:
+    // days = 1 / those points, and a modern row by the cls it names. These rows are
+    // about contact, battles and fronts, not speed; the authored speeds are measured in
+    // move_by_days_harness.
+    const float per_call[unit_class_count] = { 1.0f, 1.5f, 1.0f, 0.5f, 0.0f }; // inf, cav, ranged, siege, naval
+    for (int k = 0; k < unit_class_count; ++k)
+        mp.march_days_per_cls[static_cast<std::size_t>(k)] = per_call[k] > 0.0f ? 1.0f / per_call[k] : 0.0f;
+    for (int c = 0; c < land_class_count; ++c)
+        if (const int row = modern_row_for(static_cast<land_class>(c)); row >= 0)
+            mp.march_days_per_land_class[static_cast<std::size_t>(c)] =
+                mp.march_days_per_cls[static_cast<std::size_t>(unit_roster_table()[static_cast<std::size_t>(row)].cls)];
     reg.set_military(mp);
     return reg;
 }
@@ -199,7 +209,7 @@ int main()
               "B1 setup: the attacker is ordered onto the defender's tile");
         // The march pass with no Logistic Point resolve handed in (the fixture's
         // nations make none); the real tick then steps the battle it opened.
-        const unit_march_tick mt = run_unit_march(f.w, reg, nullptr);
+        const unit_march_tick mt = run_unit_march(f.w, reg, false);
         check(mt.attacks == 1 && mt.battles_opened == 1 && f.w.battles.size() == 1
                   && f.w.battles.front().tile == f.tile,
               "B1a THE TRIGGER FIRED — the step onto a hostile stack's tile opened a battle over it");
@@ -219,7 +229,7 @@ int main()
         build_fixture(f, /*declare=*/false);
         const int before = total_men(f.w);
         (void)apply_corp_command(f.w, reg, march_cmd(f.att, f.ua, f.tile));
-        const unit_march_tick mt = run_unit_march(f.w, reg, nullptr);
+        const unit_march_tick mt = run_unit_march(f.w, reg, false);
         run_economy_step(f.w, reg);
         check(f.w.battles.empty() && total_men(f.w) == before && mt.attacks == 0 && mt.blocked == 1
                   && f.w.units.at(f.ua).position != f.tile,
@@ -355,7 +365,9 @@ int main()
         fixture f;
         build_fixture(f);
         engage(f);
-        run_economy_step(f.w, reg); // fight
+        // BL-1445: ONE DAY's fight. A whole economy step is ninety days of rounds now,
+        // and would end the battle before B8c could ask to leave it.
+        run_battles(f.w, reg, 0);
 
         const uint64_t h_before = f.w.state_hash(1);
         const bool bogus = request_withdraw(f.w, f.att, 0x7FFFFFF0u);
@@ -376,8 +388,9 @@ int main()
             const bool ok = request_withdraw(f.w, f.att, f.tile);
             check(ok, "B8c a participant's withdraw request is accepted");
             const int rounds_before = f.w.battles.front().state.rounds_fought;
-            run_economy_step(f.w, reg); // honoured at the tick boundary
-            check(rounds_before >= 0, "B8d the request is honoured on the following tick, not instantly");
+            const battle_tick next = run_battles(f.w, reg, 1); // honoured at the day boundary
+            check(rounds_before >= 0 && next.withdrew == 1,
+                  "B8d the request is honoured on the following day, not instantly");
         }
         else
         {
@@ -804,8 +817,8 @@ int main()
         const campaign_battle_params p{};
         check(!t.dispatches.empty() && t.dispatches.front().end == campaign_battle_end::defender_broken,
               "B19 setup: the spent defender broke");
-        // The winner's +win lands, then recovery moves it at most one step back
-        // toward its supply (1000) — so it is above where it started.
+        // The winner's +win lands (recovery is quarterly since BL-1445, so nothing
+        // moves it back within the day) — so it is above where it started.
         check(f.w.units.at(f.ua).morale_permille >= 800 + p.morale_win,
               "B19a the field's holder gained morale");
         check(f.w.units.at(f.ub).morale_permille < 800,
@@ -825,13 +838,15 @@ int main()
         bool rising = true;
         for (int i = 0; i < 12; ++i)
         {
-            run_battles(f.w, reg, i);
+            // BL-1445: recovery is QUARTERLY (the economy step), not a step of the
+            // daily battle pass: a quarter's recovery, twelve times.
+            recover_out_of_contact(f.w);
             const int r = f.w.units.at(f.ua).readiness_permille;
             if (r < prev) rising = false;
             prev = r;
         }
         const unit_component& after = f.w.units.at(f.ua);
-        std::printf("        readiness 0 -> %d, morale 700 -> %d over twelve idle ticks\n",
+        std::printf("        readiness 0 -> %d, morale 700 -> %d over twelve idle quarters\n",
                     after.readiness_permille, after.morale_permille);
         check(rising && after.readiness_permille > 0, "B20a readiness climbs back while out of contact");
         check(after.readiness_permille <= after.morale_permille,
@@ -840,7 +855,7 @@ int main()
 
         unit_component& hungry = f.w.units.at(f.ub);
         hungry.supply_factor_permille = 400;
-        run_battles(f.w, reg, 20);
+        recover_out_of_contact(f.w);
         check(f.w.units.at(f.ub).morale_permille < 1000, "B20d an unsupplied unit's morale falls toward its supply");
     }
 
@@ -850,7 +865,7 @@ int main()
         fixture f;
         build_fixture(f, /*declare=*/false);
         const uint64_t h0 = f.w.state_hash(0);
-        for (int i = 0; i < 5; ++i) run_battles(f.w, reg, i);
+        for (int i = 0; i < 5; ++i) { run_battles(f.w, reg, i); recover_out_of_contact(f.w); }
         check(f.w.state_hash(0) == h0,
               "B21a fully supplied units at full readiness and morale hash exactly as before (R6)");
 
@@ -858,7 +873,7 @@ int main()
         // morale drifts toward its supply even with no fight, and the hash moves.
         f.w.units.at(f.ua).supply_factor_permille = 900;
         const uint64_t h1 = f.w.state_hash(0);
-        run_battles(f.w, reg, 9);
+        recover_out_of_contact(f.w); // a quarter's recovery
         check(f.w.state_hash(0) != h1 && f.w.units.at(f.ua).morale_permille == 990,
               "B21b an unsupplied unit's morale moves without a fight (10 toward its supply), so the hash does");
     }
@@ -889,11 +904,14 @@ int main()
         const unit_component& u = f.w.units.at(f.ua);
         const int side = road_side_between(f.w, t, u.position);
         std::printf("        morale 1000 -> %d; moved %s\n", u.morale_permille, side >= 0 ? "one tile" : "elsewhere");
-        check(u.morale_permille == 1000 - p.morale_loss + p.morale_recovery_permille,
-              "B22a it paid the morale loss ONCE (then one tick of recovery)");
+        check(u.morale_permille == 1000 - p.morale_loss,
+              "B22a it paid the morale loss ONCE (the daily pass recovers nothing, BL-1445)");
         check(side >= 0, "B22b it moved one tile, not two");
         const std::set<entity_id> foes = { f.w.units.at(f.ub).position, f.w.units.at(uc).position };
         check(foes.count(u.position) == 0, "B22c it did not retreat onto either foe's tile");
+        recover_out_of_contact(f.w);
+        check(f.w.units.at(f.ua).morale_permille == 1000 - p.morale_loss + p.morale_recovery_permille,
+              "B22d ...and the quarter's recovery then moves it one step back, once");
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

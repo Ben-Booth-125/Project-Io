@@ -11,6 +11,7 @@
 #include "scripting/persona_pack.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
+#include "world/battle_system.hpp" // battle_dispatch (BL-1445: the per-day overload)
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
@@ -58,6 +59,11 @@ void post_nation_agency_comms(const world& w, const economy_report& report,
 /// them through an unordered container is exactly the trap
 /// `post_nation_agency_comms` has to work around with its own explicit sort.
 void post_battle_dispatches(const world& w, const economy_report& report,
+                            ui::chat_state& chat, int day_tick);
+
+/// The same, for the dispatches one DAY of the military pass produced (BL-1445: battles
+/// step daily, from the app's day loop, so their traffic is posted the day it happens).
+void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& dispatches,
                             ui::chat_state& chat, int day_tick);
 
 /// Persona counsel (BL-207 slice 1): every corp due at this strategic-eval

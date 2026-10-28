@@ -17,9 +17,9 @@
 //
 //   L1  ONE SYSTEM: a city makes NO points (LOGISTICS.md, "Cities make none"),
 //       a running hub does, and a nation's pool is exactly its sources' points.
-//   L2  A march WITHIN the pool: the unit moves exactly as
-//       march_points_per_class alone would predict, credits are debited, and the
-//       nation's row records the claim as granted.
+//   L2  A march WITHIN the pool: the unit moves exactly as its class's days per
+//       tile alone would predict, credits are debited per tile crossed, and the
+//       nation's row records the claim (the path the quarter can walk) as granted.
 //   L3  A march the pool cannot cover is refused outright: the unit's
 //       order/position/progress and the owning corp's balance are all
 //       BYTE-IDENTICAL to the pre-tick snapshot, and the refusal is counted
@@ -210,9 +210,14 @@ void order_along_row(world& w, entity_id unit, entity_id body, int from_col, int
 /// author any more (BL-1352): the capacity is the nation's pool.
 recipe_registry make_registry(float march_pts, float credit_per_unit_dist)
 {
+    // BL-1445 (move by days): a class is authored as DAYS PER PLAINS TILE and the march
+    // steps once a day; @p march_pts is the traversal cost the fixture's Era -1 infantry
+    // walks in one day (days = 1 / march_pts), so one `march_tick` day moves a unit as
+    // one tick used to.
     recipe_registry reg;
     military_capability_params mp = reg.military();
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = march_pts;
+    mp.march_days_per_cls[static_cast<std::size_t>(unit_class::infantry)] =
+        march_pts > 0.0f ? 1.0f / march_pts : 0.0f;
     mp.active_lp_credit_per_unit_distance = credit_per_unit_dist;
     reg.set_military(mp);
     return reg;
@@ -225,9 +230,12 @@ bool order_equal(const movement_order& a, const movement_order& b)
         && approx(a.progress, b.progress, 1e-6f);
 }
 
-/// One tick of the two passes under test, in the tick's own order: the claims are
-/// gathered, the resolve serves them ahead of production, the march spends the
-/// answer. Exactly what `run_economy_step` does at phases 4 and 11.
+/// The two passes under test, in the game's own order: the claims are gathered, the
+/// resolve serves them ahead of production and the grants are written onto the units
+/// (`apply_march_grants`, the economy step's phase 4), then ONE DAY of the gated march
+/// spends them (BL-1445: the daily military pass). Since BL-1445 a claim is the path the
+/// QUARTER ahead can walk, capped by the order: every row's fixture path is shorter than
+/// ninety days of its class, so the claim is the whole path's traversal cost.
 struct march_tick_result
 {
     lp_tick         lp;
@@ -237,7 +245,8 @@ march_tick_result march_tick(world& w, const recipe_registry& reg)
 {
     march_tick_result out;
     out.lp    = resolve_logistic_points(w, collect_march_claims(w, reg));
-    out.march = run_unit_march(w, reg, &out.lp);
+    apply_march_grants(w, out.lp);
+    out.march = run_unit_march(w, reg, /*lp_gated=*/true, /*day_tick=*/1);
     return out;
 }
 
@@ -314,15 +323,19 @@ void l2_granted_draw()
 
     check(t.march.refused_no_lp == 0, "the march is not refused: the pool covers it");
     const lp_nation_row* r = nation_row(t.lp, nation);
-    check(r != nullptr && approx(r->march_claim, 2.0f), "the nation's row records the claim (2.0)");
-    check(r != nullptr && approx(r->march_granted, 2.0f), "and records it as granted");
+    // BL-1445: the claim is the quarter's path - all three plains tiles (1 -> 4) - and the
+    // day spends two of them.
+    check(r != nullptr && approx(r->march_claim, 3.0f), "the nation's row records the claim (3.0: the path)");
+    check(r != nullptr && approx(r->march_granted, 3.0f), "and records it as granted");
+    check(approx(w.units.at(unit).march_grant, 1.0f),
+          "BL-1445: the day spent two points of the grant, one a plains tile; one is left");
 
     // Plains cost 1.0 a tile, so 2.0 points move exactly two tiles.
     check(w.units.at(unit).position == tile_at(w, body, 3),
           "the unit moved exactly as its march points alone would predict (two plains tiles)");
     const float paid = balance_before - w.nations.at(corp).treasury;
     check(approx(paid, 0.1f * 2.0f * 50.0f),
-          "credits debited = price x points x head (the price, separate from the cap)");
+          "credits debited = price x tiles' cost x head, charged as each tile is crossed");
 }
 
 // ---------------------------------------------------------------------------
@@ -337,7 +350,7 @@ void l3_refused_mutates_nothing()
     const entity_id body   = make_row_body(w, 10);
     const entity_id nation = add_nation(w, body, 0, 9);
     // A hub whose upkeep is unmet to the point of making almost nothing: a pool
-    // of 1.2 points against a march asking for 3.0.
+    // of 1.2 points against a march asking for 5.0 (BL-1445: the path, 1 -> 6).
     const entity_id hub = add_hub(w, tile_at(w, body, 0));
     w.buildings.at(hub).supply_factor_permille = 10; // 1% of 120 = 1.2 points
     const entity_id corp = add_corp(w, "Stuck", 1000.0f, nation);
@@ -358,7 +371,7 @@ void l3_refused_mutates_nothing()
     check(approx(w.nations.at(corp).treasury, balance_before),
           "and no credits were charged for a march that did not happen");
     const lp_nation_row* r = nation_row(t.lp, nation);
-    check(r != nullptr && approx(r->march_claim, 3.0f) && approx(r->march_granted, 0.0f),
+    check(r != nullptr && approx(r->march_claim, 5.0f) && approx(r->march_granted, 0.0f),
           "the claim is recorded and granted nothing - no partial draw");
 }
 
@@ -404,8 +417,8 @@ void l4_whose_pool()
         check(w.units.at(unit).position == tile_at(w, body, 8),
               "it marches on its OWN nation's points, two tiles, and is not stranded");
         const lp_nation_row* r = nation_row(t.lp, nation);
-        check(r != nullptr && approx(r->march_granted, 2.0f),
-              "and the points came out of its own nation's pool");
+        check(r != nullptr && approx(r->march_granted, 3.0f),
+              "and the points came out of its own nation's pool (the path's 3, BL-1445)");
     }
 
     // (c) AN INVADER PAYS ITS OWN POINTS. Two nations, a hub each; the invader's unit
@@ -425,8 +438,8 @@ void l4_whose_pool()
         const lp_nation_row* ar = nation_row(t.lp, attacker);
         const lp_nation_row* dr = nation_row(t.lp, defender);
         check(t.march.refused_no_lp == 0, "the invading march is served");
-        check(ar != nullptr && approx(ar->march_granted, 2.0f),
-              "out of the ATTACKER's pool");
+        check(ar != nullptr && approx(ar->march_granted, 3.0f),
+              "out of the ATTACKER's pool (the path's 3, BL-1445)");
         check(dr != nullptr && approx(dr->march_granted, 0.0f) && approx(dr->march_claim, 0.0f),
               "and the defender's pool is untouched - an invasion is not funded by its victim");
     }
@@ -544,12 +557,13 @@ void l6_march_claims_first()
     check(f_quiet > 0.0f && f_marching > 0.0f, "the consumer produces in both worlds");
     check(f_marching < f_quiet, "production gets LESS when a march has claimed first");
 
-    // The claim is 12 points of a 120 pool against a claim of 300, so the granted
-    // fraction is pool/claim either way: 120/300 quiet, 108/300 marching.
+    // BL-1445: the march's claim is its path (3 -> 6, three plains tiles: 3 points) of a
+    // 120 pool against a claim of 300, so the granted fraction is pool/claim either way:
+    // 120/300 quiet, 117/300 marching.
     check(approx(f_quiet, lp_source_points[0] / 300.0f, 1e-3f),
           "quiet: the fraction is the whole pool over the claim");
-    check(approx(f_marching, (lp_source_points[0] - 12.0f) / 300.0f, 1e-3f),
-          "marching: it is the pool LESS the march's 12 points over the same claim");
+    check(approx(f_marching, (lp_source_points[0] - 3.0f) / 300.0f, 1e-3f),
+          "marching: it is the pool LESS the march's 3 points over the same claim");
 
     // NO CARRY-OVER. The question is whether one tick leaves anything behind for
     // the next, so it is asked of a SECOND, identically built world inside the same

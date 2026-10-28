@@ -526,19 +526,34 @@ int app::run(autostart_mode autostart)
         // to today's day of the quarter not yet stepped — never past the quarter's
         // end, which the econ step's own catch-up closes. A path with no day loop
         // gets the same days from that catch-up, so the two agree tick for tick.
+        //
+        // THE MILITARY IS MEASURED IN DAYS TOO (Ben, 2026-10-28; MILITARY.md § Marching,
+        // § Battles ruling 3; BL-1445 move by days): the same day loop walks the daily
+        // military pass after construction's day - fronts, battles, marches - so a
+        // marching unit moves tile by tile between quarters and a battle fights a round
+        // a day. `advance_quarter_to` owns both halves and the one cursor; the economy
+        // step's catch-up walks the same days on a path with no day loop. Day d of the
+        // quarter is stamped with its calendar day, the quarter's first day + d.
         const auto advance_construction_today = [&]() {
-            const long long into = static_cast<long long>(m_sim_loop.day_tick())
-                                 - static_cast<long long>(m_last_econ_tick)
-                                       * static_cast<long long>(sim_loop::econ_tick_days);
+            const long long base = static_cast<long long>(m_last_econ_tick)
+                                 * static_cast<long long>(sim_loop::econ_tick_days);
+            const long long into = static_cast<long long>(m_sim_loop.day_tick()) - base;
             if (into > 0)
-                advance_construction_to(m_world, m_registry,
-                                        static_cast<int>(std::min<long long>(into, sim_loop::econ_tick_days)));
+            {
+                std::vector<battle_dispatch> dispatches;
+                advance_quarter_to(m_world, m_registry,
+                                   static_cast<int>(std::min<long long>(into, sim_loop::econ_tick_days)),
+                                   static_cast<int>(base), &dispatches);
+                // BL-468: the day's battle traffic to the Field channel, as it happens.
+                session_history::post_battle_dispatches(m_world, dispatches, m_chat,
+                                                        static_cast<int>(m_sim_loop.day_tick()));
+            }
         };
-        advance_construction_today();
-
-        // Mirror the day tick onto the world so read-only UI surfaces can age trade
-        // routes for the activity fog (BL-089) without threading the tick everywhere.
+        // Mirror the day tick onto the world BEFORE the day loop, so read-only UI
+        // surfaces can age trade routes for the activity fog (BL-089) without threading
+        // the tick everywhere, and anything the day's passes stamp off it reads today.
         m_world.current_day_tick = static_cast<int>(m_sim_loop.day_tick());
+        advance_construction_today();
 
         // Continuous sim time for the intra-body vision beam (BL-152/154). The actual
         // vision refresh (update_body_vision) runs in render(), so both the live loop

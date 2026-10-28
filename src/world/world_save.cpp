@@ -1607,7 +1607,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // world_save_version 64 (BL-1434, unit designs): THE DESIGNS, the last section —
     // nations with a non-base design (id, n, n ids); units off base kit (id, kit,
     // refit kit); muster orders off base kit (order id, kit). Only deviations.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_march)
     {
         std::vector<entity_id> nids;
         for (const auto& [nid, nc] : w.nations)
@@ -1649,12 +1649,35 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             for (const uint8_t v : m.kit.fit) w_u8(out, v);
         }
     }
+
+    // world_save_version 65 (BL-1445, move by days): THE MARCH GRANTS, the last section —
+    // every unit holding an unspent Logistic Point grant, ascending id, as (id, f32).
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [uid, u] : w.units)
+            if (u.march_grant != 0.0f)
+                ids.push_back(uid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id uid : ids)
+        {
+            w_id(out, uid);
+            w_f32(out, w.units.at(uid).march_grant);
+        }
+    }
 }
 
 void write_world_snapshot_pre_designs(const world& w, std::ostream& out)
 {
     // VERIFICATION ONLY (BL-1434): the v63 stream shape — no designs section.
     write_world_snapshot_at(w, out, k_world_save_version_pre_designs);
+}
+
+void write_world_snapshot_pre_march(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1445): the v64 stream shape — no march-grant section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_march);
 }
 
 void write_world_snapshot_pre_tile(const world& w, std::ostream& out)
@@ -1790,7 +1813,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_refit      // 2026-10-27: v60, no unit refitting
             && version != k_world_save_version_pre_fronts     // BL-1427: v61, no fronts
             && version != k_world_save_version_pre_tile       // BL-1443: v62, battles keyed by province
-            && version != k_world_save_version_pre_designs))  // BL-1434: v63, every design base kit
+            && version != k_world_save_version_pre_designs)   // BL-1434: v63, every design base kit
+            && version != k_world_save_version_pre_march))    // BL-1445: v64, no march grants
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2659,7 +2683,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // refits; muster orders in issue order, each a real order, off base kit, holding
     // a design its row's class can hold. Refused whole otherwise. A v63 (and older)
     // stream ends before it: every nation and unit fields base kit.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_march)
     {
         const std::vector<kit_item>& cat = kit_catalogue();
         const std::vector<roster_row>& table = unit_roster_table();
@@ -2738,6 +2762,31 @@ bool read_world_snapshot(world& w, std::istream& in)
             if (m.unit_type >= table.size() || !design_valid(land_class_for(table[m.unit_type]), kit))
                 return false;
             m.kit = kit;
+        }
+    }
+
+    // v65 (BL-1445, move by days): the unspent march grants. Untrusted: units strictly
+    // ascending, each in the stream, each grant a positive finite number of points no
+    // larger than any pool could make (1e9). Refused whole otherwise. A v63 (and older)
+    // stream ends before it: every unit holds no grant, so a march in flight halts
+    // until the next economy tick grants it.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            float grant = 0.0f;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev) || !r_f32(in, grant))
+                return false;
+            prev = uid;
+            const auto uit = s.units.find(uid);
+            if (uit == s.units.end() || !std::isfinite(grant) || grant <= 0.0f || grant > 1.0e9f)
+                return false;
+            uit->second.march_grant = grant;
         }
     }
 

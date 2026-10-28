@@ -115,8 +115,11 @@ struct campaign_battle_params
     int morale_win  = 50;
     int morale_loss = 100;
 
-    /// Out of contact, per tick: readiness regained (scaled by supply, never above
-    /// morale), and the most morale moves toward the unit's supply.
+    /// Out of contact, per ECONOMY TICK (a quarter): readiness regained (scaled by
+    /// supply, never above morale), and the most morale moves toward the unit's
+    /// supply. Quarterly, not daily (BL-1445): recovery follows the supply factor,
+    /// which the quarterly upkeep pass sets, so `recover_out_of_contact` runs in the
+    /// economy step and never in the daily battle pass.
     int readiness_recovery_permille = 100;
     int morale_recovery_permille    = 10;
 
@@ -135,16 +138,19 @@ struct campaign_battle_params
     int withdraw_per_round_permille = 25;
     int withdraw_pursuit_scale      = 400;
 
-    /// BL-467, Ben's ruling 3: SEVERAL ROUNDS PER TICK. Authored data rather than
-    /// code (the corp_ai_params precedent), so tuning the window a commander gets
-    /// is a data edit.
+    /// PACING IS BY THE DAY (Ben, 2026-10-28; MILITARY.md § Battles ruling 3,
+    /// BL-1445 move by days): rounds fought per DAY. Battles step every day, from
+    /// the daily military pass (`run_military_day`), and contact is checked every
+    /// day, so the day a march meets a hostile stack is the day its battle opens.
     ///
-    /// At the shipped `max_rounds` 6 and this first-cut 3, a full battle spans two
-    /// ticks and the player gets exactly one real between-tick decision — which is
-    /// the whole point of a withdrawal window. Raise it and the fight resolves
-    /// before anyone can react; lower it and a campaign tick becomes a tactical
-    /// game, which Ben's "a short time" ruled out.
-    int rounds_per_tick = 3;
+    /// One round a day against `max_rounds` 6: a battle is fought out in at most
+    /// six days, and in about six at parity (campaign_battle_harness C4's mean
+    /// rounds, measured in days by move_by_days_harness D6). The round's damage is
+    /// unchanged - its scale was already a day's fighting once a round is a day.
+    /// Withdrawal is honoured at the day boundary, so a commander has a decision
+    /// every day of the fight rather than one between two quarters. Was
+    /// `rounds_per_tick = 3` (two economy ticks, 180 days, to a stalemate).
+    int rounds_per_day = 1;
 };
 
 /// Which side is breaking off. `none` means fight it out.

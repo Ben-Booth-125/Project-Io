@@ -551,10 +551,23 @@ inline constexpr uint32_t world_save_magic =
 /// design is not base kit, in issue order, as (u32 order id, 3 x u8 variants). v63 is a
 /// STRICT PREFIX of v64 and is read too (`k_world_save_version_pre_designs`), as a world
 /// where every nation and every unit fields base kit.
-inline constexpr uint32_t world_save_version = 64;
-
+///
 /// v63, a strict prefix of v64 (the designs section is v64's only addition).
 inline constexpr uint32_t k_world_save_version_pre_designs = 63;
+
+/// Bumped to 65 (BL-1445, move by days; MILITARY.md § Marching): Logistic Points are
+/// granted once a quarter and spent day by day, so a unit's UNSPENT GRANT is state a
+/// save taken between ticks must carry. A TRAILING SECTION after the attacking stacks
+/// carries every unit holding one, ascending id, as (id, f32 points) after a u32
+/// count. v64 is a STRICT PREFIX of v65 and is read too
+/// (`k_world_save_version_pre_march`): its units hold no grant, so a march in flight
+/// halts until the next economy tick grants it (the v64 designs section precedes it).
+/// The order's `progress` keeps its meaning — banked traversal cost — so an old
+/// stream's banked fraction reads as the same partial tile.
+inline constexpr uint32_t world_save_version = 65;
+
+/// v64, a strict prefix of v65 (the march-grant section is v65's only addition).
+inline constexpr uint32_t k_world_save_version_pre_march = 64;
 
 /// v62, a strict prefix of v63 (the attacking-stack section is v63's only addition).
 inline constexpr uint32_t k_world_save_version_pre_tile = 62;
@@ -715,6 +728,10 @@ void write_world_snapshot_pre_tile(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1434): @p w as a v63 stream — no designs section.
 void write_world_snapshot_pre_designs(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1445): @p w written as a v64 stream, less the march-grant
+/// section. The game never writes it.
+void write_world_snapshot_pre_march(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

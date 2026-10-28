@@ -215,6 +215,22 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
     return static_cast<int>(leaving.size());
 }
 
+/// The six hex neighbours of @p tile, ascending and unique — "adjacent" for the
+/// join rule. All six sides, not the four a march crosses: a stack beside the
+/// tile is beside it whichever way the grid runs.
+std::vector<entity_id> hex_neighbours(const world& w, entity_id tile)
+{
+    std::vector<entity_id> out;
+    for (int side = 0; side < 6; ++side)
+        if (const entity_id n = road_edge_neighbour(w, tile, side); n != null_entity && n != tile)
+            out.push_back(n);
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
+}
+
+} // namespace
+
 /// Out of contact, every unit recovers: readiness toward its morale (scaled by its
 /// supply, never above it), morale toward its supply. Each unit's step reads only
 /// itself, so the visit order cannot matter. A fully supplied unit at full
@@ -248,21 +264,6 @@ void recover_out_of_contact(world& w, const campaign_battle_params& p)
     }
 }
 
-/// The six hex neighbours of @p tile, ascending and unique — "adjacent" for the
-/// join rule. All six sides, not the four a march crosses: a stack beside the
-/// tile is beside it whichever way the grid runs.
-std::vector<entity_id> hex_neighbours(const world& w, entity_id tile)
-{
-    std::vector<entity_id> out;
-    for (int side = 0; side < 6; ++side)
-        if (const entity_id n = road_edge_neighbour(w, tile, side); n != null_entity && n != tile)
-            out.push_back(n);
-    std::sort(out.begin(), out.end());
-    out.erase(std::unique(out.begin(), out.end()), out.end());
-    return out;
-}
-
-} // namespace
 
 battle_phase read_battle_phase(const active_battle& b, int attacker_swing, int defender_swing,
                                const campaign_battle_params& params)
@@ -294,7 +295,7 @@ battle_phase read_battle_phase(const active_battle& b, int attacker_swing, int d
     // The opening is the first batch. After that both sides are committed —
     // which is a statement about the withdrawal price, not a mood: by round 4 the
     // per-round term alone has tripled.
-    return (b.state.rounds_fought <= std::max(1, params.rounds_per_tick))
+    return (b.state.rounds_fought <= std::max(1, params.rounds_per_day))
                ? battle_phase::opening
                : battle_phase::committed;
 }
@@ -694,7 +695,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
     (void)tick; // a battle's stream was seeded when it opened (open_tile_battle)
 
     // -----------------------------------------------------------------------
-    // 2. STEP — several rounds per tick (ruling 3)
+    // 2. STEP — `rounds_per_day` rounds a day (ruling 3, Ben 2026-10-28)
     // -----------------------------------------------------------------------
     // `w.battles` is kept sorted, so this walk is order-independent even though
     // discovery joined against unordered containers.
@@ -726,7 +727,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             ++out.withdrew;
         }
 
-        const int budget = std::max(1, params.rounds_per_tick);
+        const int budget = std::max(1, params.rounds_per_day);
         while (b.state.end == campaign_battle_end::in_progress
                && b.state.rounds_fought - rounds_before < budget)
             step_campaign_battle(b.state, atk, def, params);
@@ -895,10 +896,9 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                        }),
         w.battles.end());
 
-    // -----------------------------------------------------------------------
-    // 5. RECOVERY (BL-1421) — every unit not in a live fight
-    // -----------------------------------------------------------------------
-    recover_out_of_contact(w, params);
+    // RECOVERY (BL-1421) is no longer a step of this pass: battles step DAILY now
+    // (BL-1445), and recovery follows the supply factor the QUARTERLY upkeep pass
+    // sets, so the economy step calls `recover_out_of_contact` once a quarter.
 
     return out;
 }

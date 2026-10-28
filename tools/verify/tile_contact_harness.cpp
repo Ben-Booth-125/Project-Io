@@ -92,10 +92,20 @@ recipe_registry make_registry()
 {
     recipe_registry reg;
     military_capability_params mp = reg.military();
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = 1.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::cavalry)]  = 1.5f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::ranged)]   = 1.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::siege)]    = 0.5f;
+    // BL-1445 (move by days): a class is authored as DAYS PER PLAINS TILE and the march
+    // steps once a DAY. This fixture keeps the per-call speeds its rows were written
+    // against (infantry 1.0 of traversal cost a call, cavalry 1.5, ranged 1.0, siege
+    // 0.5), so one run_unit_march call - one day - moves a unit as one call always did:
+    // days = 1 / those points, and a modern row by the cls it names. These rows are
+    // about contact, battles and fronts, not speed; the authored speeds are measured in
+    // move_by_days_harness.
+    const float per_call[unit_class_count] = { 1.0f, 1.5f, 1.0f, 0.5f, 0.0f }; // inf, cav, ranged, siege, naval
+    for (int k = 0; k < unit_class_count; ++k)
+        mp.march_days_per_cls[static_cast<std::size_t>(k)] = per_call[k] > 0.0f ? 1.0f / per_call[k] : 0.0f;
+    for (int c = 0; c < land_class_count; ++c)
+        if (const int row = modern_row_for(static_cast<land_class>(c)); row >= 0)
+            mp.march_days_per_land_class[static_cast<std::size_t>(c)] =
+                mp.march_days_per_cls[static_cast<std::size_t>(unit_roster_table()[static_cast<std::size_t>(row)].cls)];
     reg.set_military(mp);
     return reg;
 }
@@ -167,7 +177,7 @@ unit_march_tick step_march(fixture& f, const recipe_registry& reg, int n = 1)
 {
     unit_march_tick last;
     for (int i = 0; i < n; ++i)
-        last = run_unit_march(f.w, reg, nullptr);
+        last = run_unit_march(f.w, reg, false);
     return last;
 }
 
@@ -674,8 +684,9 @@ int main()
         check(old_ok && stamped == k_world_save_version_pre_tile && old.battles.size() == 1
                   && old.battles.front().tile == T && old.battles.front().attacking_units.empty(),
               "T13c a v62 stream reads: its battle keyed by its ground tile, with no attacking stack");
-        check(v62.size() == bytes.size() - (4 + 4 + 4) - 12, // BL-1434: v64's empty designs section
-              "T13d ...and the v62 stream is today's less exactly the stack section (one battle of one unit) and the empty designs section");
+        check(v62.size() == bytes.size() - (4 + 4 + 4) - 12 - 4, // BL-1434: v64's empty designs section; BL-1445: v65's empty grant count
+              "T13d ...and the v62 stream is today's less exactly the stack section (one battle of one unit), the empty designs section "
+              "and v65's empty march-grant count");
         // An attacking stack naming a unit not on the attacker's side is refused.
         std::string bad = bytes;
         const entity_id ghost = 0x7FFFFFF0u;
@@ -959,7 +970,7 @@ int main()
             // the Logistic Points a gated march draws, and a gated tick moves no one.
             advance_fronts(w, reg);
             const battle_tick bt = run_battles(w, reg, t);
-            (void)run_unit_march(w, reg, nullptr);
+            (void)run_unit_march(w, reg, false);
             reanchor_fronts(w);
             int moved = 0, ordered = 0;
             for (const auto& [id, u] : w.units)

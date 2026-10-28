@@ -95,10 +95,20 @@ recipe_registry make_registry()
     recipe_registry reg;
     military_capability_params mp = reg.military();
     // scripts/economy.lua's per-class march points (MILITARY.md § Marching).
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = 1.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::cavalry)]  = 1.5f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::ranged)]   = 1.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::siege)]    = 0.5f;
+    // BL-1445 (move by days): a class is authored as DAYS PER PLAINS TILE and the march
+    // steps once a DAY. This fixture keeps the per-call speeds its rows were written
+    // against (infantry 1.0 of traversal cost a call, cavalry 1.5, ranged 1.0, siege
+    // 0.5), so one run_unit_march call - one day - moves a unit as one call always did:
+    // days = 1 / those points, and a modern row by the cls it names. These rows are
+    // about contact, battles and fronts, not speed; the authored speeds are measured in
+    // move_by_days_harness.
+    const float per_call[unit_class_count] = { 1.0f, 1.5f, 1.0f, 0.5f, 0.0f }; // inf, cav, ranged, siege, naval
+    for (int k = 0; k < unit_class_count; ++k)
+        mp.march_days_per_cls[static_cast<std::size_t>(k)] = per_call[k] > 0.0f ? 1.0f / per_call[k] : 0.0f;
+    for (int c = 0; c < land_class_count; ++c)
+        if (const int row = modern_row_for(static_cast<land_class>(c)); row >= 0)
+            mp.march_days_per_land_class[static_cast<std::size_t>(c)] =
+                mp.march_days_per_cls[static_cast<std::size_t>(unit_roster_table()[static_cast<std::size_t>(row)].cls)];
     reg.set_military(mp);
     return reg;
 }
@@ -293,7 +303,7 @@ void step(world& w, const recipe_registry& reg, int n = 1)
     for (int i = 0; i < n; ++i)
     {
         advance_fronts(w, reg);
-        (void)run_unit_march(w, reg, nullptr);
+        (void)run_unit_march(w, reg, false);
         reanchor_fronts(w);
     }
 }
@@ -662,13 +672,15 @@ int main()
         world old;
         bool none = from_bytes(v61, old) && stamped == k_world_save_version_pre_fronts && old.front_orders.empty();
         for (const auto& [id, uu] : old.units) none = none && uu.front == null_entity;
-        // BL-1434 (v64): today's stream ends with the designs section, three empty counts (12 bytes).
-        check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9) - 4 - 12,
-              "F7c a v61 stream (the section's 33 bytes, v63's 4-byte stack count and v64's 12-byte designs section shorter) reads as no fronts");
+        // BL-1434 (v64): today's stream carries the designs section, three empty counts (12 bytes);
+        // BL-1445 (v65) ends it with the march-grant section, an empty count (4 bytes).
+        check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9) - 4 - 12 - 4,
+              "F7c a v61 stream (the section's 33 bytes, v63's 4-byte stack count, v64's 12-byte designs section and v65's 4-byte grant count shorter) reads as no fronts");
 
         // A row naming nothing: the first assignment's key -> a ghost tile.
         std::string bad = bytes;
-        const std::size_t tail = 4 + 12; // v63's attacking-stack section (a zero battle count), v64's empty designs section
+        const std::size_t tail = 4 + 12 + 4; // v63's attacking-stack section (a zero battle count), v64's empty
+                                             // designs section, v65's march-grant section (a zero count)
         const std::size_t key0 = bytes.size() - tail - (4 + 9) - 2 * 8 + 4;
         const entity_id ghost = 0x7FFFFFF0u;
         std::memcpy(&bad[key0], &ghost, sizeof ghost);

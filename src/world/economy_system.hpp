@@ -872,59 +872,103 @@ struct unit_march_tick
 /// for the harness (tools/verify/unit_march_harness.cpp).
 bool corp_is_mobilised(const world& w, entity_id corp);
 
-/// BL-470's per-tick movement resolution. Spends each marching unit's
-/// per-CLASS `march_points_per_class` (recipe_registry::military(), keyed off
-/// the roster row's `cls`) against the per-tile traversal cost `intra_body_
-/// path`/`body_reach_field` already compute — never a second cost model —
-/// with fractional carry-over banked in `unit_component::order.progress`.
+/// BL-1445 (move by days; MILITARY.md § Marching): the DAYS a unit of roster row
+/// @p type takes to cross one plains tile (traversal cost 1.0). A row that declares a
+/// land class (every modern row) reads `march_days_per_land_class` by it; a pre-modern
+/// row reads `march_days_per_cls` by its `cls`. An unknown row reads as Era -1
+/// infantry (the "an unknown index is a data problem" tolerance resolve_unit_upkeep
+/// applies). <= 0 means the row cannot march on this land table.
+float march_days_per_tile(const military_capability_params& mil, uint16_t type);
+
+/// ONE DAY of movement (BL-1445, move by days; MILITARY.md § Marching, "Units march by
+/// the day, at their class's speed"). Each marching unit gains 1 / its class's days per
+/// plains tile (`march_days_per_tile`) of movement, banked in `order.progress` in units
+/// of traversal cost, and steps whenever the bank covers the next hop's cost - the one
+/// hop price `edge_traversal_cost`, so terrain multiplies the days and a road divides
+/// them by the road ladder's own discount. Never a second cost model.
 ///
-/// VISIT ORDER (NR-344, "war flips the queue", resolved 2026-08-19 alongside
-/// this item): a corp party to ANY declared hostility (either direction —
-/// being attacked mobilises too, `is_hostile` checked both ways against
-/// `w.corp_hostile_pairs`) has its units visited FIRST this tick; every other
-/// corp's units follow, in ascending unit id within each group. This order is
-/// what BL-596 (active Logistic Points) resolves contention with: it now IS
-/// the "deterministic priority over a sorted set" LOGISTICS.md's Refusal
-/// section calls for, reused rather than re-invented.
+/// VISIT ORDER (NR-344, "war flips the queue"): a nation party to ANY declared
+/// hostility (either direction) has its units visited FIRST; every other nation's
+/// follow, ascending unit id within each group (`march_visit_order`).
 ///
-/// BL-1352 (LOGISTICS.md § How a tile's points get to it): a march draws LOGISTIC
-/// POINTS FROM THE HOST NATION'S POOL — the one pool hubs, stations and ports make
-/// and production consumes — and it claims BEFORE production does. The claims are
-/// gathered by `collect_march_claims` and served inside
-/// `resolve_logistic_points`, both in this pass's own visit order, so this pass
-/// only spends the answer: `lp->march_granted` holds what each unit got. A unit
-/// granted less than its whole tick's budget is REFUSED outright — no partial draw,
-/// no order/position/balance mutation, `unit_march_tick::refused_no_lp` counts it —
-/// which covers a unit whose nation makes no points and one whose nation's pool ran
-/// out behind higher-priority marches. The pool is the MOVER's nation's (a corp's
-/// home nation, a garrison's own), never the ground's, so standing on unowned or
-/// foreign ground neither strands a unit nor spends its victim's points. A granted march still
-/// pays its PRICE in credits (`active_lp_credit_per_unit_distance`): points are the
-/// cap, credits are the price (LOGISTICS.md rule 1). A nation-owned garrison (BL-571)
-/// draws against the cap and pays no credits.
+/// LOGISTIC POINTS (BL-1352; LOGISTICS.md § How a tile's points get to it) are GRANTED
+/// ONCE A QUARTER and SPENT DAY BY DAY. The economy step gathers the claims
+/// (`collect_march_claims`: the path a unit can walk in the quarter ahead), resolves
+/// them ahead of production, and writes each unit's grant onto `unit_component::
+/// march_grant` (`apply_march_grants`). This pass, GATED, spends one point per unit
+/// of traversal cost each time a unit steps; a unit whose grant does not cover its
+/// next hop HALTS - it banks nothing and moves nothing that day, and
+/// `unit_march_tick::refused_no_lp` counts it - until the next quarter's grant. The
+/// pool is the MOVER's nation's, never the ground's. Every step also pays its PRICE in
+/// credits as it is taken: `active_lp_credit_per_unit_distance` x the hop's cost x the
+/// unit's men, the same total per tile as the per-tick charge it replaces (points are
+/// the cap, credits the price, LOGISTICS.md rule 1), capped at a nation's uncommitted
+/// treasury.
 ///
-/// WHAT THIS REPLACED. Until BL-1352 the march drew a SECOND, unrelated quantity: a
-/// flat `active_lp_per_anchor_tick` pool at every population centre, port and hub
-/// (`active_lp_anchor_pools`), nearest-anchor by path cost. Two LP systems were live
-/// at once, and the one the Throughput lens drew was the retired one — which is why
-/// cities appeared to supply logistics after the doc had ruled they make none.
+/// A march that reaches a tile a hostile nation's units hold registers an ATTACK on
+/// the day it gets there, and the battles open over the defenders' tiles once every
+/// unit has moved (`open_tile_battles`), stamped @p day_tick.
 ///
-/// Called from run_economy_step after the battle phase.
-///
-/// @param lp This tick's resolve (`report.logistic_points`). Null means no resolve
-///        was handed in — a harness exercising movement alone — and then the gate is
-///        open and every ordered unit marches, which is the pre-BL-596 behaviour.
+/// @param lp_gated false (a harness exercising movement alone) leaves the gate open:
+///        every ordered unit marches whatever its grant, and still pays the price.
+/// @param day_tick the day the battles this pass opens are stamped with (their stream
+///        seed folds it); < 0 reads `w.current_day_tick`.
 unit_march_tick run_unit_march(world& w, const recipe_registry& reg,
-                               const lp_tick* lp = nullptr);
+                               bool lp_gated = false, int day_tick = -1);
+
+/// BL-1445: write this quarter's march grants onto the units - every unit's
+/// `march_grant` is REPLACED by what @p lp granted it (0 for a unit that claimed
+/// nothing or was refused). An unspent grant does not carry into the next quarter.
+void apply_march_grants(world& w, const lp_tick& lp);
+
+/// What one day of the military pass did.
+struct military_day_result
+{
+    battle_tick     battles; ///< The battle step (rounds, losses, dispatches).
+    unit_march_tick march;   ///< The march, including the attacks it opened.
+};
+
+/// THE DAILY MILITARY PASS (BL-1445, move by days; MILITARY.md § Marching and
+/// § Battles ruling 3). One day, in this order: the FRONTS issue their orders
+/// (`advance_fronts` - a daily call, 0.01 ms on a generated world, so a front can send
+/// a unit on the day its last march completes); the live BATTLES fight `rounds_per_day`
+/// rounds, retreats and advances included (`run_battles`), so a unit in contact fights
+/// before it can march out; then the MARCH (`run_unit_march`), whose contacts open
+/// today's battles. Deterministic: every stage walks a sorted set.
+///
+/// What stays QUARTERLY in `run_economy_step`, because it is economic: upkeep and the
+/// orphan cleanup, musters, refits, out-of-contact recovery (it follows the quarterly
+/// supply factor), the Logistic Point resolve and grant, and the end-of-tick front
+/// re-anchor.
+military_day_result run_military_day(world& w, const recipe_registry& reg, int day_tick,
+                                     bool lp_gated);
+
+/// THE QUARTER'S DAYS (BL-1445; PRODUCTION.md § Construction is measured in days):
+/// advance the world from its one day cursor (`world::construction_quarter_day`) to
+/// day @p day_in_quarter (clamped to [0, 90]), ONE DAY AT A TIME, each day running
+/// construction's day (`advance_construction_to`) and then the military's
+/// (`run_military_day`, gated), the battles of day d stamped @p quarter_first_day_tick
+/// + d. The app calls this from its day loop; `run_economy_step` catches the rest of
+/// the quarter up through it, so a world stepped by quarters walks the identical day
+/// sequence. A world with no unit and no battle skips the military half, which is then
+/// a no-op. Battle dispatches the days produce are appended to @p dispatches when
+/// given. Returns the days advanced.
+int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
+                       int quarter_first_day_tick,
+                       std::vector<battle_dispatch>* dispatches = nullptr);
 
 /// BL-1352: the march's visit order — ascending unit id, then NR-344's mobilised-first
 /// partition. Shared by the claim collector and the march pass so the two cannot
 /// disagree about priority. Exposed for the harnesses that assert the order.
 std::vector<entity_id> march_visit_order(const world& w);
 
-/// BL-1352: what each ordered unit asks its host nation's pool for this tick, in the
-/// march's visit order. Handed to `resolve_logistic_points`, which serves the claims
-/// ahead of every producer.
+/// BL-1352 / BL-1445: what each ordered unit asks its host nation's pool for THE
+/// QUARTER AHEAD, in the march's visit order: the traversal cost of the path it can
+/// walk in ninety days at its class's speed (its banked progress included), capped by
+/// the path left - never more than the order needs, and at least its next hop, so a
+/// unit too slow to cross one tile in a quarter can still bank toward it. Handed to
+/// `resolve_logistic_points`, which serves the claims whole or refuses them, ahead of
+/// every producer.
 std::vector<lp_march_claim> collect_march_claims(const world& w, const recipe_registry& reg);
 
 /// BL-430: outcome of a PLAYER-grade recipe-switch attempt (try_switch_recipe).
