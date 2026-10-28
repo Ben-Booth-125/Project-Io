@@ -27,3 +27,4 @@
 {"id":"BL-1441","name":"FRONT_EDGE_CASES","ts":"2026-10-27T09:07:39.042Z","branch":"main"}
 {"id":"BL-1442","name":"POST_CAPACITY_STARVATION","ts":"2026-10-27T09:35:53.826Z","branch":"main"}
 {"id":"BL-1443","name":"TILE_CONTACT_ORDERS","ts":"2026-10-27T09:51:33.832Z","branch":"main"}
+{"id":"BL-1444","name":"BATTLE_CARD_MARCH_STALL","ts":"2026-10-28T10:16:09.836Z","branch":"main"}

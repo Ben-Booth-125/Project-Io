@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*13 entries — 11 open, 2 resolved.*
+*10 entries — 10 open, 0 resolved.*
 
 ---
 
@@ -135,20 +135,6 @@ MILITARY.md § Land — equipment, refit and manpower already uses "refit" for r
 
 *Files: `docs/military/MILITARY.md`, `docs/GLOSSARY.md`*
 
-### NR-1092 — Fronts: the calls taken on your behalf
-*decision · raised 2026-10-27 · from BL-1427 (fronts) lanes and cold review*
-
-Slots: unit i of n takes span[(2i+1)L/2n]; "on slot" is the slot tile's province. A hand march on an assigned unit is overridden by its front; unassign to march by hand. Push enters the neighbour's adjacent land province with the least summed unit strength. Re-anchor keeps a key only while it faces the same neighbour, else the nearest front toward that neighbour, else drops. Rivals assign only idle units outside their capital province (the capital garrison stays home), to the front with fewest units per span tile, and push only when hostile and stronger 3:2. A push the march refuses holds instead.
-
-**Why it matters.** Each shapes how wars feel; the capital-stays-home and hand-march-overridden rules are not in the grant text.
-
-- A: keep all as built
-- B: change one (say which)
-
-> **Recommendation:** A.
-
-*Files: `docs/military/MILITARY.md`, `src/world/fronts.cpp`, `src/world/corp_ai.cpp`*
-
 ### NR-1093 — Capital base: the calls taken on your behalf
 *decision · raised 2026-10-27 · from BL-1439 (capital military base) lane*
 
@@ -184,36 +170,4 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 
 Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
 answer has landed in an authority doc.
-
-### NR-1083 — May rival nations use fronts?
-*question · raised 2026-10-26 · from sprint 58 military design*
-
-Ben granted fronts for the player's assigned units (AI_OPPONENT.md § 11). Whether a rival nation may assign its own units to fronts and score hold or push is a separate subject, so it was not written into the grant.
-
-**Why it matters.** Fronts are the cheapest way for a scorer to use an army without a planner. Without this grant, rivals have no way to fight a war beyond march_unit.
-
-- A: grant rivals fronts, hold and push scored by the nation layer; B: rivals hold only; C: no rival fronts yet
-
-> **Recommendation:** A, on the standing terms. It is what makes BL-1427 (fronts) worth building for v0.3.0's AI half.
-
-> **RESOLVED.** Ben, 2026-10-27: A — rivals assign their own units to their own fronts and choose hold or push. Written as a grant in AI_OPPONENT.md § 11 and in MILITARY.md § Fronts.
-
-*Files: `docs/ai/AI_OPPONENT.md`, `docs/military/MILITARY.md`*
-
-### NR-1091 — Construction capacity retired: G1 at tick 50 falls under its gate
-*question · raised 2026-10-27 · from BL-1438 (retire construction capacity) lane, branch worktree-agent-acf7de32610de4ed0 @ 7737c801, held unmerged*
-
-market_viability FULL, 16 seeds: G1t50 87.8 -> 79.5 (target 85, FAIL); G1 93.4 -> 92.8, G1b 3.7 -> 3.5, G2 143.7 -> 192.3, G3 100 -> 100. Building is faster: processors built by tick 50 1446 -> 2762, running 1269 -> 2195 (+73%), still under construction 956 -> 181. The gate counts only finished buildings, whose count nearly doubled; input-starved 32 -> 158, decommissioned 54 -> 209.
-
-**Why it matters.** The ruling asked for smoother building, and it is: far more runs at tick 50. But more of what finishes now starves, and the merge gate fails.
-
-- A: accept and re-set G1t50 (measure the new floor)
-- B: merge, and open work on the new starvation and decommissions with G1t50 kept at 85
-- C: hold the merge until the starvation is fixed
-
-> **Recommendation:** B. The retirement is what you asked for; the starvation is a real follow-on, not a reason to keep stalled sites.
-
-> **RESOLVED.** Ben, 2026-10-27: merge BL-1438 and keep G1t50 at 85; the new starvation and decommissions are follow-on work, BL-1442 (post-capacity starvation). Merged at 9503aa06; FULL G1t50 78.9.
-
-*Files: `docs/economy/PRODUCTION.md`, `tools/verify/market_viability.cpp`*
 

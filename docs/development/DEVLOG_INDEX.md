@@ -3,7 +3,7 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 235 entries across 2 volume(s).
+One line per session, newest first — 236 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
@@ -219,6 +219,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | 2026-06-13 | [Layer 2: Primary canvases](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 1: ECS data model](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
 | 2026-06-13 | [Layer 0: Engine scaffolding](archive/DEVLOG-2026.md) | — | DEVLOG-2026.md |
+| ? | [2026-10-26 to 2026-10-28 — Sprint 58: the land combat core — version 0.2.2](DEVLOG.md) | BL-1421 BL-1425 BL-1427 BL-1433 BL-1435 BL-1437 BL-1438 BL-1439 BL-1442 BL-1443 BL-1444 | DEVLOG.md |
 | ? | [2026-10-23 to 2026-10-26 — Sprint 57: nations own everything, then economy polish — version 0.2.1](DEVLOG.md) | BL-1399 BL-1407 BL-1408 BL-1413 BL-1420 | DEVLOG.md |
 | ? | [2026-10-10 (later) — The shelf economy reviewed, ruled, re-blessed and merged into sprint 50](DEVLOG.md) | BL-1252 | DEVLOG.md |
 | ? | [2026-09-25 (evening) — Sprint 48 cut: the world moves forward](DEVLOG.md) | BL-1003 BL-1077 BL-1084 BL-1101 BL-1114 BL-1117 BL-1118 BL-1119 BL-1124 BL-1125 | DEVLOG.md |

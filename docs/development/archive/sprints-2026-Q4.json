@@ -306,6 +306,50 @@
           "Ruling register 26 of 26 pass."
         ]
       }
+    },
+    "58": {
+      "id": "58",
+      "theme": "the land combat core",
+      "state": "landed",
+      "status_line": "CLOSED 2026-10-28 at the v0.2.2 cut (Ben: v0.2.2, not v0.3.0; v0.3.0 is a working military system and its done-definition is still owed). Land units fight by soft and hard attack with HP, readiness and morale; the Military ledger, muster queue, fronts and tile-contact orders landed; construction capacity and the Era catastrophe retired. Cut with BL-1442 (post-capacity starvation) failing G1t50 79.8 against 85. One re-bless at the close.",
+      "opened_date": "2026-10-26",
+      "author": "Ben (2026-10-26)",
+      "goal": "The campaign's land fight runs on MILITARY.md § The campaign force model: per-unit HP, readiness and morale; soft and hard attack against hardness; retreat on spent readiness.",
+      "planned": [
+        "BL-1421 (soft hard resolver), carrying the class stat table from BL-1422 (land classes and kit) and readiness recovery from BL-1423 (refit and retreat).",
+        "BL-1425 (unit counter render), BL-1433 (military ledger), BL-1435 (muster queue), BL-1437 (obsolete unit types).",
+        "BL-1427 (fronts), then BL-1443 (tile contact orders).",
+        "Grown in play: BL-1438 (retire construction capacity), BL-1439 (capital military base), the refit verb."
+      ],
+      "risk": "Every item touches the unit record, the save version and the verb enum; lanes had to serialise on them. Re-bless held to sprint end (Ben, 2026-10-27).",
+      "done_when": "The item harnesses, world_determinism and save_roundtrip pass; market_viability before and after each world mover; Ben's live click on every UI item; one re-bless at the close.",
+      "notes": "Rulings 2026-10-26..28: the campaign force model, the Era catastrophe retired (an Era is an achievement), rival fronts granted (NR-1083), construction capacity retired, a capital base for every nation, tile-grain marches and contact attacks, fronts calls kept as built (NR-1092).",
+      "closed_date": "2026-10-28",
+      "retro": {
+        "landed": [
+          "COMBAT: BL-1421 (soft hard resolver): HP, readiness and morale on every land unit; soft and hard attack against hardness; spent units retreat, units out of contact recover.",
+          "RAISING: BL-1433 (military ledger) on rail slot 7, Recruit and Design tabs; BL-1435 (muster queue); BL-1437 (obsolete unit types); BL-1439 (capital military base); the refit verb (no backlog id): a unit changes to a newer row of its class.",
+          "ON THE MAP: BL-1425 (unit counter render); BL-1427 (fronts), rivals included; BL-1443 (tile contact orders): one nation per tile, a step onto a hostile stack attacks, right-click move and attack.",
+          "RETIRED: BL-1438 (retire construction capacity); the Era catastrophe, by a design pass early in the sprint (ERAS.md § The point of an Era)."
+        ],
+        "carried": [
+          "To sprint 59, leading: BL-1442 (post-capacity starvation), G1t50 79.8 against 85; Ben cut with it failing.",
+          "To sprint 59: BL-1440 (R0b budget world), BL-1441 (front edge cases), BL-1422 (land classes and kit; roster half done), BL-1423 (refit and retreat), BL-1424 (soldiers from labour), BL-1426 (bunkers), BL-1434 (unit designs), BL-1436 (kit in the age tree).",
+          "To sprint 59, unstarted: BL-1413..BL-1420, filed for sprint 58.",
+          "Filed at the close: BL-1444 (battle card march stall): battle_card.lua's march is accepted but the unit never moves in the verify world."
+        ],
+        "feedback": [
+          "Ben grew three items in play (capacity, capital base, refit); each ruling went into MILITARY.md or PRODUCTION.md first, then a lane.",
+          "The unit record, save version and verb enum were a shared seam; fronts waited on refit, and serialising them was cheaper than merging them.",
+          "Retiring construction capacity made building faster and starved processors; the gate was kept at 85 rather than lowered."
+        ],
+        "gates": [
+          "market_viability FULL at the cut (main 53e1c67f): G1 93.3, G1t50 79.8 FAIL, G1b 2.8, G2 191.0, G3 100.0.",
+          "history_sim_harness: the two known R3a2/R3a3 only. tile_contact_harness 96/0, fronts_harness 67/0, campaign_battle 27/0, unit_march 78/0, battle_engagement all pass; save_roundtrip OK; world_determinism ALL PASS.",
+          "Live clicks passed (Ben, 2026-10-27/28) on every UI item. One re-bless at the sprint end.",
+          "Ruling register 26 of 26 pass on the committed docs."
+        ]
+      }
     }
   }
 }

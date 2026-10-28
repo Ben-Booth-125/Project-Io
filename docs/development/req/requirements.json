@@ -7441,66 +7441,7 @@
    "promoted_from": "backlog.json BL-1421 (with BL-1422 T1 class stats, BL-1423 T1 recovery) - sprint 58 (Ben, 2026-10-26: \"build the land combat infrastructure\")",
    "batch": "sprint-58",
    "resolved": "2026-10-27",
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: campaign_battle_harness"
-     ],
-     "requirement": "A round deals soft_attack*(1-hardness)+hard_attack*hardness per man, scaled by morale, supply and the seeded swing; the defender's ground divides the attacker's hits (terrain_defence); the target absorbs up to defence (defending) or breakthrough (attacking); absorbed hits land at a fraction. resolve_battle is not called by the campaign path.",
-     "notes": "campaign_battle_harness 23/23 (C1-C6) on the uncommitted tree 2026-10-27; resolve_battle is called only from history_sim.cpp (cold review)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: campaign_battle_harness",
-      "headless: battle_engagement_harness"
-     ],
-     "requirement": "Landed damage splits between HP (men) and readiness, readiness the larger share. A unit at readiness 0 leaves the fight and retreats one tile away; a unit at 0 men dies through the existing orphan cleanup. A side with no unit left fighting is broken.",
-     "notes": "campaign_battle_harness C6 (readiness falls faster than men; a spent side is overrun and broken); battle_engagement_harness B18 (a spent unit steps one marchable tile and leaves the fight), B22 (a unit in two battles retreats once). 79/79."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: campaign_battle_harness"
-     ],
-     "requirement": "Seven land classes carry authored soft, hard, hardness, defence and breakthrough; every roster row maps to one (only naval rows to none); armour beats infantry in the open; a mountain costs an attacker; hardness turns soft attack away.",
-     "notes": "campaign_battle_harness C5: every roster row maps to a class (only naval to none); armour 1:1 beats infantry 100/100 on plains; infantry 2:1 wins 100/100 on plains, 70/100 on a mountain; artillery hurts armour far less than infantry. Armour, motorised and air defence have no roster row until BL-1422 (land classes and kit)."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "headless: battle_engagement_harness"
-     ],
-     "requirement": "Out of contact, readiness recovers toward morale and morale toward supply; a battle's winner gains morale and its loser loses it.",
-     "notes": "battle_engagement_harness B18d, B19 (winner +50, loser -100), B20 (readiness 0 -> 820 over twelve idle ticks under morale 700 -> 820; an unsupplied unit's morale falls)."
-    },
-    {
-     "id": "R5",
-     "status": "complete",
-     "verification": [
-      "headless: battle_engagement_harness"
-     ],
-     "requirement": "Conservation is exact (men removed equal the losses reported) and the withdrawal quote equals the charge, now charged in men.",
-     "notes": "battle_engagement_harness B5 (men removed == losses reported, per tick and end to end), B12 (quote 144 permille -> 67 men, charged 67); campaign_battle_harness C3 (a three-unit side charged exactly the quoted share)."
-    },
-    {
-     "id": "R6",
-     "status": "complete",
-     "verification": [
-      "headless: world_determinism",
-      "headless: save_roundtrip",
-      "headless: battle_engagement_harness"
-     ],
-     "requirement": "Same seed twice is byte-identical; a save round-trips establishment, readiness and morale; a v57 stream loads with full readiness and morale; a world whose units never fight and are fully supplied keeps its state_hash (an unsupplied unit's morale drifts toward its supply by design, so its hash moves; and the v58 stream moves every snapshot-byte digest, which is the sprint's re-bless to take).",
-     "notes": "world_determinism ALL PASS; save_roundtrip OK incl. P24 (v58 round-trip by value, v57 reads with defaults, readiness 1001 refused) and P6 (a mid-fight battle continues identically after load); battle_engagement_harness B21a (a fully supplied world that never fights hashes as before) and B21b (an unsupplied unit's morale drift moves the hash, by design). market_viability FULL 16 seeds identical to the BL-1408 reading on 71e32545: G1 93.4 G1t50 86.6 G1b 3.7 G2 144.4 G3 100.0. OWED: player_seed_sweep --digest-check fails 16/16 on D_land, D_settle and D_seat. D_land is taken before any tick, so its move is the v58 stream itself (version byte and unit section); D_settle/D_seat may also carry morale drift toward supply. Re-bless is Ben's call. RE-BLESSED 2026-10-27 on Ben's go after the shape probe: rebless_shape_probe ROW and MIX lines identical on all 16 seeds between e205c8f0 (before) and 9f68dcff (after); the 16 player_seed_sweep pins re-pinned (D_search unmoved on 16; D_land, D_settle, D_seat moved by the v58 stream and morale drift). Recheck: par_seeds --digest-check, 16 of 16 rows PASS (each shard 1/1 PASS; its exit 3 is the harness's partial-coverage code for a one-seed run)."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "unit-counter-render",
@@ -7512,38 +7453,7 @@
    "promoted_from": "backlog.json BL-1425 - sprint 58 (Ben, 2026-10-27: \"the rectangle in the tile with unit count, HP bar and readiness bar, and show readiness and morale on the unit card\")",
    "batch": "sprint-58",
    "resolved": "2026-10-27",
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "visual: unit_counter capture",
-      "live: click a garrison counter"
-     ],
-     "requirement": "Units on the Planetary canvas group per (tile, owner) and draw as a rectangle in the tile: owner colour, the number of units on that tile, an HP bar (men over establishment) and a readiness bar (men-weighted). A click on it selects the group's lowest-id unit.",
-     "notes": "LIVE: Ben looked in the release build 2026-10-27 after three iterations (vertical HP/readiness bars, hover ring, square corners, a narrower owner band, a 9 px floor so the bars read at play zoom) and ruled \"the counter is what I had in mind now\". Captures: scripts/verify/unit_counter.lua (own, middle zoom, hover, stack), 0 failures, 10a1f8e7."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "visual: unit_counter capture",
-      "live: open a unit card"
-     ],
-     "requirement": "The unit card shows HP (men / establishment), readiness and morale, each with its bar, and the unit's land class with its soft attack, hard attack and hardness.",
-     "notes": "Captures unit_counter_card and unit_counter_group_member: HP, readiness and morale bars visible without scrolling; the Roster page names the land class with soft, hard and hardness. The group panel (unit_counter_group) lists each unit with men, HP, readiness and morale. Not verified headless: a press on a group ROW opening that unit's card (the capture selects it through verify.select_unit) — owed to the next live session."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "visual: unit_counter capture"
-     ],
-     "requirement": "A rival's counter shows its owner and unit count; its HP and readiness bars are the player's own units' only until Ben rules otherwise (NR, rival disclosure).",
-     "notes": "Capture unit_counter_rival: a rival counter shows owner band and count, no bars; rival rows in the group panel show type, class and men only (BL-068). Whether to widen this is NR-1088."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "military-ledger",
@@ -7555,48 +7465,7 @@
    "promoted_from": "backlog.json BL-1433 - sprint 58 (Ben, 2026-10-27). Rows written at close: the lifecycle's requirement-first step was skipped when the build began.",
    "batch": "sprint-58",
    "resolved": "2026-10-27",
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "visual: military_ledger",
-      "live"
-     ],
-     "requirement": "Rail slot 7 is Military (the military base's shield), toggling its ledger; Corp. Strategy is off the rail.",
-     "notes": "military_ledger.lua captures slot 7 lit; re-pressing the active tab closes the ledger. LIVE: Ben, 2026-10-27, release build at 95a68a7b+: \"The Military ledger and muster queue work as I want\"."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "visual: military_ledger",
-      "live"
-     ],
-     "requirement": "Recruit lists the player's completed bases and the roster with class, numbers and price; Raise hires through the existing hire_unit path; unfieldable rows dim with what they lack; no base offers the site finder set to the military base.",
-     "notes": "Captures military_ledger_recruit, _raise, _no_base, _no_base_door. The dimmed-row and price-muted paths were not on screen (the test world could field and afford everything). LIVE: Ben, 2026-10-27, release build at 95a68a7b+: \"The Military ledger and muster queue work as I want\"."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "visual: military_ledger",
-      "live"
-     ],
-     "requirement": "Recruit shows the player's muster queue with time left.",
-     "notes": "military_ledger_queue after a Raise: \"Rifle Infantry at Takai — 90 d left\". LIVE: Ben, 2026-10-27, release build at 95a68a7b+: \"The Military ledger and muster queue work as I want\"."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "visual: military_ledger"
-     ],
-     "requirement": "Design lists the seven land classes with their base numbers until kit can be chosen.",
-     "notes": "military_ledger_design. LIVE: Ben, 2026-10-27, release build at 95a68a7b+: \"The Military ledger and muster queue work as I want\"."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "muster-queue",
@@ -7608,47 +7477,7 @@
    "promoted_from": "backlog.json BL-1435 - sprint 58 (Ben, 2026-10-27). Rows written at close.",
    "batch": "sprint-58",
    "resolved": "2026-10-27",
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: muster_queue"
-     ],
-     "requirement": "hire_unit pays and queues a muster_order with the row's days (90/135/180 by class); no unit until it completes; a refused hire queues nothing.",
-     "notes": "muster_queue Q1, Q3, Q5 (18/0); corp_ai_harness R4 reads the queue (its 4 failures are pre-existing on the base)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: muster_queue"
-     ],
-     "requirement": "Each tick takes 90 days off; at zero the order becomes a unit on the base's tile as a hire raised it; an order whose base is gone is dropped.",
-     "notes": "muster_queue Q2, Q3, Q4."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: muster_queue",
-      "headless: save_roundtrip",
-      "headless: world_determinism"
-     ],
-     "requirement": "The queue is saved (v59, v58 reads empty) and hashed only when non-empty; same seed, same world.",
-     "notes": "muster_queue Q6, Q7; save_roundtrip OK; world_determinism ALL PASS on the muster branch."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "code"
-     ],
-     "requirement": "A rival nation's soft cap counts queued hires.",
-     "notes": "corp_ai.cpp: owned_units counts w.musters for the corp. Not asserted by a harness."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "obsolete-unit-types",
@@ -7660,48 +7489,7 @@
    "promoted_from": "backlog.json BL-1437 - sprint 58 (Ben, 2026-10-27: \"we should be able to mark unit types as obsolete\")",
    "batch": "sprint-58",
    "resolved": "2026-10-27",
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: obsolete_units"
-     ],
-     "requirement": "Every roster row below the modern band starts obsolete for every nation; the modern rows start live.",
-     "notes": "obsolete_units O1 (14/0)."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: obsolete_units"
-     ],
-     "requirement": "set_unit_obsolete flips one row for the seat's nation and back; refuses an unknown row, a bad order, a no-op and a non-seat nation, mutating nothing.",
-     "notes": "obsolete_units O2, O3."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: obsolete_units",
-      "headless: save_roundtrip",
-      "headless: world_determinism"
-     ],
-     "requirement": "The flips are saved (v60; v59 reads the defaults) and hashed only when a nation holds any.",
-     "notes": "obsolete_units O4."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "visual: military_ledger",
-      "live"
-     ],
-     "requirement": "Recruit and the base tile card hide obsolete rows, with a \"Show obsolete (N)\" switch on Recruit; the Design tab lists every type with an obsolete toggle; a rival nation's scorer skips obsolete rows.",
-     "notes": "military_ledger_recruit: \"Show obsolete (19)\" and the seven modern rows; the Design tab's Unit types toggles sit below the class list. The scorer skip is code (corp_ai.cpp hire candidates), not asserted by a harness. Live click owed. LIVE: Ben, 2026-10-27: \"Looks good\"."
-    }
-   ]
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "fronts",
@@ -7709,61 +7497,11 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1427 - sprint 58 (Ben, 2026-10-27: \"Build fronts next\")",
    "batch": "sprint-58",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "complete",
-     "verification": [
-      "headless: fronts_harness"
-     ],
-     "requirement": "A nation's fronts are derived from tile_to_nation: per neighbour, each contiguous span of its border tiles is one front; a border cut in two is two fronts; fronts re-derive when territory changes. Same world, same fronts, same order.",
-     "notes": "fronts_harness F1-F2 (65/0 on main at b8cde345): 58 nations with land borders, 219 fronts over 2728 span tiles; spans own, bordering, contiguous, disjoint; a cut border gives two fronts; derivation repeats identically."
-    },
-    {
-     "id": "R2",
-     "status": "complete",
-     "verification": [
-      "headless: fronts_harness",
-      "headless: save_roundtrip"
-     ],
-     "requirement": "assign_front assigns the actor's own unit to one of its nation's fronts (named by a tile in the span) or unassigns it; set_front_order sets hold or push, push only toward a hostile neighbour; every refusal mutates nothing. Assignments and orders are saved and re-anchored when spans change.",
-     "notes": "fronts_harness F3 (every refusal hash-identical, push refused when only the neighbour is hostile) and F6 (reanchor; F6e: a key handed to another neighbour's front keeps the assignment and push facing the old neighbour, fails without the fix); F7 and save_roundtrip OK (v62 section)."
-    },
-    {
-     "id": "R3",
-     "status": "complete",
-     "verification": [
-      "headless: fronts_harness"
-     ],
-     "requirement": "Each tick, a front's assigned units are given slots spaced evenly along its span and march to them (legal march_unit); a gap left by a dead or retreated unit is refilled; units in battle are left alone. Under push, the units march into the neighbour's weakest adjacent province.",
-     "notes": "fronts_harness F4-F5: assigned units reach evenly spaced slots, a gap is refilled, push marches into the weakest adjacent province only while hostile and walks back when it ends; an unreachable push target holds instead."
-    },
-    {
-     "id": "R4",
-     "status": "complete",
-     "verification": [
-      "headless: fronts_harness",
-      "headless: world_determinism"
-     ],
-     "requirement": "A rival nation's scorer assigns its own units to its own fronts and chooses hold or push, deterministically; it never touches another nation's units or fronts.",
-     "notes": "fronts_harness F8 (rivals assign only their own idle units, push/hold on the fixture, deterministic) and world_determinism ALL PASS. market_viability quick on main with fronts + the capital base: G1 93.1 G1t50 85.9 G1b 4.4 G2 149.6 G3 100.0, all PASS."
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "visual: fronts",
-      "live"
-     ],
-     "requirement": "The canvas draws the player's fronts along their border edges, coloured by stance, with the assigned count; clicking a front selects it and the front card shows its neighbour, span, units and order with Hold and Push; the unit card and the stack panel carry Assign to front.",
-     "notes": "fronts.lua: one front drawn at play zoom, hover, a press selects it (selection_kind=front), the card shows neighbour, 57 tiles, Neutral, Hold lit, Push disabled with \"Not hostile\". The unit-card capture shows the front card again (no unit selected), so Assign to front is unseen. Live click owed."
-    }
-   ]
+   "resolved": "2026-10-28",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   },
   {
    "brief": "tile-contact-orders",
@@ -7771,63 +7509,11 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1443 - sprint 58 (Ben, 2026-10-27)",
    "batch": "sprint-58",
-   "resolved": null,
-   "resolution": null,
-   "rows": [
-    {
-     "id": "R1",
-     "status": "pending",
-     "verification": [
-      "headless: tile_contact_harness"
-     ],
-     "requirement": "march_unit takes a destination tile and the march ends on it; its path avoids tiles another nation's units hold, save its own destination; a non-hostile foreign stack on the next step blocks and re-paths, and with no path the order clears. Units of two nations never share a tile.",
-     "notes": null
-    },
-    {
-     "id": "R2",
-     "status": "pending",
-     "verification": [
-      "headless: tile_contact_harness",
-      "headless: battle_engagement_harness"
-     ],
-     "requirement": "A unit whose nation is hostile to a stack on its next step stops on its own tile and a battle opens over the defender's tile, wherever on the path that happens; standing adjacent opens nothing. Identity is (tile, attacker, defender); each side's stacks adjacent to the defended tile, out of other battles, join; the ground is the defended tile.",
-     "notes": null
-    },
-    {
-     "id": "R3",
-     "status": "pending",
-     "verification": [
-      "headless: tile_contact_harness",
-      "headless: campaign_battle_harness",
-      "headless: world_determinism"
-     ],
-     "requirement": "When the attacker holds the field, the attacking stack advances onto the defended tile; joined stacks stay. Retreat, withdrawal, conservation and determinism hold as before.",
-     "notes": null
-    },
-    {
-     "id": "R4",
-     "status": "pending",
-     "verification": [
-      "headless: fronts_harness",
-      "headless: save_roundtrip"
-     ],
-     "requirement": "Fronts: slots are tiles and a unit is on its slot on the tile; push marches each unit onto the neighbour's weakest adjacent tile (empty weakest), an attack where a stack stands. Rivals issue tile marches. Saves round-trip the new battle identity.",
-     "notes": null
-    },
-    {
-     "id": "R5",
-     "status": "pending",
-     "verification": [
-      "visual: unit_orders",
-      "live"
-     ],
-     "requirement": "With an own unit or stack selected, a right-click on a tile marches it there (every own unit in a stack); on another nation's stack it attacks; toward a nation the player is not hostile to it first offers to declare hostility; a front-assigned unit is unassigned and obeys. The hover shows move vs attack.",
-     "notes": null
-    }
-   ]
+   "resolved": "2026-10-28",
+   "archived": "docs/development/archive/requirements-2026-Q4.json"
   }
  ]
 }

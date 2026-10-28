@@ -448,7 +448,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "written": "2026-10-26",
    "parked": false,
    "blocked_on": null,
@@ -470,7 +470,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "written": "2026-10-26",
    "parked": false,
    "blocked_on": null,
@@ -493,7 +493,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "written": "2026-10-26",
    "parked": false,
    "blocked_on": null,
@@ -515,7 +515,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "written": "2026-10-26",
    "parked": false,
    "blocked_on": null,
@@ -537,7 +537,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "written": "2026-10-26",
    "parked": false,
    "blocked_on": null,
@@ -561,7 +561,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "written": "2026-10-26",
    "parked": false,
    "blocked_on": null,
@@ -584,7 +584,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "written": "2026-10-26",
    "parked": false,
    "blocked_on": null,
@@ -606,7 +606,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "written": "2026-10-26",
    "parked": false,
    "blocked_on": null,
@@ -627,36 +627,9 @@
    "design": "Found by the sprint 57 re-bless across all 16 library seeds (Ben carried them to sprint 58, 2026-10-26). DEFECTS: (1) seeds 40 and 12 each have a port with a partner within 50 and no laned water beside it; (2) seeds 13 and 10 have 3 colonial lane ends on a coast with no port. MISSING CHECKS: (a) nothing asserts zero unconnectable consumers - lp_coverage_census rule 3 excuses them; (b) port_lane_probe lists colonial portless coast ends but does not count them as defects. THE WORK: make both claims committed checks first, then fix the defects so they pass on all 16 seeds."
   },
   {
-   "status": "complete",
-   "glyph": "●",
-   "sprint": 58,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-26",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (sprint 58 military design, 2026-10-26)",
-   "requires": [],
-   "id": "BL-1421",
-   "category": "Military",
-   "authority_doc": "docs/military/MILITARY.md",
-   "short_name": "SOFT_HARD_RESOLVER",
-   "priority": "A",
-   "difficulty": 4,
-   "files": [
-    "src/world/campaign_battle.cpp",
-    "src/world/campaign_battle.hpp",
-    "src/world/components.hpp",
-    "src/world/battle_system.cpp",
-    "tools/verify/campaign_battle_harness.cpp"
-   ],
-   "title": "Land units carry HP, readiness and morale; the campaign round scores soft and hard attack against hardness",
-   "design": "MILITARY.md § The campaign force model (Ben, 2026-10-26). unit_component gains HP, readiness and morale (save-format change). Each round every unit deals soft_attack*(1-hardness)+hard_attack*hardness, scaled by morale and supply; the target absorbs up to defence or breakthrough plus terrain; landed damage splits HP/readiness with readiness taking the larger share. HP 0 = the unit dies; readiness 0 = it retreats one tile from the enemy. resolve_campaign_battle stops calling resolve_battle (Era -1 keeps it). Withdrawal stays priced. Deterministic: integer arithmetic, ascending unit ids, draws only in step_campaign_battle. Harness: campaign_battle_harness rewritten against the new arithmetic, C4's monotone sweep kept as a prediction.",
-   "delivered": "2026-10-27"
-  },
-  {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
    "parked": false,
@@ -684,7 +657,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
    "parked": false,
@@ -711,7 +684,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
    "parked": false,
@@ -736,35 +709,9 @@
    "design": "MILITARY.md § Land — equipment, refit and manpower; POPULATION.md § The labour pool. A unit's men are labour taken from the (nation, body) pool before buildings staff, so mobilisation empties factories. A national choice between conscript (cheap per head, wide labour drain, lower quality) and professional (wages, fewer, better). Measure the labour effect on market_viability before tuning."
   },
   {
-   "status": "complete",
-   "glyph": "●",
-   "sprint": 58,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-26",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (sprint 58 military design, 2026-10-26)",
-   "requires": [
-    "BL-1421"
-   ],
-   "id": "BL-1425",
-   "category": "UI",
-   "authority_doc": "docs/military/MILITARY.md",
-   "short_name": "UNIT_COUNTER_RENDER",
-   "priority": "A",
-   "difficulty": 2,
-   "files": [
-    "src/ui/planetary_canvas.cpp",
-    "src/ui/icons.cpp"
-   ],
-   "title": "A land unit is a rectangle in its tile: unit count, HP bar, readiness bar, class glyph",
-   "design": "MILITARY.md § Land — on the canvas. Replaces the current unit marker on the Planetary canvas. Needs a question_log entry and a live click before complete.",
-   "delivered": "2026-10-27"
-  },
-  {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
    "parked": false,
@@ -786,33 +733,6 @@
    ],
    "title": "A bunker building adds defence and hardness to the units on its tile",
    "design": "MILITARY.md § Fortifications. A building type; units on its tile gain defence, defenders gain hardness. Degraded by artillery and strikes, repaired over time."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": null,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-26",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (sprint 58 military design, 2026-10-26)",
-   "requires": [
-    "BL-1421",
-    "BL-1423"
-   ],
-   "id": "BL-1427",
-   "category": "Military",
-   "authority_doc": "docs/military/MILITARY.md",
-   "short_name": "FRONTS",
-   "priority": "A",
-   "difficulty": 4,
-   "files": [
-    "src/world/battle_system.cpp",
-    "src/world/economy_system.cpp",
-    "src/world/corp_command.cpp"
-   ],
-   "title": "Fronts: assigned units hold a border line, refill gaps, fall back, and push on order",
-   "design": "MILITARY.md § Fronts; the grant is AI_OPPONENT.md § 11 (Ben, 2026-10-26: player-assigned units only). Whether rival nations use fronts is an open grant question (NEEDS_REVIEW)."
   },
   {
    "status": "proposed",
@@ -931,35 +851,9 @@
    "design": "RELATIONS.md § 6 (Ben, 2026-10-26: the Era catastrophe retired, Alarm kept as a relations quantity). Add Alarm beside Access and Trust per (observer, subject) nation, with its factors (visible capability, severed trade, posture, unrest), decay to neutral, and the tree effects that read 'Alarm toward you' wired to it. A rival nation's scorer reads its own Alarm toward a nation when weighing embargo, coalition or war; it never declares on Alarm alone. A surface shows the player every nation's Alarm toward them. Also: industrialisation_sim_harness reading [13] still prints 'Catastrophe lean'; rename it 'Alarm lean' (INDUSTRIALISATION.md acceptance table). Whether the rival scorer reading Alarm needs its own grant is a check against AI_OPPONENT.md § 11 before building."
   },
   {
-   "status": "complete",
-   "glyph": "●",
-   "sprint": 58,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-27",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (military ledger design, 2026-10-27)",
-   "requires": [],
-   "id": "BL-1433",
-   "short_name": "MILITARY_LEDGER",
-   "category": "UI",
-   "priority": "A",
-   "difficulty": 3,
-   "authority_doc": "docs/ui/ledgers/military.md",
-   "files": [
-    "src/ui/nav_pane.cpp",
-    "src/ui/military_ledger.cpp",
-    "src/ui/military_ledger.hpp",
-    "docs/ui/MENU.md"
-   ],
-   "title": "The Military ledger on rail slot 7: a Recruit tab and a Design tab",
-   "design": "ledgers/military.md (Ben, 2026-10-27; settled). Slot 7 takes the filled shield glyph; Corp. Strategy leaves the rail. RECRUIT (default): base picker (the nation's completed military bases), the roster with each row's class, numbers, hire price and kit, Raise through the existing hire_unit verb, the muster queue (BL-1435), and the labour pool with the conscript/professional choice (BL-1424). Rows the nation cannot field are dimmed with why. DESIGN: the designs per class (BL-1434). No military base -> Recruit offers the site finder pre-set to the base. Question log entry; ACTIONS.json for Raise; live click.",
-   "delivered": "2026-10-27"
-  },
-  {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "version_goal": "v0.3.0",
    "written": "2026-10-27",
    "parked": false,
@@ -984,35 +878,9 @@
    "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): kit is researched before it enters a design, a unit is designed before it is raised. Each class has kit slots (infantry: rifles or anti-tank launchers; artillery: guns with drones or anti-armour alongside); a slot offers only researched kit (military research nodes); a design's stats are its class's plus its kit's; a unit records its design and refits to it as kit arrives. Kit is goods (BL-1422's kit half). Designs are saved (save-format change). Needs the military research nodes named: the Force branch (DG-ST-FO) holds few today."
   },
   {
-   "status": "complete",
-   "glyph": "●",
-   "sprint": 58,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-27",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (military ledger design, 2026-10-27)",
-   "requires": [],
-   "id": "BL-1435",
-   "short_name": "MUSTER_QUEUE",
-   "category": "Military",
-   "priority": "A",
-   "difficulty": 3,
-   "authority_doc": "docs/military/MILITARY.md",
-   "files": [
-    "src/world/corp_command.cpp",
-    "src/world/economy_system.cpp",
-    "src/world/components.hpp",
-    "src/world/world_save.cpp"
-   ],
-   "title": "Raising a unit takes time: a muster queue at the base, like construction",
-   "design": "MILITARY.md § The muster interface (Ben, 2026-10-27). hire_unit pays and queues at the base; the unit appears when its muster completes, measured like construction days. Muster time per row; the Force branch's Helicopter Lift (-10%) and Proven Readiness (-20%) read it. Save-format change. The Recruit tab shows the queue (BL-1433).",
-   "delivered": "2026-10-27"
-  },
-  {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "version_goal": "v0.3.0",
    "written": "2026-10-27",
    "parked": false,
@@ -1034,91 +902,9 @@
    "design": "Ben, 2026-10-27: kit is researched in the age tree, not a ladder of its own (RESEARCH.md § What technology is for; MILITARY.md § Land — the classes). research/MILITARY_KIT.md § 2 lists the items (two slots a class, gens 1-3). DESIGN PASS FIRST: the tree's grammar holds about fifteen nodes a branch (RESEARCH.md § The shape of an age's tree), so place the kit by subject across branches — small arms, section weapons, guns and protection in Force; armour materials in Processing; sensors, fire control, drones and networked kit in Signal & Orbit — as minors and majors in clusters, keeping each major's two-minors rule; say where the grammar must widen and put that to Ben. Then the store edit (tech_tree_store.js --check, gen_tech_tree_table.js), each node naming its kit as an unlock effect (unread until BL-1434, unit designs)."
   },
   {
-   "status": "complete",
-   "glyph": "●",
-   "sprint": 58,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-27",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (military kit rulings, 2026-10-27)",
-   "requires": [],
-   "id": "BL-1437",
-   "short_name": "OBSOLETE_UNIT_TYPES",
-   "category": "Military",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/military/MILITARY.md",
-   "files": [
-    "src/world/components.hpp",
-    "src/world/world_save.cpp",
-    "src/world/corp_command.hpp",
-    "src/world/corp_command.cpp",
-    "src/world/corp_ai.cpp",
-    "src/ui/military_ledger.cpp"
-   ],
-   "title": "A nation marks unit types obsolete; Recruit hides them; pre-modern rows start obsolete",
-   "design": "MILITARY.md § Land — the classes (Ben, 2026-10-27): a per-nation obsolete flag per roster row, defaulting true below the modern band; a command verb to set it (validated, whole-or-nothing); Recruit hides obsolete rows with a show-obsolete switch; the Design tab carries the toggles; the rival scorer skips obsolete rows. Saved.",
-   "delivered": "2026-10-27"
-  },
-  {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-27",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-10-27)",
-   "requires": [],
-   "id": "BL-1438",
-   "short_name": "RETIRE_CONSTRUCTION_CAPACITY",
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 4,
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "files": [
-    "src/world/construction.cpp",
-    "src/world/economy_system.cpp",
-    "src/world/corp_ai.cpp",
-    "src/world/corporation_generation.cpp",
-    "src/world/state_industry.cpp",
-    "src/world/market_saturation.cpp",
-    "scripts/recipes.lua",
-    "scripts/economy.lua",
-    "scripts/world_gen.lua",
-    "src/ui/construction_panel.cpp"
-   ],
-   "title": "Retire the construction-capacity system: builds no longer wait on construction capacity",
-   "design": "Ben, 2026-10-27: \"We are going to retire that system, and it will hopefully make building smoother.\" Overturns PRODUCTION.md § Construction as a rate (Ben, 2026-08-31). A build site no longer draws construction_capacity; it progresses on its materials and days alone. The construction building, its five production methods and generation's capacity seeding retire; the construction_capacity good keeps its enum slot (resource arrays are saved) with no producer and no consumer, retired in name. Docs: PRODUCTION.md, RESOURCES.md, MARKETS.md siblings. Gates: market_viability FULL before and after, history_sim_harness, world_determinism, construction harnesses re-pointed or retired with reasons."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 58,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-27",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-10-27)",
-   "requires": [],
-   "id": "BL-1439",
-   "short_name": "CAPITAL_MILITARY_BASE",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/military/MILITARY.md",
-   "files": [
-    "src/world/nation_generation.cpp",
-    "src/world/corporation_generation.cpp"
-   ],
-   "title": "Every nation's capital is generated with a completed military base",
-   "design": "Ben, 2026-10-27: \"make sure that the capital is generated with a military base\". At generation each nation gets a completed military_base on its own ground in its capital province (the capital garrison's province), owned by the nation (state_assets), on a tile the ordinary placement rules accept; the capital garrison records it as its muster_base. MILITARY.md § Nation garrisons and § The muster interface say so."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "version_goal": "v0.3.0",
    "written": "2026-10-27",
    "parked": false,
@@ -1140,7 +926,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
+   "sprint": 59,
    "version_goal": "v0.3.0",
    "written": "2026-10-27",
    "parked": false,
@@ -1188,35 +974,24 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 58,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-27",
+   "sprint": 59,
+   "written": "2026-10-28",
    "parked": false,
    "blocked_on": null,
-   "author": "main session (Ben, 2026-10-27)",
-   "requires": [
-    "BL-1427"
-   ],
-   "id": "BL-1443",
-   "short_name": "TILE_CONTACT_ORDERS",
-   "category": "Military",
-   "priority": "A",
-   "difficulty": 4,
+   "author": "Ben (sprint 58 close, 2026-10-28)",
+   "requires": [],
+   "id": "BL-1444",
+   "short_name": "BATTLE_CARD_MARCH_STALL",
+   "category": "Verification",
+   "priority": "B",
+   "difficulty": 2,
    "authority_doc": "docs/military/MILITARY.md",
    "files": [
-    "src/world/battle_system.cpp",
-    "src/world/campaign_battle.hpp",
-    "src/world/economy_system.cpp",
-    "src/world/corp_command.cpp",
-    "src/world/fronts.cpp",
-    "src/world/corp_ai.cpp",
-    "src/world/world_save.cpp",
-    "src/ui/body_surface_canvas.cpp",
-    "src/ui/selection_panel.cpp",
-    "src/core/app.cpp"
+    "scripts/verify/battle_card.lua",
+    "src/core/verify_api.cpp"
    ],
-   "title": "Tile-contact attacks and right-click unit orders: every march goes to a tile; stepping onto a hostile stack is an attack",
-   "design": "Ben, 2026-10-27: \"If a unit is selected, we should be able to right click a tile to give a move or attack order\" and \"attacks should take place when an attacking unit attempts to move into a defending unit's current tile\". Settled in MILITARY.md § Marching (tile grain; one nation per tile; hostile contact stops and attacks; non-hostile blocks and re-paths), § Battles (footprint is the defended tile, adjacent stacks join, identity (tile, attacker, defender), the attacking stack advances on a win) and § Fronts (slots are tiles; push marches onto the neighbour's weakest adjacent tile). Right-click: march to the tile; another nation's stack is an attack; a nation not hostile is offered a declaration; a front-assigned unit is unassigned and obeys; a selected stack orders every own unit."
+   "title": "battle_card.lua: the march is accepted but the unit never moves in the verify world",
+   "design": "SPRINT 58 CLOSE, 2026-10-28. scripts/verify/battle_card.lua fails: march_unit is accepted, but the unit sits at (250,76) for 120 ticks, state \"marching\". Likely refused each step by the Logistic Point gate, which the verify world does not feed. It was broken before sprint 58 (it died at its first line); the sprint's fix let it run far enough to show this. THE WORK: name why the march does not advance in the verify world (LP gate, path, or fixture), fix the cause or stage the fixture, and get the capture to a battle card. Do not weaken the check."
   }
  ]
 }

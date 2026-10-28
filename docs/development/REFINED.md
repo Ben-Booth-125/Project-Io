@@ -1,6 +1,34 @@
 # REFINED — active worklist
 
-## Sprint 58 — the land combat core (opened 2026-10-26)
+## Sprint 59 (opened 2026-10-28)
+
+**Target.** v0.2.3 (Ben, 2026-10-28). `sprints.json` `next_up` holds the line.
+
+**Carried from sprint 58.**
+- BL-1442 (post-capacity starvation): G1t50 79.8 against 85; measure the starving recipes, fix the cause, keep the gate.
+- BL-1440 (R0b budget world): rival_military_seeding_harness R0b fails three rows.
+- BL-1441 (front edge cases): no front without a free key tile; unreachable fronts.
+- BL-1422 (land classes and kit): the roster half is done; kit as goods remains.
+- BL-1423 (refit and retreat): wounded units refit from the shelf.
+- BL-1424 (soldiers from labour): conscript or professional, from the labour pool.
+- BL-1426 (bunkers): defence and hardness for the units on a tile.
+- BL-1434 (unit designs): a land class with researched kit per slot.
+- BL-1436 (kit in the age tree): about forty kit items in the Digitisation tree.
+- BL-1444 (battle card march stall): battle_card.lua's march is accepted but the unit never moves.
+- BL-1413 (re-curate six seeds): six library seeds no longer serve their purpose.
+- BL-1414 (Trade-flow room without rivals): no-room ignores rivals' cargo in flight.
+- BL-1415 (header NET excludes refunds): the header shows operating net.
+- BL-1416 (drop the identity wash): keep the outline.
+- BL-1417 (no nation emblem): the profile and Selection header still draw it.
+- BL-1418 (embargo bars goods): an embargo bars a nation's goods from your markets.
+- BL-1419 (Industry lens fills): it shows other nations' plants.
+- BL-1420 (lane and port defects and checks): five defects, two missing checks.
+
+**New themes, design pending (no ids yet; filed when the design lands).**
+- Day-grained unit movement by speed: days per tile by class or kit; trucks and tanks are faster.
+- A full-canvas unit designer, opened from a unit type.
+
+## Sprint 58 — the land combat core (opened 2026-10-26, CLOSED 2026-10-28 at v0.2.2)
 
 **Goal.** The campaign's land fight runs on MILITARY.md § The campaign force model: per-unit HP,
 readiness and morale; soft and hard attack against hardness; retreat on spent readiness.
@@ -12,9 +40,9 @@ quick tier before and after. A cold `code-reviewer` pass with a fix round budget
 world digests (D_land onward); they stay red until the sprint's one re-bless.
 
 ### BL-1443 (tile contact orders) — Delivery Full, group `tile-contact-orders`
-- [ ] **T1** World lane: tile-grain march_unit, one nation per tile, hostile contact opens a tile battle, adjacent stacks join, advance on a win, fronts on tiles, rival tile marches, save, `tile_contact_harness`. (R1-R4)
-- [ ] **T2** UI lane: right-click move/attack, the declare-hostility offer, stack orders, the March button picks a tile, battle mark on the defended tile. (R5)
-- [ ] **T3** Merge, cold review, gates, Ben's live click.
+- [x] **T1** World lane: tile-grain march_unit, one nation per tile, hostile contact opens a tile battle, adjacent stacks join, advance on a win, fronts on tiles, rival tile marches, save, `tile_contact_harness`. (R1-R4)
+- [x] **T2** UI lane: right-click move/attack, the declare-hostility offer, stack orders, the March button picks a tile, battle mark on the defended tile. (R5)
+- [x] **T3** Merge, cold review, gates, Ben's live click (2026-10-28).
 
 ### BL-1442 (post-capacity starvation) — Delivery Full
 - [ ] **T1** (carried to sprint 59, Ben 2026-10-28; own-market ceiling rule merged, G1t50 79.8) Economy lane: measure which recipes starve and why, fix the cause; market_viability FULL G1t50 >= 85 without lowering the gate.
@@ -24,7 +52,7 @@ Starts after the refit lane merges (both move the unit record, the save version 
 - [x] **T1** Contract on main: `fronts.hpp` (front, derive_fronts, front_key), the assignment on the unit, the order store, the two verbs' enum slots, the save section. (R1, R2)
 - [x] **T2** World lane (worktree): derivation, the verbs, the per-tick slot and push step, re-anchoring, rival front scoring, `fronts_harness`. (R1-R4)
 - [x] **T3** UI lane (worktree): front lines on the canvas, the front selection kind and card, Assign to front on the unit card and stack panel, `scripts/verify/fronts.lua`. (R5)
-- [ ] **T4** Merge, cold review, gates, Ben's live click.
+- [x] **T4** Merge, cold review, gates, Ben's live click (2026-10-28).
 
 ### BL-1437 (obsolete unit types) — Delivery Full, group `obsolete-unit-types`
 - [x] **T1** Per-nation flips, `roster_row_obsolete`, the `set_unit_obsolete` verb (39), save v60, hash; `obsolete_units` harness.

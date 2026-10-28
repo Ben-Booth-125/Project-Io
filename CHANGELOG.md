@@ -12,6 +12,50 @@ release.
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-10-28
+
+*The land combat core. Units carry HP, readiness and morale and fight by soft and hard attack;
+they are raised in a queue from a Military ledger, held on fronts and ordered by right-click.
+Construction no longer waits on capacity. A step toward v0.3.0's working military system, not
+that release: G1 at tick 50 reads 79.8 against 85, carried to sprint 59.*
+
+### Changed
+
+- **Land battles score soft and hard attack against hardness** (BL-1421 (soft hard resolver)).
+  Each unit carries HP, readiness and morale; damage splits between HP and readiness. A unit at
+  zero HP dies; at zero readiness it retreats a tile. Units out of contact recover.
+- **Raising a unit takes time** (BL-1435 (muster queue)): a hire pays and queues at its base,
+  and the unit appears when its muster completes.
+- **Every march goes to a tile** (BL-1443 (tile contact orders)). Units of two nations never
+  share a tile; stepping onto a hostile stack opens a battle over that tile, adjacent stacks join,
+  and a winning attacker advances. A non-hostile stack blocks and the march re-paths.
+- **Every capital is generated with a completed military base** (BL-1439 (capital military
+  base)); the capital garrison and the opening unit muster there.
+- **An Era is opened by what a nation achieves**, not by a catastrophe it avoided. Each nation
+  crosses when it meets the gate.
+
+### Added
+
+- **The Military ledger** on rail slot 7 (BL-1433 (military ledger)): a Recruit tab with base
+  picker, roster, Raise and the muster queue, and a Design tab.
+- **A unit counter** on the Planetary canvas (BL-1425 (unit counter render)): a rectangle per
+  tile and owner, with count, HP bar and readiness bar. The unit card shows HP, readiness, morale
+  and class stats.
+- **Fronts** (BL-1427 (fronts)): each contiguous border span per neighbour is a front. Assigned
+  units hold it or push toward a hostile neighbour; rival nations assign and push their own.
+- **Right-click orders**: with a unit or stack selected, right-click a tile to move, or a foreign
+  stack to attack, with an offer to declare hostility first.
+- **Refit**: a unit changes to a newer row of its land class, paying the price difference and
+  the new row's goods, and taking its muster days.
+- **Obsolete unit types** (BL-1437 (obsolete unit types)): a nation marks roster rows obsolete,
+  and Recruit hides them. Pre-modern rows start obsolete.
+
+### Removed
+
+- **Construction capacity** (BL-1438 (retire construction capacity)): a site progresses on its
+  materials and days alone. The construction building and its methods retire.
+- **The Era catastrophe**: no seeded test date, countdown, Ceiling or failure branch.
+
 ## [0.2.1] — 2026-10-26
 
 *Nations own everything, then economy polish. Corporations and companies are retired: every
@@ -1692,7 +1736,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.32...v0.2.0
 [0.1.32]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.31...v0.1.32

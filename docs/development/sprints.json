@@ -70,7 +70,7 @@
   "**The startup-budget chain is dropped outright (Ben, 2026-09-08): “drop it — a watched wait needs no budget”.** Sprint 35 was authored that morning around the 72–73 s warm start and re-authored the same day around generation visibility. BL-813/814/815 are deleted under the 2026-08-24 unstarted-plans policy. The ruling is not that startup time stopped mattering — it is that a wait the player is WATCHING is content rather than cost, so the obligation moves from a stopwatch to whether the thing on screen is worth looking at."
  ],
  "sprints": [],
- "next_up": "SPRINT 57 OPEN 2026-10-23: nations own everything (BL-1399, BL-1401..BL-1408). Worklist: docs/development/REFINED.md.",
+ "next_up": "SPRINT 59 OPEN 2026-10-28, targets v0.2.3: BL-1442 (post-capacity starvation) first, then the sprint 58 carries and two themes in design (day-grained movement by speed, a full-canvas unit designer). Worklist: docs/development/REFINED.md.",
  "footer_notes": [
   "**The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first."
  ]

@@ -1864,6 +1864,68 @@
         "docs/economy/LOGISTICS.md"
       ],
       "resolution": "Ben, 2026-10-26: place ports in history; colonial lane ends within two tiles of each other share one harbour port."
+    },
+    "NR-1083": {
+      "id": "NR-1083",
+      "title": "May rival nations use fronts?",
+      "raised": "2026-10-26",
+      "kind": "question",
+      "status": "resolved",
+      "source": "sprint 58 military design",
+      "what": "Ben granted fronts for the player's assigned units (AI_OPPONENT.md § 11). Whether a rival nation may assign its own units to fronts and score hold or push is a separate subject, so it was not written into the grant.",
+      "why_it_matters": "Fronts are the cheapest way for a scorer to use an army without a planner. Without this grant, rivals have no way to fight a war beyond march_unit.",
+      "options": [
+        "A: grant rivals fronts, hold and push scored by the nation layer; B: rivals hold only; C: no rival fronts yet"
+      ],
+      "recommendation": "A, on the standing terms. It is what makes BL-1427 (fronts) worth building for v0.3.0's AI half.",
+      "files": [
+        "docs/ai/AI_OPPONENT.md",
+        "docs/military/MILITARY.md"
+      ],
+      "resolution": "Ben, 2026-10-27: A — rivals assign their own units to their own fronts and choose hold or push. Written as a grant in AI_OPPONENT.md § 11 and in MILITARY.md § Fronts."
+    },
+    "NR-1091": {
+      "raised": "2026-10-27",
+      "status": "resolved",
+      "resolution": "Ben, 2026-10-27: merge BL-1438 and keep G1t50 at 85; the new starvation and decommissions are follow-on work, BL-1442 (post-capacity starvation). Merged at 9503aa06; FULL G1t50 78.9.",
+      "id": "NR-1091",
+      "kind": "question",
+      "title": "Construction capacity retired: G1 at tick 50 falls under its gate",
+      "source": "BL-1438 (retire construction capacity) lane, branch worktree-agent-acf7de32610de4ed0 @ 7737c801, held unmerged",
+      "what": "market_viability FULL, 16 seeds: G1t50 87.8 -> 79.5 (target 85, FAIL); G1 93.4 -> 92.8, G1b 3.7 -> 3.5, G2 143.7 -> 192.3, G3 100 -> 100. Building is faster: processors built by tick 50 1446 -> 2762, running 1269 -> 2195 (+73%), still under construction 956 -> 181. The gate counts only finished buildings, whose count nearly doubled; input-starved 32 -> 158, decommissioned 54 -> 209.",
+      "why_it_matters": "The ruling asked for smoother building, and it is: far more runs at tick 50. But more of what finishes now starves, and the merge gate fails.",
+      "options": [
+        "A: accept and re-set G1t50 (measure the new floor)",
+        "B: merge, and open work on the new starvation and decommissions with G1t50 kept at 85",
+        "C: hold the merge until the starvation is fixed"
+      ],
+      "recommendation": "B. The retirement is what you asked for; the starvation is a real follow-on, not a reason to keep stalled sites.",
+      "files": [
+        "docs/economy/PRODUCTION.md",
+        "tools/verify/market_viability.cpp"
+      ]
+    },
+    "NR-1092": {
+      "raised": "2026-10-27",
+      "status": "resolved",
+      "resolution": "Kept as ruled (Ben, 2026-10-28): A, all calls as built.",
+      "id": "NR-1092",
+      "kind": "decision",
+      "title": "Fronts: the calls taken on your behalf",
+      "source": "BL-1427 (fronts) lanes and cold review",
+      "what": "Slots: unit i of n takes span[(2i+1)L/2n]; \"on slot\" is the slot tile's province. A hand march on an assigned unit is overridden by its front; unassign to march by hand. Push enters the neighbour's adjacent land province with the least summed unit strength. Re-anchor keeps a key only while it faces the same neighbour, else the nearest front toward that neighbour, else drops. Rivals assign only idle units outside their capital province (the capital garrison stays home), to the front with fewest units per span tile, and push only when hostile and stronger 3:2. A push the march refuses holds instead.",
+      "why_it_matters": "Each shapes how wars feel; the capital-stays-home and hand-march-overridden rules are not in the grant text.",
+      "options": [
+        "A: keep all as built",
+        "B: change one (say which)"
+      ],
+      "recommendation": "A.",
+      "files": [
+        "docs/military/MILITARY.md",
+        "src/world/fronts.cpp",
+        "src/world/corp_ai.cpp"
+      ],
+      "resolved_on": "2026-10-28"
     }
   }
 }

@@ -10,6 +10,38 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-26 to 2026-10-28 — Sprint 58: the land combat core — version 0.2.2
+
+**Runtime:** about three days; Design on Ben's walks, then Delivery Full in worktree lanes, closed
+by Ben's live clicks.
+
+**What was built.**
+- **Combat:** BL-1421 (soft hard resolver). Every land unit carries HP, readiness and morale; a round scores soft and hard attack against hardness. Spent units retreat; units out of contact recover.
+- **Raising:**
+  - BL-1433 (military ledger) on rail slot 7, with Recruit and Design tabs;
+  - BL-1435 (muster queue): a hire waits its muster days at the base;
+  - BL-1437 (obsolete unit types), pre-modern rows obsolete by default;
+  - BL-1439 (capital military base) for every nation;
+  - the refit verb (no backlog id): a unit changes to a newer row of its class.
+- **On the map:**
+  - BL-1425 (unit counter render);
+  - BL-1427 (fronts), rivals included;
+  - BL-1443 (tile contact orders): one nation per tile, a step onto a hostile stack attacks, right-click move and attack.
+- **Retired:** BL-1438 (retire construction capacity); the Era catastrophe, by a design pass early in the sprint.
+
+**Decisions.** Every ruling is in its owning doc; the register (`tools/session/rulings/sprint-58.json`)
+passes 26 of 26 on the committed docs. Ben cut v0.2.2, not v0.3.0: v0.3.0 is a working military system and its
+done-definition is still owed. Fronts calls kept as built (NR-1092).
+
+**Re-bless.** One, at the sprint end, by the main session.
+
+**Gates at close (main 53e1c67f).** market_viability FULL: G1 93.3, G1t50 79.8 FAIL, G1b 2.8,
+G2 191.0, G3 100.0. history_sim_harness: the two known R3a2/R3a3 only.
+
+**Left open.** BL-1442 (post-capacity starvation) leads sprint 59: retiring capacity made building
+faster and starved processors, and the gate stays at 85. BL-1444 (battle card march stall) is filed:
+the march is accepted, the unit never moves in the verify world.
+
 ## 2026-10-23 to 2026-10-26 — Sprint 57: nations own everything, then economy polish — version 0.2.1
 
 **Runtime:** about four days, one long session; Delivery Full across ~25 worktree lanes, driven by
