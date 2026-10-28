@@ -25,15 +25,16 @@
 local VERB_DECLARE_HOSTILE = 17
 local VERB_MARCH_UNIT      = 21
 
-verify.goto_surface()
+verify.goto_surface("home")
 
--- Who is the player? Read it from the buildings table's own `player` flag rather
--- than assuming a corp id — corp ids are generation-dependent.
+-- Who is the player? Read it from the units table's own `player` flag rather
+-- than assuming an id — ids are generation-dependent (corporations are retired;
+-- every unit is a nation's).
 local player_corp = nil
-for _, b in ipairs(verify.buildings()) do
-    if b.player then player_corp = b.corp; break end
+for _, u in ipairs(verify.units()) do
+    if u.player then player_corp = u.owner; break end
 end
-assert(player_corp, "no player-owned building found; cannot identify the player corp")
+assert(player_corp, "no player-owned unit found; cannot identify the player nation")
 
 -- Pick the player's unit and the nearest rival unit.
 local mine, theirs = nil, nil
@@ -58,8 +59,10 @@ verify.clear_selection()
 verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = player_corp,  counterparty = theirs.owner }
 verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = theirs.owner, counterparty = player_corp }
 
-verify.corp_command{ verb = VERB_MARCH_UNIT, corp = player_corp,
-                     subject = mine.id, col = theirs.col, row = theirs.row } -- BL-1443: march onto their tile; contact is the attack
+local march_result = verify.corp_command{ verb = VERB_MARCH_UNIT, corp = player_corp,
+                     subject = mine.id, col = theirs.col, row = theirs.row }
+print(string.format("battle_card: march %s from (%d,%d) onto (%d,%d)", tostring(march_result), mine.col, mine.row, theirs.col, theirs.row))
+assert(march_result == "applied", "the march onto the rival stack was refused: " .. tostring(march_result)) -- BL-1443: march onto their tile; contact is the attack
 
 -- Step until contact. A generous budget: the march is path-marched across ticks
 -- on the shared traversal-cost metric, so how long it takes is a function of the
@@ -68,6 +71,12 @@ local in_battle = false
 for _ = 1, 120 do
     verify.econ_step(1)
     if verify.select_battle(theirs.col, theirs.row) then in_battle = true; break end
+    for _, u in ipairs(verify.units()) do
+        if u.id == mine.id and (_G.__bc_n or 0) % 10 == 0 then
+            print(string.format("battle_card: tick at (%s,%s) marching=%s", tostring(u.col), tostring(u.row), tostring(u.marching)))
+        end
+    end
+    _G.__bc_n = (_G.__bc_n or 0) + 1
 end
 assert(in_battle, "no battle opened within 120 ticks of marching into contact")
 
