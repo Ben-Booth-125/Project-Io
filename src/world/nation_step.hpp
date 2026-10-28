@@ -7,6 +7,7 @@
 
 struct world;
 struct economy_report;
+struct lp_tick; // logistic_points.hpp: the quarter's resolve (BL-1445 supply share)
 class recipe_registry;
 
 // ---------------------------------------------------------------------------
@@ -155,6 +156,17 @@ void record_market_wants(world& w, const std::vector<market_want>& wants);
 // figure, not a per-unit goods draw, so there is nothing to distribute
 // per-unit the way `distribute_losses` has to.
 //
+// THE LOGISTIC POINT SHARE IS A THIRD TRIGGER OF THE SAME RULE (Ben, 2026-10-28;
+// MILITARY.md § Upkeep, "Supply is drawn where the unit stands"). Every unit is a
+// nation's (BL-1407), so this is where the one decay rule lands on a unit's supply
+// factor; @p lp, the quarter's resolve, carries each unit's granted share of its
+// supply request at its tile (`lp_tick::supply_share`). The rule's TARGET is the
+// minimum of the bill's (0 unmet, 1000 met) and the unit's Logistic Point share, and
+// the factor steps toward it - down by `supply_decay_permille`, up by
+// `supply_recovery_permille` - exactly the BL-1172 step `run_unit_upkeep` takes. At a
+// full share (or a resolve that is absent or names no row for the unit) the target
+// is the bill's alone, which is this pass exactly as it was.
+//
 // Runs from `run_nation_step`, after `run_national_budget` (step 3) — the
 // SAME treasury and the SAME `w.nation_budgets` weights a claim on any other
 // line would read this tick, just without going through the claim/transfer
@@ -163,4 +175,5 @@ void record_market_wants(world& w, const std::vector<market_want>& wants);
 // DETERMINISTIC: nations walked in ascending id (`std::map`, built from the
 // unordered `w.units`/`w.nations` and sorted first); each nation's garrison
 // unit ids ascending.
-void run_nation_garrison_upkeep(world& w, const recipe_registry& reg);
+void run_nation_garrison_upkeep(world& w, const recipe_registry& reg,
+                                const lp_tick* lp = nullptr);

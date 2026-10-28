@@ -10,16 +10,20 @@
 //   D2  terrain multiplies (a mountain doubles), a road divides (the road ladder's own
 //       discount, `road_traversal_multiplier`);
 //   D3  partial progress banks from day to day in `order.progress`;
-//   D4  Logistic Points: granted once a quarter, spent tile by tile; a unit whose grant is
-//       spent halts and resumes on the next quarter's grant; the credit price is charged
-//       per tile at the rate x tile cost x men, the same total per tile as before;
+//   D4  movement takes no Logistic Points (Ben, 2026-10-28): a march on a zero pool moves,
+//       pays nothing, and an order given mid-quarter moves at once;
 //   D5  contact opens a battle on the day of contact;
 //   D6  battle length in days (infantry on plains, by force ratio);
 //   D7  determinism: the same fixture twice is byte-identical;
 //   D8  a save taken mid-march round-trips, and the loaded world marches on identically;
 //   D9  a world stepped day by day (the app) and one caught up by the economy step (every
 //       headless driver) end the quarter identically;
-//   D10 the loader rejects a non-positive or non-finite speed.
+//   D10 the loader rejects a non-positive or non-finite speed;
+//   D11 supply is drawn where the unit stands: its request is its supplies' quantity, a
+//       covered unit is granted it whole and keeps its supply, an uncovered one is granted
+//       nothing and decays by the one rule's step each quarter;
+//   D12 a unit a battle kills is removed that same day;
+//   D13 out of contact, readiness and morale recover daily (Ben, 2026-10-28).
 //
 // Build: bash tools/verify/build_lua_harness.sh move_by_days_harness (it loads
 // scripts/recipes.lua and scripts/economy.lua through a live Lua state). Run from the
@@ -30,6 +34,8 @@
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
 #include "world/logistic_points.hpp"
+#include "world/nation_budget.hpp"
+#include "world/nation_step.hpp"
 #include "world/logistics.hpp"
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
@@ -198,7 +204,7 @@ int days_to_cross(const recipe_registry& reg, uint16_t type, int tiles,
     order_along_row(w, u, body, 0, tiles);
     for (int day = 1; day <= 2000; ++day)
     {
-        (void)run_unit_march(w, reg, /*lp_gated=*/false, day);
+        (void)run_unit_march(w, reg, day);
         if (col_of(w, w.units.at(u).position) >= tiles)
             return day;
     }
@@ -336,7 +342,7 @@ int main()
         std::vector<int> ci, ca;
         for (int day = 1; day <= 3; ++day)
         {
-            (void)run_unit_march(w, reg, false, day);
+            (void)run_unit_march(w, reg, day);
             pi.push_back(w.units.at(ui).order.progress); ci.push_back(col_of(w, w.units.at(ui).position));
             pa.push_back(w.units.at(ua).order.progress); ca.push_back(col_of(w, w.units.at(ua).position));
         }
@@ -353,77 +359,51 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nD4 - Logistic Points: granted quarterly, spent tile by tile; a spent grant halts\n");
+    std::printf("\nD4 - movement takes no Logistic Points: a march mid-quarter moves at once on a zero pool\n");
     {
+        // No hub, no source: the nation's pool is ZERO, and no resolve has ever run.
         world w;
         const entity_id body = make_row_body(w, 60);
         const entity_id n = add_nation(w, body, 0, 59);
-        add_hub(w, tile_at(w, body, 0));
         const entity_id u = add_unit(w, n, tile_at(w, body, 0), modern(land_class::infantry), 100);
         order_along_row(w, u, body, 0, 5);
-
-        const float rate = mil.active_lp_credit_per_unit_distance;
-        const lp_tick q1 = resolve_logistic_points(w, collect_march_claims(w, reg));
-        apply_march_grants(w, q1);
-        const float grant1 = w.units.at(u).march_grant;
-        std::printf("      quarter 1: a five-tile order claims %.2f points and is granted %.2f "
-                    "(pool %.0f)\n", q1.marches.empty() ? -1.0f : q1.marches.front().need, grant1,
-                    q1.nations.empty() ? 0.0f : q1.nations.front().pool);
-        check(approx(grant1, 5.0f), "D4a the claim is the path the quarter can walk - five plains tiles, 5 points");
+        const lp_tick lp = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        std::printf("      pool %.1f\n", lp.nations.empty() ? 0.0f : lp.nations.front().pool);
 
         const float t0 = w.nations.at(n).treasury;
         int arrived_day = -1;
         for (int day = 1; day <= 20; ++day)
         {
-            (void)run_unit_march(w, reg, /*lp_gated=*/true, day);
+            (void)run_unit_march(w, reg, day);
             if (arrived_day < 0 && w.units.at(u).order.dest == null_entity)
                 arrived_day = day;
         }
         const float paid = t0 - w.nations.at(n).treasury;
-        std::printf("      arrived day %d; grant left %.3f; credits paid %.3f (rate %.4f x 5 tiles x 100 men = %.3f)\n",
-                    arrived_day, w.units.at(u).march_grant, paid, rate, rate * 5.0f * 100.0f);
-        check(arrived_day == 15, "D4b ...and spends it day by day: five tiles in fifteen days");
-        check(approx(w.units.at(u).march_grant, 0.0f, 1e-3f), "D4c the grant is spent, one point a plains tile");
-        check(approx(paid, rate * 5.0f * 100.0f, 1e-2f),
-              "D4d the credit price is charged per tile moved: rate x tile cost x men");
+        std::printf("      arrived day %d; credits paid for the march %.3f\n", arrived_day, paid);
+        check(arrived_day == 15, "D4a a five-tile order on a zero pool arrives on day 15: three days a tile");
+        check(approx(paid, 0.0f, 0.0f), "D4b the march is charged nothing, per hop or at all");
 
-        // A new, longer order mid-quarter: no grant is left, so the unit halts.
+        // A new, longer order MID-QUARTER (day 21): it moves from the next day.
         order_along_row(w, u, body, 5, 40);
         int moved_mid = 0;
-        int refused = 0;
         for (int day = 21; day <= 90; ++day)
         {
             const int before = col_of(w, w.units.at(u).position);
-            refused += run_unit_march(w, reg, true, day).refused_no_lp;
+            (void)run_unit_march(w, reg, day);
             moved_mid += col_of(w, w.units.at(u).position) - before;
         }
-        std::printf("      a 35-tile order on day 21: moved %d tiles to the quarter's end (%d day-refusals)\n",
-                    moved_mid, refused);
-        check(moved_mid == 0 && refused == 70, "D4e a unit whose grant is spent halts until the next grant");
+        std::printf("      a 35-tile order on day 21: moved %d tiles by the quarter's end\n", moved_mid);
+        check(moved_mid == 23, "D4c an order given mid-quarter moves at once: 70 days, 23 tiles - no wait for a grant");
 
-        const lp_tick q2 = resolve_logistic_points(w, collect_march_claims(w, reg));
-        apply_march_grants(w, q2);
-        const float grant2 = w.units.at(u).march_grant;
-        int moved_q2 = 0;
-        for (int day = 91; day <= 180; ++day)
-        {
-            const int before = col_of(w, w.units.at(u).position);
-            (void)run_unit_march(w, reg, true, day);
-            moved_q2 += col_of(w, w.units.at(u).position) - before;
-        }
-        std::printf("      quarter 2: granted %.2f; moved %d tiles (a quarter of foot is 30)\n", grant2, moved_q2);
-        check(approx(grant2, 30.0f) && moved_q2 == 30,
-              "D4f the next quarter's grant resumes it: capped at the 30 tiles ninety days of foot can walk");
-
-        // No pool: nobody's ground and no hub.
+        // The same through the app's path: the day loop's `advance_quarter_to`.
         world z;
-        const entity_id zb = make_row_body(z, 8);
-        const entity_id zn = add_nation(z, zb, 0, 7);
+        const entity_id zb = make_row_body(z, 12);
+        const entity_id zn = add_nation(z, zb, 0, 11);
         const entity_id zu = add_unit(z, zn, tile_at(z, zb, 0), modern(land_class::motorised));
         order_along_row(z, zu, zb, 0, 4);
-        apply_march_grants(z, resolve_logistic_points(z, collect_march_claims(z, reg)));
-        for (int day = 1; day <= 30; ++day) (void)run_unit_march(z, reg, true, day);
-        check(col_of(z, z.units.at(zu).position) == 0, "D4g a nation that makes no points grants nothing: no march");
+        (void)advance_quarter_to(z, reg, 45, 0); // day 45 of the quarter, no economy tick yet
+        check(col_of(z, z.units.at(zu).position) == 4,
+              "D4d through the day loop too: motorised walks its four tiles mid-quarter on a zero pool");
     }
 
     // -----------------------------------------------------------------------
@@ -434,7 +414,7 @@ int main()
         int opened_day = -1, adjacent_day = -1;
         for (int day = 1; day <= 30 && opened_day < 0; ++day)
         {
-            const military_day_result r = run_military_day(d.w, reg, day, /*lp_gated=*/false);
+            const military_day_result r = run_military_day(d.w, reg, day);
             if (adjacent_day < 0 && col_of(d.w, d.w.units.at(d.ua).position) == 3)
                 adjacent_day = day;
             if (r.march.battles_opened > 0)
@@ -464,7 +444,7 @@ int main()
                 int open = -1, end = -1;
                 for (int day = 1; day <= 60 && end < 0; ++day)
                 {
-                    const military_day_result r = run_military_day(d.w, reg, base + day, false);
+                    const military_day_result r = run_military_day(d.w, reg, base + day);
                     if (open < 0 && r.march.battles_opened > 0)
                         open = day;
                     if (open >= 0 && r.battles.concluded > 0)
@@ -503,8 +483,8 @@ int main()
         order_along_row(b.w, mb, b.body, 1, 4);
         for (int day = 1; day <= 60; ++day)
         {
-            (void)run_military_day(a.w, reg, day, false);
-            (void)run_military_day(b.w, reg, day, false);
+            (void)run_military_day(a.w, reg, day);
+            (void)run_military_day(b.w, reg, day);
         }
         check(a.w.state_hash(60) == b.w.state_hash(60) && to_bytes(a.w) == to_bytes(b.w),
               "D7 sixty days of marches and a battle, twice: equal state_hash and equal save bytes");
@@ -519,22 +499,20 @@ int main()
         add_hub(w, tile_at(w, body, 0));
         const entity_id u = add_unit(w, n, tile_at(w, body, 0), modern(land_class::armour));
         order_along_row(w, u, body, 0, 30);
-        apply_march_grants(w, resolve_logistic_points(w, collect_march_claims(w, reg)));
-        for (int day = 1; day <= 4; ++day) (void)run_unit_march(w, reg, true, day);
+        for (int day = 1; day <= 4; ++day) (void)run_unit_march(w, reg, day);
         const unit_component& src = w.units.at(u);
-        std::printf("      day 4: col %d, banked %.3f, grant left %.3f\n", col_of(w, src.position),
-                    src.order.progress, src.march_grant);
+        std::printf("      day 4: col %d, banked %.3f\n", col_of(w, src.position), src.order.progress);
         world back;
         const bool ok = from_bytes(to_bytes(w), back);
         const unit_component& got = back.units.at(u);
         check(ok && got.position == src.position && approx(got.order.progress, src.order.progress, 0.0f)
-                  && approx(got.march_grant, src.march_grant, 0.0f) && got.order.path == src.order.path,
-              "D8a the banked progress and the unspent grant survive the save exactly");
+                  && got.order.path == src.order.path,
+              "D8a the banked progress and the path survive the save exactly (a march holds no other state)");
         check(ok && back.state_hash(4) == w.state_hash(4), "D8b the loaded world hashes as the original");
         for (int day = 5; day <= 40; ++day)
         {
-            (void)run_unit_march(w, reg, true, day);
-            (void)run_unit_march(back, reg, true, day);
+            (void)run_unit_march(w, reg, day);
+            (void)run_unit_march(back, reg, day);
         }
         check(back.state_hash(40) == w.state_hash(40) && back.units.at(u).position == w.units.at(u).position,
               "D8c ...and marches on to the same place and the same hash");
@@ -554,18 +532,137 @@ int main()
         world a, b;
         const entity_id ua = make(a);
         (void)make(b);
-        // One quarter grants, then a quarter is walked: `a` a day at a time as the app's frame
-        // loop does, `b` all at once inside the next economy step, as every headless driver does.
+        // One economy step - whose catch-up walks its quarter's days, on no grant at all
+        // (movement takes no Logistic Points) - then a quarter is walked: `a` a day at a time
+        // as the app's frame loop does, `b` all at once inside the next economy step, as
+        // every headless driver does.
         (void)run_economy_step(a, reg);
         (void)run_economy_step(b, reg);
+        const int col_first = col_of(a, a.units.at(ua).position);
         const int base = a.current_econ_tick * 90;
         for (int d = 1; d <= 90; ++d) (void)advance_quarter_to(a, reg, d, base);
         const int col_mid = col_of(a, a.units.at(ua).position);
         (void)run_economy_step(a, reg);
         (void)run_economy_step(b, reg);
-        std::printf("      after the walked quarter: col %d; both stepped again\n", col_mid);
-        check(col_mid == 30, "D9a the walked quarter moved foot infantry thirty tiles");
+        std::printf("      after the first step: col %d; after the walked quarter: col %d; both stepped again\n",
+                    col_first, col_mid);
+        check(col_first == 30 && col_mid == 40,
+              "D9a the first step's quarter moved foot infantry thirty tiles, and the walked quarter the last ten");
         check(a.state_hash(2) == b.state_hash(2), "D9b the day-by-day world and the caught-up world hash alike");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nD11 - supply is drawn where the unit stands: an uncovered unit loses supply, a covered one keeps it\n");
+    {
+        world w;
+        const entity_id body = make_row_body(w, 40);
+        const entity_id n = add_nation(w, body, 0, 39);
+        add_hub(w, tile_at(w, body, 0)); // no road: its points reach its own tile only
+        // The nation funds its garrison's bill in full, so the bill's trigger never fires
+        // and only the Logistic Point share can move a unit's supply.
+        nation_budget bud{};
+        bud.weights[static_cast<std::size_t>(budget_priority::military_research)] = 1.0f;
+        w.nation_budgets[n] = bud;
+        const entity_id covered   = add_unit(w, n, tile_at(w, body, 0),  modern(land_class::infantry), 100);
+        const entity_id uncovered = add_unit(w, n, tile_at(w, body, 30), modern(land_class::infantry), 100);
+        const unit_upkeep_params& up = mil.upkeep;
+
+        const lp_tick lp = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        const auto share = [&](entity_id id) {
+            const auto it = lp.supply_share.find(id);
+            return it != lp.supply_share.end() ? it->second : -1;
+        };
+        float need = 0.0f;
+        for (const lp_supply_row& s : lp.supplies)
+            if (s.unit == covered) need = s.need;
+        std::printf("      request %.4f points a quarter (100 heads, authored goods per head); "
+                    "share covered %d, uncovered %d\n", need, share(covered), share(uncovered));
+        check(approx(need, unit_supply_need(w.units.at(covered), up)) && need > 0.0f,
+              "D11a the request is the unit's supplies' quantity (its upkeep goods draw)");
+        check(share(covered) == 1000, "D11b a unit on its nation's hub tile is granted its whole request");
+        check(share(uncovered) == 0, "D11c a unit thirty tiles past the network is granted nothing");
+
+        // The one decay rule, four quarters, the share re-resolved each quarter.
+        for (int q = 0; q < 4; ++q)
+        {
+            const lp_tick lq = resolve_logistic_points(w, collect_supply_claims(w, reg));
+            run_nation_garrison_upkeep(w, reg, &lq);
+        }
+        const int f_cov = w.units.at(covered).supply_factor_permille;
+        const int f_unc = w.units.at(uncovered).supply_factor_permille;
+        std::printf("      after four quarters: covered %d, uncovered %d (decay %d a quarter)\n",
+                    f_cov, f_unc, up.supply_decay_permille);
+        check(f_cov == 1000, "D11d the covered unit keeps full supply");
+        check(up.supply_decay_permille > 0 && f_unc == 1000 - 4 * up.supply_decay_permille,
+              "D11e the uncovered unit decays by the one rule's step each quarter, toward its share of 0");
+
+        // Without the resolve the pass is the bill's rule alone: nothing moves.
+        world v = w;
+        run_nation_garrison_upkeep(v, reg, nullptr);
+        check(v.units.at(uncovered).supply_factor_permille == f_unc + std::min(up.supply_recovery_permille, 1000 - f_unc),
+              "D11f with no share to read, a funded bill recovers it - the share is the trigger");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nD12 - a unit a battle kills is removed the same day\n");
+    {
+        duel d;
+        build_duel(d, 1, 3000, 1, modern(land_class::infantry));
+        int gone_day = -1, disbanded_that_day = 0;
+        bool never_dead = true;
+        for (int day = 1; day <= 30 && gone_day < 0; ++day)
+        {
+            const military_day_result r = run_military_day(d.w, reg, day);
+            for (const auto& [id, uu] : d.w.units)
+                never_dead = never_dead && uu.count > 0;
+            if (d.w.units.count(d.ud) == 0)
+            {
+                gone_day = day;
+                disbanded_that_day = r.disbanded;
+            }
+        }
+        bool named = false;
+        for (const active_battle& b : d.w.battles)
+            for (const entity_id id : b.defender_units)
+                named = named || id == d.ud;
+        std::printf("      a one-man defender against 3000: gone on day %d (%d disbanded that day)\n",
+                    gone_day, disbanded_that_day);
+        check(gone_day > 0 && disbanded_that_day >= 1,
+              "D12a the defender the battle killed is erased on the day it died, by the daily pass");
+        check(never_dead, "D12b at the end of every day no unit stands with zero men");
+        check(!named, "D12c and no battle record still names it");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nD13 - out of contact, readiness and morale recover daily\n");
+    {
+        world w;
+        const entity_id body = make_row_body(w, 10);
+        const entity_id n = add_nation(w, body, 0, 9);
+        const entity_id u = add_unit(w, n, tile_at(w, body, 3), modern(land_class::infantry), 100);
+        w.units.at(u).readiness_permille = 0;
+        w.units.at(u).morale_permille    = 500;
+        const campaign_battle_params bp{};
+        (void)advance_quarter_to(w, reg, 1, 0);
+        const int m1 = w.units.at(u).morale_permille, r1 = w.units.at(u).readiness_permille;
+        (void)advance_quarter_to(w, reg, 10, 0);
+        const int m10 = w.units.at(u).morale_permille, r10 = w.units.at(u).readiness_permille;
+        std::printf("      day 1: morale %d, readiness %d; day 10: morale %d, readiness %d (rates %d / %d a day)\n",
+                    m1, r1, m10, r10, bp.morale_recovery_permille, bp.readiness_recovery_permille);
+        check(m1 == 500 + bp.morale_recovery_permille && r1 == bp.readiness_recovery_permille,
+              "D13a one day recovers one day's step - a unit with no order is still walked");
+        check(m10 == 500 + 10 * bp.morale_recovery_permille && r10 == m10,
+              "D13b ten days recover ten steps: morale toward supply, readiness up to morale");
+
+        // A unit in contact does not recover.
+        duel d;
+        build_duel(d, 1, 300, 300, modern(land_class::infantry));
+        (void)run_military_day(d.w, reg, 1); // the march opens the battle
+        const bool in_fight = !d.w.battles.empty();
+        d.w.units.at(d.ua).morale_permille = 400;
+        (void)run_military_day(d.w, reg, 2);
+        check(in_fight && d.w.units.count(d.ua) != 0 && d.w.units.at(d.ua).morale_permille <= 400,
+              "D13c a unit in a battle recovers nothing that day");
     }
 
     // -----------------------------------------------------------------------

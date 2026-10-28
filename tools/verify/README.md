@@ -730,11 +730,15 @@ their class's speed"; § Battles ruling 3, "Pacing is by the day"), measured
 against the AUTHORED tables in `scripts/economy.lua`
 (`economy.military.march_days_per_tile`, `march_days_per_tile_by_cls`). D1 each
 class's days per plains tile over twelve tiles; D2 mountain and road; D3 banking;
-D4 the Logistic Point grant (the quarter's path, spent a point a tile, credits per
-tile, a spent grant halts until the next); D5 contact opens the battle that day;
+D4 movement takes no Logistic Points (a march on a zero pool moves on time and pays
+nothing; an order given mid-quarter moves at once); D5 contact opens the battle that day;
 D6 battle length in days by force ratio; D7 twice-equal; D8 a save mid-march
 round-trips; D9 a quarter walked day by day equals one caught up by the economy
-step; D10 the loader rejects a non-positive, non-finite or unknown entry.
+step; D10 the loader rejects a non-positive, non-finite or unknown entry; D11 a
+unit's supply is requested at its tile - covered, granted whole and kept; past the
+network, granted nothing and decayed by the one rule; D12 a unit a battle kills is
+removed that day; D13 readiness and morale recover daily out of contact (Ben,
+2026-10-28).
 
 Needs a live Lua state (it loads `scripts/recipes.lua` and `scripts/economy.lua`),
 so it builds with the Lua builder. Run from the repo root.

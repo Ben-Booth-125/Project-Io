@@ -476,7 +476,7 @@ int main()
         const std::string pb = to_bytes(plain_now);
         std::size_t units_off = 0;
         for (const auto& [uid, u] : plain.units) units_off += (!u.kit.is_base() || !u.refit_kit.is_base()) ? 1 : 0;
-        check(pb.size() == v63.size() + 12 + (8 + 2 * n) + 10 * units_off + 7 + 4, // + BL-1445 (v65): the empty march-grant count
+        check(pb.size() == v63.size() + 12 + (8 + 2 * n) + 10 * units_off + 7,
               "U6c v63 is today's stream less the designs section");
 
         std::string bad = bytes;

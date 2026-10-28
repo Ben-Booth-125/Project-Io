@@ -164,10 +164,11 @@ struct battle_tick
 /// Step every live battle by ONE DAY: `rounds_per_day` rounds each (BL-1445, move
 /// by days). Called from the daily military pass (`run_military_day`) immediately
 /// BEFORE `run_unit_march`, so a unit that is in contact fights today before it can
-/// march on. A unit this pass reduces to zero men stands inert (no fight, no march,
-/// no tile held) until the quarterly `run_unit_upkeep`, whose existing orphan cleanup
-/// disbands it. There is deliberately no second disband mechanism. Out-of-contact
-/// recovery is NOT stepped here: it is quarterly (`recover_out_of_contact`).
+/// march on. A unit this pass reduces to zero men is removed the same day by the one
+/// orphan cleanup (`disband_orphaned_units`), which the daily pass runs straight after
+/// this (Ben, 2026-10-28). There is deliberately no second disband mechanism.
+/// Out-of-contact recovery is NOT stepped here: the daily pass calls
+/// `recover_out_of_contact` after the march.
 ///
 /// THERE IS NO DISCOVERY HERE ANY MORE (Ben, 2026-10-27). The province
 /// co-presence trigger is gone: a battle opens only when a march tries to step
@@ -182,12 +183,16 @@ struct battle_tick
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
 
 /// Out of contact, every unit recovers: readiness toward its morale (scaled by its
-/// supply, never above it), morale toward its supply. ONCE A QUARTER, from the
-/// economy step (BL-1445): recovery follows the supply factor the quarterly upkeep
-/// pass sets, and the authored rates are per quarter. Each unit's step reads only
-/// itself, so the visit order cannot matter; a fully supplied unit at full readiness
-/// and morale is untouched.
+/// supply, never above it), morale toward its supply. DAILY (Ben, 2026-10-28), from
+/// the daily military pass after the march; the authored rates
+/// (`readiness_recovery_permille`, `morale_recovery_permille`) are per day. Each
+/// unit's step reads only itself, so the visit order cannot matter; a fully supplied
+/// unit at full readiness and morale is untouched.
 void recover_out_of_contact(world& w, const campaign_battle_params& p = {});
+
+/// True when `recover_out_of_contact` would change some unit today - what keeps the
+/// daily military pass walking a quiet quarter while units are still recovering.
+bool recovery_pending(const world& w, const campaign_battle_params& p = {});
 
 /// One attack a march pass registered: @p unit, of @p attacker, tried to step
 /// onto @p tile, which @p defender's units hold.

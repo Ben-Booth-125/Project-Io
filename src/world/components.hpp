@@ -1920,16 +1920,6 @@ struct unit_component
     /// `refit_unit` (the live design when the refit was ordered, its kit paid for
     /// then) and taken into `kit` when the refit completes. Base when not refitting.
     unit_design refit_kit{};
-
-    /// BL-1445 (move by days; MILITARY.md § Marching): the Logistic Points this unit
-    /// was GRANTED at the last economy tick and has not yet spent. Logistic Points are
-    /// granted once a quarter (`apply_march_grants`, from the resolve's
-    /// `lp_tick::march_granted`; the next grant REPLACES what is left, never adds to
-    /// it) and spent day by day, one point per unit of traversal cost crossed; a unit
-    /// whose next hop costs more than this halts until the next grant. Read only by a
-    /// GATED march (the economy step and the app's day loop). SERIALISED (world_save
-    /// v65's trailing march-grant section) and folded into state_hash when non-zero.
-    float march_grant = 0.0f;
 };
 
 /// `unit_component::refit_type`'s "not refitting" sentinel. Never a roster index.

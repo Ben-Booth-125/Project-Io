@@ -1738,14 +1738,14 @@ struct ui_state
 
     /// The player nation's own figures for the key, all in LP/tick: what its connected
     /// sources GENERATED (the pool), how many sources made it, and what its buildings
-    /// CONSUMED - production's grants, the marches' grants and what shipments drew -
+    /// CONSUMED - production's grants, the units' supply grants and what shipments drew -
     /// beside what production asked for. The numbers a player can act on - everything
     /// else on the body is somebody else's business.
     float lp_player_pool     = 0.0f; ///< generated this tick
     float lp_player_claim    = 0.0f; ///< production's claim (need x cover)
     float lp_player_need     = 0.0f; ///< production's need at its run, cover aside
     float lp_player_prod     = 0.0f; ///< consumed by production (granted)
-    float lp_player_march    = 0.0f; ///< consumed by marches (granted)
+    float lp_player_supply   = 0.0f; ///< consumed by units' supply (granted, BL-1445)
     float lp_player_shipping = 0.0f; ///< consumed by shipments (drawn)
     int   lp_player_sources  = 0;
     bool  lp_player_known    = false; ///< false when the player has no nation to show

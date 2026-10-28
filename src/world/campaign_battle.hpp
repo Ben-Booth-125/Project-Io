@@ -115,11 +115,12 @@ struct campaign_battle_params
     int morale_win  = 50;
     int morale_loss = 100;
 
-    /// Out of contact, per ECONOMY TICK (a quarter): readiness regained (scaled by
+    /// Out of contact, PER DAY (Ben, 2026-10-28: readiness and morale recover daily,
+    /// on the day step with the march and the battles): readiness regained (scaled by
     /// supply, never above morale), and the most morale moves toward the unit's
-    /// supply. Quarterly, not daily (BL-1445): recovery follows the supply factor,
-    /// which the quarterly upkeep pass sets, so `recover_out_of_contact` runs in the
-    /// economy step and never in the daily battle pass.
+    /// supply. The values are the per-tick figures carried onto the day unchanged, so
+    /// a spent unit at full supply is fit again in ten days and a lost battle's morale
+    /// (100) is regained in ten - a first cut on the day grain, not a measured one.
     int readiness_recovery_permille = 100;
     int morale_recovery_permille    = 10;
 

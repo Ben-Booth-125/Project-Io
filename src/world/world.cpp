@@ -388,14 +388,6 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, 0x524B4954u); // "RKIT"
                 for (const uint8_t v : u.refit_kit.fit) fnv1a_u32(h, v);
             }
-            // BL-1445 (move by days): the unspent Logistic Point grant the daily march
-            // spends, folded only while the unit holds one, behind its own marker, so a
-            // world with no grant outstanding keeps every hash.
-            if (u.march_grant != 0.0f)
-            {
-                fnv1a_u32(h, 0x4D475254u); // "MGRT"
-                fnv1a_f32(h, u.march_grant);
-            }
         }
     }
 

@@ -106,7 +106,7 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 | `terrain_attack_scale` | 1000 | How far `terrain_defence` divides the attacker's hits — a mountain halves them |
 | `wavering_readiness` | 300 | Side readiness at or below which the phase reads wavering |
 | `morale_win` / `morale_loss` | 50 / 100 | Morale a battle's winners gain, and its losers and every retreating unit lose |
-| `readiness_recovery_permille` / `morale_recovery_permille` | 100 / 10 | Out of contact, per economy tick (a quarter, not a day: recovery follows the quarterly supply factor): readiness regained (by supply, never above morale), and morale's step toward supply |
+| `readiness_recovery_permille` / `morale_recovery_permille` | 100 / 10 | Out of contact, per day (§ Marching, Ben 2026-10-28): readiness regained (by supply, never above morale), and morale's step toward supply |
 | `withdraw_base_permille` | 20 | Flat price of turning your back at all |
 | `withdraw_per_round_permille` | 25 | Added per round already fought |
 | `withdraw_pursuit_scale` | 400 | Share of how far behind the withdrawing side is |
@@ -852,14 +852,6 @@ discount, `road_traversal_multiplier` (track ×0.67, road ×0.50, highway ×0.40
 1.5 days a tile on a road, 6 on a mountain, 3 on a mountain road. Measured in
 `move_by_days_harness` D1–D3.
 
-**The grant is the quarter ahead.** At each economy tick a marching unit claims the traversal cost of
-the path it can walk in ninety days at its speed, capped by what its order still needs, and is granted
-it whole or refused (LOGISTICS.md § How a tile's points get to it). The grant is spent a point per
-unit of traversal cost as each hop is crossed, and the next tick's grant replaces what is left. An
-order given mid-quarter walks on what is left of the unit's grant, and a unit with none halts until
-the next tick. The credit price is charged per hop as it is crossed — `active_lp_credit_per_unit_distance`
-× the hop's cost × the men — so a tile costs the same whatever the class's speed.
-
 **Traversal cost over water is uniform.** `logistics::tile_traversal_cost` prices land by
 landform, and water has no landform to price — so a sea leg costs the same per tile wherever it
 runs, and distance alone sets its length. The thing that varies over water is *legality*, not
@@ -893,10 +885,11 @@ fronts issue their orders, then `run_battles` steps every live battle a day's ro
 `run_unit_march` walks the day's marches and opens the battles their contacts make. A unit in contact
 fights today before it can march out. The pass runs from the app's day loop between economy ticks,
 and every driver that steps whole quarters walks the same days in the economy step's own catch-up
-(`advance_quarter_to`, one cursor with construction's days). What stays in the quarterly step is
-economic: musters, refits, the Logistic Point grant, out-of-contact recovery (it follows the
-quarterly supply factor), and `run_unit_upkeep`, whose orphan cleanup is what disbands a unit a
-battle reduced to zero — such a unit stands inert, out of every fight, until then. There is
+(`advance_quarter_to`, one cursor with construction's days). After the battles the same pass runs
+the one orphan cleanup (`disband_orphaned_units`), so a unit a battle reduced to zero is removed that
+day, and after the march it runs out-of-contact recovery. What stays in the quarterly step is
+economic: musters, refits, each unit's supply request on the Logistic Point resolve (§ Upkeep), and
+`run_unit_upkeep`, which runs the same orphan cleanup for a base torn down that quarter. There is
 deliberately no second disband mechanism.
 
 **Three rulings** (Ben, 2026-08-19):
@@ -1243,9 +1236,9 @@ withdrawal terms sum to the total and **the quote matches the charge**. B13: twi
 byte-identical dispatch sequences and stay identical. B14: every phase produces a line. B18: a spent
 unit retreats one marchable tile and leaves the fight, losing morale. B19: the winner gains morale,
 the loser loses it. B20: out of contact readiness climbs toward morale, never above it, and morale
-moves toward supply either way, a quarter's recovery at a time. B21: a world of fully supplied units
+moves toward supply either way, a day's recovery at a time. B21: a world of fully supplied units
 at full readiness and morale hashes as it did; an unsupplied one moves. B22: a unit in two battles
-retreats once and pays the morale loss once; the daily pass recovers nothing, the quarter's recovery
+retreats once and pays the morale loss once; the battle pass itself recovers nothing, a day's recovery
 one step.
 
 **`unit_upkeep.cpp`** — the upkeep pass and derived strength. U1: the credit charge is exactly N ×
@@ -1273,11 +1266,15 @@ recompute guard's trigger) recomputes identically across two independent runs.
 **`move_by_days_harness.cpp`** — the day grain, against the authored tables. D1: each land class's
 days per plains tile measured over twelve tiles (3 / 1 / 1 / 1 / 1.5 / 2 / 1.5), and the pre-modern
 rows by `cls`. D2: a mountain doubles the days, a road halves them. D3: progress banks from day to
-day. D4: the grant is the quarter's path, spent a point a tile with the credit price charged per
-tile; a spent grant halts the unit until the next grant resumes it. D5: contact opens the battle on
+day. D4: movement takes no Logistic Points — a march on a zero pool arrives on time and pays
+nothing, and an order given mid-quarter moves at once, on the day loop's path too. D5: contact opens the battle on
 the day of contact. D6: battle length in days by force ratio. D7: twice-equal. D8: a save mid-march
 round-trips and marches on identically. D9: a quarter walked day by day and one caught up by the
-economy step hash alike. D10: the loader rejects a non-positive, non-finite or unknown entry.
+economy step hash alike. D10: the loader rejects a non-positive, non-finite or unknown entry. D11:
+supply is drawn where the unit stands — the request is the supplies' quantity, a unit on its hub's
+tile is granted it whole and keeps full supply, one past the network is granted nothing and decays a
+step a quarter by the one rule. D12: a unit a battle kills is gone that day, and no battle names it.
+D13: readiness and morale recover a step a day out of contact, and not in it.
 
 **`rival_military_seeding_harness.cpp`** — `seed_starting_military`. R1: every seeded owner
 ends generation owning exactly one `military_base` and one unit (the modern infantry row, 50

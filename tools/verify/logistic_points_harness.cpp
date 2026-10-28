@@ -1,40 +1,28 @@
 // ---------------------------------------------------------------------------
-// Headless march Logistic Points harness (BL-1352, LP_ONE_SYSTEM)
+// Headless Logistic Points harness (BL-1352, LP_ONE_SYSTEM; BL-1445 supply draw)
 // No SDL / Lua / ImGui — builds over the world/* logic alone.
 // ---------------------------------------------------------------------------
 // LOGISTICS.md § Logistic Points is the authority, and § How a tile's points get
-// to it holds the rule under test: "A march draws on the nation's pool too, and
-// claims first". A marching unit draws LOGISTIC POINTS FROM ITS HOST NATION'S
-// POOL — the one pool hubs, stations and ports make and production consumes —
-// ahead of every producer, and a granted march is priced in credits separately
-// from the points themselves.
-//
-// WHAT THIS FILE USED TO BE (BL-596): the same six rows against
-// `active_lp_anchor_pools`, a flat rate at EVERY POPULATION CENTRE. That was a
-// second, unrelated Logistic Point system, and BL-1352 retired it — so these rows
-// are rewritten rather than deleted: the questions they asked are still the right
-// ones, they are just asked of the pool that exists.
+// to it holds the rule under test: "A unit's supply draws on the pool, and claims
+// first" (Ben, 2026-10-28, overturning the 2026-10-16 march draw). Movement takes
+// no points; once a quarter each unit requests its supplies' QUANTITY at the tile
+// it stands on, routed on its own nation's sources like a building's request, and
+// served ahead of every producer. The draw is priced in credits as it is granted.
 //
 //   L1  ONE SYSTEM: a city makes NO points (LOGISTICS.md, "Cities make none"),
 //       a running hub does, and a nation's pool is exactly its sources' points.
-//   L2  A march WITHIN the pool: the unit moves exactly as its class's days per
-//       tile alone would predict, credits are debited per tile crossed, and the
-//       nation's row records the claim (the path the quarter can walk) as granted.
-//   L3  A march the pool cannot cover is refused outright: the unit's
-//       order/position/progress and the owning corp's balance are all
-//       BYTE-IDENTICAL to the pre-tick snapshot, and the refusal is counted
-//       (unit_march_tick::refused_no_lp).
-//   L4  WHOSE POOL: THE MOVER'S. A nation with no source refuses its own marches;
-//       a unit standing on UNOWNED ground still marches on its own nation's points
-//       (it is not stranded there); and a unit invading another nation draws ITS
-//       OWN nation's pool, never the invaded nation's.
-//   L5  CONTENTION, in the march's own order: two corps' claims against a pool
-//       that covers only one are served mobilised-first then by ascending unit
-//       id, identically across two independent runs.
-//   L6  THE MARCH CLAIMS FIRST: with a consumer on the same ground, production's
-//       granted fraction falls by exactly the points the march took, and the
-//       same scenario run twice in one process gives the same answer both times
-//       (the pool is a rate, recomputed fresh, never inherited).
+//   L2  A covered unit: its request (heads x goods per head) is granted whole at
+//       share 1000, recorded on the nation's row, and priced (rate x granted); its
+//       march moves on no points and pays nothing.
+//   L3  A short pool grants the request at a share (granted / need, per-mille),
+//       never refused whole; the march moves regardless.
+//   L4  WHERE AND WHOSE: no source grants nothing (and the unit still marches); a
+//       unit past its roads (cover 0) is unfed while one on its hub is fed; an
+//       invader is routed on its OWN sources and never draws its victim's pool; an
+//       ownerless unit has no pool; a request of zero is fully granted.
+//   L5  CONTENTION in ascending unit id, identically across two independent runs.
+//   L6  SUPPLY CLAIMS FIRST: production's fraction falls by exactly the points the
+//       supply took; a march adds no claim; the same scenario twice agrees.
 //
 // The process exits non-zero if any assertion FAILs.
 
@@ -204,21 +192,22 @@ void order_along_row(world& w, entity_id unit, entity_id body, int from_col, int
     w.units.at(unit).order = mo;
 }
 
-/// A registry with infantry march points and the credit price set explicitly —
-/// nothing defaults from economy.lua (this harness is Lua-free), so every number
-/// in a test is named at the call site. There is no per-anchor capacity rate to
-/// author any more (BL-1352): the capacity is the nation's pool.
-recipe_registry make_registry(float march_pts, float credit_per_unit_dist)
+/// A registry with infantry speed, the credit price and the supply rate set
+/// explicitly — nothing defaults from economy.lua (this harness is Lua-free), so
+/// every number in a test is named at the call site.
+///
+/// @p march_pts is the traversal cost the fixture's Era -1 infantry walks in one day
+/// (BL-1445: days = 1 / march_pts). @p food_per_head is the unit's upkeep goods draw
+/// per head per quarter - the QUANTITY its supply request asks of the pool (BL-1445,
+/// Ben 2026-10-28: a unit's draw is its supplies' quantity).
+recipe_registry make_registry(float march_pts, float credit_per_unit_dist, float food_per_head = 0.01f)
 {
-    // BL-1445 (move by days): a class is authored as DAYS PER PLAINS TILE and the march
-    // steps once a day; @p march_pts is the traversal cost the fixture's Era -1 infantry
-    // walks in one day (days = 1 / march_pts), so one `march_tick` day moves a unit as
-    // one tick used to.
     recipe_registry reg;
     military_capability_params mp = reg.military();
     mp.march_days_per_cls[static_cast<std::size_t>(unit_class::infantry)] =
         march_pts > 0.0f ? 1.0f / march_pts : 0.0f;
     mp.active_lp_credit_per_unit_distance = credit_per_unit_dist;
+    mp.upkeep.goods_per_head[static_cast<std::size_t>(resource_type::food_rations)] = food_per_head;
     reg.set_military(mp);
     return reg;
 }
@@ -230,23 +219,20 @@ bool order_equal(const movement_order& a, const movement_order& b)
         && approx(a.progress, b.progress, 1e-6f);
 }
 
-/// The two passes under test, in the game's own order: the claims are gathered, the
-/// resolve serves them ahead of production and the grants are written onto the units
-/// (`apply_march_grants`, the economy step's phase 4), then ONE DAY of the gated march
-/// spends them (BL-1445: the daily military pass). Since BL-1445 a claim is the path the
-/// QUARTER ahead can walk, capped by the order: every row's fixture path is shorter than
-/// ninety days of its class, so the claim is the whole path's traversal cost.
-struct march_tick_result
+/// The quarter's supply, in the game's own order (BL-1445): every unit's request is
+/// gathered and the resolve serves it ahead of production, then its credit price is
+/// charged (`charge_supply_draws`). Then ONE DAY of the march, which takes no points.
+struct supply_tick_result
 {
     lp_tick         lp;
     unit_march_tick march;
 };
-march_tick_result march_tick(world& w, const recipe_registry& reg)
+supply_tick_result supply_tick(world& w, const recipe_registry& reg)
 {
-    march_tick_result out;
-    out.lp    = resolve_logistic_points(w, collect_march_claims(w, reg));
-    apply_march_grants(w, out.lp);
-    out.march = run_unit_march(w, reg, /*lp_gated=*/true, /*day_tick=*/1);
+    supply_tick_result out;
+    out.lp    = resolve_logistic_points(w, collect_supply_claims(w, reg));
+    charge_supply_draws(w, reg, out.lp);
+    out.march = run_unit_march(w, reg, /*day_tick=*/1);
     return out;
 }
 
@@ -256,6 +242,20 @@ const lp_nation_row* nation_row(const lp_tick& t, entity_id nation)
         if (r.nation == nation)
             return &r;
     return nullptr;
+}
+
+const lp_supply_row* supply_row(const lp_tick& t, entity_id unit)
+{
+    for (const lp_supply_row& r : t.supplies)
+        if (r.unit == unit)
+            return &r;
+    return nullptr;
+}
+
+int share_of(const lp_tick& t, entity_id unit)
+{
+    const auto it = t.supply_share.find(unit);
+    return it != t.supply_share.end() ? it->second : -1;
 }
 
 float fraction_of(const lp_tick& t, entity_id building)
@@ -301,89 +301,85 @@ void l1_one_system()
 }
 
 // ---------------------------------------------------------------------------
-// L2 — a granted march moves, pays credits, and shows in the nation's row
+// L2 — a covered unit's supply is granted whole, priced, and recorded; its march
+// takes no points
 // ---------------------------------------------------------------------------
 
 void l2_granted_draw()
 {
-    std::printf("\n-- L2  a march within the pool: moves, pays, recorded --\n");
+    std::printf("\n-- L2  a unit on a covered tile: its supply granted whole, priced, recorded --\n");
 
     world w;
     const entity_id body   = make_row_body(w, 10);
     const entity_id nation = add_nation(w, body, 0, 9);
     add_hub(w, tile_at(w, body, 0));
     const entity_id corp = add_corp(w, "Mover", 1000.0f, nation);
-    const entity_id unit = add_unit(w, corp, tile_at(w, body, 1), /*count=*/50);
-    order_along_row(w, unit, body, 1, 4);
+    const entity_id unit = add_unit(w, corp, tile_at(w, body, 0), /*count=*/50); // on the hub's tile
+    order_along_row(w, unit, body, 0, 3);
 
-    const recipe_registry reg = make_registry(/*march_pts=*/2.0f, /*credit=*/0.1f);
+    const recipe_registry reg = make_registry(/*march_pts=*/2.0f, /*credit=*/0.1f, /*food=*/0.01f);
     const float balance_before = w.nations.at(corp).treasury;
 
-    const march_tick_result t = march_tick(w, reg);
+    const supply_tick_result t = supply_tick(w, reg);
 
-    check(t.march.refused_no_lp == 0, "the march is not refused: the pool covers it");
+    const lp_supply_row* s = supply_row(t.lp, unit);
+    std::printf("        need %.3f, cover %.3f, granted %.3f, share %d\n",
+                s ? s->need : -1.0f, s ? s->cover : -1.0f, s ? s->granted : -1.0f, share_of(t.lp, unit));
+    check(s != nullptr && approx(s->need, 0.5f), "the request is its supplies' quantity: 50 heads x 0.01 = 0.5");
+    check(s != nullptr && approx(s->cover, 1.0f) && approx(s->granted, 0.5f) && share_of(t.lp, unit) == 1000,
+          "on its nation's hub tile the cover is full: granted whole, share 1000");
     const lp_nation_row* r = nation_row(t.lp, nation);
-    // BL-1445: the claim is the quarter's path - all three plains tiles (1 -> 4) - and the
-    // day spends two of them.
-    check(r != nullptr && approx(r->march_claim, 3.0f), "the nation's row records the claim (3.0: the path)");
-    check(r != nullptr && approx(r->march_granted, 3.0f), "and records it as granted");
-    check(approx(w.units.at(unit).march_grant, 1.0f),
-          "BL-1445: the day spent two points of the grant, one a plains tile; one is left");
-
-    // Plains cost 1.0 a tile, so 2.0 points move exactly two tiles.
-    check(w.units.at(unit).position == tile_at(w, body, 3),
-          "the unit moved exactly as its march points alone would predict (two plains tiles)");
+    check(r != nullptr && approx(r->supply_claim, 0.5f) && approx(r->supply_granted, 0.5f),
+          "the nation's row records the claim and the grant");
     const float paid = balance_before - w.nations.at(corp).treasury;
-    check(approx(paid, 0.1f * 2.0f * 50.0f),
-          "credits debited = price x tiles' cost x head, charged as each tile is crossed");
+    check(approx(paid, 0.1f * 0.5f, 1e-3f),
+          "credits debited = price x the points granted (0.05), and nothing for the march");
+    check(w.units.at(unit).position == tile_at(w, body, 2),
+          "the march moved two plains tiles in the day on no points at all");
 }
 
 // ---------------------------------------------------------------------------
-// L3 — a refused march mutates nothing
+// L3 — a pool that covers part of the request grants that share; the march is
+// untouched
 // ---------------------------------------------------------------------------
 
-void l3_refused_mutates_nothing()
+void l3_short_pool_grants_a_share()
 {
-    std::printf("\n-- L3  a march the pool cannot cover: refused, nothing moves --\n");
+    std::printf("\n-- L3  a short pool: the supply granted at a share; the march moves anyway --\n");
 
     world w;
     const entity_id body   = make_row_body(w, 10);
     const entity_id nation = add_nation(w, body, 0, 9);
-    // A hub whose upkeep is unmet to the point of making almost nothing: a pool
-    // of 1.2 points against a march asking for 5.0 (BL-1445: the path, 1 -> 6).
+    // A hub whose upkeep is unmet to the point of making almost nothing: a pool of 1.2
+    // points against a request of 2.0 (200 heads x 0.01).
     const entity_id hub = add_hub(w, tile_at(w, body, 0));
     w.buildings.at(hub).supply_factor_permille = 10; // 1% of 120 = 1.2 points
-    const entity_id corp = add_corp(w, "Stuck", 1000.0f, nation);
-    const entity_id unit = add_unit(w, corp, tile_at(w, body, 1));
-    order_along_row(w, unit, body, 1, 6);
+    const entity_id corp = add_corp(w, "Short", 1000.0f, nation);
+    const entity_id unit = add_unit(w, corp, tile_at(w, body, 0), /*count=*/200);
+    order_along_row(w, unit, body, 0, 6);
 
-    const recipe_registry reg = make_registry(/*march_pts=*/3.0f, /*credit=*/0.1f);
-    const movement_order order_before   = w.units.at(unit).order;
-    const entity_id      position_before = w.units.at(unit).position;
-    const float          balance_before = w.nations.at(corp).treasury;
+    const recipe_registry reg = make_registry(/*march_pts=*/3.0f, /*credit=*/0.0f, /*food=*/0.01f);
+    const supply_tick_result t = supply_tick(w, reg);
 
-    const march_tick_result t = march_tick(w, reg);
-
-    check(t.march.refused_no_lp == 1, "the refusal is counted");
-    check(w.units.at(unit).position == position_before, "the unit did not move");
-    check(order_equal(w.units.at(unit).order, order_before),
-          "its order, path, index and banked progress are byte-identical");
-    check(approx(w.nations.at(corp).treasury, balance_before),
-          "and no credits were charged for a march that did not happen");
-    const lp_nation_row* r = nation_row(t.lp, nation);
-    check(r != nullptr && approx(r->march_claim, 5.0f) && approx(r->march_granted, 0.0f),
-          "the claim is recorded and granted nothing - no partial draw");
+    const lp_supply_row* s = supply_row(t.lp, unit);
+    std::printf("        need %.3f, granted %.3f, share %d\n",
+                s ? s->need : -1.0f, s ? s->granted : -1.0f, share_of(t.lp, unit));
+    check(s != nullptr && approx(s->need, 2.0f) && approx(s->granted, 1.2f, 1e-4f),
+          "the request takes what the pool holds - 1.2 of 2.0, not refused whole");
+    check(share_of(t.lp, unit) == 600, "the granted share is 600 per-mille");
+    check(w.units.at(unit).position == tile_at(w, body, 3),
+          "the march is not refused: three tiles on a pool already spent on supply");
 }
 
 // ---------------------------------------------------------------------------
-// L4 — no pool, no march
+// L4 — where the request is scored, and whose pool serves it
 // ---------------------------------------------------------------------------
 
 void l4_whose_pool()
 {
-    std::printf("\n-- L4  whose pool: the mover's, not the ground's --\n");
+    std::printf("\n-- L4  scored at the unit's tile, from its own nation's pool --\n");
 
-    // (a) A nation with NO SOURCE cannot move its own units.
+    // (a) A nation with NO SOURCE grants nothing - and its unit still marches.
     {
         world w;
         const entity_id body   = make_row_body(w, 8);
@@ -392,37 +388,38 @@ void l4_whose_pool()
         const entity_id corp = add_corp(w, "Sourceless", 10000.0f, nation);
         const entity_id unit = add_unit(w, corp, tile_at(w, body, 1));
         order_along_row(w, unit, body, 1, 5);
-        const entity_id before = w.units.at(unit).position;
         const recipe_registry reg = make_registry(1.0f, 0.1f);
-        const march_tick_result t = march_tick(w, reg);
-        check(t.march.refused_no_lp == 1, "a nation with no source refuses its own march");
-        check(w.units.at(unit).position == before, "and the unit stayed where it was");
+        const supply_tick_result t = supply_tick(w, reg);
+        check(share_of(t.lp, unit) == 0, "a nation with no source grants its unit's supply nothing");
+        check(w.units.at(unit).position == tile_at(w, body, 2), "and the unit marches all the same");
     }
 
-    // (b) UNOWNED GROUND DOES NOT STRAND A UNIT. Its own nation's hub is miles away on
-    // its own ground; the unit stands on wilderness and marches anyway. The first cut
-    // read the GROUND's nation, which refused - and because a refusal moves nothing, it
-    // refused again every tick for ever.
+    // (b) PAST THE ROADS, UNFED. Its own nation's hub at column 0, no road: the hub's
+    // points reach only its own tile (Ben, 2026-10-24: off the network a step is
+    // impassable), so a unit out in the wilderness asks on a tile no source reaches.
     {
         world w;
         const entity_id body   = make_row_body(w, 10);
         const entity_id nation = add_nation(w, body, 0, 2); // columns 3..9 belong to nobody
         add_hub(w, tile_at(w, body, 0));
         const entity_id corp = add_corp(w, "Expedition", 10000.0f, nation);
-        const entity_id unit = add_unit(w, corp, tile_at(w, body, 6)); // out in the wilderness
-        order_along_row(w, unit, body, 6, 9);
+        const entity_id far  = add_unit(w, corp, tile_at(w, body, 6)); // out in the wilderness
+        const entity_id home = add_unit(w, corp, tile_at(w, body, 0)); // on the hub
+        order_along_row(w, far, body, 6, 9);
         const recipe_registry reg = make_registry(/*march_pts=*/2.0f, /*credit=*/0.0f);
-        const march_tick_result t = march_tick(w, reg);
-        check(t.march.refused_no_lp == 0, "a unit on unowned ground is not refused");
-        check(w.units.at(unit).position == tile_at(w, body, 8),
-              "it marches on its OWN nation's points, two tiles, and is not stranded");
-        const lp_nation_row* r = nation_row(t.lp, nation);
-        check(r != nullptr && approx(r->march_granted, 3.0f),
-              "and the points came out of its own nation's pool (the path's 3, BL-1445)");
+        const supply_tick_result t = supply_tick(w, reg);
+        const lp_supply_row* s = supply_row(t.lp, far);
+        check(s != nullptr && approx(s->cover, 0.0f) && share_of(t.lp, far) == 0,
+              "a unit on a tile its network does not reach is granted nothing (cover 0, share 0)");
+        check(share_of(t.lp, home) == 1000, "while one on its hub's tile is granted whole");
+        check(w.units.at(far).position == tile_at(w, body, 8),
+              "the far unit is not stranded: it marches two tiles, on no points");
     }
 
-    // (c) AN INVADER PAYS ITS OWN POINTS. Two nations, a hub each; the invader's unit
-    // stands on the defender's ground. The defender's pool must be untouched.
+    // (c) AN INVADER DRAWS ITS OWN POOL, at its own network's cover. Two nations, a hub
+    // each; the invader stands on the defender's hub tile. The defender's network covers
+    // that tile, the attacker's does not: the attacker's unit is unfed, and the
+    // defender's pool is untouched.
     {
         world w;
         const entity_id body     = make_row_body(w, 12);
@@ -431,150 +428,136 @@ void l4_whose_pool()
         add_hub(w, tile_at(w, body, 0));  // attacker's
         add_hub(w, tile_at(w, body, 11)); // defender's
         const entity_id corp = add_corp(w, "Invader", 10000.0f, attacker);
-        const entity_id unit = add_unit(w, corp, tile_at(w, body, 7)); // on defender's ground
-        order_along_row(w, unit, body, 7, 10);
+        const entity_id unit = add_unit(w, corp, tile_at(w, body, 11)); // on defender's hub
         const recipe_registry reg = make_registry(/*march_pts=*/2.0f, /*credit=*/0.0f);
-        const march_tick_result t = march_tick(w, reg);
+        const supply_tick_result t = supply_tick(w, reg);
         const lp_nation_row* ar = nation_row(t.lp, attacker);
         const lp_nation_row* dr = nation_row(t.lp, defender);
-        check(t.march.refused_no_lp == 0, "the invading march is served");
-        check(ar != nullptr && approx(ar->march_granted, 3.0f),
-              "out of the ATTACKER's pool (the path's 3, BL-1445)");
-        check(dr != nullptr && approx(dr->march_granted, 0.0f) && approx(dr->march_claim, 0.0f),
+        check(share_of(t.lp, unit) == 0 && ar != nullptr && approx(ar->supply_granted, 0.0f),
+              "the invader's request is routed on the ATTACKER's sources, which do not reach it");
+        check(dr != nullptr && approx(dr->supply_granted, 0.0f) && approx(dr->supply_claim, 0.0f),
               "and the defender's pool is untouched - an invasion is not funded by its victim");
     }
 
-    // (d) An OWNERLESS unit - no corporation, no nation - has no pool and is refused.
+    // (d) An OWNERLESS unit - no nation - has no pool.
     {
         world w;
         const entity_id body = make_row_body(w, 8);
         add_nation(w, body, 0, 7);
         add_hub(w, tile_at(w, body, 0));
-        const entity_id unit = add_unit(w, /*corp=*/null_entity, tile_at(w, body, 1));
-        order_along_row(w, unit, body, 1, 5);
-        const entity_id before = w.units.at(unit).position;
+        const entity_id unit = add_unit(w, /*corp=*/null_entity, tile_at(w, body, 0));
         const recipe_registry reg = make_registry(1.0f, 0.1f);
-        const march_tick_result t = march_tick(w, reg);
-        check(t.march.refused_no_lp == 1, "a unit belonging to nobody has no pool to draw");
-        check(w.units.at(unit).position == before, "and does not move on someone else's points");
+        const lp_tick t = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        check(share_of(t, unit) == 0, "a unit belonging to nobody has no pool to draw");
+        check(t.nations.empty() || approx(t.nations.front().supply_granted, 0.0f),
+              "and draws no one else's points");
+    }
+
+    // (e) A request of ZERO is fully granted - nothing asked, nothing short.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 8);
+        const entity_id nation = add_nation(w, body, 0, 7); // no source at all
+        const entity_id unit   = add_unit(w, nation, tile_at(w, body, 3));
+        const recipe_registry reg = make_registry(1.0f, 0.1f, /*food=*/0.0f);
+        const lp_tick t = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        check(share_of(t, unit) == 1000, "a unit whose supplies need nothing has share 1000, even unreached");
     }
 }
 
 // ---------------------------------------------------------------------------
-// L5 — contention resolves in the march's own order, reproducibly
+// L5 — contention resolves in ascending unit id, reproducibly
 // ---------------------------------------------------------------------------
 
 void l5_contention_order()
 {
-    std::printf("\n-- L5  contention: served in the march's order, twice alike --\n");
+    std::printf("\n-- L5  contention: served in ascending unit id, twice alike --\n");
 
-    // Two corps, each one unit, on one nation's ground, against a pool that
-    // covers one march and not both. The hostile corp is created SECOND and so
-    // holds the HIGHER unit id — if the order were id alone it would lose, and
-    // the mobilised-first partition is what makes it win.
-    const auto run = [](bool* out_hostile_moved, bool* out_peaceful_moved) {
+    // Two units of one nation on its hub's tile, each asking 1.0 against a pool of 1.2.
+    const auto run = [](int* out_low, int* out_high) {
         world w;
         const entity_id body   = make_row_body(w, 10);
         const entity_id nation = add_nation(w, body, 0, 9);
         const entity_id hub    = add_hub(w, tile_at(w, body, 0));
-        w.buildings.at(hub).supply_factor_permille = 25; // 2.5% of 120 = 3.0 points
-
-        const entity_id peaceful = add_corp(w, "Peaceful", 10000.0f, nation);
-        const entity_id hostile  = add_corp(w, "Hostile",  10000.0f, nation);
-        const entity_id enemy    = add_corp(w, "Enemy");
-        w.corp_hostile_pairs.insert({hostile, enemy});
-
-        const entity_id u_peaceful = add_unit(w, peaceful, tile_at(w, body, 2));
-        const entity_id u_hostile  = add_unit(w, hostile,  tile_at(w, body, 5));
-        order_along_row(w, u_peaceful, body, 2, 4);
-        order_along_row(w, u_hostile,  body, 5, 7);
-
-        const recipe_registry reg = make_registry(/*march_pts=*/2.0f, /*credit=*/0.0f);
-        const entity_id peaceful_from = w.units.at(u_peaceful).position;
-        const entity_id hostile_from  = w.units.at(u_hostile).position;
-        const march_tick_result t = march_tick(w, reg);
-        *out_hostile_moved  = w.units.at(u_hostile).position  != hostile_from;
-        *out_peaceful_moved = w.units.at(u_peaceful).position != peaceful_from;
-        return t.march.refused_no_lp;
+        w.buildings.at(hub).supply_factor_permille = 10; // 1.2 points
+        const entity_id lo = add_unit(w, nation, tile_at(w, body, 0), 100);
+        const entity_id hi = add_unit(w, nation, tile_at(w, body, 0), 100);
+        const recipe_registry reg = make_registry(/*march_pts=*/2.0f, /*credit=*/0.0f, 0.01f);
+        const lp_tick t = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        *out_low  = share_of(t, lo);
+        *out_high = share_of(t, hi);
+        const lp_nation_row* r = nation_row(t, nation);
+        return r != nullptr ? r->supply_granted : -1.0f;
     };
 
-    bool h1 = false, p1 = false, h2 = false, p2 = false;
-    const int refused_1 = run(&h1, &p1);
-    const int refused_2 = run(&h2, &p2);
-
-    check(refused_1 == 1, "a pool covering one march of two refuses exactly one");
-    // BL-1407: "the mobilised corp's unit is served first" RETIRED — it set two
-    // corporations of ONE nation against each other in that nation's pool. With
-    // the corporation gone both units are the one nation's, so its mobilisation
-    // is a single fact; what stands is that exactly one of its two marches is
-    // served from a pool covering one.
-    check(h1 != p1, "BL-1407: one nation's two marches, a pool covering one: exactly one is served");
-    check(refused_1 == refused_2 && h1 == h2 && p1 == p2,
-          "two independent runs of the same scenario resolve identically");
+    int lo1 = 0, hi1 = 0, lo2 = 0, hi2 = 0;
+    const float g1 = run(&lo1, &hi1);
+    const float g2 = run(&lo2, &hi2);
+    std::printf("        lower id share %d, higher id share %d, granted %.3f\n", lo1, hi1, g1);
+    check(lo1 == 1000 && hi1 == 200, "the lower id is served whole (1000), the higher takes the 0.2 left (200)");
+    check(approx(g1, 1.2f, 1e-4f), "and the pool is spent exactly");
+    check(lo1 == lo2 && hi1 == hi2 && g1 == g2, "two independent runs of the same scenario resolve identically");
 }
 
 // ---------------------------------------------------------------------------
-// L6 — the march claims first, and nothing carries over
+// L6 — supply claims first; a march claims nothing; nothing carries over
 // ---------------------------------------------------------------------------
 
-void l6_march_claims_first()
+void l6_supply_claims_first()
 {
-    std::printf("\n-- L6  the march claims first; no carry-over --\n");
+    std::printf("\n-- L6  supply claims before production; a march claims nothing; no carry-over --\n");
 
     // One nation, one hub, one producing building asking for more points than the
-    // pool holds, so production is already short and every point the march takes
+    // pool holds, so production is already short and every point a unit's supply takes
     // is a point production does not get.
-    const auto build = [](world& w, bool with_march, entity_id* out_consumer) {
+    const auto build = [](world& w, bool with_unit, bool marching, entity_id* out_consumer) {
         const entity_id body   = make_row_body(w, 10);
         const entity_id nation = add_nation(w, body, 0, 9);
         add_hub(w, tile_at(w, body, 0));
         const entity_id corp = add_corp(w, "Producer", 100000.0f, nation);
         // need = 10 x 30 x 1.0 = 300 points against a pool of 120: short either way.
-        *out_consumer = add_consumer(w, tile_at(w, body, 1), corp, /*assigned=*/30.0f,
+        *out_consumer = add_consumer(w, tile_at(w, body, 0), corp, /*assigned=*/30.0f,
                                      /*target=*/100.0f);
-        if (with_march)
+        if (with_unit)
         {
-            const entity_id mover = add_corp(w, "Mover", 1000.0f, nation);
-            const entity_id unit  = add_unit(w, mover, tile_at(w, body, 3));
-            order_along_row(w, unit, body, 3, 6);
+            const entity_id unit = add_unit(w, nation, tile_at(w, body, 0), /*count=*/300); // asks 3.0
+            if (marching)
+                order_along_row(w, unit, body, 0, 6);
         }
     };
 
-    const recipe_registry reg = make_registry(/*march_pts=*/12.0f, /*credit=*/0.0f);
+    const recipe_registry reg = make_registry(/*march_pts=*/12.0f, /*credit=*/0.0f, /*food=*/0.01f);
 
     world quiet;    entity_id quiet_consumer = null_entity;
-    build(quiet, /*with_march=*/false, &quiet_consumer);
-    const march_tick_result tq = march_tick(quiet, reg);
+    build(quiet, false, false, &quiet_consumer);
+    const supply_tick_result tq = supply_tick(quiet, reg);
+
+    world standing; entity_id standing_consumer = null_entity;
+    build(standing, true, false, &standing_consumer);
+    const supply_tick_result ts = supply_tick(standing, reg);
 
     world marching; entity_id marching_consumer = null_entity;
-    build(marching, /*with_march=*/true, &marching_consumer);
-    const march_tick_result tm = march_tick(marching, reg);
+    build(marching, true, true, &marching_consumer);
+    const supply_tick_result tm = supply_tick(marching, reg);
 
     const float f_quiet    = fraction_of(tq.lp, quiet_consumer);
+    const float f_standing = fraction_of(ts.lp, standing_consumer);
     const float f_marching = fraction_of(tm.lp, marching_consumer);
+    std::printf("        production fraction: no unit %.4f, a standing unit %.4f, a marching unit %.4f\n",
+                f_quiet, f_standing, f_marching);
 
-    check(tm.march.refused_no_lp == 0, "the march is served out of the pool");
-    check(f_quiet > 0.0f && f_marching > 0.0f, "the consumer produces in both worlds");
-    check(f_marching < f_quiet, "production gets LESS when a march has claimed first");
-
-    // BL-1445: the march's claim is its path (3 -> 6, three plains tiles: 3 points) of a
-    // 120 pool against a claim of 300, so the granted fraction is pool/claim either way:
-    // 120/300 quiet, 117/300 marching.
     check(approx(f_quiet, lp_source_points[0] / 300.0f, 1e-3f),
-          "quiet: the fraction is the whole pool over the claim");
-    check(approx(f_marching, (lp_source_points[0] - 3.0f) / 300.0f, 1e-3f),
-          "marching: it is the pool LESS the march's 3 points over the same claim");
+          "no unit: the fraction is the whole pool over the claim (120/300)");
+    check(approx(f_standing, (lp_source_points[0] - 3.0f) / 300.0f, 1e-3f),
+          "a unit's supply claims FIRST: production gets the pool less its 3 points (117/300)");
+    check(approx(f_marching, f_standing, 1e-6f),
+          "a march adds no claim: the marching unit's world grants production exactly the standing one's");
 
-    // NO CARRY-OVER. The question is whether one tick leaves anything behind for
-    // the next, so it is asked of a SECOND, identically built world inside the same
-    // process - not of the first world after its march, which has moved its unit and
-    // is therefore a different world (that re-resolve measured the move, not a
-    // carry-over, and said FAIL for the wrong reason).
+    // NO CARRY-OVER: a second, identically built world in the same process.
     world repeat; entity_id repeat_consumer = null_entity;
-    build(repeat, /*with_march=*/true, &repeat_consumer);
-    const march_tick_result tr = march_tick(repeat, reg);
-    check(approx(fraction_of(tr.lp, repeat_consumer), f_marching, 1e-6f)
-              && tr.march.refused_no_lp == tm.march.refused_no_lp,
+    build(repeat, true, true, &repeat_consumer);
+    const supply_tick_result tr = supply_tick(repeat, reg);
+    check(approx(fraction_of(tr.lp, repeat_consumer), f_marching, 1e-6f),
           "the identical scenario run again gives the identical grant: a rate, not a stock");
 }
 
@@ -1212,7 +1195,7 @@ void l9_shipment_draws()
               "the state's unspent 20 stays the state's to ship");
     }
 
-    // MARCH, PRODUCTION, TRADE: a march claim of 50 and a consumer of 50 against 120
+    // SUPPLY, PRODUCTION, TRADE: a supply claim of 50 and a consumer of 50 against 120
     // leave a shipment 20.
     {
         world w;
@@ -1223,13 +1206,14 @@ void l9_shipment_draws()
         const entity_id corp = add_corp(w, "Trader", 100000.0f, nation);
         add_hub(w, tile_at(w, body, 10));
         add_consumer(w, tile_at(w, body, 10), corp, 5.0f, 100.0f); // need 50
-        lp_march_claim mc;
-        mc.unit   = w.create_entity();
-        mc.nation = nation;
-        mc.need   = 50.0f;
-        const lp_tick t = resolve_logistic_points(w, {mc});
+        lp_supply_claim sc;
+        sc.unit   = w.create_entity();
+        sc.nation = nation;
+        sc.tile   = tile_at(w, body, 10); // the hub's tile: full cover
+        sc.need   = 50.0f;
+        const lp_tick t = resolve_logistic_points(w, {sc});
         check(approx(lp_trade_admit(w, t, corp, m, 100.0f), pool - 50.0f - 50.0f, 1e-3f),
-              "the march claims first, production next, and a shipment draws what both left (20)");
+              "a unit's supply claims first, production next, and a shipment draws what both left (20)");
     }
 
     // Through the one place a shipment is committed: trimmed, drawn, then refused with
@@ -1525,10 +1509,10 @@ int main()
 
     l1_one_system();
     l2_granted_draw();
-    l3_refused_mutates_nothing();
+    l3_short_pool_grants_a_share();
     l4_whose_pool();
     l5_contention_order();
-    l6_march_claims_first();
+    l6_supply_claims_first();
     l7_reach_by_tier_and_rail();
     l8_routed_requests();
     l9_shipment_draws();

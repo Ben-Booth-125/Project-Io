@@ -520,7 +520,7 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         std::vector<const lp_building_row*> in_order;
         float handed = 0.0f, claims_all = 0.0f;
         for (const qrow& x : q) { in_order.push_back(x.row); handed += x.row->granted; claims_all += x.row->need * x.row->coverage; }
-        const float avail = mr ? std::max(0.0f, mr->pool - mr->march_granted) : 0.0f;
+        const float avail = mr ? std::max(0.0f, mr->pool - mr->supply_granted) : 0.0f;
         const bool totals = mr != nullptr && approx(handed, std::min(avail, claims_all), 1e-2f)
                          && approx(handed, mr->granted[0] + mr->granted[1] + mr->granted[2], 1e-2f);
         check(totals && queue_holds(in_order), "L5",

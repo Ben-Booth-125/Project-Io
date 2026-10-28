@@ -177,7 +177,7 @@ unit_march_tick step_march(fixture& f, const recipe_registry& reg, int n = 1)
 {
     unit_march_tick last;
     for (int i = 0; i < n; ++i)
-        last = run_unit_march(f.w, reg, false);
+        last = run_unit_march(f.w, reg);
     return last;
 }
 
@@ -684,9 +684,8 @@ int main()
         check(old_ok && stamped == k_world_save_version_pre_tile && old.battles.size() == 1
                   && old.battles.front().tile == T && old.battles.front().attacking_units.empty(),
               "T13c a v62 stream reads: its battle keyed by its ground tile, with no attacking stack");
-        check(v62.size() == bytes.size() - (4 + 4 + 4) - 12 - 4, // BL-1434: v64's empty designs section; BL-1445: v65's empty grant count
-              "T13d ...and the v62 stream is today's less exactly the stack section (one battle of one unit), the empty designs section "
-              "and v65's empty march-grant count");
+        check(v62.size() == bytes.size() - (4 + 4 + 4) - 12, // BL-1434: v64's empty designs section
+              "T13d ...and the v62 stream is today's less exactly the stack section (one battle of one unit) and the empty designs section");
         // An attacking stack naming a unit not on the attacker's side is refused.
         std::string bad = bytes;
         const entity_id ghost = 0x7FFFFFF0u;
@@ -970,7 +969,7 @@ int main()
             // the Logistic Points a gated march draws, and a gated tick moves no one.
             advance_fronts(w, reg);
             const battle_tick bt = run_battles(w, reg, t);
-            (void)run_unit_march(w, reg, false);
+            (void)run_unit_march(w, reg);
             reanchor_fronts(w);
             int moved = 0, ordered = 0;
             for (const auto& [id, u] : w.units)

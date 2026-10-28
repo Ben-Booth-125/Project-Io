@@ -231,37 +231,59 @@ std::vector<entity_id> hex_neighbours(const world& w, entity_id tile)
 
 } // namespace
 
+namespace {
+
+/// One unit's recovery step, written into @p morale and @p ready: morale a step toward
+/// its supply, readiness a supply-scaled step toward its morale, never above it. The
+/// one formula `recover_out_of_contact` applies and `recovery_pending` asks about.
+void recovery_step(const unit_component& u, const campaign_battle_params& p, int& morale, int& ready)
+{
+    const int supply = std::clamp(u.supply_factor_permille, 0, 1000);
+    morale = std::clamp(u.morale_permille, 0, 1000);
+    if (morale < supply)      morale += std::min(p.morale_recovery_permille, supply - morale);
+    else if (morale > supply) morale -= std::min(p.morale_recovery_permille, morale - supply);
+
+    ready = std::clamp(u.readiness_permille, 0, 1000);
+    if (ready < morale)
+        ready = std::min(morale, ready + p.readiness_recovery_permille * supply / 1000);
+    else
+        ready = morale;
+}
+
+} // namespace
+
 /// Out of contact, every unit recovers: readiness toward its morale (scaled by its
 /// supply, never above it), morale toward its supply. Each unit's step reads only
 /// itself, so the visit order cannot matter. A fully supplied unit at full
 /// readiness and morale is untouched, so a world that never fights is unmoved.
+/// DAILY (Ben, 2026-10-28): the daily military pass calls it once a day.
 void recover_out_of_contact(world& w, const campaign_battle_params& p)
 {
-    std::set<entity_id> in_contact;
-    for (const active_battle& b : w.battles)
-    {
-        if (b.state.end != campaign_battle_end::in_progress)
-            continue;
-        in_contact.insert(b.attacker_units.begin(), b.attacker_units.end());
-        in_contact.insert(b.defender_units.begin(), b.defender_units.end());
-    }
+    const std::set<entity_id> in_contact = units_in_live_battles(w);
     for (auto& [uid, u] : w.units)
     {
         if (u.count <= 0 || in_contact.count(uid) != 0)
             continue;
-        const int supply = std::clamp(u.supply_factor_permille, 0, 1000);
-        int morale = std::clamp(u.morale_permille, 0, 1000);
-        if (morale < supply)      morale += std::min(p.morale_recovery_permille, supply - morale);
-        else if (morale > supply) morale -= std::min(p.morale_recovery_permille, morale - supply);
-        u.morale_permille = morale;
-
-        int ready = std::clamp(u.readiness_permille, 0, 1000);
-        if (ready < morale)
-            ready = std::min(morale, ready + p.readiness_recovery_permille * supply / 1000);
-        else
-            ready = morale;
+        int morale = 0, ready = 0;
+        recovery_step(u, p, morale, ready);
+        u.morale_permille    = morale;
         u.readiness_permille = ready;
     }
+}
+
+bool recovery_pending(const world& w, const campaign_battle_params& p)
+{
+    const std::set<entity_id> in_contact = units_in_live_battles(w);
+    for (const auto& [uid, u] : w.units) // a pure any-of: walk order cannot reach it
+    {
+        if (u.count <= 0 || in_contact.count(uid) != 0)
+            continue;
+        int morale = 0, ready = 0;
+        recovery_step(u, p, morale, ready);
+        if (morale != u.morale_permille || ready != u.readiness_permille)
+            return true;
+    }
+    return false;
 }
 
 
@@ -886,9 +908,10 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
     // -----------------------------------------------------------------------
     // The trace is discarded with the record: it is retained only for the span
     // of the fight, so nothing but the record itself ever crosses a tick
-    // boundary. Zero-count units are NOT disbanded here — `run_unit_upkeep`'s
-    // existing orphan cleanup runs last in the economy step and does it, and a
-    // second disband mechanism is exactly what BL-467's aftermath note rules out.
+    // boundary. Zero-count units are NOT disbanded here — the one orphan cleanup
+    // (`disband_orphaned_units`) does it, run by the daily military pass straight
+    // after this one (BL-1445: the same day), and a second disband mechanism is
+    // exactly what BL-467's aftermath note rules out.
     w.battles.erase(
         std::remove_if(w.battles.begin(), w.battles.end(),
                        [](const active_battle& b) {
@@ -896,9 +919,8 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                        }),
         w.battles.end());
 
-    // RECOVERY (BL-1421) is no longer a step of this pass: battles step DAILY now
-    // (BL-1445), and recovery follows the supply factor the QUARTERLY upkeep pass
-    // sets, so the economy step calls `recover_out_of_contact` once a quarter.
+    // RECOVERY (BL-1421) is not a step of this pass: the daily military pass calls
+    // `recover_out_of_contact` after the day's march (Ben, 2026-10-28: daily).
 
     return out;
 }

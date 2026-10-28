@@ -181,7 +181,7 @@ void run_nation_step(world& w, const recipe_registry& reg, economy_report& repor
     // consumer, and the ONE line this pass debits without going through
     // run_national_budget's claim/transfer machinery. See nation_step.hpp's
     // own comment on run_nation_garrison_upkeep for why.
-    run_nation_garrison_upkeep(w, reg);
+    run_nation_garrison_upkeep(w, reg, &report.logistic_points);
 
     // ---- 6. Research (BL-1273, RESEARCH.md) — the academic_research line's
     // consumer, on the garrison-upkeep precedent (no corp claimant: the share is
@@ -273,7 +273,7 @@ float discontent_output_scalar(const world& w, entity_id tile, const tax_params&
 }
 
 
-void run_nation_garrison_upkeep(world& w, const recipe_registry& reg)
+void run_nation_garrison_upkeep(world& w, const recipe_registry& reg, const lp_tick* lp)
 {
     if (w.units.empty() || w.nations.empty())
         return;
@@ -354,16 +354,25 @@ void run_nation_garrison_upkeep(world& w, const recipe_registry& reg)
         // means `paid == bill == 0`, so `unmet` is false and every unit
         // recovers — inert at the shipped (all-zero) rates, matching the corp
         // path.
+        //
+        // BL-1445: the unit's Logistic Point share is the rule's third trigger - the
+        // target is the lesser of the bill's and the share, and the factor steps
+        // toward it (see the header). A full share leaves the bill's rule exactly.
         const bool unmet = paid < bill;
+        const bool lp_known = lp != nullptr && lp->resolved;
         for (const entity_id uid : unit_ids)
         {
             unit_component& u = w.units.at(uid);
-            if (unmet)
+            int target = unmet ? 0 : 1000;
+            if (lp_known)
+                if (const auto it = lp->supply_share.find(uid); it != lp->supply_share.end())
+                    target = std::min(target, std::clamp(it->second, 0, 1000));
+            if (u.supply_factor_permille > target)
                 u.supply_factor_permille =
-                    std::max(0, u.supply_factor_permille - up.supply_decay_permille);
+                    std::max(target, u.supply_factor_permille - up.supply_decay_permille);
             else
                 u.supply_factor_permille =
-                    std::min(1000, u.supply_factor_permille + up.supply_recovery_permille);
+                    std::min(target, u.supply_factor_permille + up.supply_recovery_permille);
         }
     }
 }

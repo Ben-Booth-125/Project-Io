@@ -209,7 +209,7 @@ int main()
               "B1 setup: the attacker is ordered onto the defender's tile");
         // The march pass with no Logistic Point resolve handed in (the fixture's
         // nations make none); the real tick then steps the battle it opened.
-        const unit_march_tick mt = run_unit_march(f.w, reg, false);
+        const unit_march_tick mt = run_unit_march(f.w, reg);
         check(mt.attacks == 1 && mt.battles_opened == 1 && f.w.battles.size() == 1
                   && f.w.battles.front().tile == f.tile,
               "B1a THE TRIGGER FIRED — the step onto a hostile stack's tile opened a battle over it");
@@ -229,7 +229,7 @@ int main()
         build_fixture(f, /*declare=*/false);
         const int before = total_men(f.w);
         (void)apply_corp_command(f.w, reg, march_cmd(f.att, f.ua, f.tile));
-        const unit_march_tick mt = run_unit_march(f.w, reg, false);
+        const unit_march_tick mt = run_unit_march(f.w, reg);
         run_economy_step(f.w, reg);
         check(f.w.battles.empty() && total_men(f.w) == before && mt.attacks == 0 && mt.blocked == 1
                   && f.w.units.at(f.ua).position != f.tile,
@@ -838,15 +838,15 @@ int main()
         bool rising = true;
         for (int i = 0; i < 12; ++i)
         {
-            // BL-1445: recovery is QUARTERLY (the economy step), not a step of the
-            // daily battle pass: a quarter's recovery, twelve times.
+            // Ben, 2026-10-28: recovery is DAILY, a step of the daily military pass
+            // after the march (never of run_battles itself): a day's recovery, twelve times.
             recover_out_of_contact(f.w);
             const int r = f.w.units.at(f.ua).readiness_permille;
             if (r < prev) rising = false;
             prev = r;
         }
         const unit_component& after = f.w.units.at(f.ua);
-        std::printf("        readiness 0 -> %d, morale 700 -> %d over twelve idle quarters\n",
+        std::printf("        readiness 0 -> %d, morale 700 -> %d over twelve idle days\n",
                     after.readiness_permille, after.morale_permille);
         check(rising && after.readiness_permille > 0, "B20a readiness climbs back while out of contact");
         check(after.readiness_permille <= after.morale_permille,
@@ -873,7 +873,7 @@ int main()
         // morale drifts toward its supply even with no fight, and the hash moves.
         f.w.units.at(f.ua).supply_factor_permille = 900;
         const uint64_t h1 = f.w.state_hash(0);
-        recover_out_of_contact(f.w); // a quarter's recovery
+        recover_out_of_contact(f.w); // a day's recovery
         check(f.w.state_hash(0) != h1 && f.w.units.at(f.ua).morale_permille == 990,
               "B21b an unsupplied unit's morale moves without a fight (10 toward its supply), so the hash does");
     }
@@ -905,13 +905,13 @@ int main()
         const int side = road_side_between(f.w, t, u.position);
         std::printf("        morale 1000 -> %d; moved %s\n", u.morale_permille, side >= 0 ? "one tile" : "elsewhere");
         check(u.morale_permille == 1000 - p.morale_loss,
-              "B22a it paid the morale loss ONCE (the daily pass recovers nothing, BL-1445)");
+              "B22a it paid the morale loss ONCE (the battle pass itself recovers nothing)");
         check(side >= 0, "B22b it moved one tile, not two");
         const std::set<entity_id> foes = { f.w.units.at(f.ub).position, f.w.units.at(uc).position };
         check(foes.count(u.position) == 0, "B22c it did not retreat onto either foe's tile");
         recover_out_of_contact(f.w);
         check(f.w.units.at(f.ua).morale_permille == 1000 - p.morale_loss + p.morale_recovery_permille,
-              "B22d ...and the quarter's recovery then moves it one step back, once");
+              "B22d ...and the day's recovery then moves it one step back, once");
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);
