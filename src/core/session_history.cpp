@@ -24,7 +24,13 @@ namespace session_history {
 void post_battle_dispatches(const world& w, const economy_report& report,
                             ui::chat_state& chat, int day_tick)
 {
-    if (report.battle_dispatches.empty())
+    post_battle_dispatches(w, report.battle_dispatches, chat, day_tick);
+}
+
+void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& dispatches,
+                            ui::chat_state& chat, int day_tick)
+{
+    if (dispatches.empty())
         return;
 
     // Channel 1 is the standing Field channel (chat_panel.hpp). Guarded rather
@@ -34,7 +40,7 @@ void post_battle_dispatches(const world& w, const economy_report& report,
                           ? ui::chat_state::k_field_channel
                           : ui::chat_state::k_public_channel;
 
-    for (const battle_dispatch& d : report.battle_dispatches)
+    for (const battle_dispatch& d : dispatches)
     {
         // VOICED BY THE ATTACKER'S CORP, and only for fights the player is in.
         // BL-212 keeps corporations out of Public precisely so a rival's

@@ -542,7 +542,22 @@ inline constexpr uint32_t world_save_magic =
 /// by its ground tile (or, with none, by its province id, which is the province's
 /// lowest member tile), and has no attacking stack, so it advances no one. The march
 /// order's province slot is written 0 and read past.
-inline constexpr uint32_t world_save_version = 63;
+///
+/// Bumped to 65 (BL-1445, move by days; MILITARY.md § Marching): Logistic Points are
+/// granted once a quarter and spent day by day, so a unit's UNSPENT GRANT is state a
+/// save taken between ticks must carry. A TRAILING SECTION after the attacking stacks
+/// carries every unit holding one, ascending id, as (id, f32 points) after a u32
+/// count. v63 is a STRICT PREFIX of v65 and is read too
+/// (`k_world_save_version_pre_march`): its units hold no grant, so a march in flight
+/// halts until the next economy tick grants it. v64 is RESERVED for a parallel lane
+/// (unit designs) and is not a stream this build writes or reads: the integrator
+/// renumbers on merge (stack the two trailing sections and move the prefix constant).
+/// The order's `progress` keeps its meaning — banked traversal cost — so an old
+/// stream's banked fraction reads as the same partial tile.
+inline constexpr uint32_t world_save_version = 65;
+
+/// v63, a strict prefix of v65 (the march-grant section is v65's only addition).
+inline constexpr uint32_t k_world_save_version_pre_march = 63;
 
 /// v62, a strict prefix of v63 (the attacking-stack section is v63's only addition).
 inline constexpr uint32_t k_world_save_version_pre_tile = 62;
@@ -700,6 +715,10 @@ void write_world_snapshot_pre_fronts(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1443): @p w written as a v62 stream, less the attacking-stack
 /// section. The game never writes it.
 void write_world_snapshot_pre_tile(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1445): @p w written as a v63 stream, less the march-grant
+/// section. The game never writes it.
+void write_world_snapshot_pre_march(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

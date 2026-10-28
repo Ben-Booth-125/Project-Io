@@ -44,6 +44,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <map>
 #include <sstream>
 #include <string>
@@ -91,6 +92,17 @@ std::size_t stack_section_bytes(const world& w)
     std::size_t n = 4;
     for (const active_battle& b : w.battles)
         n += 4 + 4 * b.attacking_units.size();
+    return n;
+}
+
+/// BL-1445 (v65): the march-grant section after the stacks — a count, then (id, f32)
+/// for every unit holding an unspent grant. The stream's last section.
+std::size_t march_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [uid, u] : w.units)
+        if (u.march_grant != 0.0f)
+            n += 4 + 4;
     return n;
 }
 
@@ -549,7 +561,8 @@ int main()
                                        + obsolete_section_bytes(wd)  // BL-1437 (v60)
                                        + refit_section_bytes(wd)     // v61
                                        + fronts_section_bytes(wd)    // BL-1427 (v62)
-                                       + stack_section_bytes(wd);    // BL-1443 (v63), last
+                                       + stack_section_bytes(wd)     // BL-1443 (v63)
+                                       + march_section_bytes(wd);    // BL-1445 (v65), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -614,7 +627,8 @@ int main()
                                          + obsolete_section_bytes(wu)  // BL-1437 (v60)
                                          + refit_section_bytes(wu)     // v61
                                          + fronts_section_bytes(wu)    // BL-1427 (v62)
-                                         + stack_section_bytes(wu);    // BL-1443 (v63), last
+                                         + stack_section_bytes(wu)     // BL-1443 (v63)
+                                         + march_section_bytes(wu);    // BL-1445 (v65), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
@@ -630,6 +644,59 @@ int main()
         world sentinel;
         check(have && !from_bytes(bad, sentinel) && sentinel.units.empty(),
               "P24 a readiness past 1000 is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // P25 (BL-1445, move by days) -- a unit's unspent march grant and banked
+    // progress round-trip by value, a v63 stream reads with no grant, and a
+    // non-finite or non-positive grant is refused whole.
+    // -----------------------------------------------------------------------
+    {
+        world wg = w;
+        std::vector<entity_id> uids;
+        for (const auto& [uid, u] : wg.units) uids.push_back(uid);
+        std::sort(uids.begin(), uids.end());
+        const bool have = !uids.empty();
+        if (have)
+        {
+            wg.units.at(uids[0]).march_grant    = 12.375f;
+            wg.units.at(uids[0]).order.progress = 1.0f / 3.0f;
+        }
+        const std::string b65 = to_bytes(wg);
+        world back;
+        bool ok = have && from_bytes(b65, back);
+        if (ok)
+            ok = back.units.at(uids[0]).march_grant == 12.375f
+              && back.units.at(uids[0]).order.progress == 1.0f / 3.0f
+              && back.state_hash(3) == wg.state_hash(3) && to_bytes(back) == b65;
+        check(ok, "P25 a unit's unspent march grant and banked progress round-trip by value (hash and bytes equal)");
+
+        std::string b63;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_march(wg, o);
+            b63 = o.str();
+        }
+        uint32_t stamped = 0;
+        std::memcpy(&stamped, &b63[4], sizeof stamped);
+        world old;
+        bool ok63 = have && stamped == k_world_save_version_pre_march && from_bytes(b63, old);
+        if (ok63)
+            for (const auto& [uid, u] : old.units)
+                ok63 = ok63 && u.march_grant == 0.0f;
+        check(ok63 && b65.size() == b63.size() + march_section_bytes(wg),
+              "P25 a v63 stream reads with no grant held; v63 is v65 less the march-grant section");
+
+        // Untrusted: a NaN grant (the last 4 bytes of the stream: one row, its f32) is refused.
+        std::string bad = b65;
+        if (have)
+        {
+            const float nan = std::numeric_limits<float>::quiet_NaN();
+            std::memcpy(&bad[bad.size() - 4], &nan, sizeof nan);
+        }
+        world sentinel;
+        check(have && !from_bytes(bad, sentinel) && sentinel.units.empty(),
+              "P25 a NaN march grant is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------

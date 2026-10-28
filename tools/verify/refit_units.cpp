@@ -326,8 +326,9 @@ int main()
         const bool ok60 = read_world_snapshot(old, in60);
         // BL-1427 (v62): today's stream carries the fronts section, two empty counts
         // here (8 bytes) after the refits; BL-1443 (v63) ends it with the attacking-stack
-        // section, an empty battle count (4 bytes).
-        constexpr std::size_t fronts_tail = 8 + 4;
+        // section, an empty battle count (4 bytes); BL-1445 (v65) with the march-grant
+        // section, an empty count (4 bytes).
+        constexpr std::size_t fronts_tail = 8 + 4 + 4;
         check(ok60 && v60.size() == bytes.size() - (4 + 10) - fronts_tail && !unit_refitting(old.units.at(b))
                   && old.units.at(b).type == levy,
               "R5b a v60 stream (14 bytes shorter) reads as no refit");

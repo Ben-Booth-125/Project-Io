@@ -69,8 +69,9 @@ plateau.
 
 `tile_traversal_cost` is the per-node weight used by **A\*, the reach-field Dijkstra, and a marching
 unit alike.** It is a named, public function rather than an anonymous-namespace helper precisely so
-`run_unit_march` spends march points against *the same cost function* rather than a second invented
-model.
+`run_unit_march` banks a unit's daily movement — 1 / its class's days per plains tile (MILITARY.md
+§ Marching) — against *the same cost function* rather than a second invented model, so terrain
+multiplies a march's days and a road divides them.
 
 Landform multipliers, from TILES.md: plains 1.0, valley 1.1, highland 1.25, crater 1.3, canyon 1.5,
 rift 1.6, mountain 2.0. Water is crossable at a higher **sea-leg** cost, so a path exists on any
@@ -1001,6 +1002,14 @@ kept, and with trade drawing again it keeps its original subject: the front is s
 trade and the factories behind it wait. A campaign visibly starving its own industry is the
 intended, legible cost of marching.
 
+**The march claims the quarter ahead, and spends it by the day (Ben, 2026-10-28; MILITARY.md
+§ Marching).** Units march every day, but the pool resolves once a quarter. So at each economy tick a
+marching unit claims the traversal cost of the path it can walk in the next ninety days at its
+class's speed, capped by what its order still needs; it is granted that whole or refused, before
+production claims. The grant is spent a point per unit of traversal cost as each hop is crossed, and
+the next tick's grant replaces what is left of it. A unit whose grant does not cover its next hop
+halts until the next grant.
+
 **A shipment draws points again (Ben, 2026-10-16).** The cap retired in BL-1309's cut is
 reinstated: a shipment draws **by cargo quantity**.
 **It pays for its whole route (Ben, 2026-10-23, NR-1060):** a shipment needs the Logistic Points its route costs **from its market's
@@ -1065,8 +1074,8 @@ Neither replaces the other.
 > supplying items."*
 
 The cap/price split holds. What changes is **which side of the game pays**. A convoy pays credits
-per unit-distance. A marching unit spends march points against traversal cost, and **that march is
-priced in credits by active LP** — so moving an army is not free, which was never a decision anyone
+per unit-distance. A marching unit spends Logistic Points against the traversal cost of each hop it
+crosses, and **that march is priced in credits by active LP**, charged hop by hop as it is crossed — so moving an army is not free, which was never a decision anyone
 made.
 
 So: **passive LP caps trade, which is already priced; active LP caps force, which this ruling
@@ -1116,7 +1125,8 @@ Each rejected an earlier cut. Two are structural.
 3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
    **Settled (Ben, 2026-08-25): a convoy draw is its cargo quantity; a march draw is its march
-   points.** One rate serves both, so a unit of goods and a march-point's worth of movement burden
+   points** — one point per unit of traversal cost crossed, however many days the class takes over
+   it (MILITARY.md § Marching). One rate serves both, so a unit of goods and a march-point's worth of movement burden
    an anchor equally — the implicit exchange rate, kept as settled (Ben, 2026-10-23, NR-1049).
    **For a shipment, distance now counts too (Ben, 2026-10-23, NR-1060):** it pays for its whole
    route (§ A shipment draws points again), which overturns the old rule that only cargo, never

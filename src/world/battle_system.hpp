@@ -20,8 +20,10 @@
 //      battle, join. Units never abstract into a pool — they keep their tiles.
 //   2. TERRAIN IS ONE PAIR for the whole battle, exactly as the resolver already
 //      takes it. Per-unit terrain was offered and declined.
-//   3. PACING IS SEVERAL ROUNDS PER TICK — `campaign_battle_params::
-//      rounds_per_tick`, authored data rather than code.
+//   3. PACING IS BY THE DAY (Ben, 2026-10-28, overturning "several rounds per
+//      tick"): `campaign_battle_params::rounds_per_day` rounds every day, from the
+//      daily military pass (`run_military_day`, economy_system.hpp), and contact
+//      is checked every day.
 //
 // WHAT MAKES IT DETERMINISTIC, which is the whole difficulty. The containers a
 // battle is discovered FROM are unordered (`world::units`, `world::corporations`),
@@ -159,11 +161,13 @@ struct battle_tick
     std::vector<battle_dispatch> dispatches;
 };
 
-/// Step every live battle. Called from `run_economy_step` immediately BEFORE
-/// `run_unit_march`, so a unit that is in contact fights this tick before it can
-/// march on — and before `run_unit_upkeep`, whose existing orphan cleanup is what
-/// disbands a unit this pass reduced to zero. There is deliberately no second
-/// disband mechanism.
+/// Step every live battle by ONE DAY: `rounds_per_day` rounds each (BL-1445, move
+/// by days). Called from the daily military pass (`run_military_day`) immediately
+/// BEFORE `run_unit_march`, so a unit that is in contact fights today before it can
+/// march on. A unit this pass reduces to zero men stands inert (no fight, no march,
+/// no tile held) until the quarterly `run_unit_upkeep`, whose existing orphan cleanup
+/// disbands it. There is deliberately no second disband mechanism. Out-of-contact
+/// recovery is NOT stepped here: it is quarterly (`recover_out_of_contact`).
 ///
 /// THERE IS NO DISCOVERY HERE ANY MORE (Ben, 2026-10-27). The province
 /// co-presence trigger is gone: a battle opens only when a march tries to step
@@ -176,6 +180,14 @@ struct battle_tick
 /// advances onto the defended tile — unless a unit of any other nation still
 /// stands there. Joined stacks stay where they stood.
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
+
+/// Out of contact, every unit recovers: readiness toward its morale (scaled by its
+/// supply, never above it), morale toward its supply. ONCE A QUARTER, from the
+/// economy step (BL-1445): recovery follows the supply factor the quarterly upkeep
+/// pass sets, and the authored rates are per quarter. Each unit's step reads only
+/// itself, so the visit order cannot matter; a fully supplied unit at full readiness
+/// and morale is untouched.
+void recover_out_of_contact(world& w, const campaign_battle_params& p = {});
 
 /// One attack a march pass registered: @p unit, of @p attacker, tried to step
 /// onto @p tile, which @p defender's units hold.
