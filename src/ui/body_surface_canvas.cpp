@@ -2997,6 +2997,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             continue;
         tile_wings[bt].push_back(wid); // w.wings is ordered: ascending already
     }
+    prune_wing_intents(w, state); // a held mission never outlives its wing, nor overrides a real one
     state.wing.markers.clear();
     state.wing.markers_drawn = 0;
     // The selected wing's provinces, outlined on the ground (sorted, as saved).

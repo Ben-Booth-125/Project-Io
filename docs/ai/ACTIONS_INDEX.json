@@ -739,7 +739,11 @@
   ],
   [
    "canvas.air_designer_slot_pick",
-   "The designer opened on an air class (full canvas): a slot's box, and the item list it opens beside it."
+   "The unit designer opened on an air class (full canvas; the same designer as the land classes', with the slots Airframe, Armament and Avionics): a slot's box, and the item list it opens beside it."
+  ],
+  [
+   "canvas.air_designer_save",
+   "The unit designer opened on an air class: the Save design and Revert buttons under the summary, and the close prompt ('Unsaved changes to the <class> design' - Save / Discard / Keep editing) a close with an unsaved draft raises. One draft at a time across land and air: opening the other theatre's designer is a close like any other."
   ],
   [
    "canvas.wing_select",

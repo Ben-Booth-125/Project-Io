@@ -1187,13 +1187,13 @@
   "air_designer": {
    "surface": "Unit designer on an air class - the full-canvas designer opened from an air class row in the Military ledger's Design tab",
    "answers": "What is this kind of aircraft carrying in its airframe, armament and avionics, and what could it carry instead?",
-   "because": "military.md § Grouped by theatre: Design lists the air classes beside the land ones and each opens the same full-canvas designer with its own slots (airframe, armament, avionics; MILITARY.md § Air, on the one-live-design rule). The same rung and geometry as the land designer - the class centred, one box per slot with a leader line, a box's press listing the slot's kit base first with locked kit readable and its research node named - so the two theatres read as one tool. The summary carries the air numbers a wing fights with (HP, air attack, soft and hard attack, strategic, recon, range) rather than the land ones, and counts wings flying an older design. Picks are greyed by air_design_check, the seam's own test. There is no air art yet, so the image is the aircraft glyph on the placeholder panel.",
+   "because": "military.md § Grouped by theatre: Design lists the air classes beside the land ones and each opens the same full-canvas designer with its own slots (airframe, armament, avionics; MILITARY.md § Air, on the one-live-design rule). It IS the same designer: one machine over a theatre adapter, so the land designer's rules hold unchanged - the class centred, one box per slot with a leader line, a box's press listing the slot's kit base first with locked kit readable and its research node named, and a pick that DRAFTS (military.md § The designer, NR-1096): the box marked changed, Save sending set_air_design per changed slot, Revert, a close with an unsaved draft asking Save / Discard / Keep editing, a refused slot staying drafted with the seam's message beside it. One draft at a time across both theatres, so opening a land class over an air draft is a close like any other. Only what differs is the theatre's: the summary carries the numbers a wing fights with (HP, air attack, soft and hard attack, strategic, recon, range), goods are per wing, it counts wings flying an older design, and picks are greyed by air_design_check. There is no air art yet, so the image is the aircraft glyph on the placeholder panel.",
    "backlog_item": [
     "BL-1450"
    ],
    "files": [
-    "src/ui/air_designer.cpp",
-    "src/ui/air_designer.hpp",
+    "src/ui/unit_designer.cpp",
+    "src/ui/unit_designer.hpp",
     "src/ui/detail_level.hpp",
     "src/ui/ui_state.hpp"
    ],

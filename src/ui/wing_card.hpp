@@ -36,6 +36,16 @@ const char* air_mission_label(air_mission m);
 /// The wing's display name: its roster row's ("Interceptor Wing").
 const char* wing_display_name(const world& w, entity_id wing);
 
+/// Drop held missions (`wing_ui_state::intent`) whose wing is gone or already
+/// flies: a held mission is the card's only while its wing flies nothing. The
+/// canvas calls it every frame, the card on every draw.
+void prune_wing_intents(const world& w, ui_state& s);
+
+/// Drop the wing card's held missions, its queued order and its answer, and the
+/// ledger's queued air Raise: called beside `reset_unit_designer` when the world
+/// is replaced (a load, a new campaign).
+void reset_wing_ui(ui_state& s);
+
 /// The mission a right-click assigns @p wing on: the one it flies, or — while it
 /// flies none — the mission its card holds for it (`wing_ui_state::intent`).
 air_mission wing_current_mission(const ui_state& s, const world& w, entity_id wing);

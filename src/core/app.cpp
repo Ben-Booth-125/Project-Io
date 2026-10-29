@@ -24,7 +24,7 @@
 #include "ui/military_ledger.hpp"
 #include "ui/unit_art.hpp"        // the unit designer's class art, loaded once
 #include "ui/unit_designer.hpp"   // the full-canvas unit designer
-#include "ui/air_designer.hpp"    // BL-1450: the designer on an air class
+#include "ui/wing_card.hpp"       // BL-1450: reset_wing_ui beside reset_unit_designer
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
@@ -1852,6 +1852,7 @@ void app::finish_new_game()
 
     open_play_log(std::string());
     ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
+    ui::reset_wing_ui(m_ui);       // BL-1450: so do a wing card's held missions and queued order
     m_screen = app_screen::in_game;
 }
 
@@ -2499,6 +2500,7 @@ bool app::load_game_from(const std::string& path)
     m_ui.clear_battle_selection();
     m_ui.clear_front_selection();
     ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
+    ui::reset_wing_ui(m_ui);       // BL-1450: so do a wing card's held missions and queued order
 
     m_screen = app_screen::in_game;
     open_play_log(path);
@@ -2828,10 +2830,10 @@ void app::render()
     ui::draw_military_ledger(m_world, m_registry, m_ui, m_ui.show_military_ledger);
     // The unit designer (military.md § The designer): a full-canvas takeover the
     // Design tab's class rows and the unit card's type name open. Its picks draft;
-    // Save queues `designer.pending`, sent below as `set_unit_design`.
-    ui::draw_unit_designer(m_world, m_ui);
-    // BL-1450: the same rung opened on an air class (`set_air_design`, below).
-    ui::draw_air_designer(m_world, m_registry, m_ui);
+    // Save queues `designer.pending`, sent below as `set_unit_design` — or, for an
+    // air class (BL-1450: the same designer on airframe / armament / avionics), as
+    // `set_air_design`.
+    ui::draw_unit_designer(m_world, m_registry, m_ui);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;
         // the rank table's change column reads the ranking from ~4 econ ticks back.
@@ -3361,7 +3363,7 @@ void app::render()
             corp_command cmd;
             cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
             cmd.corp      = m_world.player_entity;
-            cmd.verb      = corp_verb::set_unit_design;
+            cmd.verb      = p.air ? corp_verb::set_air_design : corp_verb::set_unit_design; // BL-1450
             cmd.order     = static_cast<uint32_t>(p.cls);
             cmd.recipe    = static_cast<uint16_t>(p.slot);
             cmd.unit_type = p.item;
@@ -3377,8 +3379,10 @@ void app::render()
                 default:                                        if (why.empty()) why = "that kit does not fit its slot"; break;
             }
         }
+        const bool air_save = m_ui.designer.pending.front().air;
         if (applied == sent)
-            m_ui.designer.last_message = "Saved: new units are raised with this design.";
+            m_ui.designer.last_message = air_save ? "Saved: new wings are raised with this design."
+                                                  : "Saved: new units are raised with this design.";
         else
             m_ui.designer.last_message = "Saved " + std::to_string(applied) + " of " + std::to_string(sent)
                                        + " changes; the rest were refused: " + why + ".";
@@ -3388,30 +3392,7 @@ void app::render()
 
     // BL-1450 (air UI): the three air presses, each through the same seam any caller
     // uses. A refusal mutates nothing and is worded where the press was made.
-    //
-    // The air designer's pick: `set_air_design`, one slot per press.
-    if (m_ui.air_designer.pending_cls >= 0)
-    {
-        corp_command cmd;
-        cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
-        cmd.corp      = m_world.player_entity;
-        cmd.verb      = corp_verb::set_air_design;
-        cmd.order     = static_cast<uint32_t>(m_ui.air_designer.pending_cls);
-        cmd.recipe    = static_cast<uint16_t>(m_ui.air_designer.pending_slot);
-        cmd.unit_type = m_ui.air_designer.pending_item;
-        switch (player_command(cmd))
-        {
-            case corp_command_result::applied:
-                m_ui.air_designer.last_message = "Saved: new wings are raised with this design."; break;
-            case corp_command_result::rejected_tech_locked:
-                m_ui.air_designer.last_message = "Not researched yet."; break;
-            case corp_command_result::rejected_state:
-                m_ui.air_designer.last_message = "Already fitted."; break;
-            default:
-                m_ui.air_designer.last_message = "That kit does not fit this slot."; break;
-        }
-        m_ui.air_designer.pending_cls = -1; // consume the request
-    }
+
     // The Military ledger's air Raise: `hire_wing` at the chosen airbase's tile.
     if (m_ui.military.pending_wing_tile != null_entity)
     {
@@ -3455,7 +3436,13 @@ void app::render()
             case corp_command_result::rejected_placement:
                 m_ui.wing.last_message = "Out of range."; break;
             case corp_command_result::rejected_state:
-                m_ui.wing.last_message = "Bombing only over a nation you are hostile to."; break;
+                // Two causes share the code: strategic bombing over a province not
+                // held by a nation you are hostile to, and an assignment that
+                // changes nothing. Name the one this press meant.
+                m_ui.wing.last_message = m_ui.wing.pending_mission == static_cast<std::uint8_t>(air_mission::strategic)
+                    ? "Strategic bombing only over a nation you are hostile to."
+                    : "Nothing to change.";
+                break;
             default:
                 m_ui.wing.last_message = "The wing can't fly that."; break;
         }

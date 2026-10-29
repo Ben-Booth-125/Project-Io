@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui_state.hpp"
+#include "world/recipe_registry.hpp"
 #include "world/unit_designs.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
@@ -29,7 +30,20 @@ namespace ui {
 /// draft keeps the designer open and asks Save or Discard.
 ///
 /// Draws nothing unless the designer is the open takeover. Call every frame.
-void draw_unit_designer(const world& w, ui_state& s);
+/// BL-1450: ONE DESIGNER, TWO THEATRES. The same machine draws a land class
+/// (`detail_surface::unit_designer`, key = land_class; `set_unit_design`) and an
+/// air class (`detail_surface::air_designer`, key = air_class; slots airframe /
+/// armament / avionics; `set_air_design`) through a theatre adapter, so the draft,
+/// Save, Revert and the close catch hold for both. Save queues `designer.pending`
+/// with each pick marked land or air; app::render sends the matching verb.
+void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s);
+
+/// Open the designer on air class @p c, or close it if open there (the toggle rule).
+/// The Military ledger Design tab's Air rows use this.
+void toggle_air_designer(ui_state& s, air_class c);
+
+/// Whether the designer is open on air class @p c.
+bool air_designer_open_on(const ui_state& s, air_class c);
 
 /// Open the designer for @p c — or, if it is already open on @p c, close it (the
 /// toggle rule: the press that opened it closes it). Both entries use this: a land

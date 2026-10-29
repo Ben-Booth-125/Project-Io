@@ -25,7 +25,7 @@ namespace ui {
 /// Air holds an airbase picker, the six air rows (Raise queues `military.pending_wing_*`,
 /// which app sends as `hire_wing`) and the player's wings, each a press selecting it;
 /// Design's Air holds the six air classes, each opening the air designer
-/// (air_designer.hpp).
+/// (unit_designer.hpp).
 ///
 /// RAISE IS NOT A SECOND HIRE PATH. The press writes `construction.pending_hire_tile`
 /// / `pending_hire_unit_type`, which `app::render` executes through the

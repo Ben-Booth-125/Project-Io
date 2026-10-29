@@ -395,42 +395,6 @@ struct military_ledger_state
     std::vector<drawn_class> air_class_rows; ///< Design's Air rows (cls = air_class): each opens the designer.
 };
 
-/// BL-1450: the AIR designer — the unit designer's full-canvas rung opened on an air
-/// class (`detail_surface::air_designer`, key = air_class), with the air slots
-/// airframe / armament / avionics (MILITARY.md § Air). Its own state, beside the land
-/// designer's, so the two never share a queued pick. VIEW state, not serialised.
-struct air_designer_state
-{
-    int  slot_open = -1;
-    int  open_cls  = -1;
-    int           pending_cls  = -1;    ///< A pick queued for app (`set_air_design`); -1 = none.
-    int           pending_slot = 0;
-    std::uint16_t pending_item = 0;
-    std::string   last_message;
-
-    // Published each frame it draws; x < 0 = absent. Its own shapes, beside the
-    // land designer's, so the two surfaces change independently.
-    struct drawn_box
-    {
-        int         slot = 0;
-        std::string name, fitted;
-        float       x = -1.0f, y = -1.0f;
-        float       anchor_x = -1.0f, anchor_y = -1.0f;
-    };
-    struct drawn_item
-    {
-        std::uint16_t item = 0;
-        std::string   name;
-        float         x = -1.0f, y = -1.0f;
-        bool          fitted = false, enabled = false, locked = false;
-        std::string   reason;
-    };
-    std::vector<drawn_box>  boxes;
-    std::vector<drawn_item> items;
-    float back_x = -1.0f, back_y = -1.0f;
-    int   drawn_cls = -1;
-};
-
 /// BL-1450: the wing card (SELECTION.md; military.md § Grouped by theatre) and the
 /// canvas's right-click assignment. VIEW state plus the one queued order.
 struct wing_ui_state
@@ -471,6 +435,7 @@ struct unit_designer_state
 {
     int  slot_open = -1;    ///< The slot whose item list is open; -1 = none.
     int  open_cls  = -1;    ///< The class the state above belongs to (a class change resets it).
+    detail_surface open_surface = detail_surface::none; ///< BL-1450: the surface `open_cls` belongs to.
 
     /// THE DRAFT (military.md § The designer, "A pick drafts; Save commits"; Ben,
     /// 2026-10-28, NR-1096). A pick changes only this: one kit catalogue id per slot
@@ -478,6 +443,9 @@ struct unit_designer_state
     /// The boxes and summary show the draft; Save sends it; Revert drops it.
     /// Read the drafted design through `unit_designer_draft_design`.
     int                          draft_cls = -1;
+    /// BL-1450: which designer the draft belongs to — `unit_designer` (a land class)
+    /// or `air_designer` (an air class). One draft at a time, across both.
+    detail_surface               draft_surface = detail_surface::unit_designer;
     std::array<std::uint16_t, 3> draft{0xFFFFu, 0xFFFFu, 0xFFFFu}; ///< k_kit_slot_max slots.
 
     /// The close prompt: a close (toggle press, return control, Escape, another
@@ -490,7 +458,7 @@ struct unit_designer_state
 
     /// Save's picks, queued for app::render, which sends one `set_unit_design`
     /// per changed slot (the seam is per slot).
-    struct pending_pick { int cls = -1; int slot = 0; std::uint16_t item = 0; };
+    struct pending_pick { int cls = -1; int slot = 0; std::uint16_t item = 0; bool air = false; }; ///< `air`: an air class, sent as `set_air_design` (BL-1450).
     std::vector<pending_pick> pending;
     /// The seam's answer to the last Save, written by app::render after sending
     /// `pending`: `save_answered` is set, and `refused` holds the picks it refused.
@@ -532,6 +500,7 @@ struct unit_designer_state
     int   changed_slots = 0;          ///< Slots whose draft differs from the live design.
     int   stale_units = 0;            ///< Field units of the class on an older design.
     int   drawn_cls   = -1;           ///< The class drawn this frame; -1 = closed.
+    bool  drawn_air   = false;        ///< BL-1450: the class drawn is an AIR class (`detail_surface::air_designer`).
 
     /// The unit card's type-name press (opens the designer for the unit's class).
     float card_type_x = -1.0f, card_type_y = -1.0f;
@@ -1008,7 +977,6 @@ struct ui_state
     /// See `military_ledger_state`.
     military_ledger_state military;
     unit_designer_state   designer; ///< The full-canvas unit designer (military.md § The designer).
-    air_designer_state    air_designer; ///< BL-1450: the designer opened on an air class.
     wing_ui_state         wing;         ///< BL-1450: the wing card and the canvas right-click assignment.
 
 

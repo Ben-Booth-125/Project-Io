@@ -6,6 +6,7 @@
 
 #include "world/air_combat.hpp"
 #include "world/province.hpp" // province_holder_for
+#include "world/stance.hpp"   // is_hostile — the strategic refusal names the province
 
 #include <imgui.h>
 
@@ -63,10 +64,19 @@ std::string mission_refusal(const world& w, const recipe_registry& reg, const ai
             return "Out of range";
         }
         case corp_command_result::rejected_state:
-            if (air_mission_bombs(mission))
-                return std::string(air_mission_label(mission))
-                     + " only over provinces held by a nation you are hostile to";
-            return "No change";
+            // Two causes share the code (air_mission_check): STRATEGIC bombing over a
+            // province not held by a nation you are hostile to — tactical bombing may
+            // fly anywhere, its hostility rule is on the target — and an assignment
+            // that changes nothing.
+            if (mission == air_mission::strategic)
+                for (const uint32_t p : provinces)
+                {
+                    const entity_id holder = province_holder_for(w, p);
+                    if (holder == null_entity || holder == wg.owner || !is_hostile(w, wg.owner, holder))
+                        return "Strategic bombing only over a nation you are hostile to: "
+                             + province_label(w, p) + " is not";
+                }
+            return "Nothing to change";
         case corp_command_result::rejected_not_owner: return "Not your wing";
         default:
             return std::string(air_class_label(wing_class(wg))) + " cannot fly " + air_mission_label(mission);
@@ -107,6 +117,31 @@ bool wing_is_players(const world& w, entity_id wing)
 {
     const auto it = w.wings.find(wing);
     return it != w.wings.end() && is_player_side(w, it->second.owner);
+}
+
+void prune_wing_intents(const world& w, ui_state& s)
+{
+    // A held mission is the card's only while its wing exists and flies nothing:
+    // once the wing flies, its real mission is the answer, and a stale intent must
+    // never come back to override it after a stand-down elsewhere.
+    for (auto it = s.wing.intent.begin(); it != s.wing.intent.end();)
+    {
+        const auto wit = w.wings.find(it->first);
+        if (wit == w.wings.end() || wit->second.mission != air_mission::none)
+            it = s.wing.intent.erase(it);
+        else
+            ++it;
+    }
+}
+
+void reset_wing_ui(ui_state& s)
+{
+    s.wing.intent.clear();
+    s.wing.pending_wing = null_entity;
+    s.wing.pending_provinces.clear();
+    s.wing.last_message.clear();
+    s.military.pending_wing_tile = null_entity;
+    s.military.air_message.clear();
 }
 
 air_mission wing_current_mission(const ui_state& s, const world& w, entity_id wing)
@@ -193,9 +228,7 @@ bool draw_wing_selection(const world& w, const recipe_registry& reg, ui_state& s
     const ImGuiStyle&     style = ImGui::GetStyle();
     ImDrawList*           dl    = ImGui::GetWindowDrawList();
     u.drawn_wing = id;
-    // The intent is only the card's while the wing flies nothing.
-    if (wg.mission != air_mission::none)
-        u.intent.erase(id);
+    prune_wing_intents(w, s);
 
     // ── Header: [aircraft] name · Wing ··· class, airbase ──
     {
@@ -219,15 +252,18 @@ bool draw_wing_selection(const world& w, const recipe_registry& reg, ui_state& s
     const float col_w   = (total_w - 2.0f * style.ItemSpacing.x) / 3.0f;
     const ImGuiWindowFlags cf = ImGuiWindowFlags_NoSavedSettings;
 
+    // A RIVAL's wing (BL-068): what it is and whose, nothing of its condition, its
+    // mission or where it flies. The card stops at the owner line.
+    if (!mine)
+    {
+        const char* who = owner_display_name(w, wg.owner);
+        ImGui::TextDisabled("Owner: %s", who != nullptr ? who : "a rival");
+        return true;
+    }
+
     // ── Left: its condition ──
     ImGui::BeginChild("##wing_state", {col_w, 0.0f}, false, cf);
     ImGui::PushTextWrapPos(0.0f);
-    if (!mine)
-    {
-        // A rival's internals stay private (BL-068).
-        ImGui::TextDisabled("Owner: %s", owner_display_name(w, wg.owner) ? owner_display_name(w, wg.owner) : "a rival");
-    }
-    else
     {
         const float hp = static_cast<float>(wg.hp_ppm) / static_cast<float>(k_wing_hp_full);
         char ov[32];

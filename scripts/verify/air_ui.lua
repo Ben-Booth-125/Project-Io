@@ -15,9 +15,18 @@
 -- 6. Design lists the six air classes under Air; a row opens the designer on the
 --    air slots (airframe, armament, avionics).
 --
+-- 2b. A REAL Raise through hire_wing: an air row's press, with a loan and
+--     the class's hire goods put on the home shelf (grant_stock), repaid after.
+-- 4b. The lit mission's press stands the wing down (the toggle rule).
+-- 4c. Strategic bombing over a province not held by a hostile nation is refused
+--     with the strategic wording, before and on the right-click.
+-- 6b. An air designer pick drafts (the box marked changed), Save sends
+--     set_air_design and the live design holds it; a close with a draft asks.
+--
 -- Staging: an airbase is STAGED on the player's own ground (stage_building), and
--- wings are STAGED at it (stage_wing) — the hire's price and shelf gate are the
--- seam's and covered by air_combat_harness; this script is about the surfaces.
+-- two more wings are STAGED at it (stage_wing) so the card and marker have a
+-- fighter and a bomber to work with. The air kit research lock is waived for the
+-- designer's Save (waive_kit_research), and turned back off.
 -- Every press aims at the point the surface published.
 
 verify.goto_surface("home")
@@ -83,6 +92,34 @@ for _, r in ipairs(led.air_raises) do
 end
 if #led.air_raises == 6 then ok("six air rows, each with a Raise press") else fail("air rows drawn: " .. #led.air_raises) end
 
+-- 2b. A real Raise through the ledger's press and hire_wing (the lowest live row).
+local LOAN = 5000.0
+verify.set_balance(verify.player_balance() + LOAN)
+verify.grant_stock("alloys", 10)
+verify.grant_stock("electronics", 10)
+verify.grant_stock("machinery", 10)
+verify.grant_stock("refined_fuel", 10)
+verify.scroll_panel("military", 1.0) -- the air rows sit at the foot of Recruit
+settle()
+led = verify.military_ledger()
+-- The press must land on screen: the lowest live row (the column scrolled to its foot).
+local raise = nil
+for _, r in ipairs(led.air_raises) do if r.enabled then raise = r end end
+local before = #verify.wings()
+if raise and raise.enabled then
+    verify.click(raise.x, raise.y); settle()
+    led = verify.military_ledger()
+    local after = #verify.wings()
+    print("air_ui: air Raise -> '" .. led.air_message .. "', player wings " .. before .. " -> " .. after)
+    if after == before + 1 and led.air_message == "Wing mustering." then ok("a Raise press raised a wing through hire_wing") else
+        fail("the Raise press did not raise a wing ('" .. led.air_message .. "')") end
+    verify.capture("air_ui_air_raised")
+else
+    fail("no air row's Raise was live")
+end
+verify.set_balance(verify.player_balance() - LOAN)
+verify.scroll_panel("military", 0.0)
+
 -- 3. Wings at the base, listed and selectable.
 local fighter = verify.stage_wing(airbase, 0) -- Interceptor Wing (fighter)
 local bomber  = verify.stage_wing(airbase, 2) -- Strategic Bomber Wing
@@ -91,7 +128,8 @@ verify.scroll_panel("military", 1.0)
 settle()
 led = verify.military_ledger()
 verify.capture("air_ui_recruit_air")
-if #led.wing_rows == 2 then ok("Your wings lists both wings") else fail("wing rows: " .. #led.wing_rows) end
+if #led.wing_rows == #verify.wings() and #led.wing_rows >= 2 then ok("Your wings lists every wing (" .. #led.wing_rows .. ")") else
+    fail("wing rows: " .. #led.wing_rows .. " for " .. #verify.wings() .. " wings") end
 local row = nil
 for _, r in ipairs(led.wing_rows) do if r.id == fighter then row = r end end
 if row then
@@ -169,8 +207,31 @@ end
 if refused then ok("a province out of range is refused with its distance and the range") else
     fail("no out-of-range refusal found walking east") end
 
--- Remove from the card.
+-- 4b. The lit mission stands the wing down (the toggle rule).
 verify.mouse(-1, -1); settle()
+card = verify.wing_card()
+for _, m in ipairs(card.missions) do if m.mission == 1 then sup = m end end
+if sup and sup.active then
+    verify.click(sup.x, sup.y); settle()
+    local wg = wing_of(fighter)
+    card = verify.wing_card()
+    local lit_none = false
+    for _, m in ipairs(card.missions) do if m.mission == 0 and m.active then lit_none = true end end
+    if wg and wg.mission == 0 and wg.provinces == 0 and lit_none then ok("pressing the lit mission stands the wing down") else
+        fail("the lit mission's press left mission " .. tostring(wg and wg.mission) .. " over " .. tostring(wg and wg.provinces)) end
+    -- Put it back for the remove test: hold the mission, right-click the province.
+    for _, m in ipairs(card.missions) do if m.mission == 1 then sup = m end end
+    verify.click(sup.x, sup.y); settle()
+    verify.center_tile(home.x, home.y, 6.0); settle(4)
+    t = verify.tile_screen(home.x, home.y)
+    verify.hover(t.x, t.y, 3)
+    verify.click(t.x, t.y, "right")
+    verify.mouse(-1, -1); settle()
+else
+    fail("Air superiority was not lit to stand down")
+end
+
+-- Remove from the card.
 card = verify.wing_card()
 if #card.removes == 1 then
     verify.click(card.removes[1].x, card.removes[1].y); settle()
@@ -183,6 +244,33 @@ if #card.removes == 1 then
 else
     fail("the card drew " .. #card.removes .. " remove presses")
 end
+
+-- 4c. Strategic bombing over the player's own province: refused, strategic words.
+verify.select_wing(bomber); settle()
+card = verify.wing_card()
+local strat = nil
+for _, m in ipairs(card.missions) do if m.mission == 3 then strat = m end end
+if strat then
+    verify.click(strat.x, strat.y); settle()
+    verify.center_tile(home.x, home.y, 6.0); settle(4)
+    t = verify.tile_screen(home.x, home.y)
+    verify.hover(t.x, t.y, 3)
+    card = verify.wing_card()
+    print("air_ui: bomber over its own province: " .. card.hover_kind .. " - " .. card.hover_text)
+    local strategic_words = string.find(card.hover_text, "Strategic bombing only over", 1, true) ~= nil
+    verify.capture("air_ui_strategic_refused")
+    verify.click(t.x, t.y, "right"); settle()
+    local wg = wing_of(bomber)
+    if card.hover_kind == "refused" and strategic_words and wg and wg.provinces == 0 then
+        ok("strategic bombing over a non-hostile province is refused with the strategic wording")
+    else
+        fail("strategic over own ground: " .. card.hover_kind .. " '" .. card.hover_text .. "', provinces "
+             .. tostring(wg and wg.provinces))
+    end
+else
+    fail("the bomber's card offers no Strategic bombing")
+end
+verify.mouse(-1, -1); settle()
 
 -- 5. The wing marker.
 verify.clear_selection()
@@ -233,13 +321,51 @@ if ac then
         fail("the air designer drew " .. #d.boxes .. " boxes") end
     for _, b in ipairs(d.boxes) do print("  slot " .. b.slot .. " " .. b.name .. ": " .. b.fitted) end
     verify.capture("air_ui_air_designer")
+    -- 6b. Draft and Save. The air kit's research nodes are not in the tree yet, so
+    --     the lock is waived for the pick (staging), and turned back off.
+    verify.waive_kit_research(true)
+    settle()
     if d.boxes[1] then
         verify.click(d.boxes[1].x, d.boxes[1].y); settle()
         d = verify.air_designer()
         print("air_ui: airframe list " .. #d.items .. " items")
-        verify.capture("air_ui_air_designer_slot")
+        local pick = nil
+        for _, it in ipairs(d.items) do if it.enabled and not it.fitted then pick = it; break end end
+        if pick then
+            local live_before = verify.air_design_fitted(d.cls, 0)
+            verify.click(pick.x, pick.y); settle()
+            d = verify.air_designer()
+            local box = d.boxes[1]
+            if d.changed_slots == 1 and box.changed and verify.air_design_fitted(d.cls, 0) == live_before then
+                ok("an air pick drafts: the box is marked changed and the live design is untouched")
+            else
+                fail("the air pick did not draft (changed " .. d.changed_slots .. ")")
+            end
+            verify.capture("air_ui_air_designer_draft")
+            -- A close with the draft asks (the class row's press), Keep editing stays.
+            verify.click(ac.x, ac.y); settle()
+            d = verify.air_designer()
+            if d.open and d.confirm_close then ok("closing with an unsaved air draft asks Save or Discard") else
+                fail("the close with a draft did not ask") end
+            verify.capture("air_ui_air_designer_prompt")
+            verify.click(d.prompt_keep_x, d.prompt_keep_y); settle()
+            d = verify.air_designer()
+            verify.click(d.save_x, d.save_y); settle(4)
+            d = verify.air_designer()
+            print("air_ui: air Save -> '" .. d.message .. "', airframe " .. live_before .. " -> "
+                  .. verify.air_design_fitted(d.cls, 0))
+            if verify.air_design_fitted(d.cls, 0) == pick.item and d.changed_slots == 0 then
+                ok("Save sends set_air_design: the live design holds the pick")
+            else
+                fail("the air Save did not land")
+            end
+            verify.capture("air_ui_air_designer_saved")
+        else
+            fail("no live airframe pick with the research waived")
+        end
     end
-    -- The toggle rule: the row that opened it closes it.
+    verify.waive_kit_research(false)
+    -- The toggle rule: the row that opened it closes it (no draft now).
     verify.click(ac.x, ac.y); settle()
     if not verify.air_designer().open then ok("pressing the lit air class closes the designer") else
         fail("the air designer stayed open") end

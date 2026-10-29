@@ -6,7 +6,6 @@
 #include "nav_pane.hpp"           // close_all_panels — the no-base door takes the column
 #include "presentation.hpp"
 #include "unit_designer.hpp"      // the Design tab's class rows open it
-#include "air_designer.hpp"       // BL-1450: the Design tab's air rows open it
 #include "wing_card.hpp"          // BL-1450: air class / mission names
 
 #include "world/air_combat.hpp"   // BL-1450: the air roster, hire_wing_check

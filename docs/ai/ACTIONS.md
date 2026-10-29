@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*189 entries — 46 gameplay · 34 canvas · 16 lens · 60 ledger · 33 chrome.*
+*190 entries — 46 gameplay · 35 canvas · 16 lens · 60 ledger · 33 chrome.*
 
 ---
 
@@ -1293,9 +1293,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Attack an enemy stack directly from the map.
 
-### `canvas.air_designer_slot_pick` — The designer opened on an air class (full canvas): a slot's box, and the item list it opens beside it.
+### `canvas.air_designer_slot_pick` — The unit designer opened on an air class (full canvas; the same designer as the land classes', with the slots Airframe, Armament and Avionics): a slot's box, and the item list it opens beside it.
 
-**Press.** Click a slot's box to open its list (again to close it). The list holds the slot's air kit, base first: each row with its stat change against the fitted item, its goods per wing, and - when your nation lacks its research node - a LOCKED badge naming the node. Click a live row to fit it; hovering a row previews the design's numbers with it fitted.
+**Press.** Click a slot's box to open its list (click it again to close it). The list holds the slot's air kit, base first: each row names the item, its stat change against the item the draft fits, its goods per wing, and - when your nation lacks its research node - a LOCKED badge naming the node. Click a live row to draft it. Hovering a row previews the design's numbers with it fitted.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1303,12 +1303,29 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 | `item` | `air kit catalogue id` | The row pressed. |
 
 **Valid when:**
-- The air designer is open on a class.
-- A row is live only when air_design_check would apply it: researched and not already fitted. A locked row is disabled with 'Locked: needs research <node>'; the fitted row reads 'Fitted'.
+- The designer is open on an air class, and its close prompt is not up.
+- A row is live when air_design_check would apply it against the live design (researched and not the live item), or when it is the live item and the draft has moved off it (picking it returns the slot to the live design). The draft's own item is disabled and badged 'Fitted'; the live item, when the draft differs, is badged 'Saved'. A locked row is disabled with 'Locked: needs research <node>'. The air kit's research nodes are not in the age tree yet, so every later item reads locked.
 
-**Expected output.** Issues gameplay.set_air_design {order = class, recipe = slot, unit_type = item} at the frame's end through the player's seat, one slot per press; the pick is the class's live design at once. The designer shows 'Saved: new wings are raised with this design.', 'Not researched yet.', 'Already fitted.' or 'That kit does not fit this slot.'.
+**Expected output.** A pick DRAFTS (NR-1096, the land designer's rule): it changes only the open design's draft and issues nothing. The box shows the drafted item, marked 'Changed' with an amber edge; the summary shows the draft's HP, air attack, soft and hard attack, strategic, recon and range and its kit goods per wing; the Save row reads 'N slot(s) changed, not saved.' The world is unchanged until canvas.air_designer_save.
 
-**Reason to select.** Fit the best researched air kit in each slot of the classes you raise.
+**Reason to select.** Try air kit in each slot, weighing its numbers against its goods, before saving the design.
+
+### `canvas.air_designer_save` — The unit designer opened on an air class: the Save design and Revert buttons under the summary, and the close prompt ('Unsaved changes to the <class> design' - Save / Discard / Keep editing) a close with an unsaved draft raises. One draft at a time across land and air: opening the other theatre's designer is a close like any other.
+
+**Press.** Click Save design to commit the draft, or Revert to drop it. Closing the designer (its class press - ledger.military_open_air_designer -, its top-left return control, Esc, or opening another full-canvas view, a land class's designer included) while a slot is changed keeps it open and raises the prompt: Save commits and closes, Discard drops the draft and closes, Keep editing dismisses the prompt.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `button` | `one of save, revert, prompt_save, prompt_discard, prompt_keep` | The button pressed. |
+
+**Valid when:**
+- The designer is open on an air class.
+- Save design and Revert are live only while at least one slot's draft differs from the live design, and not while the prompt is up.
+- The prompt's buttons exist only while the prompt is up.
+
+**Expected output.** Save issues gameplay.set_air_design {order = air class, recipe = slot, unit_type = air kit item} once per changed slot at the frame's end through the player's seat, then drops the draft: the saved design is the class's live design at once - the next wing hired of the class records it and buys its kit goods; wings already flying keep the design they were raised to. The designer then shows 'Saved: new wings are raised with this design.', or 'Saved N of M changes; the rest were refused: <reason>.' A refused slot stays in the draft, still marked Changed, with the message beside the Save row; a prompt Save with any refusal keeps the designer open on it. Revert and Discard issue nothing.
+
+**Reason to select.** Save once the draft is the air design you want new wings raised to; Revert to abandon it.
 
 ### `canvas.wing_select` — Planetary canvas: the wing marker - a round plate with the aircraft, at the upper right of the hex of each of your airbases that bases a wing, with the number of wings based there when more than one.
 
@@ -1336,9 +1353,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Valid when:**
 - Your own wing is selected; no construction or road tool is armed, no march pick is armed, no lens is on.
-- The hover line reads from air_mission_check, so it cannot disagree with the press. It refuses - and the right-click does nothing - when: the card holds no mission ('Choose the wing's mission on its card first'); the province is already assigned; eight are already assigned ('Eight provinces already assigned: remove one on the wing card'); the province is out of range ('Out of range: <place> is N tiles away, range R' - the straight-line distance from the airbase to the province's nearest tile against the class's range plus its kit); or a bombing mission names a province not held by a nation you are hostile to.
+- The hover line reads from air_mission_check, so it cannot disagree with the press. It refuses - and the right-click does nothing - when: the card holds no mission ('Choose the wing's mission on its card first'); the province is already assigned; eight are already assigned ('Eight provinces already assigned: remove one on the wing card'); the province is out of range ('Out of range: <place> is N tiles away, range R' - the straight-line distance from the airbase to the province's nearest tile against the class's range plus its kit); or the mission is STRATEGIC bombing and the province is not held by a nation you are hostile to ('Strategic bombing only over a nation you are hostile to: <place> is not'). Tactical bombing, superiority and recon may be assigned over any province in range, your own included: tactical bombing's hostility rule is on its targets, not the ground.
 
-**Expected output.** Issues gameplay.assign_air_mission {subject = wing, order = mission, provinces = the wing's list plus this one} at the frame's end through the player's seat. The wing card's list grows and the province is outlined; the card shows 'Mission assigned.' or the seam's refusal.
+**Expected output.** Issues gameplay.assign_air_mission {subject = wing, order = mission, provinces = the wing's list plus this one} at the frame's end through the player's seat. The wing card's list grows and the province is outlined; the card shows 'Mission assigned.', or the seam's refusal: 'Out of range.', 'Strategic bombing only over a nation you are hostile to.', 'Nothing to change.' or 'The wing can't fly that.'.
 
 **Reason to select.** Send a wing where it is needed: over a front for superiority, over an enemy's units or industry to bomb, over ground you want spotted.
 
@@ -2349,7 +2366,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 ### `ledger.military_open_air_designer` — Military ledger, Design tab, under the Air header: one row per air class (Fighter, Strike / multirole, Strategic bomber, Attack helicopter, Strike drone, Recon / AWACS), its name a press with the missions it flies and its live design's numbers under it.
 
-**Press.** Click the class name. Clicking the lit row of the class the designer is open on closes it (the toggle rule); clicking another class switches it.
+**Press.** Click the class name. Clicking the lit row of the class the designer is open on closes it (the toggle rule); clicking another class switches it. Either one, while a slot's draft is unsaved, keeps the designer open and asks Save or Discard (canvas.air_designer_save).
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -2358,7 +2375,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - The Military ledger is open on Design, the Air header unfolded.
 
-**Expected output.** The designer takes the canvas region on the air class: the aircraft in the middle (a placeholder image until air art lands), one box per slot - Airframe, Armament, Avionics - beside it with a leader line, each showing the slot, the fitted item and its change; under it the design's HP, air attack, soft and hard attack, strategic, recon and range, its kit goods per wing, and how many of your wings fly an older design. Closes on the same press, its return control, or Esc. No world change.
+**Expected output.** The unit designer takes the canvas region on the air class: the aircraft in the middle (a placeholder image until air art lands), one box per slot - Airframe, Armament, Avionics - beside it with a leader line, each showing the slot, the drafted item and its change; under it the design's HP, air attack, soft and hard attack, strategic, recon and range, its kit goods per wing, how many of your wings fly an older design, and the Save design / Revert row. Closes on the same press, its return control, or Esc - asking first when a draft is unsaved. No world change.
 
 **Reason to select.** See what each air slot holds, what research would open, and change the class's live design.
 
@@ -2371,10 +2388,10 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 | `mission` | `air_mission (0 none, 1 superiority, 2 tactical, 3 strategic, 4 recon)` | The button pressed. |
 
 **Valid when:**
-- A wing of yours is selected (a rival's card shows its class and owner only, and no presses).
-- A mission is DISABLED, with the seam's reason on hover, when air_mission_check would refuse it over the provinces already assigned - e.g. a bombing mission while a province is held by a nation you are not hostile to.
+- A wing of yours is selected. A rival's card names its type, class, airbase and owner and stops there: no condition, no mission, no provinces, no presses (BL-068).
+- A mission is DISABLED, with the seam's reason on hover, when air_mission_check would refuse it over the provinces already assigned: Strategic bombing while a province is held by a nation you are not hostile to ('Strategic bombing only over a nation you are hostile to: <place> is not').
 
-**Expected output.** Issues gameplay.assign_air_mission at the frame's end (or, with no province yet, holds the choice on the card and sends nothing). The card shows 'Mission assigned.', 'Wing stood down.' or the refusal.
+**Expected output.** Issues gameplay.assign_air_mission at the frame's end (or, with no province yet, holds the choice on the card and sends nothing; a held choice is dropped once the wing flies a mission or is gone). The card shows 'Mission assigned.', 'Wing stood down.', 'Strategic bombing only over a nation you are hostile to.', 'Nothing to change.' or 'The wing can't fly that.'.
 
 **Reason to select.** Choose what the wing does before naming where.
 

@@ -3154,15 +3154,18 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
-    // BL-1450: every wing — id, whether the player's, roster row, class, mission,
-    // how many provinces it flies, muster days left, and its airbase's building id.
-    // Counts and ids only; no tile data.
+    // BL-1450: the PLAYER's wings — id, roster row, class, mission, how many
+    // provinces it flies, muster days left, and its airbase's building id. A
+    // rival's wings are not listed: what they fly is private (BL-068), as their
+    // card says. Counts and ids only; no tile data.
     v.set_function("wings", [this]() {
         sol::state& st = m_lua.state();
         sol::table out = st.create_table();
         int k = 0;
         for (const auto& [wid, wg] : m_world.wings)
         {
+            if (wg.owner != m_world.player_entity)
+                continue;
             sol::table e = st.create_table();
             e["id"] = static_cast<unsigned>(wid);
             e["player"] = (wg.owner == m_world.player_entity);
@@ -3180,10 +3183,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // BL-1450 STAGING: a wing of air roster row @p row at the player's airbase
     // @p airbase (a building id), ready to fly — bypassing the hire's price and
     // shelf gate, as stage_building bypasses placement. Returns the wing id, or 0
-    // when @p airbase is not an airbase. Verify-only, behind --verify.
+    // when @p airbase is not an airbase the player owns. Verify-only, behind --verify.
     v.set_function("stage_wing", [this](unsigned airbase, int row) -> unsigned {
         const auto bit = m_world.buildings.find(static_cast<entity_id>(airbase));
         if (bit == m_world.buildings.end() || bit->second.type != building_type::airbase
+            || !owner_holds(m_world, m_world.player_entity, bit->first) // the player's own airbase only
             || row < 0 || row >= static_cast<int>(air_roster_table().size()))
             return 0u;
         air_wing wg;
@@ -3195,6 +3199,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const entity_id wid = m_world.create_entity();
         m_world.wings.emplace(wid, std::move(wg));
         return static_cast<unsigned>(wid);
+    });
+
+    // BL-1450: the air catalogue id fitted in @p slot of the player's live design for
+    // air class @p cls — what the designer's box shows once a Save lands.
+    v.set_function("air_design_fitted", [this](int cls, int slot) -> int {
+        if (cls < 0 || cls >= air_class_count || slot < 0 || slot >= k_air_kit_slot_count)
+            return -1;
+        return static_cast<int>(air_design_fitted(m_world, m_world.player_entity, static_cast<air_class>(cls), slot));
     });
 
     // Select a wing (its card on the Selection band), as select_unit does a unit.
@@ -3211,24 +3223,35 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return true;
     });
 
-    // BL-1450: the air designer — what it drew this frame (as unit_designer()).
+    // BL-1450: the designer open on an AIR class — the same machine and state as
+    // unit_designer() (draft, Save, Revert, the close prompt), read when the class
+    // drawn is an air class. `open` is false while the designer shows a land class.
     v.set_function("air_designer", [this]() {
         sol::state& st = m_lua.state();
-        const auto& d = m_ui.air_designer;
+        const auto& d = m_ui.designer;
         sol::table out = st.create_table();
-        out["open"]      = d.drawn_cls >= 0;
-        out["cls"]       = d.drawn_cls;
-        out["slot_open"] = d.slot_open;
-        out["back_x"]    = d.back_x;
-        out["back_y"]    = d.back_y;
-        out["message"]   = d.last_message;
+        out["open"]          = d.drawn_cls >= 0 && d.drawn_air;
+        out["cls"]           = d.drawn_air ? d.drawn_cls : -1;
+        out["slot_open"]     = d.slot_open;
+        out["back_x"]        = d.back_x;
+        out["back_y"]        = d.back_y;
+        out["message"]       = d.last_message;
+        out["stale_wings"]   = d.drawn_air ? d.stale_units : 0;
+        out["changed_slots"] = d.changed_slots;
+        out["confirm_close"] = d.confirm_close;
+        out["save_x"]           = d.save_x;           out["save_y"]           = d.save_y;
+        out["revert_x"]         = d.revert_x;         out["revert_y"]         = d.revert_y;
+        out["prompt_save_x"]    = d.prompt_save_x;    out["prompt_save_y"]    = d.prompt_save_y;
+        out["prompt_discard_x"] = d.prompt_discard_x; out["prompt_discard_y"] = d.prompt_discard_y;
+        out["prompt_keep_x"]    = d.prompt_keep_x;    out["prompt_keep_y"]    = d.prompt_keep_y;
         sol::table boxes = st.create_table();
         int k = 0;
-        for (const auto& b : d.boxes)
+        for (const auto& bx : d.boxes)
         {
             sol::table e = st.create_table();
-            e["slot"] = b.slot; e["name"] = b.name; e["fitted"] = b.fitted;
-            e["x"] = b.x; e["y"] = b.y;
+            e["slot"] = bx.slot; e["name"] = bx.name; e["fitted"] = bx.fitted;
+            e["live"] = bx.live; e["changed"] = bx.changed;
+            e["x"] = bx.x; e["y"] = bx.y;
             boxes[++k] = e;
         }
         out["boxes"] = boxes;
