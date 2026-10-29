@@ -1252,7 +1252,7 @@ assigned to a front (§ Fronts). A rival assigns its border garrisons and keeps 
 none of any nation's units to a front: every garrison opens on its post. After the handoff the
 player decides where its units move and how they are supplied — *"ensuring units get their supply
 and where they should move is up to the player"* — and a rival's scorer assigns its own under its
-grant ( § 11). **An army sent past its roads starves, as ruled (Ben,
+grant (`../ai/AI_OPPONENT.md` § 11). **An army sent past its roads starves, as ruled (Ben,
 2026-10-29)**: a front never bends its slots to supply reach; keeping a front fed is the commander's
 job.
 
