@@ -915,51 +915,56 @@ economy = {
             out_of_supply_reach      = 24.0, -- reach cost past which a unit is out of supply; <= 0 disables
         },
 
-        -- BL-470: march points spent per tick against per-tile traversal cost
-        -- (the SAME cost body_reach_field/the road network already compute —
-        -- see logistics.hpp's tile_traversal_cost, plains=1.0, mountain=2.0,
-        -- discounted by road_level). PER-CLASS from the start (Ben's own
-        -- overturn of the item's one-speed first cut, same elicitation
-        -- session, 2026-08-19): a wing outpaces a line. First-cut authored
-        -- constants — a Levy Spear on Plains (cost 1.0/tile) covers 1 tile/
-        -- tick unescorted; a Rifle Regiment covers 1.5. Naval is 0 —
-        -- strategic-only presence (combat.hpp), no naval movement model yet.
-        march_points_per_class = {
-            infantry = 1.0,
+        -- BL-1445 (Ben, 2026-10-28; MILITARY.md § Marching): UNITS MARCH BY THE
+        -- DAY, at their class's speed. The DAYS a unit takes to cross one plains
+        -- tile (traversal cost 1.0), by LAND CLASS (unit_roster.hpp land_class).
+        -- Terrain multiplies the days by the hop's traversal cost (mountain 2.0)
+        -- and a road divides them by the road ladder's discount (track x0.67,
+        -- road x0.50, highway x0.40 - logistics.cpp road_traversal_multiplier):
+        -- the one hop price, edge_traversal_cost. Trucks and tracks are what make
+        -- a force fast. The class's speed holds until kit changes it (BL-1436).
+        -- Every entry must be a positive, finite number (the loader rejects
+        -- anything else, and any key that names no class).
+        march_days_per_tile = {
+            infantry     = 3.0,  -- foot infantry
+            motorised    = 1.0,
+            mechanised   = 1.0,
+            light_armour = 1.0,
+            armour       = 1.5,  -- medium armour, the main battle tank line
+            artillery    = 2.0,  -- towed artillery
+            air_defence  = 1.5,
+        },
+        -- The same for a PRE-MODERN row (an Era -1 row declaring no land class),
+        -- keyed by its cls: foot 3 like modern foot, horse twice as fast, ranged
+        -- on foot, siege trains at foot pace. Naval has no entry: it cannot march
+        -- on this land table (a sea unit moves under § The campaign force model).
+        march_days_per_tile_by_cls = {
+            infantry = 3.0,
             cavalry  = 1.5,
-            ranged   = 1.0,
-            siege    = 0.5,
-            naval    = 0.0,
+            ranged   = 3.0,
+            siege    = 3.0,
         },
 
-        -- BL-596 / BL-1352: a march's Logistic Points. The CAPACITY rate that
-        -- used to be authored here, `active_lp_per_anchor_tick = 20.0`, is
-        -- RETIRED with the per-anchor pool it filled: a march now draws the
-        -- HOST NATION's pool — made by hubs, stations and ports, consumed by
-        -- production, and claimed by the march FIRST (LOGISTICS.md § How a
-        -- tile's points get to it). There is no second rate to author.
+        -- BL-596 / BL-1352 / BL-1445: a UNIT'S SUPPLY draws Logistic Points, never its
+        -- march (Ben, 2026-10-28: movement takes no Logistic Points; a march is paid in
+        -- days). Once a quarter each unit requests the QUANTITY of its supplies - its
+        -- upkeep goods (unit_upkeep.goods_per_head x heads, above) plus what an HP refill
+        -- draws (none yet: no refill mechanism) - at the tile it stands on, routed from
+        -- its own nation's sources like a building's request and served ahead of
+        -- production (NR-917). There is no second rate to author: one point admits one
+        -- unit of goods, as a shipment's cargo does (LOGISTICS.md settled rule 3).
         --
-        -- The exchange rate is unchanged and still a first cut: one point admits
-        -- one march-point's worth of movement (an infantry tick 1.0, a cavalry
-        -- tick 1.5), against a production need of 10 per unit of run. Nothing
-        -- measured says a soldier-tick and a unit of grain burden a nation
-        -- equally; flagged for calibration once the 2040 run is in.
-
         -- PRICE. active_lp_credit_per_unit_distance is argued against
         -- logistics.base_cost_per_unit_distance.land (0.02, below) rather
-        -- than guessed — same "credits per unit-distance" shape the convoy
-        -- layer already prices with. Doubled to 0.04: moving armed units
-        -- costs more than routine cargo the way the convoy table itself
-        -- already prices mode by burden (land 0.02 < air 0.15 < space 1.00;
-        -- sea, 0.002 since BL-1194, is not a marching mode) — a marching
-        -- column's escort/coordination overhead sits above a cargo haul's, so
-        -- a flat 2x on the land rate is the conservative first step up that
-        -- ladder rather than a reach for the next rung. Charged per (active-LP-unit drawn x head
-        -- in the unit), so a company of 200 drawing 1.0 LP this tick pays
-        -- 200 x 1.0 x 0.04 = 8.0 credits — well under hire_base_cost (40,
-        -- above), so marching an already-raised unit stays far cheaper than
-        -- raising a fresh one, the same relationship BL-603's upkeep
-        -- derivation keeps for standing-force wages.
+        -- than guessed - same "credits per unit-distance" shape the convoy
+        -- layer already prices with, doubled to 0.04 for an army's escort and
+        -- coordination overhead. BL-1445: it prices the ACTIVE draw, which is the
+        -- supply draw now ("an army in the field is priced in credits by active
+        -- LP", LOGISTICS.md): credits = this x the points a unit's supply request was
+        -- granted, charged to its nation each quarter. A 50-head infantry unit asks
+        -- 50 x (0.00625 + 0.000875) = 0.356 points a quarter, so 0.014 credits - the
+        -- march's old per-tile charge (8.0 credits for 200 heads a plains tile) is gone
+        -- with the march's draw.
         active_lp_credit_per_unit_distance = 0.04,
 
         -- BL-1449 (MILITARY.md § Air, Ben 2026-10-28): the air theatre. A FIRST CUT,

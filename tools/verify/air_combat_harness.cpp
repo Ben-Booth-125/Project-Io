@@ -276,11 +276,14 @@ float shelf_of(const fixture& f, entity_id m, resource_type r)
 recipe_registry make_registry()
 {
     recipe_registry reg;
+    // Movement is by the day (BL-1445): the registry's march days default to zero
+    // (cannot march), so the fixture authors foot pace for every row it raises.
     military_capability_params mp = reg.military();
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = 6.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::cavalry)]  = 6.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::ranged)]   = 6.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::siege)]    = 6.0f;
+    mp.march_days_per_land_class.fill(3.0f);
+    mp.march_days_per_cls[static_cast<std::size_t>(unit_class::infantry)] = 3.0f;
+    mp.march_days_per_cls[static_cast<std::size_t>(unit_class::cavalry)]  = 3.0f;
+    mp.march_days_per_cls[static_cast<std::size_t>(unit_class::ranged)]   = 3.0f;
+    mp.march_days_per_cls[static_cast<std::size_t>(unit_class::siege)]    = 3.0f;
     reg.set_military(mp);
     building_economics ex = reg.economics(building_type::extraction_site);
     ex.base_rate = 4.0f;
@@ -444,7 +447,9 @@ int main()
             cmd.tick = 1; cmd.corp = g.b; cmd.verb = corp_verb::march_unit; cmd.subject = u;
             cmd.tile = tile(g, 40, 2);
             const auto r = apply_corp_command(g.w, reg, cmd);
-            run_unit_march(g.w, reg, nullptr);
+            // Movement is by the day (BL-1445): 18 days of marching, a call a day.
+            for (int day = 0; day < 18; ++day)
+                run_unit_march(g.w, reg, day);
             return std::make_pair(r, g.w.tiles.at(g.w.units.at(u).position).grid_x);
         };
         fixture ctl;

@@ -116,8 +116,8 @@ verify.econ_step(4)
 verify.frames(2)
 local k = verify.throughput_key()
 print(string.format("[logistics_lens] key: generated %.1f by %d source(s); consumed %.1f "
-      .. "(production %.1f of %.1f asked, %.1f needed; marches %.1f, shipments %.1f)",
-      k.generated, k.sources, k.consumed, k.production, k.asked, k.needed, k.marches, k.shipments))
+      .. "(production %.1f of %.1f asked, %.1f needed; unit supply %.1f, shipments %.1f)",
+      k.generated, k.sources, k.consumed, k.production, k.asked, k.needed, k.supply, k.shipments))
 verify.expect(k.known, "T5: the key has the player's nation to show")
 verify.expect(k.generated > 0, "T5: the player nation generates Logistic Points ("
               .. tostring(k.generated) .. ")")

@@ -106,11 +106,11 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 | `terrain_attack_scale` | 1000 | How far `terrain_defence` divides the attacker's hits — a mountain halves them |
 | `wavering_readiness` | 300 | Side readiness at or below which the phase reads wavering |
 | `morale_win` / `morale_loss` | 50 / 100 | Morale a battle's winners gain, and its losers and every retreating unit lose |
-| `readiness_recovery_permille` / `morale_recovery_permille` | 100 / 10 | Out of contact, per tick: readiness regained (by supply, never above morale), and morale's step toward supply |
+| `readiness_recovery_permille` / `morale_recovery_permille` | 100 / 10 | Out of contact, per day (§ Marching, Ben 2026-10-28): readiness regained (by supply, never above morale), and morale's step toward supply |
 | `withdraw_base_permille` | 20 | Flat price of turning your back at all |
 | `withdraw_per_round_permille` | 25 | Added per round already fought |
 | `withdraw_pursuit_scale` | 400 | Share of how far behind the withdrawing side is |
-| `rounds_per_tick` | 3 | Rounds fought per economy tick (Ben's ruling 3, 2026-08-19) |
+| `rounds_per_day` | 1 | Rounds fought per day (§ Battles ruling 3, Ben 2026-10-28) |
 
 **The strength reading is side readiness**: a side's men-weighted mean readiness, read against the
 units still in the fight. The withdrawal price is charged **in men**, per-mille of the side's
@@ -118,12 +118,16 @@ standing men.
 
 **The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio): attacking is
 dear, and breaking a defender takes about 2:1 in men — decisive 0% at 1:1, 15% at 1.5:1, 64% at
-1.75:1, 89% at 2:1, 99% from 2.5:1, a fight lasting about two ticks. `swing_permille` stays at 600
-(NR-204: a narrower swing made the edge too safe).
+1.75:1, 89% at 2:1, 99% from 2.5:1. `swing_permille` stays at 600 (NR-204: a narrower swing made the
+edge too safe).
 
-`rounds_per_tick` at 3 against `max_rounds` 6 means a full battle spans two ticks and the player
-gets exactly one real between-tick decision. Raise it and the fight resolves before anyone can
-react; lower it and a campaign tick becomes a tactical game, which Ben's "a short time" ruled out.
+**A battle lasts days.** At one round a day against `max_rounds` 6, a fight is over in at most six
+days. Measured through the daily pass (`move_by_days_harness` D6, infantry on plains, 40 openings a
+ratio, days from contact to close): **about five days at parity** (4.9), 5.6 at 1.5:1, 3.7 at 2:1 and
+2.1 at 3:1 — the curve's mean rounds, a round a day. The round's damage is calibrated to the day:
+one round is one day's fighting, so the per-round numbers above are a day's. A commander
+gets a decision every day of the fight — a withdrawal is honoured at the next day's boundary —
+rather than one between two quarters.
 
 **Withdrawal is a first-class verb, not a failure state**, and it is never free. The cost has three
 terms — base, per-round, and pursuit — and the second and third are what make a late break-off
@@ -812,9 +816,9 @@ The **class carries the role and `power_mod` the generation**. A modern row sits
 industrial rows (380–420), and the spread is kept narrow so the class, not the modifier, decides the
 fight: `unit_land_stats` scales the class stats by 1000 + `power_mod`. Ore gates steel-heavy kit and
 energy gates fuelled vehicles; infantry is ungated, the floor a modern state can always raise. Each
-modern row also names the nearest Era −1 `cls` for what still keys on it — the march points per
-class and the stack adapter: foot and trucks march as infantry, armour as cavalry, guns as siege,
-air defence as ranged.
+modern row also names the nearest Era −1 `cls` for what still keys on it — the stack adapter. A
+march does **not** key on it: speed keys on the land class (§ Marching), and only a pre-modern row,
+which declares no land class, marches by its `cls`.
 
 **Seeded forces open on modern infantry.** A nation's garrisons and its opening unit take
 `campaign_opening_unit_row()`, the modern row of land class infantry, looked up by class and band
@@ -890,7 +894,7 @@ hold is never taken as a move:
   stops on the tile it stands on and a battle opens on the defender's tile (§ Battles). This holds
   wherever the path meets that unit — "stops and attacks it" — not only at the march's end. The
   march's order is spent only by the battle it opens: if no battle opens with the unit — the stack
-  walked off in the same tick, or the unit was drawn into another battle first — it keeps its order
+  walked off the same day, or the unit was drawn into another battle first — it keeps its order
   and carries on. A spent unit (readiness 0) starts no fight, so a march that would be an attack by
   one is refused when it is given.
 - **Toward any other nation, the step is blocked.** The march re-paths around the tile; if no path
@@ -939,6 +943,18 @@ stands).
 march and the battle, and **a unit a battle kills is removed that same day** — it does not stand on
 its tile, blocking a step, until the quarter ends.
 
+The days are authored data: `economy.military.march_days_per_tile`, keyed by land class, and
+`economy.military.march_days_per_tile_by_cls` for a **pre-modern row**, which declares no land
+class and marches by its `cls` — infantry 3, cavalry 1.5, ranged 3, siege 3 (foot pace for a siege
+train); naval has no entry, so a naval row cannot march on this table. The loader rejects any entry
+that is not a positive, finite number, and any key that names no class. A day's movement is
+1 / the class's days, banked in `order.progress` in units of traversal cost — the unit the field
+always had, so a saved part-tile reads as the same part-tile — and the unit steps whenever the bank
+covers the next hop's price (`edge_traversal_cost`). A road divides by the road ladder's own
+discount, `road_traversal_multiplier` (track ×0.67, road ×0.50, highway ×0.40): foot infantry takes
+1.5 days a tile on a road, 6 on a mountain, 3 on a mountain road. Measured in
+`move_by_days_harness` D1–D3.
+
 **Traversal cost over water is uniform.** `logistics::tile_traversal_cost` prices land by
 landform, and water has no landform to price — so a sea leg costs the same per tile wherever it
 runs, and distance alone sets its length. The thing that varies over water is *legality*, not
@@ -967,10 +983,17 @@ export. The rival scorer can legally issue `march_unit`; scoring march *quality*
 
 `src/world/battle_system.{hpp,cpp}` (BL-467, battle state in world) is both halves of making
 force meet stance: it discovers that a fight should happen, and it owns the fight between ticks.
-`run_battles` is called from `run_economy_step` immediately **before** `run_unit_march` — so a
-unit in contact fights this tick before it can march out next tick — and before
-`run_unit_upkeep`, whose orphan cleanup is what disbands a unit the battle reduced to zero. There
-is deliberately no second disband mechanism.
+Both run **every day**, in the daily military pass (`run_military_day`, economy_system.hpp): the
+fronts issue their orders, then `run_battles` steps every live battle a day's rounds, then
+`run_unit_march` walks the day's marches and opens the battles their contacts make. A unit in contact
+fights today before it can march out. The pass runs from the app's day loop between economy ticks,
+and every driver that steps whole quarters walks the same days in the economy step's own catch-up
+(`advance_quarter_to`, one cursor with construction's days). After the battles the same pass runs
+the one orphan cleanup (`disband_orphaned_units`), so a unit a battle reduced to zero is removed that
+day, and after the march it runs out-of-contact recovery. What stays in the quarterly step is
+economic: musters, refits, each unit's supply request on the Logistic Point resolve (§ Upkeep), and
+`run_unit_upkeep`, which runs the same orphan cleanup for a base torn down that quarter. There is
+deliberately no second disband mechanism.
 
 **Three rulings** (Ben, 2026-08-19):
 
@@ -1032,7 +1055,7 @@ then re-read over the units still in it.
 
 **Withdrawal** is `request_withdraw(w, actor, tile, against)`, the battle named by its defended
 tile. `against` names the fight, because a nation can be in more than one battle over one tile;
-`null_entity` means "the first, in sorted order". The request is **honoured at the tick boundary**, before the next round batch — that delay
+`null_entity` means "the first, in sorted order". The request is **honoured at the day boundary**, before the next day's rounds — that delay
 *is* the withdrawal window. Strength is captured before the withdrawal is applied, so the parting
 cost reaches the men and not only a number. A request naming no live battle, or from a
 non-participant, returns false and mutates nothing — the seam rule for an AI-facing boundary.
@@ -1054,9 +1077,9 @@ still unowned work. Battle state survives a save under BL-536 (world snapshot sa
 ### Dispatches and the card
 
 A battle **reports**. `battle_tick::dispatches` carries one pure-data `battle_dispatch` per battle
-that acted this tick — the defended tile and its province, sides, phase, rounds fought / this tick / max, both strengths and
+that acted this day — the defended tile and its province, sides, phase, rounds fought / today / max, both strengths and
 swings, men lost, and for an ending the `withdrew`, `end` and `field_held_by` fields. It includes
-battles that **concluded** this tick and are already erased from `world::battles`; that is the only
+battles that **concluded** that day and are already erased from `world::battles`; that is the only
 way the aftermath — who held the field, what it cost — can reach a surface at all.
 
 **`battle_phase`** is derived **once, in the world layer** (`read_battle_phase`), because two
@@ -1311,15 +1334,17 @@ duplicate. B4: province and role order each change the stream. B5: no count goes
 conservation is exact, per tick and end to end. B6: five ticks twice gives identical strengths and
 an identical `state_hash`. B7: the battle anchors on the defender's best tile, ties on ascending
 tile id. B8: a bogus or non-participant withdraw mutates nothing; a participant's request is
-honoured on the following tick. B9: a unit in contact reads as in-battle and `march_unit` refuses
+honoured on the following day. B9: a unit in contact reads as in-battle and `march_unit` refuses
 it. B10–B11: a battle that fought emits a dispatch naming the fight, rounds/max and the stream
 seed; a concluded dispatch names who held the field after the record is gone. B12: the three
 withdrawal terms sum to the total and **the quote matches the charge**. B13: twin worlds emit
 byte-identical dispatch sequences and stay identical. B14: every phase produces a line. B18: a spent
 unit retreats one marchable tile and leaves the fight, losing morale. B19: the winner gains morale,
 the loser loses it. B20: out of contact readiness climbs toward morale, never above it, and morale
-moves toward supply either way. B21: a world of fully supplied units at full readiness and morale
-hashes as it did; an unsupplied one moves.
+moves toward supply either way, a day's recovery at a time. B21: a world of fully supplied units
+at full readiness and morale hashes as it did; an unsupplied one moves. B22: a unit in two battles
+retreats once and pays the morale loss once; the battle pass itself recovers nothing, a day's recovery
+one step.
 
 **`unit_upkeep.cpp`** — the upkeep pass and derived strength. U1: the credit charge is exactly N ×
 the type's rate and nothing else in the budget moves; the goods debit is exactly N × each authored
@@ -1335,13 +1360,26 @@ assertions are invariants — the authored rates are zero, a zero rate costs not
 linear in heads, and decay is bounded.
 
 **`unit_march_harness.cpp`** — the march seam and pass. M1: `march_unit` sets a reachable path and
-rejects not-owner/invalid/ocean-dest/off-body/already-there without mutating the world. M2:
-`run_unit_march` spends per-class march points against the shared traversal-cost weight, carries
-fractional progress across ticks, and clears the order on arrival. M3: `halt_unit` clears the order
+rejects not-owner/invalid/ocean-dest/off-body/already-there without mutating the world. M2: a day of
+`run_unit_march` spends the class's daily movement against the shared traversal-cost weight, carries
+fractional progress from day to day, and clears the order on arrival. M3: `halt_unit` clears the order
 and rejects a unit with none; `disband_unit` erases the unit and rejects a non-owned/unknown one.
-M4: NR-344 — a mobilised nation's units are visited before a peaceful nation's within one tick's pass.
+M4: NR-344 — a mobilised nation's units are visited before a peaceful nation's within one day's pass.
 M5: state-hash replay determinism with marching units in flight. M6: a corrupted path (the
 recompute guard's trigger) recomputes identically across two independent runs.
+
+**`move_by_days_harness.cpp`** — the day grain, against the authored tables. D1: each land class's
+days per plains tile measured over twelve tiles (3 / 1 / 1 / 1 / 1.5 / 2 / 1.5), and the pre-modern
+rows by `cls`. D2: a mountain doubles the days, a road halves them. D3: progress banks from day to
+day. D4: movement takes no Logistic Points — a march on a zero pool arrives on time and pays
+nothing, and an order given mid-quarter moves at once, on the day loop's path too. D5: contact opens the battle on
+the day of contact. D6: battle length in days by force ratio. D7: twice-equal. D8: a save mid-march
+round-trips and marches on identically. D9: a quarter walked day by day and one caught up by the
+economy step hash alike. D10: the loader rejects a non-positive, non-finite or unknown entry. D11:
+supply is drawn where the unit stands — the request is the supplies' quantity, a unit on its hub's
+tile is granted it whole and keeps full supply, one past the network is granted nothing and decays a
+step a quarter by the one rule. D12: a unit a battle kills is gone that day, and no battle names it.
+D13: readiness and morale recover a step a day out of contact, and not in it.
 
 **`rival_military_seeding_harness.cpp`** — `seed_starting_military`. R1: every seeded owner
 ends generation owning exactly one `military_base` and one unit (the modern infantry row, 50

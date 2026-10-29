@@ -95,10 +95,20 @@ recipe_registry make_registry()
     recipe_registry reg;
     military_capability_params mp = reg.military();
     // scripts/economy.lua's per-class march points (MILITARY.md § Marching).
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = 1.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::cavalry)]  = 1.5f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::ranged)]   = 1.0f;
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::siege)]    = 0.5f;
+    // BL-1445 (move by days): a class is authored as DAYS PER PLAINS TILE and the march
+    // steps once a DAY. This fixture keeps the per-call speeds its rows were written
+    // against (infantry 1.0 of traversal cost a call, cavalry 1.5, ranged 1.0, siege
+    // 0.5), so one run_unit_march call - one day - moves a unit as one call always did:
+    // days = 1 / those points, and a modern row by the cls it names. These rows are
+    // about contact, battles and fronts, not speed; the authored speeds are measured in
+    // move_by_days_harness.
+    const float per_call[unit_class_count] = { 1.0f, 1.5f, 1.0f, 0.5f, 0.0f }; // inf, cav, ranged, siege, naval
+    for (int k = 0; k < unit_class_count; ++k)
+        mp.march_days_per_cls[static_cast<std::size_t>(k)] = per_call[k] > 0.0f ? 1.0f / per_call[k] : 0.0f;
+    for (int c = 0; c < land_class_count; ++c)
+        if (const int row = modern_row_for(static_cast<land_class>(c)); row >= 0)
+            mp.march_days_per_land_class[static_cast<std::size_t>(c)] =
+                mp.march_days_per_cls[static_cast<std::size_t>(unit_roster_table()[static_cast<std::size_t>(row)].cls)];
     reg.set_military(mp);
     return reg;
 }
@@ -293,7 +303,7 @@ void step(world& w, const recipe_registry& reg, int n = 1)
     for (int i = 0; i < n; ++i)
     {
         advance_fronts(w, reg);
-        (void)run_unit_march(w, reg, nullptr);
+        (void)run_unit_march(w, reg);
         reanchor_fronts(w);
     }
 }

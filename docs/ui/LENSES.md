@@ -1043,7 +1043,7 @@ none"), nor is one on ground no nation holds, nor one on a neighbour's.
 requested"),
 the source ring drawn exactly as the map draws it beside the largest source's rate, and the
 nation's arithmetic, absolute: what its connected sources **generated** this tick and how
-many; what its buildings **consumed** — production's grants, the marches' grants and what
+many; what its buildings **consumed** — production's grants, the units' supply grants and what
 shipments drew — with what is left **unused**; and what production **needs** at its run,
 whatever reaches it. A nation with no connected source still shows its ramp and its
 arithmetic, with *No connected source here*, so "generated 0 against a need" reads as the

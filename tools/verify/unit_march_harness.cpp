@@ -148,7 +148,7 @@ entity_id add_unit(world& w, entity_id corp, entity_id tile, uint16_t type = ROW
     return u;
 }
 
-/// A registry with `march_points_per_class[infantry]` authored to @p pts;
+/// A registry whose Era -1 infantry moves @p pts of traversal cost a day;
 /// every other class stays at the struct default (0.0 — cannot march).
 ///
 /// BL-596: also authors a deliberately generous active_lp_per_anchor_tick so
@@ -159,9 +159,16 @@ entity_id add_unit(world& w, entity_id corp, entity_id tile, uint16_t type = ROW
 /// refusal path, are actually exercised.
 recipe_registry registry_with_march(float pts)
 {
+    // BL-1445 (move by days): a march is stepped once a DAY, and a class is authored
+    // as DAYS PER PLAINS TILE. This file's rows are about march resolution (carry-over,
+    // arrival, visit order, recompute), not speed, so a fixture authored at @p pts
+    // "points a call" is the class that crosses a plains tile in 1/pts days: each
+    // run_unit_march call (one day) then banks exactly pts of traversal cost, the
+    // arithmetic every row below was written against. Row 0 is an Era -1 infantry row,
+    // so it reads the by-cls table. The authored speeds are move_by_days_harness's.
     recipe_registry reg;
     military_capability_params mp = reg.military();
-    mp.march_points_per_class[static_cast<std::size_t>(unit_class::infantry)] = pts;
+    mp.march_days_per_cls[static_cast<std::size_t>(unit_class::infantry)] = pts > 0.0f ? 1.0f / pts : 0.0f;
     mp.active_lp_credit_per_unit_distance = 0.0f; // isolate march mechanics from credit pricing here
     reg.set_military(mp);
     return reg;

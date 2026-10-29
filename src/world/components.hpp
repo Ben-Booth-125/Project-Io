@@ -1821,8 +1821,14 @@ struct population_centre_component
 /// per tick. `next_index` is the index into `path` of the next tile the unit
 /// has not yet reached (`path[0]` is the tile the unit stood on when the
 /// order was placed, so a fresh order starts at `next_index == 1`).
-/// `progress` banks fractional march points toward the next hop's cost
-/// across tick boundaries — see run_unit_march (economy_system.cpp).
+/// `progress` banks fractional movement toward the next hop's cost, in units of
+/// TRAVERSAL COST (a plains tile is 1.0), from DAY to day: each day a unit gains
+/// 1 / its class's days-per-plains-tile (BL-1445, move by days; MILITARY.md
+/// § Marching) and steps when the bank covers the hop. The field's unit is the
+/// one it always had - a march point is one unit of traversal cost - so an old
+/// save's banked fraction reads as the same partial tile; only the rate it
+/// fills at moved, from once a quarter to once a day. See run_unit_march
+/// (economy_system.cpp).
 ///
 /// EVERY MARCH GOES TO A TILE AND ENDS ON IT (Ben, 2026-10-27: "all marches go
 /// to a tile"). `dest` is the commanded tile; the march ends when the path is

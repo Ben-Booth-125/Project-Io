@@ -5,8 +5,11 @@
 
 #include <sol/sol.hpp>
 
+#include <algorithm> // std::find_if -- the march-days key check (BL-1445)
 #include <cmath>     // std::isfinite -- the nation_ai loader's own rejection (Sprint N3 T1)
 #include <limits>
+#include <utility>
+#include <vector>
 #include <stdexcept>
 #include <string>
 
@@ -690,25 +693,54 @@ void recipe_registry::load_from_lua(lua_state& lua)
             mp.upkeep = up;
         }
 
-        // BL-470: per-class march points (economy.military.march_points_per_class).
-        // Absent table = every class at 0 = no unit can march — the seam still
-        // accepts march_unit and computes/stores the path, it just never
-        // consumes it, mirroring how BL-454's upkeep landed inert at zero.
-        sol::optional<sol::table> march = (*military)["march_points_per_class"];
-        if (march)
-        {
-            auto& mpc = mp.march_points_per_class;
-            mpc[static_cast<std::size_t>(unit_class::infantry)] =
-                march->get_or("infantry", mpc[static_cast<std::size_t>(unit_class::infantry)]);
-            mpc[static_cast<std::size_t>(unit_class::cavalry)] =
-                march->get_or("cavalry", mpc[static_cast<std::size_t>(unit_class::cavalry)]);
-            mpc[static_cast<std::size_t>(unit_class::ranged)] =
-                march->get_or("ranged", mpc[static_cast<std::size_t>(unit_class::ranged)]);
-            mpc[static_cast<std::size_t>(unit_class::siege)] =
-                march->get_or("siege", mpc[static_cast<std::size_t>(unit_class::siege)]);
-            mpc[static_cast<std::size_t>(unit_class::naval)] =
-                march->get_or("naval", mpc[static_cast<std::size_t>(unit_class::naval)]);
-        }
+        // BL-1445 (move by days; MILITARY.md § Marching): DAYS PER PLAINS TILE, by land
+        // class (`march_days_per_tile`) and, for pre-modern rows, by cls
+        // (`march_days_per_tile_by_cls`). Absent table = every class at 0 = no unit can
+        // march — the seam still accepts march_unit and stores the path. A PRESENT entry
+        // must be a positive, finite number of days, and every key must name a class:
+        // a zero, a negative, an infinity, a NaN, a non-number or a typo'd key throws,
+        // naming it, rather than being read as "cannot march" (the untrusted-input rule:
+        // an authored nonsense speed is never silently reinterpreted). Checked as a
+        // double before the narrowing cast, so a value finite in Lua but not as a float
+        // is caught too.
+        const auto read_days = [](const sol::table& tbl, const std::string& context,
+                                  const std::vector<std::pair<const char*, std::size_t>>& keys,
+                                  float* dst) {
+            for (const auto& kv : tbl)
+            {
+                if (kv.first.get_type() != sol::type::string)
+                    throw std::runtime_error(context + " has a non-string key");
+                const std::string key = kv.first.as<std::string>();
+                const auto it = std::find_if(keys.begin(), keys.end(),
+                                             [&](const auto& k) { return key == k.first; });
+                if (it == keys.end())
+                    throw std::runtime_error("Unknown class '" + key + "' in " + context);
+                if (kv.second.get_type() != sol::type::number)
+                    throw std::runtime_error(context + "." + key + " must be a number of days");
+                const double v = kv.second.as<double>();
+                if (!std::isfinite(v) || v <= 0.0 || v > 1.0e6)
+                    throw std::runtime_error(context + "." + key + " = " + std::to_string(v)
+                                             + " is not a positive, finite number of days");
+                dst[it->second] = static_cast<float>(v);
+            }
+        };
+        if (sol::optional<sol::table> days = (*military)["march_days_per_tile"])
+            read_days(*days, "military.march_days_per_tile",
+                      { { "infantry",      static_cast<std::size_t>(land_class::infantry) },
+                        { "motorised",     static_cast<std::size_t>(land_class::motorised) },
+                        { "mechanised",    static_cast<std::size_t>(land_class::mechanised) },
+                        { "light_armour",  static_cast<std::size_t>(land_class::light_armour) },
+                        { "armour",        static_cast<std::size_t>(land_class::armour) },
+                        { "artillery",     static_cast<std::size_t>(land_class::artillery) },
+                        { "air_defence",   static_cast<std::size_t>(land_class::air_defence) } },
+                      mp.march_days_per_land_class.data());
+        if (sol::optional<sol::table> days = (*military)["march_days_per_tile_by_cls"])
+            read_days(*days, "military.march_days_per_tile_by_cls",
+                      { { "infantry", static_cast<std::size_t>(unit_class::infantry) },
+                        { "cavalry",  static_cast<std::size_t>(unit_class::cavalry) },
+                        { "ranged",   static_cast<std::size_t>(unit_class::ranged) },
+                        { "siege",    static_cast<std::size_t>(unit_class::siege) } },
+                      mp.march_days_per_cls.data());
 
         // BL-596 / BL-1352: the PRICE of an active march. The per-anchor CAPACITY
         // rate that stood beside it is retired with the per-anchor pool itself

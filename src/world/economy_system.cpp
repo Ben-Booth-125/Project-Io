@@ -1852,15 +1852,23 @@ int advance_construction_to(world& w, const recipe_registry& reg, int day_in_qua
 
 namespace {
 
-/// Close the quarter (Ben, 2026-10-24): catch construction up to its 90th day —
-/// a path with no day loop advances the whole quarter here — then turn each
+/// Close the quarter (Ben, 2026-10-24): catch the quarter's days up to its 90th —
+/// construction and, since BL-1445, the military; a path with no day loop advances
+/// the whole quarter here — then turn each
 /// completion day into the output share THIS tick reads, and reset the cursor
 /// for the quarter ahead. Every building whose share is not pending reads 1000.
 /// Order-free: each building is written against itself only.
-void close_construction_quarter(world& w, const recipe_registry& reg)
+void close_construction_quarter(world& w, const recipe_registry& reg,
+                                std::vector<battle_dispatch>* dispatches)
 {
     const int q = k_construction_quarter_days;
-    advance_construction_to(w, reg, q);
+    // BL-1445: the quarter's days are construction's AND the military's, walked one
+    // day at a time (`advance_quarter_to`), so a headless driver that steps quarters
+    // walks the very sequence the app's day loop does. Day d is stamped (for the
+    // battle streams it opens) `military_quarter_day_base(T) + d`, T the counter THIS
+    // step runs under - the one base the app's day loop stamps with too (it hands in
+    // the counter its next step will run under), so the two paths seed alike.
+    advance_quarter_to(w, reg, q, military_quarter_day_base(w.current_econ_tick), dispatches);
     for (auto& [bid, b] : w.buildings)
     {
         if (b.completion_day > 0)
@@ -2100,7 +2108,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // are advanced now, sites completing on their own days, and each completion
     // becomes the output share this tick reads. Before the funding plan, so a
     // state site that completed last quarter is funded as a running building.
-    close_construction_quarter(w, reg);
+    close_construction_quarter(w, reg, &report.battle_dispatches);
     plan_state_funding(w, reg);
 
     run_construction(w, reg, report);
@@ -2754,14 +2762,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // ── BL-1309: this tick's Logistic Points — each nation's pool from its
     // sources, each producing building's claim and grant (logistic_points.hpp).
     //
-    // BL-1352: THE MARCH CLAIMS FIRST, so its claims are gathered here, before the
-    // resolve, and the march pass further down (phase 11) spends the answer. The
-    // claims are read at THIS point in the tick, which means a unit killed in the
-    // battle phase between here and there has already consumed its nation's points
-    // for the tick: the logistics were committed to a march that no longer happens.
-    // That is the cheap reading and it is deliberate — the alternative is resolving
-    // the pool twice a tick — and it is logged for Ben (NR, 2026-10-18).
-    report.logistic_points = resolve_logistic_points(w, collect_march_claims(w, reg));
+    // BL-1445 (Ben, 2026-10-28; LOGISTICS.md § A unit's supply draws on the pool, and
+    // claims first): MOVEMENT TAKES NO LOGISTIC POINTS - a march is paid in days. What
+    // draws is each unit's SUPPLY, once a quarter, AT THE TILE IT STANDS ON: its
+    // requests are gathered here, before the resolve, so they claim ahead of every
+    // producer (NR-917 kept), and the share each was granted is what the one decay
+    // rule reads (`run_nation_garrison_upkeep`, through `lp_tick::supply_share`). The
+    // draw is priced in credits as it is granted (`charge_supply_draws`).
+    report.logistic_points = resolve_logistic_points(w, collect_supply_claims(w, reg));
+    charge_supply_draws(w, reg, report.logistic_points);
     lp_ready = true;
 
     // ── Pass 5 pre-pass, BL-1209 (MARKETS.md § Price resolution, "A short shelf
@@ -3443,60 +3452,32 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     }
     phase_stamp(9); // corp_strategic (BL-202)
 
-    // BL-470: the march pass. Runs where BL-467's battle-discovery phase will
-    // sit once it exists — "a unit that marched into a hostile province this
-    // tick fights before it can march out next tick" (the item's own design).
-    // BL-467 landed the battle-discovery phase this comment used to say was
-    // absent; `run_battles` is the call, immediately below.
-    // Runs BEFORE run_unit_upkeep so a unit that arrives at a new tile THIS
-    // tick is already upkept/reach-checked from its new position, not its
-    // stale one.
+    // BL-1445 (move by days; MILITARY.md § Marching, § Battles ruling 3): THE MARCH,
+    // THE FRONTS' ORDERS, THE BATTLES, OUT-OF-CONTACT RECOVERY AND THE REMOVAL OF A
+    // UNIT A BATTLE KILLED ARE DAILY NOW. They run in the daily military pass
+    // (`run_military_day`), from the app's day loop between ticks and, for every
+    // driver that steps quarters, from this step's own catch-up at its top
+    // (`close_construction_quarter` -> `advance_quarter_to`), which walks the quarter
+    // just closed day by day. What stays HERE is what is economic, once a quarter:
     //
-    // NR-344 ("war flips the queue", resolved 2026-08-19 alongside this
-    // item): peacetime already visits convoys before anything in this
-    // function, because advance_convoys runs in the sim loop BEFORE
-    // run_economy_step is even called (main.cpp/app.cpp) — the pre-existing,
-    // previously-accidental default this rule now states on purpose. What
-    // THIS pass adds is the war-time flip: a corp party to any declared
-    // hostility (either direction) has its OWN units visited first within
-    // the march pass. See run_unit_march's doc comment for why this is
-    // currently a written rule with no observable effect (no shared
-    // logistics-point pool exists yet to contend over).
+    //   - musters and refits advance a quarter's days and complete into units (below),
+    //     BEFORE the end-of-tick re-anchor, so a unit finishing either is free to be
+    //     sent by a front from tomorrow;
+    //   - the units' supply requests on the Logistic Point resolve (above);
+    //   - the unit upkeep pass and its orphan cleanup (below) - the same cleanup the
+    //     daily pass runs (`disband_orphaned_units`), here for a base torn down this tick.
     //
-    // BL-467 (2026-08-21): the battle-discovery phase the comment above says does
-    // not exist NOW EXISTS, and it runs immediately before this line — which is
-    // what makes the sentence "a unit in contact this tick fights before it can
-    // march out next tick" true rather than aspirational.
-    // BL-1435: musters advance a quarter's days each tick and complete into units at
-    // their base, BEFORE the battle pass, so a unit that finishes mustering this tick
-    // can be drawn into a fight that opens on its province.
+    // NR-344 ("war flips the queue") lives in the daily march's visit order.
     advance_musters(w);
-    advance_refits(w); // Ben, 2026-10-27: a refit completes before the battle pass too
-    // BL-1427 (fronts; MILITARY.md § Fronts): after the musters and refits (a unit
-    // that finishes either this tick is free to be sent) and BEFORE the battle pass,
-    // so a front's orders are issued against this tick's contacts: a unit already in
-    // a battle is left alone, and the orders issued here are walked by the march
-    // pass below, after the battles - the same "fight before you march out" rule
-    // every other order obeys.
-    advance_fronts(w, reg);
+    advance_refits(w); // Ben, 2026-10-27: a refit completes on the tick, as a muster does
 
-    // BL-1449 (MILITARY.md § Air): the air missions, flown DAILY — the quarter's 90
-    // days here, beside the battles, until the daily step (BL-1445, move by days)
-    // takes the call with days = 1. Before the battle pass, so a unit bombed today
-    // fights weakened, and before the march, which reads the superiority it leaves.
+    // BL-1449 (MILITARY.md § Air): the air missions, still flown over the quarter's 90
+    // days HERE rather than in the daily military pass (run_military_day), until they
+    // move onto it (owed). The superiority they leave is read by the next quarter's
+    // daily marches and battles.
     report.air = run_air_missions(w, reg, report, econ_tick_days_world);
-
-    {
-        const battle_tick bt = run_battles(w, reg, w.current_day_tick);
-        // Carried out on the report, not dropped: a concluded battle is erased
-        // inside the pass, so this is the only chance the aftermath has to reach
-        // a surface. See economy_report::battle_dispatches.
-        report.battle_dispatches = std::move(bt.dispatches);
-    }
-    phase_stamp(10); // battles
-
-    run_unit_march(w, reg, &report.logistic_points);
-    phase_stamp(11); // march
+    phase_stamp(10); // (the battle phase is daily now: run_military_day)
+    phase_stamp(11); // (recovery and the march are daily now: run_military_day)
 
     // BL-454: the unit pass — goods draw, the decay rule, orphan cleanup. LAST,
     // deliberately: the strategic tier above demolishes at tick rate, so running
@@ -4011,33 +3992,20 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
         ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
 
+    // --- 1. Orphan cleanup: THE ONE DISBAND PATH (`disband_orphaned_units`) -------
+    // The daily military pass runs the same function after each day's battles, so a
+    // unit a battle kills is gone that day (BL-1445); here it catches what the
+    // quarter's own passes orphaned (a muster base the strategic tier tore down).
+    out.disbanded = disband_orphaned_units(w);
+    ids.erase(std::remove_if(ids.begin(), ids.end(),
+                             [&](entity_id id) { return w.units.find(id) == w.units.end(); }),
+              ids.end());
+
     std::vector<entity_id> disband;
 
     for (const entity_id id : ids)
     {
         unit_component& u = w.units.at(id);
-
-        // --- 1. Orphan cleanup ------------------------------------------------
-        // A unit whose owner, tile, or muster base has been erased has nothing
-        // holding it in the world. `muster_base == null_entity` means "no base
-        // recorded" (a unit that predates the muster rule) and never orphans.
-        //
-        // BL-467 ADDED THE FIRST CONDITION: a unit ground to zero men. Before the
-        // battle pass existed nothing could reduce a count to zero, so the case
-        // could not arise and the cleanup had no reason to test for it. It can
-        // now, and without this a destroyed unit would persist forever — holding
-        // a tile, pinning its province, and folded into state_hash as a force
-        // that no longer exists.
-        //
-        // It belongs HERE rather than in the battle pass, and that is BL-467's
-        // aftermath ruling rather than convenience: disbanding is this pass's
-        // job, and a second disband site would be a second place to forget. The
-        // battle pass removes MEN; this removes the unit when there are none.
-        if (u.count <= 0)
-        {
-            disband.push_back(id);
-            continue;
-        }
 
         // BL-571: a nation-owned garrison is a FOURTH owner kind this pass
         // never saw before — `owner` names a nation, not a corp. It is not
@@ -4055,13 +4023,10 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
         // recorded muster base has been erased is disbanded. The muster-base and
         // tile checks sat after an always-true branch and never ran (BL-1439's
         // lane found it); they run here now.
+        // (The orphan tests above in `disband_orphaned_units` have already removed a
+        // unit whose nation, base or tile is gone, so every unit left is alive.)
         {
-            if (w.nations.find(u.owner) == w.nations.end()
-                || (u.muster_base != null_entity && w.buildings.find(u.muster_base) == w.buildings.end())
-                || w.tiles.find(u.position) == w.tiles.end())
-                disband.push_back(id);
-            else
-                ++out.units; // alive, counted, untouched by the rest of this loop
+            ++out.units; // alive, counted, untouched by the rest of this loop
             continue;
         }
         if (u.muster_base != null_entity && w.buildings.find(u.muster_base) == w.buildings.end())
@@ -4135,6 +4100,58 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
         ++out.disbanded;
     }
     return out;
+}
+
+int disband_orphaned_units(world& w)
+{
+    if (w.units.empty())
+        return 0;
+    // Ascending unit id; each unit's test reads only itself and the world's stores,
+    // so the order cannot change WHICH units go, only the order they are erased in.
+    std::vector<entity_id> ids;
+    ids.reserve(w.units.size());
+    for (const auto& kv : w.units)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+
+    std::vector<entity_id> gone;
+    for (const entity_id id : ids)
+    {
+        const unit_component& u = w.units.at(id);
+        // A unit whose owner, tile, or muster base has been erased has nothing
+        // holding it in the world. `muster_base == null_entity` means "no base
+        // recorded" (a unit that predates the muster rule) and never orphans.
+        //
+        // BL-467 ADDED THE FIRST CONDITION: a unit ground to zero men. Without it a
+        // destroyed unit would persist forever — holding a tile, pinning its
+        // province, and folded into state_hash as a force that no longer exists.
+        // The battle pass removes MEN; this removes the unit when there are none,
+        // and there is deliberately no second disband site. BL-1445: it runs DAILY
+        // too (`run_military_day`), so a unit a battle kills never stands on its
+        // tile, blocking a step, until the quarter ends.
+        //
+        // BL-1407: every unit is a NATION's, so an owner that is not a live nation
+        // orphans it (MILITARY.md § Upkeep, "Orphan cleanup").
+        if (u.count <= 0
+            || w.nations.find(u.owner) == w.nations.end()
+            || (u.muster_base != null_entity && w.buildings.find(u.muster_base) == w.buildings.end())
+            || w.tiles.find(u.position) == w.tiles.end())
+            gone.push_back(id);
+    }
+    if (gone.empty())
+        return 0;
+    for (const entity_id id : gone)
+        w.units.erase(id);
+    // A live battle may still list a removed unit; the rounds already skip a unit that
+    // is gone (`build_combatants`), and its id is stripped here so no record names a
+    // unit the world no longer holds. `gone` is ascending, so a binary search answers.
+    const auto is_gone = [&](entity_id id) { return std::binary_search(gone.begin(), gone.end(), id); };
+    for (active_battle& b : w.battles)
+    {
+        for (std::vector<entity_id>* v : {&b.attacker_units, &b.defender_units, &b.attacking_units})
+            v->erase(std::remove_if(v->begin(), v->end(), is_gone), v->end());
+    }
+    return static_cast<int>(gone.size());
 }
 
 // ---------------------------------------------------------------------------
@@ -4465,46 +4482,117 @@ std::vector<entity_id> march_visit_order(const world& w)
     return ids;
 }
 
-std::vector<lp_march_claim> collect_march_claims(const world& w, const recipe_registry& reg)
+float march_days_per_tile(const military_capability_params& mil, uint16_t type)
 {
-    std::vector<lp_march_claim> claims;
+    // An unknown roster type reads as Era -1 infantry — the "an unknown index is a
+    // data problem, not a reason to make a unit free" tolerance resolve_unit_upkeep
+    // already applies (unit_roster.cpp).
+    const auto& table = unit_roster_table();
+    if (type >= table.size())
+        return mil.march_days_per_cls[static_cast<std::size_t>(unit_class::infantry)];
+    const roster_row& r = table[type];
+    // Speed keys on the LAND CLASS (Ben, 2026-10-28): every modern row declares one.
+    // A pre-modern row declares none and marches by its Era -1 cls.
+    if (r.land != k_land_class_from_cls)
+    {
+        const std::size_t i = static_cast<std::size_t>(r.land);
+        return i < mil.march_days_per_land_class.size() ? mil.march_days_per_land_class[i] : 0.0f;
+    }
+    return mil.march_days_per_cls[static_cast<std::size_t>(r.cls)];
+}
+
+namespace {
+
+/// The movement a unit gains in ONE DAY, in units of traversal cost: the reciprocal of
+/// its days per plains tile. 0 = it cannot march.
+float march_rate_per_day(const military_capability_params& mil, uint16_t type)
+{
+    const float days = march_days_per_tile(mil, type);
+    return days > 0.0f ? 1.0f / days : 0.0f;
+}
+
+} // namespace
+
+float unit_supply_need(const unit_component& u, const unit_upkeep_params& up)
+{
+    // THE SUPPLIES' QUANTITY (Ben, 2026-10-28; MILITARY.md § Upkeep, "Supply is drawn
+    // where the unit stands"): the request is the quantity of the goods that keep the
+    // unit in the field this quarter, as a shipment's draw is its cargo.
+    //   - its upkeep goods: food rations and ordnance per head
+    //     (`economy.military.unit_upkeep.goods_per_head`, `resolve_unit_upkeep`);
+    //   - the equipment and manpower its HP refill draws while wounded. No refill
+    //     mechanism exists in the sim yet - a unit's `count` never climbs back toward
+    //     its `establishment` - so that half is zero until refill lands, and joins here.
+    if (u.count <= 0)
+        return 0.0f;
+    const unit_upkeep_draw d = resolve_unit_upkeep(u, up);
+    float need = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r) // resource index order: a fixed sum
+        if (d.goods[r] > 0.0f)
+            need += d.goods[r];
+    return need;
+}
+
+std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_registry& reg)
+{
+    std::vector<lp_supply_claim> claims;
     if (w.units.empty())
         return claims;
-    const auto& table = unit_roster_table();
-    const military_capability_params& mil = reg.military();
-    const std::set<entity_id> fighting = units_in_live_battles(w);
-    for (const entity_id id : march_visit_order(w))
+    const unit_upkeep_params& up = reg.military().upkeep;
+    // ASCENDING UNIT ID (Ben, 2026-10-28): the resolver serves the requests in the
+    // order given, so the order is load-bearing when a pool runs short.
+    std::vector<entity_id> ids;
+    ids.reserve(w.units.size());
+    for (const auto& kv : w.units)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    for (const entity_id id : ids)
     {
         const unit_component& u = w.units.at(id);
-        if (u.order.dest == null_entity)
-            continue; // halted / never ordered: nothing to ask for
-        if (fighting.count(id) != 0)
-            continue; // in a battle: it holds, and asks for nothing (run_unit_march)
-        const unit_class cls = (u.type < table.size()) ? table[u.type].cls : unit_class::infantry;
-        const float base_points = mil.march_points_per_class[static_cast<std::size_t>(cls)];
-        if (base_points <= 0.0f)
-            continue; // this class cannot march under the authored data
-        lp_march_claim c;
+        if (u.count <= 0)
+            continue; // a dead unit asks for nothing (and is gone by the next day)
+        lp_supply_claim c;
         c.unit = id;
-        c.need = base_points + u.order.progress; // the whole tick's budget, carry-over included
-
-        // WHOSE POOL: THE MOVER'S, NOT THE GROUND'S (BL-1352, cold review).
-        // LOGISTICS.md reads "Movement a player or rival directs draws the same points
-        // production and trade do" - the nation DIRECTING the march. The first cut took
-        // the nation of the ground the unit stood on, and that was wrong twice over: a
-        // unit that ran out of points on unowned wilderness could never be granted
-        // again, so it was immobilised for good; and a unit invading another nation
-        // drew ITS victim's pool, starving the defender's industry to fund the attack.
-        // A corporation's march is its home nation's; a nation-owned garrison (BL-571)
-        // is its own nation's.
-        if (w.nations.find(u.owner) != w.nations.end()) // BL-1407: a nation's own march
+        c.tile = u.position;
+        c.need = unit_supply_need(u, up);
+        // WHOSE POOL: THE UNIT'S OWN NATION'S, routed from its own sources - never the
+        // ground's, which would fund an invasion out of the invaded nation's points.
+        if (w.nations.find(u.owner) != w.nations.end()) // BL-1407: every unit is a nation's
             c.nation = u.owner;
         claims.push_back(c);
     }
     return claims;
 }
 
-unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_tick* lp)
+void charge_supply_draws(world& w, const recipe_registry& reg, const lp_tick& lp)
+{
+    // THE PRICE (LOGISTICS.md § The cap/price split: "an army in the field is priced
+    // in credits by active LP", and since 2026-10-28 the active draw is a unit's
+    // supply, not its march). `active_lp_credit_per_unit_distance` x the points
+    // granted, charged to the unit's nation through its purse (BL-1402), capped at
+    // its uncommitted room so it never runs into debt (BL-1407). In the resolver's
+    // serving order (ascending unit id), so the cap binds the same units every run.
+    const float rate = reg.military().active_lp_credit_per_unit_distance;
+    if (!(rate > 0.0f))
+        return;
+    for (const lp_supply_row& s : lp.supplies)
+    {
+        if (!(s.granted > 0.0f))
+            continue;
+        const auto uit = w.units.find(s.unit);
+        if (uit == w.units.end())
+            continue;
+        const entity_id owner = uit->second.owner;
+        if (float* purse = purse_of(w, owner); purse != nullptr)
+        {
+            const float cost = std::min(rate * s.granted, purse_room_of(w, owner));
+            if (cost > 0.0f)
+                *purse -= cost;
+        }
+    }
+}
+
+unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tick)
 {
     unit_march_tick out;
     if (w.units.empty())
@@ -4512,7 +4600,6 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
 
     const std::vector<entity_id> ids = march_visit_order(w);
 
-    const auto& table = unit_roster_table();
     const military_capability_params& mil = reg.military();
 
     // A unit in a live battle does not march: walking away from contact is a
@@ -4564,78 +4651,26 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
 
         ++out.marching;
 
-        // An unknown roster type resolves as unit_class::infantry — the same
-        // "an unknown index is a data problem, not a reason to make a unit
-        // free" tolerance resolve_unit_upkeep already applies (unit_roster.cpp).
-        const unit_class cls = (u.type < table.size()) ? table[u.type].cls : unit_class::infantry;
-        const float base_points = mil.march_points_per_class[static_cast<std::size_t>(cls)];
-        if (base_points <= 0.0f)
+        // ONE DAY'S MOVEMENT (BL-1445): 1 / the class's days per plains tile, in units of
+        // traversal cost. An unknown roster type reads as Era -1 infantry
+        // (`march_days_per_tile`).
+        const float rate = march_rate_per_day(mil, u.type);
+        if (rate <= 0.0f)
             continue; // this class cannot march under the authored data
 
-        // The full tick's movement budget, banked carry-over included — the same
-        // quantity `collect_march_claims` asked the pool for (BL-1352: one point
-        // admits one march-point's worth of movement), computed BEFORE anything
-        // mutates so a refusal can still leave u.order.progress untouched.
-        const float would_be_points = base_points + u.order.progress;
-
-        // --- BL-1352: the Logistic Point gate, before any state mutates ---
-        //
-        // The points were CLAIMED before this tick's resolve (collect_march_claims,
-        // above), so what arrives here is the answer: `lp->march_granted` holds what
-        // each unit was granted out of its host nation's pool, served in this same
-        // visit order and ahead of every producer. This pass only spends it.
-        //
-        // A unit granted nothing is refused outright — no partial draw, and nothing
-        // about its order, position or balance moves this tick. That covers a unit on
-        // nobody's ground, one whose nation makes no points, and one whose nation's
-        // pool ran out behind higher-priority marches.
-        //
-        // WITH NO RESOLVE HANDED IN (`lp` null: a harness exercising the march alone)
-        // the gate is open and every ordered unit marches, which is the pre-BL-596
-        // behaviour and keeps a movement test a movement test.
-        // A unit whose own tile is GONE is not asked the points question at all, and
-        // falls through to the loop below, where the missing tile dissolves its stale
-        // order (defensive - tiles do not change post-generation). The first cut
-        // refused it here instead, which left the dead order in place for ever and
-        // counted a refusal every tick (cold review).
-        const bool somewhere = w.tiles.find(u.position) != w.tiles.end();
-        if (lp != nullptr && somewhere)
-        {
-            const auto git = lp->march_granted.find(id);
-            const float granted = git != lp->march_granted.end() ? git->second : 0.0f;
-            if (granted + 1e-6f < would_be_points)
-            {
-                ++out.refused_no_lp;
-                continue;
-            }
-        }
-
-        // THE PRICE, charged on every march that happens — LP is the cap, credits are
-        // the separate price (LOGISTICS.md rule 1; Ben, 2026-08-22, "it should cost
-        // actual money... moving units"). Outside the gate deliberately: with no
-        // resolve handed in the march is UNGATED, not FREE, and the first cut made it
-        // free by pricing inside the branch (cold review). A nation-owned garrison
-        // (BL-571) draws against the cap, as the physical constraint applies to
-        // everyone. Its UPKEEP stays outside run_unit_upkeep's credits+goods vector
-        // (MILITARY.md); this march price is separate from upkeep.
-        // BL-1402: charged to the march's owner through its purse — a
-        // corporation's balance (which may go negative, as before) or a nation's
-        // treasury, capped at its uncommitted room so the nation never runs into
-        // debt. An owner that is neither pays nothing.
-        if (float* purse = purse_of(w, u.owner); purse != nullptr)
-        {
-            float credit_cost = mil.active_lp_credit_per_unit_distance
-                               * would_be_points * static_cast<float>(u.count);
-            credit_cost = std::min(credit_cost, purse_room_of(w, u.owner)); // BL-1407: a nation
-            *purse -= credit_cost;
-        }
-
-
-
-        float points = would_be_points;
+        // MOVEMENT TAKES NO LOGISTIC POINTS (Ben, 2026-10-28; MILITARY.md § Marching): a
+        // march is paid in days, never in points, so an order given mid-quarter moves at
+        // once and nothing halts it but the ground. What a unit costs the network is its
+        // supply, drawn once a quarter at its tile (`collect_supply_claims`).
+        float points = u.order.progress + rate; // today's movement, the bank included
         u.order.progress = 0.0f;
 
-        while (points > 0.0f && u.order.next_index < u.order.path.size())
+        // Walked until the bank no longer covers the next hop (the else branch below
+        // banks it and stops) - NOT while the bank is positive: a unit that steps onto
+        // the tile beside a hostile stack with exactly nothing left registers its
+        // attack TODAY, the day it got there (MILITARY.md § Battles ruling 3), whatever
+        // its speed's rounding leaves in the bank.
+        while (u.order.next_index < u.order.path.size())
         {
             const auto cur_it  = w.tiles.find(u.position);
             const entity_id next_id = u.order.path[u.order.next_index];
@@ -4732,6 +4767,9 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
             if (step_cost <= 0.0f || points + 1e-6f >= step_cost)
             {
                 points -= step_cost;
+                // No price per hop: the active Logistic Point draw, and the credits it
+                // is priced in, moved to the unit's quarterly supply (Ben, 2026-10-28;
+                // `charge_supply_draws`).
                 if (u.count > 0)
                 {
                     --occupancy[u.position][u.owner];
@@ -4745,8 +4783,8 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
             }
             else
             {
-                u.order.progress = points; // bank the remainder for next tick
-                points = 0.0f;
+                u.order.progress = std::max(0.0f, points); // bank the remainder for tomorrow
+                break;
             }
         }
 
@@ -4761,9 +4799,91 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, const lp_ti
     // (tile, attacker, defender) order — so which battle claims an adjacent stack
     // first is a property of the ids, never of the visit order.
     if (!attacks.empty())
-        out.battles_opened = open_tile_battles(w, w.current_day_tick, std::move(attacks));
+        out.battles_opened = open_tile_battles(w, day_tick >= 0 ? day_tick : w.current_day_tick,
+                                               std::move(attacks));
 
     return out;
+}
+
+namespace {
+
+/// Is there anything for a military day to do? A unit with an order or a front, or a
+/// live battle. Nothing else issues a march between economy ticks on a headless path
+/// (the scorers are quarterly), so a quarter that goes quiet stays quiet.
+bool military_active(const world& w)
+{
+    if (!w.battles.empty())
+        return true;
+    for (const auto& [uid, u] : w.units) // a pure any-of: walk order cannot reach it
+        if (u.order.dest != null_entity || u.front != null_entity || u.count <= 0)
+            return true;
+    // BL-1445: out-of-contact recovery is daily, so a day with a unit still
+    // recovering is a day with something to do (no battle is live here, so every
+    // unit is out of contact).
+    return recovery_pending(w);
+}
+
+} // namespace
+
+military_day_result run_military_day(world& w, const recipe_registry& reg, int day_tick)
+{
+    military_day_result out;
+    if (!military_active(w))
+        return out;
+
+    // THE FRONTS FIRST, after yesterday's musters and before today's battles, so a
+    // front's orders are issued against today's contacts: a unit already in a battle
+    // is left alone, and the orders issued here are walked by today's march, after
+    // the battles — the "fight before you march out" rule every order obeys. Daily,
+    // because a march now completes in days and a front must be able to send a unit
+    // on the day its last one ends (0.01 ms a call on a generated world,
+    // fronts_harness). Skipped outright when no unit is assigned: the re-anchor it
+    // would run is then only the cache, which the economy step's own re-anchor keeps.
+    bool any_front = false;
+    for (const auto& [uid, u] : w.units) // a pure any-of
+        if (u.front != null_entity) { any_front = true; break; }
+    if (any_front)
+        advance_fronts(w, reg);
+
+    out.battles = run_battles(w, reg, day_tick);
+    // A UNIT A BATTLE KILLS IS REMOVED THE SAME DAY (Ben, 2026-10-28; MILITARY.md
+    // § Marching), by the one disband path the upkeep pass also runs, so it never
+    // stands on its tile blocking today's march.
+    out.disbanded = disband_orphaned_units(w);
+    out.march   = run_unit_march(w, reg, day_tick);
+    // OUT OF CONTACT, READINESS AND MORALE RECOVER DAILY (Ben, 2026-10-28), after the
+    // march, so a unit whose march opened a battle today is in contact and does not.
+    recover_out_of_contact(w);
+    return out;
+}
+
+int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
+                       int quarter_first_day_tick, std::vector<battle_dispatch>* dispatches)
+{
+    const int q    = k_construction_quarter_days;
+    const int to   = std::clamp(day_in_quarter, 0, q);
+    const int from = std::clamp(w.construction_quarter_day, 0, q);
+    if (to <= from)
+        return 0;
+    // Day by day: construction's day d, then the military's — so a road a site
+    // completes on day d is under the march from that day on, on every path alike.
+    for (int d = from + 1; d <= to; ++d)
+    {
+        if (!military_active(w))
+        {
+            // Nothing military left to walk: construction takes the rest in one call,
+            // which walks the identical days (advance_construction_to is days-outer).
+            advance_construction_to(w, reg, to);
+            break;
+        }
+        advance_construction_to(w, reg, d);
+        military_day_result r = run_military_day(w, reg, quarter_first_day_tick + d);
+        if (dispatches != nullptr)
+            dispatches->insert(dispatches->end(),
+                               std::make_move_iterator(r.battles.dispatches.begin()),
+                               std::make_move_iterator(r.battles.dispatches.end()));
+    }
+    return to - from;
 }
 
 // inject_substrate_demand (BL-078) was removed by BL-365: the abstract

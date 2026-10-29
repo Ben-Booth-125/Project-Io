@@ -83,8 +83,9 @@ float step_cost(const world& w, entity_id tile, const tile_component& tc, lp_net
         {
             // Ben, 2026-10-24: THE NETWORK IS THE ROADS AND THE RAIL. A hub's points
             // travel only along a roaded edge; a step off the road is impassable, so
-            // no point reaches a tile no road leads to. (Off-network supply is the
-            // units' alone, NR-1050: a march draws its nation's pool with no reach.)
+            // no point reaches a tile no road leads to. (NR-1050's off-network unit
+            // supply is overturned, Ben 2026-10-28: a unit's supply is routed at its
+            // tile like any request, so an army past its roads is unfed.)
             // A BRIDGE IS A ROAD (Ben, 2026-10-17: a road may span water): a roaded
             // edge onto a water tile carries points like any other, so a strait the
             // road crosses is no gap in the network; water no road crosses still is.
@@ -455,7 +456,7 @@ const std::set<entity_id>& memo_chain(world& w, lp_reach_memo& memo, entity_id n
                                       entity_id body, entity_id centre);
 } // namespace
 
-lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& marches)
+lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& supplies)
 {
     lp_tick out;
     resolver_input in;
@@ -502,38 +503,56 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
     for (auto& [nid, r] : rows)
         r.pool = r.made[0] + r.made[1] + r.made[2];
 
-    // 1b. THE MARCH CLAIMS FIRST (BL-1352; LOGISTICS.md § How a tile's points get to
-    // it). The claims arrive in the march pass's own order, and each is served whole
-    // or refused — a half-fed march is not a thing the movement rule can spend — so
-    // what production claims against below is `pool - march_granted`, not `pool`.
-    // A claim on nobody's ground, or on a nation with no pool at all, is refused;
-    // nothing about that unit moves, exactly as a building there produces nothing.
-    for (const lp_march_claim& m : marches)
+    // 1b. A UNIT'S SUPPLY CLAIMS FIRST (BL-1445; LOGISTICS.md § How a tile's points get
+    // to it, "A unit's supply draws on the pool, and claims first", NR-917 kept). The
+    // requests arrive in ascending unit id. Each is ROUTED ON THE TILE THE UNIT STANDS
+    // ON against its own nation's sources, exactly as a building's request is (step 2
+    // below): its claim is need x cover, served while the pool lasts - so what
+    // production claims against below is `pool - supply_granted`, not `pool`. A unit
+    // with no nation, or on a tile its nation's network does not reach, is granted
+    // nothing; a request of zero is fully granted (share 1000).
+    for (const lp_supply_claim& c : supplies)
     {
-        lp_march_row mr;
-        mr.unit   = m.unit;
-        mr.nation = m.nation;
-        mr.need   = m.need;
-        if (m.nation != null_entity && m.need > 0.0f)
+        lp_supply_row sr;
+        sr.unit   = c.unit;
+        sr.nation = c.nation;
+        sr.tile   = c.tile;
+        sr.need   = c.need;
+        if (c.need > 0.0f)
         {
-            // The row is created if this nation has none yet: a nation with no sources
-            // still ASKED, and `march_claim` is the ledger of what was asked. Its pool
-            // is 0, so the claim is granted nothing and production - which creates its
-            // own row at step 2 - sees exactly what it saw before (cold review).
-            //
-            // `march_granted` IS the running total, so what is left is the pool minus
-            // it — no second accumulator to keep in step with it.
-            lp_nation_row& r = rows[m.nation];
-            r.nation = m.nation;
-            r.march_claim += m.need;
-            if (m.need <= (r.pool - r.march_granted) + 1e-6f)
+            sr.share_permille = 0;
+            const auto tit = w.tiles.find(c.tile);
+            if (c.nation != null_entity && tit != w.tiles.end())
             {
-                r.march_granted += m.need;
-                mr.granted = m.need;
+                // The row is created if this nation has none yet: a nation with no
+                // sources still ASKED, and `supply_claim` is the ledger of what was
+                // asked. Its pool is 0, so the claim is granted nothing and production
+                // sees exactly what it saw before.
+                lp_nation_row& r = rows[c.nation];
+                r.nation = c.nation;
+                r.supply_claim += c.need;
+                sr.cover = lp_route_to(w, memo, c.nation, tit->second.body, c.tile).cover;
+                const float claim = c.need * std::clamp(sr.cover, 0.0f, 1.0f);
+                // `supply_granted` IS the running total, so what is left is the pool
+                // minus it - no second accumulator to keep in step with it.
+                const float left = std::max(0.0f, r.pool - r.supply_granted);
+                sr.granted = std::min(claim, left);
+                r.supply_granted += sr.granted;
+                // Integer per-mille, truncated - with ONE relative tolerance
+                // (`k_share_eps`, 1e-5 of the request), so float noise never costs a
+                // per-mille: a quotient a hair under an exact per-mille (1.2 / 2.0 =
+                // 0.59999996) reads as that per-mille, and a grant a hair under the
+                // whole request (a summed cover of 0.9999999) reads as 1000, not 999
+                // for ever.
+                constexpr float k_share_eps = 1e-5f;
+                const float ratio = std::clamp(sr.granted / c.need, 0.0f, 1.0f);
+                sr.share_permille = ratio >= 1.0f - k_share_eps
+                    ? 1000
+                    : std::min(1000, static_cast<int>(std::floor((ratio + k_share_eps) * 1000.0f)));
             }
         }
-        out.marches.push_back(mr);
-        out.march_granted[mr.unit] = mr.granted;
+        out.supplies.push_back(sr);
+        out.supply_share[sr.unit] = sr.share_permille;
     }
 
     // 2. Consumers: need, coverage (ROUTED, BL-1356), class. The memo is step 1's.
@@ -588,10 +607,10 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
         std::array<bool, lp_class_count> g{};
         r.rule_set = false;
         const float total = r.claim[0] + r.claim[1] + r.claim[2];
-        // BL-1352: what the march left. A nation row created by a CONSUMER below
+        // BL-1445: what the units' supply left. A nation row created by a CONSUMER
         // (no sources, so no row at 1b) has pool 0 and granted 0, so this is 0 for
-        // it exactly as `pool` was before the march joined.
-        const float avail = std::max(0.0f, r.pool - r.march_granted);
+        // it exactly as `pool` was before supply joined.
+        const float avail = std::max(0.0f, r.pool - r.supply_granted);
         const float f = total > 0.0f ? std::min(1.0f, avail / total) : 0.0f;
         g.fill(avail >= total);
         for (std::size_t k = 0; k < lp_class_count; ++k)
@@ -645,11 +664,11 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& mar
         if (row.nation != null_entity)
             rows[row.nation].granted[static_cast<std::size_t>(row.cls)] += row.granted;
     }
-    // BL-1361: what a shipment may draw is the pool less the march's grant and
-    // production's (LOGISTICS.md: march, production, trade) - one pot (BL-1405).
+    // BL-1361: what a shipment may draw is the pool less the supply grant and
+    // production's (LOGISTICS.md: supply, production, trade) - one pot (BL-1405).
     for (auto& [nid, r] : rows)
     {
-        const float avail = std::max(0.0f, r.pool - r.march_granted);
+        const float avail = std::max(0.0f, r.pool - r.supply_granted);
         const float total = std::max(0.0f, avail - (r.granted[0] + r.granted[1] + r.granted[2]));
         r.left.fill(0.0f);
         r.left[0] = total;

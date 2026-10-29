@@ -1576,9 +1576,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["asked"]      = m_ui.lp_player_claim;
         out["needed"]     = m_ui.lp_player_need;
         out["production"] = m_ui.lp_player_prod;
-        out["marches"]    = m_ui.lp_player_march;
+        out["supply"]     = m_ui.lp_player_supply;
         out["shipments"]  = m_ui.lp_player_shipping;
-        out["consumed"]   = m_ui.lp_player_prod + m_ui.lp_player_march + m_ui.lp_player_shipping;
+        out["consumed"]   = m_ui.lp_player_prod + m_ui.lp_player_supply + m_ui.lp_player_shipping;
         return out;
     });
 

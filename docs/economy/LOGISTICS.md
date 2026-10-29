@@ -69,8 +69,9 @@ plateau.
 
 `tile_traversal_cost` is the per-node weight used by **A\*, the reach-field Dijkstra, and a marching
 unit alike.** It is a named, public function rather than an anonymous-namespace helper precisely so
-`run_unit_march` spends march points against *the same cost function* rather than a second invented
-model.
+`run_unit_march` banks a unit's daily movement — 1 / its class's days per plains tile (MILITARY.md
+§ Marching) — against *the same cost function* rather than a second invented model, so terrain
+multiplies a march's days and a road divides them.
 
 Landform multipliers, from TILES.md: plains 1.0, valley 1.1, highland 1.25, crater 1.3, canyon 1.5,
 rift 1.6, mountain 2.0. Water is crossable at a higher **sea-leg** cost, so a path exists on any
@@ -983,8 +984,9 @@ requests) and BL-1361 (a shipment draws points).
   all of it; halfway down the fade, half), and the next one tops up the remainder, until the
   request is covered or the sources run out. A tile's cap is therefore its qualifying reaches
   summed, at most its whole request.
-- **After the march, production claims before trade.** The march claims first (NR-917, above);
-  production is served next, in queue order; a shipment draws what production left.
+- **After the units' supply, production claims before trade.** A unit's supply claims first
+  (NR-917, above); production is served next, in queue order; a shipment draws what production
+  left.
 
 **Distance orders the queue; it never raises the bill.** When a nation's points fall short of what
 its ground asks for, requests **inside the falloff range are served first**, then the ones beyond
@@ -1016,7 +1018,7 @@ tell, so it is never refused whole: its shipment sends what the anchor admits, e
 
 **Under routing, the anchor is a request like any other (decided 2026-10-22, NR-1062).** The
 anchor is the source market's **centre tile**. A shipment leaving it draws on the pool of the
-nation whose ground that tile is, from what the march and production left there, and the centre's
+nation whose ground that tile is, from what the units' supply and production left there, and the centre's
 routed cover caps its share as it caps any tile's request: where the qualifying sources reach the
 centre at half strength, a cargo carries half. A centre on nobody's ground, or one no connected
 source reaches, admits nothing — the trade waits until a source is built there, which is what makes
@@ -1149,7 +1151,7 @@ LP is what makes that priority explicit, and it is the strongest argument for it
   legible; a queued one is not. The cost is that LP reads as a wall, which is the honest trade.
   **Surfacing is non-optional** — a refusal nobody sees is silent interdiction again.
   **The rule covers COMMANDED legs (Ben, 2026-10-05, NR-969):** a leg somebody named for this
-  tick — a march — is refused whole and told. A trade is a standing route that ships every tick
+  tick — a march, until movement stopped drawing points (Ben, 2026-10-28) — is refused whole and told. A trade is a standing route that ships every tick
   on its own, with nobody to tell, so a whole refusal there would be exactly the silent
   interdiction this rule forbids; its shipment sends what the anchor admits instead (`SUPPLY.md`
   § A shipment).

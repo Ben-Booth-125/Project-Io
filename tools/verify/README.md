@@ -684,8 +684,9 @@ IO_RUN_SWEEPS=1 ctest --test-dir build -R settlement_density
 ## unit_march_harness (BL-470, retargeted by BL-511)
 
 The unit-march seam: the three `corp_verb`s BL-470 added (`march_unit` /
-`halt_unit` / `disband_unit`) plus the per-tick resolution pass
-`run_unit_march`. Never had a README entry when it landed; added 2026-08-21
+`halt_unit` / `disband_unit`) plus the resolution pass `run_unit_march` — one
+DAY of movement per call since BL-1445 (the fixture registry authors its class
+at 1/points days a tile, so a call moves what a tick used to). Never had a README entry when it landed; added 2026-08-21
 alongside BL-511's grain change.
 
 **BL-511 moved `march_unit`'s payload from a TILE to a PROVINCE** (Ben's
@@ -720,6 +721,31 @@ Links the world superset; CMake target via the generic glob.
 cmake --build build --target unit_march_harness   # from a vcvars shell
 node tools/verify/build_harness.js unit_march_harness   # or the CMake-free route
 ctest --test-dir build -R unit_march_harness
+```
+
+## move_by_days_harness (BL-1445, move by days)
+
+The day grain of the military (MILITARY.md § Marching, "Units march by the day, at
+their class's speed"; § Battles ruling 3, "Pacing is by the day"), measured
+against the AUTHORED tables in `scripts/economy.lua`
+(`economy.military.march_days_per_tile`, `march_days_per_tile_by_cls`). D1 each
+class's days per plains tile over twelve tiles; D2 mountain and road; D3 banking;
+D4 movement takes no Logistic Points (a march on a zero pool moves on time and pays
+nothing; an order given mid-quarter moves at once); D5 contact opens the battle that day;
+D6 battle length in days by force ratio; D7 twice-equal; D8 a save mid-march
+round-trips; D9 a quarter walked day by day equals one caught up by the economy
+step; D10 the loader rejects a non-positive, non-finite or unknown entry; D11 a
+unit's supply is requested at its tile - covered, granted whole and kept; past the
+network, granted nothing and decayed by the one rule; D12 a unit a battle kills is
+removed that day; D13 readiness and morale recover daily out of contact (Ben,
+2026-10-28).
+
+Needs a live Lua state (it loads `scripts/recipes.lua` and `scripts/economy.lua`),
+so it builds with the Lua builder. Run from the repo root.
+
+```
+bash tools/verify/build_lua_harness.sh move_by_days_harness
+./build_gen/verify/move_by_days_harness.exe
 ```
 
 ## condition_set_harness (BL-342, extended by BL-570)

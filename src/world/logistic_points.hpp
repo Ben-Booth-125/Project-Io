@@ -43,26 +43,22 @@
 // Every walk is in ascending id order and every field is a bounded Dijkstra
 // with (cost, tile id) ordering, so the answer is replay-exact.
 //
-//   * A MARCH DRAWS THE SAME POOL, AND CLAIMS FIRST (BL-1352; LOGISTICS.md
-//     § How a tile's points get to it, "A march draws on the nation's pool too,
-//     and claims first"). Movement a player or a rival directs draws the host
-//     nation's points before any producer does: the marching claims are served
-//     in the march pass's own order (mobilised corps first, then ascending unit
-//     id), each all-or-nothing, and PRODUCTION'S GRANTS ARE COMPUTED ON WHAT IS
-//     LEFT. So guns, butter and freight compete in one currency, and a campaign
-//     visibly starving its own industry is the intended, legible cost.
+//   * A UNIT'S SUPPLY DRAWS THE SAME POOL, AND CLAIMS FIRST (BL-1445; LOGISTICS.md
+//     § How a tile's points get to it, "A unit's supply draws on the pool, and
+//     claims first", Ben 2026-10-28, overturning the 2026-10-16 march draw).
+//     Movement draws no points: a march is paid in days. Once a quarter each unit
+//     asks the points its supplies need - their QUANTITY, as a shipment's draw is
+//     its cargo - AT THE TILE IT STANDS ON, routed against its own nation's
+//     sources exactly as a building's request is (`lp_route_to`: the claim is
+//     need x cover). The supply claims are served in ascending unit id, BEFORE any
+//     producer (NR-917 kept), and PRODUCTION'S GRANTS ARE COMPUTED ON WHAT IS LEFT.
+//     So guns, butter and freight compete in one currency, and a campaign visibly
+//     starving its own industry is the intended, legible cost of an army in the
+//     field. A unit on a tile its network does not reach is granted nothing.
 //
-//     WHOSE POOL: THE MOVER'S. A corporation's march draws its home nation's
-//     points, a nation's garrison its own - "Movement a player or rival DIRECTS"
-//     (LOGISTICS.md). Never the pool of the ground it stands on: that first cut
-//     immobilised a unit for good once its points ran out on unowned wilderness
-//     (the refusal moves nothing, so it re-fires for ever) and funded an invasion
-//     out of the invaded nation's own pool.
-//
-//     INTERIM, and narrower than the doc's eventual rule: there is no reach test
-//     on a march, because the off-network military reach is still "military detail
-//     later" (LOGISTICS.md), so a march anywhere draws its own nation's pool at
-//     full strength.
+//     WHOSE POOL: THE UNIT'S NATION'S, routed from that nation's own sources -
+//     never the pool of a foreign ground it stands on, which would fund an
+//     invasion out of the invaded nation's points.
 //
 //     BL-1352 retired the second, unrelated system this used to be: a flat
 //     20/tick pool at EVERY POPULATION CENTRE (`active_lp_anchor_pools`), which
@@ -155,11 +151,12 @@ struct lp_building_row
 struct lp_nation_row
 {
     entity_id nation = null_entity;
-    float     pool   = 0.0f;         ///< made this tick, before the march's claim
-    /// BL-1352: the marching claim on this pool, and what it was granted. Production
-    /// claims against `pool - march_granted`, never against `pool`.
-    float     march_claim   = 0.0f;
-    float     march_granted = 0.0f;
+    float     pool   = 0.0f;         ///< made this tick, before the supply claims
+    /// BL-1445: what this nation's units ASKED for their supplies (the quantity, before
+    /// cover), and what they were granted. Production claims against
+    /// `pool - supply_granted`, never against `pool`.
+    float     supply_claim   = 0.0f;
+    float     supply_granted = 0.0f;
     std::array<float, lp_network_count> made{}; ///< by network
     std::array<int,   lp_network_count> sources{};
     std::array<float, lp_class_count>   claim{};
@@ -202,23 +199,29 @@ struct lp_source_row
     bool       connected = true;
 };
 
-/// One marching unit's claim, handed IN by the march pass (BL-1352). The pass owns
-/// both the points a unit would move on and the order claims are served in, so the
-/// resolver takes them rather than deriving a second copy of either.
-struct lp_march_claim
+/// One unit's supply request, handed IN by the economy step (BL-1445,
+/// `collect_supply_claims`), which owns what a unit's supplies are. Served in the
+/// order given (ascending unit id).
+struct lp_supply_claim
 {
     entity_id unit   = null_entity;
-    entity_id nation = null_entity; ///< ground the unit stands on; null = no pool
-    float     need   = 0.0f;        ///< march points it would spend this tick
+    entity_id nation = null_entity; ///< the unit's own nation, whose pool serves it; null = no pool
+    entity_id tile   = null_entity; ///< the tile it stands on, where the request is routed
+    float     need   = 0.0f;        ///< the quantity of its supplies this quarter
 };
 
-/// One marching unit's answer.
-struct lp_march_row
+/// One unit's answer.
+struct lp_supply_row
 {
     entity_id unit    = null_entity;
     entity_id nation  = null_entity;
+    entity_id tile    = null_entity;
     float     need    = 0.0f;
-    float     granted = 0.0f; ///< `need` when served, 0 when refused: a march is all or nothing
+    float     cover   = 0.0f; ///< the tile's routed cover from the nation's sources, [0,1]
+    float     granted = 0.0f; ///< <= need x cover, and what the pool had left
+    /// granted / need in integer per-mille (truncated); 1000 for a request of zero.
+    /// The share `run_nation_garrison_upkeep` folds into the one decay rule.
+    int       share_permille = 1000;
 };
 
 struct lp_tick
@@ -226,11 +229,11 @@ struct lp_tick
     std::vector<lp_nation_row>   nations;   ///< ascending nation id
     std::vector<lp_source_row>   sources;   ///< ascending building id
     std::vector<lp_building_row> buildings; ///< ascending building id
-    std::vector<lp_march_row>    marches;   ///< BL-1352, in the order claims were served
+    std::vector<lp_supply_row>   supplies;  ///< BL-1445, in the order claims were served (ascending unit id)
     /// building id -> fraction, for the economy step's lookup.
     std::unordered_map<entity_id, float> fraction;
-    /// unit id -> points granted, for the march pass's lookup (BL-1352).
-    std::unordered_map<entity_id, float> march_granted;
+    /// unit id -> its supply share per-mille, for the upkeep pass's lookup (BL-1445).
+    std::map<entity_id, int> supply_share;
     /// BL-1361: market id -> its anchor, for every market, read at resolve.
     std::map<entity_id, lp_trade_anchor> trade_anchors;
     /// BL-1361: true once `resolve_logistic_points` filled this tick. A shipment
@@ -317,12 +320,12 @@ std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body,
 
 /// Resolve this tick's pools, claims and grants. Pure; mutates only caches.
 ///
-/// @param marches BL-1352: the marching claims, in the order they are to be served
-///        (the march pass's own order). Each is granted whole or refused, before any
-///        producer claims, so production sees `pool - march_granted`. Empty (the
-///        default) is a tick with nothing marching, and leaves every grant exactly
-///        as it was before the march joined this pool.
-lp_tick resolve_logistic_points(world& w, const std::vector<lp_march_claim>& marches = {});
+/// @param supplies BL-1445: the units' supply requests, in the order they are to be
+///        served (ascending unit id). Each is routed on its tile and served need x
+///        cover while its nation's pool lasts, before any producer claims, so
+///        production sees `pool - supply_granted`. Empty (the default) is a tick with
+///        no unit, and leaves every grant exactly as it was before supply joined.
+lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& supplies = {});
 
 /// One running source as routing reads it (BL-1356).
 struct lp_source_ref

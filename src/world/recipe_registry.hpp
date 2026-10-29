@@ -804,24 +804,29 @@ struct military_capability_params
     /// at the contract loop; this is where it actually landed.
     unit_upkeep_params upkeep = {};
 
-    /// BL-470: march points spent per tick against per-tile traversal cost,
-    /// keyed by `unit_class` (combat.hpp — infantry/cavalry/ranged/siege/naval).
-    /// PER-CLASS FROM THE START (overturned the item's own one-speed first
-    /// cut, same elicitation) — a wing outpaces a line, authored as data
-    /// rather than a code branch. Authored under
-    /// `economy.military.march_points_per_class`; a class with a non-positive
-    /// entry cannot march at all (naval defaults to 0 — no naval movement
-    /// model exists yet, combat.hpp's own "strategic-only presence" note).
-    /// A composite unit (BL-472, not built here) reads its SLOWEST member's
-    /// class entry — the hook, not the composite logic.
-    std::array<float, unit_class_count> march_points_per_class = {};
+    /// UNITS MARCH BY THE DAY, AT THEIR CLASS'S SPEED (Ben, 2026-10-28; MILITARY.md
+    /// § Marching; BL-1445 move by days). The DAYS a unit takes to cross one plains
+    /// tile (traversal cost 1.0), keyed by its LAND CLASS (`land_class_for`, indexed
+    /// by `land_class`): terrain multiplies them by the hop's traversal cost and a
+    /// road divides them by its own discount (`edge_traversal_cost`, the one hop
+    /// price). Authored under `economy.military.march_days_per_tile`. Read for every
+    /// row that DECLARES a land class (every modern row); 0 = cannot march (`none`).
+    std::array<float, land_class_count> march_days_per_land_class = {};
+
+    /// The same, for a PRE-MODERN row (an Era -1 row, declaring no land class), keyed
+    /// by its `unit_class` (`cls`). Authored under
+    /// `economy.military.march_days_per_tile_by_cls`; 0 = cannot march (naval: a sea
+    /// unit moves under § The campaign force model's Sea, not this land table). A
+    /// composite unit (BL-472, not built here) reads its SLOWEST member's entry.
+    std::array<float, unit_class_count> march_days_per_cls = {};
 
     // RETIRED (BL-1352): `active_lp_per_anchor_tick`, the per-anchor rate of the
     // second Logistic Point system. A march now draws the HOST NATION's pool —
     // made by hubs, stations and ports, consumed by production, claimed first by
     // the march (logistic_points.hpp) — so there is no second rate to author. The
-    // exchange is unchanged: one point admits one march-point's worth of movement,
-    // which is the scale `march_points_per_class` above is already in.
+    // exchange: one point admits one unit of traversal cost (a plains tile is 1.0),
+    // whatever the class's speed — speed decides how many DAYS a tile takes, never
+    // how many points it costs (BL-1445).
 
     /// BL-596: credits charged per (active-LP-unit x head) an active march
     /// draws — "it should cost actual money to resolve LP usage... moving

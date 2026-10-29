@@ -1483,7 +1483,7 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
 
     // And the nation's own arithmetic, ABSOLUTE (Ben, 2026-10-24): what its sources
     // GENERATED, what its buildings CONSUMED and on what, and what production NEEDS.
-    const float used = state.lp_player_prod + state.lp_player_march + state.lp_player_shipping;
+    const float used = state.lp_player_prod + state.lp_player_supply + state.lp_player_shipping;
     char line[96];
     std::snprintf(line, sizeof line, "Generated %.0f /tick, %d source(s)",
                   static_cast<double>(state.lp_player_pool), state.lp_player_sources);
@@ -1498,8 +1498,8 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
                   static_cast<double>(state.lp_player_prod), static_cast<double>(state.lp_player_need));
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), line); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 2.0f;
-    std::snprintf(line, sizeof line, "  marches %.0f, shipments %.0f",
-                  static_cast<double>(state.lp_player_march), static_cast<double>(state.lp_player_shipping));
+    std::snprintf(line, sizeof line, "  unit supply %.0f, shipments %.0f",
+                  static_cast<double>(state.lp_player_supply), static_cast<double>(state.lp_player_shipping));
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), line); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
@@ -2071,7 +2071,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_player_claim    = 0.0f;
     state.lp_player_need     = 0.0f;
     state.lp_player_prod     = 0.0f;
-    state.lp_player_march    = 0.0f;
+    state.lp_player_supply    = 0.0f;
     state.lp_player_shipping = 0.0f;
     state.lp_player_sources  = 0;
     state.lp_player_known    = false;
@@ -2416,12 +2416,12 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
                 if (r.nation == pn)
                 {
                     // GENERATED and CONSUMED, both absolute (Ben, 2026-10-24): the pool
-                    // its connected sources made, and what production, the marches and
+                    // its connected sources made, and what production, the units' supply and
                     // the shipments actually drew from it this tick.
                     state.lp_player_pool     = r.pool;
                     state.lp_player_claim    = r.claim[0] + r.claim[1] + r.claim[2];
                     state.lp_player_prod     = r.granted[0] + r.granted[1] + r.granted[2];
-                    state.lp_player_march    = r.march_granted;
+                    state.lp_player_supply   = r.supply_granted;
                     state.lp_player_shipping = r.trade_drawn;
                 }
             // What the nation's producers NEED at their run, whatever reaches them: the

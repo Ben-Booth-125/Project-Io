@@ -1139,7 +1139,17 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             mo.path       = path; // travel order: path[0] is the tile the unit occupies
             mo.next_index = 1;
             mo.progress   = 0.0f;
-            w.units.at(cmd.subject).order = mo;
+            // BL-1445 (move by days): THE BANK SURVIVES A RE-ISSUE TOWARD THE SAME NEXT
+            // TILE. Movement banks day by day in `progress` toward the next hop; a new
+            // order whose first hop is the hop the unit was already banking toward keeps
+            // that bank, so a slow unit a front re-targets every day or two (push mode)
+            // still steps. A new first hop starts from zero, as it always did.
+            unit_component& mu = w.units.at(cmd.subject);
+            if (mu.order.dest != null_entity && mu.order.next_index < mu.order.path.size()
+                && path.size() > 1 && mu.order.path[mu.order.next_index] == path[1]
+                && std::isfinite(mu.order.progress) && mu.order.progress > 0.0f)
+                mo.progress = mu.order.progress;
+            mu.order = mo;
             return corp_command_result::applied;
         }
 
