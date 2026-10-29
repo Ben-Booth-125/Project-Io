@@ -103,6 +103,36 @@ struct campaign_battle_params
     /// readiness.
     int readiness_cost = 185;
 
+    /// A BATTLE IS WEEKS LONG, NOT DAYS (Ben, 2026-10-29; MILITARY.md § Battles).
+    /// Two terms on the damage a side takes in a day, applied to the landed hits
+    /// after the visible share, so men and readiness slow together and a battle
+    /// kills the same share of its men it always did, over more days:
+    ///
+    ///   day_damage_permille — every day's landed damage x this. At 125 (1/8) a
+    ///     parity fight of base infantry, which the round once spent in about seven
+    ///     days, runs about forty (move_by_days D6; 167 measured 29.8, the low edge).
+    ///   the ROUT TERM — when the side dealing the damage out-hits the side taking
+    ///     it by more than `rout_ratio_permille` (raw hits before the swing, the
+    ///     ground included), the damage is raised by the excess ratio CUBED:
+    ///     x (ratio / rout_ratio)^3, capped at `rout_cap_permille`. Below the line
+    ///     nothing changes, so the contested band (about 1.5:1, where breaking a
+    ///     defender lies) is the longest fight; above it a rout stays fast — at
+    ///     3:1 the beaten side takes 8x the base, about the old pace.
+    /// Measured in campaign_battle_harness C4 and move_by_days_harness D6.
+    int day_damage_permille = 125;
+    int rout_ratio_permille = 1500;
+    int rout_cap_permille   = 12000;
+
+    /// THE BATTLE'S FORTUNE (BL-1453 retune). A weeks-long fight averages forty
+    /// daily swings, which alone makes the result a lookup of who is bigger — the
+    /// thing NR-204 ruled against. So each side also fights the whole battle under
+    /// one fortune — its generalship, plan and luck for this operation — a
+    /// multiplier on every hit it deals, uniform in [1000 - this, 1000 + this].
+    /// DERIVED from the battle's `stream_seed` (`battle_fortune_permille`), never
+    /// drawn from the round stream: the two-draws-a-round budget is unchanged and
+    /// nothing new is saved.
+    int fortune_permille = 250;
+
     /// How much the battle ground's terrain_defence divides the ATTACKER's hits:
     /// hits x 1000 / (1000 + terrain_defence x this / 1000). At 1000 a mountain
     /// (terrain_defence 1000) halves them.
@@ -144,8 +174,13 @@ struct campaign_battle_params
     /// 250 (day 10) and holds there, so the first ten days price as they always did
     /// and the dearest exit — 20 + 250 + a pursuit of at most 400 — is 670 per-mille
     /// of the leaving side's men: a late exit stays dear and never takes them all.
+    ///
+    /// RE-CUT FOR WEEKS-LONG BATTLES (BL-1453 retune, 2026-10-29): 6 a round to the
+    /// cap of 250 (day 42, about a parity battle's length), so a break-off in the
+    /// first week of a forty-day fight is cheap and one at its end is dear. The
+    /// dearest exit is still 20 + 250 + 400 = 670 per-mille of the leaving side's men.
     int withdraw_base_permille          = 20;
-    int withdraw_per_round_permille     = 25;
+    int withdraw_per_round_permille     = 6;
     int withdraw_per_round_cap_permille = 250;
     int withdraw_pursuit_scale          = 400;
 
@@ -377,6 +412,11 @@ inline bool battle_order_less(const active_battle& a, const active_battle& b)
     if (a.attacker != b.attacker) return a.attacker < b.attacker;
     return a.defender < b.defender;
 }
+
+/// BL-1453 retune: @p side's fortune for the battle whose stream seed is @p seed,
+/// per-mille, uniform in [1000 - half_width, 1000 + half_width] (attacker and
+/// defender folded apart). A pure function of the seed: consumes no draw.
+int battle_fortune_permille(uint64_t seed, bool attacker, int half_width);
 
 /// Fold @p id into the battle's stream seed. Exposed so a caller can log it
 /// and so a harness can assert that two different identities really do produce

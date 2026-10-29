@@ -102,13 +102,17 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 | `hp_share_permille` | 300 | Share of landed damage that kills men; the rest spends readiness |
 | `hp_cost` | 400 | Milli-hits of HP damage that kill one man |
 | `readiness_cost` | 185 | Milli-hits per man that spend a unit's whole readiness |
+| `day_damage_permille` | 125 | Every day's landed damage (men and readiness alike) is scaled by this — what makes a battle weeks long |
+| `rout_ratio_permille` | 1500 | Above this ratio of raw hits (the dealer's over the taker's, before the swing), the damage the taker takes rises by the excess ratio cubed — a rout stays fast |
+| `rout_cap_permille` | 12000 | The most the rout term multiplies the day's damage by |
+| `fortune_permille` | 250 | Each side's fortune for the whole battle — a multiplier on every hit it deals, uniform in [750, 1250], derived from the battle's seed (no draw) |
 | `terrain_attack_scale` | 1000 | How far `terrain_defence` divides the attacker's hits — a mountain halves them |
 | `wavering_readiness` | 300 | Side readiness at or below which the phase reads wavering |
 | `morale_win` / `morale_loss` | 50 / 100 | Morale a battle's winners gain, and its losers and every retreating unit lose |
 | `readiness_recovery_permille` / `morale_recovery_permille` | 100 / 10 | Out of contact, per day (§ Marching, Ben 2026-10-28): readiness regained (by supply, never above morale), and morale's step toward supply |
 | `withdraw_base_permille` | 20 | Flat price of turning your back at all |
-| `withdraw_per_round_permille` | 25 | Added per round already fought |
-| `withdraw_per_round_cap_permille` | 250 | The most the per-round term reaches (day 10), so the dearest exit is 670 per-mille of the leaving side's men |
+| `withdraw_per_round_permille` | 6 | Added per round already fought |
+| `withdraw_per_round_cap_permille` | 250 | The most the per-round term reaches (day 42, about a parity battle's length), so the dearest exit is 670 per-mille of the leaving side's men |
 | `withdraw_pursuit_scale` | 400 | Share of how far behind the withdrawing side is |
 | `rounds_per_day` | 1 | Rounds fought per day (§ Battles ruling 3, Ben 2026-10-28) |
 
@@ -118,9 +122,12 @@ standing men.
 
 **The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio, full vision):
 attacking is dear, and breaking a defender takes about 1.5:1 in men — the defender broken in 0% at
-1:1, 12% at 1.25:1, 90% at 1.5:1 and 100% from 1.75:1. With no round cap every fight ends on a
-break, so the decisive share equals the result. `swing_permille` stays at 600 (NR-204: a narrower
-swing made the edge too safe).
+1:1, 26% at 1.25:1, 82% at 1.5:1, 99% at 1.75:1 and 100% from 2:1. Every fight ends on a break, so
+the decisive share equals the result. `swing_permille` stays at 600 (NR-204: a narrower swing made
+the edge too safe). **The battle's fortune keeps the fight uncertain.** Forty daily swings average
+out, which alone would make a weeks-long battle a lookup of who is bigger; a fortune per side for
+the whole battle — its plan, its generalship, its luck in this operation — is what leaves a 1.25:1
+assault a one-in-four chance.
 
 **A battle has no maximum duration (Ben, 2026-10-29).** *"They continue while one unit is trying
 to move and end when readiness runs out. Some battles may easily take 90-180 days."* A battle runs
@@ -134,6 +141,14 @@ still, and a rout stays fast. **Breaking a defender takes about 1.5:1 in men** (
 keeping the ratio the uncapped battle produced). The round's damage is calibrated to the day — one round is one day's fighting, so the
 per-round numbers above are a day's — and a commander gets a decision every day of the fight, a
 withdrawal honoured at the next day's boundary.
+
+**The measured lengths** (`move_by_days_harness` D6, infantry on plains through the daily pass, with
+recon, 40 openings a ratio, days from contact to close): **39 days at parity** (the attacker breaks;
+the longest 60), **46 at 1.5:1** (the contested band, the longest fight; up to 92), 20 at 2:1 and
+**6 at 3:1** — a rout. The resolver alone (C4, 200 seeds) reads 51, 52, 18 and 4 days. **The recon
+ramp now sits inside every battle:** full vision by day 20 comes in the first half of a parity
+fight, so recon decides how the opening weeks go rather than how long the battle lasts — with or
+without it a base-infantry battle runs the same length (`land_recon_harness` M1).
 
 **Withdrawal is a first-class verb, not a failure state**, and it is never free. The cost has three
 terms — base, per-round, and pursuit — and the second and third are what make a late break-off

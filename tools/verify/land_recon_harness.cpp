@@ -406,12 +406,24 @@ int main()
               "R6d a unit raised in it fights with the class stealth plus the kit's");
         open_tile_battle(g.w, 0, g.tile, g.att, g.def, {g.ua});
         open_tile_battle(h.w, 0, h.tile, h.att, h.def, {h.ua});
-        for (int d = 0; d < 3; ++d) { run_battles(g.w, reg, d); run_battles(h.w, reg, d); }
-        const int lost_g = 500 - g.w.units.at(g.ub).count;
-        const int lost_h = 500 - h.w.units.at(h.ub).count;
-        std::printf("        defender men lost over three days: %d in a steel helmet, %d in ceramic plates\n",
-                    lost_g, lost_h);
-        check(lost_h < lost_g, "R6e end to end, the plate carrier's defender loses fewer men (stealth and defence together)");
+        // Every hit the attacker landed on the defender, summed over the days: the
+        // battle's own round record (a battle is weeks long, so men lost in a few
+        // days are too few to tell apart one by one).
+        long long landed_g = 0, landed_h = 0;
+        for (int d = 0; d < 20; ++d)
+        {
+            run_battles(g.w, reg, d);
+            run_battles(h.w, reg, d);
+        }
+        if (const active_battle* bg = the_battle(g))
+            for (const campaign_battle_round& r : bg->state.rounds) landed_g += r.attacker_power;
+        if (const active_battle* bh = the_battle(h))
+            for (const campaign_battle_round& r : bh->state.rounds) landed_h += r.attacker_power;
+        std::printf("        hits landed on the defender over twenty days: %lld in a steel helmet, %lld in ceramic plates"
+                    " (men lost %d / %d)\n", landed_g, landed_h,
+                    500 - g.w.units.at(g.ub).count, 500 - h.w.units.at(h.ub).count);
+        check(landed_g > 0 && landed_h < landed_g,
+              "R6e end to end, the plate carrier's defender takes fewer hits (stealth and defence together)");
     }
 
     // -----------------------------------------------------------------------

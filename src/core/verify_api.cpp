@@ -11,6 +11,8 @@
 #include <chrono>
 #include <thread>
 #include "app.hpp"
+#include "world/economy_system.hpp" // BL-1453: advance_quarter_to for day_step
+#include "core/session_history.hpp" // BL-1453: day_step posts battle dispatches
 
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
@@ -1864,6 +1866,36 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // window is hang-declared mid-script (see the run header above).
             SDL_PumpEvents();
         }
+    });
+
+    // BL-1453 (NR-587's shape): STEP DAYS, not quarters. One econ_step is a whole
+    // quarter, ninety days, and a battle opens and closes inside it, so a capture
+    // could never see one live. This walks @p n days (default 1) through the SAME
+    // path the app's day loop uses - advance_quarter_to, construction's day then the
+    // military's, stamped off military_quarter_day_base(m_econ_steps) - and posts the
+    // day's battle dispatches to the Field channel as the day loop does. A day that
+    // would pass the quarter's end first closes it with one economy step, exactly as
+    // econ_step would. Returns the days advanced; reveals nothing the screen does not.
+    // Verify-only, bound behind --verify.
+    v.set_function("day_step", [this](sol::optional<int> n) {
+        const int days = std::clamp(n.value_or(1), 0, 3650);
+        int advanced = 0;
+        for (int i = 0; i < days; ++i)
+        {
+            if (m_world.construction_quarter_day >= k_construction_quarter_days)
+            {
+                ++m_world.current_day_tick; // as econ_step does
+                step_economy();
+            }
+            std::vector<battle_dispatch> dispatches;
+            advanced += advance_quarter_to(m_world, m_registry, m_world.construction_quarter_day + 1,
+                                           military_quarter_day_base(static_cast<int>(m_econ_steps)),
+                                           &dispatches);
+            session_history::post_battle_dispatches(m_world, dispatches, m_chat,
+                                                    m_world.current_day_tick);
+            SDL_PumpEvents(); // heartbeat, as econ_step's
+        }
+        return advanced;
     });
 
     // BL-1406: FOLD THE VERIFY WORLD TO GROUND, as every campaign start does

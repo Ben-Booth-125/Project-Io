@@ -11,6 +11,8 @@
 -- Nothing here hard-codes a grid coordinate, so a generation change moves the
 -- fight rather than silently invalidating the check.
 --
+-- FIXED (BL-1453, 2026-10-29): the loop below steps DAYS (verify.day_step), so
+-- the fragility recorded here no longer applies. The record, kept:
 -- KNOWN FRAGILITY (NR-587, 2026-08-24): the step-until-contact loop below only
 -- ever observes a battle via `verify.select_battle`, which can only see world
 -- state BETWEEN whole ticks. If the specific matchup this run's generation
@@ -65,12 +67,13 @@ local march_result = verify.corp_command{ verb = VERB_MARCH_UNIT, corp = player_
 print(string.format("battle_card: march %s from (%d,%d) onto (%d,%d)", tostring(march_result), mine.col, mine.row, theirs.col, theirs.row))
 assert(march_result == "applied", "the march onto the rival stack was refused: " .. tostring(march_result)) -- BL-1443: march onto their tile; contact is the attack
 
--- Step until contact. A generous budget: the march is path-marched across ticks
--- on the shared traversal-cost metric, so how long it takes is a function of the
--- generated ground, not a constant this script may assume.
+-- Step DAYS until contact (BL-1453, NR-587's fix): verify.day_step walks the day
+-- loop's own path, so the battle is seen live on the day it opens rather than
+-- opening and closing inside a ninety-day econ_step. A generous budget: how long
+-- the march takes is a function of the generated ground, not a constant.
 local in_battle = false
-for _ = 1, 120 do
-    verify.econ_step(1)
+for _ = 1, 720 do
+    verify.day_step(1)
     if verify.select_battle(theirs.col, theirs.row) then in_battle = true; break end
     for _, u in ipairs(verify.units()) do
         if u.id == mine.id and (_G.__bc_n or 0) % 10 == 0 then
@@ -79,17 +82,17 @@ for _ = 1, 120 do
     end
     _G.__bc_n = (_G.__bc_n or 0) + 1
 end
-assert(in_battle, "no battle opened within 120 ticks of marching into contact")
+assert(in_battle, "no battle opened within 720 days of marching into contact")
 
 -- The card: phase word, both sides' per-unit strength bars, and the withdrawal
 -- price with its three terms separated.
 verify.capture("battle_card")
 
--- One more tick batch, so the card shows a fight that has MOVED — the phase
--- readout is a reading of the last round batch, and a first-round capture cannot
--- show it changing.
-verify.econ_step(1)
-verify.select_battle(theirs.col, theirs.row)
+-- A few more days, so the card shows a fight that has MOVED — the phase readout
+-- is a reading of the last round batch, and a first-round capture cannot show it
+-- changing. A battle is weeks long, so it is still live.
+verify.day_step(3)
+assert(verify.select_battle(theirs.col, theirs.row), "the battle closed within three days of opening")
 verify.capture("battle_card_stepped")
 
 -- The Field channel (BL-468). Channel 1 is Field — appended after Public, never

@@ -445,7 +445,7 @@ int main()
         build_fixture(f);
         engage(f);
         bool saw_conclusion = false;
-        for (int i = 0; i < 10 && !saw_conclusion; ++i)
+        for (int i = 0; i < 200 && !saw_conclusion; ++i) // a battle is weeks long (BL-1453)
         {
             const battle_tick t = run_battles(f.w, reg, i);
             for (const battle_dispatch& d : t.dispatches)
@@ -461,7 +461,7 @@ int main()
                       "B11c its phase reads as an ending");
             }
         }
-        check(saw_conclusion, "B11  a battle concluded within ten ticks (the row was exercised)");
+        check(saw_conclusion, "B11  a battle concluded within 200 days (the row was exercised)");
     }
 
     // -----------------------------------------------------------------------
@@ -771,14 +771,14 @@ int main()
         }
         const int before = total_men(f.w);
         bool concluded = false;
-        for (int i = 0; i < 10 && !concluded; ++i)
+        for (int i = 0; i < 200 && !concluded; ++i) // a battle is weeks long (BL-1453)
         {
             const battle_tick bt = run_battles(f.w, reg, i);
             for (const battle_dispatch& d : bt.dispatches)
                 if (d.end != campaign_battle_end::in_progress)
                     concluded = true;
         }
-        check(concluded, "B17e the battle RESOLVED within ten ticks");
+        check(concluded, "B17e the battle RESOLVED within 200 days");
         check(f.w.battles.empty(), "B17f ...and is erased on conclusion");
         check(total_men(f.w) < before, "B17g men died through the real step");
     }
@@ -790,10 +790,8 @@ int main()
         build_fixture(f);
         engage(f);
         // BL-1453 (land recon): this row is about the RETREAT, so it fights in full
-        // vision from day 1 (time_full_days 1). Under the shipped recon a 1v1 parity
-        // assault sees 30-55 % of its target over its first six days and is not spent
-        // within the ten days this row allows (land_recon_harness M1), which is
-        // recon's own subject, not this row's.
+        // vision from day 1 (time_full_days 1), so the retreat is not entangled with
+        // the vision ramp, which is land_recon_harness's subject.
         recipe_registry seen = reg;
         {
             military_capability_params mp = seen.military();
@@ -803,7 +801,7 @@ int main()
         const entity_id start = f.w.units.at(f.ua).position;
         bool retreated = false;
         int morale_after = 1000;
-        for (int i = 0; i < 10 && !retreated; ++i)
+        for (int i = 0; i < 200 && !retreated; ++i) // a battle is weeks long (BL-1453)
         {
             run_battles(f.w, seen, i);
             const unit_component& u = f.w.units.at(f.ua);

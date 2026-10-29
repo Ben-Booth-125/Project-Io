@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 
 namespace {
 
@@ -92,6 +93,32 @@ int64_t side_absorb(const std::vector<land_combatant>& side, bool defending)
             absorb += static_cast<int64_t>(c.men)
                     * std::max(0, defending ? c.stats.defence : c.stats.breakthrough);
     return absorb;
+}
+
+/// BL-1453 retune (Ben, 2026-10-29: "a battle is weeks long, not days"): THE DAY'S
+/// DAMAGE SCALE on @p landed milli-hits a side takes — `day_damage_permille`, raised
+/// by the rout term when the dealer's raw hits @p dealt exceed the taker's own
+/// @p taken by more than `rout_ratio_permille` (x (ratio / line)^3, capped).
+int64_t day_scaled(int64_t landed, int64_t dealt, int64_t taken, const campaign_battle_params& p)
+{
+    if (landed <= 0)
+        return landed;
+    int64_t scale = std::max(0, p.day_damage_permille); // per-mille
+    const int64_t line = std::max(1, p.rout_ratio_permille);
+    if (dealt > 0)
+    {
+        // ratio x 1000 / line, per-mille; a taker who deals nothing is out-hit at the cap.
+        const int64_t over = taken > 0 ? dealt * 1000 / taken * 1000 / line
+                                       : std::numeric_limits<int64_t>::max() / 4;
+        if (over > 1000)
+        {
+            const int64_t cap = std::max<int64_t>(1000, p.rout_cap_permille);
+            const int64_t o = std::min<int64_t>(over, 100000); // keeps the cube in range
+            const int64_t cube = std::min<int64_t>(o * o / 1000 * o / 1000, cap);
+            scale = scale * cube / 1000;
+        }
+    }
+    return landed * scale / 1000;
 }
 
 /// What actually lands of @p hits against @p absorb.
@@ -254,6 +281,18 @@ int side_readiness(const std::vector<land_combatant>& side)
     return men > 0 ? static_cast<int>(ready / men) : 0;
 }
 
+int battle_fortune_permille(uint64_t seed, bool attacker, int half_width)
+{
+    half_width = std::clamp(half_width, 0, 1000);
+    if (half_width == 0)
+        return 1000;
+    // Its own fold, off the seed rather than the stream state, so reading it never
+    // moves the round's draws.
+    const uint64_t h = splitmix64(seed ^ (attacker ? 0xA77ACCE5F0E7A9E1ull : 0xDEFE9DE5F0E7A9E2ull));
+    const uint64_t span = static_cast<uint64_t>(2 * half_width + 1);
+    return 1000 - half_width + static_cast<int>(h % span);
+}
+
 uint64_t campaign_battle_seed(const campaign_battle_identity& id)
 {
     // Fold each field through its own mix so no two of them can cancel. The
@@ -321,10 +360,22 @@ bool step_campaign_battle(campaign_battle_state&        st,
     const int64_t terrain_d = terrain_defence(st.terrain_sub, st.terrain_cov,
                                               st.terrain_density, st.terrain_lf);
     const int64_t ground = 1000 + std::max<int64_t>(0, terrain_d) * params.terrain_attack_scale / 1000;
-    const int64_t atk_hits = side_hits(attacker, side_hardness(defender)) * atk_swing / 1000 * 1000 / ground;
-    const int64_t def_hits = side_hits(defender, side_hardness(attacker)) * def_swing / 1000;
-    const int64_t on_def = visible_landed(defender, landed_hits(atk_hits, side_absorb(defender, true), params));
-    const int64_t on_atk = visible_landed(attacker, landed_hits(def_hits, side_absorb(attacker, false), params));
+    // Each side's FORTUNE for the battle (derived from the seed, no draw) scales
+    // every hit it deals, the raw hits the rout term reads included.
+    const int64_t atk_fortune = battle_fortune_permille(st.stream_seed, true, params.fortune_permille);
+    const int64_t def_fortune = battle_fortune_permille(st.stream_seed, false, params.fortune_permille);
+    const int64_t atk_hits = side_hits(attacker, side_hardness(defender)) * atk_fortune / 1000
+                           * atk_swing / 1000 * 1000 / ground;
+    const int64_t def_hits = side_hits(defender, side_hardness(attacker)) * def_fortune / 1000
+                           * def_swing / 1000;
+    // The rout term reads the RAW hits before the swing (the ground included), so a
+    // day's luck does not tip a contested fight into a rout.
+    const int64_t atk_raw = side_hits(attacker, side_hardness(defender)) * atk_fortune / 1000 * 1000 / ground;
+    const int64_t def_raw = side_hits(defender, side_hardness(attacker)) * def_fortune / 1000;
+    const int64_t on_def = day_scaled(visible_landed(defender, landed_hits(atk_hits, side_absorb(defender, true), params)),
+                                      atk_raw, def_raw, params);
+    const int64_t on_atk = day_scaled(visible_landed(attacker, landed_hits(def_hits, side_absorb(attacker, false), params)),
+                                      def_raw, atk_raw, params);
 
     const bool atk_could_fight = fighting_men(attacker) > 0;
     const bool def_could_fight = fighting_men(defender) > 0;
