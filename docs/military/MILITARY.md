@@ -89,15 +89,14 @@ window is a real window rather than a parameter pretending to be one.
 plan. It adds no rules of its own, so a scripted run and a stepped one resolve identically.
 
 **Each round.** Every participating unit deals its hits by the soft/hard arithmetic (§ The
-campaign force model), then exactly two draws apply a swing — attacker first, defender second,
-always in that order. A side breaks when its units' readiness is spent, not at a strength
+campaign force model), with **no draw and no swing** (Ben, 2026-10-29: battles carry no
+randomness). A side breaks when its units' readiness is spent, not at a strength
 threshold.
 
 Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` precedent:
 
 | Field | Default | Meaning |
 |---|---|---|
-| `swing_permille` | 600 | Half-width of the per-round power swing — a uniform draw in [400, 1600] |
 | `absorbed_land_permille` | 250 | Share at which hits within the target's defence (or breakthrough) land; hits beyond it land in full |
 | `hp_share_permille` | 300 | Share of landed damage that kills men; the rest spends readiness |
 | `hp_cost` | 400 | Milli-hits of HP damage that kill one man |
@@ -120,14 +119,10 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 units still in the fight. The withdrawal price is charged **in men**, per-mille of the side's
 standing men.
 
-**The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio, full vision):
-attacking is dear, and breaking a defender takes about 1.5:1 in men — the defender broken in 0% at
-1:1, 26% at 1.25:1, 82% at 1.5:1, 99% at 1.75:1 and 100% from 2:1. Every fight ends on a break, so
-the decisive share equals the result. `swing_permille` stays at 600 (NR-204: a narrower swing made
-the edge too safe). **The battle's fortune keeps the fight uncertain.** Forty daily swings average
-out, which alone would make a weeks-long battle a lookup of who is bigger; a fortune per side for
-the whole battle — its plan, its generalship, its luck in this operation — is what leaves a 1.25:1
-assault a one-in-four chance.
+**The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio): attacking is
+dear, and breaking a defender takes about 2:1 in men — decisive 0% at 1:1, 15% at 1.5:1, 64% at
+1.75:1, 89% at 2:1, 99% from 2.5:1. With no swing (Ben, 2026-10-29, overturning NR-204's "a narrower
+swing made the edge too safe"), the same inputs always give the same battle.
 
 **A battle has no maximum duration (Ben, 2026-10-29).** *"They continue while one unit is trying
 to move and end when readiness runs out. Some battles may easily take 90-180 days."* A battle runs
@@ -141,6 +136,22 @@ still, and a rout stays fast. **Breaking a defender takes about 1.5:1 in men** (
 keeping the ratio the uncapped battle produced). The round's damage is calibrated to the day — one round is one day's fighting, so the
 per-round numbers above are a day's — and a commander gets a decision every day of the fight, a
 withdrawal honoured at the next day's boundary.
+
+**Like forces entrench, and supply decides the stalemate (Ben, 2026-10-29).** When the two sides'
+raw hits stand near parity — neither side dealing much more than the other — the
+battle **digs in**: its landed damage drops further, and each side **recovers readiness from its
+carried supplies** (§ Carried supplies) while it fights — a unit that is fed and holds ammunition
+above its floor recovers; a hungry unit, or one at the ammunition floor, does not. An entrenched
+battle spends ammunition and food every day like any other, so it is **decided by which side's
+stocks give out first** — by its network, not its dice. Two sides both fully supplied hold each
+other for as long as the attacker presses: that is the stalemate, and its price is the supply both
+networks pay to keep it. A battle that leaves the near-parity band leaves entrenchment, and fights
+on at the ordinary rate.
+
+**A battle has no randomness (Ben, 2026-10-29: "Let's not add battle randomness … remove the swing
+too").** No per-round swing and no per-battle roll: the same forces on the same ground with the same
+supply fight the same battle, every time. A long battle between unequal forces is therefore
+predictable, and that is accepted: what keeps a fight open is entrenchment and supply, not a draw.
 
 **The measured lengths** (`move_by_days_harness` D6, infantry on plains through the daily pass, with
 recon, 40 openings a ratio, days from contact to close): **39 days at parity** (the attacker breaks;
@@ -156,7 +167,7 @@ dear. Because a battle has no cap, the per-round term is bounded so that a late 
 never costs more men than the side has. Rounds already fought have separately cost their own attrition, so a late exit is expensive
 twice over.
 
-Withdrawing consumes **no draws** — disengaging is a decision, not another gamble.
+Withdrawing is a decision, not a gamble — no battle step draws at all.
 
 **Who holds the field.** On a withdrawal, the side that stayed holds it, even if it was losing on
 points; ground is held by being on it. Breaking is checked *after* a round resolves, so a routed
@@ -218,7 +229,10 @@ restock rate a day; a unit covered in part drains at the shortfall, more slowly 
 the share at which a stock holds steady is `need / (need + restock rate)`. The sub-‰ remainder of a
 delivery carries from day to day, so rounding never drains a covered unit. A unit raised at a base
 starts full. **A unit past its roads is unfed even at home (Ben, 2026-10-29)**: a home garrison on a
-tile its network does not cover draws nothing, and starves like any other unit.
+tile its network does not cover draws nothing, and starves like any other unit. **"Past its roads"
+is more than 8 tiles from them (Ben, 2026-10-29):** a unit within 8 tiles of a road its network
+reaches draws its supply at that road, paid per item resupplied
+([`LOGISTICS.md`](../economy/LOGISTICS.md) § A unit draws off the road).
 
 **Only the road gap starves (Ben, 2026-10-29).** The share that resupplies the stocks is the
 **Logistic Point share** at the unit's tile — whether the network reaches it. A nation that does
@@ -483,7 +497,9 @@ there, and superiority adds recon in proportion to its share (§ Recon).
 tactical mission spends its hits on enemy units fighting a battle in the province first, and on any
 other enemy unit there once none is in battle. Its hits use the land arithmetic (soft and hard
 attack against the target's hardness), with no terrain divisor, since an aircraft attacks from
-above.
+above. **Bombing a unit takes the land round's day scale (Ben, 2026-10-29):** its landed damage is
+scaled by the same per-day factor a battle's round is (§ Battles, "A battle is weeks long"), so air
+stays one arm of a weeks-long fight rather than outpacing it.
 
 **Strategic bombing damages a building, and damage slows its throughput (Ben, 2026-10-28).** Each
 building carries a **condition**, full when built. A strategic mission lowers the condition of an
@@ -1206,7 +1222,8 @@ capital rule. Neither post is the province's lowest-id tile, which is its id rat
 (BL-1145, a province's readers take its anchor).
 
 **A garrison is posted only where its network covers (Ben, 2026-10-29).** Each post above is chosen
-among the province's tiles that its nation's Logistic Point cover reaches at the handoff, by the
+among the province's tiles that its nation's Logistic Point cover reaches at the handoff — on the
+network or within the 8-tile off-road draw (§ Carried supplies) — by the
 same rule (the anchor centre; the tile facing the neighbour). A province with no covered tile posts
 its garrison on the covered tile of the nation's own ground nearest the post the rule would have
 chosen, ties to the lowest tile id. A nation's opening army therefore starts fed (§ Carried
@@ -1340,7 +1357,9 @@ manpower). The request is the quantity of those goods, as a convoy's draw is its
 tile's cover meets only part of it, the unit is supplied at that share, and the one decay rule above
 moves its supply factor toward it — a third trigger of the same rule, not a second rule. The
 supply factor is the rate at which the unit's carried food, ammunition and equipment are refilled
-(§ Carried supplies). An army deep past its roads is an army its network cannot feed.
+(§ Carried supplies). A unit off the road draws at the closest road within 8 tiles, paid per item
+resupplied (`../economy/LOGISTICS.md` § A unit draws off the road); an army deep past its roads is
+an army its network cannot feed.
 
 **Supply is measurably real in the resolver, not merely expensive.** The land round reads each
 unit's carried food, ammunition and equipment (§ Carried supplies), which its supply factor refills,
