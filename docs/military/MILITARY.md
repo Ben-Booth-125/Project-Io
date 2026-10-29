@@ -201,7 +201,10 @@ restock rate a day; a unit covered in part drains at the shortfall, more slowly 
 the share at which a stock holds steady is `need / (need + restock rate)`. The sub-‰ remainder of a
 delivery carries from day to day, so rounding never drains a covered unit. A unit raised at a base
 starts full. **A unit past its roads is unfed even at home (Ben, 2026-10-29)**: a home garrison on a
-tile its network does not cover draws nothing, and starves like any other unit.
+tile its network does not cover draws nothing, and starves like any other unit. **"Past its roads"
+is more than 8 tiles from them (Ben, 2026-10-29):** a unit within 8 tiles of a road its network
+reaches draws its supply at that road, paid per item resupplied
+([`LOGISTICS.md`](../economy/LOGISTICS.md) § A unit draws off the road).
 
 **Only the road gap starves (Ben, 2026-10-29).** The share that resupplies the stocks is the
 **Logistic Point share** at the unit's tile — whether the network reaches it. A nation that does
@@ -1188,7 +1191,8 @@ capital rule. Neither post is the province's lowest-id tile, which is its id rat
 (BL-1145, a province's readers take its anchor).
 
 **A garrison is posted only where its network covers (Ben, 2026-10-29).** Each post above is chosen
-among the province's tiles that its nation's Logistic Point cover reaches at the handoff, by the
+among the province's tiles that its nation's Logistic Point cover reaches at the handoff — on the
+network or within the 8-tile off-road draw (§ Carried supplies) — by the
 same rule (the anchor centre; the tile facing the neighbour). A province with no covered tile posts
 its garrison on the covered tile of the nation's own ground nearest the post the rule would have
 chosen, ties to the lowest tile id. A nation's opening army therefore starts fed (§ Carried
@@ -1322,7 +1326,9 @@ manpower). The request is the quantity of those goods, as a convoy's draw is its
 tile's cover meets only part of it, the unit is supplied at that share, and the one decay rule above
 moves its supply factor toward it — a third trigger of the same rule, not a second rule. The
 supply factor is the rate at which the unit's carried food, ammunition and equipment are refilled
-(§ Carried supplies). An army deep past its roads is an army its network cannot feed.
+(§ Carried supplies). A unit off the road draws at the closest road within 8 tiles, paid per item
+resupplied (`../economy/LOGISTICS.md` § A unit draws off the road); an army deep past its roads is
+an army its network cannot feed.
 
 **Supply is measurably real in the resolver, not merely expensive.** The land round reads each
 unit's carried food, ammunition and equipment (§ Carried supplies), which its supply factor refills,
