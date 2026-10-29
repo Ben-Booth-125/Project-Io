@@ -54,6 +54,7 @@
 #include "world/world_save.hpp"
 #include "world/placement_rules.hpp"
 #include "world/state_industry.hpp"
+#include "world/trade.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -364,15 +365,23 @@ int main()
         const entity_id ftr = add_wing(f, f.a, f.airbase, air_class::fighter, air_mission::none, {});
         const entity_id mr  = add_wing(f, f.a, f.airbase, air_class::multirole, air_mission::none, {});
         const entity_id bw  = add_wing(f, f.b, f.b_airbase, air_class::fighter, air_mission::none, {});
+        const entity_id bm  = add_wing(f, f.a, f.airbase, air_class::bomber, air_mission::none, {});
         check(air_province_distance(f.w, tile(f, 30, 1), strip(f, 10)) == 10
                   && air_province_distance(f.w, tile(f, 30, 1), strip(f, 15)) == 30,
               "A2a the straight-line distance to a province is to its nearest tile (10 and 30)");
         refused(f, [&] { return assign(f, reg, f.a, ftr, air_mission::superiority, {strip(f, 15)}); },
                 corp_command_result::rejected_placement, "A2b a province out of the fighter's range (30 > 15) is refused");
-        refused(f, [&] { return assign(f, reg, f.a, mr, air_mission::tactical, {strip(f, 10)}); },
-                corp_command_result::rejected_state, "A2c bombing a nation the owner is not hostile to is refused");
-        refused(f, [&] { return assign(f, reg, f.a, mr, air_mission::tactical, {strip(f, 5)}); },
-                corp_command_result::rejected_state, "A2d bombing the owner's own province is refused");
+        refused(f, [&] { return assign(f, reg, f.a, bm, air_mission::strategic, {strip(f, 10)}); },
+                corp_command_result::rejected_state, "A2c strategic bombing of a nation the owner is not hostile to is refused");
+        refused(f, [&] { return assign(f, reg, f.a, bm, air_mission::strategic, {strip(f, 5)}); },
+                corp_command_result::rejected_state, "A2d strategic bombing of the owner's own province is refused");
+        {
+            world keep = f.w;
+            const bool own = assign(f, reg, f.a, mr, air_mission::tactical, {strip(f, 5)})
+                             == corp_command_result::applied;
+            f.w = keep;
+            check(own, "A2d2 tactical bombing may fly over the owner's own province (close air support)");
+        }
         refused(f, [&] { return assign(f, reg, f.a, ftr, air_mission::tactical, {strip(f, 6)}); },
                 corp_command_result::rejected_invalid, "A2e a mission the class does not fly is refused");
         refused(f, [&] { return assign(f, reg, f.a, ftr, air_mission::none, {strip(f, 6)}); },
@@ -394,8 +403,9 @@ int main()
         refused(f, [&] { return assign(f, reg, f.a, ftr, air_mission::superiority, {strip(f, 6), strip(f, 10)}); },
                 corp_command_result::rejected_state, "A2m the same assignment again changes nothing");
         declare_hostile(f.w, f.a, f.b);
-        check(assign(f, reg, f.a, mr, air_mission::tactical, {strip(f, 10)}) == corp_command_result::applied,
-              "A2n once hostile, tactical bombing over the enemy's province applies");
+        check(assign(f, reg, f.a, mr, air_mission::tactical, {strip(f, 10)}) == corp_command_result::applied
+                  && assign(f, reg, f.a, bm, air_mission::strategic, {strip(f, 10)}) == corp_command_result::applied,
+              "A2n once hostile, tactical and strategic bombing over the enemy's province apply");
         const std::vector<uint32_t> in = air_provinces_in_range(f.w, reg, ftr);
         bool agree = !in.empty();
         for (std::size_t k = 0; k < f.strip_id.size(); ++k)
@@ -569,6 +579,40 @@ int main()
               "A6d with nothing on the shelf the repair stalls and it stays damaged");
         check(f.w.buildings.at(f.airbase).condition_permille == 1000,
               "A6e the bomber's own side's buildings are untouched");
+        {
+            recipe_registry treg = reg;
+            trade_params tp = treg.trade();
+            tp.marketplace_points = 10.0f;
+            tp.port_points = 8.0f;
+            treg.set_trade(tp);
+            building_component mk{};
+            mk.type = building_type::planetary_marketplace;
+            mk.workforce_assigned = 1.0f; mk.workforce_target = 200;
+            const float whole = building_trade_points(treg, mk, 1.0f, true);
+            mk.condition_permille = 500;
+            const float half = building_trade_points(treg, mk, 1.0f, true);
+            building_component port{};
+            port.type = building_type::port;
+            const float pw = building_trade_points(treg, port, 1.0f, true);
+            port.condition_permille = 250;
+            const float pq = building_trade_points(treg, port, 1.0f, true);
+            check(whole > 0.0f && std::fabs(half - whole * 0.5f) < 1e-4f && std::fabs(pq - pw * 0.25f) < 1e-4f,
+                  "A6f a bombed marketplace and port make trade points at their condition");
+        }
+        {
+            fixture g;
+            build(g);
+            declare_hostile(g.w, g.a, g.b);
+            // Strip 12 holds only military installations of B: nothing a bomber bites.
+            add_building(g, g.b, 49, 2, building_type::military_base);
+            add_wing(g, g.a, g.airbase, air_class::bomber, air_mission::strategic, {strip(g, 12)});
+            const air_day_tick t = fly(g, reg, 10);
+            bool whole = true;
+            for (const auto& kv : g.w.buildings) whole = whole && kv.second.condition_permille == 1000;
+            check(t.strategic_hits == 0 && whole && condition_bites(building_type::extraction_site)
+                      && !condition_bites(building_type::military_base) && !condition_bites(building_type::airbase),
+                  "A6g military bases and airbases are not strategic targets (their output is not condition-scaled)");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -586,6 +630,18 @@ int main()
         const wing_upkeep_tick t = run_wing_upkeep(f.w, reg, rep);
         check(gone && t.disbanded == 2 && f.w.wings.count(w1) == 0 && f.w.wings.count(w2) == 0,
               "A7b a wing whose airbase is demolished, and one shot down, are disbanded");
+        {
+            fixture g;
+            build(g);
+            const entity_id gw = add_wing(g, g.b, g.b_airbase, air_class::fighter, air_mission::none, {});
+            g.w.buildings.at(g.b_airbase).decommissioned = true;
+            const float fuel0 = shelf_of(g, g.b_market, resource_type::refined_fuel);
+            economy_report r2;
+            const wing_upkeep_tick u = run_wing_upkeep(g.w, reg, r2);
+            check(u.wings == 1 && g.w.wings.count(gw) == 1
+                      && shelf_of(g, g.b_market, resource_type::refined_fuel) == fuel0,
+                  "A7c a wing at a decommissioned airbase is grounded: kept, and draws no fuel");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -598,7 +654,10 @@ int main()
         const uint32_t p10 = strip(f, 10);
         add_wing(f, f.a, f.airbase, air_class::fighter, air_mission::superiority, {p10});
         add_wing(f, f.a, f.airbase, air_class::multirole, air_mission::tactical, {p10});
-        add_wing(f, f.a, f.airbase, air_class::bomber, air_mission::strategic, {p10, strip(f, 12)});
+        // One province: split over two contested ones a bomber lands 3 per-mille a day,
+        // under the 4 a day repair, and the building would never stay damaged.
+        add_wing(f, f.a, f.airbase, air_class::bomber, air_mission::strategic, {p10});
+        add_wing(f, f.a, f.airbase, air_class::recon, air_mission::recon, {strip(f, 9), p10}); // a two-province record
         add_wing(f, f.b, f.b_airbase, air_class::fighter, air_mission::superiority, {p10});
         add_unit(f, f.b, 42, 1, rifle);
         add_unit(f, f.b, 42, 3, ad_row);
@@ -655,6 +714,37 @@ int main()
             }
             check(refused_bad, "A8c a corrupt mission in the air section refuses the stream whole");
         }
+    }
+
+    {
+        std::printf("\nA8d - a unit the air names, disbanded, then saved\n");
+        fixture f;
+        build(f);
+        declare_hostile(f.w, f.a, f.b);
+        const uint32_t p10 = strip(f, 10);
+        add_wing(f, f.a, f.airbase, air_class::fighter, air_mission::superiority, {p10});
+        add_wing(f, f.a, f.airbase, air_class::multirole, air_mission::tactical, {p10});
+        const entity_id u = add_unit(f, f.b, 42, 1, rifle);
+        fly(f, reg, 1);
+        const bool named = f.w.air_hit_bank.count(u) == 1 && f.w.air_revealed.count({f.a, u}) == 1;
+        corp_command cmd;
+        cmd.tick = 1; cmd.corp = f.b; cmd.verb = corp_verb::disband_unit; cmd.subject = u;
+        const auto r = apply_corp_command(f.w, reg, cmd);
+        const bool forgotten = f.w.air_hit_bank.count(u) == 0 && f.w.air_revealed.count({f.a, u}) == 0;
+        world back;
+        const std::string bytes = to_bytes(f.w);
+        const bool loads = from_bytes(bytes, back) && to_bytes(back) == bytes
+                           && back.state_hash(4) == f.w.state_hash(4);
+        check(named && r == corp_command_result::applied && forgotten && loads,
+              "A8d reveal + bank on a unit, the unit disbanded: the air forgets it, and the save loads byte-identically");
+        // The second guard: a unit erased by a path that forgot nothing still saves loadably.
+        const entity_id v = add_unit(f, f.b, 42, 2, rifle);
+        f.w.air_hit_bank[v] = {5, 5};
+        f.w.air_revealed.insert({f.a, v});
+        f.w.units.erase(v);
+        world back2;
+        check(from_bytes(to_bytes(f.w), back2) && back2.air_hit_bank.count(v) == 0,
+              "A8e a dangling bank / reveal entry is pruned on write, so the strict reader still loads it");
     }
 
     // -----------------------------------------------------------------------
@@ -810,7 +900,7 @@ int main()
             f.w.buildings.at(built).ticks_remaining = 0;
             f.w.buildings.at(built).days_remaining = 0;
         }
-        add_unit(f, c, 58, 2, rifle);         // a target in reach the rival is NOT hostile to
+        const entity_id c_unit = add_unit(f, c, 58, 2, rifle); // in reach, a nation the rival is NOT hostile to
         add_unit(f, f.a, 38, 1, rifle);       // a target it is
         add_building(f, f.a, 37, 2, building_type::extraction_site);
         for (int k = 0; k < 6; ++k)
@@ -847,14 +937,21 @@ int main()
             assigned += wg.mission != air_mission::none ? 1 : 0;
             bombing  += air_mission_bombs(wg.mission) ? 1 : 0;
             one_province = one_province && wg.provinces.size() <= 1;
-            if (air_mission_bombs(wg.mission))
+            if (wg.mission == air_mission::strategic)
                 for (const uint32_t p : wg.provinces)
                     bombs_hostile_only = bombs_hostile_only && province_holder_for(f.w, p) == f.a;
+        }
+        {
+            world flown = f.w;
+            economy_report rr;
+            run_air_missions(flown, reg, rr, 20);
+            bombs_hostile_only = bombs_hostile_only && flown.air_hit_bank.count(c_unit) == 0
+                                 && flown.units.at(c_unit).count == 50;
         }
         check(assigned >= 1 && bombing >= 1, "R4 it assigns its own raised wings missions (" + std::to_string(assigned)
                   + " of 3, " + std::to_string(bombing) + " bombing)");
         check(bombs_hostile_only,
-              "R5 not admitted: bombing a nation it is not already hostile to (none over the third nation)");
+              "R5 not admitted: bombing a nation it is not already hostile to (strategic only over the enemy's provinces; the third nation's unit untouched)");
         check(f.w.corp_hostile_pairs == pairs0, "R6 not admitted: declaring the hostility a bombing mission needs");
         check(one_province, "R7 not admitted: a campaign planned past the next assignment (one province a wing)");
         check(f.w.wings.at(a_wing).mission == air_mission::none && f.w.wings.at(c_wing).mission == air_mission::none,

@@ -507,8 +507,8 @@ bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
 /// a rival nation's air pass — build its own airbase while mobilised, hire a wing
 /// there under a soft cap of three, and give each of its own raised wings the one
 /// best mission over one province in range — all through the legal verbs. Bombing
-/// only over a province held by a nation it is already hostile to; it never
-/// declares. Does nothing for the player's nation (or an unknown one). Called by
+/// only a nation it is already hostile to (tactical: its units, anywhere; strategic:
+/// over a province it holds); it never declares. Does nothing for the player's nation (or an unknown one). Called by
 /// run_corp_strategic_step for each due nation; exported for the harness.
 void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, int tick);
 

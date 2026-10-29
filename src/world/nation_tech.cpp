@@ -836,6 +836,12 @@ struct research_buildings
 {
     std::map<entity_id, int> universities;
     std::map<entity_id, int> institutes;
+    /// BL-1449: the condition a nation's counted Universities / institutes have LOST to
+    /// strategic bombing, summed per-mille (1000 = one building's worth). A building's
+    /// RP scale with its condition, so these come off the counts above. Absent for a
+    /// nation whose research buildings are whole, so an unbombed world is bit-identical.
+    std::map<entity_id, std::int64_t> universities_lost_permille;
+    std::map<entity_id, std::int64_t> institutes_lost_permille;
     /// BL-1324: `nation_economy_milli` per home nation, summed in integers.
     std::map<entity_id, std::int64_t> economy_milli;
 };
@@ -873,12 +879,20 @@ research_buildings count_research_buildings(const world& w)
             if (b.type == building_type::university)
             {
                 if (const auto tn = w.tile_to_nation.find(b.tile); tn != w.tile_to_nation.end())
+                {
                     ++rb.universities[tn->second];
+                    if (b.condition_permille < 1000)
+                        rb.universities_lost_permille[tn->second] += 1000 - std::max(0, b.condition_permille);
+                }
             }
             else if (b.type == building_type::research_institute)
             {
                 if (home != null_entity)
+                {
                     ++rb.institutes[home];
+                    if (b.condition_permille < 1000)
+                        rb.institutes_lost_permille[home] += 1000 - std::max(0, b.condition_permille);
+                }
             }
         }
     }
@@ -920,12 +934,20 @@ research_accrual compute_accrual(const world& w, entity_id nid, const research_b
 
     // The RP that cost no treasury: the base, the buildings and (BL-1324) the
     // economy term — RP that grow with the nation's economy to meet the prices.
-    const std::int64_t free_milli = scale_milli(
-        to_milli(static_cast<double>(p.base_rp_per_nation)
-                 + static_cast<double>(row.universities) * p.rp_per_university * uni_factor
-                 + static_cast<double>(row.institutes) * p.rp_per_institute
-                 + static_cast<double>(p.rp_per_economy_unit) * row.economy),
-        mult);
+    // BL-1449: a bombed research building makes RP at its condition. The term is
+    // subtracted only where a building is damaged, so a whole world sums as before.
+    double bombed = 0.0;
+    if (const auto u = rb.universities_lost_permille.find(nid); u != rb.universities_lost_permille.end())
+        bombed += static_cast<double>(u->second) / 1000.0 * p.rp_per_university * uni_factor;
+    if (const auto r = rb.institutes_lost_permille.find(nid); r != rb.institutes_lost_permille.end())
+        bombed += static_cast<double>(r->second) / 1000.0 * p.rp_per_institute;
+    double free_rp = static_cast<double>(p.base_rp_per_nation)
+                   + static_cast<double>(row.universities) * p.rp_per_university * uni_factor
+                   + static_cast<double>(row.institutes) * p.rp_per_institute
+                   + static_cast<double>(p.rp_per_economy_unit) * row.economy;
+    if (bombed > 0.0)
+        free_rp -= bombed;
+    const std::int64_t free_milli = scale_milli(to_milli(free_rp), mult);
 
     // What the queue still owes: every queued node's cost, less the pool
     // and less what the free RP will bring this quarter.

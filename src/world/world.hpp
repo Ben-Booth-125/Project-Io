@@ -419,6 +419,16 @@ struct world
     /// one man, so the remainder carries. Pruned when the unit goes. Saved (v65).
     std::map<entity_id, std::pair<int32_t, int32_t>> air_hit_bank;
 
+    /// BL-1449 fix round: forget unit @p uid in the air records (the reveal set and
+    /// the hit bank). Every path that erases a unit calls it, so neither ever names
+    /// a unit the world no longer holds (the v65 reader refuses such a stream).
+    void forget_air_unit(entity_id uid)
+    {
+        air_hit_bank.erase(uid);
+        for (auto it = air_revealed.begin(); it != air_revealed.end();)
+            it = (it->second == uid) ? air_revealed.erase(it) : std::next(it);
+    }
+
     /// BL-1427 (fronts): every front order that is not hold, sorted by (nation, key).
     /// Fronts themselves are derived (fronts.hpp), never stored.
     std::vector<front_order_entry> front_orders;

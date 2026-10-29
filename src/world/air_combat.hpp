@@ -83,6 +83,15 @@ int wing_strength_permille(const recipe_registry& reg, const air_wing& wg);
 /// May class @p c fly mission @p m (its authored mission list)? `none` always.
 bool air_class_flies(const recipe_registry& reg, air_class c, air_mission m);
 
+/// Does a building of @p t lose throughput with its condition — the only kind a
+/// strategic mission targets? Producers (output), the marketplace and the port
+/// (trade points), hubs, stations and ports (Logistic Points), and the University and
+/// research institute (research points). NOT the military base or the airbase
+/// (BL-1449 fix round: their muster and sortie are not scaled by condition, so they
+/// are excluded from strategic targeting rather than bombed to no effect), nor the
+/// launchpad or schooling, which have no throughput the condition reaches.
+bool condition_bites(building_type t);
+
 /// Tactical and strategic missions bomb; superiority and recon do not.
 bool air_mission_bombs(air_mission m);
 
@@ -126,8 +135,9 @@ corp_command_result hire_wing_check(const world& w, entity_id nation, entity_id 
 /// (rejected_invalid) and is @p nation's (rejected_not_owner); @p mission is a mission
 /// (rejected_invalid) its class flies (rejected_invalid); `none` names no province,
 /// every other mission 1..8 distinct real provinces (rejected_invalid); each in range
-/// (rejected_placement); a bombing mission's every province held by a nation @p nation
-/// is hostile to (rejected_state); the assignment changes something (rejected_state).
+/// (rejected_placement); a STRATEGIC mission's every province held by a nation @p nation
+/// is hostile to (rejected_state) — tactical may fly anywhere, its targets being hostile
+/// units; the assignment changes something (rejected_state).
 /// @p provinces holds @p n ids in any order; the sorted set lands in @p out.
 corp_command_result air_mission_check(const world& w, const recipe_registry& reg,
                                       entity_id nation, entity_id wing, uint32_t mission,

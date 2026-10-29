@@ -1373,9 +1373,10 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
 // air wings", Ben 2026-10-28; MILITARY.md § Air). The grant and nothing wider: the
 // nation's OWN airbase built on its OWN ground, wings hired at it, and each of its
 // OWN wings given a mission over provinces in its range, all through the verbs the
-// player uses (build, hire_wing, assign_air_mission). Bombing only over a province
-// held by a nation it is ALREADY hostile to (the verb refuses anything else, and this
-// scorer never proposes it); it never declares the hostility (the stance scorer's,
+// player uses (build, hire_wing, assign_air_mission). Bombing only a nation it is
+// ALREADY hostile to: tactical strikes only that nation's units (over any province,
+// its own soil included), strategic only over a province that nation holds (the verb
+// refuses anything else, and this scorer never proposes it); it never declares the hostility (the stance scorer's,
 // BL-450). It plans nothing past the next assignment: each evaluation picks, per wing,
 // the one best province for the one best mission its class flies. Never the player's
 // nation — not even under spectate, the grant naming the player's wings among what
@@ -1394,9 +1395,10 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
 //   drone 1; recon 0.5.
 //   MISSION. Each of its raised wings, ascending id, scores every province in range
 //   for every mission its class flies: superiority — hostile superiority power there
-//   plus 1000 a unit of its own in battle there; tactical — over a province held by a
-//   nation it is hostile to, 2000 an enemy unit in battle and 1000 an enemy unit;
-//   strategic — the same holder rule, 1000 a completed hostile building; recon — 500 a
+//   plus 1000 a unit of its own in battle there; tactical — over ANY province, 2000 a
+//   unit of a nation it is hostile to in battle there and 1000 one out of battle;
+//   strategic — over a province held by a nation it is hostile to, 1000 a completed
+//   building of a hostile nation whose output its condition scales; recon — 500 a
 //   hostile unit. The best (score, then lowest province, then mission order) is
 //   assigned when it beats the wing's current assignment's own score by
 //   `k_rival_air_switch` per-mille, or the current one has become illegal; with
@@ -1433,8 +1435,8 @@ int64_t rival_air_score(const world& w, entity_id nation, const air_wing& wg, ai
             break;
         }
         case air_mission::tactical:
-            if (!bomb_ok)
-                return 0;
+            // Any province — its own soil included (close air support): the
+            // hostility rule is on the target unit, as the verb's (cold review).
             for (const auto& [uid, u] : w.units)
                 if (u.count > 0 && u.owner != nation && is_hostile(w, nation, u.owner)
                     && w.provinces.province_of(u.position) == p)
@@ -1452,7 +1454,7 @@ int64_t rival_air_score(const world& w, entity_id nation, const air_wing& wg, ai
                 {
                     const auto bit = w.buildings.find(bid);
                     if (bit != w.buildings.end() && bit->second.ticks_remaining <= 0
-                        && bit->second.condition_permille > 0
+                        && condition_bites(bit->second.type) && bit->second.condition_permille > 0
                         && w.provinces.province_of(bit->second.tile) == p)
                         s += 1000;
                 }
@@ -1659,7 +1661,7 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
             cur_legal = true;
             for (const uint32_t p : wg.provinces)
                 if (!air_province_in_range(w, reg, wg, p)
-                    || (air_mission_bombs(wg.mission)
+                    || (wg.mission == air_mission::strategic
                         && !is_hostile(w, nation, province_holder_for(w, p))))
                     cur_legal = false;
         }

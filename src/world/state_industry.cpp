@@ -1344,7 +1344,10 @@ fold_report fold_to_ground(world& w)
                             gone_units.push_back(uid);
                     std::sort(gone_units.begin(), gone_units.end());
                     for (const entity_id uid : gone_units)
+                    {
                         w.units.erase(uid);
+                        w.forget_air_unit(uid); // BL-1449
+                    }
                     w.buildings.erase(bit);
                     w.stockpiles.erase(bid);
                     ++out.on_unowned;
@@ -1425,7 +1428,10 @@ void erase_unowned_building(world& w, entity_id bid)
             gone_units.push_back(uid);
     std::sort(gone_units.begin(), gone_units.end());
     for (const entity_id uid : gone_units)
+    {
         w.units.erase(uid);
+        w.forget_air_unit(uid); // BL-1449
+    }
     w.buildings.erase(bid);
     w.stockpiles.erase(bid);
 }
