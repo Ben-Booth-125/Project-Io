@@ -845,6 +845,12 @@ periphery is left uncovered on purpose — ground a player or a rival covers lat
 a station or a port where it is wanted. The field is therefore a slope away from the capital, not a
 blanket, and an outlying hub reads as a deliberate reach into thin ground.
 
+**Logistics serves the armies from generation (Ben, 2026-10-29).** The seeding counts every
+garrison post — the capital's and each border post facing a neighbour — as a request beside the
+producing buildings, so the sources it stands reach the ground the nation's armies open on, within
+the 8-tile off-road draw (§ A unit draws off the road). A nation opens with its army fed; where it
+marches next is the player's to supply.
+
 Three things follow, and each is a check rather than a preference:
 
 - **Every capital holds a source.** A nation whose capital makes no points has no centre for its
