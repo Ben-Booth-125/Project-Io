@@ -190,12 +190,12 @@ reads is shown on the surface that reads it.
 | **Hardness** | class × equipment, 0..1 | Share of the unit that is armoured. |
 | **Defence** | class | Hits absorbed when defending. |
 | **Breakthrough** | class | Hits absorbed when attacking. |
-| **Recon offence** | class × equipment | Recon the unit adds to its side's recon stock each day it attacks, and to the opening when it faces the tile (§ Recon). Every class has a base above zero. |
-| **Counter-recon** | class × equipment | The recon an attacker needs to land its full hits on the unit (§ Recon). |
+| **Recon** | class × equipment | Recon the unit adds to its side's recon stock each day it attacks, and to the opening when it faces the tile (§ Recon). Every class has a base above zero. |
+| **Stealth** | class × equipment | The recon an attacker needs to land its full hits on the unit (§ Recon). |
 
 **The arithmetic.** A unit's hits on a target are
 `soft_attack × (1 − target.hardness) + hard_attack × target.hardness`, scaled by its morale and
-its carried supplies (§ Carried supplies), then — for an attacker — by its **recon against the target's counter-recon**
+its carried supplies (§ Carried supplies), then — for an attacker — by its **recon against the target's stealth**
 (§ Recon). The defender's ground divides the attacker's hits (`terrain_defence`: a mountain halves
 them). The target absorbs up to its defence (defending) or breakthrough (attacking), raised by
 fortification; absorbed hits land at a fraction, the rest in full. Landed damage
@@ -245,27 +245,26 @@ scaling hits directly.
 ### Recon (Ben, 2026-10-29)
 
 **An attacker damages only what its recon has found (Ben, 2026-10-29).** Each unit carries a
-**counter-recon** — how hard it is to find — and an attacking side carries **recon**. The
-attacker's hits on a defending unit are scaled by `min(1, attacker recon / target counter-recon)`,
-capped at 1: an attacker with half the recon its target's counter-recon asks for lands half its
+**stealth** — how hard it is to find — and an attacking side carries **recon**. The
+attacker's hits on a defending unit are scaled by `min(1, attacker recon / target stealth)`,
+capped at 1: an attacker with half the recon its target's stealth asks for lands half its
 hits. **The defender's hits are always full** — it is dug in on its own ground and the attacker is
 the one exposed by moving. Recon is therefore one-sided: it is the attacker's problem, and the
-defender's counter-recon is its answer.
+defender's stealth is its answer.
 
 **Recon builds very quickly in battle (Ben, 2026-10-29).** The attacker's recon is a stock that grows
-every day of the fight by its **recon offence** — and grows fast, so a battle is seen within days of
+every day of the fight by the **recon its units bring** — and grows fast, so a battle is seen within days of
 opening, not weeks: recon decides how a battle *opens*, not how long it lasts. It stops growing once
-it covers the target's counter-recon. **Every land class has a base recon offence above zero**, so
+it covers the target's stealth. **Every land class has a base recon above zero**, so
 every attack's recon grows.
 
-**The attacker's recon offence on a day is the sum of:**
+**What the attacker's recon grows by each day is the recon stat of:**
 
-- **Its units in the battle.** Recon offence is a class × kit stat like soft attack (§ The kit):
+- **Its units in the battle.** Recon is a class × kit stat like soft attack (§ The kit):
   every class has a base, and light armour, drones and optics raise it.
 - **Its units adjacent, at once.** Each of its own nation's units on a tile adjacent to the defended
-  tile adds its recon offence, whether or not it joined the battle — counted the day it stands
-  there, with nothing stored. **On the opening day the recon stock starts at that adjacent recon
-  offence**, so an attacker whose line has been facing the enemy opens already seeing it — *"we
+  tile adds its recon stat, whether or not it joined the battle — counted the day it stands
+  there, with nothing stored. **On the opening day the recon stock starts at that adjacent recon**, so an attacker whose line has been facing the enemy opens already seeing it — *"we
   should never see those battles where we are fighting with insufficient recon"*.
 - **Air.** **Every one of its wings active over the province gives recon** (Ben, 2026-10-29: *"all
   air active in a region gives recon"*) — the recon class most, the others a base authored amount
@@ -276,9 +275,8 @@ a **whole day** before the contact. A column that marches up and attacks on the 
 brings none of its own recon to the opening, and fights partly blind for the few days its recon
 takes to build.
 
-**Counter-recon is a kit stat.** Each class has a base counter-recon, and kit raises it: **better
-armour for infantry gives more counter-recon** (Ben's example, first given for stealth, which
-counter-recon replaces). The designer shows recon offence and counter-recon beside the other stats
+**Stealth is a kit stat.** Each class has a base stealth, and kit raises it: **better
+armour for infantry gives more stealth** (Ben's example). The designer shows recon and stealth beside the other stats
 (`../ui/ledgers/military.md` § The designer).
 
 ### Land — the classes
@@ -321,7 +319,7 @@ tab (`../ui/ledgers/military.md`).
   rival nations field base kit, since no AI grant lets a rival design.
 - **The kit catalogue.** Every slot of every class lists its items: the **base item** first — the
   1960 standard, adding nothing and costing no goods — then **two to four later items**. A later
-  item carries a **stat delta** (soft attack, hard attack, hardness, defence, breakthrough, recon offence, counter-recon), its
+  item carries a **stat delta** (soft attack, hard attack, hardness, defence, breakthrough, recon, stealth), its
   **goods** and the **research node** that opens it. A design's stats are its class's plus its
   kit's deltas, before the roster row's quality scale; hardness stays inside 0..1000. The catalogue
   is validated where it is authored, so a slot without a base item, or an item that fits no slot,
@@ -628,7 +626,7 @@ snow are covers.
 
 | Class | Mountain | Canyon / rift | Marsh | Desert (dunes) | Forest | Urban | Snow |
 |---|---|---|---|---|---|---|---|
-| Infantry | — | — | — | — | counter-recon ×1.5 | counter-recon ×1.5 | — |
+| Infantry | — | — | — | — | stealth ×1.5 | stealth ×1.5 | — |
 | Motorised infantry | dismounts | dismounts | blocked unless roaded | move ×1.25 | move ×1.25 | — | move ×1.25 |
 | Mechanised infantry | dismounts | dismounts | blocked unless roaded | — | move ×1.25 | fight −15% | — |
 | Light armour | blocked unless roaded; fight −40% | blocked unless roaded | blocked unless roaded | move ×1.25; wear | fight −25% | fight −30% | move ×1.5 |
@@ -644,9 +642,9 @@ snow are covers.
 - **The worst row only (Ben, 2026-10-29).** A tile that matches two rows — a forested mountain —
   applies, per effect, the worst of them for the unit: blocked if either blocks, the larger move
   multiplier, the deeper fight debuff, the faster wear. They never multiply.
-- **Terrain moves counter-recon both ways (Ben, 2026-10-29; written for stealth, which counter-recon replaces).** Concealing cover hides infantry (×1.5 in
+- **Terrain moves stealth both ways (Ben, 2026-10-29).** Concealing cover hides infantry (×1.5 in
   forest and urban, above), and **open ground exposes everyone**: on plains or highland with no
-  concealing cover (none, grass, salt, snow or dunes) every unit's counter-recon is ×0.75 (§ Recon).
+  concealing cover (none, grass, salt, snow or dunes) every unit's stealth is ×0.75 (§ Recon).
 
 The rows are authored data beside the march days (`economy.military`), keyed by class and terrain,
 and checked by the loader as the march days are. **A block is a per-class wall in the path**: a
