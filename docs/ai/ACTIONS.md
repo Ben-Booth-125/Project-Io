@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*175 entries — 43 gameplay · 30 canvas · 16 lens · 53 ledger · 33 chrome.*
+*178 entries — 46 gameplay · 30 canvas · 16 lens · 53 ledger · 33 chrome.*
 
 ---
 
@@ -795,6 +795,68 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The nation's live design for that class fits the item (nation_component::unit_design_kit holds the non-base items; base kit is stored as nothing). New hires of the class are raised to it and buy its kit goods; units already raised keep the design they recorded until refitted to it (gameplay.refit_unit to their own row). A design's stats are its class's plus its kit's. Saved (world_save_version 64).
 
 **Reason to select.** Fit the best researched kit in each slot of the classes you raise, weighing its goods against what your shelves hold: a design whose kit cannot be bought cannot be hired.
+
+### `gameplay.hire_wing` — No surface yet: the Military ledger's air rows (BL-1450, air UI) will carry the press. A corp_verb (corp_verb::hire_wing, 44) on the command seam today.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=44 tile=<the airbase's tile> unit_type=<air roster row: 0 Interceptor Wing (fighter), 1 Strike Wing (multirole), 2 Strategic Bomber Wing, 3 Attack Helicopter Wing, 4 Strike Drone Wing, 5 Airborne Early Warning Wing (recon)>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `entity_id (tile)` | The tile of one of the actor's own completed airbases (building_type::airbase, 12). |
+| `unit_type` | `uint16 air roster row` | Which air class to raise (air_roster_table, src/world/air_combat.hpp). |
+
+**Valid when:**
+- The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).
+- unit_type names an air row (rejected_invalid otherwise) the nation's shelves can field now — the land rows' binary gate: steel-or-ore and fuel on the shelves of the markets its buildings sit in (rejected_invalid otherwise).
+- tile is a tile (rejected_invalid) carrying the actor's OWN completed, not decommissioned airbase (rejected_placement otherwise). A military base hosts no wings.
+- The treasury's uncommitted part covers the class's hire credits, and the shelves hold the class's hire goods plus its live air design's kit goods (rejected_funds otherwise). Both legs are checked before either is taken; a refusal mutates nothing.
+
+**Expected output.** A wing is created in world::wings (never world::units) at that airbase, owned by the nation, on its class's live air design, with the class's muster days to run before it flies (fighter 135, multirole 135, bomber 180, helicopter 90, drone 90, recon 135); its id is returned as `building=`. The credits and goods are paid now. A wing records its airbase and is disbanded when the airbase goes. Saved (world_save_version 65). Rival nations' scorers issue it for their own airbases (AI_OPPONENT.md § 11, 'Rival nations fly air wings').
+
+**Reason to select.** Raise air power: fighters to hold the air over a front, strike wings and helicopters to hit enemy units, bombers to wear down an enemy's industry, drones and early-warning aircraft to spot.
+
+### `gameplay.assign_air_mission` — No surface yet: right-clicking a province with the wing selected (docs/ui/ledgers/military.md; BL-1450, air UI) will issue it. A corp_verb (corp_verb::assign_air_mission, 45) on the command seam today.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=45 subject=<wing id> order=<0 none, 1 superiority, 2 tactical, 3 strategic, 4 recon> provinces=<id>,<id>,... (1 to 8 province ids; omitted for none).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (wing)` | One of the actor's own wings. |
+| `order` | `uint32 air_mission` | The mission: 0 none (ground it), 1 air superiority, 2 tactical bombing, 3 strategic bombing, 4 recon. A class flies only its own missions: fighter superiority; multirole tactical and superiority (its air attack counts at 60 %); bomber strategic; helicopter tactical; drone tactical and recon; recon recon. |
+| `provinces` | `up to 8 province ids (corp_command::air_provinces; on the wire a comma list)` | The provinces it flies over, in any order; it divides each day evenly across them. |
+
+**Valid when:**
+- The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).
+- The wing exists (rejected_invalid) and is the actor's own (rejected_not_owner).
+- The mission is one of the five (rejected_invalid) and one the wing's class flies (rejected_invalid).
+- none names no province; every other mission names 1 to 8 distinct, real provinces (rejected_invalid otherwise). On the wire, a malformed provinces list (more than 8, a non-number, a negative or no_province value) refuses the whole command before the seam.
+- Each province is IN RANGE: the straight-line hex distance from the wing's airbase tile to the province's nearest tile is within the class's range plus its kit (fighter 15, multirole 12, bomber 40, helicopter 6, drone 10, recon 20 tiles) (rejected_placement otherwise).
+- A STRATEGIC mission only over provinces held by a nation the actor has declared hostile toward (rejected_state otherwise). A TACTICAL mission may fly over any province in range - the actor's own, a third nation's, the sea - because it hits only units of nations the actor is hostile to.
+- The assignment changes something (rejected_state otherwise). A refusal mutates nothing.
+
+**Expected output.** The wing stores the mission and the sorted provinces (air_wing::mission, ::provinces). Each day it is raised and its airbase stands complete it flies: superiority adds its air attack to its nation's superiority over each province (world::air_superiority) and shoots hostile wings there; tactical hits enemy units in the province, units in battle first, by the land soft/hard arithmetic with no terrain divisor; strategic lowers the condition of an enemy building there whose throughput the condition scales - producers, ports, hubs, stations, marketplaces, Universities and research institutes, never military bases or airbases (condition repairs by drawing goods); recon raises its side's bombing hits there (up to +50 %) and spots. The side lacking superiority in a province bombs less there, marches slower through it and has its units revealed to the holder (world::air_revealed). Ground air defence shoots every hostile mission flown over its province. Saved (world_save_version 65).
+
+**Reason to select.** Put a raised wing to work: contest the air over a front, strike the enemy's units or industry, or spot for your own.
+
+### `gameplay.set_air_design` — No surface yet: the Design tab's air classes (BL-1450, air UI). A corp_verb (corp_verb::set_air_design, 46) on the command seam today.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=46 order=<air class 0..5> recipe=<slot: 0 airframe, 1 armament, 2 avionics> unit_type=<air kit catalogue id>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32 air_class` | 0 fighter, 1 multirole, 2 bomber, 3 helicopter, 4 drone, 5 recon. |
+| `recipe` | `uint16 slot` | The slot: 0 airframe, 1 armament, 2 avionics. |
+| `unit_type` | `uint16 air kit id` | An air_kit_catalogue() id (src/world/unit_designs.hpp) that fits that class and slot; the slot's base item puts it back to base kit. |
+
+**Valid when:**
+- The actor is the seat's nation (rejected_not_owner otherwise): no grant lets a rival design, so rivals fly base kit.
+- The class, slot and item exist and the item fits that class and slot (rejected_invalid otherwise).
+- The item is researched (rejected_tech_locked otherwise); base kit always is. The air kit's research nodes are not in the age tree yet, so every later item reads locked.
+- The slot does not already hold it (rejected_state otherwise). A refusal mutates nothing.
+
+**Expected output.** The class's live air design holds the item (nation_component::air_design_kit). The next wing hired of that class records the design and buys its kit goods; wings already flying keep the design they were raised to. Saved (world_save_version 65).
+
+**Reason to select.** Field better aircraft as research opens new airframes, weapons and avionics.
 
 ---
 

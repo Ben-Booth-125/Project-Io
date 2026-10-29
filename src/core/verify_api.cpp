@@ -4593,6 +4593,23 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         cmd.workforce = wf;
         // BL-1296: the state industry a command acts for (0 = the corp's own book).
         cmd.as_nation = static_cast<entity_id>(t.get_or("as_nation", 0u));
+        // BL-1449: assign_air_mission's provinces, `provinces = { id, id, ... }` — at
+        // most k_air_mission_provinces_max integers, each a uint32 other than
+        // no_province, range-checked before the narrowing cast; anything else
+        // rejects the whole command. Whether each names a province is the seam's.
+        if (const sol::optional<sol::table> pt = t["provinces"]; pt)
+        {
+            const std::size_t n = pt->size();
+            if (n > k_air_mission_provinces_max) return "rejected_invalid";
+            for (std::size_t i = 1; i <= n; ++i)
+            {
+                const sol::optional<double> v = (*pt)[i];
+                if (!v || !std::isfinite(*v) || *v < 0.0 || *v >= static_cast<double>(no_province)
+                    || *v != std::floor(*v))
+                    return "rejected_invalid";
+                cmd.air_provinces[i - 1] = static_cast<uint32_t>(*v);
+            }
+        }
         if (const sol::optional<int> ty = t["type"]; ty)
         {
             if (*ty < 0 || *ty >= static_cast<int>(building_type_count)) return "rejected_invalid";

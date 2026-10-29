@@ -8,6 +8,7 @@
 #include "history_log.hpp" // write_history_log / read_history_log -- the embedded section
 #include "state_industry.hpp"
 #include "unit_designs.hpp" // BL-1434: the designs section's range checks
+#include "air_combat.hpp"   // BL-1449: air_roster_table — the air section's range checks
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <algorithm>
@@ -41,7 +42,7 @@ constexpr auto max_cover      = terrain_cover::urban;
 constexpr auto max_landform   = terrain_landform::rift;
 constexpr auto max_body_type  = body_type::star;
 constexpr auto max_atmosphere = atmosphere_class::thick;
-constexpr auto max_building   = building_type::railway_station; // BL-1255 (v49); BL-1266 (v46); BL-615 before it.
+constexpr auto max_building   = building_type::airbase; // BL-1449 (v65); BL-1255 (v49); BL-1266 (v46); BL-615 before it.
                                                            // A WIDENED range gate, not a format
                                                            // change: no serialised array is sized
                                                            // by building_type (unlike resource_
@@ -1607,7 +1608,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // world_save_version 64 (BL-1434, unit designs): THE DESIGNS, the last section —
     // nations with a non-base design (id, n, n ids); units off base kit (id, kit,
     // refit kit); muster orders off base kit (order id, kit). Only deviations.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_air)
     {
         std::vector<entity_id> nids;
         for (const auto& [nid, nc] : w.nations)
@@ -1649,6 +1650,111 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             for (const uint8_t v : m.kit.fit) w_u8(out, v);
         }
     }
+
+    // world_save_version 65 (BL-1449, air combat): THE AIR, the last section — the
+    // wings, the superiority map, the reveal set, the hit bank, the air designs and
+    // every building off full condition. Every container is ordered or sorted here.
+    // PRUNED ON WRITE (BL-1449 fix round): a record naming a unit, nation or building
+    // the world no longer holds is never written — every erase path forgets its air
+    // records too (world::forget_air_unit), and this is the second guard, so a save
+    // taken between an erase and the next tick still loads under the strict reader.
+    if (version == world_save_version)
+    {
+        const auto wing_ok = [&](const air_wing& wg) {
+            return w.nations.count(wg.owner) != 0 && w.buildings.count(wg.airbase) != 0;
+        };
+        uint32_t live_wings = 0;
+        for (const auto& [wid, wg] : w.wings)
+            live_wings += wing_ok(wg) ? 1u : 0u;
+        w_u32(out, live_wings);
+        for (const auto& [wid, wg] : w.wings)
+        {
+            if (!wing_ok(wg))
+                continue;
+            w_id(out, wid);
+            w_id(out, wg.owner);
+            w_id(out, wg.airbase);
+            w_u16(out, wg.type);
+            w_i32(out, wg.hp_ppm);
+            w_i32(out, wg.morale_permille);
+            w_i32(out, wg.supply_factor_permille);
+            w_i32(out, wg.muster_days);
+            for (const uint8_t v : wg.kit.fit) w_u8(out, v);
+            w_u8(out, static_cast<uint8_t>(wg.mission));
+            w_u32(out, static_cast<uint32_t>(wg.provinces.size()));
+            for (const uint32_t p : wg.provinces) w_u32(out, p);
+        }
+
+        uint32_t n_sup = 0;
+        for (const auto& [key, v] : w.air_superiority)
+            n_sup += (v > 0 && w.nations.count(key.second) != 0) ? 1u : 0u;
+        w_u32(out, n_sup);
+        for (const auto& [key, v] : w.air_superiority)
+        {
+            if (!(v > 0 && w.nations.count(key.second) != 0))
+                continue;
+            w_u32(out, key.first);
+            w_id(out, key.second);
+            w_i32(out, v);
+        }
+
+        uint32_t n_rev = 0;
+        for (const auto& [viewer, unit] : w.air_revealed)
+            n_rev += (w.nations.count(viewer) != 0 && w.units.count(unit) != 0) ? 1u : 0u;
+        w_u32(out, n_rev);
+        for (const auto& [viewer, unit] : w.air_revealed)
+        {
+            if (!(w.nations.count(viewer) != 0 && w.units.count(unit) != 0))
+                continue;
+            w_id(out, viewer);
+            w_id(out, unit);
+        }
+
+        uint32_t n_bank = 0;
+        for (const auto& [uid, bank] : w.air_hit_bank)
+            n_bank += w.units.count(uid) != 0 ? 1u : 0u;
+        w_u32(out, n_bank);
+        for (const auto& [uid, bank] : w.air_hit_bank)
+        {
+            if (w.units.count(uid) == 0)
+                continue;
+            w_id(out, uid);
+            w_i32(out, bank.first);
+            w_i32(out, bank.second);
+        }
+
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+            if (!nc.air_design_kit.empty())
+                nids.push_back(nid);
+        std::sort(nids.begin(), nids.end());
+        w_u32(out, static_cast<uint32_t>(nids.size()));
+        for (const entity_id nid : nids)
+        {
+            const std::vector<uint16_t>& v = w.nations.at(nid).air_design_kit;
+            w_id(out, nid);
+            w_u32(out, static_cast<uint32_t>(v.size()));
+            for (const uint16_t id : v) w_u16(out, id);
+        }
+
+        std::vector<entity_id> bids;
+        for (const auto& [bid, bc] : w.buildings)
+            if (bc.condition_permille != 1000)
+                bids.push_back(bid);
+        std::sort(bids.begin(), bids.end());
+        w_u32(out, static_cast<uint32_t>(bids.size()));
+        for (const entity_id bid : bids)
+        {
+            w_id(out, bid);
+            w_i32(out, w.buildings.at(bid).condition_permille);
+        }
+    }
+}
+
+void write_world_snapshot_pre_air(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1449): the v64 stream shape — no air section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_air);
 }
 
 void write_world_snapshot_pre_designs(const world& w, std::ostream& out)
@@ -1790,7 +1896,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_refit      // 2026-10-27: v60, no unit refitting
             && version != k_world_save_version_pre_fronts     // BL-1427: v61, no fronts
             && version != k_world_save_version_pre_tile       // BL-1443: v62, battles keyed by province
-            && version != k_world_save_version_pre_designs))  // BL-1434: v63, every design base kit
+            && version != k_world_save_version_pre_designs    // BL-1434: v63, every design base kit
+            && version != k_world_save_version_pre_air))      // BL-1449: v64, no air
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2570,7 +2677,7 @@ bool read_world_snapshot(world& w, std::istream& in)
             // design once the designs section is read); before v64 a refit always
             // changed the row.
             if (uit == s.units.end() || target >= rows
-                || (target == uit->second.type && version < world_save_version)
+                || (target == uit->second.type && version < k_world_save_version_pre_air)
                 || days < 1 || days > 3650)
                 return false;
             uit->second.refit_type = target;
@@ -2659,7 +2766,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // refits; muster orders in issue order, each a real order, off base kit, holding
     // a design its row's class can hold. Refused whole otherwise. A v63 (and older)
     // stream ends before it: every nation and unit fields base kit.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_air)
     {
         const std::vector<kit_item>& cat = kit_catalogue();
         const std::vector<roster_row>& table = unit_roster_table();
@@ -2738,6 +2845,150 @@ bool read_world_snapshot(world& w, std::istream& in)
             if (m.unit_type >= table.size() || !design_valid(land_class_for(table[m.unit_type]), kit))
                 return false;
             m.kit = kit;
+        }
+    }
+
+    // v65 (BL-1449, air combat): the wings, the superiority map, the reveal set, the
+    // hit bank, the air designs, the damaged buildings. Untrusted: every list strictly
+    // ascending in its key; a wing's owner a nation in the stream, its row a real air
+    // row, its HP / morale / supply / muster days inside their domains, its kit a design
+    // its class can hold, its mission real, with 1..8 provinces strictly ascending iff
+    // it has one; superiority entries positive, for nations in the stream; reveals and
+    // banks name units in the stream; an air design holds only non-base air items, at
+    // most one per (class, slot); a condition is a real building's, in [0, 999].
+    // Refused whole otherwise. A v64 (and older) stream ends before it: no air, every
+    // building whole.
+    if (version == world_save_version)
+    {
+        constexpr uint32_t k_max = 1u << 22;
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > k_max)
+            return false;
+        const std::size_t air_rows = air_roster_table().size();
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id wid = null_entity;
+            air_wing wg;
+            uint8_t mission = 0;
+            uint32_t n = 0;
+            if (!r_id(in, wid) || wid == null_entity || (k > 0 && wid <= prev)
+                || !r_id(in, wg.owner) || !r_id(in, wg.airbase) || !r_u16(in, wg.type)
+                || !r_i32(in, wg.hp_ppm) || !r_i32(in, wg.morale_permille)
+                || !r_i32(in, wg.supply_factor_permille) || !r_i32(in, wg.muster_days))
+                return false;
+            for (uint8_t& v : wg.kit.fit) if (!r_u8(in, v)) return false;
+            if (!r_u8(in, mission) || !r_u32(in, n))
+                return false;
+            prev = wid;
+            // BL-1449 fix round: the id is one the world handed out and no other
+            // entity holds; the airbase is a building in the stream.
+            if (wid >= next_entity || s.units.count(wid) != 0 || s.buildings.count(wid) != 0
+                || s.nations.count(wid) != 0 || s.tiles.count(wid) != 0 || s.markets.count(wid) != 0
+                || s.bodies.count(wid) != 0)
+                return false;
+            if (s.nations.count(wg.owner) == 0 || s.buildings.count(wg.airbase) == 0 || wg.type >= air_rows
+                || wg.hp_ppm < 0 || wg.hp_ppm > k_wing_hp_full
+                || wg.morale_permille < 0 || wg.morale_permille > 1000
+                || wg.supply_factor_permille < 0 || wg.supply_factor_permille > 1000
+                || wg.muster_days < 0 || wg.muster_days > 3650
+                || !air_design_valid(air_roster_table()[wg.type].cls, wg.kit)
+                || mission >= static_cast<uint8_t>(air_mission_count)
+                || n > k_air_mission_provinces_max
+                || ((mission == 0) != (n == 0)))
+                return false;
+            wg.mission = static_cast<air_mission>(mission);
+            wg.provinces.resize(n);
+            for (uint32_t i = 0; i < n; ++i)
+                if (!r_u32(in, wg.provinces[i]) || wg.provinces[i] == 0 || wg.provinces[i] == no_province
+                    || (i > 0 && wg.provinces[i] <= wg.provinces[i - 1]))
+                    return false;
+            s.wings.emplace(wid, std::move(wg));
+        }
+
+        if (!r_u32(in, count) || count > k_max)
+            return false;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            uint32_t prov = 0;
+            entity_id nid = null_entity;
+            int32_t v = 0;
+            if (!r_u32(in, prov) || !r_id(in, nid) || !r_i32(in, v) || v <= 0
+                || s.nations.count(nid) == 0)
+                return false;
+            const std::pair<uint32_t, entity_id> key{prov, nid};
+            if (!s.air_superiority.empty() && !(s.air_superiority.rbegin()->first < key))
+                return false;
+            s.air_superiority.emplace(key, v);
+        }
+
+        if (!r_u32(in, count) || count > k_max)
+            return false;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id viewer = null_entity, unit = null_entity;
+            if (!r_id(in, viewer) || !r_id(in, unit) || s.nations.count(viewer) == 0
+                || s.units.count(unit) == 0)
+                return false;
+            const std::pair<entity_id, entity_id> key{viewer, unit};
+            if (!s.air_revealed.empty() && !(*s.air_revealed.rbegin() < key))
+                return false;
+            s.air_revealed.insert(key);
+        }
+
+        if (!r_u32(in, count) || count > k_max)
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            int32_t a = 0, b = 0;
+            if (!r_id(in, uid) || (k > 0 && uid <= prev) || !r_i32(in, a) || !r_i32(in, b)
+                || s.units.count(uid) == 0 || a < 0 || b < 0)
+                return false;
+            prev = uid;
+            s.air_hit_bank.emplace(uid, std::make_pair(a, b));
+        }
+
+        const std::vector<air_kit_item>& acat = air_kit_catalogue();
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            uint32_t n = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev) || !r_u32(in, n)
+                || n == 0 || n > acat.size())
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            std::vector<uint16_t> v(n);
+            std::set<std::pair<int, int>> slots;
+            for (uint32_t i = 0; i < n; ++i)
+                if (!r_u16(in, v[i]) || v[i] >= acat.size() || (i > 0 && v[i] <= v[i - 1])
+                    || air_kit_variant_of(v[i]) == 0
+                    || !slots.insert({static_cast<int>(acat[v[i]].cls), acat[v[i]].slot}).second)
+                    return false;
+            nit->second.air_design_kit = std::move(v);
+        }
+
+        if (!r_u32(in, count) || count > s.buildings.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id bid = null_entity;
+            int32_t c = 0;
+            if (!r_id(in, bid) || (k > 0 && bid <= prev) || !r_i32(in, c) || c < 0 || c > 999)
+                return false;
+            prev = bid;
+            const auto bit = s.buildings.find(bid);
+            if (bit == s.buildings.end())
+                return false;
+            bit->second.condition_permille = c;
         }
     }
 

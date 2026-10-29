@@ -209,6 +209,12 @@ enum class corp_verb : uint8_t
     // The SEAT's alone: no grant lets a rival design (AI_OPPONENT.md § 11), so rivals
     // keep base kit and corp_ai.cpp never issues it.
     set_unit_design,      ///< The seat's nation fits kit item `unit_type` (a kit catalogue id, unit_designs.hpp) into slot `recipe` (0-based) of its live design for land class `order` (a `land_class` value). rejected_not_owner unless `corp` is the seat; rejected_invalid for an unknown class (or `none`), slot or item, or an item that does not fit that (class, slot); rejected_tech_locked when the item is not researched; rejected_state when the slot already holds it. See `unit_design_check`.
+    // --- BL-1449: air combat (MILITARY.md § Air, Ben 2026-10-28) ---
+    // Appended after set_unit_design, same append-only rule. A wing lives in
+    // `world::wings`, never in `world::units` (air_combat.hpp).
+    hire_wing,            ///< Raise a wing of air roster row `unit_type` (air_roster_table) at the actor's own completed airbase on `tile` (a military base hosts no wings). Pays the class's hire credits and its hire goods plus its live air design's kit goods off the shelves, both legs checked first; the wing is created at once with the class's muster days to run before it flies, and returned through `out_building`. rejected_invalid (unknown row, a row the nation's shelves cannot field, unknown tile) / rejected_placement (no such airbase) / rejected_funds — see `hire_wing_check`.
+    assign_air_mission,   ///< Assign wing `subject` mission `order` (0 none, 1 superiority, 2 tactical, 3 strategic, 4 recon) over the provinces in `air_provinces` (unused slots `no_province`; any order). rejected_invalid (no such wing, a mission its class does not fly, none with provinces or a mission with none, an unknown or repeated province) / rejected_not_owner / rejected_placement (a province out of straight-line range of its airbase) / rejected_state (a bombing mission over a province not held by a nation the actor is hostile to; no change) — see `air_mission_check`.
+    set_air_design,       ///< The seat's nation fits air kit item `unit_type` (an air kit id, unit_designs.hpp) into slot `recipe` (0 airframe, 1 armament, 2 avionics) of its live design for air class `order`. The seat's alone: no grant lets a rival design. See `air_design_check`.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -218,7 +224,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::set_unit_design) + 1;
+    static_cast<uint8_t>(corp_verb::set_air_design) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.
@@ -251,6 +257,14 @@ inline constexpr std::size_t mercenary_contract_max_units = 8;
 /// instead: it requires component index 7, and a 2x2 block splits into at
 /// most 4 connected components, so the partition never assigns above 3.
 inline constexpr uint32_t no_province = 0xFFFFFFFFu;
+
+/// BL-1449: `corp_command::air_provinces` with every slot unused.
+constexpr std::array<uint32_t, k_air_mission_provinces_max> no_air_provinces()
+{
+    std::array<uint32_t, k_air_mission_provinces_max> a{};
+    for (uint32_t& p : a) p = no_province;
+    return a;
+}
 
 /// One serialisable intent: {tick, corp, verb, fixed-size args}. Which args are
 /// meaningful depends on the verb; unused args stay at their defaults so two
@@ -367,6 +381,13 @@ struct corp_command
     /// admits a nation owner) and, for the seat's nation only, the research
     /// verbs. Procurement is refused to a nation (rejected_invalid).
     entity_id as_nation = null_entity;
+
+    // --- BL-1449: air combat ---
+    /// assign_air_mission's provinces (province ids), unused slots `no_province`.
+    /// A fixed-size array, for the reason `units` is one: the untrusted seam can
+    /// range-check it field by field. Appended LAST so every older field keeps its
+    /// place in the record.
+    std::array<uint32_t, k_air_mission_provinces_max> air_provinces = no_air_provinces();
 };
 
 /// Outcome of applying a command. Only `applied` mutates the world; every

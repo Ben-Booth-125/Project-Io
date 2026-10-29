@@ -8,6 +8,8 @@
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
 #include "battle_system.hpp"   // unit_in_battle (BL-1427: a rival assigns only idle units)
 #include "fronts.hpp"          // BL-1427: a rival uses its fronts
+#include "air_combat.hpp"      // BL-1451: a rival flies air wings
+#include "stance.hpp"          // is_hostile (BL-1451)
 #include "input_reach.hpp"     // BL-1187: obtainable inputs (the BL-1185 reach)
 #include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
 #include "market_clearing.hpp" // market_for_tile
@@ -444,6 +446,9 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::assign_front:  return "front assignment"; // BL-1427
         case corp_verb::set_front_order: return "front order";    // BL-1427
         case corp_verb::set_unit_design: return "unit design";    // BL-1434: never issued by a rival
+        case corp_verb::hire_wing:       return "hire wing";      // BL-1449
+        case corp_verb::assign_air_mission: return "air mission"; // BL-1449
+        case corp_verb::set_air_design:  return "air design";     // BL-1449: never issued by a rival
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";
@@ -1363,6 +1368,325 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
 }
 } // namespace
 
+// ---------------------------------------------------------------------------
+// BL-1451 — a rival nation flies air wings (AI_OPPONENT.md § 11, "Rival nations fly
+// air wings", Ben 2026-10-28; MILITARY.md § Air). The grant and nothing wider: the
+// nation's OWN airbase built on its OWN ground, wings hired at it, and each of its
+// OWN wings given a mission over provinces in its range, all through the verbs the
+// player uses (build, hire_wing, assign_air_mission). Bombing only a nation it is
+// ALREADY hostile to: tactical strikes only that nation's units (over any province,
+// its own soil included), strategic only over a province that nation holds (the verb
+// refuses anything else, and this scorer never proposes it); it never declares the hostility (the stance scorer's,
+// BL-450). It plans nothing past the next assignment: each evaluation picks, per wing,
+// the one best province for the one best mission its class flies. Never the player's
+// nation — not even under spectate, the grant naming the player's wings among what
+// is not admitted. Pure arithmetic on sorted ids; no RNG.
+//
+//   AIRBASE. A nation party to a declared hostility (either way: `corp_is_mobilised`)
+//   with no airbase of its own, built or building, builds one: on its capital tile, or
+//   failing that its own tile nearest the capital that the door admits, ties to the
+//   lowest id — only while its uncommitted treasury holds twice the build's capex.
+//   HIRE. Mobilised, with a completed airbase, under the soft cap of
+//   `k_rival_wing_cap` wings (mustering ones count), it hires ONE wing an evaluation:
+//   the available row of best `value / hire_cost`, ties to the lowest row, only while
+//   its uncommitted treasury holds twice the price. Value: a fighter 3 while a hostile
+//   nation flies wings and 1 else; a strike wing 2; a bomber 1.5 and a helicopter 1
+//   while a province held by a nation it is hostile to lies in their range, else 0; a
+//   drone 1; recon 0.5.
+//   MISSION. Each of its raised wings, ascending id, scores every province in range
+//   for every mission its class flies: superiority — hostile superiority power there
+//   plus 1000 a unit of its own in battle there; tactical — over ANY province, 2000 a
+//   unit of a nation it is hostile to in battle there and 1000 one out of battle;
+//   strategic — over a province held by a nation it is hostile to, 1000 a completed
+//   building of a hostile nation whose output its condition scales; recon — 500 a
+//   hostile unit. The best (score, then lowest province, then mission order) is
+//   assigned when it beats the wing's current assignment's own score by
+//   `k_rival_air_switch` per-mille, or the current one has become illegal; with
+//   nothing scoring above 0, a wing whose mission went illegal is grounded.
+// ---------------------------------------------------------------------------
+
+constexpr int     k_rival_wing_cap      = 3;
+constexpr int64_t k_rival_air_switch    = 1250; ///< per-mille: a 25 % better target to switch
+
+namespace {
+
+int64_t rival_air_score(const world& w, entity_id nation, const air_wing& wg, air_mission m,
+                        uint32_t p, const std::set<entity_id>& fighting)
+{
+    const ::province* pr = w.provinces.find(p);
+    if (pr == nullptr)
+        return 0;
+    const entity_id holder = province_holder_for(w, p);
+    const bool bomb_ok = holder != null_entity && holder != nation && is_hostile(w, nation, holder);
+    int64_t s = 0;
+    switch (m)
+    {
+        case air_mission::superiority:
+        {
+            for (auto it = w.air_superiority.lower_bound({p, null_entity});
+                 it != w.air_superiority.end() && it->first.first == p; ++it)
+                if (it->first.second != nation
+                    && (is_hostile(w, nation, it->first.second) || is_hostile(w, it->first.second, nation)))
+                    s += it->second;
+            for (const auto& [uid, u] : w.units)
+                if (u.owner == nation && u.count > 0 && fighting.count(uid) != 0
+                    && w.provinces.province_of(u.position) == p)
+                    s += 1000;
+            break;
+        }
+        case air_mission::tactical:
+            // Any province — its own soil included (close air support): the
+            // hostility rule is on the target unit, as the verb's (cold review).
+            for (const auto& [uid, u] : w.units)
+                if (u.count > 0 && u.owner != nation && is_hostile(w, nation, u.owner)
+                    && w.provinces.province_of(u.position) == p)
+                    s += fighting.count(uid) != 0 ? 2000 : 1000;
+            break;
+        case air_mission::strategic:
+        {
+            if (!bomb_ok)
+                return 0;
+            for (const auto& [nid, nc] : w.nations)
+            {
+                if (nid == nation || !is_hostile(w, nation, nid))
+                    continue;
+                for (const entity_id bid : nc.state_assets)
+                {
+                    const auto bit = w.buildings.find(bid);
+                    if (bit != w.buildings.end() && bit->second.ticks_remaining <= 0
+                        && condition_bites(bit->second.type) && bit->second.condition_permille > 0
+                        && w.provinces.province_of(bit->second.tile) == p)
+                        s += 1000;
+                }
+            }
+            break;
+        }
+        case air_mission::recon:
+            for (const auto& [uid, u] : w.units)
+                if (u.count > 0 && u.owner != nation
+                    && (is_hostile(w, nation, u.owner) || is_hostile(w, u.owner, nation))
+                    && w.provinces.province_of(u.position) == p)
+                    s += 500;
+            break;
+        case air_mission::none:
+            break;
+    }
+    (void)wg;
+    return s;
+}
+
+} // namespace
+
+void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, int tick)
+{
+    // Never the player's nation (AI_OPPONENT.md § 11: "Not admitted: any wing,
+    // airbase or mission of another nation, the player's included").
+    if (nation == null_entity || nation == player_nation(w) || w.nations.find(nation) == w.nations.end())
+        return;
+    // Copies: the verbs below may grow the nation's asset list.
+    const nation_component nc = w.nations.at(nation);
+    const bool mobilised = corp_is_mobilised(w, nation);
+
+    // --- AIRBASE --------------------------------------------------------------
+    entity_id base = null_entity;   // a completed, working airbase of its own
+    bool      any_base = false;     // built or building
+    {
+        std::vector<entity_id> own = nc.state_assets;
+        std::sort(own.begin(), own.end());
+        for (const entity_id bid : own)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end() || bit->second.type != building_type::airbase
+                || bit->second.decommissioned)
+                continue;
+            any_base = true;
+            if (bit->second.ticks_remaining <= 0 && base == null_entity)
+                base = bid;
+        }
+    }
+    if (mobilised && !any_base)
+    {
+        const entity_id cap = nc.capital_tile;
+        const auto cit = w.tiles.find(cap);
+        entity_id best = null_entity;
+        long long best_d = std::numeric_limits<long long>::max();
+        std::vector<entity_id> tiles = nc.tiles;
+        std::sort(tiles.begin(), tiles.end());
+        const float reach_budget = reg.construction().max_logistics_reach;
+        for (const entity_id tid : tiles)
+        {
+            const auto tit = w.tiles.find(tid);
+            if (tit == w.tiles.end())
+                continue;
+            long long d = 0;
+            if (cit != w.tiles.end())
+            {
+                if (tit->second.body != cit->second.body)
+                    continue;
+                const long long dx = tit->second.grid_x - cit->second.grid_x;
+                const long long dy = tit->second.grid_y - cit->second.grid_y;
+                d = dx * dx + dy * dy;
+            }
+            if (d >= best_d)
+                continue;
+            body_reach_field(w, tit->second.body);
+            if (!placement_rules::can_place_in_world(w, tid, building_type::airbase,
+                                                     resource_type::iron_ore, reach_budget, nation))
+                continue;
+            best = tid;
+            best_d = d;
+        }
+        if (best != null_entity)
+        {
+            const float capex = construction_capex(w, reg, best, building_type::airbase,
+                                                   resource_type::iron_ore);
+            if (state_uncommitted_treasury(w, nation) >= 2.0f * capex)
+            {
+                corp_command cmd;
+                cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+                cmd.verb = corp_verb::build; cmd.tile = best; cmd.type = building_type::airbase;
+                (void)apply_corp_command(w, reg, cmd);
+            }
+        }
+    }
+
+    // --- HIRE -------------------------------------------------------------------
+    if (mobilised && base != null_entity)
+    {
+        int owned = 0;
+        bool hostile_air = false;
+        for (const auto& [wid, wg] : w.wings)
+        {
+            if (wg.owner == nation)
+                ++owned;
+            else if (is_hostile(w, nation, wg.owner) || is_hostile(w, wg.owner, nation))
+                hostile_air = true;
+        }
+        if (owned < k_rival_wing_cap)
+        {
+            const entity_id base_tile = w.buildings.at(base).tile;
+            // The farthest a hostile-held province lies from the base, for the
+            // range-gated values.
+            int nearest_hostile = -1;
+            for (const ::province& p : w.provinces.provinces)
+            {
+                const entity_id holder = province_holder_for(w, p.id);
+                if (holder == null_entity || holder == nation || !is_hostile(w, nation, holder))
+                    continue;
+                const int d = air_province_distance(w, base_tile, p.id);
+                if (d >= 0 && (nearest_hostile < 0 || d < nearest_hostile))
+                    nearest_hostile = d;
+            }
+            const air_params& ap = reg.military().air;
+            const auto in_reach = [&](air_class c) {
+                return nearest_hostile >= 0
+                    && nearest_hostile <= ap.cls[static_cast<std::size_t>(c)].range;
+            };
+            int    best_row = -1;
+            double best = 0.0;
+            for (const uint16_t row : available_air_rows(w, nation)) // ascending
+            {
+                const air_class c = air_roster_table()[row].cls;
+                double value = 0.0;
+                switch (c)
+                {
+                    case air_class::fighter:    value = hostile_air ? 3.0 : 1.0; break;
+                    case air_class::multirole:  value = 2.0; break;
+                    case air_class::bomber:     value = in_reach(c) ? 1.5 : 0.0; break;
+                    case air_class::helicopter: value = in_reach(c) ? 1.0 : 0.0; break;
+                    case air_class::drone:      value = 1.0; break;
+                    case air_class::recon:      value = 0.5; break;
+                }
+                const float price = ap.cls[static_cast<std::size_t>(c)].hire_cost;
+                if (value <= 0.0 || price <= 0.0f || state_uncommitted_treasury(w, nation) < 2.0f * price)
+                    continue;
+                const double score = value / static_cast<double>(price);
+                if (score > best)
+                {
+                    best = score;
+                    best_row = row;
+                }
+            }
+            if (best_row >= 0)
+            {
+                corp_command cmd;
+                cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+                cmd.verb = corp_verb::hire_wing; cmd.tile = base_tile;
+                cmd.unit_type = static_cast<uint16_t>(best_row);
+                (void)apply_corp_command(w, reg, cmd);
+            }
+        }
+    }
+
+    // --- MISSION ------------------------------------------------------------------
+    std::vector<entity_id> mine;
+    for (const auto& [wid, wg] : w.wings)
+        if (wg.owner == nation && wg.muster_days <= 0 && wg.hp_ppm > 0)
+            mine.push_back(wid); // std::map: ascending
+    if (mine.empty())
+        return;
+    const std::set<entity_id> fighting = units_in_live_battles(w);
+    for (const entity_id wid : mine)
+    {
+        const air_wing wg = w.wings.at(wid); // a copy: the verb below writes the live one
+        const air_class c = wing_class(wg);
+        const std::vector<uint32_t> in_range = air_provinces_in_range(w, reg, wid);
+        air_mission best_m = air_mission::none;
+        uint32_t    best_p = 0;
+        int64_t     best_s = 0;
+        for (int mi = 1; mi < air_mission_count; ++mi)
+        {
+            const air_mission m = static_cast<air_mission>(mi);
+            if (!air_class_flies(reg, c, m))
+                continue;
+            for (const uint32_t p : in_range) // ascending
+            {
+                const int64_t s = rival_air_score(w, nation, wg, m, p, fighting);
+                if (s > best_s)
+                {
+                    best_s = s;
+                    best_m = m;
+                    best_p = p;
+                }
+            }
+        }
+        // The wing's current assignment, scored the same way, and whether the verb
+        // would still admit it.
+        int64_t cur_s = 0;
+        bool    cur_legal = wg.mission == air_mission::none;
+        if (wg.mission != air_mission::none)
+        {
+            for (const uint32_t p : wg.provinces)
+                cur_s += rival_air_score(w, nation, wg, wg.mission, p, fighting);
+            cur_legal = true;
+            for (const uint32_t p : wg.provinces)
+                if (!air_province_in_range(w, reg, wg, p)
+                    || (wg.mission == air_mission::strategic
+                        && !is_hostile(w, nation, province_holder_for(w, p))))
+                    cur_legal = false;
+        }
+        corp_command cmd;
+        cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+        cmd.verb = corp_verb::assign_air_mission; cmd.subject = wid;
+        if (best_s > 0)
+        {
+            if (cur_legal && wg.mission != air_mission::none
+                && best_s * 1000 <= cur_s * k_rival_air_switch)
+                continue; // the current target is good enough: no thrash
+            if (wg.mission == best_m && wg.provinces.size() == 1 && wg.provinces[0] == best_p)
+                continue;
+            cmd.order = static_cast<uint32_t>(best_m);
+            cmd.air_provinces[0] = best_p;
+            (void)apply_corp_command(w, reg, cmd);
+        }
+        else if (!cur_legal)
+        {
+            cmd.order = static_cast<uint32_t>(air_mission::none); // ground it
+            (void)apply_corp_command(w, reg, cmd);
+        }
+    }
+}
+
 bool corp_strategic_eval_due(const world& w, entity_id corp, int tick, const corp_ai_params& p)
 {
     // The player-corp skip, and the ONE condition that removes it (BL-409).
@@ -1503,6 +1827,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // player guard above, so never the player's nation in a seated session.
         if (actor.is_nation)
             score_nation_fronts(w, reg, corp, tick);
+
+        // BL-1451 (AI_OPPONENT.md § 11, "Rival nations fly air wings", Ben 2026-10-28):
+        // its own airbase, its own wings and their missions. Past the player guard
+        // above, and score_nation_air refuses the player's nation itself as well.
+        if (actor.is_nation)
+            score_nation_air(w, reg, corp, tick);
 
         // BL-1309 grant (AI_OPPONENT.md § 11, Ben 2026-10-15): a producing build
         // beyond its host nation's Logistic Point reach is scored with the capex of
@@ -4061,6 +4391,35 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
                              static_cast<double>(w.provinces.province_of(u.order.dest)), 1.0f,
                              fact_provenance::own_asset);
                 }
+            }
+        }
+
+        // BL-1449 (air combat): the corp's OWN wings — base, class row, HP, mission
+        // and its provinces — and the hostile units its air has REVEALED (superiority
+        // or recon over their province). No unit fog consumes the reveal set yet, so
+        // this export (and the verify API) is its reader. Own facts only, as above.
+        {
+            for (const auto& [wid, wg] : w.wings) // ascending id
+            {
+                if (wg.owner != corp)
+                    continue;
+                add_fact(bb, tick, wid, "wing_airbase", static_cast<double>(wg.airbase), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, wid, "wing_type", static_cast<double>(wg.type), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, wid, "wing_hp_ppm", static_cast<double>(wg.hp_ppm), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, wid, "wing_muster_days", static_cast<double>(wg.muster_days), 1.0f, fact_provenance::own_asset);
+                add_fact(bb, tick, wid, "wing_mission", static_cast<double>(wg.mission), 1.0f, fact_provenance::own_asset);
+                for (const uint32_t p : wg.provinces)
+                    add_fact(bb, tick, wid, "wing_province", static_cast<double>(p), 1.0f, fact_provenance::own_asset);
+            }
+            for (const auto& [viewer, uid] : w.air_revealed) // ordered
+            {
+                if (viewer != corp)
+                    continue;
+                const auto uit = w.units.find(uid);
+                if (uit == w.units.end())
+                    continue;
+                add_fact(bb, tick, uid, "revealed_unit_tile", static_cast<double>(uit->second.position),
+                         1.0f, fact_provenance::rival_visible);
             }
         }
     }

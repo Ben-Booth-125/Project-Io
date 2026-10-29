@@ -9,6 +9,7 @@
 #include "space_programme.hpp" // BL-644: space_programme_params — the tenth budget line's purchase lumps
 #include "space_assets.hpp"    // BL-1327: space_asset_params — launch, reach, travel and upkeep dials
 #include "nation_tax.hpp"       // BL-1335: tax_params — the tax tiers and Discontent dials
+#include "air_params.hpp"  // BL-1449: air_params — the air theatre's authored numbers
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 
 #include <array>
@@ -830,6 +831,10 @@ struct military_capability_params
     /// see that file's comment. Authored under
     /// `economy.military.active_lp_credit_per_unit_distance`.
     float active_lp_credit_per_unit_distance = 0.0f;
+
+    /// BL-1449 (MILITARY.md § Air): the six air classes and the air rules' dials,
+    /// authored under `economy.military.air`. Defaults equal the Lua values.
+    air_params air = default_air_params();
 };
 
 /// BL-350 procurement/contract tunables, authored in scripts/economy.lua under the top-level

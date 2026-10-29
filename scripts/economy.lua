@@ -289,6 +289,19 @@ economy = {
             build_duration_days = 360,
             resource_costs = { steel = 35.0 },
         },
+        -- BL-1449 (MILITARY.md § Air, Ben 2026-10-28): Airbase — the one door an
+        -- air wing is hired at, built on a nation's own ground as a military base
+        -- is. Produces nothing, staffs at zero, no supply anchor. A first cut priced
+        -- above the military base: a runway and hangars are more steel and more
+        -- upkeep than a garrison.
+        airbase = {
+            base_rate   = 0.0,
+            maintenance = 20.0,
+            base_wage   = 10.0,
+            build_cost  = 450.0,
+            build_duration_days = 360,
+            resource_costs = { steel = 50.0 },
+        },
         -- BL-332: Research Institute — the dedicated tech-progress building.
         -- Same passive shape as military_base (base_rate 0, staffs at zero);
         -- its output is research points, each quarter, into the owning corp's
@@ -948,6 +961,65 @@ economy = {
         -- raising a fresh one, the same relationship BL-603's upkeep
         -- derivation keeps for standing-force wages.
         active_lp_credit_per_unit_distance = 0.04,
+
+        -- BL-1449 (MILITARY.md § Air, Ben 2026-10-28): the air theatre. A FIRST CUT,
+        -- authored inside the doc's characterisation; the same numbers are the C++
+        -- defaults (src/world/air_params.hpp), so a harness registry flies what the
+        -- game flies. UNITS: `air` and `ad_attack` are milli-HP a day at full
+        -- strength; `soft` / `hard` milli-hits a day on the land round's scale (an
+        -- infantry man's soft attack is 60 a round); `strategic` building condition
+        -- per-mille a day; `recon` per-mille added to its side's hits; `range` tiles
+        -- in a straight line from the airbase to a province's nearest tile.
+        -- A wing assigned N provinces spends a day across them: its attack and the
+        -- fire it takes over each are 1/N of a day's.
+        air = {
+            bombing_penalty_permille = 700, -- at share 0 a side's bombing lands at 30 %
+            march_slow_permille      = 500, -- at share 0 a march step costs 1.5x
+            reveal_share_permille    = 500, -- a share above this reveals the other side's units
+            recon_cap_permille       = 500, -- recon raises a side's hits by at most +50 %
+            ad_attack                = 1000, -- one air defence unit: 1 HP a day to each wing over it
+            repair_permille_per_day  = 4,   -- a bombed building regains 0.4 % a day
+            repair_goods_per_permille = { steel = 0.05, machinery = 0.02 },
+            wing_upkeep_goods        = { refined_fuel = 1.0 }, -- per wing per tick, at its airbase
+            classes = {
+                fighter = {
+                    hp = 100, air = 2000, superiority_permille = 1000, range = 15,
+                    ad_vulnerability_permille = 700, muster_days = 135, hire_cost = 900.0,
+                    hire_goods = { alloys = 4.0, electronics = 3.0, machinery = 2.0, refined_fuel = 2.0 },
+                    missions = { "superiority" },
+                },
+                multirole = {
+                    hp = 100, air = 1500, superiority_permille = 600, soft = 80, hard = 60,
+                    range = 12, ad_vulnerability_permille = 1000, muster_days = 135, hire_cost = 1100.0,
+                    hire_goods = { alloys = 4.0, electronics = 3.0, machinery = 2.0, ordnance = 2.0 },
+                    missions = { "tactical", "superiority" },
+                },
+                bomber = {
+                    hp = 140, strategic = 12, superiority_permille = 0, range = 40,
+                    ad_vulnerability_permille = 1600, muster_days = 180, hire_cost = 1600.0,
+                    hire_goods = { alloys = 6.0, electronics = 3.0, machinery = 3.0, ordnance = 3.0 },
+                    missions = { "strategic" },
+                },
+                helicopter = {
+                    hp = 60, soft = 50, hard = 120, superiority_permille = 0, range = 6,
+                    ad_vulnerability_permille = 1300, muster_days = 90, hire_cost = 500.0,
+                    hire_goods = { alloys = 2.0, machinery = 2.0, electronics = 1.0 },
+                    missions = { "tactical" },
+                },
+                drone = {
+                    hp = 40, soft = 40, hard = 40, recon = 150, superiority_permille = 0, range = 10,
+                    ad_vulnerability_permille = 1200, has_morale = false, muster_days = 90, hire_cost = 400.0,
+                    hire_goods = { electronics = 2.0, alloys = 1.0 },
+                    missions = { "tactical", "recon" },
+                },
+                recon = {
+                    hp = 80, recon = 300, superiority_permille = 0, range = 20,
+                    ad_vulnerability_permille = 800, muster_days = 135, hire_cost = 800.0,
+                    hire_goods = { alloys = 3.0, electronics = 4.0 },
+                    missions = { "recon" },
+                },
+            },
+        },
     },
 
     -- BL-350: the procurement/contract seam — "a build order placed with

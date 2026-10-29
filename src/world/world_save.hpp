@@ -551,7 +551,22 @@ inline constexpr uint32_t world_save_magic =
 /// design is not base kit, in issue order, as (u32 order id, 3 x u8 variants). v63 is a
 /// STRICT PREFIX of v64 and is read too (`k_world_save_version_pre_designs`), as a world
 /// where every nation and every unit fields base kit.
-inline constexpr uint32_t world_save_version = 64;
+///
+/// Bumped to 65 (BL-1449, air combat; MILITARY.md § Air): A TRAILING SECTION after the
+/// designs carries, each after a u32 count: every wing, ascending id, as (id, owner,
+/// airbase, u16 roster row, i32 hp ppm, i32 morale, i32 supply, i32 muster days, 3 x u8
+/// kit variants, u8 mission, u32 n, n x u32 provinces ascending); the superiority map in
+/// key order as (u32 province, nation, i32 power); the reveal set in order as (viewer,
+/// unit); the hit bank in unit order as (unit, i32 hp milli-hits, i32 readiness
+/// milli-hits); every nation with an air design, ascending, as (id, u32 n, n x u16 air
+/// kit ids ascending); and every building off full condition, ascending, as (id, i32
+/// condition). v64 is a STRICT PREFIX of v65 and is read too
+/// (`k_world_save_version_pre_air`), as a world with no air and every building whole.
+/// BL-1445 (move by days) claims v65 on another branch too: the second to merge renumbers.
+inline constexpr uint32_t world_save_version = 65;
+
+/// v64, a strict prefix of v65 (the air section is v65's only addition).
+inline constexpr uint32_t k_world_save_version_pre_air = 64;
 
 /// v63, a strict prefix of v64 (the designs section is v64's only addition).
 inline constexpr uint32_t k_world_save_version_pre_designs = 63;
@@ -715,6 +730,9 @@ void write_world_snapshot_pre_tile(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1434): @p w as a v63 stream — no designs section.
 void write_world_snapshot_pre_designs(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1449): the v64 stream shape, with no air section.
+void write_world_snapshot_pre_air(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

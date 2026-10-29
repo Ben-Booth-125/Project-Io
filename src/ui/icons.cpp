@@ -477,6 +477,7 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
         case building_type::railway_station:      hub_node(dl, centre, r, fill);  break; // BL-1255: the hub glyph until one is drawn
         case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
         case building_type::military_base:        shield(dl, centre, r, fill);    break; // BL-325
+        case building_type::airbase:              shield(dl, centre, r, fill);    break; // BL-1449: the shield until BL-1450 draws one
         case building_type::research_institute:   research(dl, centre, r, fill);  break; // BL-332
         // BL-615: education pair reuses the research glyph family until the
         // icon vocabulary gives them their own (ICONS.md owns that call).
