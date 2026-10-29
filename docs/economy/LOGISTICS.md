@@ -845,6 +845,12 @@ periphery is left uncovered on purpose — ground a player or a rival covers lat
 a station or a port where it is wanted. The field is therefore a slope away from the capital, not a
 blanket, and an outlying hub reads as a deliberate reach into thin ground.
 
+**Logistics serves the armies from generation (Ben, 2026-10-29).** The seeding counts every
+garrison post — the capital's and each border post facing a neighbour — as a request beside the
+producing buildings, so the sources it stands reach the ground the nation's armies open on, within
+the 8-tile off-road draw (§ A unit draws off the road). A nation opens with its army fed; where it
+marches next is the player's to supply.
+
 Three things follow, and each is a check rather than a preference:
 
 - **Every capital holds a source.** A nation whose capital makes no points has no centre for its
@@ -1005,6 +1011,16 @@ request. Guns, butter and freight still compete in one currency. **The supply dr
 others** — Ben's 2026-09-24 ruling (NR-917), kept with its original subject: the front is supplied,
 and the trade and the factories behind it wait. A campaign visibly starving its own industry is the
 intended, legible cost of keeping an army in the field.
+
+**A unit draws off the road, up to 8 tiles from it (Ben, 2026-10-29).** A unit need not stand on
+the network to be supplied. Its request is **paid at the closest road** of its nation's network —
+the nearest tile within **8 tiles** of the unit that the network reaches, by steps over crossable
+land, ties to the lowest tile id — and is served by *that* tile's routed cover. The points are
+**spent per item resupplied**: the request is the quantity of goods the unit's resupply needs, as
+a shipment's draw is its cargo, so a full unit near a road draws little and a depleted one draws a
+lot. A unit more than 8 tiles from any road of its network draws nothing — it is past its roads,
+and unfed (`../military/MILITARY.md` § Carried supplies). The Logistics lens draws the off-road
+leg as a dashed line from that road tile to the unit (`../ui/LENSES.md` § Logistics lens).
 
 **A shipment draws points again (Ben, 2026-10-16).** The cap retired in BL-1309's cut is
 reinstated: a shipment draws **by cargo quantity**.
