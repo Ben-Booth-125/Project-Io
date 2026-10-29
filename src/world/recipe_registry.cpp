@@ -747,6 +747,10 @@ void recipe_registry::load_from_lua(lua_state& lua)
         // a class, a terrain or an effect; every number must be finite and in its domain;
         // every flag a boolean. A bad cell THROWS, naming it, never clamps or drops (the
         // authoring boundary's untrusted-input rule). Absent = every cell neutral.
+        const sol::object tc_obj = (*military)["terrain_class"];
+        if (tc_obj.valid() && tc_obj.get_type() != sol::type::lua_nil
+            && tc_obj.get_type() != sol::type::table)
+            throw std::runtime_error("military.terrain_class must be a table of class rows");
         if (sol::optional<sol::table> tc = (*military)["terrain_class"])
         {
             const std::vector<std::pair<const char*, std::size_t>> classes = {
@@ -821,7 +825,16 @@ void recipe_registry::load_from_lua(lua_state& lua)
                         };
                         if (ekey == "move")                       row.move = number(1.0, false, 10.0);
                         else if (ekey == "blocked_unless_roaded") row.blocked_unless_roaded = flag();
-                        else if (ekey == "dismount")              row.dismount = flag();
+                        else if (ekey == "dismount")
+                        {
+                            // Only infantry carriers dismount (Ben, 2026-10-29): a dismount
+                            // on any other class names a vehicle with no men to leave it.
+                            row.dismount = flag();
+                            if (row.dismount && cit->second != static_cast<std::size_t>(land_class::motorised)
+                                && cit->second != static_cast<std::size_t>(land_class::mechanised))
+                                throw std::runtime_error(ctx + ".dismount: only motorised and mechanised "
+                                                         "infantry dismount");
+                        }
                         else if (ekey == "fight")                 row.fight = number(0.0, true, 1.0);
                         else if (ekey == "wear")                  row.wear = number(1.0, false, 10.0);
                         else if (ekey == "stealth")

@@ -2446,7 +2446,7 @@ bool app::load_game_from(const std::string& path)
     save_envelope env;
 
     // Reads into scratch, so a rejected file leaves the running campaign whole.
-    if (!read_save_game(path, w, env))
+    if (!read_save_game(path, w, env, &m_registry.military())) // BL-1455: legacy step-offs read the walls
     {
         ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
                       ui::chat_state::k_field_channel,
@@ -3238,6 +3238,10 @@ void app::render()
                 // card's separate press); a spent unit starts no fight.
                 m_ui.construction.last_message = "Can't march — already there, in a fight, refitting, or too spent to attack.";
                 break;
+            case corp_command_result::rejected_terrain:
+                // BL-1455 (MILITARY.md § Terrain and the classes): the class's wall.
+                m_ui.construction.last_message = "Can't march there — its class can't cross that ground without a road.";
+                break;
             default:
                 m_ui.construction.last_message = "Can't march there."; break;
         }
@@ -3264,15 +3268,21 @@ void app::render()
         bool go = true;
         if (m_ui.pending_unit_order_declare != null_entity)
         {
-            bool any = false;
+            bool any = false, walled = false;
             for (const entity_id unit : m_ui.pending_unit_order_units)
-                any = any || march_check(m_world, m_world.player_entity, unit, m_ui.pending_unit_order_tile,
-                                         m_ui.pending_unit_order_declare, nullptr,
-                                         &m_registry.military()) == corp_command_result::applied;
+            {
+                const corp_command_result cr =
+                    march_check(m_world, m_world.player_entity, unit, m_ui.pending_unit_order_tile,
+                                m_ui.pending_unit_order_declare, nullptr, &m_registry.military());
+                any    = any || cr == corp_command_result::applied;
+                walled = walled || cr == corp_command_result::rejected_terrain;
+            }
             if (!any)
             {
                 go = false;
-                m_ui.construction.last_message = "Can't attack there.";
+                m_ui.construction.last_message = walled
+                    ? "Can't attack there — their class can't cross that ground without a road."
+                    : "Can't attack there.";
             }
         }
         if (go && m_ui.pending_unit_order_declare != null_entity)
@@ -3290,7 +3300,7 @@ void app::render()
         }
         if (go)
         {
-            int marching = 0, refused = 0;
+            int marching = 0, refused = 0, walled = 0;
             for (const entity_id unit : m_ui.pending_unit_order_units)
             {
                 corp_command cmd;
@@ -3299,8 +3309,10 @@ void app::render()
                 cmd.verb     = corp_verb::march_unit;
                 cmd.subject  = unit;
                 cmd.tile     = m_ui.pending_unit_order_tile;
-                const bool applied = player_command(cmd) == corp_command_result::applied;
+                const corp_command_result mr = player_command(cmd);
+                const bool applied = mr == corp_command_result::applied;
                 (applied ? marching : refused) += 1;
+                walled += mr == corp_command_result::rejected_terrain ? 1 : 0; // BL-1455
                 // Unassign only once the march is accepted: a refused order leaves
                 // the unit on its front. Both land in this frame, before the next
                 // tick's front step could re-order it.
@@ -3317,14 +3329,19 @@ void app::render()
                 }
             }
             const char* verb = m_ui.pending_unit_order_attack ? " attacking" : " marching";
+            // BL-1455: a refusal for the class's wall says so, in the same line.
+            const std::string wall_note = walled > 0
+                ? std::string(" — ") + (walled == refused && marching == 0 ? "" : std::to_string(walled) + " ")
+                      + "can't cross that ground without a road"
+                : std::string();
             if (marching == 0)
-                m_ui.construction.last_message = m_ui.pending_unit_order_attack
-                    ? "Can't attack there." : "Can't march there.";
+                m_ui.construction.last_message = std::string(m_ui.pending_unit_order_attack
+                    ? "Can't attack there" : "Can't march there") + (walled > 0 ? wall_note : ".");
             else if (refused == 0)
                 m_ui.construction.last_message = std::to_string(marching) + verb;
             else
                 m_ui.construction.last_message = std::to_string(marching) + verb + ", "
-                                               + std::to_string(refused) + " refused";
+                                               + std::to_string(refused) + " refused" + wall_note;
         }
         m_ui.pending_unit_order_units.clear(); // consume the request
         m_ui.pending_unit_order_tile     = null_entity;

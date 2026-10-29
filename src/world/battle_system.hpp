@@ -322,7 +322,9 @@ struct shared_tile_fix
 /// lowest tile id. A unit that steps off loses its order (its path started where it
 /// no longer stands). A unit with nowhere to go is DISBANDED - erased, and struck
 /// from every battle's lists. A world that keeps the rule is untouched.
-shared_tile_fix resolve_shared_tiles(world& w);
+/// With @p mil given (BL-1455), a step never lands on a tile the unit's class cannot
+/// enter (`retreat_tile`'s wall test); a unit with no other way off is disbanded.
+shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params* mil = nullptr);
 
 /// The march path @p from -> @p dest on @p body for a unit of @p owner, in TRAVEL
 /// order (path[0] == @p from), solved around every tile in @p blocked save @p dest

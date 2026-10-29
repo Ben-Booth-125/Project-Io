@@ -4691,7 +4691,7 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
             // was given) invalidates the step the same way, and re-paths around the wall.
             const bool blocked = (cur_it == w.tiles.end()) || (next_it == w.tiles.end())
                                 || (next_it->second.body != cur_it->second.body)
-                                || wall(next_it->second);
+                                || (wall && wall(next_it->second));
             if (blocked)
             {
                 if (cur_it == w.tiles.end())

@@ -1055,6 +1055,15 @@ in `tools/verify/README.md`.
   itself so the pass can be timed alone — cross-checked against `lp_pool_harness`'s shipped `[lp]`
   line, same hubs and pools. Build with `bash tools/verify/build_lua_harness.sh lp_coverage_census`;
   sweep with `bash tools/verify/par_seeds.sh lp_coverage_census --tier full`.
+- **`terrain_class_harness`** — BL-1455 (terrain class modifiers; MILITARY.md § Terrain and the
+  classes): the per-class terrain rows, against the authored `economy.military.terrain_class`.
+  The lookup for every cell of the doc's table and the open-ground stealth rule; worst-row
+  stacking on a tile matching two rows; medium armour refused across a roadless mountain
+  (`rejected_terrain`), routed round it, and across on a mountain road; the dismount and forest
+  move rows in days; leaving a wall; the fight scale and the road halving it, in a battle and on
+  the resolver; a retreat that refuses a wall; fronts that substitute a walled slot, skip a walled
+  push target and never re-issue a walled unit daily; and the loader's rejections. Build with
+  `bash tools/verify/build_lua_harness.sh terrain_class_harness`.
 
 ## Running the whole suite (CTest — BL-104)
 

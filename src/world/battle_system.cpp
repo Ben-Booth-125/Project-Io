@@ -486,6 +486,20 @@ std::set<entity_id> foreign_held_tiles(const world& w, entity_id owner)
 std::function<bool(const tile_component&)> class_wall(const military_capability_params& mil,
                                                       uint16_t type)
 {
+    // NO BLOCKING ROW, NO WALL: an empty function, so march_path keeps its old fast
+    // path (no avoiding search) for a class the ground never walls, and for every
+    // class when no rows are loaded.
+    const auto& table = unit_roster_table();
+    if (type >= table.size() || table[type].land == k_land_class_from_cls)
+        return {};
+    const int ci = static_cast<int>(table[type].land);
+    if (ci < 0 || ci >= land_class_count)
+        return {};
+    bool any = false;
+    for (const terrain_class_row& r : mil.terrain.rows[static_cast<std::size_t>(ci)])
+        any = any || r.blocked_unless_roaded;
+    if (!any)
+        return {};
     return [&mil, type](const tile_component& t) {
         return terrain_class_effects_for_type(mil, type, t).walled;
     };
@@ -686,7 +700,7 @@ int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks)
     return opened;
 }
 
-shared_tile_fix resolve_shared_tiles(world& w)
+shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params* mil)
 {
     shared_tile_fix out;
     // tile -> standing units there, ascending id (the map and the sorted walk).
@@ -721,7 +735,7 @@ shared_tile_fix resolve_shared_tiles(world& w)
             // Read as the world stands NOW: earlier step-offs count, so no step lands a
             // second nation anywhere.
             const std::set<entity_id> foreign = foreign_held_tiles(w, u.owner);
-            const entity_id to = retreat_tile(w, u, 0, foreign, false);
+            const entity_id to = retreat_tile(w, u, 0, foreign, false, mil);
             if (to != null_entity)
             {
                 u.position = to;

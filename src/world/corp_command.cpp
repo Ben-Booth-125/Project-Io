@@ -734,16 +734,17 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
     std::function<bool(const tile_component&)> wall;
     if (mil != nullptr)
     {
-        wall = class_wall(*mil, uit->second.type);
-        if (wall(dit->second))
+        wall = class_wall(*mil, uit->second.type); // empty when the class has no blocking row
+        if (wall && wall(dit->second))
             return corp_command_result::rejected_terrain; // the class cannot enter it
     }
     const std::vector<entity_id> path =
         march_path(w, sit->second.body, uit->second.position, tile, foreign,
-                   mil != nullptr ? &wall : nullptr);
+                   wall ? &wall : nullptr);
     if (path.size() < 2)
     {
-        if (mil != nullptr
+        // The second search names the reason, and runs only where walls exist.
+        if (wall
             && march_path(w, sit->second.body, uit->second.position, tile, foreign).size() >= 2)
             return corp_command_result::rejected_terrain; // only the walls stand in the way
         return corp_command_result::rejected_invalid; // unreachable

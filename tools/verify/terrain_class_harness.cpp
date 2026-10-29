@@ -18,7 +18,12 @@
 //   T6  a unit standing on a blocked tile may leave it;
 //   T7  the fight debuff, by each unit's own class on either side, and a road halving it;
 //   T8  a retreat never steps onto a tile its class cannot enter;
-//   T9  the loader rejects bad rows.
+//   T9  the loader rejects bad rows (a non-table terrain_class, a dismount on a class
+//       that carries no infantry, ...);
+//   T10 fronts route as a march does: a walled hold slot is substituted, a push skips a
+//       walled target, a unit with no legal slot is never re-ordered daily;
+//   T11 a class with no blocking row has an empty wall (the old fast path);
+//   T12 a legacy load's one-nation-per-tile step-off never lands on a wall.
 //
 // Build: bash tools/verify/build_lua_harness.sh terrain_class_harness (it loads
 // scripts/recipes.lua and scripts/economy.lua through a live Lua state). Run from the
@@ -29,6 +34,7 @@
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
+#include "world/fronts.hpp"
 #include "world/logistics.hpp"
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
@@ -323,6 +329,95 @@ duel_result duel(const recipe_registry& reg, uint16_t att_type, uint16_t def_typ
     out.att_lost = 600 - men(ua);
     out.def_lost = 600 - men(ud);
     return out;
+}
+
+// ---------------------------------------------------------------------------
+// The fronts fixture (after fronts_harness's cylinder): a 12 x 6 body of plains, A
+// holding rows 0-2 (a province per tile), B rows 3-5 (four blocks). A's front toward B
+// is row 2, a ring of twelve.
+// ---------------------------------------------------------------------------
+
+constexpr int FW = 12, FH = 6;
+
+struct front_fixture
+{
+    world     w;
+    entity_id body = null_entity, A = null_entity, B = null_entity;
+    std::vector<entity_id> cell;
+    entity_id at(int x, int y) const { return cell[static_cast<std::size_t>(y * FW + x)]; }
+};
+
+void build_fronts(front_fixture& f)
+{
+    world& w = f.w;
+    f.body = w.create_entity();
+    body_component bc{};
+    bc.name = "Cylinder"; bc.type = body_type::planet; bc.grid_width = FW; bc.grid_height = FH;
+    w.bodies[f.body] = bc;
+    for (int y = 0; y < FH; ++y)
+        for (int x = 0; x < FW; ++x)
+        {
+            const entity_id t = w.create_entity();
+            tile_component tc{};
+            tc.body = f.body; tc.grid_x = x; tc.grid_y = y;
+            tc.substrate = terrain_substrate::rocky; tc.landform = terrain_landform::plains;
+            w.tiles[t] = tc;
+            f.cell.push_back(t);
+        }
+    const auto add = [&](const char* name) {
+        const entity_id n = w.create_entity();
+        nation_component nc{};
+        nc.name = name; nc.treasury = 1.0e6f;
+        w.nations[n] = nc;
+        return n;
+    };
+    f.A = add("Aster");
+    f.B = add("Brael");
+    for (int y = 0; y < FH; ++y)
+        for (int x = 0; x < FW; ++x)
+            w.set_tile_nation(f.at(x, y), y < 3 ? f.A : f.B);
+    for (int y = 0; y < 3; ++y)
+        for (int x = 0; x < FW; ++x)
+        {
+            province p; p.id = f.at(x, y); p.body = f.body; p.tiles = { f.at(x, y) };
+            w.provinces.provinces.push_back(p);
+        }
+    for (int k = 0; k < 4; ++k)
+    {
+        province p; p.id = f.at(3 * k, 3); p.body = f.body;
+        for (int y = 3; y < FH; ++y)
+            for (int x = 3 * k; x < 3 * k + 3; ++x)
+                p.tiles.push_back(f.at(x, y));
+        std::sort(p.tiles.begin(), p.tiles.end());
+        w.provinces.provinces.push_back(p);
+    }
+    for (const province& p : w.provinces.provinces)
+        for (const entity_id t : p.tiles)
+            w.provinces.tile_province[t] = p.id;
+    invalidate_logistics_caches(w);
+}
+
+const front* front_of(world& w, entity_id nation, entity_id neighbour)
+{
+    for (const front& fr : nation_fronts(w, nation))
+        if (fr.neighbour == neighbour)
+            return &fr;
+    return nullptr;
+}
+
+corp_command_result front_cmd(world& w, const recipe_registry& reg, entity_id actor, corp_verb v,
+                              entity_id subject, entity_id tile, uint32_t order = 0)
+{
+    corp_command c;
+    c.corp = actor; c.as_nation = actor; c.verb = v; c.subject = subject; c.tile = tile; c.order = order;
+    return apply_corp_command(w, reg, c);
+}
+
+void front_day(world& w, const recipe_registry& reg, int day)
+{
+    advance_fronts(w, reg);
+    (void)run_unit_march(w, reg, day);
+    reanchor_fronts(w);
 }
 
 recipe_registry load_registry(const char* patch = nullptr)
@@ -740,6 +835,176 @@ int main()
     }
 
     // -----------------------------------------------------------------------
+    std::printf("\nT10 - fronts route as a march does\n");
+    {
+        const uint16_t tank = modern(land_class::armour);
+        const uint16_t inf  = modern(land_class::infantry);
+        // T10a: hold. One unit's slot is span[6]; make it a roadless mountain.
+        const auto hold_run = [&](uint16_t type, entity_id* slot_tile, entity_id* sub_tile,
+                                  entity_id* first_dest, int* dest_changes, entity_id* final_pos,
+                                  bool* ever_on_wall) {
+            front_fixture f;
+            build_fronts(f);
+            const front* fr = front_of(f.w, f.A, f.B);
+            if (fr == nullptr || fr->span.size() != 12)
+                return false;
+            const std::vector<entity_id> span = fr->span;
+            f.w.tiles.at(span[6]).landform = terrain_landform::mountain;
+            invalidate_logistics_caches(f.w);
+            *slot_tile = span[6];
+            *sub_tile  = span[5];
+            const entity_id u = add_unit(f.w, f.A, f.at(0, 0), type);
+            if (front_cmd(f.w, reg, f.A, corp_verb::assign_front, u, span[0]) != corp_command_result::applied)
+                return false;
+            entity_id last = null_entity;
+            *dest_changes = 0;
+            *ever_on_wall = false;
+            for (int day = 1; day <= 60; ++day)
+            {
+                front_day(f.w, reg, day);
+                const unit_component& uu = f.w.units.at(u);
+                if (day == 1)
+                    *first_dest = uu.order.dest;
+                if (uu.order.dest != null_entity && uu.order.dest != last)
+                {
+                    if (last != null_entity) ++*dest_changes;
+                    last = uu.order.dest;
+                }
+                *ever_on_wall = *ever_on_wall || uu.position == span[6];
+            }
+            *final_pos = f.w.units.at(u).position;
+            return true;
+        };
+        entity_id slot = null_entity, sub = null_entity, first = null_entity, pos = null_entity;
+        int changes = 0;
+        bool on_wall = false;
+        const bool ran = hold_run(tank, &slot, &sub, &first, &changes, &pos, &on_wall);
+        std::printf("      medium armour holding a front whose slot is a roadless mountain: first order to the "
+                    "substitute %d, order changes %d, ends on the substitute %d, ever on the wall %d\n",
+                    first == sub, changes, pos == sub, on_wall);
+        check(ran && first == sub && pos == sub && !on_wall,
+              "T10a a walled slot gives way to the nearest unwalled span tile (ties to the lower index), "
+              "and the armour holds it");
+        check(ran && changes == 0, "T10b the substitute is ordered once: no daily re-issue churns the order");
+        entity_id islot = null_entity, isub = null_entity, ifirst = null_entity, ipos = null_entity;
+        int ichanges = 0;
+        bool ion = false;
+        const bool iran = hold_run(inf, &islot, &isub, &ifirst, &ichanges, &ipos, &ion);
+        check(iran && ifirst == islot && ipos == islot,
+              "T10c control: infantry, which no mountain walls, takes the slot itself");
+
+        // T10d: no legal slot at all. Every span tile a roadless mountain; the armour holds
+        // where it stands and is never re-ordered.
+        {
+            front_fixture f;
+            build_fronts(f);
+            const front* fr = front_of(f.w, f.A, f.B);
+            const std::vector<entity_id> span = fr != nullptr ? fr->span : std::vector<entity_id>{};
+            for (const entity_id t : span)
+                f.w.tiles.at(t).landform = terrain_landform::mountain;
+            invalidate_logistics_caches(f.w);
+            const entity_id u = add_unit(f.w, f.A, f.at(0, 0), tank);
+            (void)march(f.w, reg, f.A, u, f.at(5, 1)); // a standing order the front must clear
+            const corp_command_result ar =
+                span.empty() ? corp_command_result::rejected_invalid
+                             : front_cmd(f.w, reg, f.A, corp_verb::assign_front, u, span[0]);
+            int ordered_days = 0;
+            const entity_id start = f.w.units.at(u).position;
+            bool moved = false;
+            for (int day = 1; day <= 30; ++day)
+            {
+                front_day(f.w, reg, day);
+                ordered_days += f.w.units.at(u).order.dest != null_entity ? 1 : 0;
+                moved = moved || f.w.units.at(u).position != start;
+            }
+            std::printf("      medium armour on a front of nothing but roadless mountain: assign %s, days with an "
+                        "order %d of 30, moved %d\n", result_name(ar), ordered_days, moved);
+            check(ar == corp_command_result::applied && ordered_days == 0 && !moved,
+                  "T10d a unit with no legal slot holds where it stands: halted once, never re-ordered daily");
+        }
+
+        // T10e: push. Every one of B's border tiles is a roadless mountain save (9,3).
+        const auto push_run = [&](uint16_t type, entity_id* dest, bool* dest_walled) {
+            front_fixture f;
+            build_fronts(f);
+            for (int x = 0; x < FW; ++x)
+                if (x != 9)
+                    f.w.tiles.at(f.at(x, 3)).landform = terrain_landform::mountain;
+            invalidate_logistics_caches(f.w);
+            const front* fr = front_of(f.w, f.A, f.B);
+            if (fr == nullptr)
+                return false;
+            const entity_id key = fr->key;
+            (void)declare_hostile(f.w, f.A, f.B);
+            const entity_id u = add_unit(f.w, f.A, f.at(1, 1), type);
+            if (front_cmd(f.w, reg, f.A, corp_verb::assign_front, u, key) != corp_command_result::applied
+                || front_cmd(f.w, reg, f.A, corp_verb::set_front_order, null_entity, key, 1)
+                       != corp_command_result::applied)
+                return false;
+            advance_fronts(f.w, reg);
+            *dest = f.w.units.at(u).order.dest;
+            *dest_walled = *dest != null_entity
+                        && f.w.tiles.at(*dest).landform == terrain_landform::mountain;
+            return true;
+        };
+        entity_id tdest = null_entity, idest = null_entity;
+        bool twall = true, iwall = false;
+        const bool tp = push_run(tank, &tdest, &twall);
+        front_fixture probe;
+        build_fronts(probe);
+        const bool ip = push_run(inf, &idest, &iwall);
+        const entity_id open_tile = probe.at(9, 3);
+        const bool same_ids = tdest != null_entity && tdest == open_tile;
+        std::printf("      push, all of B's border mountain but one tile: armour's target is the open tile %d "
+                    "(walled %d); infantry's target walled %d\n", same_ids, twall, iwall);
+        check(tp && !twall && same_ids,
+              "T10e a push skips the targets the armour cannot enter and takes the first legal one");
+        check(ip && iwall, "T10f control: infantry pushes onto the nearest tile, mountain or not");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nT11 - no blocking row, no wall\n");
+    {
+        check(!class_wall(mil, modern(land_class::infantry)) && static_cast<bool>(class_wall(mil, modern(land_class::armour)))
+                  && !class_wall(reg0.military(), modern(land_class::armour)),
+              "T11 a class with no blocking row (infantry; every class with no rows loaded) has an empty "
+              "wall, so the march keeps its old fast path");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nT12 - a legacy load's step-off never lands on a wall\n");
+    {
+        // A pre-v63 world: two nations on one tile; the second's only way off is a
+        // roadless mountain (`resolve_shared_tiles`, which read_world_snapshot runs on such
+        // a stream, now given the rows the load path holds).
+        const auto run = [&](const military_capability_params* m, entity_id* wall_tile, entity_id* pos,
+                             bool* alive) {
+            grid g;
+            build_grid(g, 6, 1);
+            g.tc(2, 0).landform = terrain_landform::mountain;
+            const entity_id a = add_nation(g, 0, 0);
+            const entity_id b = add_nation(g, 1, 5);
+            partition(g);
+            (void)add_unit(g.w, a, g.at(0, 0), modern(land_class::infantry)); // a holds col 0
+            (void)add_unit(g.w, a, g.at(1, 0), modern(land_class::infantry)); // lowest id on col 1: a keeps it
+            const entity_id ub = add_unit(g.w, b, g.at(1, 0), modern(land_class::armour));
+            (void)resolve_shared_tiles(g.w, m);
+            *wall_tile = g.at(2, 0);
+            const auto it = g.w.units.find(ub);
+            *alive = it != g.w.units.end();
+            *pos   = *alive ? it->second.position : null_entity;
+        };
+        entity_id wall_a = null_entity, pos_a = null_entity, wall_b = null_entity, pos_b = null_entity;
+        bool alive_a = false, alive_b = false;
+        run(&mil, &wall_a, &pos_a, &alive_a);
+        run(nullptr, &wall_b, &pos_b, &alive_b);
+        std::printf("      with the rows: on the wall %d (alive %d); without: on the wall %d\n",
+                    pos_a == wall_a, alive_a, pos_b == wall_b);
+        check(pos_a != wall_a && pos_b == wall_b,
+              "T12 resolve_shared_tiles with the rows never steps the armour onto the mountain (without them it does)");
+    }
+
+    // -----------------------------------------------------------------------
     std::printf("\nT9 - the loader rejects bad rows\n");
     {
         const auto rejects = [](const char* patch) {
@@ -766,6 +1031,12 @@ int main()
               "T9i an unknown effect key is rejected");
         check(rejects("economy.military.terrain_open_ground_stealth = 0"),
               "T9j a zero open-ground stealth is rejected");
+        check(rejects("economy.military.terrain_class = 5"),
+              "T9l a terrain_class that is not a table is rejected, never read as neutral");
+        check(rejects("economy.military.terrain_class.armour.mountain.dismount = true"),
+              "T9m a dismount on a class that is not an infantry carrier is rejected");
+        check(!rejects("economy.military.terrain_class.mechanised.marsh.dismount = true"),
+              "T9n ...and allowed on mechanised infantry");
         check(!rejects(nullptr), "T9k the shipped rows load");
     }
 

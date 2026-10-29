@@ -638,7 +638,10 @@ snow are covers.
 The rows are authored data beside the march days (`economy.military`), keyed by class and terrain,
 and checked by the loader as the march days are. **A block is a per-class wall in the path**: a
 march or a front's order routes around it, an order with no legal route is refused with the reason
-(`rejected_terrain`), and a retreat never steps onto a tile its class cannot enter. "A road on it"
+(`rejected_terrain`), and a retreat never steps onto a tile its class cannot enter. On a front
+(§ Fronts) a slot the class cannot enter gives way to the nearest span tile it can, ties to the
+lower index; a unit with no such slot holds where it stands. A push skips a target the class
+cannot enter or reach for the next in the push's order. "A road on it"
 is any road edge on the tile. The move rows price a hop's days but do not steer the route: the
 path is the shared terrain-weighted one, solved around the walls. A pre-modern row, which declares
 no land class, reads none of these rows.

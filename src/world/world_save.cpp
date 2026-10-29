@@ -1864,7 +1864,7 @@ void write_world_snapshot_pre_road_edges(const world& w, std::ostream& out)
     write_world_snapshot_at(w, out, k_world_save_version_pre_road_edges);
 }
 
-bool read_world_snapshot(world& w, std::istream& in)
+bool read_world_snapshot(world& w, std::istream& in, const military_capability_params* mil)
 {
     uint32_t magic = 0;
     if (!r_u32(in, magic) || magic != world_save_magic)
@@ -3039,7 +3039,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // (`resolve_shared_tiles`). A v63 stream keeps the rule already and is not touched,
     // so save -> load -> save of the fixed world is byte-stable.
     if (version <= k_world_save_version_pre_tile)
-        (void)resolve_shared_tiles(s);
+        (void)resolve_shared_tiles(s, mil); // BL-1455: never onto a class wall
 
     clear_derived_state(s);
     w = std::move(s); // replace only on full success
