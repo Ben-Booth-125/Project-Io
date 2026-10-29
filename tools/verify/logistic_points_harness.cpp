@@ -369,6 +369,24 @@ void l3_short_pool_grants_a_share()
     check(share_of(t.lp, unit) == 600, "the granted share is 600 per-mille");
     check(w.units.at(unit).position == tile_at(w, body, 3),
           "the march is not refused: three tiles on a pool already spent on supply");
+
+    // A grant a float HAIR under the whole request reads as whole (cold review): a pool
+    // of 1.2 against a request of 100 x 0.012 (1.2 in arithmetic, a few ulps over it in
+    // float) must give 1000, not 999 for ever.
+    {
+        world h;
+        const entity_id hb = make_row_body(h, 6);
+        const entity_id hn = add_nation(h, hb, 0, 5);
+        const entity_id hh = add_hub(h, tile_at(h, hb, 0));
+        h.buildings.at(hh).supply_factor_permille = 10; // 1.2 points
+        const entity_id hu = add_unit(h, hn, tile_at(h, hb, 0), /*count=*/100);
+        const recipe_registry hr = make_registry(1.0f, 0.0f, /*food=*/0.012f);
+        const lp_tick ht = resolve_logistic_points(h, collect_supply_claims(h, hr));
+        const lp_supply_row* hs = supply_row(ht, hu);
+        std::printf("        hair: need %.9f, granted %.9f, share %d\n",
+                    hs ? hs->need : -1.0f, hs ? hs->granted : -1.0f, share_of(ht, hu));
+        check(share_of(ht, hu) == 1000, "a grant within 1e-5 of the request reads 1000, not 999");
+    }
 }
 
 // ---------------------------------------------------------------------------

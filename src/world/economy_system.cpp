@@ -1865,10 +1865,10 @@ void close_construction_quarter(world& w, const recipe_registry& reg,
     // BL-1445: the quarter's days are construction's AND the military's, walked one
     // day at a time (`advance_quarter_to`), so a headless driver that steps quarters
     // walks the very sequence the app's day loop does. Day d is stamped (for the
-    // battle streams it opens) quarter x 90 + d off the driver's quarter counter: the
-    // app's catch-up here is empty (its day loop already advanced the days, stamped
-    // off its own calendar), so this stamp only ever reaches a headless driver's days.
-    advance_quarter_to(w, reg, q, w.current_econ_tick * q, dispatches);
+    // battle streams it opens) `military_quarter_day_base(T) + d`, T the counter THIS
+    // step runs under - the one base the app's day loop stamps with too (it hands in
+    // the counter its next step will run under), so the two paths seed alike.
+    advance_quarter_to(w, reg, q, military_quarter_day_base(w.current_econ_tick), dispatches);
     for (auto& [bid, b] : w.buildings)
     {
         if (b.completion_day > 0)

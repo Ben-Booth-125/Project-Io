@@ -533,7 +533,11 @@ int app::run(autostart_mode autostart)
         // marching unit moves tile by tile between quarters and a battle fights a round
         // a day. `advance_quarter_to` owns both halves and the one cursor; the economy
         // step's catch-up walks the same days on a path with no day loop. Day d of the
-        // quarter is stamped with its calendar day, the quarter's first day + d.
+        // quarter is STAMPED `military_quarter_day_base(T) + d`, T the econ-tick counter
+        // the step that closes this quarter will run under (`m_econ_steps`: the settle's
+        // twelve, then one per live quarter) - the very base that step's own catch-up
+        // stamps with, so a battle seeds alike on either path. How far into the quarter
+        // today is stays a calendar question (`m_last_econ_tick`).
         const auto advance_construction_today = [&]() {
             const long long base = static_cast<long long>(m_last_econ_tick)
                                  * static_cast<long long>(sim_loop::econ_tick_days);
@@ -543,7 +547,7 @@ int app::run(autostart_mode autostart)
                 std::vector<battle_dispatch> dispatches;
                 advance_quarter_to(m_world, m_registry,
                                    static_cast<int>(std::min<long long>(into, sim_loop::econ_tick_days)),
-                                   static_cast<int>(base), &dispatches);
+                                   military_quarter_day_base(static_cast<int>(m_econ_steps)), &dispatches);
                 // BL-468: the day's battle traffic to the Field channel, as it happens.
                 session_history::post_battle_dispatches(m_world, dispatches, m_chat,
                                                         static_cast<int>(m_sim_loop.day_tick()));

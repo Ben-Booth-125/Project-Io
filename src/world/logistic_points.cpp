@@ -538,13 +538,17 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& su
                 const float left = std::max(0.0f, r.pool - r.supply_granted);
                 sr.granted = std::min(claim, left);
                 r.supply_granted += sr.granted;
-                // Integer per-mille, truncated - with a hair of tolerance, so a float
-                // quotient one ulp under an exact per-mille (1.2 / 2.0 = 0.59999996)
-                // reads as that per-mille and not one below it. Never 1000 short of need.
+                // Integer per-mille, truncated - with ONE relative tolerance
+                // (`k_share_eps`, 1e-5 of the request), so float noise never costs a
+                // per-mille: a quotient a hair under an exact per-mille (1.2 / 2.0 =
+                // 0.59999996) reads as that per-mille, and a grant a hair under the
+                // whole request (a summed cover of 0.9999999) reads as 1000, not 999
+                // for ever.
+                constexpr float k_share_eps = 1e-5f;
                 const float ratio = std::clamp(sr.granted / c.need, 0.0f, 1.0f);
-                sr.share_permille = sr.granted >= c.need
+                sr.share_permille = ratio >= 1.0f - k_share_eps
                     ? 1000
-                    : std::min(999, static_cast<int>(std::floor(ratio * 1000.0f + 1e-3f)));
+                    : std::min(1000, static_cast<int>(std::floor((ratio + k_share_eps) * 1000.0f)));
             }
         }
         out.supplies.push_back(sr);

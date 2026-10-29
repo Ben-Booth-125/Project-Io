@@ -944,6 +944,20 @@ struct military_day_result
 /// Logistic Point resolve, and the end-of-tick front re-anchor.
 military_day_result run_military_day(world& w, const recipe_registry& reg, int day_tick);
 
+/// THE ONE DAY-STAMP BASE (BL-1445). The days of a quarter are stamped (and a battle
+/// opened on day d seeds its stream off) `military_quarter_day_base(T) + d`, where T is
+/// the econ-tick counter of the economy step that CLOSES that quarter - the
+/// `w.current_econ_tick` that step runs under (the settle's 0..11, then 12, 13, ... in
+/// live play; `econ_tick_after_live_steps`). Both paths read it: the economy step's
+/// catch-up (`close_construction_quarter`, with `w.current_econ_tick`) and the app's day
+/// loop (with the counter its next step will run under), so the same contact on the
+/// same day seeds the same battle whichever path walked the day, and live stamps never
+/// reuse the settle's range.
+inline int military_quarter_day_base(int closing_econ_tick)
+{
+    return closing_econ_tick * k_construction_quarter_days;
+}
+
 /// THE QUARTER'S DAYS (BL-1445; PRODUCTION.md § Construction is measured in days):
 /// advance the world from its one day cursor (`world::construction_quarter_day`) to
 /// day @p day_in_quarter (clamped to [0, 90]), ONE DAY AT A TIME, each day running

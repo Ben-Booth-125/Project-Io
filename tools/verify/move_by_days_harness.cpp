@@ -23,7 +23,10 @@
 //       covered unit is granted it whole and keeps its supply, an uncovered one is granted
 //       nothing and decays by the one rule's step each quarter;
 //   D12 a unit a battle kills is removed that same day;
-//   D13 out of contact, readiness and morale recover daily (Ben, 2026-10-28).
+//   D13 out of contact, readiness and morale recover daily (Ben, 2026-10-28);
+//   D14 ONE day-stamp base: the app's day loop and the headless catch-up seed the same
+//       battle stream and end the quarter byte-identical (`military_quarter_day_base`);
+//   D15 a march re-issued toward the same next tile keeps its banked progress.
 //
 // Build: bash tools/verify/build_lua_harness.sh move_by_days_harness (it loads
 // scripts/recipes.lua and scripts/economy.lua through a live Lua state). Run from the
@@ -31,7 +34,9 @@
 
 #include "world/battle_system.hpp"
 #include "world/campaign_battle.hpp"
+#include "world/campaign_settle.hpp"
 #include "world/components.hpp"
+#include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/logistic_points.hpp"
 #include "world/nation_budget.hpp"
@@ -663,6 +668,114 @@ int main()
         (void)run_military_day(d.w, reg, 2);
         check(in_fight && d.w.units.count(d.ua) != 0 && d.w.units.at(d.ua).morale_permille <= 400,
               "D13c a unit in a battle recovers nothing that day");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nD14 - one day-stamp base: the app's day loop and the headless catch-up seed a battle alike\n");
+    {
+        // The first LIVE quarter: the settle stepped econ ticks 0..11, so the step that
+        // closes this quarter runs under k_campaign_settle_ticks (12). An infantry march
+        // from column 0 meets the defender at column 12 on day 33 and fights it out
+        // inside the quarter.
+        const int closing = k_campaign_settle_ticks;
+        const auto stream = [](const std::vector<battle_dispatch>& v) {
+            std::vector<uint64_t> s;
+            for (const battle_dispatch& d : v) s.push_back(d.stream_seed);
+            return s;
+        };
+
+        // THE APP: the day loop walks days 1..90 itself, stamped as app.cpp stamps them
+        // (`military_quarter_day_base` of the counter its next step runs under), then
+        // the step runs - its own catch-up finds no day left.
+        duel a;
+        build_duel(a, 12, 400, 300, modern(land_class::infantry));
+        std::vector<battle_dispatch> app_days;
+        for (int d = 1; d <= 90; ++d)
+            (void)advance_quarter_to(a.w, reg, d, military_quarter_day_base(closing), &app_days);
+        a.w.current_econ_tick = closing;
+        const economy_report ra = run_economy_step(a.w, reg);
+
+        // HEADLESS: the step's own catch-up walks the same 90 days.
+        duel b;
+        build_duel(b, 12, 400, 300, modern(land_class::infantry));
+        b.w.current_econ_tick = closing;
+        const economy_report rb = run_economy_step(b.w, reg);
+
+        // The old app derivation, the calendar quarter (live quarter 0 -> base 0), as a
+        // control: it must seed differently, or this case could not see the stamp.
+        duel c;
+        build_duel(c, 12, 400, 300, modern(land_class::infantry));
+        std::vector<battle_dispatch> old_days;
+        for (int d = 1; d <= 90; ++d)
+            (void)advance_quarter_to(c.w, reg, d, 0 * 90, &old_days);
+        c.w.current_econ_tick = closing;
+        (void)run_economy_step(c.w, reg);
+
+        const std::vector<uint64_t> sa = stream(app_days), sb = stream(rb.battle_dispatches),
+                                    sc = stream(old_days);
+        std::printf("      dispatches: app %zu, headless %zu, old-base control %zu; first seed app %llx headless %llx control %llx\n",
+                    sa.size(), sb.size(), sc.size(),
+                    static_cast<unsigned long long>(sa.empty() ? 0 : sa.front()),
+                    static_cast<unsigned long long>(sb.empty() ? 0 : sb.front()),
+                    static_cast<unsigned long long>(sc.empty() ? 0 : sc.front()));
+        (void)ra;
+        check(!sa.empty() && sa == sb, "D14a the same contact seeds the same battle stream on both paths");
+        check(a.w.state_hash(closing) == b.w.state_hash(closing) && to_bytes(a.w) == to_bytes(b.w),
+              "D14b ...and the two worlds end the quarter hash- and byte-identical");
+        check(!sc.empty() && sc != sb,
+              "D14c control: the retired calendar base (live quarter x 90) seeds a different stream");
+        check(military_quarter_day_base(closing) >= military_quarter_day_base(k_campaign_settle_ticks - 1) + 90,
+              "D14d live stamps start past the settle's last quarter: no reuse of its range");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nD15 - a re-issued march toward the same next tile keeps the bank\n");
+    {
+        world w;
+        const entity_id body = make_row_body(w, 16);
+        const entity_id n = add_nation(w, body, 0, 15);
+        w.provinces.seed = 0x1445u;
+        build_province_partition(w, 0x1445u);
+        const entity_id u = add_unit(w, n, tile_at(w, body, 0), modern(land_class::infantry));
+        const auto order_to = [&](int col) {
+            corp_command cmd;
+            cmd.corp    = n;
+            cmd.verb    = corp_verb::march_unit;
+            cmd.subject = u;
+            cmd.tile    = tile_at(w, body, col);
+            return apply_corp_command(w, reg, cmd);
+        };
+        // A front in push mode flips its target every day: col 5, col 8, col 5, ...
+        // Both lie east, so the first hop is col 1 either way.
+        bool all_applied = true;
+        int stepped_day = -1;
+        for (int day = 1; day <= 6 && stepped_day < 0; ++day)
+        {
+            all_applied = all_applied && order_to(day % 2 ? 5 : 8) == corp_command_result::applied;
+            (void)run_unit_march(w, reg, day);
+            if (col_of(w, w.units.at(u).position) >= 1)
+                stepped_day = day;
+        }
+        std::printf("      re-targeted every day between two eastern tiles: first step on day %d\n", stepped_day);
+        check(all_applied && stepped_day == 3,
+              "D15a foot infantry still crosses its first tile on day 3: the bank survives each re-issue");
+
+        // A new first hop starts from zero, as before.
+        world z;
+        const entity_id zb = make_row_body(z, 16);
+        const entity_id zn = add_nation(z, zb, 0, 15);
+        z.provinces.seed = 0x1445u;
+        build_province_partition(z, 0x1445u);
+        const entity_id zu = add_unit(z, zn, tile_at(z, zb, 8), modern(land_class::infantry));
+        corp_command east;
+        east.corp = zn; east.verb = corp_verb::march_unit; east.subject = zu; east.tile = tile_at(z, zb, 12);
+        (void)apply_corp_command(z, reg, east);
+        (void)run_unit_march(z, reg, 1);
+        corp_command west = east;
+        west.tile = tile_at(z, zb, 4);
+        const bool turned = apply_corp_command(z, reg, west) == corp_command_result::applied;
+        check(turned && approx(z.units.at(zu).order.progress, 0.0f, 0.0f),
+              "D15b an order whose first hop differs starts its bank from zero");
     }
 
     // -----------------------------------------------------------------------
