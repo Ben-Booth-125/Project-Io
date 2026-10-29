@@ -690,7 +690,8 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
 }
 
 logistics_path intra_body_path_avoiding(world& w, entity_id body, entity_id src_tile,
-                                        entity_id dst_tile, const std::set<entity_id>& blocked)
+                                        entity_id dst_tile, const std::set<entity_id>& blocked,
+                                        const std::function<bool(const tile_component&)>* wall)
 {
     // The flood_field_for Dijkstra, anchored at the DESTINATION over the same
     // directed edge (flood_edge_cost), with two differences: a blocked cell is
@@ -761,6 +762,8 @@ logistics_path intra_body_path_avoiding(world& w, entity_id body, entity_id src_
             const entity_id nid = grid[static_cast<std::size_t>(nidx)];
             if (nidx != src_idx && blocked.count(nid) != 0)
                 continue; // another nation's stack: never walked through
+            if (nidx != src_idx && wall != nullptr && (*wall)(*n_tc))
+                continue; // BL-1455: ground the walker's class cannot enter without a road
             const float nd = dist[static_cast<std::size_t>(idx)] + flood_edge_cost(*cur_tc, *n_tc, nr, i);
             if (nd < dist[static_cast<std::size_t>(nidx)])
             {

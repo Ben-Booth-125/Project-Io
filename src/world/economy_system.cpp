@@ -4665,6 +4665,10 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
         float points = u.order.progress + rate; // today's movement, the bank included
         u.order.progress = 0.0f;
 
+        // TERRAIN AND THE CLASSES (BL-1455; MILITARY.md § Terrain and the classes): the
+        // class's wall - ground it cannot enter without a road - for every re-path below.
+        const std::function<bool(const tile_component&)> wall = class_wall(mil, u.type);
+
         // Walked until the bank no longer covers the next hop (the else branch below
         // banks it and stops) - NOT while the bank is positive: a unit that steps onto
         // the tile beside a hostile stack with exactly nothing left registers its
@@ -4683,8 +4687,11 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
             // directly) the next hop is no longer on the same body as the
             // unit. Recompute ONCE from the CURRENT position to the SAME
             // dest — never a per-tick Dijkstra, only on an actual block.
+            // BL-1455: a next hop the class cannot enter (a road lost since the order
+            // was given) invalidates the step the same way, and re-paths around the wall.
             const bool blocked = (cur_it == w.tiles.end()) || (next_it == w.tiles.end())
-                                || (next_it->second.body != cur_it->second.body);
+                                || (next_it->second.body != cur_it->second.body)
+                                || wall(next_it->second);
             if (blocked)
             {
                 if (cur_it == w.tiles.end())
@@ -4692,19 +4699,17 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
                     u.order = movement_order{}; // the unit's own tile is gone — nothing to recompute from
                     break;
                 }
-                const logistics_path& rp =
-                    intra_body_path(w, cur_it->second.body, u.position, u.order.dest);
+                const std::vector<entity_id> rp =
+                    march_path(w, cur_it->second.body, u.position, u.order.dest, {}, &wall);
                 ++out.recomputed;
-                if (!rp.reachable || rp.tiles.empty())
+                if (rp.size() < 2)
                 {
                     u.order = movement_order{}; // no route remains — order dissolves, not a crash
                     break;
                 }
                 movement_order mo;
                 mo.dest = u.order.dest;
-                mo.path = rp.tiles;
-                if (mo.path.front() != u.position)
-                    std::reverse(mo.path.begin(), mo.path.end());
+                mo.path = rp; // travel order already (march_path)
                 mo.next_index = 1;
                 mo.progress   = 0.0f;
                 u.order = mo;
@@ -4733,7 +4738,8 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
                 ++out.recomputed;
                 ++out.blocked;
                 const std::vector<entity_id> rp =
-                    march_path(w, cur_it->second.body, u.position, u.order.dest, blocked_for(u.owner));
+                    march_path(w, cur_it->second.body, u.position, u.order.dest, blocked_for(u.owner),
+                               &wall);
                 if (rp.size() < 2 || foreign_holder(rp[1], u.owner, false) != null_entity)
                 {
                     u.order = movement_order{};
@@ -4754,6 +4760,14 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
             const int march_side = road_side_between(w, u.position, next_id);
             float step_cost =
                 edge_traversal_cost(cur_it->second, next_it->second, march_side);
+            // BL-1455 (MILITARY.md § Terrain and the classes): the class's MOVE row on the
+            // destination tile multiplies the hop's days - a dismount folded in as foot
+            // infantry's days over the class's own. Exactly 1.0 on ground no row names.
+            {
+                const float move = terrain_class_effects_for_type(mil, u.type, next_it->second).move;
+                if (move != 1.0f)
+                    step_cost *= move;
+            }
             // BL-1449 (MILITARY.md § Air): air superiority SLOWS the side that lacks
             // it — a step into a province where the marcher's share is short costs up
             // to (1000 + march_slow) per-mille. Exactly 1000 (the unchanged path) when

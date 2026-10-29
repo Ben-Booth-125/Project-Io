@@ -3267,7 +3267,8 @@ void app::render()
             bool any = false;
             for (const entity_id unit : m_ui.pending_unit_order_units)
                 any = any || march_check(m_world, m_world.player_entity, unit, m_ui.pending_unit_order_tile,
-                                         m_ui.pending_unit_order_declare) == corp_command_result::applied;
+                                         m_ui.pending_unit_order_declare, nullptr,
+                                         &m_registry.military()) == corp_command_result::applied;
             if (!any)
             {
                 go = false;

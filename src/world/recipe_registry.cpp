@@ -742,6 +742,114 @@ void recipe_registry::load_from_lua(lua_state& lua)
                         { "siege",    static_cast<std::size_t>(unit_class::siege) } },
                       mp.march_days_per_cls.data());
 
+        // BL-1455 (terrain and the classes; MILITARY.md § Terrain and the classes): a row
+        // per (land class, terrain), checked as the march days are - every key must name
+        // a class, a terrain or an effect; every number must be finite and in its domain;
+        // every flag a boolean. A bad cell THROWS, naming it, never clamps or drops (the
+        // authoring boundary's untrusted-input rule). Absent = every cell neutral.
+        if (sol::optional<sol::table> tc = (*military)["terrain_class"])
+        {
+            const std::vector<std::pair<const char*, std::size_t>> classes = {
+                { "infantry",     static_cast<std::size_t>(land_class::infantry) },
+                { "motorised",    static_cast<std::size_t>(land_class::motorised) },
+                { "mechanised",   static_cast<std::size_t>(land_class::mechanised) },
+                { "light_armour", static_cast<std::size_t>(land_class::light_armour) },
+                { "armour",       static_cast<std::size_t>(land_class::armour) },
+                { "artillery",    static_cast<std::size_t>(land_class::artillery) },
+                { "air_defence",  static_cast<std::size_t>(land_class::air_defence) } };
+            const std::vector<std::pair<const char*, std::size_t>> terrains = {
+                { "mountain", static_cast<std::size_t>(class_terrain::mountain) },
+                { "canyon",   static_cast<std::size_t>(class_terrain::canyon) },
+                { "rift",     static_cast<std::size_t>(class_terrain::rift) },
+                { "marsh",    static_cast<std::size_t>(class_terrain::marsh) },
+                { "desert",   static_cast<std::size_t>(class_terrain::desert) },
+                { "forest",   static_cast<std::size_t>(class_terrain::forest) },
+                { "urban",    static_cast<std::size_t>(class_terrain::urban) },
+                { "snow",     static_cast<std::size_t>(class_terrain::snow) } };
+            const auto find_key = [](const std::vector<std::pair<const char*, std::size_t>>& keys,
+                                     const std::string& key) {
+                return std::find_if(keys.begin(), keys.end(),
+                                    [&](const auto& k) { return key == k.first; });
+            };
+            const std::string base = "military.terrain_class";
+            for (const auto& ckv : *tc)
+            {
+                if (ckv.first.get_type() != sol::type::string)
+                    throw std::runtime_error(base + " has a non-string key");
+                const std::string ckey = ckv.first.as<std::string>();
+                const auto cit = find_key(classes, ckey);
+                if (cit == classes.end())
+                    throw std::runtime_error("Unknown class '" + ckey + "' in " + base);
+                if (ckv.second.get_type() != sol::type::table)
+                    throw std::runtime_error(base + "." + ckey + " must be a table of terrain rows");
+                const sol::table crow = ckv.second.as<sol::table>();
+                for (const auto& tkv : crow)
+                {
+                    const std::string cctx = base + "." + ckey;
+                    if (tkv.first.get_type() != sol::type::string)
+                        throw std::runtime_error(cctx + " has a non-string key");
+                    const std::string tkey = tkv.first.as<std::string>();
+                    const auto tit = find_key(terrains, tkey);
+                    if (tit == terrains.end())
+                        throw std::runtime_error("Unknown terrain '" + tkey + "' in " + cctx);
+                    if (tkv.second.get_type() != sol::type::table)
+                        throw std::runtime_error(cctx + "." + tkey + " must be a table of effects");
+                    const std::string ctx = cctx + "." + tkey;
+                    terrain_class_row row;
+                    const sol::table cell = tkv.second.as<sol::table>();
+                    for (const auto& ekv : cell)
+                    {
+                        if (ekv.first.get_type() != sol::type::string)
+                            throw std::runtime_error(ctx + " has a non-string key");
+                        const std::string ekey = ekv.first.as<std::string>();
+                        const auto number = [&](double lo, bool lo_open, double hi) {
+                            if (ekv.second.get_type() != sol::type::number)
+                                throw std::runtime_error(ctx + "." + ekey + " must be a number");
+                            const double v = ekv.second.as<double>();
+                            const bool below = lo_open ? !(v > lo) : !(v >= lo);
+                            if (!std::isfinite(v) || below || v > hi)
+                                throw std::runtime_error(ctx + "." + ekey + " = " + std::to_string(v)
+                                                         + " is outside " + (lo_open ? "(" : "[")
+                                                         + std::to_string(lo) + ", "
+                                                         + std::to_string(hi) + "]");
+                            return static_cast<float>(v);
+                        };
+                        const auto flag = [&]() {
+                            if (ekv.second.get_type() != sol::type::boolean)
+                                throw std::runtime_error(ctx + "." + ekey + " must be a boolean");
+                            return ekv.second.as<bool>();
+                        };
+                        if (ekey == "move")                       row.move = number(1.0, false, 10.0);
+                        else if (ekey == "blocked_unless_roaded") row.blocked_unless_roaded = flag();
+                        else if (ekey == "dismount")              row.dismount = flag();
+                        else if (ekey == "fight")                 row.fight = number(0.0, true, 1.0);
+                        else if (ekey == "wear")                  row.wear = number(1.0, false, 10.0);
+                        else if (ekey == "stealth")
+                        {
+                            row.stealth     = number(0.0, true, 10.0);
+                            row.has_stealth = true;
+                        }
+                        else
+                            throw std::runtime_error("Unknown effect '" + ekey + "' in " + ctx);
+                    }
+                    mp.terrain.rows[cit->second][tit->second] = row;
+                }
+            }
+        }
+        {
+            const sol::object og = (*military)["terrain_open_ground_stealth"];
+            if (og.valid() && og.get_type() != sol::type::lua_nil)
+            {
+                if (og.get_type() != sol::type::number)
+                    throw std::runtime_error("military.terrain_open_ground_stealth must be a number");
+                const double v = og.as<double>();
+                if (!std::isfinite(v) || !(v > 0.0) || v > 10.0)
+                    throw std::runtime_error("military.terrain_open_ground_stealth = " + std::to_string(v)
+                                             + " is outside (0, 10]");
+                mp.terrain.open_ground_stealth = static_cast<float>(v);
+            }
+        }
+
         // BL-596 / BL-1352: the PRICE of an active march. The per-anchor CAPACITY
         // rate that stood beside it is retired with the per-anchor pool itself
         // (recipe_registry.hpp); an unread `active_lp_per_anchor_tick` left in

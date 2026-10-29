@@ -625,7 +625,8 @@ corp_command_result unit_design_check(const world& w, entity_id nation, uint32_t
 // retired). A nation is never bought and never goes insolvent.
 
 corp_command_result march_check(world& w, entity_id actor, entity_id unit, entity_id tile,
-                                entity_id assume_hostile, std::vector<entity_id>* out_path)
+                                entity_id assume_hostile, std::vector<entity_id>* out_path,
+                                const military_capability_params* mil)
 {
     const auto uit = w.units.find(unit);
     if (uit == w.units.end())
@@ -724,11 +725,29 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
     // actor is hostile to) or a block, decided as the march steps
     // (run_unit_march). Read-only: nothing is written until the single
     // `order` assignment in apply_corp_command, so a refusal mutates nothing.
+    //
+    // TERRAIN AND THE CLASSES (BL-1455; MILITARY.md § Terrain and the classes): a block
+    // is a per-class WALL in the path. The route is solved around it; an order with no
+    // legal route because of it is refused with its own reason - a walled destination,
+    // or a destination the unit could reach were it not for the walls.
+    const std::set<entity_id> foreign = foreign_held_tiles(w, uit->second.owner);
+    std::function<bool(const tile_component&)> wall;
+    if (mil != nullptr)
+    {
+        wall = class_wall(*mil, uit->second.type);
+        if (wall(dit->second))
+            return corp_command_result::rejected_terrain; // the class cannot enter it
+    }
     const std::vector<entity_id> path =
-        march_path(w, sit->second.body, uit->second.position, tile,
-                   foreign_held_tiles(w, uit->second.owner));
+        march_path(w, sit->second.body, uit->second.position, tile, foreign,
+                   mil != nullptr ? &wall : nullptr);
     if (path.size() < 2)
+    {
+        if (mil != nullptr
+            && march_path(w, sit->second.body, uit->second.position, tile, foreign).size() >= 2)
+            return corp_command_result::rejected_terrain; // only the walls stand in the way
         return corp_command_result::rejected_invalid; // unreachable
+    }
     if (out_path != nullptr)
         *out_path = path;
     return corp_command_result::applied;
@@ -1131,7 +1150,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // refusal mutates nothing; the single `order` assignment below applies it.
             std::vector<entity_id> path;
             const corp_command_result r =
-                march_check(w, cmd.corp, cmd.subject, cmd.tile, null_entity, &path);
+                march_check(w, cmd.corp, cmd.subject, cmd.tile, null_entity, &path, &reg.military());
             if (r != corp_command_result::applied)
                 return r;
             movement_order mo;
