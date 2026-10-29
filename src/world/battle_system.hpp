@@ -100,7 +100,6 @@ struct battle_dispatch
 
     int rounds_fought = 0;   ///< Total, not this tick's batch.
     int rounds_this_tick = 0;
-    int max_rounds = 0;      ///< So a surface can print "round 4 / 6" without knowing params.
 
     int attacker_strength_permille = 0; ///< After this tick's rounds.
     int defender_strength_permille = 0;

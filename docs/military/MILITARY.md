@@ -64,7 +64,7 @@ arithmetic in § The campaign force model; `resolve_battle` is a generation func
 ### `resolve_campaign_battle` — campaign scale
 
 `src/world/campaign_battle.{hpp,cpp}` (BL-315, armed house conflict spine). Campaign-scale: two
-forces in a province, fought over a bounded number of rounds, with priced withdrawal. Its
+forces over a tile, fought round by round until a side breaks or withdraws, with priced withdrawal. Its
 production caller is `run_battles` (§ Battles); `tools/verify/campaign_battle_harness.cpp`
 asserts it in isolation.
 
@@ -97,7 +97,6 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 
 | Field | Default | Meaning |
 |---|---|---|
-| `max_rounds` | 6 | Rounds before the fight is called a stalemate |
 | `swing_permille` | 600 | Half-width of the per-round power swing — a uniform draw in [400, 1600] |
 | `absorbed_land_permille` | 250 | Share at which hits within the target's defence (or breakthrough) land; hits beyond it land in full |
 | `hp_share_permille` | 300 | Share of landed damage that kills men; the rest spends readiness |
@@ -109,6 +108,7 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 | `readiness_recovery_permille` / `morale_recovery_permille` | 100 / 10 | Out of contact, per day (§ Marching, Ben 2026-10-28): readiness regained (by supply, never above morale), and morale's step toward supply |
 | `withdraw_base_permille` | 20 | Flat price of turning your back at all |
 | `withdraw_per_round_permille` | 25 | Added per round already fought |
+| `withdraw_per_round_cap_permille` | 250 | The most the per-round term reaches (day 10), so the dearest exit is 670 per-mille of the leaving side's men |
 | `withdraw_pursuit_scale` | 400 | Share of how far behind the withdrawing side is |
 | `rounds_per_day` | 1 | Rounds fought per day (§ Battles ruling 3, Ben 2026-10-28) |
 
@@ -116,15 +116,22 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 units still in the fight. The withdrawal price is charged **in men**, per-mille of the side's
 standing men.
 
-**The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio): attacking is
-dear, and breaking a defender takes about 2:1 in men — decisive 0% at 1:1, 15% at 1.5:1, 64% at
-1.75:1, 89% at 2:1, 99% from 2.5:1. `swing_permille` stays at 600 (NR-204: a narrower swing made the
-edge too safe).
+**The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio, full vision):
+attacking is dear, and breaking a defender takes about 1.5:1 in men — the defender broken in 0% at
+1:1, 12% at 1.25:1, 90% at 1.5:1 and 100% from 1.75:1. With no round cap every fight ends on a
+break, so the decisive share equals the result. `swing_permille` stays at 600 (NR-204: a narrower
+swing made the edge too safe).
 
-**A battle lasts days.** At one round a day against `max_rounds` 6, a fight is over in at most six
-days. Measured through the daily pass (`move_by_days_harness` D6, infantry on plains, 40 openings a
-ratio, days from contact to close): **about five days at parity** (4.9), 5.6 at 1.5:1, 3.7 at 2:1 and
-2.1 at 3:1 — the curve's mean rounds, a round a day. The round's damage is calibrated to the day:
+**A battle has no maximum duration (Ben, 2026-10-29).** *"Battles shouldn't have maximum durations.
+They continue while one unit is trying to move and end when readiness runs out. Some battles may
+easily take 90-180 days."* A fight runs, a round a day, until one side is **broken** (no unit of it
+left fighting) or **withdraws**; the attacker cancelling its move is its withdrawal. Nothing ends a
+fight on the calendar. Measured through the daily pass with recon (`move_by_days_harness` D6,
+infantry on plains, 40 openings a ratio, days from contact to close): **7.0 days at 1:1** (the
+attacker breaks), 10.6 at 1.5:1 (the contested band, the longest), 7.5 at 2:1 and 4.7 at 3:1; the
+longest single fight ran 14 days. Base-infantry fights are short because readiness is spent fast;
+a long fight is one whose sides are hard to spend. A battle in which neither side can land a hit
+runs until the attacker withdraws. The round's damage is calibrated to the day:
 one round is one day's fighting, so the per-round numbers above are a day's. A commander
 gets a decision every day of the fight — a withdrawal is honoured at the next day's boundary —
 rather than one between two quarters.
@@ -142,7 +149,9 @@ side still took and dealt that round's damage. Both breaking at once resolves in
 favour, consistent with every other tie across both paths.
 
 Ends are enumerated: `attacker_broken`, `defender_broken`, `attacker_withdrew`,
-`defender_withdrew`, `stalemate`. Withdrawal is its own end state rather than a flavour of defeat.
+`defender_withdrew`. Withdrawal is its own end state rather than a flavour of defeat. A fifth value,
+`stalemate`, is produced by nothing since battles have no maximum duration; it stays so a saved
+battle that ended on it still reads.
 
 ---
 
@@ -1007,7 +1016,8 @@ defended tile (Ben, 2026-10-27)**; adjacent stacks that joined stay where they s
 never puts two nations on one tile: a defender with nowhere to retreat stays put, and the attacking
 stack then stays where it stood. `world::province_holder` is what tracks *who currently holds a province*
 across battles (BL-569, province holder): seeded at generation from the territorial plurality,
-moved by a decisive battle's `field_held_by`, and left untouched by a stalemate. **A won battle
+moved by a decisive battle's `field_held_by`, and left untouched by a stalemate (which a saved
+battle alone can carry). **A won battle
 moves the holder only when the beaten side has no unit left anywhere in the province (Ben,
 2026-10-27)**: a battle is one tile, so beating one stack takes that tile, and the province changes
 hands when its last defending stack falls. It is deliberately
@@ -1018,7 +1028,7 @@ still unowned work. Battle state survives a save under BL-536 (world snapshot sa
 ### Dispatches and the card
 
 A battle **reports**. `battle_tick::dispatches` carries one pure-data `battle_dispatch` per battle
-that acted this day — the defended tile and its province, sides, phase, rounds fought / today / max, both strengths and
+that acted this day — the defended tile and its province, sides, phase, rounds fought and today's, both strengths and
 swings, men lost, and for an ending the `withdrew`, `end` and `field_held_by` fields. It includes
 battles that **concluded** that day and are already erased from `world::battles`; that is the only
 way the aftermath — who held the field, what it cost — can reach a surface at all.

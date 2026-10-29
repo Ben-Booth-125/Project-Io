@@ -21,9 +21,11 @@
 //       less and takes fewer hits (pure, isolated); end to end, an infantry unit in
 //       a ceramic plate carrier loses fewer men than one in a steel helmet.
 //   R7  DETERMINISM: two identical worlds fight byte-identical battles.
-//   M1  MEASURED (reported, not asserted): 1v1 and 3v1 base-infantry battles over
-//       200 seeds, full vision vs recon, at max_rounds 6 and with the cap lifted
-//       to 40 — end types, mean rounds, men lost. And day-1 damage on typical kit.
+//   M1  MEASURED (reported, not asserted): base-infantry battles over 200 seeds at
+//       1:1, 1.5:1, 2:1 and 3:1 (two defending units of 500 against 2, 3, 4, 6),
+//       full vision vs recon, with no round cap (Ben, 2026-10-29) — end types, mean
+//       and longest days, men lost; a fight still live at the 2000-round guard is
+//       counted, not hidden. And day-1 damage on typical kit.
 //
 // Run: land_recon_harness
 // ---------------------------------------------------------------------------
@@ -204,30 +206,34 @@ entity_id add_wing(fixture& f, entity_id owner, entity_id base, air_class cls, a
 /// One measured sweep cell.
 struct cell
 {
-    int a_broken = 0, d_broken = 0, stale = 0;
+    int a_broken = 0, d_broken = 0, live = 0, longest = 0;
     long long rounds = 0, a_lost = 0, d_lost = 0;
 };
 
-cell sweep(int attackers, bool recon, int max_rounds, const land_recon_params& rp)
+/// A HARNESS guard, not a game rule: the resolver has no round cap, so a fight
+/// that lands nothing would run forever here. One still live at it is counted.
+constexpr int k_guard_rounds = 2000;
+
+cell sweep(int attackers, int defenders, bool recon, const land_recon_params& rp)
 {
     cell out;
-    campaign_battle_params p{};
-    p.max_rounds = max_rounds;
+    const campaign_battle_params p{};
     for (uint32_t seed = 1; seed <= 200; ++seed)
     {
         std::vector<land_combatant> a, d;
         for (int k = 0; k < attackers; ++k) a.push_back(infantry(10 + k));
-        d.push_back(infantry(100));
+        for (int k = 0; k < defenders; ++k) d.push_back(infantry(100 + k));
         campaign_battle_state st = open_pure(seed, a, d);
         const int a0 = men_of(a), d0 = men_of(d);
-        while (st.end == campaign_battle_end::in_progress)
+        while (st.end == campaign_battle_end::in_progress && st.rounds_fought < k_guard_rounds)
         {
             if (recon) set_vision(st, a, d, rp);
             step_campaign_battle(st, a, d, p);
         }
         if (st.end == campaign_battle_end::attacker_broken) ++out.a_broken;
         else if (st.end == campaign_battle_end::defender_broken) ++out.d_broken;
-        else ++out.stale;
+        else ++out.live;
+        out.longest = std::max(out.longest, st.rounds_fought);
         out.rounds += st.rounds_fought;
         out.a_lost += a0 - men_of(a);
         out.d_lost += d0 - men_of(d);
@@ -431,18 +437,20 @@ int main()
     // -----------------------------------------------------------------------
     std::printf("\nM1 - measured: base infantry, 200 seeds (reported, not asserted)\n");
     {
-        std::printf("        %-28s %8s %8s %8s %8s %9s %9s\n", "case", "atk_brk", "def_brk", "stale",
-                    "rounds", "atk_lost", "def_lost");
-        for (int n : {1, 3})
-            for (int cap : {6, 40})
-                for (bool rc : {false, true})
-                {
-                    const cell c = sweep(n, rc, cap, rp);
-                    char label[64];
-                    std::snprintf(label, sizeof label, "%dv1 cap %d %s", n, cap, rc ? "recon" : "full vision");
-                    std::printf("        %-28s %8d %8d %8d %8.2f %9.1f %9.1f\n", label, c.a_broken, c.d_broken,
-                                c.stale, c.rounds / 200.0, c.a_lost / 200.0, c.d_lost / 200.0);
-                }
+        std::printf("        %-24s %8s %8s %6s %8s %8s %9s %9s\n", "case (days)", "atk_brk", "def_brk",
+                    "live", "mean", "longest", "atk_lost", "def_lost");
+        int live_total = 0;
+        for (const int n : {2, 3, 4, 6})
+            for (const bool rc : {false, true})
+            {
+                const cell c = sweep(n, 2, rc, rp);
+                live_total += c.live;
+                char label[64];
+                std::snprintf(label, sizeof label, "%.1f:1 %s", n / 2.0, rc ? "recon" : "full vision");
+                std::printf("        %-24s %8d %8d %6d %8.2f %8d %9.1f %9.1f\n", label, c.a_broken, c.d_broken,
+                            c.live, c.rounds / 200.0, c.longest, c.a_lost / 200.0, c.d_lost / 200.0);
+            }
+        check(live_total == 0, "M1b every measured fight ends on a break (none reaches the 2000-round guard)");
         // Day-1 damage on typical kit, 1v1.
         std::vector<land_combatant> a{infantry(1)}, d{infantry(2)};
         campaign_battle_state st = open_pure(3, a, d);

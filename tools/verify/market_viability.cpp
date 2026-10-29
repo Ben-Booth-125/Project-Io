@@ -617,6 +617,11 @@ struct seed_reading
     int    trade_corps_at_build = 0; ///< BL-1306: corporations of trade focus (the port archetype)
     std::string g1b_why; ///< G1b's settle read per starved plant (settle_starve_class)
     int    firms_handoff = 0, firms_survived = 0, firms_end = 0, last_tick = 0;
+    // BL-1453 fix round (battles have no maximum duration, Ben 2026-10-29): a
+    // REPORT-ONLY read of the play's battles. `bt_stuck` counts live battles at the
+    // end whose last round landed nothing on either side - the edge Ben named
+    // (neither side can hit: it runs until the attacker withdraws).
+    int    bt_peak_live = 0, bt_live_end = 0, bt_longest_rounds = 0, bt_stuck = 0;
     // G4
     entity_id seat = null_entity;
     std::string seat_name;
@@ -1667,6 +1672,15 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
             }
         }
         r.last_tick = k;
+        r.bt_peak_live = std::max(r.bt_peak_live, static_cast<int>(w.battles.size()));
+    }
+    r.bt_live_end = static_cast<int>(w.battles.size());
+    for (const active_battle& b : w.battles)
+    {
+        r.bt_longest_rounds = std::max(r.bt_longest_rounds, b.state.rounds_fought);
+        if (!b.state.rounds.empty() && b.state.rounds.back().attacker_power == 0
+            && b.state.rounds.back().defender_power == 0)
+            ++r.bt_stuck;
     }
     for (const auto& [bid, rec] : g5)
     {
@@ -1793,6 +1807,9 @@ int main(int argc, char** argv)
                     r.firms_handoff, r.last_tick, r.firms_survived,
                     r.firms_handoff ? pct(static_cast<double>(r.firms_survived) / r.firms_handoff) : 0.0,
                     r.firms_end);
+        std::printf(" B battles (report only): peak live %d, live at the end %d, longest live %d rounds,"
+                    " live with a last round landing nothing on either side %d\n",
+                    r.bt_peak_live, r.bt_live_end, r.bt_longest_rounds, r.bt_stuck);
         if (r.t_ticks > 0)
             std::printf(" T trade (play 1-%d, per tick): points made %.1f spent %.1f | shipments auto %.1f manual %.1f"
                         " | units %.1f | LP-refused %.1f | corps trading (max) %d | at t%d: %d Marketplaces, %d Ports\n",

@@ -344,7 +344,8 @@ withdrawal_price quote_withdrawal(const active_battle& b, withdrawing_side side,
     const int behind = std::max(0, enemy - own);
 
     q.base      = params.withdraw_base_permille;
-    q.per_round = b.state.rounds_fought * params.withdraw_per_round_permille;
+    q.per_round = std::min(b.state.rounds_fought * params.withdraw_per_round_permille,
+                           std::max(0, params.withdraw_per_round_cap_permille)); // capped (BL-1453)
     q.pursuit   = behind * params.withdraw_pursuit_scale / 1000;
     // One price: the resolver's own total, which is what withdraw_campaign_battle
     // charges (in men since BL-1421).
@@ -895,7 +896,6 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             d.phase    = read_battle_phase(b, swing_a, swing_d, params);
             d.rounds_fought    = b.state.rounds_fought;
             d.rounds_this_tick = fought;
-            d.max_rounds       = params.max_rounds;
             d.attacker_strength_permille = b.state.attacker_strength_permille;
             d.defender_strength_permille = b.state.defender_strength_permille;
             d.attacker_swing_permille = swing_a;
@@ -917,8 +917,8 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
 
             // BL-569 (province holder): a DECISIVE close moves the holder to
             // whoever field_held_by already names — every ending except
-            // stalemate, mirroring MILITARY.md's "moved by a decisive
-            // battle's field_held_by, left untouched by a stalemate". Reuses
+            // stalemate (which nothing produces since 2026-10-29; a loaded
+            // pre-ruling one is still left alone), mirroring MILITARY.md. Reuses
             // `province_partition::find` (province.hpp) to translate the
             // province id into `province_holder`'s positional index; a world
             // whose holder vector was never seeded (empty, or a fixture that

@@ -353,10 +353,10 @@ bool step_campaign_battle(campaign_battle_state&        st,
     const bool atk_broken = !atk_could_fight || fighting_men(attacker) == 0;
     const bool def_broken = !def_could_fight || fighting_men(defender) == 0;
 
+    // NO ROUND CAP (Ben, 2026-10-29): nothing else ends a fight here. A side breaks
+    // or withdraws (withdraw_campaign_battle); `stalemate` is produced by nothing.
     if (atk_broken)                     st.end = campaign_battle_end::attacker_broken;
     else if (def_broken)                st.end = campaign_battle_end::defender_broken;
-    else if (st.rounds_fought >= std::max(1, params.max_rounds))
-                                        st.end = campaign_battle_end::stalemate;
 
     return st.end == campaign_battle_end::in_progress;
 }
@@ -376,9 +376,13 @@ int withdrawal_cost_permille(const campaign_battle_state& st, withdrawing_side s
     // break-off is dear twice over. Nothing here is clamped to produce that
     // ordering; it falls out of the shape.
     const int behind = std::max(0, enemy - own);
-    return clamp_permille(params.withdraw_base_permille +
-                          st.rounds_fought * params.withdraw_per_round_permille +
-                          behind * params.withdraw_pursuit_scale / 1000);
+    // The per-round term holds at its cap (BL-1453 fix round): a battle has no
+    // round cap now, and an uncapped term would reach the whole force.
+    const int64_t per_round = std::min<int64_t>(
+        int64_t{st.rounds_fought} * params.withdraw_per_round_permille,
+        std::max(0, params.withdraw_per_round_cap_permille));
+    return clamp_permille(static_cast<int>(params.withdraw_base_permille + per_round +
+                                           behind * params.withdraw_pursuit_scale / 1000));
 }
 
 int withdraw_campaign_battle(campaign_battle_state&        st,
@@ -436,8 +440,8 @@ campaign_battle_outcome campaign_battle_result(const campaign_battle_state& st)
             out.result = battle_result::attacker_victory;
             break;
         default:
-            // Stalemate (or read mid-fight): the side with more readiness left
-            // holds, defender on an exact tie.
+            // Read mid-fight (or a pre-2026-10-29 stalemate): the side with more
+            // readiness left holds, defender on an exact tie.
             out.result = st.attacker_strength_permille > st.defender_strength_permille
                              ? battle_result::attacker_victory
                              : battle_result::defender_victory;

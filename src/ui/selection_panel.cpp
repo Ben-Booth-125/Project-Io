@@ -2269,7 +2269,9 @@ void draw_battle_selection(world& w, ui_state& ui)
     ImGui::SameLine();
     ImGui::Text("%s", battle_phase_word(phase));
     ImGui::SameLine();
-    ImGui::TextDisabled("round %d / %d", b.state.rounds_fought, params.max_rounds);
+    // The days fought so far, with no denominator: a battle has no maximum duration
+    // (Ben, 2026-10-29) - it runs until a side is broken or withdraws.
+    ImGui::TextDisabled("day %d", b.state.rounds_fought / std::max(1, params.rounds_per_day));
     ImGui::Separator();
 
     // --- the map ----------------------------------------------------------
@@ -2337,7 +2339,7 @@ void draw_battle_selection(world& w, ui_state& ui)
         // All three terms legible, and updating as rounds pass — the per-round
         // term is what makes leaving late dear, so hiding it inside a total would
         // hide the shape of the decision.
-        ImGui::TextDisabled("costs %.1f%%  (base %.1f + %d rounds %.1f + pursuit %.1f)",
+        ImGui::TextDisabled("costs %.1f%%  (base %.1f + %d days %.1f + pursuit %.1f)",
                             q.total / 10.0f, q.base / 10.0f,
                             b.state.rounds_fought, q.per_round / 10.0f, q.pursuit / 10.0f);
         if (already)

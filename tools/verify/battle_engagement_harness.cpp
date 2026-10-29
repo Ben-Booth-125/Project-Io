@@ -24,7 +24,9 @@
 //   B10-B14 the dispatch record and its text.
 //   B15 BL-569: A DECISIVE CLOSE MOVES world::province_holder (the defended
 //       tile's province) to the winner.
-//   B16 BL-569: A STALEMATE LEAVES IT UNTOUCHED.
+//   B16 NO ROUND CAP (Ben, 2026-10-29): a battle past the old six-round cap
+//       fights on, ends only on a break or a withdrawal - never a stalemate -
+//       and leaves the province holder untouched while it runs.
 //   B17 open_tile_battle is ENTITY-ID-AGNOSTIC: it opens a battle with no stance
 //       row (the capability the retired mercenary trigger used).
 //   B18-B22 retreat, morale, recovery, a quiet world, a unit in two battles.
@@ -425,8 +427,8 @@ int main()
             const battle_dispatch& d = t1.dispatches.front();
             check(d.tile == f.tile && d.province == f.province && d.attacker == f.att && d.defender == f.def,
                   "B10b the record names the fight (tile, attacker, defender) and the tile's province");
-            check(d.rounds_this_tick > 0 && d.max_rounds > 0,
-                  "B10c it carries round/max so a surface need not know campaign_battle_params");
+            check(d.rounds_this_tick > 0 && d.rounds_fought > 0,
+                  "B10c it carries the rounds fought (a battle has no maximum, so no denominator)");
             check(d.stream_seed != 0,
                   "B10d it carries the battle's stream seed, so phrasing can vary per fight without a draw");
         }
@@ -679,7 +681,7 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB16 — BL-569: a stalemate leaves the province holder untouched\n");
+    std::printf("\nB16 — no round cap: a battle fights on past the old cap, and never ends a stalemate\n");
     {
         fixture f;
         build_fixture(f, /*declare=*/false);
@@ -696,11 +698,10 @@ int main()
             f.w.province_holder[idx] = third;
         }
 
-        // Hand-built battle, ONE ROUND SHORT of max_rounds (6), both units fresh
-        // and equal. One round at the widest swing spends at most a few hundred
-        // per-mille of either side's readiness (campaign_battle_harness C6 prints
-        // a whole parity fight spending 1000 over six), so neither side can be
-        // spent by round 6 and it concludes as a stalemate by construction.
+        // Hand-built battle at round 5 - one short of the retired six-round cap -
+        // both units fresh and equal. One round spends at most a few hundred
+        // per-mille of either side's readiness, so neither can be spent by round 6:
+        // under the old cap it concluded a stalemate; now it fights on.
         active_battle b;
         b.tile            = f.tile;
         b.province        = f.province;
@@ -722,11 +723,27 @@ int main()
         if (!t.dispatches.empty())
         {
             const battle_dispatch& d = t.dispatches.front();
-            check(d.end == campaign_battle_end::stalemate,
-                  "B16b round 6 elapsed with both sides still standing -- guaranteed by two fresh equal units");
+            check(d.end == campaign_battle_end::in_progress && f.w.battles.size() == 1,
+                  "B16b round 6 fought with both sides standing: the battle is still live (no cap)");
             check(province_holder_for(f.w, f.province) == third,
-                  "B16c THE PROVINCE HOLDER STAYED PUT -- a stalemate mutates nothing here");
+                  "B16c THE PROVINCE HOLDER STAYED PUT while it runs");
         }
+        // Fight it out: it ends on a break, never a stalemate, however long it takes.
+        campaign_battle_end last = campaign_battle_end::in_progress;
+        int days = 0;
+        for (int day = 1; day <= 400 && !f.w.battles.empty(); ++day)
+        {
+            const battle_tick tk = run_battles(f.w, reg, day);
+            for (const battle_dispatch& d : tk.dispatches)
+                last = d.end;
+            days = day + 1;
+        }
+        std::printf("        concluded after %d days: %s\n", days,
+                    last == campaign_battle_end::attacker_broken ? "attacker broken"
+                    : last == campaign_battle_end::defender_broken ? "defender broken" : "other");
+        check(f.w.battles.empty() && (last == campaign_battle_end::attacker_broken
+                                      || last == campaign_battle_end::defender_broken),
+              "B16d it fights on until a side's readiness is spent - never a stalemate");
     }
 
     // -----------------------------------------------------------------------
@@ -774,9 +791,9 @@ int main()
         engage(f);
         // BL-1453 (land recon): this row is about the RETREAT, so it fights in full
         // vision from day 1 (time_full_days 1). Under the shipped recon a 1v1 parity
-        // assault sees 30-55 % of its target over the six rounds and ends a stalemate
-        // with the attacker unspent (land_recon_harness M1), which is recon's own
-        // subject, not this row's.
+        // assault sees 30-55 % of its target over its first six days and is not spent
+        // within the ten days this row allows (land_recon_harness M1), which is
+        // recon's own subject, not this row's.
         recipe_registry seen = reg;
         {
             military_capability_params mp = seen.military();

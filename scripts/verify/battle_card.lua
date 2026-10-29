@@ -16,8 +16,9 @@
 -- state BETWEEN whole ticks. If the specific matchup this run's generation
 -- produces settles within one `econ_step` call -- and since BL-1445 (move by
 -- days) battles step a round a DAY and one `econ_step` is a whole quarter, ninety
--- days, so EVERY fight (at most `max_rounds` 6 days) opens and concludes inside
--- one call -- the battle is never observably "in progress", and this script
+-- days, so a SHORT fight opens and concludes inside one call (battles have no
+-- maximum duration since 2026-10-29, so a long one is still live after it) --
+-- the battle is never observably "in progress", and this script
 -- fails with "no battle opened" even though a real fight did happen. Noted rather than fixed (Ben, 2026-08-24:
 -- low priority) -- if this script starts failing, check for that before
 -- assuming discovery itself broke.

@@ -64,10 +64,12 @@ struct campaign_battle_identity
 /// per-mille unless named otherwise.
 struct campaign_battle_params
 {
-    /// How many rounds a fight runs before it is called a stalemate. "A short
-    /// time" (Ben) — long enough to read the fight and pull out, short enough
-    /// that a campaign tick is not a tactical game.
-    int max_rounds = 6;
+    // NO ROUND CAP (Ben, 2026-10-29: "Battles shouldn't have maximum durations.
+    // They continue while one unit is trying to move and end when readiness runs
+    // out. Some battles may easily take 90-180 days."). The `max_rounds` stalemate
+    // that stood here (6) is gone: a fight ends only when a side is broken (no unit
+    // of it left fighting) or a side withdraws, and the attacker cancelling its move
+    // IS its withdrawal (`attacker_withdrew`, priced below).
 
     /// Half-width of the per-round power swing. 600 = each side's scored power
     /// is multiplied by a uniform draw in [400, 1600] that round. This is the
@@ -135,22 +137,29 @@ struct campaign_battle_params
     ///                 breaking off while losing badly is where armies die.
     /// Note the rounds already fought have ALSO cost their own attrition, so
     /// the total price of a late withdrawal compounds twice over.
-    int withdraw_base_permille      = 20;
-    int withdraw_per_round_permille = 25;
-    int withdraw_pursuit_scale      = 400;
+    ///
+    /// THE PER-ROUND TERM IS CAPPED (BL-1453 fix round, 2026-10-29). With no round
+    /// cap a battle can run 90-180 days, and 25 a round uncapped would reach the
+    /// side's whole force by day 40. It grows 25 a round to `withdraw_per_round_cap`
+    /// 250 (day 10) and holds there, so the first ten days price as they always did
+    /// and the dearest exit — 20 + 250 + a pursuit of at most 400 — is 670 per-mille
+    /// of the leaving side's men: a late exit stays dear and never takes them all.
+    int withdraw_base_permille          = 20;
+    int withdraw_per_round_permille     = 25;
+    int withdraw_per_round_cap_permille = 250;
+    int withdraw_pursuit_scale          = 400;
 
     /// PACING IS BY THE DAY (Ben, 2026-10-28; MILITARY.md § Battles ruling 3,
     /// BL-1445 move by days): rounds fought per DAY. Battles step every day, from
     /// the daily military pass (`run_military_day`), and contact is checked every
     /// day, so the day a march meets a hostile stack is the day its battle opens.
     ///
-    /// One round a day against `max_rounds` 6: a battle is fought out in at most
-    /// six days, and in about six at parity (campaign_battle_harness C4's mean
-    /// rounds, measured in days by move_by_days_harness D6). The round's damage is
-    /// unchanged - its scale was already a day's fighting once a round is a day.
-    /// Withdrawal is honoured at the day boundary, so a commander has a decision
-    /// every day of the fight rather than one between two quarters. Was
-    /// `rounds_per_tick = 3` (two economy ticks, 180 days, to a stalemate).
+    /// One round a day, with no cap on the rounds: a battle runs until a side is
+    /// broken or withdraws (move_by_days_harness D6 measures the days by force
+    /// ratio). The round's damage is unchanged - its scale was already a day's
+    /// fighting once a round is a day. Withdrawal is honoured at the day boundary,
+    /// so a commander has a decision every day of the fight. Was `rounds_per_tick
+    /// = 3` (two economy ticks, 180 days, to a stalemate).
     int rounds_per_day = 1;
 };
 
@@ -171,7 +180,10 @@ enum class campaign_battle_end : uint8_t
     defender_broken   = 2,
     attacker_withdrew = 3,
     defender_withdrew = 4,
-    stalemate         = 5, ///< max_rounds elapsed with both sides still standing.
+    /// PRODUCED BY NOTHING since 2026-10-29 (Ben: battles have no maximum duration;
+    /// the `max_rounds` stalemate is gone). Kept so a saved battle or dispatch that
+    /// ended on it still reads; never renumber.
+    stalemate         = 5,
 };
 
 /// One round's public record — what a watching player is shown, and what a
