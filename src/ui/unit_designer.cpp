@@ -1,10 +1,13 @@
 #include "unit_designer.hpp"
 
 #include "detail_level.hpp"
+#include "icons.hpp"
 #include "presentation.hpp"
 #include "unit_art.hpp"
+#include "wing_card.hpp" // air_class_label
 
-#include "world/corp_command.hpp"           // unit_design_check
+#include "world/air_combat.hpp"             // wing_class — an air class's stale wings
+#include "world/corp_command.hpp"           // unit_design_check / air_design_check
 #include "world/digitisation_tree_data.hpp" // io::dg::find_node — a locked item's node, named
 #include "world/unit_designs.hpp"
 
@@ -14,6 +17,7 @@
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -21,50 +25,45 @@ namespace ui {
 
 namespace {
 
-const char* class_label(land_class c)
-{
-    static const char* const k_names[land_class_count] = {
-        "Infantry", "Motorised infantry", "Mechanised infantry", "Armour",
-        "Light armour", "Artillery", "Air defence", "Not a land fighter",
-    };
-    const int i = static_cast<int>(c);
-    return (i >= 0 && i < land_class_count) ? k_names[i] : "Unknown";
-}
+// ===========================================================================
+// THE THEATRE ADAPTER (BL-1450). The designer is one machine — the draft, Save,
+// Revert, the close catch and prompt, the boxes and the item list — over two kit
+// catalogues: the land classes' (`kit_catalogue`, `set_unit_design`) and the air
+// classes' (`air_kit_catalogue`, `set_air_design`; MILITARY.md § Air, slots
+// airframe / armament / avionics). Everything the draw reads about a class goes
+// through this interface, so the draft/Save model (military.md § The designer,
+// NR-1096) is written once and holds for both.
+// ===========================================================================
 
-/// The non-zero entries of a stat delta, signed: "+10 soft attack, +15% hardness".
-/// "No change" when every entry is zero.
-std::string delta_text(const land_combat_stats& d)
+/// One column of the summary: its label, the lower-case word a delta uses, the
+/// value, and whether it is a per-mille shown as a percentage.
+struct stat
+{
+    const char* label;
+    const char* word;
+    int         value;
+    bool        pct;
+};
+
+/// "steel 2, machinery 1" from a goods array; "none (base kit)" when empty.
+std::string goods_text(const std::array<float, resource_count>& goods)
 {
     std::string out;
-    char        buf[48];
-    auto add = [&](int v, const char* name, bool pct) {
-        if (v == 0) return;
-        if (pct) std::snprintf(buf, sizeof buf, "%+d%% %s", v / 10, name);
-        else     std::snprintf(buf, sizeof buf, "%+d %s", v, name);
-        if (!out.empty()) out += ", ";
-        out += buf;
-    };
-    add(d.soft, "soft attack", false);
-    add(d.hard, "hard attack", false);
-    add(d.defence, "defence", false);
-    add(d.breakthrough, "breakthrough", false);
-    add(d.hardness, "hardness", true);
-    return out.empty() ? std::string("No change") : out;
+    char        buf[64];
+    for (int r = 0; r < resource_count; ++r)
+        if (goods[static_cast<std::size_t>(r)] > 0.0f)
+        {
+            std::snprintf(buf, sizeof buf, "%s%s %g", out.empty() ? "" : ", ",
+                          resource_name(static_cast<resource_type>(r)),
+                          static_cast<double>(goods[static_cast<std::size_t>(r)]));
+            out += buf;
+        }
+    return out.empty() ? std::string("none (base kit)") : out;
 }
 
-land_combat_stats minus(const land_combat_stats& a, const land_combat_stats& b)
-{
-    land_combat_stats d;
-    d.soft         = a.soft - b.soft;
-    d.hard         = a.hard - b.hard;
-    d.hardness     = a.hardness - b.hardness;
-    d.defence      = a.defence - b.defence;
-    d.breakthrough = a.breakthrough - b.breakthrough;
-    return d;
-}
-
-/// An item's goods per unit: "steel 2, machinery 1"; "no goods" for base kit.
-std::string item_goods_text(const kit_item& it)
+/// An item's goods: "steel 2, machinery 1"; "no goods" for base kit.
+template <class Item>
+std::string item_goods_text(const Item& it)
 {
     if (it.goods_count == 0)
         return "no goods";
@@ -79,20 +78,304 @@ std::string item_goods_text(const kit_item& it)
     return out;
 }
 
-/// A design's goods per unit, from `kit_goods`.
-std::string design_goods_text(const std::array<float, resource_count>& goods)
+/// The non-zero differences b - a, signed: "+10 soft attack, +15% hardness";
+/// "No change" when none differ.
+std::string stat_delta_text(const std::vector<stat>& a, const std::vector<stat>& b)
 {
     std::string out;
-    char        buf[64];
-    for (int r = 0; r < resource_count; ++r)
-        if (goods[static_cast<std::size_t>(r)] > 0.0f)
+    char        buf[48];
+    for (std::size_t i = 0; i < a.size() && i < b.size(); ++i)
+    {
+        const int v = b[i].value - a[i].value;
+        if (v == 0)
+            continue;
+        if (a[i].pct) std::snprintf(buf, sizeof buf, "%+d%% %s", v / 10, a[i].word);
+        else          std::snprintf(buf, sizeof buf, "%+d %s", v, a[i].word);
+        if (!out.empty()) out += ", ";
+        out += buf;
+    }
+    return out.empty() ? std::string("No change") : out;
+}
+
+class theatre
+{
+public:
+    virtual ~theatre() = default;
+    virtual int                          slots() const = 0;
+    virtual const char*                  slot_name(int sl) const = 0;
+    virtual const std::vector<uint16_t>& items(int sl) const = 0;
+    virtual uint16_t                     live(int sl) const = 0;      ///< The live design's item.
+    virtual uint16_t                     item_at(int sl, uint8_t variant) const = 0;
+    virtual uint8_t                      variant_of(uint16_t item) const = 0;
+    virtual unit_design                  live_design() const = 0;
+    virtual std::size_t                  catalogue_size() const = 0;
+    virtual const char*                  item_name(uint16_t item) const = 0;
+    virtual bool                         item_is_base(uint16_t item) const = 0;
+    virtual std::string                  item_goods(uint16_t item) const = 0;
+    virtual const char*                  research_node(uint16_t item) const = 0;
+    virtual bool                         researched(uint16_t item) const = 0;
+    virtual corp_command_result          check(int sl, uint16_t item) const = 0;
+    virtual std::string                  item_delta(uint16_t item) const = 0; ///< Its own change, for the box.
+    virtual std::vector<stat>            stats(const unit_design& d) const = 0;
+    virtual std::string                  design_goods(const unit_design& d) const = 0;
+    virtual const char*                  class_label() const = 0;
+    virtual const char*                  per() const = 0;             ///< "unit" / "wing".
+    virtual int                          stale() const = 0;           ///< Fielded on an older design.
+    virtual std::string                  stale_text(int n) const = 0;
+    virtual std::string                  model_text() const = 0;
+    /// The class's image in [i0, i1] (or a placeholder) and its anchors.
+    virtual void  draw_image(ImDrawList* dl, ImVec2 i0, ImVec2 i1) const = 0;
+    virtual float image_w() const = 0;
+    virtual float image_h() const = 0;
+    virtual float anchor_x(int sl) const = 0;
+    virtual float anchor_y(int sl) const = 0;
+};
+
+constexpr ImU32 k_box_bg     = IM_COL32(24, 26, 33, 255);
+constexpr ImU32 k_box_border = IM_COL32(90, 94, 106, 255);
+constexpr ImU32 k_leader     = IM_COL32(120, 126, 140, 255);
+
+const char* land_label(land_class c)
+{
+    static const char* const k_names[land_class_count] = {
+        "Infantry", "Motorised infantry", "Mechanised infantry", "Armour",
+        "Light armour", "Artillery", "Air defence", "Not a land fighter",
+    };
+    const int i = static_cast<int>(c);
+    return (i >= 0 && i < land_class_count) ? k_names[i] : "Unknown";
+}
+
+/// The land classes (`kit_catalogue`; MILITARY.md § The kit).
+class land_theatre final : public theatre
+{
+public:
+    land_theatre(const world& w, entity_id nation, land_class c) : w_(w), nation_(nation), c_(c) {}
+    int slots() const override { return kit_slot_count(c_); }
+    const char* slot_name(int sl) const override { return kit_slot_name(c_, sl); }
+    const std::vector<uint16_t>& items(int sl) const override { return kit_items_for(c_, sl); }
+    uint16_t live(int sl) const override { return design_fitted(w_, nation_, c_, sl); }
+    uint16_t item_at(int sl, uint8_t v) const override { return kit_item_at(c_, sl, v); }
+    uint8_t variant_of(uint16_t it) const override { return kit_variant_of(it); }
+    unit_design live_design() const override { return design_of(w_, nation_, c_); }
+    std::size_t catalogue_size() const override { return kit_catalogue().size(); }
+    const char* item_name(uint16_t it) const override { return kit_catalogue()[it].name; }
+    bool item_is_base(uint16_t it) const override { return kit_catalogue()[it].goods_count == 0; }
+    std::string item_goods(uint16_t it) const override { return item_goods_text(kit_catalogue()[it]); }
+    const char* research_node(uint16_t it) const override { return kit_catalogue()[it].research_node; }
+    bool researched(uint16_t it) const override { return kit_item_researched(w_, nation_, it); }
+    corp_command_result check(int sl, uint16_t it) const override
+    {
+        return unit_design_check(w_, nation_, static_cast<uint32_t>(c_), static_cast<uint16_t>(sl), it);
+    }
+    std::string item_delta(uint16_t it) const override
+    {
+        const land_combat_stats& d = kit_catalogue()[it].delta;
+        static const std::vector<stat> zero = to_stats({});
+        return stat_delta_text(zero, to_stats(d));
+    }
+    std::vector<stat> stats(const unit_design& d) const override { return to_stats(kit_stats(c_, d)); }
+    std::string design_goods(const unit_design& d) const override { return goods_text(kit_goods(c_, d)); }
+    const char* class_label() const override { return land_label(c_); }
+    const char* per() const override { return "unit"; }
+    int stale() const override
+    {
+        int n = 0;
+        for (const auto& [uid, u] : w_.units)
+            if (u.owner == nation_ && unit_land_class(u) == c_ && unit_design_stale(w_, u))
+                ++n;
+        return n;
+    }
+    std::string stale_text(int n) const override
+    {
+        char buf[160];
+        std::snprintf(buf, sizeof buf, "%d unit%s in the field on an older design \xe2\x80\x94 refit from the unit card.",
+                      n, n == 1 ? "" : "s");
+        return buf;
+    }
+    std::string model_text() const override
+    {
+        return "A pick is a draft. Save makes it the live design: new units are raised with it, units in the field take it by refit.";
+    }
+    void draw_image(ImDrawList* dl, ImVec2 i0, ImVec2 i1) const override
+    {
+        const unit_art& art = unit_art_for(c_);
+        if (art.tex != nullptr)
         {
-            std::snprintf(buf, sizeof buf, "%s%s %g", out.empty() ? "" : ", ",
-                          resource_name(static_cast<resource_type>(r)),
-                          static_cast<double>(goods[static_cast<std::size_t>(r)]));
-            out += buf;
+            dl->AddImage(reinterpret_cast<ImTextureID>(art.tex), i0, i1);
+            return;
         }
-    return out.empty() ? std::string("none (base kit)") : out;
+        dl->AddRect(i0, i1, k_box_border, 4.0f, 0, 1.5f);
+        const char* msg = "No image for this class";
+        const ImVec2 ts = ImGui::CalcTextSize(msg);
+        dl->AddText({(i0.x + i1.x - ts.x) * 0.5f, (i0.y + i1.y - ts.y) * 0.5f}, palette::text_secondary, msg);
+    }
+    float image_w() const override { const unit_art& a = unit_art_for(c_); return a.width > 0 ? static_cast<float>(a.width) : 640.0f; }
+    float image_h() const override { const unit_art& a = unit_art_for(c_); return a.height > 0 ? static_cast<float>(a.height) : 400.0f; }
+    float anchor_x(int sl) const override { return unit_art_for(c_).anchor_x[sl]; }
+    float anchor_y(int sl) const override { return unit_art_for(c_).anchor_y[sl]; }
+
+private:
+    static std::vector<stat> to_stats(const land_combat_stats& s)
+    {
+        return {{"Soft attack", "soft attack", s.soft, false},
+                {"Hard attack", "hard attack", s.hard, false},
+                {"Defence", "defence", s.defence, false},
+                {"Breakthrough", "breakthrough", s.breakthrough, false},
+                {"Hardness", "hardness", s.hardness, true}};
+    }
+    const world& w_;
+    entity_id    nation_;
+    land_class   c_;
+};
+
+/// The air classes (`air_kit_catalogue`; MILITARY.md § Air). No air art yet: the
+/// image is the aircraft glyph on the placeholder panel, anchored at the wing root
+/// (airframe), under the wing (armament) and the nose (avionics).
+class air_theatre final : public theatre
+{
+public:
+    air_theatre(const world& w, const recipe_registry& reg, entity_id nation, air_class c)
+        : w_(w), reg_(reg), nation_(nation), c_(c) {}
+    int slots() const override { return k_air_kit_slot_count; }
+    const char* slot_name(int sl) const override { return air_kit_slot_name(sl); }
+    const std::vector<uint16_t>& items(int sl) const override { return air_kit_items_for(c_, sl); }
+    uint16_t live(int sl) const override { return air_design_fitted(w_, nation_, c_, sl); }
+    uint16_t item_at(int sl, uint8_t v) const override { return air_kit_item_at(c_, sl, v); }
+    uint8_t variant_of(uint16_t it) const override { return air_kit_variant_of(it); }
+    unit_design live_design() const override { return air_design_of(w_, nation_, c_); }
+    std::size_t catalogue_size() const override { return air_kit_catalogue().size(); }
+    const char* item_name(uint16_t it) const override { return air_kit_catalogue()[it].name; }
+    bool item_is_base(uint16_t it) const override { return air_kit_catalogue()[it].goods_count == 0; }
+    std::string item_goods(uint16_t it) const override { return item_goods_text(air_kit_catalogue()[it]); }
+    const char* research_node(uint16_t it) const override { return air_kit_catalogue()[it].research_node; }
+    bool researched(uint16_t it) const override { return air_kit_item_researched(w_, nation_, it); }
+    corp_command_result check(int sl, uint16_t it) const override
+    {
+        return air_design_check(w_, nation_, static_cast<uint32_t>(c_), static_cast<uint16_t>(sl), it);
+    }
+    std::string item_delta(uint16_t it) const override
+    {
+        return stat_delta_text(to_stats({}), to_stats(air_kit_catalogue()[it].delta));
+    }
+    std::vector<stat> stats(const unit_design& d) const override
+    {
+        const air_class_stats& cs = reg_.military().air.cls[static_cast<std::size_t>(c_)];
+        const air_combat_stats k  = air_kit_delta(c_, d);
+        air_combat_stats t;
+        t.hp = cs.hp + k.hp;  t.air = cs.air + k.air;  t.soft = cs.soft + k.soft;  t.hard = cs.hard + k.hard;
+        t.strategic = cs.strategic + k.strategic;  t.recon = cs.recon + k.recon;  t.range = cs.range + k.range;
+        return to_stats(t);
+    }
+    std::string design_goods(const unit_design& d) const override { return goods_text(air_kit_goods(c_, d)); }
+    const char* class_label() const override { return air_class_label(c_); }
+    const char* per() const override { return "wing"; }
+    int stale() const override
+    {
+        const unit_design live_d = live_design();
+        int n = 0;
+        for (const auto& [wid, wg] : w_.wings)
+            if (wg.owner == nation_ && wing_class(wg) == c_ && wg.kit != live_d)
+                ++n;
+        return n;
+    }
+    std::string stale_text(int n) const override
+    {
+        char buf[120];
+        std::snprintf(buf, sizeof buf, "%d wing%s flying an older design.", n, n == 1 ? "" : "s");
+        return buf;
+    }
+    std::string model_text() const override
+    {
+        return "A pick is a draft. Save makes it the live design: new wings are raised with it.";
+    }
+    void draw_image(ImDrawList* dl, ImVec2 i0, ImVec2 i1) const override
+    {
+        dl->AddRect(i0, i1, k_box_border, 4.0f, 0, 1.5f);
+        icons::aircraft(dl, {(i0.x + i1.x) * 0.5f, (i0.y + i1.y) * 0.5f},
+                        std::min(i1.x - i0.x, i1.y - i0.y) * 0.42f,
+                        palette::building_kind_colour(building_type::airbase));
+    }
+    float image_w() const override { return 640.0f; }
+    float image_h() const override { return 400.0f; }
+    float anchor_x(int sl) const override { static constexpr float x[3] = {0.30f, 0.76f, 0.52f}; return x[sl]; }
+    float anchor_y(int sl) const override { static constexpr float y[3] = {0.58f, 0.66f, 0.20f}; return y[sl]; }
+
+private:
+    static std::vector<stat> to_stats(const air_combat_stats& s)
+    {
+        return {{"HP", "HP", s.hp, false},
+                {"Air attack", "air attack", s.air, false},
+                {"Soft attack", "soft attack", s.soft, false},
+                {"Hard attack", "hard attack", s.hard, false},
+                {"Strategic", "strategic", s.strategic, false},
+                {"Recon", "recon", s.recon, false},
+                {"Range", "range", s.range, false}};
+    }
+    const world&           w_;
+    const recipe_registry& reg_;
+    entity_id              nation_;
+    air_class              c_;
+};
+
+bool is_air(detail_surface s) { return s == detail_surface::air_designer; }
+
+/// Is (@p surface, @p key) a designer the theatre can open?
+bool valid_key(detail_surface surface, int key)
+{
+    if (is_air(surface))
+        return key >= 0 && key < air_class_count;
+    return key >= 0 && key < land_class_count && kit_slot_count(static_cast<land_class>(key)) > 0;
+}
+
+/// The theatre of (@p surface, @p key). @p reg may be null for a land class only
+/// (the land arithmetic needs none); an air class without one gets nullptr.
+std::unique_ptr<theatre> make_theatre(const world& w, const recipe_registry* reg, entity_id nation,
+                                      detail_surface surface, int key)
+{
+    if (!valid_key(surface, key))
+        return nullptr;
+    if (is_air(surface))
+    {
+        if (reg == nullptr)
+            return nullptr;
+        return std::make_unique<air_theatre>(w, *reg, nation, static_cast<air_class>(key));
+    }
+    return std::make_unique<land_theatre>(w, nation, static_cast<land_class>(key));
+}
+
+/// The draft's picks laid over @p t's live design.
+unit_design drafted(const theatre& t, const unit_designer_state& d)
+{
+    unit_design out = t.live_design();
+    for (int sl = 0; sl < t.slots() && sl < static_cast<int>(k_kit_slot_max); ++sl)
+    {
+        const uint16_t it = d.draft[static_cast<std::size_t>(sl)];
+        if (it != k_no_kit_item)
+            out.fit[static_cast<std::size_t>(sl)] = t.variant_of(it);
+    }
+    return out;
+}
+
+/// Slots of the open draft that differ from its live design. Item ids only, so no
+/// registry is needed: an air draft is counted through a registry-free probe.
+int changed_in(const world& w, const unit_designer_state& d, entity_id nation)
+{
+    if (d.draft_cls < 0 || !valid_key(d.draft_surface, d.draft_cls))
+        return 0;
+    int n = 0;
+    const bool air   = is_air(d.draft_surface);
+    const int  slots = air ? k_air_kit_slot_count : kit_slot_count(static_cast<land_class>(d.draft_cls));
+    for (int sl = 0; sl < slots && sl < static_cast<int>(k_kit_slot_max); ++sl)
+    {
+        const uint16_t it = d.draft[static_cast<std::size_t>(sl)];
+        if (it == k_no_kit_item)
+            continue;
+        const uint16_t live = air ? air_design_fitted(w, nation, static_cast<air_class>(d.draft_cls), sl)
+                                  : design_fitted(w, nation, static_cast<land_class>(d.draft_cls), sl);
+        if (it != live)
+            ++n;
+    }
+    return n;
 }
 
 /// The age-tree node an item needs, named: the node's name when the tree holds it,
@@ -108,14 +391,15 @@ std::string node_text(const char* node)
 }
 
 /// The seam's refusal, in the player's words. Empty for `applied`.
-std::string refusal_text(corp_command_result r, const kit_item& it)
+std::string refusal_text(corp_command_result r, const char* research)
 {
     switch (r)
     {
-        case corp_command_result::applied:             return {};
-        case corp_command_result::rejected_tech_locked: return "Locked: needs research " + node_text(it.research_node);
-        case corp_command_result::rejected_state:      return "Already fitted";
-        default:                                       return "Does not fit this slot";
+        case corp_command_result::applied:              return {};
+        case corp_command_result::rejected_tech_locked: return "Locked: needs research " + node_text(research);
+        case corp_command_result::rejected_state:       return "Already fitted";
+        case corp_command_result::rejected_not_owner:   return "Only your own nation's design can be changed";
+        default:                                        return "Does not fit this slot";
     }
 }
 
@@ -128,66 +412,6 @@ void clipped_text(ImDrawList* dl, ImVec2 p, float w, ImU32 col, const std::strin
     dl->PopClipRect();
 }
 
-constexpr ImU32 k_box_bg     = IM_COL32(24, 26, 33, 255);
-constexpr ImU32 k_box_border = IM_COL32(90, 94, 106, 255);
-constexpr ImU32 k_leader     = IM_COL32(120, 126, 140, 255);
-
-} // namespace
-
-bool unit_designer_open_on(const ui_state& s, land_class c)
-{
-    return is_expanded(s, detail_surface::unit_designer, static_cast<int>(c));
-}
-
-void toggle_unit_designer(ui_state& s, land_class c)
-{
-    if (unit_designer_open_on(s, c))
-        fold(s);
-    else if (kit_slot_count(c) > 0)
-        expand(s, detail_surface::unit_designer, static_cast<int>(c));
-}
-
-static_assert(std::tuple_size<decltype(unit_designer_state::draft)>::value == k_kit_slot_max,
-              "the designer's draft holds one item per kit slot");
-
-unit_design unit_designer_draft_design(const world& w, const ui_state& s, entity_id nation, land_class c)
-{
-    unit_design out = design_of(w, nation, c);
-    if (s.designer.draft_cls != static_cast<int>(c))
-        return out;
-    const int slots = kit_slot_count(c);
-    for (int sl = 0; sl < slots && sl < static_cast<int>(k_kit_slot_max); ++sl)
-    {
-        const uint16_t it = s.designer.draft[static_cast<std::size_t>(sl)];
-        if (it != k_no_kit_item)
-            out.fit[static_cast<std::size_t>(sl)] = kit_variant_of(it);
-    }
-    return out;
-}
-
-land_combat_stats unit_designer_draft_stats(const world& w, const ui_state& s, entity_id nation, land_class c)
-{
-    return kit_stats(c, unit_designer_draft_design(w, s, nation, c));
-}
-
-int unit_designer_changed_slots(const world& w, const ui_state& s, entity_id nation)
-{
-    const int key = s.designer.draft_cls;
-    if (key < 0 || key >= land_class_count)
-        return 0;
-    const land_class c = static_cast<land_class>(key);
-    int n = 0;
-    for (int sl = 0; sl < kit_slot_count(c) && sl < static_cast<int>(k_kit_slot_max); ++sl)
-    {
-        const uint16_t it = s.designer.draft[static_cast<std::size_t>(sl)];
-        if (it != k_no_kit_item && it != design_fitted(w, nation, c, sl))
-            ++n;
-    }
-    return n;
-}
-
-namespace {
-
 void clear_draft(unit_designer_state& d)
 {
     d.draft_cls = -1;
@@ -197,15 +421,17 @@ void clear_draft(unit_designer_state& d)
 /// Save: queue one pick per changed slot for app::render, then drop the draft.
 void save_draft(const world& w, unit_designer_state& d, entity_id nation)
 {
-    const int key = d.draft_cls;
-    if (key >= 0 && key < land_class_count)
+    if (d.draft_cls >= 0 && valid_key(d.draft_surface, d.draft_cls))
     {
-        const land_class c = static_cast<land_class>(key);
-        for (int sl = 0; sl < kit_slot_count(c) && sl < static_cast<int>(k_kit_slot_max); ++sl)
+        const bool air   = is_air(d.draft_surface);
+        const int  slots = air ? k_air_kit_slot_count : kit_slot_count(static_cast<land_class>(d.draft_cls));
+        for (int sl = 0; sl < slots && sl < static_cast<int>(k_kit_slot_max); ++sl)
         {
             const uint16_t it = d.draft[static_cast<std::size_t>(sl)];
-            if (it != k_no_kit_item && it != design_fitted(w, nation, c, sl))
-                d.pending.push_back({key, sl, it});
+            const uint16_t live = air ? air_design_fitted(w, nation, static_cast<air_class>(d.draft_cls), sl)
+                                      : design_fitted(w, nation, static_cast<land_class>(d.draft_cls), sl);
+            if (it != k_no_kit_item && it != live)
+                d.pending.push_back({d.draft_cls, sl, it, air});
         }
     }
     clear_draft(d);
@@ -224,10 +450,59 @@ void finish_close(ui_state& s)
 
 } // namespace
 
+bool unit_designer_open_on(const ui_state& s, land_class c)
+{
+    return is_expanded(s, detail_surface::unit_designer, static_cast<int>(c));
+}
+
+void toggle_unit_designer(ui_state& s, land_class c)
+{
+    if (unit_designer_open_on(s, c))
+        fold(s);
+    else if (kit_slot_count(c) > 0)
+        expand(s, detail_surface::unit_designer, static_cast<int>(c));
+}
+
+bool air_designer_open_on(const ui_state& s, air_class c)
+{
+    return is_expanded(s, detail_surface::air_designer, static_cast<int>(c));
+}
+
+void toggle_air_designer(ui_state& s, air_class c)
+{
+    if (air_designer_open_on(s, c))
+        fold(s);
+    else
+        expand(s, detail_surface::air_designer, static_cast<int>(c));
+}
+
+static_assert(std::tuple_size<decltype(unit_designer_state::draft)>::value == k_kit_slot_max,
+              "the designer's draft holds one item per kit slot");
+static_assert(k_air_kit_slot_count <= static_cast<int>(k_kit_slot_max),
+              "an air design's slots fit the draft");
+
+unit_design unit_designer_draft_design(const world& w, const ui_state& s, entity_id nation, land_class c)
+{
+    if (s.designer.draft_cls != static_cast<int>(c) || is_air(s.designer.draft_surface))
+        return design_of(w, nation, c);
+    return drafted(land_theatre(w, nation, c), s.designer);
+}
+
+land_combat_stats unit_designer_draft_stats(const world& w, const ui_state& s, entity_id nation, land_class c)
+{
+    return kit_stats(c, unit_designer_draft_design(w, s, nation, c));
+}
+
+int unit_designer_changed_slots(const world& w, const ui_state& s, entity_id nation)
+{
+    return changed_in(w, s.designer, nation);
+}
+
 void reset_unit_designer(ui_state& s)
 {
     unit_designer_state& d = s.designer;
     clear_draft(d);
+    d.draft_surface    = detail_surface::unit_designer;
     d.confirm_close    = false;
     d.after_surface    = detail_surface::none;
     d.after_key        = 0;
@@ -238,9 +513,10 @@ void reset_unit_designer(ui_state& s)
     d.last_message.clear();
     d.slot_open = -1;
     d.open_cls  = -1;
+    d.open_surface = detail_surface::none;
 }
 
-void draw_unit_designer(const world& w, ui_state& s)
+void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
 {
     unit_designer_state& d = s.designer;
     d.boxes.clear();
@@ -252,6 +528,7 @@ void draw_unit_designer(const world& w, ui_state& s)
     d.changed_slots = 0;
     d.stale_units = 0;
     d.drawn_cls   = -1;
+    d.drawn_air   = false;
 
     const entity_id nation = player_nation(w);
 
@@ -264,9 +541,11 @@ void draw_unit_designer(const world& w, ui_state& s)
         if (!d.refused.empty())
         {
             clear_draft(d);
-            d.draft_cls = d.refused.front().cls;
+            d.draft_cls     = d.refused.front().cls;
+            d.draft_surface = d.refused.front().air ? detail_surface::air_designer : detail_surface::unit_designer;
             for (const auto& r : d.refused)
-                if (r.cls == d.draft_cls && r.slot >= 0 && r.slot < static_cast<int>(k_kit_slot_max))
+                if (r.cls == d.draft_cls && r.air == is_air(d.draft_surface)
+                    && r.slot >= 0 && r.slot < static_cast<int>(k_kit_slot_max))
                     d.draft[static_cast<std::size_t>(r.slot)] = r.item;
             d.refused.clear();
             d.close_after_save = false; // stay open on what was refused
@@ -278,20 +557,21 @@ void draw_unit_designer(const world& w, ui_state& s)
         }
     }
 
-    // THE CLOSE CATCH. Every close path — the toggle press (toggle_unit_designer),
+    // THE CLOSE CATCH. Every close path — the toggle press (toggle_*_designer),
     // the return control (fold_overlay_begin), Escape (app.cpp's rung), a press
-    // opening another takeover — ends in `fold` or `expand` on `ui_state::expanded`,
-    // and all of them run before this draw. So one check here covers them all
-    // without each knowing about drafts: if the draft has unsaved changes and the
-    // takeover is no longer the draft's class, put the designer back, remember
-    // where the close was going, and ask.
+    // opening another takeover (the other theatre's designer included) — ends in
+    // `fold` or `expand` on `ui_state::expanded`, and all of them run before this
+    // draw. So one check here covers them all without each knowing about drafts: if
+    // the draft has unsaved changes and the takeover is no longer the draft's
+    // (surface, class), put the designer back, remember where the close was going,
+    // and ask.
     //
     // A close drawn by a surface that draws BEFORE this one (another takeover's
     // opening press) shows that surface for one frame before the catch puts the
     // designer back. Accepted: one frame, and only with an unsaved draft.
-    if (d.draft_cls >= 0 && !is_expanded(s, detail_surface::unit_designer, d.draft_cls))
+    if (d.draft_cls >= 0 && !is_expanded(s, d.draft_surface, d.draft_cls))
     {
-        if (unit_designer_changed_slots(w, s, nation) > 0)
+        if (changed_in(w, d, nation) > 0)
         {
             // A second close over an open prompt (Escape again, the class press)
             // keeps the FIRST close's destination.
@@ -300,8 +580,8 @@ void draw_unit_designer(const world& w, ui_state& s)
                 d.after_surface = s.expanded.surface;
                 d.after_key     = s.expanded.key;
             }
-            d.confirm_close = true;
-            s.expanded.surface = detail_surface::unit_designer;
+            d.confirm_close    = true;
+            s.expanded.surface = d.draft_surface;
             s.expanded.key     = d.draft_cls;
             s.expanded.focus   = false;
         }
@@ -312,40 +592,45 @@ void draw_unit_designer(const world& w, ui_state& s)
         }
     }
 
-    if (s.expanded.surface != detail_surface::unit_designer)
+    const detail_surface surface = s.expanded.surface;
+    if (surface != detail_surface::unit_designer && surface != detail_surface::air_designer)
     {
-        d.slot_open = -1;
-        d.open_cls  = -1;
+        d.slot_open    = -1;
+        d.open_cls     = -1;
+        d.open_surface = detail_surface::none;
         return;
     }
     const int key = s.expanded.key;
-    if (key < 0 || key >= land_class_count || kit_slot_count(static_cast<land_class>(key)) == 0)
+    const std::unique_ptr<theatre> tp = make_theatre(w, &reg, nation, surface, key);
+    if (!tp)
     {
         fold(s);
         return;
     }
-    const land_class cls   = static_cast<land_class>(key);
-    const int        slots = kit_slot_count(cls);
-    if (d.open_cls != key)
+    const theatre& t     = *tp;
+    const int      slots = t.slots();
+    if (d.open_cls != key || d.open_surface != surface)
     {
-        d.open_cls  = key;
-        d.slot_open = -1;
+        d.open_cls     = key;
+        d.open_surface = surface;
+        d.slot_open    = -1;
         d.last_message.clear();
     }
-    if (d.draft_cls != key)
+    if (d.draft_cls != key || d.draft_surface != surface)
     {
         clear_draft(d); // the catch above has already asked about a changed one
-        d.draft_cls = key;
+        d.draft_cls     = key;
+        d.draft_surface = surface;
     }
-    d.changed_slots = unit_designer_changed_slots(w, s, nation);
+    d.changed_slots = changed_in(w, d, nation);
     if (d.changed_slots == 0)
         d.confirm_close = false;
     if (d.slot_open >= slots)
         d.slot_open = -1;
 
     char title[96];
-    std::snprintf(title, sizeof title, "Unit designer \xe2\x80\x94 %s", class_label(cls));
-    if (!fold_overlay_begin(s, detail_surface::unit_designer, key, title))
+    std::snprintf(title, sizeof title, "Unit designer \xe2\x80\x94 %s", t.class_label());
+    if (!fold_overlay_begin(s, surface, key, title))
         return;
     {
         // The return control `‹` fold_overlay_begin drew: the window's top-left
@@ -356,17 +641,13 @@ void draw_unit_designer(const world& w, ui_state& s)
         d.back_y = wp.y + 28.0f + fh * 0.5f;
     }
     d.drawn_cls = key;
+    d.drawn_air = is_air(surface);
 
-    const unit_design  design = unit_designer_draft_design(w, s, nation, cls); // what is shown
-    const auto&        cat    = kit_catalogue();
-    const unit_art&    art    = unit_art_for(cls);
-    ImDrawList*        dl     = ImGui::GetWindowDrawList();
-    const float        line   = ImGui::GetTextLineHeight();
-    const float        pad    = 6.0f;
-
-    for (const auto& [uid, u] : w.units)
-        if (u.owner == nation && unit_land_class(u) == cls && unit_design_stale(w, u))
-            ++d.stale_units;
+    const unit_design design = drafted(t, d); // what is shown
+    ImDrawList*       dl     = ImGui::GetWindowDrawList();
+    const float       line   = ImGui::GetTextLineHeight();
+    const float       pad    = 6.0f;
+    d.stale_units = t.stale();
 
     // ── Layout: image in the middle, slot boxes in columns either side, the
     //    summary strip underneath. ─────────────────────────────────────────────
@@ -382,22 +663,12 @@ void draw_unit_designer(const world& w, ui_state& s)
     const float img_x0 = o.x + box_w + gap;
     const float img_x1 = o.x + avail.x - box_w - gap;
     const float img_w_room = std::max(40.0f, img_x1 - img_x0);
-    const float aw = art.width  > 0 ? static_cast<float>(art.width)  : 640.0f;
-    const float ah = art.height > 0 ? static_cast<float>(art.height) : 400.0f;
+    const float aw = t.image_w(), ah = t.image_h();
     const float scale = std::min(img_w_room / aw, main_h / ah);
     const float iw = aw * scale, ih = ah * scale;
     const ImVec2 i0 = {img_x0 + (img_w_room - iw) * 0.5f, o.y + (main_h - ih) * 0.5f};
     const ImVec2 i1 = {i0.x + iw, i0.y + ih};
-    if (art.tex != nullptr)
-        dl->AddImage(reinterpret_cast<ImTextureID>(art.tex), i0, i1);
-    else
-    {
-        dl->AddRect(i0, i1, k_box_border, 4.0f, 0, 1.5f);
-        const char* msg = "No image for this class";
-        const ImVec2 ts = ImGui::CalcTextSize(msg);
-        dl->AddText({(i0.x + i1.x - ts.x) * 0.5f, (i0.y + i1.y - ts.y) * 0.5f},
-                    palette::text_secondary, msg);
-    }
+    t.draw_image(dl, i0, i1);
 
     // Anchors on screen, and which side each slot's box takes: the side its
     // anchor is nearer, so leader lines do not cross the image.
@@ -405,8 +676,8 @@ void draw_unit_designer(const world& w, ui_state& s)
     std::vector<slot_pos> pos;
     for (int sl = 0; sl < slots; ++sl)
     {
-        const ImVec2 a = {i0.x + art.anchor_x[sl] * iw, i0.y + art.anchor_y[sl] * ih};
-        pos.push_back({sl, a, art.anchor_x[sl] >= 0.5f, 0.0f});
+        const ImVec2 a = {i0.x + t.anchor_x(sl) * iw, i0.y + t.anchor_y(sl) * ih};
+        pos.push_back({sl, a, t.anchor_x(sl) >= 0.5f, 0.0f});
     }
     for (int side = 0; side < 2; ++side)
     {
@@ -436,19 +707,20 @@ void draw_unit_designer(const world& w, ui_state& s)
     }
 
     // ── The boxes ───────────────────────────────────────────────────────────
+    const std::size_t ncat = t.catalogue_size();
     float open_box_top = 0.0f;
     bool  open_box_right = false;
     float open_box_x = 0.0f;
     for (const slot_pos& p : pos)
     {
-        const int      sl     = p.slot;
-        const uint16_t live_it = design_fitted(w, nation, cls, sl);
-        const uint16_t fitted  = kit_item_at(cls, sl, design.fit[static_cast<std::size_t>(sl)]);
+        const int      sl      = p.slot;
+        const uint16_t live_it = t.live(sl);
+        const uint16_t fitted  = t.item_at(sl, design.fit[static_cast<std::size_t>(sl)]);
         const bool     changed = fitted != live_it;
-        const kit_item* fi    = fitted < cat.size() ? &cat[fitted] : nullptr;
-        const float    bx     = p.right ? o.x + avail.x - box_w : o.x;
-        const ImVec2   b0     = {bx, p.top};
-        const ImVec2   b1     = {bx + box_w, p.top + box_h};
+        const bool     has_fi  = fitted < ncat;
+        const float    bx      = p.right ? o.x + avail.x - box_w : o.x;
+        const ImVec2   b0      = {bx, p.top};
+        const ImVec2   b1      = {bx + box_w, p.top + box_h};
 
         ImGui::SetCursorScreenPos(b0);
         ImGui::PushID(sl);
@@ -460,16 +732,16 @@ void draw_unit_designer(const world& w, ui_state& s)
         const bool open = d.slot_open == sl;
         if (pressed)
             d.slot_open = open ? -1 : sl; // the toggle rule: the press that opened it closes it
-        if (hot && fi != nullptr && !d.confirm_close)
+        if (hot && has_fi && !d.confirm_close)
         {
             if (changed)
                 ImGui::SetTooltip("%s: %s (changed, not saved; the live design has %s)\n%s\nPress to %s the choices.",
-                                  kit_slot_name(cls, sl), fi->name,
-                                  live_it < cat.size() ? cat[live_it].name : "\xe2\x80\x94",
-                                  delta_text(fi->delta).c_str(), open ? "close" : "see");
+                                  t.slot_name(sl), t.item_name(fitted),
+                                  live_it < ncat ? t.item_name(live_it) : "\xe2\x80\x94",
+                                  t.item_delta(fitted).c_str(), open ? "close" : "see");
             else
-                ImGui::SetTooltip("%s: %s\n%s\nPress to %s the choices.", kit_slot_name(cls, sl), fi->name,
-                                  delta_text(fi->delta).c_str(), open ? "close" : "see");
+                ImGui::SetTooltip("%s: %s\n%s\nPress to %s the choices.", t.slot_name(sl), t.item_name(fitted),
+                                  t.item_delta(fitted).c_str(), open ? "close" : "see");
         }
 
         const bool  lit  = hot || d.slot_open == sl;
@@ -492,21 +764,21 @@ void draw_unit_designer(const world& w, ui_state& s)
             const char*  mark = "Changed";
             const ImVec2 ms   = ImGui::CalcTextSize(mark);
             dl->AddText({b1.x - pad - ms.x, ty}, palette::pinned, mark);
-            clipped_text(dl, {b0.x + pad, ty}, tw - ms.x - 6.0f, palette::text_secondary, kit_slot_name(cls, sl));
+            clipped_text(dl, {b0.x + pad, ty}, tw - ms.x - 6.0f, palette::text_secondary, t.slot_name(sl));
         }
         else
-            clipped_text(dl, {b0.x + pad, ty}, tw, palette::text_secondary, kit_slot_name(cls, sl));
+            clipped_text(dl, {b0.x + pad, ty}, tw, palette::text_secondary, t.slot_name(sl));
         ty += line + 2.0f;
-        clipped_text(dl, {b0.x + pad, ty}, tw, palette::selection, fi ? fi->name : "\xe2\x80\x94");
+        clipped_text(dl, {b0.x + pad, ty}, tw, palette::selection, has_fi ? t.item_name(fitted) : "\xe2\x80\x94");
         ty += line + 2.0f;
         clipped_text(dl, {b0.x + pad, ty}, tw, palette::text_secondary,
-                     fi && fi->goods_count > 0 ? delta_text(fi->delta) : "Base kit");
+                     has_fi && !t.item_is_base(fitted) ? t.item_delta(fitted) : std::string("Base kit"));
 
         unit_designer_state::drawn_box db;
         db.slot = sl;
-        db.name = kit_slot_name(cls, sl);
-        db.fitted = fi ? fi->name : "";
-        db.live = live_it < cat.size() ? cat[live_it].name : "";
+        db.name = t.slot_name(sl);
+        db.fitted = has_fi ? t.item_name(fitted) : "";
+        db.live = live_it < ncat ? t.item_name(live_it) : "";
         db.changed = changed;
         db.x = (b0.x + b1.x) * 0.5f;
         db.y = (b0.y + b1.y) * 0.5f;
@@ -523,16 +795,16 @@ void draw_unit_designer(const world& w, ui_state& s)
     }
 
     // ── The open slot's item list, beside its box, over the image ──────────
+    const std::vector<stat> now_stats = t.stats(design);
     uint16_t preview = k_no_kit_item;
     if (d.slot_open >= 0)
     {
         const int                    sl     = d.slot_open;
-        const std::vector<uint16_t>& items  = kit_items_for(cls, sl);
+        const std::vector<uint16_t>& items  = t.items(sl);
         // `fitted` is the DRAFT's item (what the box shows: the one-of-n selector's
         // choice); `live_it` is the live design's, which a pick can return to.
-        const uint16_t               fitted  = kit_item_at(cls, sl, design.fit[static_cast<std::size_t>(sl)]);
-        const uint16_t               live_it = design_fitted(w, nation, cls, sl);
-        const land_combat_stats      now     = kit_stats(cls, design);
+        const uint16_t fitted  = t.item_at(sl, design.fit[static_cast<std::size_t>(sl)]);
+        const uint16_t live_it = t.live(sl);
         const float row_h3 = 3.0f * line + 8.0f; // a locked row takes a fourth line: the node that opens it
         const float list_w = std::min(440.0f, std::max(240.0f, img_x1 - img_x0 + gap));
         const float want_h = ImGui::GetFrameHeightWithSpacing() + static_cast<float>(items.size()) * (row_h3 + line + 4.0f) + 16.0f;
@@ -545,33 +817,31 @@ void draw_unit_designer(const world& w, ui_state& s)
         ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(palette::hover));
         ImGui::BeginChild("##designer_items", {list_w, list_h}, ImGuiChildFlags_Borders);
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s \xe2\x80\x94 choose kit",
-                           kit_slot_name(cls, sl));
+                           t.slot_name(sl));
         ImDrawList* cdl = ImGui::GetWindowDrawList();
         const float rw  = ImGui::GetContentRegionAvail().x;
         for (const uint16_t id : items)
         {
-            if (id >= cat.size())
+            if (id >= ncat)
                 continue;
-            const kit_item& it  = cat[id];
-            const bool is_fit   = id == fitted;
+            const bool is_fit = id == fitted;
             // The seam's check is against the LIVE design, so it calls the live item
             // "already fitted"; in a draft that differs, the live item is a live pick
             // (it returns the slot to the live design). The draft's own item is the
             // one disabled "Fitted".
-            corp_command_result why =
-                unit_design_check(w, nation, static_cast<uint32_t>(key), static_cast<uint16_t>(sl), id);
+            corp_command_result why = t.check(sl, id);
             if (is_fit)
                 why = corp_command_result::rejected_state;
             else if (id == live_it && why == corp_command_result::rejected_state)
                 why = corp_command_result::applied;
-            const bool locked  = !kit_item_researched(w, nation, id);
+            const bool locked  = !t.researched(id);
             const bool enabled = why == corp_command_result::applied && !d.confirm_close;
             const float row_h  = locked ? row_h3 + line : row_h3;
 
             // The item's stats against the FITTED item: what this pick would change.
             unit_design probe = design;
-            probe.fit[static_cast<std::size_t>(sl)] = kit_variant_of(id);
-            const land_combat_stats diff = minus(kit_stats(cls, probe), now);
+            probe.fit[static_cast<std::size_t>(sl)] = t.variant_of(id);
+            const std::string diff = stat_delta_text(now_stats, t.stats(probe));
 
             ImGui::PushID(static_cast<int>(id));
             const ImVec2 r0 = ImGui::GetCursorScreenPos();
@@ -584,7 +854,8 @@ void draw_unit_designer(const world& w, ui_state& s)
             {
                 // A pick drafts: it changes only the open design's draft. Picking
                 // the live item clears the slot's draft, so it no longer reads changed.
-                d.draft_cls = key;
+                d.draft_cls     = key;
+                d.draft_surface = surface;
                 d.draft[static_cast<std::size_t>(sl)] = id == live_it ? k_no_kit_item : id;
                 d.last_message.clear();
             }
@@ -592,10 +863,10 @@ void draw_unit_designer(const world& w, ui_state& s)
             {
                 preview = id;
                 if (!enabled)
-                    ImGui::SetTooltip("%s", refusal_text(why, it).c_str());
+                    ImGui::SetTooltip("%s", refusal_text(why, t.research_node(id)).c_str());
             }
 
-            // Line 1: name, then the badge — Fitted or LOCKED — at the right.
+            // Line 1: name, then the badge — Fitted, LOCKED or Saved — at the right.
             const float tx = r0.x + 6.0f;
             const bool  is_live = id == live_it && !is_fit; // the saved item, when the draft moved off it
             const char* badge = is_fit ? "Fitted" : locked ? "LOCKED" : is_live ? "Saved" : nullptr;
@@ -608,26 +879,26 @@ void draw_unit_designer(const world& w, ui_state& s)
                 cdl->AddText({bp.x + 2.0f, bp.y}, bc, badge);
             }
             clipped_text(cdl, {tx, r0.y + 3.0f}, rw - badge_w - 14.0f,
-                         locked ? palette::text_secondary : palette::selection, it.name);
+                         locked ? palette::text_secondary : palette::selection, t.item_name(id));
             // Line 2: what it changes against the fitted item.
             clipped_text(cdl, {tx, r0.y + 3.0f + line}, rw - 12.0f, palette::text_secondary,
-                         is_fit ? std::string("Fitted now") : delta_text(diff));
-            // Line 3: goods per unit. Line 4, when locked: the node that opens it.
+                         is_fit ? std::string("Fitted now") : diff);
+            // Line 3: goods per unit / wing. Line 4, when locked: the node that opens it.
             clipped_text(cdl, {tx, r0.y + 3.0f + 2.0f * line}, rw - 12.0f, palette::text_secondary,
-                         item_goods_text(it) + " per unit");
+                         t.item_goods(id) + " per " + t.per());
             if (locked)
                 clipped_text(cdl, {tx, r0.y + 3.0f + 3.0f * line}, rw - 12.0f, palette::negative,
-                             "Needs research " + node_text(it.research_node));
+                             "Needs research " + node_text(t.research_node(id)));
 
             unit_designer_state::drawn_item di;
             di.item = id;
-            di.name = it.name;
+            di.name = t.item_name(id);
             di.x = r0.x + rw * 0.5f;
             di.y = r0.y + row_h * 0.5f;
             di.fitted = is_fit;
             di.enabled = enabled;
             di.locked = locked;
-            di.reason = refusal_text(why, it);
+            di.reason = refusal_text(why, t.research_node(id));
             d.items.push_back(di);
         }
         ImGui::EndChild();
@@ -638,51 +909,38 @@ void draw_unit_designer(const world& w, ui_state& s)
     ImGui::SetCursorScreenPos({o.x, o.y + main_h + 6.0f});
     ImGui::Separator();
     {
-        const land_combat_stats now = unit_designer_draft_stats(w, s, nation, cls);
         unit_design next = design;
         const bool has_preview = preview != k_no_kit_item && d.slot_open >= 0 && !d.confirm_close
-                              && kit_variant_of(preview) != design.fit[static_cast<std::size_t>(d.slot_open)];
+                              && t.variant_of(preview) != design.fit[static_cast<std::size_t>(d.slot_open)];
         if (has_preview)
-            next.fit[static_cast<std::size_t>(d.slot_open)] = kit_variant_of(preview);
-        const land_combat_stats then = kit_stats(cls, next);
+            next.fit[static_cast<std::size_t>(d.slot_open)] = t.variant_of(preview);
+        const std::vector<stat> then = t.stats(next);
 
-        struct stat_col { const char* name; int a, b; bool pct; };
-        const stat_col cols[] = {
-            {"Soft attack", now.soft, then.soft, false},
-            {"Hard attack", now.hard, then.hard, false},
-            {"Defence", now.defence, then.defence, false},
-            {"Breakthrough", now.breakthrough, then.breakthrough, false},
-            {"Hardness", now.hardness, then.hardness, true},
-        };
-        const float col_w = avail.x / 5.0f;
+        const int   n     = static_cast<int>(now_stats.size());
+        const float col_w = avail.x / static_cast<float>(std::max(1, n));
         const float x0    = ImGui::GetCursorPosX();
-        for (int i = 0; i < 5; ++i)
+        for (int i = 0; i < n; ++i)
         {
             if (i) ImGui::SameLine(x0 + col_w * static_cast<float>(i));
-            const stat_col& c = cols[i];
-            const int a = c.pct ? (c.a + 5) / 10 : c.a;
-            const int b = c.pct ? (c.b + 5) / 10 : c.b;
-            if (has_preview && c.a != c.b)
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(c.b > c.a ? palette::positive : palette::negative),
-                                   "%s %d%s \xe2\x86\x92 %d%s", c.name, a, c.pct ? "%" : "", b, c.pct ? "%" : "");
+            const stat& c  = now_stats[static_cast<std::size_t>(i)];
+            const int   cb = then[static_cast<std::size_t>(i)].value;
+            const int   a  = c.pct ? (c.value + 5) / 10 : c.value;
+            const int   b  = c.pct ? (cb + 5) / 10 : cb;
+            if (has_preview && c.value != cb)
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(cb > c.value ? palette::positive : palette::negative),
+                                   "%s %d%s \xe2\x86\x92 %d%s", c.label, a, c.pct ? "%" : "", b, c.pct ? "%" : "");
             else
-                ImGui::Text("%s %d%s", c.name, a, c.pct ? "%" : "");
+                ImGui::Text("%s %d%s", c.label, a, c.pct ? "%" : "");
         }
-        const std::string goods_now = design_goods_text(kit_goods(cls, design));
+        const std::string goods_now = t.design_goods(design);
         if (has_preview)
-            ImGui::TextDisabled("Kit goods per unit: %s  \xe2\x86\x92  %s", goods_now.c_str(),
-                                design_goods_text(kit_goods(cls, next)).c_str());
+            ImGui::TextDisabled("Kit goods per %s: %s  \xe2\x86\x92  %s", t.per(), goods_now.c_str(),
+                                t.design_goods(next).c_str());
         else
-            ImGui::TextDisabled("Kit goods per unit: %s", goods_now.c_str());
+            ImGui::TextDisabled("Kit goods per %s: %s", t.per(), goods_now.c_str());
 
         // The save model, said once: a pick drafts; Save makes it the live design.
-        char stale[200];
-        if (d.stale_units > 0)
-            std::snprintf(stale, sizeof stale, "%d unit%s in the field on an older design \xe2\x80\x94 refit from the unit card.",
-                          d.stale_units, d.stale_units == 1 ? "" : "s");
-        else
-            std::snprintf(stale, sizeof stale, "A pick is a draft. Save makes it the live design: new units are raised with it, units in the field take it by refit.");
-        ImGui::TextDisabled("%s", stale);
+        ImGui::TextDisabled("%s", d.stale_units > 0 ? t.stale_text(d.stale_units).c_str() : t.model_text().c_str());
 
         // The Save / Revert row. Both act on the whole draft; both are live only
         // while a slot is changed. Actions, not states, so the toggle rule does
@@ -699,7 +957,8 @@ void draw_unit_designer(const world& w, ui_state& s)
         if (ImGui::Button("Revert"))
         {
             clear_draft(d);
-            d.draft_cls = key;
+            d.draft_cls     = key;
+            d.draft_surface = surface;
             d.last_message.clear();
         }
         {
@@ -737,7 +996,7 @@ void draw_unit_designer(const world& w, ui_state& s)
         ImGui::PushStyleColor(ImGuiCol_Border, ImGui::ColorConvertU32ToFloat4(palette::pinned));
         ImGui::BeginChild("##designer_close_prompt", {pw, ph}, ImGuiChildFlags_Borders);
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Unsaved changes to the %s design",
-                           class_label(cls));
+                           t.class_label());
         ImGui::TextDisabled("%d slot%s changed. Save them before closing?", d.changed_slots,
                             d.changed_slots == 1 ? "" : "s");
         auto press = [](const char* label, float& x, float& y) {
