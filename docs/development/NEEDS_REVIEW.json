@@ -301,6 +301,16 @@
    "source": "main session (Ben land battle form 2026-10-29)",
    "what": "(1) The quarterly supply share arrives as a DAILY resupply of share x daily need, not one quarterly top-up - a quarterly refill dips below full the day after, so the flat hunger penalty would apply almost always. (2) The round reads the three carried stocks; supply_factor_permille no longer scales hits directly, it only sets the resupply rate. (3) Air superiority adds recon in proportion to its share rather than making revealed units fully visible, so superiority alone does not settle every battle. Also: the stat grid replaces the unit card's Strength and Roster pages.",
    "why_it_matters": "Each changes how strong a supplied, a half-supplied and an air-covered army is. Written into MILITARY.md § Carried supplies, § Recon and § Air, ledgers/military.md § The stat grid, SELECTION.md. Work: BL-1452 (carried supplies), BL-1453 (land recon), BL-1454 (unit stat grid)."
+  },
+  {
+   "raised": "2026-10-29",
+   "status": "open",
+   "id": "NR-1098",
+   "kind": "decision",
+   "title": "Terrain and the classes: four readings the build took",
+   "source": "BL-1455 (terrain class modifiers) lane, cold review 2026-10-29",
+   "what": "(a) Wear is x1.5 equipment drain - the ruling named the cells but no rate. (b) \"Blocked unless roaded\" means any road edge on the tile, so armour may enter a mountain tile from a roadless side if some road touches it. (c) The move rows change a march's days but not its route: the path stays the shared terrain-weighted one, so medium armour may be routed through forest at x1.5 when a faster route for it exists. (d) Pre-modern rows (no land class) read none of the rows, not even the open-ground stealth x0.75 the doc gives every unit. Also: carriers dismount even on a mountain road, as the doc reads.",
+   "why_it_matters": "(b) and (c) decide whether terrain shapes WHERE armour goes or only how slowly; (c) in particular lets an armoured column walk into a forest debuff it could have avoided. Written into MILITARY.md § Terrain and the classes. Work: BL-1455 (terrain class modifiers)."
   }
  ]
 }
