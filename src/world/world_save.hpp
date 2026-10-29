@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+struct military_capability_params; // recipe_registry.hpp (BL-1455: the load-time step-off's walls)
+
 // ---------------------------------------------------------------------------
 // World snapshot -- the flat-binary save (BL-536)
 // ---------------------------------------------------------------------------
@@ -747,8 +749,12 @@ void write_world_snapshot_pre_air(const world& w, std::ostream& out);
 ///
 /// @param w  Destination world, untouched unless the whole read succeeds.
 /// @param in Source stream, opened binary.
+/// @param mil BL-1455 (terrain and the classes): the class terrain rows, when the
+///            caller holds a registry. A pre-v63 stream's shared tiles step their units
+///            off by the retreat rule (`resolve_shared_tiles`), and with the rows given
+///            no unit steps onto a tile its class cannot enter. Null = no class walls.
 /// @return   True if the snapshot was read whole; false on any rejection.
-bool read_world_snapshot(world& w, std::istream& in);
+bool read_world_snapshot(world& w, std::istream& in, const military_capability_params* mil = nullptr);
 
 /// Drop every derived cache on @p w so the next read of each rebuilds.
 ///

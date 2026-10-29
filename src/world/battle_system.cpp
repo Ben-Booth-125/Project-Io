@@ -56,10 +56,21 @@ terrain_pick tile_ground(const world& w, entity_id tile)
 
 /// A side's combatants, in the side's own (ascending unit id) order, every unit
 /// with men standing.
-std::vector<land_combatant> build_combatants(const world& w, const std::vector<entity_id>& units)
+///
+/// With @p mil and @p ground given (BL-1455, terrain and the classes), each unit's
+/// fight scale on the battle's ground - by its OWN class, either side, a road there
+/// halving the debuff - is written into `land_combatant::terrain`, where the round
+/// reads it beside morale and supply. Without them every unit fights at 1000.
+std::vector<land_combatant> build_combatants(const world& w, const std::vector<entity_id>& units,
+                                             const military_capability_params* mil = nullptr,
+                                             entity_id ground = null_entity)
 {
     std::vector<land_combatant> out;
     out.reserve(units.size());
+    const tile_component* ground_tc = nullptr;
+    if (mil != nullptr && ground != null_entity)
+        if (const auto git = w.tiles.find(ground); git != w.tiles.end())
+            ground_tc = &git->second;
     for (const entity_id uid : units)
     {
         const auto it = w.units.find(uid);
@@ -73,6 +84,8 @@ std::vector<land_combatant> build_combatants(const world& w, const std::vector<e
         c.morale    = std::clamp(u.morale_permille, 0, 1000);
         c.supply    = std::clamp(u.supply_factor_permille, 0, 1000);
         c.stats     = unit_land_stats(u);
+        if (ground_tc != nullptr)
+            c.terrain = terrain_fight_permille(terrain_class_effects_for_type(*mil, u.type, *ground_tc));
         out.push_back(c);
     }
     return out;
@@ -138,8 +151,11 @@ void move_morale(world& w, const std::vector<entity_id>& units, int delta)
 /// With @p province_term false (`resolve_shared_tiles`: a step off a shared tile,
 /// with no battle and so no province to leave) the province preference is dropped
 /// and only the own-ground preference and the tie-break remain.
+/// With @p mil given (BL-1455, terrain and the classes), a neighbour the unit's class
+/// cannot enter - blocked unless roaded, with no road - is never the step.
 entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
-                       const std::set<entity_id>& foreign_tiles, bool province_term = true)
+                       const std::set<entity_id>& foreign_tiles, bool province_term = true,
+                       const military_capability_params* mil = nullptr)
 {
     const auto here = w.tiles.find(u.position);
     if (here == w.tiles.end())
@@ -158,6 +174,8 @@ entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
         const auto tit = w.tiles.find(n);
         if (tit == w.tiles.end() || is_water(tit->second.substrate))
             continue;
+        if (mil != nullptr && terrain_class_effects_for_type(*mil, u.type, tit->second).walled)
+            continue; // a retreat never steps onto ground its class cannot enter
         const auto nat  = w.tile_to_nation.find(n);
         const int  rank = (province_term && w.provinces.province_of(n) != province ? 2 : 0)
                         + (nat != w.tile_to_nation.end() && nat->second == u.owner ? 1 : 0);
@@ -178,7 +196,7 @@ entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
 /// the order units retreat in cannot change where they go (a side is one nation, so
 /// its own units sharing a tile is a stack, never a breach). @return units retreated.
 int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint32_t province,
-                 bool all, const campaign_battle_params& p)
+                 bool all, const campaign_battle_params& p, const military_capability_params* mil)
 {
     std::vector<entity_id> leaving;
     for (const entity_id uid : units)
@@ -195,7 +213,7 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
     for (const entity_id uid : leaving)
     {
         unit_component& u = w.units.at(uid);
-        if (const entity_id to = retreat_tile(w, u, province, foreign); to != null_entity)
+        if (const entity_id to = retreat_tile(w, u, province, foreign, true, mil); to != null_entity)
             u.position = to;
         u.order           = movement_order{};
         u.morale_permille = std::clamp(u.morale_permille - p.morale_loss, 0, 1000);
@@ -465,10 +483,52 @@ std::set<entity_id> foreign_held_tiles(const world& w, entity_id owner)
     return out;
 }
 
+std::function<bool(const tile_component&)> class_wall(const military_capability_params& mil,
+                                                      uint16_t type)
+{
+    // NO BLOCKING ROW, NO WALL: an empty function, so march_path keeps its old fast
+    // path (no avoiding search) for a class the ground never walls, and for every
+    // class when no rows are loaded.
+    const auto& table = unit_roster_table();
+    if (type >= table.size() || table[type].land == k_land_class_from_cls)
+        return {};
+    const int ci = static_cast<int>(table[type].land);
+    if (ci < 0 || ci >= land_class_count)
+        return {};
+    bool any = false;
+    for (const terrain_class_row& r : mil.terrain.rows[static_cast<std::size_t>(ci)])
+        any = any || r.blocked_unless_roaded;
+    if (!any)
+        return {};
+    return [&mil, type](const tile_component& t) {
+        return terrain_class_effects_for_type(mil, type, t).walled;
+    };
+}
+
+terrain_class_effect unit_terrain_effects(const world& w, const military_capability_params& mil,
+                                          const unit_component& u)
+{
+    const auto it = w.tiles.find(u.position);
+    if (it == w.tiles.end())
+        return terrain_class_effect{};
+    return terrain_class_effects_for_type(mil, u.type, it->second);
+}
+
 std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, entity_id dest,
-                                  const std::set<entity_id>& blocked)
+                                  const std::set<entity_id>& blocked,
+                                  const std::function<bool(const tile_component&)>* wall)
 {
     std::vector<entity_id> path;
+    // BL-1455: a destination the class cannot enter is no destination at all.
+    const bool walls = wall != nullptr && static_cast<bool>(*wall);
+    const auto walled = [&](entity_id t) {
+        if (!walls)
+            return false;
+        const auto it = w.tiles.find(t);
+        return it != w.tiles.end() && (*wall)(it->second);
+    };
+    if (walls && dest != from && walled(dest))
+        return path;
     {
         const logistics_path& p = intra_body_path(w, body, from, dest);
         if (p.reachable && !p.tiles.empty())
@@ -480,11 +540,12 @@ std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, enti
     }
     bool clear = !path.empty();
     for (std::size_t i = 1; clear && i + 1 < path.size(); ++i)
-        clear = blocked.count(path[i]) == 0;
-    if (clear || blocked.empty())
+        clear = blocked.count(path[i]) == 0 && !walled(path[i]);
+    if (clear || (blocked.empty() && !walls))
         return path;
 
-    const logistics_path p = intra_body_path_avoiding(w, body, from, dest, blocked);
+    const logistics_path p = intra_body_path_avoiding(w, body, from, dest, blocked,
+                                                      walls ? wall : nullptr);
     path.clear();
     if (p.reachable && !p.tiles.empty())
     {
@@ -639,7 +700,7 @@ int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks)
     return opened;
 }
 
-shared_tile_fix resolve_shared_tiles(world& w)
+shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params* mil)
 {
     shared_tile_fix out;
     // tile -> standing units there, ascending id (the map and the sorted walk).
@@ -674,7 +735,7 @@ shared_tile_fix resolve_shared_tiles(world& w)
             // Read as the world stands NOW: earlier step-offs count, so no step lands a
             // second nation anywhere.
             const std::set<entity_id> foreign = foreign_held_tiles(w, u.owner);
-            const entity_id to = retreat_tile(w, u, 0, foreign, false);
+            const entity_id to = retreat_tile(w, u, 0, foreign, false, mil);
             if (to != null_entity)
             {
                 u.position = to;
@@ -714,7 +775,8 @@ shared_tile_fix resolve_shared_tiles(world& w)
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
 {
     battle_tick out;
-    (void)reg; // the resolver's tuning is campaign_battle_params, not the registry
+    // The resolver's tuning is campaign_battle_params, not the registry; the registry
+    // supplies the class terrain rows (BL-1455): the fight scale and the retreat's walls.
     const campaign_battle_params params{};
 
     (void)tick; // a battle's stream was seeded when it opened (open_tile_battle)
@@ -731,8 +793,9 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
 
         // The side's units AS THEY STAND NOW: men lost, readiness spent and supply
         // moved since the last batch all carry into this one.
-        std::vector<land_combatant> atk = build_combatants(w, b.attacker_units);
-        std::vector<land_combatant> def = build_combatants(w, b.defender_units);
+        // BL-1455: each unit's fight scale on the battle ground (the defended tile).
+        std::vector<land_combatant> atk = build_combatants(w, b.attacker_units, &reg.military(), b.tile);
+        std::vector<land_combatant> def = build_combatants(w, b.defender_units, &reg.military(), b.tile);
 
         const int before_a = b.state.attacker_strength_permille;
         const int before_d = b.state.defender_strength_permille;
@@ -776,9 +839,9 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         // A spent unit leaves the fight one tile away from its enemies; a side that
         // withdrew leaves whole.
         retreat_side(w, b.attacker_units, b.attacker, b.province,
-                     left == withdrawing_side::attacker, params);
+                     left == withdrawing_side::attacker, params, &reg.military());
         retreat_side(w, b.defender_units, b.defender, b.province,
-                     left == withdrawing_side::defender, params);
+                     left == withdrawing_side::defender, params, &reg.military());
 
         // The strength reading follows the units STILL IN the fight, so the next
         // withdrawal price and phase are read against the force that is there, not
@@ -895,6 +958,12 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                                 continue; // it retreated: it is not the one who took the tile
                             const auto it = w.units.find(uid);
                             if (it == w.units.end() || it->second.count <= 0)
+                                continue;
+                            // BL-1455: never onto ground the unit's class cannot enter (its
+                            // march refused such a tile, so this guards a road lost mid-fight).
+                            if (const auto tt = w.tiles.find(b.tile); tt != w.tiles.end()
+                                && terrain_class_effects_for_type(reg.military(), it->second.type,
+                                                                  tt->second).walled)
                                 continue;
                             it->second.position = b.tile;
                             it->second.order    = movement_order{};

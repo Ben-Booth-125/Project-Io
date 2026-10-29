@@ -11,6 +11,7 @@
 #include "nation_tax.hpp"       // BL-1335: tax_params — the tax tiers and Discontent dials
 #include "air_params.hpp"  // BL-1449: air_params — the air theatre's authored numbers
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
+#include "terrain_class.hpp" // BL-1455: terrain_class_params — the per-class terrain rows
 
 #include <array>
 #include <cstdint>
@@ -819,6 +820,14 @@ struct military_capability_params
     /// unit moves under § The campaign force model's Sea, not this land table). A
     /// composite unit (BL-472, not built here) reads its SLOWEST member's entry.
     std::array<float, unit_class_count> march_days_per_cls = {};
+
+    /// TERRAIN AND THE CLASSES (Ben, 2026-10-29; MILITARY.md § Terrain and the classes;
+    /// BL-1455). A row per (land class, terrain) - move, blocked unless roaded, dismount,
+    /// fight, wear, stealth - plus the open-ground stealth rule. Authored under
+    /// `economy.military.terrain_class` and `economy.military.terrain_open_ground_stealth`;
+    /// read through `terrain_class_effects` (terrain_class.hpp), never cell by cell.
+    /// Absent = every cell neutral = ground treats every class alike.
+    terrain_class_params terrain = {};
 
     // RETIRED (BL-1352): `active_lp_per_anchor_tick`, the per-anchor rate of the
     // second Logistic Point system. A march now draws the HOST NATION's pool —

@@ -124,6 +124,7 @@ const char* result_name(corp_command_result r)
         case corp_command_result::rejected_cooldown:        return "rejected_cooldown";
         case corp_command_result::rejected_no_lp:           return "rejected_no_lp";
         case corp_command_result::rejected_wrong_air:       return "rejected_wrong_air";
+        case corp_command_result::rejected_terrain:         return "rejected_terrain"; // BL-1455
     }
     return "result?";
 }

@@ -226,6 +226,10 @@ struct land_combatant
     int               readiness = 1000; ///< Per-mille. Mutated by the round; 0 = out of the fight.
     int               morale    = 1000; ///< Per-mille. Scales the hits this unit deals.
     int               supply    = 1000; ///< Per-mille. Scales the hits this unit deals.
+    /// Per-mille. BL-1455 (terrain and the classes): the unit's class's fight scale on
+    /// the battle ground, a road there halving the debuff (`terrain_fight_permille`).
+    /// Scales its soft and hard hits AND its defence and breakthrough. 1000 = no effect.
+    int               terrain   = 1000;
     land_combat_stats stats{};          ///< unit_land_stats(), resolved at build.
 };
 

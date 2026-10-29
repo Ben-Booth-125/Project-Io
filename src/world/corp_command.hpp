@@ -9,6 +9,7 @@
 
 struct world;
 class recipe_registry;
+struct military_capability_params; // recipe_registry.hpp (BL-1455: march_check's class walls)
 
 // ---------------------------------------------------------------------------
 // Corp-command seam (BL-202, docs/ai/AI_OPPONENT.md § 6)
@@ -415,6 +416,7 @@ enum class corp_command_result : uint8_t
     rejected_cooldown,        ///< BL-430: economy.recipe_switch's cooldown has not elapsed on this building.
     rejected_no_lp,           ///< BL-597: no passive Logistic Points at the source anchor for this leg.
     rejected_wrong_air,       ///< The recipe cannot run on this body's air: propellant_electrolysis only on an airless body, propellant_atmospheric only under air (Ben, 2026-10-09).
+    rejected_terrain,         ///< BL-1455: the unit's class cannot enter the destination, or every route to it crosses ground the class cannot enter without a road (MILITARY.md § Terrain and the classes).
 };
 
 /// Refit to a newer type (Ben, 2026-10-27): the credits a refit of a unit of row
@@ -456,9 +458,15 @@ corp_command_result unit_design_check(const world& w, entity_id nation, uint32_t
 /// (rejected_invalid). @p assume_hostile, when named, is read as hostile already (a
 /// declare the caller is about to make). `applied` means the verb would apply; the
 /// path it would order is written to @p out_path when given.
+///
+/// With @p mil given (BL-1455, terrain and the classes), the path is solved around the
+/// unit's class's walls (`class_wall`), and an order with no legal route because of
+/// them - a walled destination, or every route crossing a wall - is
+/// `rejected_terrain`. `apply_corp_command` always passes the registry's.
 corp_command_result march_check(world& w, entity_id actor, entity_id unit, entity_id tile,
                                 entity_id assume_hostile = null_entity,
-                                std::vector<entity_id>* out_path = nullptr);
+                                std::vector<entity_id>* out_path = nullptr,
+                                const military_capability_params* mil = nullptr);
 
 /// Apply one command through the player-grade seams. Deterministic; a rejected
 /// command mutates nothing. `out_building` (optional) receives the entity id a

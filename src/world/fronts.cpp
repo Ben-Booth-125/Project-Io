@@ -5,6 +5,7 @@
 #include "hex_neighbors.hpp"
 #include "logistics.hpp"     // body_tile_grid (warming the raster)
 #include "province.hpp"
+#include "recipe_registry.hpp" // BL-1455: the class terrain rows a front's slot and target read
 #include "stance.hpp"        // is_hostile
 #include "unit_roster.hpp"   // unit_strength
 #include "world.hpp"
@@ -693,22 +694,62 @@ void advance_fronts(world& w, const recipe_registry& reg)
         // unit i (ascending id) takes slot i. A unit is on its slot when it stands
         // ON the slot tile — every march ends on its tile (2026-10-27).
         const std::size_t n = uids.size(), len = f->span.size();
-        const auto slot_of = [&](std::size_t i) { return f->span[((2 * i + 1) * len) / (2 * n)]; };
+        const auto slot_index = [&](std::size_t i) { return ((2 * i + 1) * len) / (2 * n); };
+        const auto slot_of = [&](std::size_t i) { return f->span[slot_index(i)]; };
+
+        // TERRAIN AND THE CLASSES (BL-1455; MILITARY.md § Terrain and the classes): a
+        // front routes as a march does, so a tile the unit's class cannot enter (blocked
+        // unless roaded, no road) is never its slot or its target. `walled_for` is the
+        // class's wall test; an empty test (a class the ground never walls) walls nothing.
+        using wall_fn = std::function<bool(const tile_component&)>;
+        const auto walled_for = [&](const wall_fn& wall, entity_id t) {
+            if (!wall)
+                return false;
+            const auto it = w.tiles.find(t);
+            return it != w.tiles.end() && wall(it->second);
+        };
+
+        // HOLD: the slot is the span tile at the unit's index; on a walled slot, the
+        // nearest UNWALLED span tile by index (ties to the lower index). A unit with no
+        // unwalled slot on the span holds where it stands - halted once, never
+        // re-issued daily. (A legal slot the march refuses for another reason - another
+        // landmass - is asked again next day, as before.)
         const auto hold = [&](std::size_t i) {
             const entity_id uid = uids[i];
             const unit_component& u = w.units.at(uid);
             if (busy(uid, u))
                 return;
-            const entity_id slot = slot_of(i);
-            if (u.position == slot)
+            const wall_fn wall = class_wall(reg.military(), u.type);
+            const std::size_t s = slot_index(i);
+            std::vector<entity_id> slots; // nearest first, ties to the lower index
+            slots.reserve(len);
+            for (std::size_t d = 0; d < len; ++d)
             {
-                if (u.order.dest != null_entity)
-                    issue(uid, nk.first, corp_verb::halt_unit, null_entity);
+                if (d > s && s + d >= len)
+                    break;
+                if (d <= s)
+                    slots.push_back(f->span[s - d]);
+                if (d > 0 && s + d < len)
+                    slots.push_back(f->span[s + d]);
+            }
+            for (const entity_id slot : slots)
+            {
+                if (walled_for(wall, slot))
+                    continue;
+                if (u.position == slot)
+                {
+                    if (u.order.dest != null_entity)
+                        issue(uid, nk.first, corp_verb::halt_unit, null_entity);
+                    return;
+                }
+                if (u.order.dest == slot)
+                    return;
+                issue(uid, nk.first, corp_verb::march_unit, slot);
                 return;
             }
-            if (u.order.dest == slot)
-                return;
-            issue(uid, nk.first, corp_verb::march_unit, slot);
+            // No legal slot: hold where it stands.
+            if (u.order.dest != null_entity)
+                issue(uid, nk.first, corp_verb::halt_unit, null_entity);
         };
 
         if (push)
@@ -730,29 +771,43 @@ void advance_fronts(world& w, const recipe_registry& reg)
                 if (owner_of(w, u.position) == f->neighbour)
                     continue; // on the neighbour's ground: it holds what it took
                 const entity_id slot = slot_of(i);
-                entity_id target = null_entity;
-                int64_t   best_s = std::numeric_limits<int64_t>::max();
-                int       best_d = std::numeric_limits<int>::max();
-                for (const auto& [t, st] : held) // ascending id: the first of a tie wins
+                // The targets in the push's order: weakest stack, then nearest the slot,
+                // then the lower tile id. BL-1455: a target the unit's class cannot
+                // enter is skipped, and a target whose every route crosses its walls
+                // (rejected_terrain) gives way to the next; the first legal one wins.
+                struct ranked { int64_t s; int d; entity_id t; };
+                std::vector<ranked> order;
+                order.reserve(held.size());
+                for (const auto& [t, st] : held)
+                    order.push_back({ st, hex_distance(w, slot, t), t });
+                std::sort(order.begin(), order.end(), [](const ranked& a, const ranked& b) {
+                    if (a.s != b.s) return a.s < b.s;
+                    if (a.d != b.d) return a.d < b.d;
+                    return a.t < b.t;
+                });
+                const wall_fn wall = class_wall(reg.military(), u.type);
+                bool done = false;
+                for (const ranked& r : order)
                 {
-                    const int d = hex_distance(w, slot, t);
-                    if (st < best_s || (st == best_s && d < best_d))
+                    if (walled_for(wall, r.t))
+                        continue;
+                    if (u.order.dest == r.t)
                     {
-                        target = t;
-                        best_s = st;
-                        best_d = d;
+                        done = true; // already on its way
+                        break;
                     }
+                    const corp_command_result res = issue(uid, nk.first, corp_verb::march_unit, r.t);
+                    if (res == corp_command_result::applied)
+                    {
+                        done = true;
+                        break;
+                    }
+                    if (res != corp_command_result::rejected_terrain)
+                        break; // another landmass and the like: hold, as before
                 }
-                if (target == null_entity)
-                {
-                    hold(i); // nothing left to push onto: hold the slot
-                    continue;
-                }
-                if (u.order.dest == target)
-                    continue;
-                // A unit that cannot reach the target (another landmass) holds its
-                // slot rather than standing idle (cold review, 2026-10-27).
-                if (issue(uid, nk.first, corp_verb::march_unit, target) != corp_command_result::applied)
+                // Nothing left to push onto, or no target reachable: hold the slot
+                // rather than stand idle (cold review, 2026-10-27).
+                if (!done)
                     hold(i);
             }
             continue;

@@ -964,7 +964,8 @@ bool write_save_game(const std::string& path, const world& w, const save_envelop
     return static_cast<bool>(out); // one check for the whole file, not one per field
 }
 
-bool read_save_game(const std::string& path, world& w, save_envelope& env)
+bool read_save_game(const std::string& path, world& w, save_envelope& env,
+                    const military_capability_params* mil)
 {
     std::ifstream in(path, std::ios::binary);
     if (!in)
@@ -985,7 +986,7 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env)
     world         scratch_world;
     save_envelope scratch_env;
 
-    if (!read_world_snapshot(scratch_world, in))
+    if (!read_world_snapshot(scratch_world, in, mil))
         return false;
     if (!r_envelope(in, scratch_env, version))
         return false;
