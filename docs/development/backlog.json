@@ -1206,6 +1206,36 @@
    ],
    "title": "Unit stat grid on the unit card and in the designer, with signed deltas while editing",
    "design": "Written in docs/ui/ledgers/military.md § The stat grid and SELECTION.md § The unit element's layout (Ben, 2026-10-29). One shared grid: HP, readiness, morale, food, ammunition, equipment, soft, hard, defence, breakthrough, hardness, recon, stealth, speed. Unit card: class image left, grid fills the centre (Strength and Roster pages fold in). Designer: bottom right, design stats only, signed +/- deltas against the live design for the draft and the hovered item. Rival unit: design stats only once seen (battle or recon), internals hidden. Needs a live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-29",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben terrain modifier form 2026-10-29)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1455",
+   "short_name": "TERRAIN_CLASS_MODIFIERS",
+   "priority": "A",
+   "difficulty": 3,
+   "requires": [
+    "BL-1445"
+   ],
+   "files": [
+    "src/world/recipe_registry.hpp",
+    "src/world/recipe_registry.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/campaign_battle.cpp",
+    "src/world/battle_system.cpp",
+    "src/world/logistics.cpp",
+    "scripts/economy.lua"
+   ],
+   "title": "Terrain and the classes: per-class terrain rows - blocked unless roaded, march multiplier, fight debuff, equipment wear, terrain stealth",
+   "design": "Written in MILITARY.md § Terrain and the classes (Ben, 2026-10-29). Per land class x terrain (mountain, canyon/rift landforms; marsh, desert=dunes, forest, urban, snow covers) up to four effects: move multiplier on march days; blocked unless the tile has a road (refuses entry, never exit); fight scale on soft/hard attack, defence and breakthrough when the defended tile is that terrain, each unit by its own class, halved by a road on the defended tile; equipment wear (faster daily equipment drain, the carried-supplies stock). Motorised/mechanised infantry dismount to foot pace on mountain/canyon/rift. Medium armour blocked in desert unless roaded, -30% there. Worst row only when a tile matches two. Stealth: infantry x1.5 in forest/urban; open ground (plains/highland with no concealing cover) x0.75 for every unit. Authored rows in economy.military beside the march days, loader-checked. A block is a per-class wall in march_path: orders route around it or are refused with the reason; a retreat never steps onto a tile its class cannot enter. Wear lands on BL-1452 (carried supplies) and stealth on BL-1453 (land recon): it composes with whichever is merged first and owes the other its hook at merge. A harness; ACTIONS.json march preconditions name the refusal."
   }
  ]
 }

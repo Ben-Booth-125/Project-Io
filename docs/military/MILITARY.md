@@ -97,7 +97,6 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 
 | Field | Default | Meaning |
 |---|---|---|
-| `max_rounds` | 6 | Rounds before the fight is called a stalemate |
 | `swing_permille` | 600 | Half-width of the per-round power swing — a uniform draw in [400, 1600] |
 | `absorbed_land_permille` | 250 | Share at which hits within the target's defence (or breakthrough) land; hits beyond it land in full |
 | `hp_share_permille` | 300 | Share of landed damage that kills men; the rest spends readiness |
@@ -121,17 +120,23 @@ dear, and breaking a defender takes about 2:1 in men — decisive 0% at 1:1, 15%
 1.75:1, 89% at 2:1, 99% from 2.5:1. `swing_permille` stays at 600 (NR-204: a narrower swing made the
 edge too safe).
 
-**A battle lasts days.** At one round a day against `max_rounds` 6, a fight is over in at most six
-days. Measured through the daily pass (`move_by_days_harness` D6, infantry on plains, 40 openings a
-ratio, days from contact to close): **about five days at parity** (4.9), 5.6 at 1.5:1, 3.7 at 2:1 and
-2.1 at 3:1 — the curve's mean rounds, a round a day. The round's damage is calibrated to the day:
-one round is one day's fighting, so the per-round numbers above are a day's. A commander
-gets a decision every day of the fight — a withdrawal is honoured at the next day's boundary —
-rather than one between two quarters.
+**A battle has no maximum duration (Ben, 2026-10-29).** *"They continue while one unit is trying
+to move and end when readiness runs out. Some battles may easily take 90-180 days."* A battle runs
+for as long as the attacking side still holds its order to move onto the defended tile, and it ends
+only when a side's readiness is spent (broken) or a side withdraws. Cancelling the attacker's move
+is the withdrawal verb, priced as any withdrawal. There is no round cap and no stalemate by
+exhaustion of rounds: the recon ramp (§ Recon, full vision by day 20) always completes inside a
+battle. **A battle is weeks long, not days (Ben, 2026-10-29):** the daily round's readiness
+damage is scaled so that a battle at parity runs about **30–60 days**, one at 1.5:1 runs longer
+still, and a rout stays fast. **Breaking a defender takes about 1.5:1 in men** (Ben, 2026-10-29,
+keeping the ratio the uncapped battle produced). The round's damage is calibrated to the day — one round is one day's fighting, so the
+per-round numbers above are a day's — and a commander gets a decision every day of the fight, a
+withdrawal honoured at the next day's boundary.
 
 **Withdrawal is a first-class verb, not a failure state**, and it is never free. The cost has three
 terms — base, per-round, and pursuit — and the second and third are what make a late break-off
-dear. Rounds already fought have separately cost their own attrition, so a late exit is expensive
+dear. Because a battle has no cap, the per-round term is bounded so that a late exit stays dear but
+never costs more men than the side has. Rounds already fought have separately cost their own attrition, so a late exit is expensive
 twice over.
 
 Withdrawing consumes **no draws** — disengaging is a decision, not another gamble.
@@ -142,7 +147,8 @@ side still took and dealt that round's damage. Both breaking at once resolves in
 favour, consistent with every other tie across both paths.
 
 Ends are enumerated: `attacker_broken`, `defender_broken`, `attacker_withdrew`,
-`defender_withdrew`, `stalemate`. Withdrawal is its own end state rather than a flavour of defeat.
+`defender_withdrew`. Withdrawal is its own end state rather than a flavour of defeat. (`stalemate`
+remains a value only so an older save still reads; nothing produces it.)
 
 ---
 
@@ -188,9 +194,21 @@ check**: hardness alone carries "infantry cannot hurt tanks".
 are stored on the unit and move every day: food is eaten at the unit's ration rate, ammunition is
 spent by every day the unit fights, and equipment is lost to battle and to attrition. They are
 **refilled by the quarterly supply draw** (§ Upkeep, "Supply is drawn where the unit stands"): the
-share the network granted for the quarter arrives as a daily resupply of that share of each stock's
-daily need, so a unit the network covers in full stays full, and a unit covered at half loses half
-its daily need every day. A unit raised at a base starts full.
+share the network granted for the quarter arrives as a daily resupply. **Restock scales with cover
+(Ben, 2026-10-29):** each day a stock receives `share × (daily need + restock rate)`, capped at full
+— *"half cover then drains more slowly, full cover refills"*. A unit covered in full refills by the
+restock rate a day; a unit covered in part drains at the shortfall, more slowly than its bare need;
+the share at which a stock holds steady is `need / (need + restock rate)`. The sub-‰ remainder of a
+delivery carries from day to day, so rounding never drains a covered unit. A unit raised at a base
+starts full. **A unit past its roads is unfed even at home (Ben, 2026-10-29)**: a home garrison on a
+tile its network does not cover draws nothing, and starves like any other unit.
+
+**Only the road gap starves (Ben, 2026-10-29).** The share that resupplies the stocks is the
+**Logistic Point share** at the unit's tile — whether the network reaches it. A nation that does
+not pay a unit's wage, or whose goods draw goes unmet, lowers that unit's readiness and morale
+through the supply factor (§ Upkeep), but **never empties its food**: hunger is a road problem,
+not a budget problem. **Starvation runs from the handoff (Ben, 2026-10-29):** the pre-game settle
+keeps every stock full, and the stocks move only once the campaign begins.
 
 - **Hunger.** Below full food, the unit takes a **flat −15% to its attack and to its readiness
   recovery**. It is a flat step, not a slope: a hungry army is a worse army at once.
@@ -556,6 +574,51 @@ frontier shapes a border more strongly than a merely expensive one — a frontie
 not a moor — but attrition alone must still be able to stop an army crossing an ice cap nobody is
 defending. **Neither resolver reads it**; its consumers are `src/world/history_ladder.cpp` (pricing
 conquest at generation time) and `tools/verify/world_audit.cpp`.
+
+### Terrain and the classes (Ben, 2026-10-29)
+
+**Ground treats the classes differently: tanks cannot cross mountains without a road, and fight
+worse in them.** On top of the shared terrain table above, which every unit reads alike, each land
+class carries a **per-terrain row** with up to four effects:
+
+- **Move** — a multiplier on the march days (§ Marching), on top of the tile's traversal cost.
+- **Blocked unless roaded** — the class cannot enter the tile without a road on it. A block refuses
+  *entry*, never exit: a unit already standing on such a tile may leave it.
+- **Fight** — a scale on the unit's soft attack, hard attack, defence and breakthrough when the
+  battle's ground (the defended tile, § Battles) is that terrain. It applies to each unit by its own
+  class, on both sides. **A road on the defended tile halves the fight debuff.**
+- **Wear** — the unit's carried equipment (§ Carried supplies) drains faster each day it stands
+  there.
+
+Desert is the **dunes** cover; mountain, canyon and rift are landforms; marsh, forest, urban and
+snow are covers.
+
+| Class | Mountain | Canyon / rift | Marsh | Desert (dunes) | Forest | Urban | Snow |
+|---|---|---|---|---|---|---|---|
+| Infantry | — | — | — | — | stealth ×1.5 | stealth ×1.5 | — |
+| Motorised infantry | dismounts | dismounts | blocked unless roaded | move ×1.25 | move ×1.25 | — | move ×1.25 |
+| Mechanised infantry | dismounts | dismounts | blocked unless roaded | — | move ×1.25 | fight −15% | — |
+| Light armour | blocked unless roaded; fight −40% | blocked unless roaded | blocked unless roaded | move ×1.25; wear | fight −25% | fight −30% | move ×1.5 |
+| Medium armour | blocked unless roaded; fight −50% | blocked unless roaded; fight −40% | blocked unless roaded; fight −50% | blocked unless roaded; fight −30% | move ×1.5; fight −30% | fight −40% | move ×1.25 |
+| Artillery | blocked unless roaded | blocked unless roaded | blocked unless roaded | move ×1.25 | move ×1.5 | fight −20% | move ×1.5 |
+| Air defence | blocked unless roaded | blocked unless roaded | blocked unless roaded | wear | — | — | move ×1.25 |
+
+- **Infantry carriers dismount (Ben, 2026-10-29).** Motorised and mechanised infantry are never
+  blocked by high ground: on mountain, canyon or rift they leave their vehicles and march at foot
+  infantry's pace.
+- **Tanks are blocked in desert too (Ben, 2026-10-29).** Medium armour needs a road to enter dunes,
+  and fights there at −30%.
+- **The worst row only (Ben, 2026-10-29).** A tile that matches two rows — a forested mountain —
+  applies, per effect, the worst of them for the unit: blocked if either blocks, the larger move
+  multiplier, the deeper fight debuff, the faster wear. They never multiply.
+- **Terrain moves stealth both ways (Ben, 2026-10-29).** Concealing cover hides infantry (×1.5 in
+  forest and urban, above), and **open ground exposes everyone**: on plains or highland with no
+  concealing cover (none, grass, salt, snow or dunes) every unit's stealth is ×0.75 (§ Recon).
+
+The rows are authored data beside the march days (`economy.military`), keyed by class and terrain,
+and checked by the loader as the march days are. **A block is a per-class wall in the path**: a
+march or a front's order routes around it, an order with no legal route is refused with the reason,
+and a retreat never steps onto a tile its class cannot enter.
 
 ---
 
@@ -1123,6 +1186,13 @@ garrison is read as border force only through its own tile's neighbours, so one 
 its province would guard nothing. A capital province that is also a border province takes the
 capital rule. Neither post is the province's lowest-id tile, which is its id rather than its place
 (BL-1145, a province's readers take its anchor).
+
+**A garrison is posted only where its network covers (Ben, 2026-10-29).** Each post above is chosen
+among the province's tiles that its nation's Logistic Point cover reaches at the handoff, by the
+same rule (the anchor centre; the tile facing the neighbour). A province with no covered tile posts
+its garrison on the covered tile of the nation's own ground nearest the post the rule would have
+chosen, ties to the lowest tile id. A nation's opening army therefore starts fed (§ Carried
+supplies).
 
 **Every capital is generated with a military base (Ben, 2026-10-27).** Each nation, major or minor,
 opens owning one completed `military_base` on its own ground in its capital province, on the legal
