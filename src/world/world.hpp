@@ -568,6 +568,21 @@ struct world
     /// after a load. A `std::map` so any walk over it is ascending id.
     std::map<entity_id, carve_slot> gen_carve_centres;
 
+    /// BL-1452 (Ben, 2026-10-29; MILITARY.md § Nation garrisons, "A garrison is posted
+    /// only where its network covers"): every garrison `seed_nation_garrisons` posted,
+    /// with the rule that posted it — so once the network stands, the post can be
+    /// re-chosen among the tiles its nation's Logistic Point cover reaches
+    /// (`repost_garrisons_on_cover`, which clears it). A GENERATION-TIME INDEX on
+    /// `gen_carve_centres`' footing: NOT SERIALISED, not hashed; empty after a load.
+    struct generated_garrison
+    {
+        entity_id unit     = null_entity;
+        entity_id nation   = null_entity;
+        uint32_t  province = 0;
+        entity_id guarded  = null_entity; ///< The neighbour a border post faces; null for the capital's.
+    };
+    std::vector<generated_garrison> gen_garrisons;
+
     /// BL-1042 — the carved centres that were NEVER founded, in carve order,
     /// with why. Their slots' share of a region's points is counted unspent
     /// under its own reason rather than spread over the region's founded

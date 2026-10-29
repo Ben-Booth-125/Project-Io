@@ -6,6 +6,7 @@
 #include "world/hard_coded_world.hpp"  // generation_progress
 #include "world/logistics.hpp"         // the network: reach and traversal cost
 #include "world/market_clearing.hpp"   // clear_markets
+#include "world/nation_generation.hpp" // BL-1452: repost_garrisons_on_cover, at the handoff
 #include "world/nation_step.hpp"       // run_nation_step
 #include "world/nation_tech.hpp"       // clear_research_at_handover (BL-1273)
 #include "world/recipe_registry.hpp"   // logistics_cost, firm_exit
@@ -98,7 +99,16 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // the pass itself.
     out.standings = compute_corp_standings(w, out.flows);
     // BL-1407: firm exit retired with the corporation (FINANCE.md § Firm exit).
-    lap_done(5); // standings + exits
+
+    // BL-1452 (Ben, 2026-10-29; MILITARY.md § Nation garrisons): A GARRISON IS POSTED
+    // ONLY WHERE ITS NETWORK COVERS - the cover its nation's network reaches AT THE
+    // HANDOFF. So at the end of the settle's last tick, whichever path ran it (the
+    // app's `run_settle`, a harness's own loop), each generated garrison still standing
+    // on its post is re-chosen on covered ground. Inside the lap, so a digest after it
+    // sees the posted world. A no-op on a world with no generation record (a load).
+    if (econ_step == k_campaign_settle_ticks - 1 && !w.gen_garrisons.empty())
+        print_garrison_repost(repost_garrisons_on_cover(w));
+    lap_done(5); // standings + exits (+ the handoff's garrison posts)
 
     return out;
 }

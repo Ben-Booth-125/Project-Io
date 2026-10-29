@@ -457,6 +457,8 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // (LOGISTICS.md, Ben 2026-10-23).
     lp_seed_read_at_gate(w, reg, out.lp);
     print_lp_seed_report(out.lp);
+    // BL-1452: the garrisons are re-posted on covered ground at the HANDOFF, the end of
+    // the settle's last tick (run_settle_tick), against the cover the handoff receives.
     // BL-1347, the SECOND site-road call: the seeding above stood hubs and ports, and a
     // port it landed on an island coast may carry no road yet. Idempotent: every site the
     // pre-seeding call joined is skipped. Before the settle, so the twelve econ ticks

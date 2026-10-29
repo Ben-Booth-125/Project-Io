@@ -19,6 +19,8 @@
 #include "world/battle_system.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/carried_supplies.hpp"
+#include "world/logistic_points.hpp"
+#include "world/nation_generation.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
 #include "world/nation_budget.hpp"
@@ -27,6 +29,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <memory>
 #include <set>
 
@@ -41,7 +44,8 @@ bool at_home(const world& w, const unit_component& u)
 void census(const world& w, const char* when)
 {
     int units = 0, men = 0, est = 0, full_cover = 0, part_cover = 0, below_even = 0, no_cover = 0;
-    int hungry = 0, starving = 0, home = 0;
+    int hungry = 0, starving = 0, home = 0, road_full = 0, road_below = 0, road_zero = 0;
+    long long road = 0;
     long long food = 0, ammo = 0, equip = 0;
     for (const auto& [uid, u] : w.units)
     {
@@ -54,6 +58,10 @@ void census(const world& w, const char* when)
         else if (u.supply_factor_permille <= 0) ++no_cover;
         else ++part_cover;
         below_even += u.supply_factor_permille < 667 ? 1 : 0;
+        road += u.lp_share_permille;
+        road_full  += u.lp_share_permille >= 1000 ? 1 : 0;
+        road_below += u.lp_share_permille < 667 ? 1 : 0;
+        road_zero  += u.lp_share_permille <= 0 ? 1 : 0;
         hungry   += unit_hungry(u) ? 1 : 0;
         starving += unit_starving(u) ? 1 : 0;
         food += u.food_permille; ammo += u.ammo_permille; equip += u.equipment_permille;
@@ -63,6 +71,8 @@ void census(const world& w, const char* when)
                 "hungry %4d starving %4d  mean food %4lld ammo %4lld equip %4lld\n",
                 when, units, home, men, est, full_cover, part_cover, below_even, no_cover, hungry,
                 starving, food / n, ammo / n, equip / n);
+    std::printf("  %-8s road share: full %4d  <667 %4d  zero %4d  mean %4lld\n", when, road_full,
+                road_below, road_zero, road / n);
 }
 
 /// Which trigger holds the units under cover: their tile's Logistic Point share, or a
@@ -96,9 +106,11 @@ void triggers(const world& w, const lp_tick& lp, int tick)
 struct tracker
 {
     std::set<entity_id> home_zero, any_zero, starved_home, starved_any, watch, watch_home;
+    std::set<entity_id> zero_drawable; ///< seen at zero food on a tile the 8-tile draw reaches
 
-    void observe(const world& w)
+    void observe(world& w)
     {
+        unit_draw_memo dm;
         for (auto it = watch.begin(); it != watch.end();)
         {
             if (w.units.count(*it) == 0)
@@ -114,7 +126,8 @@ struct tracker
         for (const auto& [uid, u] : w.units)
         {
             if (u.count <= 0 || !unit_starving(u)) continue;
-            any_zero.insert(uid);
+            if (any_zero.insert(uid).second && unit_tile_drawable(w, dm, u.owner, u.position))
+                zero_drawable.insert(uid);
             const bool home = at_home(w, u);
             if (home) home_zero.insert(uid);
             if (fighting.count(uid) == 0)
@@ -127,10 +140,14 @@ struct tracker
 
     void print(std::uint32_t seed, const char* phase) const
     {
+        std::size_t starved_drawable = 0;
+        for (const entity_id u : starved_any) starved_drawable += zero_drawable.count(u);
         std::printf("  STARVATION seed %u %-7s: home garrisons at zero food %3zu (any unit %3zu); "
-                    "starved to death: home %3zu (any %3zu)\n",
+                    "starved to death: home %3zu (any %3zu) | 8-TILE READING: of those at zero food "
+                    "%3zu stood within the draw, of the starved %3zu -> starved past the draw %3zu\n",
                     seed, phase, home_zero.size(), any_zero.size(), starved_home.size(),
-                    starved_any.size());
+                    starved_any.size(), zero_drawable.size(), starved_drawable,
+                    starved_any.size() - starved_drawable);
     }
 };
 
@@ -154,6 +171,31 @@ int main(int argc, char** argv)
     build_app_start_world(lua, p, *start);
     world& w = start->w;
     census(w, "start");
+    std::map<entity_id, entity_id> posted; // unit -> the tile it opened on
+    for (const auto& [uid, u] : w.units) posted[uid] = u.position;
+    const auto moved_report = [&](const char* when) {
+        // Of the units at a zero road share: how many stand off the tile they opened on
+        // (a front or a march took them there), how many on a front, and how many still
+        // on their opening tile (the network stopped covering it).
+        int zero = 0, off_post = 0, on_front = 0, on_post = 0, post_now_covered = 0, drawable = 0;
+        lp_reach_memo memo;
+        unit_draw_memo dm;
+        for (const auto& [uid, u] : w.units)
+        {
+            if (u.count <= 0 || u.lp_share_permille > 0) continue;
+            ++zero;
+            const auto it = posted.find(uid);
+            const bool moved = it == posted.end() || it->second != u.position;
+            off_post += moved ? 1 : 0;
+            on_post  += moved ? 0 : 1;
+            on_front += u.front != null_entity ? 1 : 0;
+            if (!moved && lp_coverage_at(w, memo, u.position) >= 1.0f) ++post_now_covered;
+            if (unit_tile_drawable(w, dm, u.owner, u.position)) ++drawable;
+        }
+        std::printf("  %-8s zero road share %3d: off their opening tile %3d (on a front %3d), on it %3d "
+                    "(of which its tile now reads covered %3d); within the 8-tile draw %3d\n",
+                    when, zero, off_post, on_front, on_post, post_now_covered, drawable);
+    };
 
     // The settle, a tick at a time, as run_app_validation_settle steps it.
     tracker settle;
@@ -168,6 +210,7 @@ int main(int argc, char** argv)
     }
     clear_research_at_handover(w);
     census(w, "handoff");
+    moved_report("handoff");
 
     // The live window, a tick at a time, exactly as run_app_live_window steps it. The
     // watch carries over: a unit starving at the handoff that dies in the window

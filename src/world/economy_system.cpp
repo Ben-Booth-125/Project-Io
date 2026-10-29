@@ -4810,14 +4810,15 @@ namespace {
 
 /// STARVATION RUNS FROM THE HANDOFF (Ben, 2026-10-29; MILITARY.md § Carried supplies):
 /// is @p day_tick a day of the campaign rather than of the pre-game settle? Keyed on the
-/// ONE day-stamp base (`military_quarter_day_base`): the settle's quarters close at econ
-/// ticks 0..11, so their days are stamped below the base of tick 12, and every live day
-/// - the app's day loop and the headless catch-up alike - is stamped at or above it. A
-/// negative stamp reads the world's day tick, as the march does.
+/// ONE day-stamp base (`military_quarter_day_base`): a quarter closed by econ tick T
+/// stamps its days base(T) + 1 .. base(T) + 90, so the settle's twelve (T = 0..11) end
+/// on base(12) itself, and every live day - the app's day loop and the headless catch-up
+/// alike - is stamped strictly above it. A negative stamp reads the world's day tick,
+/// as the march does.
 bool carried_supplies_live(const world& w, int day_tick)
 {
     const int stamp = day_tick >= 0 ? day_tick : w.current_day_tick;
-    return stamp >= military_quarter_day_base(k_campaign_settle_ticks);
+    return stamp > military_quarter_day_base(k_campaign_settle_ticks);
 }
 
 /// Is there anything for a military day to do? A unit with an order or a front, or a

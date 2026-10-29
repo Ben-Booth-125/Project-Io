@@ -637,6 +637,15 @@ int main()
                     d.w.units.at(d.u).food_permille, c.w.units.at(c.u).count, men);
         check(d.w.units.at(d.u).food_permille == 1000 && c.w.units.at(c.u).count == men,
               "S12 a day stamped in the settle neither drains a stock nor starves a man");
+        // The boundary: the settle's last quarter (closed by econ tick 11) stamps its days
+        // up to k_live itself; the first live day is k_live + 1.
+        camp e;
+        build_camp(e, 0);
+        (void)run_military_day(e.w, reg, k_live);
+        const int after_last_settle_day = e.w.units.at(e.u).food_permille;
+        (void)run_military_day(e.w, reg, k_live + 1);
+        check(after_last_settle_day == 1000 && e.w.units.at(e.u).food_permille < 1000,
+              "S12b the settle's last day (stamp = live base) keeps the stock full; the next day drains it");
     }
 
     // -----------------------------------------------------------------------
