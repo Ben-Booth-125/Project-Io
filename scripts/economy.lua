@@ -946,6 +946,13 @@ economy = {
         --     when a battle matures; the 20% floor keeps it fighting after;
         --   equipment 1 a day attrition, 10 per day fighting: a quarter in camp
         --     unsupplied wears a tenth of the kit; a battle wears it ten times faster.
+        -- RESTOCK (Ben, 2026-10-29: "Delivery is share x (daily need + a restock rate);
+        -- half cover then drains more slowly, full cover refills"): restock_permille
+        -- of each stock's full daily rate rides on top of today's need, at the share.
+        -- 500 (half): full cover refills an empty stock at half its rate a day (food
+        -- 16.5/day, ~61 days from empty), and a stock spent at its full rate breaks
+        -- even at 1000 / 1.5 = 667 permille cover; half cover now loses 8.25 food a day
+        -- (a full stock lasts ~121 days) instead of 16.5.
         -- The hunger step (-15%), the ammunition floor (20%) and starvation's 180 days
         -- are the design's own numbers (carried_supplies.hpp), not rates.
         carried_supplies = {
@@ -953,6 +960,7 @@ economy = {
             ammo_per_battle_day         = 50,
             equipment_attrition_per_day = 1,
             equipment_per_battle_day    = 10,
+            restock_permille            = 500,
         },
 
         -- BL-596 / BL-1352 / BL-1445: a UNIT'S SUPPLY draws Logistic Points, never its

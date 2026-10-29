@@ -1658,8 +1658,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     {
         std::vector<entity_id> uids;
         for (const auto& [uid, u] : w.units)
-            if (u.food_permille != 1000 || u.ammo_permille != 1000
-                || u.equipment_permille != 1000 || u.starvation_carry != 0)
+            if (!unit_supplies_full(u))
                 uids.push_back(uid);
         std::sort(uids.begin(), uids.end());
         w_u32(out, static_cast<uint32_t>(uids.size()));
@@ -1671,6 +1670,9 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, u.ammo_permille);
             w_i32(out, u.equipment_permille);
             w_i32(out, u.starvation_carry);
+            w_i32(out, u.food_remainder);
+            w_i32(out, u.ammo_remainder);
+            w_i32(out, u.equipment_remainder);
         }
     }
 }
@@ -2786,22 +2788,34 @@ bool read_world_snapshot(world& w, std::istream& in)
         for (uint32_t k = 0; k < count; ++k)
         {
             entity_id uid = null_entity;
-            int32_t food = 0, ammo = 0, equip = 0, carry = 0;
+            int32_t food = 0, ammo = 0, equip = 0, carry = 0, rf = 0, ra = 0, re = 0;
             if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev)
-                || !r_i32(in, food) || !r_i32(in, ammo) || !r_i32(in, equip) || !r_i32(in, carry))
+                || !r_i32(in, food) || !r_i32(in, ammo) || !r_i32(in, equip) || !r_i32(in, carry)
+                || !r_i32(in, rf) || !r_i32(in, ra) || !r_i32(in, re))
                 return false;
             prev = uid;
             const auto uit = s.units.find(uid);
             const auto in_pm = [](int32_t v) { return v >= 0 && v <= 1000; };
+            // A remainder is below one per-mille, and a full stock carries none (the
+            // step clamps it away), so a remainder on a full stock is not a record the
+            // writer can produce.
+            const auto rem_ok = [](int32_t stock, int32_t rem) {
+                return rem >= 0 && rem < k_supply_remainder_unit && (stock < 1000 || rem == 0);
+            };
             if (uit == s.units.end() || !in_pm(food) || !in_pm(ammo) || !in_pm(equip)
                 || carry < 0 || carry >= k_starvation_days || (carry != 0 && food != 0)
-                || (food == 1000 && ammo == 1000 && equip == 1000 && carry == 0))
+                || !rem_ok(food, rf) || !rem_ok(ammo, ra) || !rem_ok(equip, re))
                 return false;
             unit_component& u = uit->second;
-            u.food_permille      = food;
-            u.ammo_permille      = ammo;
-            u.equipment_permille = equip;
-            u.starvation_carry   = carry;
+            u.food_permille       = food;
+            u.ammo_permille       = ammo;
+            u.equipment_permille  = equip;
+            u.starvation_carry    = carry;
+            u.food_remainder      = rf;
+            u.ammo_remainder      = ra;
+            u.equipment_remainder = re;
+            if (unit_supplies_full(u))
+                return false; // only units off full are written
         }
     }
 

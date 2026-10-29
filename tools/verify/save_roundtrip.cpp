@@ -112,14 +112,13 @@ std::size_t designs_section_bytes(const world& w)
     return n;
 }
 
-/// The v66 carried-supplies section (BL-1452): u32 count + 20 bytes a unit off full.
+/// The v66 carried-supplies section (BL-1452): u32 count + 32 bytes a unit off full.
 std::size_t supplies_section_bytes(const world& w)
 {
     std::size_t n = 4;
     for (const auto& [uid, u] : w.units)
-        if (u.food_permille != 1000 || u.ammo_permille != 1000
-            || u.equipment_permille != 1000 || u.starvation_carry != 0)
-            n += 4 + 16;
+        if (!unit_supplies_full(u))
+            n += 4 + 28;
     return n;
 }
 

@@ -10,15 +10,15 @@
 //             ammunition: `ammo_per_battle_day` on a day the unit fought;
 //             equipment: `equipment_attrition_per_day` every day, plus
 //             `equipment_per_battle_day` on a day it fought;
-//   resupply  supply_factor_permille x today's spend / 1000 (floor) — the share of
-//             today's need — so a unit its network covers in full stays full whatever
-//             it does, and a unit covered at half loses half its daily need a day.
-//             At FULL cover only, the network also RESTOCKS one full daily rate (food:
-//             the ration; ammunition: a battle day; equipment: attrition + a battle
-//             day), capped at full: without it a stock once emptied could never
-//             refill, and a fully supplied unit at zero food would starve for ever
-//             (BL-1452 implementer's call; MILITARY.md says how a unit drains, not
-//             how an empty one refills). Short cover never catches up.
+//   resupply  share x (today's spend + restock) (Ben, 2026-10-29: "Delivery is share x
+//             (daily need + a restock rate); half cover then drains more slowly, full
+//             cover refills"), capped at full. The share is supply_factor_permille; the
+//             restock is `restock_permille` of the stock's FULL daily rate (food: the
+//             ration; ammunition: a battle day; equipment: attrition + a battle day).
+//             At the authored half, full cover refills an empty stock at half its rate a
+//             day, and a stock drawn at its full rate breaks even at 2/3 cover (667‰).
+//             The sub-per-mille remainder is CARRIED per stock (`*_remainder`, units of
+//             1/1,000,000 of full), so a cover at break-even does not drift from rounding.
 //             The supply factor is the ONE supply quantity (the one decay rule,
 //             nation_step.cpp `run_nation_garrison_upkeep`); there is no second.
 //
@@ -45,7 +45,15 @@ struct carried_supply_params
     int ammo_per_battle_day         = 50; ///< Spent per day fighting: 20 days of fire, floor aside.
     int equipment_attrition_per_day = 1;  ///< Wear on the march and in camp.
     int equipment_per_battle_day    = 10; ///< Lost to battle, per day fighting.
+    /// The restock, per-mille of each stock's full daily rate, delivered at the share on
+    /// top of today's need. 500: full cover refills at half a day's rate, and the break-
+    /// even cover against a full-rate spend is 1000 / 1.5 = 667‰.
+    int restock_permille            = 500;
 };
+
+/// A stock's remainder is kept in these sub-per-mille units: one per-mille of stock is
+/// this many (share ‰ x need ‰ x 1000 is the day's delivery in them, exactly).
+inline constexpr int32_t k_supply_remainder_unit = 1000000;
 
 /// DESIGN CONSTANTS (Ben, 2026-10-29), not rates: the doc fixes them.
 inline constexpr int k_hunger_penalty_permille = 150; ///< Flat -15% attack and readiness recovery.

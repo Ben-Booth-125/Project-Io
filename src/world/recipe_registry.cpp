@@ -753,6 +753,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
                 { "ammo_per_battle_day",         &mp.supplies.ammo_per_battle_day },
                 { "equipment_attrition_per_day", &mp.supplies.equipment_attrition_per_day },
                 { "equipment_per_battle_day",    &mp.supplies.equipment_per_battle_day },
+                { "restock_permille",            &mp.supplies.restock_permille },
             };
             for (const auto& kv : *cs)
             {

@@ -557,7 +557,8 @@ inline constexpr uint32_t world_save_magic =
 /// and the merge renumbers if needed. A TRAILING SECTION after the designs carries,
 /// after a u32 count, every unit whose carried stocks are not all full or whose
 /// starvation carry is not zero, ascending id, as (id, i32 food, i32 ammunition,
-/// i32 equipment, i32 carry) — stocks in [0, 1000], carry in [0, 180). v64 is a
+/// i32 equipment, i32 carry, 3 x i32 sub-per-mille remainders) — stocks in [0, 1000],
+/// carry in [0, 180), remainders in [0, 1000000) and zero on a full stock. v64 is a
 /// STRICT PREFIX of v66 and is read too (`k_world_save_version_pre_supplies`), as a
 /// world where every unit's stocks are full.
 inline constexpr uint32_t world_save_version = 66;

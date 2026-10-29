@@ -1941,7 +1941,23 @@ struct unit_component
     /// in [0, k_starvation_days). A starving unit loses establishment / 180 men a day
     /// with this integer carry, so the whole establishment goes in exactly 180 days.
     int32_t   starvation_carry = 0;
+
+    /// Each stock's sub-per-mille remainder, in [0, k_supply_remainder_unit) millionths
+    /// of full (carried_supplies.hpp): the delivery's fraction carried day to day, so a
+    /// cover at break-even neither drifts up nor down. 0 at full.
+    int32_t   food_remainder = 0;
+    int32_t   ammo_remainder = 0;
+    int32_t   equipment_remainder = 0;
 };
+
+/// True when a unit's carried supplies are all full with nothing carried — the state
+/// the save and the hash leave out (BL-1452).
+inline bool unit_supplies_full(const unit_component& u)
+{
+    return u.food_permille == 1000 && u.ammo_permille == 1000 && u.equipment_permille == 1000
+        && u.starvation_carry == 0 && u.food_remainder == 0 && u.ammo_remainder == 0
+        && u.equipment_remainder == 0;
+}
 
 /// `unit_component::refit_type`'s "not refitting" sentinel. Never a roster index.
 inline constexpr uint16_t k_no_refit = 0xFFFFu;

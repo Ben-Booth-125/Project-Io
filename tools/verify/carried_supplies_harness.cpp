@@ -6,7 +6,8 @@
 // the AUTHORED rates (scripts/economy.lua § economy.military.carried_supplies):
 //
 //   S1  full cover stays full — in camp for a quarter, and fighting;
-//   S2  half cover drains half the daily need a day;
+//   S2  half cover drains more slowly than its need: share x (need + restock), the
+//       restock half a day's full rate (Ben, 2026-10-29);
 //   S3  the hunger step: at 999 food the attack and readiness recovery take a flat -15%;
 //   S4  starvation kills a unit in exactly 180 days at zero food — alive on day 179,
 //       gone from the world by day 181 — and returning food stops the loss;
@@ -15,7 +16,10 @@
 //   S7  the save round-trips the stocks and the carry; a v64 stream loads full; a
 //       corrupt record is refused whole;
 //   S8  determinism: the same fixture twice is byte-identical;
-//   S9  the loader rejects a rate that is not an integer per-mille.
+//   S9  the loader rejects a rate that is not an integer per-mille;
+//   S10 the remainder carry: cover at or past break-even never drains a full stock,
+//       a fractional gain accrues exactly, and an exact break-even holds for years;
+//   S11 the quiet world: a fed world at peace costs no daily churn.
 //
 // Build: bash tools/verify/build_lua_harness.sh carried_supplies_harness. Run from the
 // repo root.
@@ -33,6 +37,7 @@
 #include "world/world_save.hpp"
 #include "scripting/lua_state.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <set>
 #include <sstream>
@@ -120,6 +125,22 @@ entity_id add_unit(world& w, entity_id owner, entity_id tile, uint16_t type, int
     return u;
 }
 
+/// The day's net change of a stock in millionths of full: share x (spend + restock) - spend.
+int64_t net_u(const carried_supply_params& p, int spend, int full_rate, int share)
+{
+    return static_cast<int64_t>(share) * (static_cast<int64_t>(spend) * 1000
+                                          + static_cast<int64_t>(full_rate) * p.restock_permille)
+         - static_cast<int64_t>(spend) * k_supply_remainder_unit;
+}
+
+/// A stock after @p days from @p from at a constant net (clamped), per-mille.
+int after_days(int from, int64_t net, int days)
+{
+    const int64_t v = std::clamp<int64_t>(static_cast<int64_t>(from) * k_supply_remainder_unit
+                                              + net * days, 0, 1000LL * k_supply_remainder_unit);
+    return static_cast<int>(v / k_supply_remainder_unit);
+}
+
 uint16_t infantry() { return static_cast<uint16_t>(modern_row_for(land_class::infantry)); }
 
 /// A lone unit in camp on its own ground, at @p supply.
@@ -203,13 +224,16 @@ int main()
     recipe_registry reg;
     reg.load_from_lua(lua);
     const carried_supply_params& sp = reg.military().supplies;
-    std::printf("  authored: food %d/day, ammunition %d/battle day, equipment %d/day + %d/battle day\n",
+    std::printf("  authored: food %d/day, ammunition %d/battle day, equipment %d/day + %d/battle day, "
+                "restock %d permille of the full rate (break-even %.1f permille)\n",
                 sp.food_per_day, sp.ammo_per_battle_day, sp.equipment_attrition_per_day,
-                sp.equipment_per_battle_day);
+                sp.equipment_per_battle_day, sp.restock_permille,
+                1000.0 * 1000.0 / (1000.0 + sp.restock_permille));
     const carried_supply_params defaults{};
     check(sp.food_per_day == defaults.food_per_day && sp.ammo_per_battle_day == defaults.ammo_per_battle_day
               && sp.equipment_attrition_per_day == defaults.equipment_attrition_per_day
-              && sp.equipment_per_battle_day == defaults.equipment_per_battle_day,
+              && sp.equipment_per_battle_day == defaults.equipment_per_battle_day
+              && sp.restock_permille == defaults.restock_permille,
           "S0 the C++ defaults match the authored rates");
 
     // -----------------------------------------------------------------------
@@ -244,19 +268,21 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nS2 - half cover drains half the daily need a day\n");
+    std::printf("\nS2 - half cover drains more slowly than its need\n");
     {
         camp c;
         build_camp(c, 500);
         (void)advance_quarter_to(c.w, reg, 10, 0);
         const unit_component& u = c.w.units.at(c.u);
-        const int per_day = sp.food_per_day - sp.food_per_day * 500 / 1000;
-        std::printf("      after 10 days at 500 supply: food %d (loss %d a day), ammunition %d, equipment %d\n",
-                    u.food_permille, per_day, u.ammo_permille, u.equipment_permille);
-        check(u.food_permille == 1000 - 10 * per_day, "S2a food falls by need - floor(share x need) a day");
-        const int wear = sp.equipment_attrition_per_day - sp.equipment_attrition_per_day * 500 / 1000;
-        check(u.ammo_permille == 1000 && u.equipment_permille == 1000 - 10 * wear,
-              "S2b out of battle no ammunition is spent; half cover leaves camp wear short");
+        const int64_t food_net = net_u(sp, sp.food_per_day, sp.food_per_day, 500);
+        std::printf("      after 10 days at 500 supply: food %d (net %.2f a day), ammunition %d, equipment %d\n",
+                    u.food_permille, static_cast<double>(food_net) / k_supply_remainder_unit,
+                    u.ammo_permille, u.equipment_permille);
+        check(food_net < 0 && -food_net < static_cast<int64_t>(sp.food_per_day) * k_supply_remainder_unit / 2
+                  && u.food_permille == after_days(1000, food_net, 10),
+              "S2a food falls by need - share x (need + restock): less than half the ration a day");
+        check(u.ammo_permille == 1000 && u.equipment_permille == 1000,
+              "S2b out of battle no ammunition is spent, and half cover more than meets camp wear");
 
         duel d;
         build_duel(d, 2000, 2000);
@@ -264,11 +290,11 @@ int main()
         (void)run_military_day(d.w, reg, 1); // the march opens the battle
         (void)run_military_day(d.w, reg, 2); // a day fought
         const unit_component& a = d.w.units.at(d.ua);
-        const int ammo_loss = sp.ammo_per_battle_day - sp.ammo_per_battle_day * 500 / 1000;
+        const int64_t ammo_net = net_u(sp, sp.ammo_per_battle_day, sp.ammo_per_battle_day, 500);
         std::printf("      a day fought at 500 supply: ammunition %d, equipment %d\n",
                     a.ammo_permille, a.equipment_permille);
-        check(!d.w.battles.empty() && a.ammo_permille == 1000 - ammo_loss,
-              "S2c a day fought at half cover spends half a battle day's ammunition net");
+        check(!d.w.battles.empty() && a.ammo_permille == after_days(1000, ammo_net, 1),
+              "S2c a day fought at half cover spends a quarter of a battle day's ammunition net");
     }
 
     // -----------------------------------------------------------------------
@@ -357,10 +383,10 @@ int main()
     // -----------------------------------------------------------------------
     std::printf("\nS5 - a starving unit's readiness is capped at its men over establishment\n");
     {
-        // 999 cover: food stays at zero (a day's ration less one short), but morale
-        // holds near full, so the ceiling read is starvation's, not morale's.
+        // 600 cover, below break-even: food stays at zero, but morale holds at 600, above
+        // the HP share, so the ceiling read is starvation's, not morale's.
         camp c;
-        build_camp(c, 999, 1000);
+        build_camp(c, 600, 1000);
         c.w.units.at(c.u).food_permille = 0;
         for (int day = 1; day <= 90; ++day) (void)run_military_day(c.w, reg, day);
         const unit_component& u = c.w.units.at(c.u);
@@ -408,7 +434,7 @@ int main()
     std::printf("\nS7 - the save round-trips the stocks\n");
     {
         camp c;
-        build_camp(c, 0, 1000);
+        build_camp(c, 500, 1000); // half cover: food stays at 0, equipment refills with a remainder
         c.w.units.at(c.u).food_permille = 0;
         c.w.units.at(c.u).ammo_permille = 400;
         c.w.units.at(c.u).equipment_permille = 730;
@@ -421,11 +447,13 @@ int main()
             && back.units.at(c.u).food_permille == src.food_permille
             && back.units.at(c.u).ammo_permille == src.ammo_permille
             && back.units.at(c.u).equipment_permille == src.equipment_permille
-            && back.units.at(c.u).starvation_carry == src.starvation_carry;
-        std::printf("      saved food %d ammunition %d equipment %d carry %d (v%u)\n", src.food_permille,
-                    src.ammo_permille, src.equipment_permille, src.starvation_carry,
+            && back.units.at(c.u).starvation_carry == src.starvation_carry
+            && back.units.at(c.u).equipment_remainder == src.equipment_remainder;
+        std::printf("      saved food %d ammunition %d equipment %d (+%d/1e6) carry %d (v%u)\n", src.food_permille,
+                    src.ammo_permille, src.equipment_permille, src.equipment_remainder, src.starvation_carry,
                     static_cast<unsigned>(world_save_version));
-        check(src.starvation_carry != 0 && same, "S7a the stocks and the starvation carry round-trip");
+        check(src.starvation_carry != 0 && src.equipment_remainder != 0 && same,
+              "S7a the stocks, their remainders and the starvation carry round-trip");
         check(ok && back.state_hash(7) == c.w.state_hash(7) && to_bytes(back) == bytes,
               "S7b the loaded world hashes and re-saves as the original");
         for (int day = 8; day <= 20; ++day)
@@ -446,7 +474,7 @@ int main()
 
         // Corrupt the food of the one record (the section is the stream's tail).
         std::string bad = bytes;
-        const std::size_t food_at = bad.size() - 16;
+        const std::size_t food_at = bad.size() - 28; // (id, food, ammo, equip, carry, 3 remainders)
         bad[food_at] = static_cast<char>(0xE9); bad[food_at + 1] = static_cast<char>(0x03); // 1001
         world untouched;
         const bool refused = !from_bytes(bad, untouched) && untouched.units.empty();
@@ -486,6 +514,74 @@ int main()
         check(rejects("economy.military.carried_supplies.ammo_per_battle_day = 1001"), "S9b a rate past 1000");
         check(rejects("economy.military.carried_supplies.equipment_per_battle_day = 2.5"), "S9c a fraction");
         check(rejects("economy.military.carried_supplies.fuel_per_day = 3"), "S9d an unknown key");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nS10 - the remainder carry: no drift from rounding\n");
+    {
+        const std::set<entity_id> none;
+        bool held = true;
+        for (const int share : { 999, 900, 700, 667 })
+        {
+            camp c;
+            build_camp(c, share);
+            for (int day = 1; day <= 360; ++day) (void)run_carried_supplies_day(c.w, sp, none);
+            const unit_component& u = c.w.units.at(c.u);
+            held = held && u.food_permille == 1000 && u.equipment_permille == 1000 && u.food_remainder == 0;
+        }
+        check(held, "S10a at 999, 900, 700 and 667 cover a full stock stays full for a year (floor no longer drains)");
+
+        camp g;
+        build_camp(g, 700);
+        g.w.units.at(g.u).food_permille = 500;
+        for (int day = 1; day <= 100; ++day) (void)run_carried_supplies_day(g.w, sp, none);
+        const int64_t gain = net_u(sp, sp.food_per_day, sp.food_per_day, 700);
+        std::printf("      500 food at 700 cover, 100 days: %d (+%d/1e6); exact %.2f a day\n",
+                    g.w.units.at(g.u).food_permille, g.w.units.at(g.u).food_remainder,
+                    static_cast<double>(gain) / k_supply_remainder_unit);
+        check(g.w.units.at(g.u).food_permille == after_days(500, gain, 100),
+              "S10b a fractional daily gain accrues exactly (1.65 a day, not 1)");
+
+        camp h;
+        build_camp(h, 666);
+        for (int day = 1; day <= 360; ++day) (void)run_carried_supplies_day(h.w, sp, none);
+        const int64_t loss = net_u(sp, sp.food_per_day, sp.food_per_day, 666);
+        std::printf("      full food at 666 cover, a year: %d (exact net %.3f a day)\n",
+                    h.w.units.at(h.u).food_permille, static_cast<double>(loss) / k_supply_remainder_unit);
+        check(h.w.units.at(h.u).food_permille == after_days(1000, loss, 360) && h.w.units.at(h.u).food_permille >= 985,
+              "S10c just below break-even the drain is its true 0.033 a day, not a floored 1");
+
+        // An EXACT break-even (rates chosen so share x (need + restock) == need): a
+        // half stock holds for ten years, remainder and all.
+        carried_supply_params e = sp;
+        e.food_per_day = 30; e.restock_permille = 250; // 800 x (30 + 7.5) = 30
+        camp x;
+        build_camp(x, 800);
+        x.w.units.at(x.u).food_permille = 500;
+        for (int day = 1; day <= 3600; ++day) (void)run_carried_supplies_day(x.w, e, none);
+        check(x.w.units.at(x.u).food_permille == 500 && x.w.units.at(x.u).food_remainder == 0,
+              "S10d at exact break-even a half stock holds for ten years, to the millionth");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nS11 - the quiet world\n");
+    {
+        bool quiet = true;
+        for (const int share : { 1000, 700 })
+        {
+            camp c;
+            build_camp(c, share);
+            c.w.units.at(c.u).morale_permille = share; // morale already at its supply
+            c.w.units.at(c.u).readiness_permille = share;
+            const uint64_t before = c.w.state_hash(1);
+            const std::string bytes = to_bytes(c.w);
+            quiet = quiet && !carried_supplies_pending(c.w, sp);
+            // The military days alone (advance_quarter_to also moves the construction
+            // cursor, which is not the military pass's to keep still).
+            for (int day = 1; day <= 90; ++day) (void)run_military_day(c.w, reg, day);
+            quiet = quiet && c.w.state_hash(1) == before && to_bytes(c.w) == bytes;
+        }
+        check(quiet, "S11 a full unit at full or past-break-even cover is inert: no pending day, a quarter writes nothing");
     }
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
