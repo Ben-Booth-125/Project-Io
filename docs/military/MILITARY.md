@@ -133,6 +133,22 @@ keeping the ratio the uncapped battle produced). The round's damage is calibrate
 per-round numbers above are a day's — and a commander gets a decision every day of the fight, a
 withdrawal honoured at the next day's boundary.
 
+**Like forces entrench, and supply decides the stalemate (Ben, 2026-10-29).** When the two sides'
+raw hits stand near parity — neither side dealing much more than the other, before the swing — the
+battle **digs in**: its landed damage drops further, and each side **recovers readiness from its
+carried supplies** (§ Carried supplies) while it fights — a unit that is fed and holds ammunition
+above its floor recovers; a hungry unit, or one at the ammunition floor, does not. An entrenched
+battle spends ammunition and food every day like any other, so it is **decided by which side's
+stocks give out first** — by its network, not its dice. Two sides both fully supplied hold each
+other for as long as the attacker presses: that is the stalemate, and its price is the supply both
+networks pay to keep it. A battle that leaves the near-parity band leaves entrenchment, and fights
+on at the ordinary rate.
+
+**No battle randomness is added (Ben, 2026-10-29).** The per-round swing (two draws a round) is the
+whole of a battle's chance; there is no per-battle roll. A long battle between unequal forces is
+therefore predictable, and that is accepted: what keeps a fight open is entrenchment and supply,
+not a draw.
+
 **Withdrawal is a first-class verb, not a failure state**, and it is never free. The cost has three
 terms — base, per-round, and pursuit — and the second and third are what make a late break-off
 dear. Because a battle has no cap, the per-round term is bounded so that a late exit stays dear but
@@ -469,7 +485,9 @@ there, and superiority adds recon in proportion to its share (§ Recon).
 tactical mission spends its hits on enemy units fighting a battle in the province first, and on any
 other enemy unit there once none is in battle. Its hits use the land arithmetic (soft and hard
 attack against the target's hardness), with no terrain divisor, since an aircraft attacks from
-above.
+above. **Bombing a unit takes the land round's day scale (Ben, 2026-10-29):** its landed damage is
+scaled by the same per-day factor a battle's round is (§ Battles, "A battle is weeks long"), so air
+stays one arm of a weeks-long fight rather than outpacing it.
 
 **Strategic bombing damages a building, and damage slows its throughput (Ben, 2026-10-28).** Each
 building carries a **condition**, full when built. A strategic mission lowers the condition of an
