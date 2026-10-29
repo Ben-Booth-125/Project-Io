@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Air combat (BL-1449; MILITARY.md § Air). No SDL.
+// Air combat (BL-1449; MILITARY.md § Air) and rival air (BL-1451). No SDL.
 // ---------------------------------------------------------------------------
 // One 80 x 4 body cut into twenty 4-column provinces. Nation A (the seat) holds
 // columns 0-39, nation B 40-79. A's airbase stands at column 30, so B's nearest
@@ -31,6 +31,8 @@
 //   A10 DESIGNS: the air catalogue is well-formed; a rival may not design; a locked
 //       item is refused; a researched one moves the wing's stats.
 //   A11 THE ECONOMY TICK flies the air: run_economy_step's report carries the days.
+//   R1-R11 RIVAL AIR (BL-1451): a rival builds, hires and assigns its own air, and
+//       each 'not admitted' clause of the AI_OPPONENT.md § 11 grant is a check.
 //
 // Run: air_combat_harness
 // ---------------------------------------------------------------------------
@@ -50,6 +52,8 @@
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
+#include "world/placement_rules.hpp"
+#include "world/state_industry.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -287,7 +291,7 @@ recipe_registry make_registry()
 
 int main()
 {
-    std::printf("=== air combat (BL-1449) ===\n");
+    std::printf("=== air combat (BL-1449) and rival air (BL-1451) ===\n");
     const recipe_registry reg = make_registry();
     const int rifle = unit_row("Rifle Infantry");
     const int ad_row = unit_row("Air Defence Battery");
@@ -740,6 +744,154 @@ int main()
         check(rep.air.sorties == 90 && rep.air.ad_shots == 90 && rep.wing_upkeep.wings == 1,
               "A11a run_economy_step flies the quarter's 90 days and upkeeps the wing ("
                   + std::to_string(rep.air.sorties) + " sorties)");
+    }
+
+    // -----------------------------------------------------------------------
+    // R — RIVAL AIR (BL-1451; AI_OPPONENT.md § 11, "Rival nations fly air wings").
+    // B is the rival, A the seat, C a third nation holding columns 72-79. Each
+    // "not admitted" clause of the grant is a check of its own.
+    std::printf("\nR - rival air (BL-1451)\n");
+    {
+        auto rival_fixture = [&](fixture& g, entity_id& c) {
+            build(g);
+            // B builds its own airbase in R2: remove the fixture's.
+            demolish_state_building(g.w, g.b, g.b_airbase);
+            g.b_airbase = null_entity;
+            c = g.w.create_entity();
+            nation_component nc{}; nc.name = "Corrie"; nc.treasury = 100000.0f;
+            g.w.nations[c] = nc;
+            for (int r = 0; r < GH; ++r)
+                for (int col = 56; col < 64; ++col) // strips 14-15, inside a drone's reach of B's base
+                    g.w.set_tile_nation(tile(g, col, r), c);
+            g.w.province_holder[14] = c;
+            g.w.province_holder[15] = c;
+            // A road along row 1, east to west: no building stands where no road reaches.
+            for (int col = 0; col < GW - 1; ++col)
+                lay_road_edge(g.w, tile(g, col, 1), 0, 1);
+            // The nations' own tile lists (generation fills them; the scorer reads them).
+            for (int r = 0; r < GH; ++r)
+                for (int col = 0; col < GW; ++col)
+                {
+                    const entity_id t = tile(g, col, r);
+                    g.w.nations.at(g.w.tile_to_nation.at(t)).tiles.push_back(t);
+                }
+            g.w.nations.at(g.b).capital_tile = tile(g, 46, 1);
+            g.w.nations.at(g.a).capital_tile = tile(g, 30, 1);
+        };
+
+        fixture f;
+        entity_id c = null_entity;
+        rival_fixture(f, c);
+        const uint64_t h_peace = f.w.state_hash(1);
+        score_nation_air(f.w, reg, f.b, 1);
+        check(f.w.state_hash(1) == h_peace, "R1 at peace a rival builds no airbase and hires nothing");
+
+        declare_hostile(f.w, f.b, f.a);
+        const auto pairs0 = f.w.corp_hostile_pairs;
+        score_nation_air(f.w, reg, f.b, 2);
+        entity_id built = null_entity;
+        for (const entity_id bid : f.w.nations.at(f.b).state_assets)
+            if (f.w.buildings.count(bid) && f.w.buildings.at(bid).type == building_type::airbase)
+                built = bid;
+        const bool own_ground = built != null_entity
+            && f.w.tile_to_nation.at(f.w.buildings.at(built).tile) == f.b;
+        check(own_ground, "R2 at war it builds an airbase, on its own ground, through the build verb");
+        if (built != null_entity)
+            f.w.buildings.at(built).ticks_remaining = 2; // a default registry builds at once: make it a site
+        score_nation_air(f.w, reg, f.b, 3);
+        int bases = 0;
+        for (const entity_id bid : f.w.nations.at(f.b).state_assets)
+            if (f.w.buildings.count(bid) && f.w.buildings.at(bid).type == building_type::airbase)
+                ++bases;
+        check(bases == 1 && f.w.wings.empty(), "R2b one airbase at a time; no wing while it is still building");
+
+        if (built != null_entity)
+        {
+            f.w.buildings.at(built).ticks_remaining = 0;
+            f.w.buildings.at(built).days_remaining = 0;
+        }
+        add_unit(f, c, 58, 2, rifle);         // a target in reach the rival is NOT hostile to
+        add_unit(f, f.a, 38, 1, rifle);       // a target it is
+        add_building(f, f.a, 37, 2, building_type::extraction_site);
+        for (int k = 0; k < 6; ++k)
+            score_nation_air(f.w, reg, f.b, 10 + k);
+        // The seat's and the third nation's air, which the rival must never touch.
+        const entity_id a_wing = add_wing(f, f.a, f.airbase, air_class::fighter, air_mission::none, {});
+        const entity_id c_base = add_building(f, c, 58, 1, building_type::airbase);
+        const entity_id c_wing = add_wing(f, c, c_base, air_class::multirole, air_mission::none, {});
+        int b_wings = 0;
+        bool at_own_base = true, one_province = true, bombs_hostile_only = true;
+        for (const auto& [wid, wg] : f.w.wings)
+        {
+            if (wg.owner != f.b)
+                continue;
+            ++b_wings;
+            at_own_base = at_own_base && wg.airbase == built;
+            one_province = one_province && wg.provinces.size() <= 1;
+            if (air_mission_bombs(wg.mission))
+                for (const uint32_t p : wg.provinces)
+                    bombs_hostile_only = bombs_hostile_only && province_holder_for(f.w, p) == f.a;
+        }
+        check(b_wings == 3 && at_own_base, "R3 it hires wings only at its own airbase, up to its cap of three ("
+                  + std::to_string(b_wings) + ")");
+        // Raise them, then let it assign.
+        for (auto& [wid, wg] : f.w.wings)
+            if (wg.owner == f.b) wg.muster_days = 0;
+        score_nation_air(f.w, reg, f.b, 20);
+        int assigned = 0, bombing = 0;
+        one_province = true; bombs_hostile_only = true;
+        for (const auto& [wid, wg] : f.w.wings)
+        {
+            if (wg.owner != f.b)
+                continue;
+            assigned += wg.mission != air_mission::none ? 1 : 0;
+            bombing  += air_mission_bombs(wg.mission) ? 1 : 0;
+            one_province = one_province && wg.provinces.size() <= 1;
+            if (air_mission_bombs(wg.mission))
+                for (const uint32_t p : wg.provinces)
+                    bombs_hostile_only = bombs_hostile_only && province_holder_for(f.w, p) == f.a;
+        }
+        check(assigned >= 1 && bombing >= 1, "R4 it assigns its own raised wings missions (" + std::to_string(assigned)
+                  + " of 3, " + std::to_string(bombing) + " bombing)");
+        check(bombs_hostile_only,
+              "R5 not admitted: bombing a nation it is not already hostile to (none over the third nation)");
+        check(f.w.corp_hostile_pairs == pairs0, "R6 not admitted: declaring the hostility a bombing mission needs");
+        check(one_province, "R7 not admitted: a campaign planned past the next assignment (one province a wing)");
+        check(f.w.wings.at(a_wing).mission == air_mission::none && f.w.wings.at(c_wing).mission == air_mission::none,
+              "R8 not admitted: another nation's wing, the seat's included");
+        int base_count_a = 0;
+        for (const entity_id bid : f.w.nations.at(f.a).state_assets)
+            if (f.w.buildings.count(bid) && f.w.buildings.at(bid).type == building_type::airbase) ++base_count_a;
+        check(base_count_a == 1, "R9 not admitted: an airbase on another nation's ground (the seat's still one)");
+
+        // The seat's nation, at war and armed, is never acted for.
+        declare_hostile(f.w, f.a, f.b);
+        f.w.wings.at(a_wing).muster_days = 0;
+        const uint64_t h_seat = f.w.state_hash(30);
+        score_nation_air(f.w, reg, f.a, 30);
+        check(f.w.state_hash(30) == h_seat, "R10 not admitted: the player's nation — its pass changes nothing");
+
+        // Determinism: twin runs alike.
+        auto twin = [&](fixture& g) {
+            entity_id cc = null_entity;
+            rival_fixture(g, cc);
+            declare_hostile(g.w, g.b, g.a);
+            add_unit(g, g.a, 38, 1, rifle);
+            add_building(g, g.a, 37, 2, building_type::extraction_site);
+            economy_report rep;
+            for (int k = 0; k < 8; ++k)
+            {
+                score_nation_air(g.w, reg, g.b, k);
+                for (auto& kv : g.w.buildings) if (kv.second.type == building_type::airbase) { kv.second.ticks_remaining = 0; kv.second.days_remaining = 0; }
+                run_air_missions(g.w, reg, rep, 90);
+                run_wing_upkeep(g.w, reg, rep);
+            }
+        };
+        fixture t1, t2;
+        twin(t1);
+        twin(t2);
+        check(t1.w.state_hash(9) == t2.w.state_hash(9) && to_bytes(t1.w) == to_bytes(t2.w) && !t1.w.wings.empty(),
+              "R11 twin rival-air runs hash and serialise alike");
     }
 
     std::printf("\n%d / %d checks passed\n", checks - failures, checks);
