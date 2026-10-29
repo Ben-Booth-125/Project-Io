@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "recipe_registry.hpp"
 #include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
+#include "air_combat.hpp"    // air_day_tick, wing_upkeep_tick (BL-1449)
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
@@ -333,6 +334,10 @@ struct economy_report
     /// longer holds — the aftermath is the line a player most needs and it
     /// describes something already erased.
     std::vector<battle_dispatch> battle_dispatches;
+
+    /// BL-1449 (air combat): what this tick's air days and the wing upkeep did.
+    air_day_tick     air;
+    wing_upkeep_tick wing_upkeep;
 
     /// Per (corporation, pool key) — BL-1003: the MARKET the draw happened in
     /// (the consumer's tile market), or the body id on a market-less body. The
@@ -771,6 +776,19 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
 /// at the quarter, and the daily military pass after each day's battles (BL-1445), so
 /// a unit a battle kills is removed that same day. There is no second disband site.
 int disband_orphaned_units(world& w);
+
+/// BL-1449: THE ONE SHELF DRAW (`draw_goods_or_bid`, the path run_unit_upkeep and
+/// run_building_upkeep take), for a caller outside this file — a wing's upkeep at its
+/// airbase, a bombed building's repair. Draws @p need at @p tile for @p owner, bidding
+/// the shortfall onto the tile's market. Returns the share met, per-mille (1000 when
+/// nothing was needed or all of it was met).
+int draw_goods_at_tile(world& w, const recipe_registry& reg, economy_report& report,
+                       entity_id owner, entity_id tile,
+                       const std::array<float, resource_count>& need);
+
+/// BL-1449: a unit's supply step toward its target (run_unit_upkeep's own rule),
+/// exported so a wing's supply moves by the very same step.
+int step_unit_supply_toward(int factor, int target_permille, const unit_upkeep_params& up);
 
 // ---------------------------------------------------------------------------
 // BL-641 — the building pass

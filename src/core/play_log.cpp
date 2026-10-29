@@ -221,6 +221,9 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::assign_front:         return "assign_front";    // BL-1427
         case corp_verb::set_front_order:      return "set_front_order"; // BL-1427
         case corp_verb::set_unit_design:      return "set_unit_design"; // BL-1434
+        case corp_verb::hire_wing:            return "hire_wing";          // BL-1449
+        case corp_verb::assign_air_mission:   return "assign_air_mission"; // BL-1449
+        case corp_verb::set_air_design:       return "set_air_design";     // BL-1449
     }
     return "verb?";
 }
@@ -387,6 +390,19 @@ void play_log::command(const world& w, const corp_command& cmd, corp_command_res
     if (cmd.counterparty != d.counterparty) kv_int(o, "counterparty", cmd.counterparty);
     if (cmd.province != d.province)         kv_int(o, "province", static_cast<long long>(cmd.province));
     if (cmd.as_nation != d.as_nation)       kv_int(o, "as_nation", cmd.as_nation);
+    if (cmd.air_provinces != d.air_provinces) // BL-1449: assign_air_mission's provinces
+    {
+        std::string list;
+        for (const std::uint32_t p : cmd.air_provinces)
+        {
+            if (p == no_province)
+                continue;
+            if (!list.empty())
+                list += ',';
+            list += std::to_string(p);
+        }
+        kv_str(o, "provinces", list.c_str());
+    }
     // A research press names a node by index: name it too.
     if ((cmd.verb == corp_verb::queue_research || cmd.verb == corp_verb::unqueue_research)
         && cmd.order < static_cast<std::uint32_t>(io::dg::node_count))

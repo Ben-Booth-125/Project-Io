@@ -3470,6 +3470,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // NR-344 ("war flips the queue") lives in the daily march's visit order.
     advance_musters(w);
     advance_refits(w); // Ben, 2026-10-27: a refit completes on the tick, as a muster does
+    // BL-1449 (MILITARY.md § Air): the air missions. MERGE RESOLUTION (BL-1453's lane,
+    // merging BL-1445 and BL-1449 as they stood): the battles, march and fronts are
+    // daily now (run_military_day), but the air day draws repair goods onto an
+    // economy_report the daily pass does not carry, so the call stays here, flying
+    // the quarter's 90 days once a tick, until it is moved onto the daily step with
+    // days = 1 (owed: thread a report through run_military_day / advance_quarter_to).
+    report.air = run_air_missions(w, reg, report, econ_tick_days_world);
     phase_stamp(10); // (the battle phase is daily now: run_military_day)
     phase_stamp(11); // (recovery and the march are daily now: run_military_day)
 
@@ -3478,6 +3485,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // after it means a muster base torn down THIS tick orphans its units in the
     // same tick rather than leaving them live for one. See run_unit_upkeep.
     run_unit_upkeep(w, reg, report);
+    // BL-1449: the wings' half of the same pass — orphans disbanded, supply drawn at
+    // the airbase — straight after, on the same rule and for the same reason (last).
+    report.wing_upkeep = run_wing_upkeep(w, reg, report);
     phase_stamp(12); // unit_upkeep
 
     // BL-641: the building pass — the goods half of a building's upkeep and the
@@ -3942,6 +3952,28 @@ int step_building_supply(int factor, bool unmet, const building_upkeep_params& u
 }
 
 } // namespace
+
+int draw_goods_at_tile(world& w, const recipe_registry& reg, economy_report& report,
+                       entity_id owner, entity_id tile,
+                       const std::array<float, resource_count>& need)
+{
+    bool any = false;
+    for (const float q : need)
+        any = any || q > 0.0f;
+    if (!any)
+        return 1000;
+    const auto tit = w.tiles.find(tile);
+    const entity_id body = (tit != w.tiles.end()) ? tit->second.body : null_entity;
+    draw_outcome rec;
+    if (!draw_goods_or_bid(w, reg, report, owner, body, tile, need, &rec))
+        return 1000;
+    return draw_share_permille(rec);
+}
+
+int step_unit_supply_toward(int factor, int target_permille, const unit_upkeep_params& up)
+{
+    return step_unit_supply(factor, target_permille, up);
+}
 
 unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_report& report)
 {
@@ -4720,8 +4752,18 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
             // bridged water node at its deck — so a unit marching over a bridge pays the
             // road, as a convoy does, and neither invents a second model.
             const int march_side = road_side_between(w, u.position, next_id);
-            const float step_cost =
+            float step_cost =
                 edge_traversal_cost(cur_it->second, next_it->second, march_side);
+            // BL-1449 (MILITARY.md § Air): air superiority SLOWS the side that lacks
+            // it — a step into a province where the marcher's share is short costs up
+            // to (1000 + march_slow) per-mille. Exactly 1000 (the unchanged path) when
+            // no superiority is flown anywhere.
+            if (!w.air_superiority.empty())
+            {
+                const int slow = air_march_cost_permille(w, reg, u.owner, next_id);
+                if (slow != 1000)
+                    step_cost *= static_cast<float>(slow) / 1000.0f;
+            }
             if (step_cost <= 0.0f || points + 1e-6f >= step_cost)
             {
                 points -= step_cost;

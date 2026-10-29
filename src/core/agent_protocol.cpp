@@ -177,6 +177,9 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::assign_front:      // BL-1427
         case corp_verb::set_front_order:   // BL-1427
         case corp_verb::set_unit_design:   // BL-1434: the seat's nation; the seam refuses any other
+        case corp_verb::hire_wing:          // BL-1449: the actor's own airbase
+        case corp_verb::assign_air_mission: // BL-1449: the actor's own wing
+        case corp_verb::set_air_design:     // BL-1449: the seat's nation; the seam refuses any other
         // BL-1407: every player verb is sent as the nation, these included.
         case corp_verb::survey:
         case corp_verb::hold_convoy:
@@ -368,6 +371,37 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         if ((qty_d != 0.0 && qty_v == 0.0f) || (floor_d != 0.0 && floor_v == 0.0f))
             floats_ok = false;
 
+        // BL-1449: assign_air_mission's provinces, `provinces=<id>,<id>,...` — at most
+        // k_air_mission_provinces_max ids, each a decimal uint32 other than
+        // no_province, nothing else in the token. A wire boundary: validated as the
+        // values that land, and the whole command refused on any violation. Whether
+        // each names a real province in range is the seam's own check.
+        std::array<uint32_t, k_air_mission_provinces_max> air_provs = no_air_provinces();
+        if (const auto pit = kv.find("provinces"); pit != kv.end() && !pit->second.empty())
+        {
+            std::size_t n = 0;
+            std::size_t at = 0;
+            const std::string& sv = pit->second;
+            while (ok)
+            {
+                const std::size_t comma = sv.find(',', at);
+                const std::string tok = sv.substr(at, comma == std::string::npos ? std::string::npos
+                                                                               : comma - at);
+                char* end = nullptr;
+                const long long v = tok.empty() ? -1 : std::strtoll(tok.c_str(), &end, 10);
+                if (tok.empty() || end == tok.c_str() || *end != '\0' || v < 0
+                    || v >= static_cast<long long>(no_province) || n >= air_provs.size())
+                {
+                    ok = false;
+                    break;
+                }
+                air_provs[n++] = static_cast<uint32_t>(v);
+                if (comma == std::string::npos)
+                    break;
+                at = comma + 1;
+            }
+        }
+
         if (!ok || !floats_ok)
         {
             out += "RESULT result=rejected_invalid building=-1\n";
@@ -393,6 +427,7 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         cmd.counterparty = static_cast<entity_id>(cp_v);
         cmd.province     = static_cast<uint32_t>(prov_v);
         cmd.as_nation    = static_cast<entity_id>(nat_v);
+        cmd.air_provinces = air_provs; // BL-1449
 
         // BL-387: refuse to act as a corp the session is not. Before this
         // gate the only validation of `corp` was that the corp EXISTS, so

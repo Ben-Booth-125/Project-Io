@@ -116,6 +116,7 @@ float construction_initial_workforce(building_type type)
 {
     return (type == building_type::port || type == building_type::inland_logistics_hub
             || type == building_type::military_base
+            || type == building_type::airbase // BL-1449: passive, as the military base
             || type == building_type::railway_station) ? 0.0f : 0.5f; // BL-1255: zero staff
 }
 

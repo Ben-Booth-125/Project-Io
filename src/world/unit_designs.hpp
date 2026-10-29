@@ -146,3 +146,81 @@ land_class unit_land_class(const unit_component& u);
 /// Does @p u's recorded design differ from its owner's live design for its class?
 /// Such a unit may refit to the live design in place (`refit_unit` to its own row).
 bool unit_design_stale(const world& w, const unit_component& u);
+
+// ===========================================================================
+// BL-1449 — AIR designs (MILITARY.md § Air: "its slots in the designer are
+// airframe, armament and avionics, on the same one-live-design rule")
+// ===========================================================================
+// The air classes' own catalogue, beside the land one and on the same rules: per
+// (air class, slot) a base item first, then two to four later items, each with a
+// research node (none in the tree yet, so every later item reads locked, as the
+// land kit's do) and the goods a hire to it buys. Validated at compile time.
+// A nation's live air designs are `nation_component::air_design_kit`; a wing
+// records the design it was raised to (`air_wing::kit`). Rival nations fly base
+// kit: no grant lets a rival design.
+
+/// An air kit item's ADDITION to its class's numbers (air_class_stats, Lua).
+struct air_combat_stats
+{
+    int hp        = 0;
+    int air       = 0;
+    int soft      = 0;
+    int hard      = 0;
+    int strategic = 0;
+    int recon     = 0;
+    int range     = 0;
+};
+
+inline constexpr int k_air_kit_slot_count = 3; ///< Airframe · Armament · Avionics.
+
+struct air_kit_item
+{
+    const char*      id;
+    const char*      name;          ///< Mechanism name. Never an Earth proper noun.
+    air_class        cls;
+    uint8_t          slot;          ///< < k_air_kit_slot_count.
+    air_combat_stats delta;
+    std::array<kit_good, k_kit_goods_max> goods;
+    uint8_t          goods_count;
+    const char*      research_node; ///< nullptr for base kit.
+};
+
+/// Every air kit item, in id order (the id is the index).
+const std::vector<air_kit_item>& air_kit_catalogue();
+
+/// nullptr when the air catalogue is well-formed, else the first rule it breaks.
+const char* air_kit_catalogue_first_error();
+
+/// "Airframe", "Armament", "Avionics"; "" out of range.
+const char* air_kit_slot_name(int slot);
+
+/// The air catalogue ids fitting (@p c, @p slot), base first. Empty out of range.
+const std::vector<uint16_t>& air_kit_items_for(air_class c, int slot);
+
+/// The air catalogue id of variant @p variant of (@p c, @p slot), or k_no_kit_item.
+uint16_t air_kit_item_at(air_class c, int slot, uint8_t variant);
+
+/// The air catalogue id with string id @p id, or k_no_kit_item.
+uint16_t air_kit_item_by_id(std::string_view id);
+
+/// The variant of air catalogue item @p item within its slot; 0 for an unknown item.
+uint8_t air_kit_variant_of(uint16_t item);
+
+/// The land kit's lock rule, for air kit: base always; a later item when @p nation
+/// holds its research node (or the harness waiver is on).
+bool air_kit_item_researched(const world& w, entity_id nation, uint16_t item);
+
+/// @p nation's live air design for @p c (base kit except where `air_design_kit` names an item).
+unit_design air_design_of(const world& w, entity_id nation, air_class c);
+
+/// The air catalogue id fitted in @p slot of @p nation's live design for @p c.
+uint16_t air_design_fitted(const world& w, entity_id nation, air_class c, int slot);
+
+/// The sum of design @p d's kit deltas for @p c. A variant out of range reads as base.
+air_combat_stats air_kit_delta(air_class c, const unit_design& d);
+
+/// The goods of every non-base item of @p d: what a wing hire to it buys.
+std::array<float, resource_count> air_kit_goods(air_class c, const unit_design& d);
+
+/// Is @p d a design @p c can hold (each variant inside its slot's list)? The save loader's check.
+bool air_design_valid(air_class c, const unit_design& d);

@@ -472,8 +472,14 @@ int main()
         check(ok63, "U6b a v63 stream reads as base kit everywhere");
         // The tail: 3 counts + nation (4+4+2n) + units (4+6 each) + musters (4+3 each).
         const std::size_t n = f.w.nations.at(f.nation).unit_design_kit.size();
-        world plain_now = plain;
-        const std::string pb = to_bytes(plain_now);
+        // BL-1449: v64 (the designs' own stream) is today's less the v65 air section,
+        // so the designs section is measured against the v64 writer.
+        std::string pb;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_air(plain, o);
+            pb = o.str();
+        }
         std::size_t units_off = 0;
         for (const auto& [uid, u] : plain.units) units_off += (!u.kit.is_base() || !u.refit_kit.is_base()) ? 1 : 0;
         check(pb.size() == v63.size() + 12 + (8 + 2 * n) + 10 * units_off + 7,

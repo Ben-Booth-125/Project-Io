@@ -351,8 +351,52 @@ An air wing is **based** at an airbase and **assigned** to provinces in range wi
 **air superiority**, **strategic bombing** of infrastructure and production, or **tactical
 bombing** of land and sea units. It never stands on a tile. Air units carry HP, morale, an air
 attack, and ground soft and hard attack; they carry **no hardness**, because every aircraft is
-soft. Classes: planes (fighter, strike, strategic bomber, helicopter) and strike drones. Ground air
-defence engages every mission flown over its province.
+soft. Ground air defence engages every mission flown over its province.
+
+**The airbase is its own building (Ben, 2026-10-28).** An airbase is built and placed on a nation's
+own ground as a military base is, and is the one door a wing is hired at: a wing records its airbase
+as a land unit records its `muster_base`, and the same orphan rule disbands a wing whose airbase is
+torn down. A military base hosts no wings. A wing's quarterly supply is drawn at its airbase's tile
+(§ Upkeep — supply is drawn where the unit stands).
+
+**Six classes (Ben, 2026-10-28).**
+
+| Class | Missions | Character |
+|---|---|---|
+| **Fighter** | Air superiority | Air attack only. |
+| **Strike / multirole** | Tactical bombing; superiority at a discount | Ground soft and hard attack, some air attack. |
+| **Strategic bomber** | Strategic bombing | Long range, costly; dies to dense air defence. |
+| **Attack helicopter** | Tactical bombing | Short range, cheap; strong hard attack. |
+| **Strike drone** | Tactical bombing, recon | Cheap; no pilot, so no morale. |
+| **Recon / AWACS** | Recon | No attack; raises its side's hits in the province and spots. |
+
+Each class has an authored **range in tiles**, and its slots in the designer are **airframe,
+armament and avionics** (Ben, 2026-10-28), on the same one-live-design rule as the land classes
+(§ The kit).
+
+**Assignment is to provinces in range, straight line (Ben, 2026-10-28).** A wing is assigned a
+mission and a set of provinces; a province is in range when the straight-line tile distance from
+the airbase to the province's nearest tile is within the class's range. The player assigns by
+**right-clicking a province with the wing selected** (`../ui/ledgers/military.md`). Missions are
+flown **daily**, on the same day step as the march and battles.
+
+**Air superiority** in a province is each side's share of the air attack flying superiority there.
+It does three things to the side that lacks it: it **scales down that side's bombing missions** in
+the province, it **slows that side's march** through the province, and it **reveals that side's
+units** in the province to the side that holds it. Superiority is fought plane against plane, and
+ground air defence still shoots every mission whatever the share.
+
+**Tactical bombing hits enemy units in the province, units in battle first (Ben, 2026-10-28).** A
+tactical mission spends its hits on enemy units fighting a battle in the province first, and on any
+other enemy unit there once none is in battle. Its hits use the land arithmetic (soft and hard
+attack against the target's hardness), with no terrain divisor, since an aircraft attacks from
+above.
+
+**Strategic bombing damages a building, and damage slows its throughput (Ben, 2026-10-28).** Each
+building carries a **condition**, full when built. A strategic mission lowers the condition of an
+enemy building in the province, and a building's throughput scales with its condition — a factory
+at half condition runs at half rate. Condition is **repaired** over time by drawing goods, as a unit
+refits HP, so a bombed economy rebuilds at a cost and an unbuildable repair stays damaged.
 
 ### Sea
 

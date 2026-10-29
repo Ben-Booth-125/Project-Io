@@ -2311,3 +2311,12 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   `march_unit`. **Not admitted:** any unit or front of another nation, the player's included;
   declaring the hostility a push needs (that stays the stance scorer's, BL-450); a campaign planned
   beyond the next order. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **Rival nations fly air wings — granted (Ben, 2026-10-28; `../military/MILITARY.md` § Air).** A new
+  subject: a rival nation's scorer may build airbases on its own ground, hire wings at them, and
+  assign each of its OWN wings a mission over provinces in the wing's range — air superiority,
+  tactical or strategic bombing, or recon — chosen by scored utility over the same legal verbs the
+  player's right-click issues. Bombing missions target only a nation the rival is already hostile
+  to. **Not admitted:** any wing, airbase or mission of another nation, the player's included;
+  declaring the hostility a bombing mission needs (that stays the stance scorer's, BL-450); a
+  campaign of missions planned beyond the next assignment. Pure, seeded, deterministic, replayable,
+  legal verbs only, never a planner.

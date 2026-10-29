@@ -700,6 +700,18 @@
   [
    "ledger.unit_order_declare_confirm",
    "The small confirm a right-click attack on a nation the player is not hostile to opens beside the cursor (BL-1443; SELECTION.md § Right-click orders)."
+  ],
+  [
+   "gameplay.hire_wing",
+   "No surface yet: the Military ledger's air rows (BL-1450, air UI) will carry the press. A corp_verb (corp_verb::hire_wing, 44) on the command seam today."
+  ],
+  [
+   "gameplay.assign_air_mission",
+   "No surface yet: right-clicking a province with the wing selected (docs/ui/ledgers/military.md; BL-1450, air UI) will issue it. A corp_verb (corp_verb::assign_air_mission, 45) on the command seam today."
+  ],
+  [
+   "gameplay.set_air_design",
+   "No surface yet: the Design tab's air classes (BL-1450, air UI). A corp_verb (corp_verb::set_air_design, 46) on the command seam today."
   ]
  ]
 }

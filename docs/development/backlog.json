@@ -1041,6 +1041,86 @@
    ],
    "title": "Designer picks draft; Save commits the live design, Revert drops the draft",
    "design": "Ben, 2026-10-28 (NR-1096 option C). The design is written in docs/ui/ledgers/military.md § The designer: a pick changes the draft only; changed slots are marked; Save sends set_unit_design for each changed slot; Revert drops the draft; closing with an unsaved draft asks save or discard; the fitted item stays disabled. UI-only: set_unit_design is unchanged. Needs a live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-28",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben air form 2026-10-28)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1449",
+   "short_name": "AIR_COMBAT_CORE",
+   "priority": "A",
+   "difficulty": 4,
+   "requires": [],
+   "files": [
+    "src/world/components.hpp",
+    "src/world/unit_roster.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/battle_system.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/unit_designs.cpp",
+    "src/world/world_save.cpp",
+    "scripts/economy.lua"
+   ],
+   "title": "Air combat: airbases, six wing classes, daily missions, superiority, air defence, tactical and strategic bombing with building condition",
+   "design": "Written in MILITARY.md § Air (Ben, 2026-10-28). Airbase is a new building, the one door a wing is hired at; orphan rule as muster_base. Six classes with authored range in tiles and designer slots airframe/armament/avionics. assign_air_mission verb: mission + provinces in straight-line range. Daily mission pass: superiority share per province (scales enemy bombing, slows enemy march, reveals enemy units), air defence shoots every mission, tactical bombing hits units in battle first then any enemy unit (land arithmetic, no terrain divisor), strategic bombing lowers a building condition that scales throughput and repairs by drawing goods. Wing supply drawn at its airbase tile. Save section, ACTIONS.json entries, a harness."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-28",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben air form 2026-10-28)",
+   "category": "UI",
+   "authority_doc": "docs/ui/ledgers/military.md",
+   "id": "BL-1450",
+   "short_name": "AIR_UI",
+   "priority": "A",
+   "difficulty": 3,
+   "requires": [
+    "BL-1449"
+   ],
+   "files": [
+    "src/ui/military_ledger.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/core/app.cpp",
+    "src/ui/unit_designer.cpp"
+   ],
+   "title": "Military ledger groups by theatre (collapsible); wing card; right-click a province assigns a wing; air designer slots",
+   "design": "Written in docs/ui/ledgers/military.md § Grouped by theatre (Ben, 2026-10-28). Recruit and Design group rows under collapsible Land / Air headers; airbases under Air in the base picker; right-click a province with a wing selected assigns it (out of range refused with distance and range); wing card sets mission and lists provinces; designer opens for air classes. Needs a live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-28",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben air form 2026-10-28)",
+   "category": "Military",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "id": "BL-1451",
+   "short_name": "RIVAL_AIR",
+   "priority": "B",
+   "difficulty": 3,
+   "requires": [
+    "BL-1449"
+   ],
+   "files": [
+    "src/world/corp_ai.cpp"
+   ],
+   "title": "Rival nations build airbases, hire wings and assign missions by scored utility",
+   "design": "Granted (Ben, 2026-10-28) in AI_OPPONENT.md § 11: own wings only, bombing only against a nation already hostile, no hostility declared for it, never a planner. Pure, seeded, deterministic."
   }
  ]
 }

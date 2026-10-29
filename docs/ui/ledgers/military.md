@@ -35,6 +35,19 @@ Two views behind a `nav_button` strip, inside `foldout_begin("Military")`.
 **Why Recruit is the default.** It is the act the ledger exists for; Design is set once and
 revisited when a technology lands.
 
+### Grouped by theatre (Ben, 2026-10-28)
+
+**Recruit and Design group their rows by theatre** — Land, then Air (and Sea and Space as they
+arrive) — each under a **collapsible header** carrying the theatre's name and its count. A header
+is a toggle: pressing it folds or unfolds its rows. On Recruit the base picker lists military bases
+under Land and airbases under Air, and a row raises at a base of its own theatre only. Design lists
+the air classes beside the land ones; each opens the same full-canvas designer with its own slots
+(airframe, armament, avionics).
+
+**A wing is ordered from the canvas.** With a wing selected, right-clicking a province assigns the
+wing there on its current mission; a province out of range is refused with its distance and the
+wing's range. The wing card on the Selection band sets the mission and lists the provinces assigned.
+
 ### The empty states
 
 - **No military base** → Recruit says **"No military base"** and offers the Construction ledger's

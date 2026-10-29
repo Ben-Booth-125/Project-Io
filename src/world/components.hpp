@@ -644,6 +644,11 @@ enum class building_type : uint8_t
                           ///< city tile touching track, zero staff, a build cost and upkeep —
                           ///< the port's shape on land. Produces nothing. State industry in a
                           ///< major (transport sector), a background firm's in a minor.
+    airbase = 12, ///< BL-1449 (MILITARY.md § Air, Ben 2026-10-28): the one door an air wing is
+                  ///< hired at, built on a nation's own ground as a military base is. Produces
+                  ///< nothing, staffs at zero, is no supply anchor. A wing records its airbase
+                  ///< and is disbanded when it goes (the muster_base orphan rule). A military
+                  ///< base hosts no wings.
 };
 
 /// One past the last building type — the wire parser's range gate (BL-396:
@@ -653,7 +658,7 @@ enum class building_type : uint8_t
 /// enum's tail, the same way resource_count derives from resource_type::count:
 /// appending a type means moving this with it.
 static constexpr uint8_t building_type_count =
-    static_cast<uint8_t>(building_type::railway_station) + 1;
+    static_cast<uint8_t>(building_type::airbase) + 1;
 
 /// Infrastructure is every building that is not a producer (PRODUCTION.md §
 /// Infrastructure buildings): ports, logistics hubs, railway stations, the
@@ -1183,6 +1188,15 @@ struct building_component
     /// corporation owns. SERIALISED in the v48 state-industry trailing section
     /// (world_save.cpp) so a load reads what the surfaces read before the save.
     bool state_idle = false;
+
+    /// BL-1449 (MILITARY.md § Air, strategic bombing): the building's CONDITION,
+    /// per-mille, full (1000) when built. A strategic mission lowers it; its
+    /// throughput scales with it (`building_supply_scalar` folds it in, so every
+    /// reader of output — the tick, the preview, the Logistic Point sources —
+    /// sees the same rate); it repairs a little each day by drawing goods
+    /// (air_combat.cpp's repair pass), so an unbuildable repair stays damaged.
+    /// Saved sparsely in world_save v65's air section; hashed only when < 1000.
+    int32_t condition_permille = 1000;
 };
 
 /// BL-641. The output scalar `building_component::supply_factor_permille`
@@ -1195,13 +1209,24 @@ struct building_component
 /// arithmetic is bit-for-bit what it was before this field existed. Values above
 /// 1000 are clamped rather than rewarded: supply cannot make a building better
 /// than its own nominal, only worse.
+///
+/// BL-1449: THE CONDITION FOLDS IN HERE TOO (MILITARY.md § Air: "a factory at
+/// half condition runs at half rate"), multiplied in, so a bombed building and an
+/// unsupplied one dim by the same channel. A full-condition building takes the
+/// unchanged path, bit for bit.
 inline float building_supply_scalar(const building_component& b)
 {
-    return (b.supply_factor_permille >= 1000)
+    const float supply = (b.supply_factor_permille >= 1000)
              ? 1.0f
              : ((b.supply_factor_permille <= 0)
                     ? 0.0f
                     : static_cast<float>(b.supply_factor_permille) / 1000.0f);
+    if (b.condition_permille >= 1000)
+        return supply;
+    const float cond = (b.condition_permille <= 0)
+                           ? 0.0f
+                           : static_cast<float>(b.condition_permille) / 1000.0f;
+    return supply * cond;
 }
 
 /// Construction is measured in DAYS (Ben, 2026-10-24; PRODUCTION.md § Construction
@@ -1949,6 +1974,59 @@ struct muster_order
     unit_design kit{};
 };
 
+// ---------------------------------------------------------------------------
+// BL-1449 — air wings (MILITARY.md § Air, Ben 2026-10-28)
+// ---------------------------------------------------------------------------
+// A wing is BASED at an airbase and ASSIGNED to provinces with a mission; it never
+// stands on a tile. So it is NOT a unit_component and lives in its own container
+// (`world::wings`): no land path — march, battle contact, tile blocking, fronts,
+// upkeep, the blackboard's unit section — can mistake it for a ground unit, because
+// none of them can see it. air_combat.hpp owns everything a wing does.
+
+/// The six air classes. APPEND-ONLY: a wing's roster row names one.
+enum class air_class : uint8_t
+{
+    fighter    = 0, ///< Air superiority. Air attack only.
+    multirole  = 1, ///< Tactical bombing; superiority at a discount.
+    bomber     = 2, ///< Strategic bombing. Long range, costly; dies to dense air defence.
+    helicopter = 3, ///< Tactical bombing. Short range, cheap; strong hard attack.
+    drone      = 4, ///< Tactical bombing, recon. Cheap; no pilot, so no morale.
+    recon      = 5, ///< Recon / AWACS. No attack; raises its side's hits and spots.
+};
+inline constexpr int air_class_count = 6;
+
+/// A wing's mission. APPEND-ONLY (saved, and carried in `corp_command::order`).
+enum class air_mission : uint8_t
+{
+    none        = 0, ///< Unassigned: on the ground at its airbase.
+    superiority = 1, ///< Fight hostile aircraft over the provinces.
+    tactical    = 2, ///< Bomb hostile units, units in battle first.
+    strategic   = 3, ///< Bomb hostile buildings' condition.
+    recon       = 4, ///< Raise its side's hits and spot hostile units.
+};
+inline constexpr int air_mission_count = 5;
+
+/// The most provinces one assignment may name (the verb's fixed-size field).
+inline constexpr std::size_t k_air_mission_provinces_max = 8;
+
+/// A wing's HP is held in parts per million of its full HP, so damage on any
+/// class's HP scale lands without rounding to nothing.
+inline constexpr int32_t k_wing_hp_full = 1000000;
+
+struct air_wing
+{
+    entity_id owner   = null_entity; ///< The nation that flies it.
+    entity_id airbase = null_entity; ///< Its base: the ORPHAN KEY, as a unit's muster_base.
+    uint16_t  type    = 0;           ///< Air roster row (air_combat.hpp `air_roster_table`).
+    int32_t   hp_ppm  = k_wing_hp_full; ///< HP, ppm of full. At 0 the wing is lost.
+    int32_t   morale_permille        = 1000; ///< Scales its attack. A drone's stays 1000.
+    int32_t   supply_factor_permille = 1000; ///< Steered by its upkeep draw, as a unit's.
+    int32_t   muster_days = 0;       ///< Days left raising it; it flies nothing until 0.
+    unit_design kit{};               ///< The air design it was raised to (airframe/armament/avionics).
+    air_mission mission = air_mission::none;
+    std::vector<uint32_t> provinces; ///< Assigned provinces, ascending, <= k_air_mission_provinces_max.
+};
+
 /// BL-1427 (fronts; MILITARY.md § Fronts): a front's order. Hold is the default and
 /// is never stored; push is open only toward a neighbour the nation is hostile to.
 enum class front_order : uint8_t
@@ -2465,6 +2543,11 @@ struct nation_component
     /// Ascending, no duplicates. Read through `design_of`; written only by
     /// `set_unit_design`. Saved (world_save_version 64) and hashed only when non-empty.
     std::vector<uint16_t> unit_design_kit;
+    /// BL-1449 (MILITARY.md § Air): the live AIR designs, as `unit_design_kit` is the
+    /// land ones — the air kit catalogue ids (unit_designs.hpp `air_kit_catalogue`)
+    /// of every non-base item fitted, at most one per (air class, slot), ascending.
+    /// Written only by `set_air_design`. Saved (world_save_version 65).
+    std::vector<uint16_t> air_design_kit;
 };
 
 // ---------------------------------------------------------------------------
