@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*175 entries — 43 gameplay · 30 canvas · 16 lens · 53 ledger · 33 chrome.*
+*176 entries — 43 gameplay · 31 canvas · 16 lens · 53 ledger · 33 chrome.*
 
 ---
 
@@ -778,7 +778,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `gameplay.set_unit_design` — The unit designer, a full-canvas takeover opened from a land class row in the Military ledger's Design tab (ledger.military_open_designer) or from the type name on the player's unit card (ledger.selection_unit_type_designer): per land class, one choice of kit per slot. Also a corp_verb (corp_verb::set_unit_design, 43) on the command seam.
 
-**Press.** Open the designer for a class, press a slot's box, and choose an item in its list (canvas.designer_slot_pick); locked kit is shown but cannot be chosen. Over the seam: COMMAND corp=<nation> verb=43 order=<land class> recipe=<slot> unit_type=<kit catalogue id>.
+**Press.** Open the designer for a class, press a slot's box, draft an item from its list (canvas.designer_slot_pick), then Save (canvas.designer_save) - one command per changed slot; locked kit is shown but cannot be chosen. Over the seam: COMMAND corp=<nation> verb=43 order=<land class> recipe=<slot> unit_type=<kit catalogue id>.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1155,7 +1155,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `canvas.designer_slot_pick` — The unit designer (full canvas): a slot's box, and the item list it opens beside it.
 
-**Press.** Click a slot's box to open its item list (click it again to close the list). The list holds the slot's kit, base first: each row names the item, its stat change against the fitted item, its goods per unit, and - when your nation lacks its research node - a LOCKED badge with the node named. Click a live row to fit it. Hovering a row previews the design's stats and goods with it fitted.
+**Press.** Click a slot's box to open its item list (click it again to close the list). The list holds the slot's kit, base first: each row names the item, its stat change against the item the draft fits, its goods per unit, and - when your nation lacks its research node - a LOCKED badge with the node named. Click a live row to draft it. Hovering a row previews the design's stats and goods with it fitted.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1163,12 +1163,29 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 | `item` | `kit catalogue id` | The row pressed. |
 
 **Valid when:**
+- The designer is open on a class, and its close prompt is not up.
+- A row is live when unit_design_check would apply it against the live design (the item is researched and not the live item), or when it is the live item and the draft has moved off it (picking it returns the slot to the live design). The draft's own item is disabled and badged 'Fitted'; the live item, when the draft differs, is badged 'Saved'. A locked row is disabled with 'Locked: needs research <node>'. Every later item is locked until its kit node is in the age tree.
+
+**Expected output.** A pick DRAFTS (Ben, 2026-10-28, NR-1096): it changes only the open design's draft and issues nothing. The slot's box shows the drafted item, marked 'Changed' with an amber edge while it differs from the live design; the summary shows the draft's stats and goods; the Save row reads 'N slot(s) changed, not saved.' Picking the live item again clears that slot's change. The world is unchanged until canvas.designer_save.
+
+**Reason to select.** Try kit in each slot of the classes you raise, weighing its stats against its goods, before saving the design.
+
+### `canvas.designer_save` — The unit designer (full canvas): the Save design and Revert buttons under the summary, and the close prompt ('Unsaved changes to the <class> design' - Save / Discard / Keep editing) that a close with an unsaved draft raises.
+
+**Press.** Click Save design to commit the draft, or Revert to drop it. Closing the designer (its class press - ledger.military_open_designer or ledger.selection_unit_type_designer -, its top-left return control, Esc, or opening another full-canvas view) while a slot is changed keeps it open and raises the prompt: Save commits and closes, Discard drops the draft and closes, Keep editing dismisses the prompt.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `button` | `one of save, revert, prompt_save, prompt_discard, prompt_keep` | The button pressed. |
+
+**Valid when:**
 - The designer is open on a class.
-- A row is live only when unit_design_check would apply it: the item is researched and not already fitted. A locked row is disabled with 'Locked: needs research <node>'; the fitted row is marked 'Fitted'. Every later item is locked until its kit node is in the age tree.
+- Save design and Revert are live only while at least one slot's draft differs from the live design, and not while the prompt is up.
+- The prompt's buttons exist only while the prompt is up.
 
-**Expected output.** Issues gameplay.set_unit_design {order = class, recipe = slot, unit_type = item} at the frame's end through the player's seat - one slot per press. The pick IS the class's live design at once (there is no separate save): new hires are raised with it and buy its kit goods; units in the field keep their recorded design until refitted (gameplay.refit_unit to their own row). The designer shows the seam's answer: 'Saved: new units are raised with this design.', 'Not researched yet.', 'Already fitted.' or 'That kit does not fit this slot.'.
+**Expected output.** Save issues gameplay.set_unit_design {order = class, recipe = slot, unit_type = item} once per changed slot at the frame's end through the player's seat, then drops the draft: the saved design is the class's live design at once (new hires are raised with it and buy its kit goods; units in the field keep their recorded design until refitted - gameplay.refit_unit to their own row). The designer then shows 'Saved: new units are raised with this design.', or 'Saved N of M changes; the rest were refused: <reason>.' Revert and Discard issue nothing; the boxes return to the live design. The prompt's Save and Discard carry the interrupted close on to where it was going (the ledger or card the designer was opened from, or the other view).
 
-**Reason to select.** Fit the best researched kit in each slot of the classes you raise, weighing its goods against what your shelves hold.
+**Reason to select.** Save once the draft is the design you want new hires raised to; Revert to abandon it.
 
 ### `canvas.front_select` — A front line on the Planetary canvas: the player nation's fronts, drawn along the shared hex edges between each span and the neighbour's ground, in the colour of the player's stance toward that neighbour (hostile red, neutral gold, friendly green), with the number of units assigned on a small plate at the span's middle edge. Plain canvas only, like the border band.
 
@@ -2095,13 +2112,13 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - The Military ledger is open on Design.
 
-**Expected output.** The unit designer takes the canvas region (the full-canvas rung; the ledger column, header, Selection band and minimap stay). The class's image fills the middle; one box per kit slot (infantry 2, every other class 3) sits beside it with a leader line to the slot's point on the image; each box shows the slot, the fitted item and its stat change. Under the image: the design's soft attack, hard attack, defence, breakthrough and hardness, its kit goods per unit, and how many of your units in the field are on an older design. It closes on the same press, its top-left return control, or Esc. Nothing in the world changes.
+**Expected output.** The unit designer takes the canvas region (the full-canvas rung; the ledger column, header, Selection band and minimap stay). The class's image fills the middle; one box per kit slot (infantry 2, every other class 3) sits beside it with a leader line to the slot's point on the image; each box shows the slot, the fitted item and its stat change. Under the image: the design's soft attack, hard attack, defence, breakthrough and hardness, its kit goods per unit, and how many of your units in the field are on an older design. It closes on the same press, its top-left return control, or Esc - unless a slot's draft is unsaved, when it stays open and asks Save or Discard (canvas.designer_save). Nothing in the world changes.
 
 **Reason to select.** Answers 'what is this kind of unit carrying, and what can it carry instead?'. Open it to see what each slot holds, what research would open, and to change the class's live design.
 
 ### `ledger.selection_unit_type_designer` — Selection band, the unit card's Roster page (the card's second page): the unit type's name under 'Type', for the player's own unit.
 
-**Press.** Click the type name. Clicking it again while the designer is open on that unit's class closes it (the toggle rule).
+**Press.** Click the type name. Clicking it again while the designer is open on that unit's class closes it (the toggle rule) - unless a slot's draft is unsaved, when the designer stays open and asks Save or Discard (canvas.designer_save).
 
 **Valid when:**
 - A unit of your own nation is selected and its card is on the Roster page. A rival's unit shows its type as plain text: the designer edits your own designs.

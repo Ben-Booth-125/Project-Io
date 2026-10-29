@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui_state.hpp"
+#include "world/unit_designs.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
 
@@ -19,9 +20,13 @@ namespace ui {
 /// `unit_design_check` refuses is disabled with the seam's reason. The summary
 /// under the image is the design's stats and kit goods, previewing the hovered pick.
 ///
-/// SAVING IS PER PICK. A live pick queues `designer.pending_*`, which app::render
-/// sends as one `set_unit_design` (the seam is per slot): the choice is at once the
-/// class's live design — new hires take it; units in the field take it by refit.
+/// A PICK DRAFTS; SAVE COMMITS (Ben, 2026-10-28, NR-1096). A pick changes only the
+/// open design's draft (`designer.draft`): the boxes and summary show the draft, and
+/// a box whose draft differs from the live design is marked changed. Save queues
+/// `designer.pending`, which app::render sends as one `set_unit_design` per changed
+/// slot (the seam is per slot); Revert drops the draft. Any close — the toggle
+/// press, the return control, Escape, another takeover — asked for with an unsaved
+/// draft keeps the designer open and asks Save or Discard.
 ///
 /// Draws nothing unless the designer is the open takeover. Call every frame.
 void draw_unit_designer(const world& w, ui_state& s);
@@ -33,5 +38,17 @@ void toggle_unit_designer(ui_state& s, land_class c);
 
 /// Whether the designer is open on @p c.
 bool unit_designer_open_on(const ui_state& s, land_class c);
+
+/// The design the designer shows for @p c: @p nation's live design with the open
+/// draft's picks over it (just the live design when the draft is for another
+/// class). What the boxes, the summary — and a stat grid reading the open design —
+/// read, so every reader agrees on what "the draft" is.
+unit_design unit_designer_draft_design(const world& w, const ui_state& s, entity_id nation, land_class c);
+
+/// `kit_stats` of `unit_designer_draft_design`: the drafted design's numbers.
+land_combat_stats unit_designer_draft_stats(const world& w, const ui_state& s, entity_id nation, land_class c);
+
+/// The slots of the open draft that differ from @p nation's live design (0 = clean).
+int unit_designer_changed_slots(const world& w, const ui_state& s, entity_id nation);
 
 } // namespace ui

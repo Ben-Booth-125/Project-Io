@@ -368,24 +368,42 @@ struct military_ledger_state
 /// The unit designer (docs/ui/ledgers/military.md § The designer): the full-canvas
 /// takeover `detail_surface::unit_designer`, keyed by land class. Which class is
 /// open lives in `ui_state::expanded`; this holds the rest of its view state, the
-/// one queued pick, and where its controls landed so a verify script presses the
+/// draft and its queued Save, and where its controls landed so a verify script presses the
 /// REAL control. VIEW state, not serialised.
 struct unit_designer_state
 {
     int  slot_open = -1;    ///< The slot whose item list is open; -1 = none.
     int  open_cls  = -1;    ///< The class the state above belongs to (a class change resets it).
 
-    /// A pick queued for app::render, which sends `set_unit_design` (one slot per press).
-    int           pending_cls  = -1; ///< -1 = nothing pending.
-    int           pending_slot = 0;
-    std::uint16_t pending_item = 0;
-    std::string   last_message;      ///< The seam's answer to the last pick (app writes it).
+    /// THE DRAFT (military.md § The designer, "A pick drafts; Save commits"; Ben,
+    /// 2026-10-28, NR-1096). A pick changes only this: one kit catalogue id per slot
+    /// for class `draft_cls`, 0xFFFF where the slot keeps the live design's item.
+    /// The boxes and summary show the draft; Save sends it; Revert drops it.
+    /// Read the drafted design through `unit_designer_draft_design`.
+    int                          draft_cls = -1;
+    std::array<std::uint16_t, 3> draft{0xFFFFu, 0xFFFFu, 0xFFFFu}; ///< k_kit_slot_max slots.
+
+    /// The close prompt: a close (toggle press, return control, Escape, another
+    /// takeover) asked for while the draft differs from the live design. The
+    /// designer stays open and asks Save or Discard; `after_*` is where the close
+    /// was going, applied once the prompt is answered.
+    bool           confirm_close = false;
+    detail_surface after_surface = detail_surface::none;
+    int            after_key     = 0;
+
+    /// Save's picks, queued for app::render, which sends one `set_unit_design`
+    /// per changed slot (the seam is per slot).
+    struct pending_pick { int cls = -1; int slot = 0; std::uint16_t item = 0; };
+    std::vector<pending_pick> pending;
+    std::string   last_message;      ///< The seam's answer to the last Save (app writes it).
 
     // Published each frame the designer draws; x < 0 = absent.
     struct drawn_box
     {
         int         slot = 0;
-        std::string name, fitted;
+        std::string name, fitted;                 ///< `fitted`: the DRAFT's item, what the box shows.
+        std::string live;                         ///< The live design's item in this slot.
+        bool        changed = false;              ///< The draft differs from the live design here.
         float       x = -1.0f, y = -1.0f;         ///< The box's centre (its press).
         float       anchor_x = -1.0f, anchor_y = -1.0f;
     };
@@ -400,6 +418,13 @@ struct unit_designer_state
     std::vector<drawn_box>  boxes;
     std::vector<drawn_item> items;    ///< The open slot's list, drawn order.
     float back_x = -1.0f, back_y = -1.0f;
+    float save_x = -1.0f, save_y = -1.0f;     ///< The Save press (live only with a changed slot).
+    float revert_x = -1.0f, revert_y = -1.0f; ///< The Revert press.
+    /// The close prompt's presses; x < 0 when the prompt is not up.
+    float prompt_save_x = -1.0f, prompt_save_y = -1.0f;
+    float prompt_discard_x = -1.0f, prompt_discard_y = -1.0f;
+    float prompt_keep_x = -1.0f, prompt_keep_y = -1.0f;
+    int   changed_slots = 0;          ///< Slots whose draft differs from the live design.
     int   stale_units = 0;            ///< Field units of the class on an older design.
     int   drawn_cls   = -1;           ///< The class drawn this frame; -1 = closed.
 
