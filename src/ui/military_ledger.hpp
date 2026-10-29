@@ -20,6 +20,13 @@ namespace ui {
 ///   press opens the full-canvas unit designer for that class (unit_designer.hpp),
 ///   and pressing the lit row again closes it. Below, the obsolete-type toggles.
 ///
+/// GROUPED BY THEATRE (BL-1450; military.md § Grouped by theatre): both tabs set
+/// their rows under collapsible Land and Air headers, each with its count. Recruit's
+/// Air holds an airbase picker, the six air rows (Raise queues `military.pending_wing_*`,
+/// which app sends as `hire_wing`) and the player's wings, each a press selecting it;
+/// Design's Air holds the six air classes, each opening the air designer
+/// (unit_designer.hpp).
+///
 /// RAISE IS NOT A SECOND HIRE PATH. The press writes `construction.pending_hire_tile`
 /// / `pending_hire_unit_type`, which `app::render` executes through the
 /// `hire_unit` verb — the same request the tile card's Hire press makes.

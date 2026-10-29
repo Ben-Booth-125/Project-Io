@@ -670,6 +670,10 @@
    "The unit designer (full canvas): a slot's box, and the item list it opens beside it."
   ],
   [
+   "canvas.designer_save",
+   "The unit designer (full canvas): the Save design and Revert buttons under the summary, and the close prompt ('Unsaved changes to the <class> design' - Save / Discard / Keep editing) that a close with an unsaved draft raises."
+  ],
+  [
    "ledger.selection_unit_type_designer",
    "Selection band, the unit card's Roster page (the card's second page): the unit type's name under 'Type', for the player's own unit."
   ],
@@ -703,15 +707,59 @@
   ],
   [
    "gameplay.hire_wing",
-   "No surface yet: the Military ledger's air rows (BL-1450, air UI) will carry the press. A corp_verb (corp_verb::hire_wing, 44) on the command seam today."
+   "The Military ledger's air rows (nav rail slot 7, Recruit tab, under the Air header; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too."
   ],
   [
    "gameplay.assign_air_mission",
-   "No surface yet: right-clicking a province with the wing selected (docs/ui/ledgers/military.md; BL-1450, air UI) will issue it. A corp_verb (corp_verb::assign_air_mission, 45) on the command seam today."
+   "The wing card on the Selection band (ledger.selection_wing_mission, ledger.selection_wing_remove_province) and a right-click on a province of the Planetary canvas with the wing selected (canvas.wing_assign_province). Also a corp_verb (corp_verb::assign_air_mission, 45) on the command seam."
   ],
   [
    "gameplay.set_air_design",
-   "No surface yet: the Design tab's air classes (BL-1450, air UI). A corp_verb (corp_verb::set_air_design, 46) on the command seam today."
+   "The designer opened on an air class (ledger.military_open_air_designer; canvas.air_designer_slot_pick). Also a corp_verb (corp_verb::set_air_design, 46) on the command seam."
+  ],
+  [
+   "ledger.military_theatre_header",
+   "Military ledger (nav rail slot 7), Recruit and Design tabs: the collapsible theatre headers 'Land (N)' and 'Air (N)' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes)."
+  ],
+  [
+   "ledger.military_air_raise",
+   "Military ledger, Recruit tab, under the Air header: the airbase picker ('Raise at' - one row per completed airbase of your nation, with the wings based there) and one row per air class (Interceptor Wing, Strike Wing, Strategic Bomber Wing, Attack Helicopter Wing, Strike Drone Wing, Airborne Early Warning Wing), each with its class, the missions it flies, its live design's numbers (air, soft, hard, strategic, recon, range), its price and a 'Raise' press. With no airbase the theatre reads 'No airbase' and offers 'Find a site for an airbase'."
+  ],
+  [
+   "ledger.military_find_airbase_site",
+   "Military ledger, Recruit tab, Air header: 'Find a site for an airbase' - shown only when your nation has no completed airbase."
+  ],
+  [
+   "ledger.military_select_wing",
+   "Military ledger, Recruit tab, Air header, 'Your wings': one row per wing of your nation - its type and what it is doing ('mustering, N d left', 'no mission', or '<mission> over N provinces')."
+  ],
+  [
+   "ledger.military_open_air_designer",
+   "Military ledger, Design tab, under the Air header: one row per air class (Fighter, Strike / multirole, Strategic bomber, Attack helicopter, Strike drone, Recon / AWACS), its name a press with the missions it flies and its live design's numbers under it."
+  ],
+  [
+   "canvas.air_designer_slot_pick",
+   "The unit designer opened on an air class (full canvas; the same designer as the land classes', with the slots Airframe, Armament and Avionics): a slot's box, and the item list it opens beside it."
+  ],
+  [
+   "canvas.air_designer_save",
+   "The unit designer opened on an air class: the Save design and Revert buttons under the summary, and the close prompt ('Unsaved changes to the <class> design' - Save / Discard / Keep editing) a close with an unsaved draft raises. One draft at a time across land and air: opening the other theatre's designer is a close like any other."
+  ],
+  [
+   "canvas.wing_select",
+   "Planetary canvas: the wing marker - a round plate with the aircraft, at the upper right of the hex of each of your airbases that bases a wing, with the number of wings based there when more than one."
+  ],
+  [
+   "canvas.wing_assign_province",
+   "Planetary canvas with one of your wings selected: the hovered hex is outlined in the air colour with a line at the cursor saying what a right-click would do, or in red with why it is refused."
+  ],
+  [
+   "ledger.selection_wing_mission",
+   "Selection band, the wing card: header (aircraft, the wing's type, its class and its airbase); left, its HP, morale, supply, muster days left, range and numbers; middle, the Mission buttons - None and only the missions its class flies - the active one lit; right, 'Provinces (n of 8)'."
+  ],
+  [
+   "ledger.selection_wing_remove_province",
+   "Selection band, the wing card's 'Provinces' column: one row per assigned province (its population centre's name, or 'Province N', and who holds it) with an 'x' press."
   ]
  ]
 }

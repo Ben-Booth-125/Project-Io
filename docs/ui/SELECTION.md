@@ -460,6 +460,13 @@ card's shape is built ahead of units carrying much in the live economy (Ben's di
 
 `ui_state::selection_unit_page` is the pager index, mirroring `selection_building_page`.
 
+**The stat grid takes the centre (Ben, 2026-10-29).** Beside the portrait — the class's authored
+image (`assets/units/<class>.png`, the designer's) in the left quarter — the centre column is the
+unit's **stat grid** (`ledgers/military.md` § The stat grid): every stat the unit fights with, in
+one grid, headed by its type and owner. The Strength and Roster pages fold into it; what is left
+(the front it holds, a refit in progress) is a line under the grid. A rival's unit shows design
+stats only once seen, internals never.
+
 A unit standing with others of its owner on its tile carries a **`< Group (N)`** press in the
 card's header, left of 'go to', which returns the band to that group (§ The unit group element).
 

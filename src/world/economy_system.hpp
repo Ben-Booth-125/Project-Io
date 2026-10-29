@@ -769,14 +769,6 @@ struct unit_upkeep_tick
 ///               `reservation_mult` at its 0 default nothing is ever written.
 unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_report& report);
 
-/// THE ONE DISBAND PATH (BL-467's aftermath ruling; MILITARY.md § Upkeep, "Orphan
-/// cleanup"): erase every unit ground to zero men, or whose owning nation, tile or
-/// recorded muster base is gone, in ascending unit id, and strip their ids from every
-/// live battle's unit lists. Returns how many were erased. `run_unit_upkeep` runs it
-/// at the quarter, and the daily military pass after each day's battles (BL-1445), so
-/// a unit a battle kills is removed that same day. There is no second disband site.
-int disband_orphaned_units(world& w);
-
 /// BL-1449: THE ONE SHELF DRAW (`draw_goods_or_bid`, the path run_unit_upkeep and
 /// run_building_upkeep take), for a caller outside this file — a wing's upkeep at its
 /// airbase, a bombed building's repair. Draws @p need at @p tile for @p owner, bidding
@@ -789,6 +781,14 @@ int draw_goods_at_tile(world& w, const recipe_registry& reg, economy_report& rep
 /// BL-1449: a unit's supply step toward its target (run_unit_upkeep's own rule),
 /// exported so a wing's supply moves by the very same step.
 int step_unit_supply_toward(int factor, int target_permille, const unit_upkeep_params& up);
+
+/// THE ONE DISBAND PATH (BL-467's aftermath ruling; MILITARY.md § Upkeep, "Orphan
+/// cleanup"): erase every unit ground to zero men, or whose owning nation, tile or
+/// recorded muster base is gone, in ascending unit id, and strip their ids from every
+/// live battle's unit lists. Returns how many were erased. `run_unit_upkeep` runs it
+/// at the quarter, and the daily military pass after each day's battles (BL-1445), so
+/// a unit a battle kills is removed that same day. There is no second disband site.
+int disband_orphaned_units(world& w);
 
 // ---------------------------------------------------------------------------
 // BL-641 — the building pass

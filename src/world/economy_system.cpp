@@ -3470,12 +3470,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // NR-344 ("war flips the queue") lives in the daily march's visit order.
     advance_musters(w);
     advance_refits(w); // Ben, 2026-10-27: a refit completes on the tick, as a muster does
-    // BL-1449 (MILITARY.md § Air): the air missions. MERGE RESOLUTION (BL-1453's lane,
-    // merging BL-1445 and BL-1449 as they stood): the battles, march and fronts are
-    // daily now (run_military_day), but the air day draws repair goods onto an
-    // economy_report the daily pass does not carry, so the call stays here, flying
-    // the quarter's 90 days once a tick, until it is moved onto the daily step with
-    // days = 1 (owed: thread a report through run_military_day / advance_quarter_to).
+
+    // BL-1449 (MILITARY.md § Air): the air missions, still flown over the quarter's 90
+    // days HERE rather than in the daily military pass (run_military_day), until they
+    // move onto it (owed). The superiority they leave is read by the next quarter's
+    // daily marches and battles.
     report.air = run_air_missions(w, reg, report, econ_tick_days_world);
     phase_stamp(10); // (the battle phase is daily now: run_military_day)
     phase_stamp(11); // (recovery and the march are daily now: run_military_day)
@@ -4097,6 +4096,7 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
     for (const entity_id id : disband)
     {
         w.units.erase(id);
+        w.forget_air_unit(id); // BL-1449
         ++out.disbanded;
     }
     return out;

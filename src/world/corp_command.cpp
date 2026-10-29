@@ -1268,6 +1268,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // from under a live contract it was committed to. Nothing commits a
             // unit any more, so there is no lock left to honour.
             w.units.erase(uit); // no refund — manpower walks away (BL-470's design)
+            w.forget_air_unit(cmd.subject); // BL-1449: no air record names a gone unit
             return corp_command_result::applied;
         }
 

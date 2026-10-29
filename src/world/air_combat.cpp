@@ -98,6 +98,24 @@ bool air_class_flies(const recipe_registry& reg, air_class c, air_mission m)
     return (reg.military().air.cls[static_cast<std::size_t>(c)].missions & air_mission_bit(m)) != 0;
 }
 
+bool condition_bites(building_type t)
+{
+    switch (t)
+    {
+        case building_type::extraction_site:
+        case building_type::processing_facility:
+        case building_type::port:
+        case building_type::inland_logistics_hub:
+        case building_type::research_institute:
+        case building_type::university:
+        case building_type::planetary_marketplace:
+        case building_type::railway_station:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool air_mission_bombs(air_mission m)
 {
     return m == air_mission::tactical || m == air_mission::strategic;
@@ -274,10 +292,13 @@ corp_command_result air_mission_check(const world& w, const recipe_registry& reg
         if (!air_province_in_range(w, reg, wg, p))
             return corp_command_result::rejected_placement;
 
-    // Bombing only over a province held by a nation the owner is hostile to
-    // (directed: the owner's own declaration — MILITARY.md § Air, and the rival
-    // grant's "only a nation the rival is already hostile to").
-    if (air_mission_bombs(m))
+    // STRATEGIC bombing only over a province held by a nation the owner is hostile
+    // to (directed: the owner's own declaration — MILITARY.md § Air, and the rival
+    // grant's "only a nation the rival is already hostile to"). TACTICAL bombing may
+    // fly over ANY province — the owner's own, a third nation's, the sea — because
+    // its hostility rule is on the TARGET: run_air_day hits only units of a nation
+    // the owner is hostile to (cold review, 2026-10-29: close air support on home soil).
+    if (m == air_mission::strategic)
         for (const uint32_t p : set)
         {
             const entity_id holder = province_holder_for(w, p);
@@ -563,7 +584,7 @@ air_day_tick run_air_day(world& w, const recipe_registry& reg, economy_report& r
         for (const entity_id bid : bids)
         {
             const building_component& b = w.buildings.at(bid);
-            if (b.ticks_remaining <= 0)
+            if (b.ticks_remaining <= 0 && condition_bites(b.type))
                 buildings_in[w.provinces.province_of(b.tile)].push_back(bid);
         }
     }
@@ -771,15 +792,25 @@ air_day_tick run_air_missions(world& w, const recipe_registry& reg, economy_repo
                               int days)
 {
     air_day_tick sum;
-    if (w.wings.empty())
+    // THE FAST PATH (cold review): no wing flying, none finishing its muster inside
+    // the span, and no building below full condition — then every day of the span
+    // would fly nothing, repair nothing and leave an empty superiority map and reveal
+    // set, so the span is applied at once: musters run down, the maps clear.
     {
-        // Nothing flies: but a building bombed before its last wing died still repairs,
-        // and a stale map must not slow a march.
-        bool damaged = false;
-        for (const auto& kv : w.buildings)
-            damaged = damaged || kv.second.condition_permille < 1000;
-        if (!damaged && w.air_superiority.empty() && w.air_revealed.empty())
+        bool busy = false;
+        for (const auto& [wid, wg] : w.wings)
+            busy = busy || wing_flies(w, wg) || (wg.muster_days > 0 && wg.muster_days <= days);
+        for (auto it = w.buildings.begin(); !busy && it != w.buildings.end(); ++it)
+            busy = it->second.condition_permille < 1000;
+        if (!busy)
+        {
+            for (auto& [wid, wg] : w.wings)
+                if (wg.muster_days > 0)
+                    wg.muster_days = std::max(0, wg.muster_days - std::max(0, days));
+            w.air_superiority.clear();
+            w.air_revealed.clear();
             return sum;
+        }
     }
     for (int d = 0; d < days; ++d)
     {
@@ -842,6 +873,10 @@ wing_upkeep_tick run_wing_upkeep(world& w, const recipe_registry& reg, economy_r
         ++out.wings;
         if (wg.muster_days > 0)
             continue; // still being raised: draws nothing yet
+        // Grounded by its base — decommissioned or (rebuilt) still a site — it flies
+        // nothing (wing_flies) and draws no fuel either; its supply stands.
+        if (bit->second.decommissioned || bit->second.ticks_remaining > 0)
+            continue;
         // Supply is drawn where the wing stands — at its airbase.
         const int share = draw_goods_at_tile(w, reg, report, wg.owner, bit->second.tile,
                                              ap.wing_upkeep_goods);

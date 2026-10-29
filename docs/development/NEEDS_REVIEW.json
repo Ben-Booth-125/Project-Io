@@ -291,6 +291,16 @@
     "src/ui/unit_designer.cpp",
     "docs/ui/ledgers/military.md"
    ]
+  },
+  {
+   "raised": "2026-10-29",
+   "status": "open",
+   "id": "NR-1097",
+   "kind": "decision",
+   "title": "Land battle form: three readings taken in writing the carried-supplies and recon rulings",
+   "source": "main session (Ben land battle form 2026-10-29)",
+   "what": "(1) The quarterly supply share arrives as a DAILY resupply of share x daily need, not one quarterly top-up - a quarterly refill dips below full the day after, so the flat hunger penalty would apply almost always. (2) The round reads the three carried stocks; supply_factor_permille no longer scales hits directly, it only sets the resupply rate. (3) Air superiority adds recon in proportion to its share rather than making revealed units fully visible, so superiority alone does not settle every battle. Also: the stat grid replaces the unit card's Strength and Roster pages.",
+   "why_it_matters": "Each changes how strong a supplied, a half-supplied and an air-covered army is. Written into MILITARY.md § Carried supplies, § Recon and § Air, ledgers/military.md § The stat grid, SELECTION.md. Work: BL-1452 (carried supplies), BL-1453 (land recon), BL-1454 (unit stat grid)."
   }
  ]
 }

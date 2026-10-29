@@ -90,6 +90,54 @@ void shield(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
     dl->AddPolyline(v, 5, outline, ImDrawFlags_Closed, 1.0f);
 }
 
+// Aircraft silhouette (BL-1450; MILITARY.md § Air) — top-down, nose up: a narrow
+// fuselage, a pair of swept main wings and a small tailplane. Several convex parts,
+// so each is outlined first and every fill is laid over every outline: the union
+// then carries an outline on its outside edge only. The airbase marker and the wing
+// marker both draw it; nothing else on the canvas has wings, so it never reads as
+// the shield, the port's triangle or the hub's hexagon.
+void aircraft(ImDrawList* dl, ImVec2 c, float r, ImU32 fill, bool outlined)
+{
+    const ImVec2 fus[6] = {
+        { c.x,             c.y - r },          // nose
+        { c.x + r * 0.16f, c.y - r * 0.62f },
+        { c.x + r * 0.14f, c.y + r * 0.78f },
+        { c.x,             c.y + r * 0.92f },  // tail
+        { c.x - r * 0.14f, c.y + r * 0.78f },
+        { c.x - r * 0.16f, c.y - r * 0.62f },
+    };
+    const ImVec2 wing_r[4] = {
+        { c.x + r * 0.12f, c.y - r * 0.30f },
+        { c.x + r * 1.00f, c.y + r * 0.22f },
+        { c.x + r * 1.00f, c.y + r * 0.40f },
+        { c.x + r * 0.12f, c.y + r * 0.18f },
+    };
+    const ImVec2 wing_l[4] = {
+        { c.x - r * 0.12f, c.y - r * 0.30f },
+        { c.x - r * 0.12f, c.y + r * 0.18f },
+        { c.x - r * 1.00f, c.y + r * 0.40f },
+        { c.x - r * 1.00f, c.y + r * 0.22f },
+    };
+    const ImVec2 tail[4] = {
+        { c.x - r * 0.42f, c.y + r * 0.86f },
+        { c.x - r * 0.10f, c.y + r * 0.58f },
+        { c.x + r * 0.10f, c.y + r * 0.58f },
+        { c.x + r * 0.42f, c.y + r * 0.86f },
+    };
+    if (outlined)
+    {
+        const float t = std::max(1.5f, r * 0.14f);
+        dl->AddPolyline(fus, 6, outline, ImDrawFlags_Closed, t);
+        dl->AddPolyline(wing_r, 4, outline, ImDrawFlags_Closed, t);
+        dl->AddPolyline(wing_l, 4, outline, ImDrawFlags_Closed, t);
+        dl->AddPolyline(tail, 4, outline, ImDrawFlags_Closed, t);
+    }
+    dl->AddConvexPolyFilled(fus, 6, fill);
+    dl->AddConvexPolyFilled(wing_r, 4, fill);
+    dl->AddConvexPolyFilled(wing_l, 4, fill);
+    dl->AddConvexPolyFilled(tail, 4, fill);
+}
+
 // Market-stall silhouette — the Planetary Marketplace marker (BL-1266/BL-1269;
 // TRADE.md § The Planetary Marketplace). An awning — a trapezoid flaring out over
 // its counter — on a narrower stall block, both FILLED and outlined like every
@@ -477,7 +525,7 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
         case building_type::railway_station:      hub_node(dl, centre, r, fill);  break; // BL-1255: the hub glyph until one is drawn
         case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
         case building_type::military_base:        shield(dl, centre, r, fill);    break; // BL-325
-        case building_type::airbase:              shield(dl, centre, r, fill);    break; // BL-1449: the shield until BL-1450 draws one
+        case building_type::airbase:              aircraft(dl, centre, r, fill, true); break; // BL-1450: its own glyph, the aircraft
         case building_type::research_institute:   research(dl, centre, r, fill);  break; // BL-332
         // BL-615: education pair reuses the research glyph family until the
         // icon vocabulary gives them their own (ICONS.md owns that call).
@@ -1262,6 +1310,34 @@ void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool commit
         constexpr ImU32 kCommittedRing = IM_COL32(255, 195, 60, 230);
         dl->AddCircle(centre, r * 1.20f, kCommittedRing, 20, 2.0f);
     }
+}
+
+void aircraft(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    aircraft(dl, centre, r, colour, true);
+}
+
+void wing_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count, bool hovered)
+{
+    // A round dark plate — the land counter is square, so a wing never reads as a
+    // unit standing on the tile — with the aircraft in the owner's colour on it.
+    dl->AddCircleFilled(centre, r, IM_COL32(18, 20, 26, 235));
+    dl->AddCircle(centre, r, fill, 0, std::max(1.0f, r * 0.12f));
+    aircraft(dl, centre, r * 0.72f, fill, false);
+    if (count > 1 && r >= 6.0f)
+    {
+        char buf[8];
+        std::snprintf(buf, sizeof buf, "%d", count);
+        ImFont*      font = ImGui::GetFont();
+        const float  size = std::max(8.0f, std::min(ImGui::GetFontSize(), r * 1.1f));
+        const ImVec2 ts   = font->CalcTextSizeA(size, FLT_MAX, 0.0f, buf);
+        const ImVec2 at{ centre.x + r * 0.55f, centre.y + r * 0.35f };
+        dl->AddRectFilled({ at.x - 1.0f, at.y }, { at.x + ts.x + 1.0f, at.y + ts.y },
+                          IM_COL32(18, 20, 26, 235));
+        dl->AddText(font, size, at, IM_COL32(235, 235, 240, 255), buf); // fit-exempt: on-canvas badge, sized to its own text
+    }
+    if (hovered)
+        dl->AddCircle(centre, r + std::max(1.5f, r * 0.15f), palette::hover, 0, 2.0f);
 }
 
 void unit_counter(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count,

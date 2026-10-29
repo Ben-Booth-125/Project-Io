@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*12 entries — 10 open, 2 resolved.*
+*13 entries — 11 open, 2 resolved.*
 
 ---
 
@@ -163,6 +163,13 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 > **Recommendation:** A now; B only if old saves matter before v1.0.
 
 *Files: `scripts/recipes.lua`, `docs/economy/PRODUCTION.md`*
+
+### NR-1097 — Land battle form: three readings taken in writing the carried-supplies and recon rulings
+*decision · raised 2026-10-29 · from main session (Ben land battle form 2026-10-29)*
+
+(1) The quarterly supply share arrives as a DAILY resupply of share x daily need, not one quarterly top-up - a quarterly refill dips below full the day after, so the flat hunger penalty would apply almost always. (2) The round reads the three carried stocks; supply_factor_permille no longer scales hits directly, it only sets the resupply rate. (3) Air superiority adds recon in proportion to its share rather than making revealed units fully visible, so superiority alone does not settle every battle. Also: the stat grid replaces the unit card's Strength and Roster pages.
+
+**Why it matters.** Each changes how strong a supplied, a half-supplied and an air-covered army is. Written into MILITARY.md § Carried supplies, § Recon and § Air, ledgers/military.md § The stat grid, SELECTION.md. Work: BL-1452 (carried supplies), BL-1453 (land recon), BL-1454 (unit stat grid).
 
 ---
 

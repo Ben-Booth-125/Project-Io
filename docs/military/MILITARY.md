@@ -122,23 +122,23 @@ attacking is dear, and breaking a defender takes about 1.5:1 in men — the defe
 break, so the decisive share equals the result. `swing_permille` stays at 600 (NR-204: a narrower
 swing made the edge too safe).
 
-**A battle has no maximum duration (Ben, 2026-10-29).** *"Battles shouldn't have maximum durations.
-They continue while one unit is trying to move and end when readiness runs out. Some battles may
-easily take 90-180 days."* A fight runs, a round a day, until one side is **broken** (no unit of it
-left fighting) or **withdraws**; the attacker cancelling its move is its withdrawal. Nothing ends a
-fight on the calendar. Measured through the daily pass with recon (`move_by_days_harness` D6,
-infantry on plains, 40 openings a ratio, days from contact to close): **7.0 days at 1:1** (the
-attacker breaks), 10.6 at 1.5:1 (the contested band, the longest), 7.5 at 2:1 and 4.7 at 3:1; the
-longest single fight ran 14 days. Base-infantry fights are short because readiness is spent fast;
-a long fight is one whose sides are hard to spend. A battle in which neither side can land a hit
-runs until the attacker withdraws. The round's damage is calibrated to the day:
-one round is one day's fighting, so the per-round numbers above are a day's. A commander
-gets a decision every day of the fight — a withdrawal is honoured at the next day's boundary —
-rather than one between two quarters.
+**A battle has no maximum duration (Ben, 2026-10-29).** *"They continue while one unit is trying
+to move and end when readiness runs out. Some battles may easily take 90-180 days."* A battle runs
+for as long as the attacking side still holds its order to move onto the defended tile, and it ends
+only when a side's readiness is spent (broken) or a side withdraws. Cancelling the attacker's move
+is the withdrawal verb, priced as any withdrawal. There is no round cap and no stalemate by
+exhaustion of rounds: the recon ramp (§ Recon, full vision by day 20) always completes inside a
+battle. **A battle is weeks long, not days (Ben, 2026-10-29):** the daily round's readiness
+damage is scaled so that a battle at parity runs about **30–60 days**, one at 1.5:1 runs longer
+still, and a rout stays fast. **Breaking a defender takes about 1.5:1 in men** (Ben, 2026-10-29,
+keeping the ratio the uncapped battle produced). The round's damage is calibrated to the day — one round is one day's fighting, so the
+per-round numbers above are a day's — and a commander gets a decision every day of the fight, a
+withdrawal honoured at the next day's boundary.
 
 **Withdrawal is a first-class verb, not a failure state**, and it is never free. The cost has three
 terms — base, per-round, and pursuit — and the second and third are what make a late break-off
-dear. Rounds already fought have separately cost their own attrition, so a late exit is expensive
+dear. Because a battle has no cap, the per-round term is bounded so that a late exit stays dear but
+never costs more men than the side has. Rounds already fought have separately cost their own attrition, so a late exit is expensive
 twice over.
 
 Withdrawing consumes **no draws** — disengaging is a decision, not another gamble.
@@ -149,9 +149,8 @@ side still took and dealt that round's damage. Both breaking at once resolves in
 favour, consistent with every other tie across both paths.
 
 Ends are enumerated: `attacker_broken`, `defender_broken`, `attacker_withdrew`,
-`defender_withdrew`. Withdrawal is its own end state rather than a flavour of defeat. A fifth value,
-`stalemate`, is produced by nothing since battles have no maximum duration; it stays so a saved
-battle that ended on it still reads.
+`defender_withdrew`. Withdrawal is its own end state rather than a flavour of defeat. (`stalemate`
+remains a value only so an older save still reads; nothing produces it.)
 
 ---
 
@@ -169,21 +168,89 @@ reads is shown on the surface that reads it.
 | **HP** | stored, per unit | Men and equipment fit to fight. **At 0 the unit dies.** Refilled over time by drawing equipment and manpower (§ Refit). |
 | **Readiness** | stored, per unit | Cohesion in contact. Takes most of the damage. **At 0 the unit retreats** one tile away from the enemy. Recovers out of contact. |
 | **Morale** | stored, per unit | Will to fight. Scales the unit's attack and caps its maximum readiness. Moved by supply, victories, losses and its nation's war exhaustion. |
-| **Supply** | stored, per unit | `supply_factor_permille`, as today (§ Upkeep). Scales attack and recovery alongside morale. |
+| **Food** | stored, per unit, ‰ | The carried food stock (§ Carried supplies). Below full, a flat penalty; at zero, the unit starves. |
+| **Ammunition** | stored, per unit, ‰ | The carried ammunition stock. Scales every combat stat, floored at 20%. |
+| **Equipment** | stored, per unit, ‰ | The carried equipment stock — the kit fit to use. Scales every combat stat. |
+| **Supply** | stored, per unit | `supply_factor_permille`: the share of its supplies the network delivers (§ Upkeep). It is what resupplies the three stocks, not a scale on the round of its own. |
 | **Soft attack** | class × equipment | Hits per round against a target's soft share. |
 | **Hard attack** | class × equipment | Hits per round against its hard share. |
 | **Hardness** | class × equipment, 0..1 | Share of the unit that is armoured. |
 | **Defence** | class | Hits absorbed when defending. |
 | **Breakthrough** | class | Hits absorbed when attacking. |
+| **Recon** | class × equipment | Recon points the unit gives its side (§ Recon). |
+| **Stealth** | class × equipment | Recon points an enemy needs to see the whole unit (§ Recon). |
 
 **The arithmetic.** A unit's hits on a target are
 `soft_attack × (1 − target.hardness) + hard_attack × target.hardness`, scaled by its morale and
-supply. The defender's ground divides the attacker's hits (`terrain_defence`: a mountain halves
+its carried supplies (§ Carried supplies), then by the **share of the target its side can see**
+(§ Recon). The defender's ground divides the attacker's hits (`terrain_defence`: a mountain halves
 them). The target absorbs up to its defence (defending) or breakthrough (attacking), raised by
 fortification; absorbed hits land at a fraction, the rest in full. Landed damage
 splits between HP and readiness, readiness taking the larger share, so most fights end in a
 retreat rather than a death — which is how real units fail. **There is no piercing-versus-armour
 check**: hardness alone carries "infantry cannot hurt tanks".
+
+### Carried supplies (Ben, 2026-10-29)
+
+**A unit carries three stocks — food, ammunition and equipment — each in per-mille of full.** They
+are stored on the unit and move every day: food is eaten at the unit's ration rate, ammunition is
+spent by every day the unit fights, and equipment is lost to battle and to attrition. They are
+**refilled by the quarterly supply draw** (§ Upkeep, "Supply is drawn where the unit stands"): the
+share the network granted for the quarter arrives as a daily resupply. **Restock scales with cover
+(Ben, 2026-10-29):** each day a stock receives `share × (daily need + restock rate)`, capped at full
+— *"half cover then drains more slowly, full cover refills"*. A unit covered in full refills by the
+restock rate a day; a unit covered in part drains at the shortfall, more slowly than its bare need;
+the share at which a stock holds steady is `need / (need + restock rate)`. The sub-‰ remainder of a
+delivery carries from day to day, so rounding never drains a covered unit. A unit raised at a base
+starts full. **A unit past its roads is unfed even at home (Ben, 2026-10-29)**: a home garrison on a
+tile its network does not cover draws nothing, and starves like any other unit.
+
+**Only the road gap starves (Ben, 2026-10-29).** The share that resupplies the stocks is the
+**Logistic Point share** at the unit's tile — whether the network reaches it. A nation that does
+not pay a unit's wage, or whose goods draw goes unmet, lowers that unit's readiness and morale
+through the supply factor (§ Upkeep), but **never empties its food**: hunger is a road problem,
+not a budget problem. **Starvation runs from the handoff (Ben, 2026-10-29):** the pre-game settle
+keeps every stock full, and the stocks move only once the campaign begins.
+
+- **Hunger.** Below full food, the unit takes a **flat −15% to its attack and to its readiness
+  recovery**. It is a flat step, not a slope: a hungry army is a worse army at once.
+- **Starvation.** At zero food the unit **loses HP linearly, its full establishment over 180 days**
+  (1/180 a day), and its **readiness is capped at its HP share** (men over establishment), so a
+  starving unit's strength falls with its men. Food returning stops the loss; it does not return
+  the men (that is refit's, § Land — equipment, refit and manpower).
+- **Ammunition and equipment.** Each **scales every combat stat in proportion** — soft attack, hard
+  attack, defence and breakthrough. **Ammunition is floored at 20%**: a unit out of shells still
+  fights with small arms at close quarters. Equipment has no floor. The two multiply, with morale.
+
+The three stocks are what the round reads for supply; `supply_factor_permille` is the delivered
+share that feeds them, so the one decay rule (§ Upkeep) now moves the stocks' resupply rather than
+scaling hits directly.
+
+### Recon (Ben, 2026-10-29)
+
+**A unit damages only the part of its target its side can see.** Each target unit has a
+**stealth** — the recon points needed to see all of it — and each side has **recon points** over
+the battle. The visible share of a target is `min(1, side recon / target stealth)`, and **every
+hit on that target is scaled by it**: seeing 40% of a unit lands 40% of the hits on it.
+
+**Recon is two-way, with no floor, and the defender is favoured (Ben, 2026-10-29).** Both sides
+need vision to do damage, and a side with no recon on a fresh battle lands nothing. **The
+defender's recon counts 1.5×** — it knows its ground. A side's recon points are the sum of:
+
+- **Its units' kit.** Recon is a kit stat like soft attack (§ The kit): light armour, drones and
+  optics carry it; most kit carries none.
+- **Its units adjacent.** Each of its own nation's units on a tile adjacent to the defended tile adds
+  its recon, whether or not it joined the battle.
+- **Time in battle.** Each day of fighting reveals more: by **day 20, time alone gives full vision**
+  — a target's stealth × `min(1, days / 20)` — so every battle eventually sees.
+- **Air.** **Every one of the side's wings active over the province gives recon** (Ben, 2026-10-29:
+  *"all air active in a region gives recon"*) — the recon class most, the others a base authored
+  amount — and the side holding air superiority over the province adds recon in proportion to its
+  share (§ Air).
+
+**Stealth is a kit stat too.** Each class has a base stealth, and kit raises it: **better armour for
+infantry gives more stealth** (Ben's example). The designer shows recon and stealth beside the other
+stats (`../ui/ledgers/military.md` § The designer).
 
 ### Land — the classes
 
@@ -225,7 +292,7 @@ tab (`../ui/ledgers/military.md`).
   rival nations field base kit, since no AI grant lets a rival design.
 - **The kit catalogue.** Every slot of every class lists its items: the **base item** first — the
   1960 standard, adding nothing and costing no goods — then **two to four later items**. A later
-  item carries a **stat delta** (soft attack, hard attack, hardness, defence, breakthrough), its
+  item carries a **stat delta** (soft attack, hard attack, hardness, defence, breakthrough, recon, stealth), its
   **goods** and the **research node** that opens it. A design's stats are its class's plus its
   kit's deltas, before the roster row's quality scale; hardness stays inside 0..1000. The catalogue
   is validated where it is authored, so a slot without a base item, or an item that fits no slot,
@@ -393,7 +460,9 @@ flown **daily**, on the same day step as the march and battles.
 It does three things to the side that lacks it: it **scales down that side's bombing missions** in
 the province, it **slows that side's march** through the province, and it **reveals that side's
 units** in the province to the side that holds it. Superiority is fought plane against plane, and
-ground air defence still shoots every mission whatever the share.
+ground air defence still shoots every mission whatever the share. **Air also sees for the land
+battle (Ben, 2026-10-29)**: every wing active over a province adds recon to its side's battles
+there, and superiority adds recon in proportion to its share (§ Recon).
 
 **Tactical bombing hits enemy units in the province, units in battle first (Ben, 2026-10-28).** A
 tactical mission spends its hits on enemy units fighting a battle in the province first, and on any
@@ -508,6 +577,51 @@ not a moor — but attrition alone must still be able to stop an army crossing a
 defending. **Neither resolver reads it**; its consumers are `src/world/history_ladder.cpp` (pricing
 conquest at generation time) and `tools/verify/world_audit.cpp`.
 
+### Terrain and the classes (Ben, 2026-10-29)
+
+**Ground treats the classes differently: tanks cannot cross mountains without a road, and fight
+worse in them.** On top of the shared terrain table above, which every unit reads alike, each land
+class carries a **per-terrain row** with up to four effects:
+
+- **Move** — a multiplier on the march days (§ Marching), on top of the tile's traversal cost.
+- **Blocked unless roaded** — the class cannot enter the tile without a road on it. A block refuses
+  *entry*, never exit: a unit already standing on such a tile may leave it.
+- **Fight** — a scale on the unit's soft attack, hard attack, defence and breakthrough when the
+  battle's ground (the defended tile, § Battles) is that terrain. It applies to each unit by its own
+  class, on both sides. **A road on the defended tile halves the fight debuff.**
+- **Wear** — the unit's carried equipment (§ Carried supplies) drains faster each day it stands
+  there.
+
+Desert is the **dunes** cover; mountain, canyon and rift are landforms; marsh, forest, urban and
+snow are covers.
+
+| Class | Mountain | Canyon / rift | Marsh | Desert (dunes) | Forest | Urban | Snow |
+|---|---|---|---|---|---|---|---|
+| Infantry | — | — | — | — | stealth ×1.5 | stealth ×1.5 | — |
+| Motorised infantry | dismounts | dismounts | blocked unless roaded | move ×1.25 | move ×1.25 | — | move ×1.25 |
+| Mechanised infantry | dismounts | dismounts | blocked unless roaded | — | move ×1.25 | fight −15% | — |
+| Light armour | blocked unless roaded; fight −40% | blocked unless roaded | blocked unless roaded | move ×1.25; wear | fight −25% | fight −30% | move ×1.5 |
+| Medium armour | blocked unless roaded; fight −50% | blocked unless roaded; fight −40% | blocked unless roaded; fight −50% | blocked unless roaded; fight −30% | move ×1.5; fight −30% | fight −40% | move ×1.25 |
+| Artillery | blocked unless roaded | blocked unless roaded | blocked unless roaded | move ×1.25 | move ×1.5 | fight −20% | move ×1.5 |
+| Air defence | blocked unless roaded | blocked unless roaded | blocked unless roaded | wear | — | — | move ×1.25 |
+
+- **Infantry carriers dismount (Ben, 2026-10-29).** Motorised and mechanised infantry are never
+  blocked by high ground: on mountain, canyon or rift they leave their vehicles and march at foot
+  infantry's pace.
+- **Tanks are blocked in desert too (Ben, 2026-10-29).** Medium armour needs a road to enter dunes,
+  and fights there at −30%.
+- **The worst row only (Ben, 2026-10-29).** A tile that matches two rows — a forested mountain —
+  applies, per effect, the worst of them for the unit: blocked if either blocks, the larger move
+  multiplier, the deeper fight debuff, the faster wear. They never multiply.
+- **Terrain moves stealth both ways (Ben, 2026-10-29).** Concealing cover hides infantry (×1.5 in
+  forest and urban, above), and **open ground exposes everyone**: on plains or highland with no
+  concealing cover (none, grass, salt, snow or dunes) every unit's stealth is ×0.75 (§ Recon).
+
+The rows are authored data beside the march days (`economy.military`), keyed by class and terrain,
+and checked by the loader as the march days are. **A block is a per-class wall in the path**: a
+march or a front's order routes around it, an order with no legal route is refused with the reason,
+and a retreat never steps onto a tile its class cannot enter.
+
 ---
 
 ## The unit model
@@ -605,8 +719,9 @@ the 2026-09-06 reading that the campaign raises no fleet. The Era −1 sim's nav
 [`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md) § Naval's. The domain
 table above still says which classes may be where.
 
-**Overseas supply WORKS, and there is no starvation model here.** Historically nations supplied
-overseas expeditions perfectly well; that is most of what a navy is for. The Era −1 sim applies a
+**Overseas supply WORKS.** Historically nations supplied
+overseas expeditions perfectly well; that is most of what a navy is for. An army goes hungry only
+where its network cannot reach it (§ Carried supplies), never because the sea is in the way. The Era −1 sim applies a
 shore-adjacency forage **simplification** because it needs overseas reach to cost *something* and
 cannot afford a logistics model — it is a stand-in, labelled as one in its own document, and it
 does not describe the campaign.
@@ -1075,6 +1190,13 @@ its province would guard nothing. A capital province that is also a border provi
 capital rule. Neither post is the province's lowest-id tile, which is its id rather than its place
 (BL-1145, a province's readers take its anchor).
 
+**A garrison is posted only where its network covers (Ben, 2026-10-29).** Each post above is chosen
+among the province's tiles that its nation's Logistic Point cover reaches at the handoff, by the
+same rule (the anchor centre; the tile facing the neighbour). A province with no covered tile posts
+its garrison on the covered tile of the nation's own ground nearest the post the rule would have
+chosen, ties to the lowest tile id. A nation's opening army therefore starts fed (§ Carried
+supplies).
+
 **Every capital is generated with a military base (Ben, 2026-10-27).** Each nation, major or minor,
 opens owning one completed `military_base` on its own ground in its capital province, on the legal
 tile nearest its capital garrison: one `can_place` accepts, an empty tile before one the stacking
@@ -1172,8 +1294,8 @@ goods draw went unmet. Both fire the **same** subtraction on `supply_factor_perm
 mean the same thing — an army that is not being supplied gets weaker. It is deliberately not two
 rules. The subtraction stops at the unit's **supply share**: zero out of reach, and on a short draw
 the mean over its goods of the fraction met, in integer per-mille (BL-1172, fair-price upkeep). A
-unit fed half its draw hits at half strength, since the land round scales each unit's hits by its
-supply factor, and its morale drifts toward it.
+unit fed half its draw is resupplied at half its daily need, so its carried stocks run down
+(§ Carried supplies) and its morale drifts toward the share.
 
 The reach trigger is **opt-in**: a non-positive `out_of_supply_reach` disables it *and* the
 Dijkstra behind it, so a zero table costs no time as well as no credits. The test is
@@ -1201,11 +1323,13 @@ everything that keeps a unit in the field: food upkeep, ammunition resupply, the
 attrition, and the recruits and equipment that refill its HP (§ Land — equipment, refit and
 manpower). The request is the quantity of those goods, as a convoy's draw is its cargo. Where the
 tile's cover meets only part of it, the unit is supplied at that share, and the one decay rule above
-moves its supply factor toward it — a third trigger of the same rule, not a second rule. An army
-deep past its roads is an army its network cannot feed.
+moves its supply factor toward it — a third trigger of the same rule, not a second rule. The
+supply factor is the rate at which the unit's carried food, ammunition and equipment are refilled
+(§ Carried supplies). An army deep past its roads is an army its network cannot feed.
 
 **Supply is measurably real in the resolver, not merely expensive.** The land round reads each
-unit's `supply_factor_permille`, so an unsupplied army is weaker where it counts.
+unit's carried food, ammunition and equipment (§ Carried supplies), which its supply factor refills,
+so an unsupplied army is weaker where it counts.
 
 ---
 

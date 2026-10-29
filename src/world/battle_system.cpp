@@ -704,7 +704,10 @@ shared_tile_fix resolve_shared_tiles(world& w)
             strip(b.attacking_units);
         }
         for (const entity_id uid : doomed)
+        {
             w.units.erase(uid);
+            w.forget_air_unit(uid); // BL-1449
+        }
         out.disbanded = static_cast<int>(doomed.size());
     }
     return out;
