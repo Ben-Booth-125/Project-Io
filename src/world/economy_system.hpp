@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "recipe_registry.hpp"
 #include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
+#include "carried_supplies.hpp" // BL-1452: carried_supplies_day, the daily stock step
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
@@ -925,7 +926,8 @@ void charge_supply_draws(world& w, const recipe_registry& reg, const lp_tick& lp
 struct military_day_result
 {
     battle_tick     battles;       ///< The battle step (rounds, losses, dispatches).
-    int             disbanded = 0; ///< Units removed after the battles (`disband_orphaned_units`).
+    carried_supplies_day supplies; ///< BL-1452: the day's drain, resupply and starvation.
+    int             disbanded = 0; ///< Units removed after the battles and starvation (`disband_orphaned_units`).
     unit_march_tick march;         ///< The march, including the attacks it opened.
 };
 

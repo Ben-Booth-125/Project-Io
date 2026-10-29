@@ -1920,6 +1920,27 @@ struct unit_component
     /// `refit_unit` (the live design when the refit was ordered, its kit paid for
     /// then) and taken into `kit` when the refit completes. Base when not refitting.
     unit_design refit_kit{};
+
+    // BL-1452 (carried supplies; MILITARY.md § Carried supplies, Ben 2026-10-29): the
+    // three stocks a unit carries, each per-mille of full, and the starvation carry.
+    // Full at hire (these defaults), drained and refilled once a day by
+    // `run_carried_supplies_day` (carried_supplies.hpp), read by the land round
+    // through `carried_attack_permille` / `carried_combat_permille`. Saved
+    // (world_save_version 66, only off full) and hashed only off full.
+
+    /// Carried food, per-mille. Below 1000 the unit is hungry; at 0 it starves.
+    int32_t   food_permille = 1000;
+
+    /// Carried ammunition, per-mille. Scales every combat stat, floored at 20%.
+    int32_t   ammo_permille = 1000;
+
+    /// Carried equipment (the kit fit to use), per-mille. Scales every combat stat.
+    int32_t   equipment_permille = 1000;
+
+    /// The starvation remainder: establishment-days owed toward the next man lost,
+    /// in [0, k_starvation_days). A starving unit loses establishment / 180 men a day
+    /// with this integer carry, so the whole establishment goes in exactly 180 days.
+    int32_t   starvation_carry = 0;
 };
 
 /// `unit_component::refit_type`'s "not refitting" sentinel. Never a roster index.

@@ -10,6 +10,7 @@
 #include "space_assets.hpp"    // BL-1327: space_asset_params — launch, reach, travel and upkeep dials
 #include "nation_tax.hpp"       // BL-1335: tax_params — the tax tiers and Discontent dials
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
+#include "carried_supplies.hpp" // BL-1452: carried_supply_params — the daily stock rates
 
 #include <array>
 #include <cstdint>
@@ -818,6 +819,13 @@ struct military_capability_params
     /// unit moves under § The campaign force model's Sea, not this land table). A
     /// composite unit (BL-472, not built here) reads its SLOWEST member's entry.
     std::array<float, unit_class_count> march_days_per_cls = {};
+
+    /// BL-1452 (carried supplies; MILITARY.md § Carried supplies): the daily drain
+    /// rates of a unit's food, ammunition and equipment, per-mille of a full stock.
+    /// Authored under `economy.military.carried_supplies`; the defaults are the
+    /// authored values. Each must be an integer in [0, 1000] (the loader rejects
+    /// anything else, and any unknown key).
+    carried_supply_params supplies = {};
 
     // RETIRED (BL-1352): `active_lp_per_anchor_tick`, the per-anchor rate of the
     // second Logistic Point system. A march now draws the HOST NATION's pool —

@@ -932,6 +932,29 @@ economy = {
             siege    = 3.0,
         },
 
+        -- BL-1452 (carried supplies; MILITARY.md § Carried supplies, Ben 2026-10-29): A
+        -- UNIT CARRIES FOOD, AMMUNITION AND EQUIPMENT, each per-mille of full, drained
+        -- once a DAY and refilled at its supply factor's share of the stock's full daily
+        -- rate (a unit covered in full stays full; one covered at half loses half its
+        -- daily need a day). Per-mille of a full stock per day; integers in [0, 1000]
+        -- (the loader rejects anything else, and any unknown key). FIRST CUT, argued:
+        --   food 33: a full stock feeds a cut-off unit ~30 days (1000 / 33), a month of
+        --     carried rations - long enough that a quarter's short grant bites inside
+        --     the quarter, short enough that an army cut off for a season starves;
+        --   ammunition 50 per day fighting: 20 days of fire from full, the day by which
+        --     recon gives full vision (§ Recon), so an unsupplied stack runs dry about
+        --     when a battle matures; the 20% floor keeps it fighting after;
+        --   equipment 1 a day attrition, 10 per day fighting: a quarter in camp
+        --     unsupplied wears a tenth of the kit; a battle wears it ten times faster.
+        -- The hunger step (-15%), the ammunition floor (20%) and starvation's 180 days
+        -- are the design's own numbers (carried_supplies.hpp), not rates.
+        carried_supplies = {
+            food_per_day                = 33,
+            ammo_per_battle_day         = 50,
+            equipment_attrition_per_day = 1,
+            equipment_per_battle_day    = 10,
+        },
+
         -- BL-596 / BL-1352 / BL-1445: a UNIT'S SUPPLY draws Logistic Points, never its
         -- march (Ben, 2026-10-28: movement takes no Logistic Points; a march is paid in
         -- days). Once a quarter each unit requests the QUANTITY of its supplies - its

@@ -112,6 +112,17 @@ std::size_t designs_section_bytes(const world& w)
     return n;
 }
 
+/// The v66 carried-supplies section (BL-1452): u32 count + 20 bytes a unit off full.
+std::size_t supplies_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [uid, u] : w.units)
+        if (u.food_permille != 1000 || u.ammo_permille != 1000
+            || u.equipment_permille != 1000 || u.starvation_carry != 0)
+            n += 4 + 16;
+    return n;
+}
+
 int g_failures = 0;
 
 void check(bool ok, const char* what)
@@ -568,7 +579,8 @@ int main()
                                        + refit_section_bytes(wd)     // v61
                                        + fronts_section_bytes(wd)    // BL-1427 (v62)
                                        + stack_section_bytes(wd)     // BL-1443 (v63)
-                                       + designs_section_bytes(wd);  // BL-1434 (v64), last
+                                       + designs_section_bytes(wd)   // BL-1434 (v64)
+                                       + supplies_section_bytes(wd); // BL-1452 (v66), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -634,7 +646,8 @@ int main()
                                          + refit_section_bytes(wu)     // v61
                                          + fronts_section_bytes(wu)    // BL-1427 (v62)
                                          + stack_section_bytes(wu)     // BL-1443 (v63)
-                                         + designs_section_bytes(wu);  // BL-1434 (v64), last
+                                         + designs_section_bytes(wu)   // BL-1434 (v64)
+                                         + supplies_section_bytes(wu); // BL-1452 (v66), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 

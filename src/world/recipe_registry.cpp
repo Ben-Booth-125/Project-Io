@@ -741,6 +741,38 @@ void recipe_registry::load_from_lua(lua_state& lua)
                         { "siege",    static_cast<std::size_t>(unit_class::siege) } },
                       mp.march_days_per_cls.data());
 
+        // BL-1452 (carried supplies): the daily stock rates. Untrusted authored data:
+        // every key must name a rate and every value be an integer number of per-mille
+        // in [0, 1000] — a typo, a fraction, a negative or a non-number throws, naming
+        // it, rather than being read as some other rate.
+        if (sol::optional<sol::table> cs = (*military)["carried_supplies"])
+        {
+            const std::string ctx = "military.carried_supplies";
+            const std::vector<std::pair<const char*, int*>> keys = {
+                { "food_per_day",                &mp.supplies.food_per_day },
+                { "ammo_per_battle_day",         &mp.supplies.ammo_per_battle_day },
+                { "equipment_attrition_per_day", &mp.supplies.equipment_attrition_per_day },
+                { "equipment_per_battle_day",    &mp.supplies.equipment_per_battle_day },
+            };
+            for (const auto& kv : *cs)
+            {
+                if (kv.first.get_type() != sol::type::string)
+                    throw std::runtime_error(ctx + " has a non-string key");
+                const std::string key = kv.first.as<std::string>();
+                const auto it = std::find_if(keys.begin(), keys.end(),
+                                             [&](const auto& k) { return key == k.first; });
+                if (it == keys.end())
+                    throw std::runtime_error("Unknown rate '" + key + "' in " + ctx);
+                if (kv.second.get_type() != sol::type::number)
+                    throw std::runtime_error(ctx + "." + key + " must be a number");
+                const double v = kv.second.as<double>();
+                if (!std::isfinite(v) || v < 0.0 || v > 1000.0 || v != std::floor(v))
+                    throw std::runtime_error(ctx + "." + key + " = " + std::to_string(v)
+                                             + " is not an integer per-mille in [0, 1000]");
+                *it->second = static_cast<int>(v);
+            }
+        }
+
         // BL-596 / BL-1352: the PRICE of an active march. The per-anchor CAPACITY
         // rate that stood beside it is retired with the per-anchor pool itself
         // (recipe_registry.hpp); an unread `active_lp_per_anchor_tick` left in

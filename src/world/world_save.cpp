@@ -8,6 +8,7 @@
 #include "history_log.hpp" // write_history_log / read_history_log -- the embedded section
 #include "state_industry.hpp"
 #include "unit_designs.hpp" // BL-1434: the designs section's range checks
+#include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <algorithm>
@@ -1607,7 +1608,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // world_save_version 64 (BL-1434, unit designs): THE DESIGNS, the last section —
     // nations with a non-base design (id, n, n ids); units off base kit (id, kit,
     // refit kit); muster orders off base kit (order id, kit). Only deviations.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_supplies)
     {
         std::vector<entity_id> nids;
         for (const auto& [nid, nc] : w.nations)
@@ -1649,6 +1650,35 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             for (const uint8_t v : m.kit.fit) w_u8(out, v);
         }
     }
+
+    // world_save_version 66 (BL-1452, carried supplies): THE STOCKS, the last section —
+    // every unit off full (or with a starvation carry), ascending id, as (id, food,
+    // ammunition, equipment, carry). Only deviations.
+    if (version == world_save_version)
+    {
+        std::vector<entity_id> uids;
+        for (const auto& [uid, u] : w.units)
+            if (u.food_permille != 1000 || u.ammo_permille != 1000
+                || u.equipment_permille != 1000 || u.starvation_carry != 0)
+                uids.push_back(uid);
+        std::sort(uids.begin(), uids.end());
+        w_u32(out, static_cast<uint32_t>(uids.size()));
+        for (const entity_id uid : uids)
+        {
+            const unit_component& u = w.units.at(uid);
+            w_id(out, uid);
+            w_i32(out, u.food_permille);
+            w_i32(out, u.ammo_permille);
+            w_i32(out, u.equipment_permille);
+            w_i32(out, u.starvation_carry);
+        }
+    }
+}
+
+void write_world_snapshot_pre_supplies(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1452): the v64 stream shape — no carried-supplies section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_supplies);
 }
 
 void write_world_snapshot_pre_designs(const world& w, std::ostream& out)
@@ -1790,7 +1820,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_refit      // 2026-10-27: v60, no unit refitting
             && version != k_world_save_version_pre_fronts     // BL-1427: v61, no fronts
             && version != k_world_save_version_pre_tile       // BL-1443: v62, battles keyed by province
-            && version != k_world_save_version_pre_designs))  // BL-1434: v63, every design base kit
+            && version != k_world_save_version_pre_designs    // BL-1434: v63, every design base kit
+            && version != k_world_save_version_pre_supplies)) // BL-1452: v64, every unit's stocks full
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2659,7 +2690,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // refits; muster orders in issue order, each a real order, off base kit, holding
     // a design its row's class can hold. Refused whole otherwise. A v63 (and older)
     // stream ends before it: every nation and unit fields base kit.
-    if (version == world_save_version)
+    if (version >= k_world_save_version_pre_supplies)
     {
         const std::vector<kit_item>& cat = kit_catalogue();
         const std::vector<roster_row>& table = unit_roster_table();
@@ -2738,6 +2769,39 @@ bool read_world_snapshot(world& w, std::istream& in)
             if (m.unit_type >= table.size() || !design_valid(land_class_for(table[m.unit_type]), kit))
                 return false;
             m.kit = kit;
+        }
+    }
+
+    // v66 (BL-1452, carried supplies): every unit off full. Untrusted: units strictly
+    // ascending and in the stream, each actually off full, stocks in [0, 1000], carry in
+    // [0, 180) and non-zero only on a starving unit (food 0) — the only records the
+    // writer and the supply day can produce. Refused whole otherwise. A v64 (and older)
+    // stream ends before it: every unit's stocks are full.
+    if (version == world_save_version)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            int32_t food = 0, ammo = 0, equip = 0, carry = 0;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev)
+                || !r_i32(in, food) || !r_i32(in, ammo) || !r_i32(in, equip) || !r_i32(in, carry))
+                return false;
+            prev = uid;
+            const auto uit = s.units.find(uid);
+            const auto in_pm = [](int32_t v) { return v >= 0 && v <= 1000; };
+            if (uit == s.units.end() || !in_pm(food) || !in_pm(ammo) || !in_pm(equip)
+                || carry < 0 || carry >= k_starvation_days || (carry != 0 && food != 0)
+                || (food == 1000 && ammo == 1000 && equip == 1000 && carry == 0))
+                return false;
+            unit_component& u = uit->second;
+            u.food_permille      = food;
+            u.ammo_permille      = ammo;
+            u.equipment_permille = equip;
+            u.starvation_carry   = carry;
         }
     }
 

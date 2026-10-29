@@ -375,6 +375,18 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, 0x46524E54u); // "FRNT"
                 fnv1a_u32(h, u.front);
             }
+            // BL-1452 (carried supplies): the three stocks and the starvation carry,
+            // folded only off full, behind their own marker, so a world whose units
+            // stay full keeps every hash.
+            if (u.food_permille != 1000 || u.ammo_permille != 1000
+                || u.equipment_permille != 1000 || u.starvation_carry != 0)
+            {
+                fnv1a_u32(h, 0x53555050u); // "SUPP"
+                fnv1a_i32(h, u.food_permille);
+                fnv1a_i32(h, u.ammo_permille);
+                fnv1a_i32(h, u.equipment_permille);
+                fnv1a_i32(h, u.starvation_carry);
+            }
             // BL-1434 (unit designs): the recorded design and a refit's target design,
             // each folded only when not base kit, behind its own marker, so a world of
             // base-kit units keeps every hash.

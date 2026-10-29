@@ -4768,7 +4768,7 @@ namespace {
 /// Is there anything for a military day to do? A unit with an order or a front, or a
 /// live battle. Nothing else issues a march between economy ticks on a headless path
 /// (the scorers are quarterly), so a quarter that goes quiet stays quiet.
-bool military_active(const world& w)
+bool military_active(const world& w, const recipe_registry& reg)
 {
     if (!w.battles.empty())
         return true;
@@ -4778,7 +4778,9 @@ bool military_active(const world& w)
     // BL-1445: out-of-contact recovery is daily, so a day with a unit still
     // recovering is a day with something to do (no battle is live here, so every
     // unit is out of contact).
-    return recovery_pending(w);
+    // BL-1452: so is a day on which some unit's carried stocks still move (an
+    // under-supplied or starving unit, or one refilling).
+    return recovery_pending(w) || carried_supplies_pending(w, reg.military().supplies);
 }
 
 } // namespace
@@ -4786,7 +4788,7 @@ bool military_active(const world& w)
 military_day_result run_military_day(world& w, const recipe_registry& reg, int day_tick)
 {
     military_day_result out;
-    if (!military_active(w))
+    if (!military_active(w, reg))
         return out;
 
     // THE FRONTS FIRST, after yesterday's musters and before today's battles, so a
@@ -4803,7 +4805,16 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     if (any_front)
         advance_fronts(w, reg);
 
+    // BL-1452: the units in contact at the day's start fight today's rounds, so they
+    // spend ammunition and battle-worn equipment today (read before the battles, which
+    // may end and release them).
+    const std::set<entity_id> fought = units_in_live_battles(w);
     out.battles = run_battles(w, reg, day_tick);
+    // THE CARRIED SUPPLIES' DAY (BL-1452; MILITARY.md § Carried supplies): after the
+    // rounds that read the stocks, drain and refill them at the supply factor's share,
+    // and starve a unit with no food - before the disband, so a unit starvation takes
+    // to zero men is removed today as a battle-killed one is.
+    out.supplies = run_carried_supplies_day(w, reg.military().supplies, fought);
     // A UNIT A BATTLE KILLS IS REMOVED THE SAME DAY (Ben, 2026-10-28; MILITARY.md
     // § Marching), by the one disband path the upkeep pass also runs, so it never
     // stands on its tile blocking today's march.
@@ -4827,7 +4838,7 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
     // completes on day d is under the march from that day on, on every path alike.
     for (int d = from + 1; d <= to; ++d)
     {
-        if (!military_active(w))
+        if (!military_active(w, reg))
         {
             // Nothing military left to walk: construction takes the rest in one call,
             // which walks the identical days (advance_construction_to is days-outer).
