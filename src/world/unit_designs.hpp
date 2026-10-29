@@ -74,7 +74,8 @@ const std::vector<kit_item>& kit_catalogue();
 /// each slot has exactly one base item, listed first, with no delta, no goods and
 /// no research node; each slot has 2..4 later items, each with a research node and
 /// at least one good of positive quantity; ids and research nodes are unique; a
-/// hardness delta keeps the class inside 0..1000.
+/// hardness delta keeps the class inside 0..1000; a recon or stealth delta is never
+/// negative (BL-1453: kit only adds them).
 const char* kit_catalogue_first_error();
 
 /// The number of kit slots @p c has: infantry 2, every other land class 3, `none` 0.
@@ -120,8 +121,8 @@ unit_design design_of(const world& w, entity_id nation, land_class c);
 /// k_no_kit_item for a slot the class lacks.
 uint16_t design_fitted(const world& w, entity_id nation, land_class c, int slot);
 
-/// @p c's stats plus design @p d's kit: soft, hard, defence and breakthrough floored
-/// at 0, hardness kept in 0..1000. Unscaled by any row's quality. A variant out of
+/// @p c's stats plus design @p d's kit: soft, hard, defence, breakthrough, recon and
+/// stealth floored at 0, hardness kept in 0..1000. Unscaled by any row's quality. A variant out of
 /// range reads as base.
 land_combat_stats kit_stats(land_class c, const unit_design& d);
 

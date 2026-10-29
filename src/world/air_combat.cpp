@@ -739,6 +739,34 @@ air_day_tick run_air_day(world& w, const recipe_registry& reg, economy_report& r
     return out;
 }
 
+int64_t air_land_recon_milli(const world& w, const recipe_registry& reg, uint32_t province,
+                             entity_id nation)
+{
+    if (province == 0 || nation == null_entity)
+        return 0;
+    const land_recon_params& rp = reg.military().recon;
+    int64_t milli = 0;
+    // EVERY WING ACTIVE OVER THE PROVINCE (Ben, 2026-10-29: "all air active in a
+    // region gives recon"): flying today, on any mission, with the province among its
+    // assignment. The recon class most, every other class the base amount; scaled by
+    // the wing's strength and spread over its provinces as its day is. A sum, so the
+    // (ascending) walk order cannot reach it.
+    for (const auto& [wid, wg] : w.wings)
+    {
+        if (wg.owner != nation || !wing_flies(w, wg)
+            || std::find(wg.provinces.begin(), wg.provinces.end(), province) == wg.provinces.end())
+            continue;
+        const int64_t pts = wing_class(wg) == air_class::recon ? rp.recon_wing_points : rp.wing_points;
+        const int64_t n   = std::max<int64_t>(1, static_cast<int64_t>(wg.provinces.size()));
+        milli += pts * 1000 * wing_strength_permille(reg, wg) / 1000 / n;
+    }
+    // SUPERIORITY ADDS IN PROPORTION TO ITS SHARE — for the side that flies it there.
+    const auto own = w.air_superiority.find({province, nation});
+    if (own != w.air_superiority.end() && own->second > 0)
+        milli += int64_t{rp.superiority_points} * air_share_permille(w, province, nation);
+    return milli;
+}
+
 air_day_tick run_air_missions(world& w, const recipe_registry& reg, economy_report& report,
                               int days)
 {

@@ -191,6 +191,15 @@ struct wing_upkeep_tick
 /// set and the hit bank of units this tick erased.
 wing_upkeep_tick run_wing_upkeep(world& w, const recipe_registry& reg, economy_report& report);
 
+/// BL-1453 (MILITARY.md § Recon; § Air, "Air also sees for the land battle"): the
+/// recon @p nation's air gives its battles in @p province, in MILLI-points: every
+/// wing of its own active over the province (flying, any mission, the province in
+/// its assignment) adds `land_recon_params::recon_wing_points` (recon class) or
+/// `wing_points` (any other), x its strength, / its province count; and when it
+/// flies superiority there, `superiority_points` x its share. 0 for province 0.
+int64_t air_land_recon_milli(const world& w, const recipe_registry& reg, uint32_t province,
+                             entity_id nation);
+
 /// The bonus per-mille an air defence unit's kit adds to its fire (MILITARY.md § Air
 /// defence's kit is "for the air theatre"): launcher +0/+300/+600/+900, fire control
 /// +0/+200/+400/+500 by variant.

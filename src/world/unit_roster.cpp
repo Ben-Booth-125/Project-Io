@@ -395,15 +395,20 @@ namespace {
 // passenger in a ground fight. The absolute scale is set against
 // campaign_battle_params (campaign_battle_harness prints the curve).
 constexpr std::array<land_combat_stats, land_class_count> k_land_stats = {{
-    //  soft  hard  hardness defence breakthrough
-    {   60,   15,     0,      90,     25 }, // infantry
-    {   60,   15,   100,      70,     35 }, // motorised
-    {   70,   45,   600,      70,     70 }, // mechanised
-    {  100,  140,   900,      35,    120 }, // armour
-    {   90,   25,   500,      25,     70 }, // light armour
-    {  160,   25,   100,      15,     15 }, // artillery
-    {   10,   10,   200,      20,      5 }, // air defence
-    {    0,    0,     0,       5,      0 }, // none
+    // BL-1453 (land recon): the last two columns are PER UNIT recon points and
+    // stealth (MILITARY.md § Recon). A first cut: a side of two base infantry
+    // (recon 20) sees half of one infantry (stealth 40) on day one, a defending
+    // one 37.5 %, plus the time term (1/20 a day). Light armour is the recon
+    // class; tanks and vehicles are easy to see, infantry on foot hardest.
+    //  soft  hard  hardness defence breakthrough recon stealth
+    {   60,   15,     0,      90,     25,    10,    40 }, // infantry
+    {   60,   15,   100,      70,     35,    10,    30 }, // motorised
+    {   70,   45,   600,      70,     70,    10,    25 }, // mechanised
+    {  100,  140,   900,      35,    120,     5,    20 }, // armour
+    {   90,   25,   500,      25,     70,    40,    30 }, // light armour
+    {  160,   25,   100,      15,     15,     5,    30 }, // artillery
+    {   10,   10,   200,      20,      5,    15,    25 }, // air defence
+    {    0,    0,     0,       5,      0,     0,    10 }, // none
 }};
 
 } // namespace

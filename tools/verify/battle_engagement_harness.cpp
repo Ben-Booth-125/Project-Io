@@ -772,12 +772,23 @@ int main()
         fixture f;
         build_fixture(f);
         engage(f);
+        // BL-1453 (land recon): this row is about the RETREAT, so it fights in full
+        // vision from day 1 (time_full_days 1). Under the shipped recon a 1v1 parity
+        // assault sees 30-55 % of its target over the six rounds and ends a stalemate
+        // with the attacker unspent (land_recon_harness M1), which is recon's own
+        // subject, not this row's.
+        recipe_registry seen = reg;
+        {
+            military_capability_params mp = seen.military();
+            mp.recon.time_full_days = 1;
+            seen.set_military(mp);
+        }
         const entity_id start = f.w.units.at(f.ua).position;
         bool retreated = false;
         int morale_after = 1000;
         for (int i = 0; i < 10 && !retreated; ++i)
         {
-            run_battles(f.w, reg, i);
+            run_battles(f.w, seen, i);
             const unit_component& u = f.w.units.at(f.ua);
             if (u.position != start)
             {

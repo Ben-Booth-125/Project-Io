@@ -182,6 +182,22 @@ struct battle_tick
 /// stands there. Joined stacks stay where they stood.
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
 
+/// BL-1453 (MILITARY.md § Recon): a side's recon points over battle @p b, in
+/// MILLI-points, BEFORE the time term and the defender's 1.5x (both are applied per
+/// target by `visible_share_permille`). The sum of: the kit recon of the side's
+/// FIGHTING units (`land_combatant_fighting`, as built for the round); the recon of
+/// every other unit of the side's nation, with men standing, on a tile adjacent to
+/// the defended tile (joined or not - a unit already in the side's list counts once,
+/// through the first term, or not at all when it is spent); and its air over the
+/// battle's province (`air_land_recon_milli`). A sum over sorted or keyed walks, so
+/// no visit order reaches it.
+int64_t battle_side_recon_milli(const world& w, const recipe_registry& reg, const active_battle& b,
+                                bool attacker_side);
+
+/// BL-1453: the day of battle @p b the next round is fought on, 1-based - its rounds
+/// fought / `rounds_per_day`, plus one. What the time term reads.
+int battle_day(const active_battle& b, const campaign_battle_params& p = {});
+
 /// Out of contact, every unit recovers: readiness toward its morale (scaled by its
 /// supply, never above it), morale toward its supply. DAILY (Ben, 2026-10-28), from
 /// the daily military pass after the march; the authored rates

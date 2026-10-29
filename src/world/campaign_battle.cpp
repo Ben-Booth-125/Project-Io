@@ -102,17 +102,29 @@ int64_t landed_hits(int64_t hits, int64_t absorb, const campaign_battle_params& 
     return within * clamp_permille(p.absorbed_land_permille) / 1000 + beyond;
 }
 
+/// BL-1453: a target's weight in the split of a side's landed hits — its men x the
+/// share of it the enemy sees, so every hit on a unit is scaled by its own visible
+/// share (MILITARY.md § Recon). With every unit fully seen this is men x 1000, and
+/// the split is the men-proportional one exactly.
+int64_t seen_men(const land_combatant& c)
+{
+    return static_cast<int64_t>(c.men) * clamp_permille(c.visible);
+}
+
 /// Kill exactly @p to_remove men across @p targets (indices into @p side),
-/// proportional to men, floor shares first and the remainder one man at a time
-/// in vector order — ascending unit id by the combatant contract. Integer
-/// throughout, so the split cannot depend on a rounding mode. @return removed.
+/// proportional to men seen (`seen_men`), floor shares first and the remainder one
+/// man at a time in vector order — ascending unit id by the combatant contract.
+/// Integer throughout, so the split cannot depend on a rounding mode. @return removed.
 int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::size_t>& targets,
                    int64_t to_remove)
 {
-    int64_t total = 0;
+    int64_t total = 0, weight = 0;
     for (const std::size_t k : targets)
-        total += side[k].men;
-    if (to_remove <= 0 || total <= 0)
+    {
+        total  += side[k].men;
+        weight += seen_men(side[k]);
+    }
+    if (to_remove <= 0 || total <= 0 || weight <= 0)
         return 0;
     to_remove = std::min(to_remove, total);
 
@@ -120,7 +132,8 @@ int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::siz
     int64_t assigned = 0;
     for (std::size_t t = 0; t < targets.size(); ++t)
     {
-        hit[t]    = to_remove * side[targets[t]].men / total;
+        hit[t]    = std::min<int64_t>(to_remove * seen_men(side[targets[t]]) / weight,
+                                      side[targets[t]].men);
         assigned += hit[t];
     }
     // Bounded: to_remove <= total, so while assigned < to_remove some unit has room.
@@ -128,7 +141,7 @@ int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::siz
     {
         bool progressed = false;
         for (std::size_t t = 0; t < targets.size() && assigned < to_remove; ++t)
-            if (hit[t] < side[targets[t]].men)
+            if (hit[t] < side[targets[t]].men && seen_men(side[targets[t]]) > 0)
             {
                 ++hit[t];
                 ++assigned;
@@ -146,6 +159,29 @@ int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::siz
         removed += take;
     }
     return removed;
+}
+
+/// BL-1453 (MILITARY.md § Recon): THE VISIBLE-SHARE TERM. @p landed milli-hits on
+/// @p side, scaled by the share of it the enemy sees — the men-weighted mean of its
+/// units' `visible` over the units the hits fall on (`apply_landed`'s targets: the
+/// fighting units, or every unit standing when none is). Each unit then takes its
+/// share in proportion to its men seen, so every hit on a unit is scaled by its
+/// own visible share. 1000 everywhere returns @p landed unchanged.
+int64_t visible_landed(const std::vector<land_combatant>& side, int64_t landed)
+{
+    if (landed <= 0)
+        return landed;
+    bool any_fighting = false;
+    for (const land_combatant& c : side)
+        any_fighting = any_fighting || land_combatant_fighting(c);
+    int64_t men = 0, seen = 0;
+    for (const land_combatant& c : side)
+        if (any_fighting ? land_combatant_fighting(c) : c.men > 0)
+        {
+            men  += c.men;
+            seen += seen_men(c);
+        }
+    return men > 0 ? landed * seen / (men * 1000) : landed;
 }
 
 /// Land @p landed milli-hits on @p side. The HP share kills men across the
@@ -172,14 +208,14 @@ void apply_landed(std::vector<land_combatant>& side, int64_t landed, const campa
     // so the two halves of the same hits are measured against the same force.
     if (!overrun)
     {
-        int64_t men = 0;
+        int64_t seen = 0;
         for (const std::size_t k : targets)
-            men += side[k].men;
+            seen += seen_men(side[k]);
         const int64_t ready_hits = landed * (1000 - clamp_permille(p.hp_share_permille)) / 1000;
         for (const std::size_t k : targets)
         {
             land_combatant& c = side[k];
-            const int64_t own = ready_hits * c.men / men;
+            const int64_t own = seen > 0 ? ready_hits * seen_men(c) / seen : 0;
             const int64_t cost = static_cast<int64_t>(c.men) * std::max(1, p.readiness_cost);
             const int64_t loss = own * 1000 / cost;
             c.readiness = static_cast<int>(std::max<int64_t>(0, c.readiness - loss));
@@ -191,6 +227,20 @@ void apply_landed(std::vector<land_combatant>& side, int64_t landed, const campa
 }
 
 } // namespace
+
+int visible_share_permille(int64_t side_recon_milli, int target_stealth, int day,
+                           int time_full_days, int side_permille)
+{
+    if (target_stealth <= 0)
+        return 1000;
+    const int64_t full = std::max(1, time_full_days);
+    const int64_t time_pm = std::clamp<int64_t>(int64_t{std::max(0, day)} * 1000 / full, 0, 1000);
+    // Milli-points against the target: the side's own, plus the time term.
+    const int64_t points = std::max<int64_t>(0, side_recon_milli)
+                         + int64_t{target_stealth} * time_pm;
+    const int64_t scaled = points * std::max(0, side_permille) / 1000;
+    return static_cast<int>(std::min<int64_t>(1000, scaled / target_stealth));
+}
 
 int side_readiness(const std::vector<land_combatant>& side)
 {
@@ -273,8 +323,8 @@ bool step_campaign_battle(campaign_battle_state&        st,
     const int64_t ground = 1000 + std::max<int64_t>(0, terrain_d) * params.terrain_attack_scale / 1000;
     const int64_t atk_hits = side_hits(attacker, side_hardness(defender)) * atk_swing / 1000 * 1000 / ground;
     const int64_t def_hits = side_hits(defender, side_hardness(attacker)) * def_swing / 1000;
-    const int64_t on_def = landed_hits(atk_hits, side_absorb(defender, true), params);
-    const int64_t on_atk = landed_hits(def_hits, side_absorb(attacker, false), params);
+    const int64_t on_def = visible_landed(defender, landed_hits(atk_hits, side_absorb(defender, true), params));
+    const int64_t on_atk = visible_landed(attacker, landed_hits(def_hits, side_absorb(attacker, false), params));
 
     const bool atk_could_fight = fighting_men(attacker) > 0;
     const bool def_could_fight = fighting_men(defender) > 0;

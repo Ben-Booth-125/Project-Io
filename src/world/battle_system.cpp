@@ -1,5 +1,6 @@
 #include "battle_system.hpp"
 
+#include "air_combat.hpp" // air_land_recon_milli: the air's recon over a battle (BL-1453)
 #include "logistics.hpp" // road_edge_neighbour: the retreat step (BL-1421)
 #include "placement_rules.hpp"
 #include "province.hpp"
@@ -708,10 +709,84 @@ shared_tile_fix resolve_shared_tiles(world& w)
     return out;
 }
 
+int battle_day(const active_battle& b, const campaign_battle_params& p)
+{
+    return std::max(0, b.state.rounds_fought) / std::max(1, p.rounds_per_day) + 1;
+}
+
+namespace {
+
+/// The kit term: the recon of a side's FIGHTING combatants, milli-points.
+int64_t fighting_recon_milli(const std::vector<land_combatant>& side)
+{
+    int64_t milli = 0;
+    for (const land_combatant& c : side)
+        if (land_combatant_fighting(c))
+            milli += int64_t{std::max(0, c.stats.recon)} * 1000;
+    return milli;
+}
+
+/// The adjacency and air terms, milli-points: what the side's nation adds to the
+/// battle beyond the units fighting it.
+int64_t support_recon_milli(const world& w, const recipe_registry& reg, const active_battle& b,
+                            bool attacker_side)
+{
+    const std::vector<entity_id>& ids = attacker_side ? b.attacker_units : b.defender_units;
+    const entity_id nation = attacker_side ? b.attacker : b.defender;
+    int64_t milli = 0;
+    // Its nation's other units beside the defended tile, joined or not.
+    const std::vector<entity_id> beside = hex_neighbours(w, b.tile);
+    for (const auto& [uid, u] : w.units) // a sum: walk order cannot reach it
+    {
+        if (u.owner != nation || u.count <= 0
+            || !std::binary_search(beside.begin(), beside.end(), u.position)
+            || std::find(ids.begin(), ids.end(), uid) != ids.end())
+            continue;
+        milli += int64_t{std::max(0, unit_land_stats(u).recon)} * 1000;
+    }
+    // Its air over the province.
+    milli += air_land_recon_milli(w, reg, b.province, nation);
+    return milli;
+}
+
+} // namespace
+
+int64_t battle_side_recon_milli(const world& w, const recipe_registry& reg, const active_battle& b,
+                                bool attacker_side)
+{
+    return fighting_recon_milli(build_combatants(w, attacker_side ? b.attacker_units : b.defender_units))
+         + support_recon_milli(w, reg, b, attacker_side);
+}
+
+namespace {
+
+/// BL-1453 (MILITARY.md § Recon): set every combatant's `visible` — the share of it
+/// the OTHER side sees today — before a round. Two-way: each side's recon points
+/// (`battle_side_recon_milli`) against each enemy unit's stealth, with the time term
+/// and, for the defender, its 1.5x (`visible_share_permille`).
+void set_battle_vision(const world& w, const recipe_registry& reg, const active_battle& b,
+                       std::vector<land_combatant>& atk, std::vector<land_combatant>& def,
+                       const campaign_battle_params& params)
+{
+    const land_recon_params& rp = reg.military().recon;
+    const int day = battle_day(b, params);
+    // The kit term from the combatants as the batch has left them; the rest from the world.
+    const int64_t atk_recon = fighting_recon_milli(atk) + support_recon_milli(w, reg, b, true);
+    const int64_t def_recon = fighting_recon_milli(def) + support_recon_milli(w, reg, b, false);
+    for (land_combatant& c : def) // what the attacker sees of the defender
+        c.visible = visible_share_permille(atk_recon, c.stats.stealth, day, rp.time_full_days, 1000);
+    for (land_combatant& c : atk) // what the defender sees of the attacker
+        c.visible = visible_share_permille(def_recon, c.stats.stealth, day, rp.time_full_days,
+                                           rp.defender_permille);
+}
+
+} // namespace
+
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
 {
     battle_tick out;
-    (void)reg; // the resolver's tuning is campaign_battle_params, not the registry
+    // The resolver's tuning is campaign_battle_params, not the registry; the
+    // registry carries land recon's rates (BL-1453, set_battle_vision).
     const campaign_battle_params params{};
 
     (void)tick; // a battle's stream was seeded when it opened (open_tile_battle)
@@ -752,7 +827,12 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         const int budget = std::max(1, params.rounds_per_day);
         while (b.state.end == campaign_battle_end::in_progress
                && b.state.rounds_fought - rounds_before < budget)
+        {
+            // BL-1453: each round's vision from the force as it stands - the units
+            // fighting now, today's day of battle, the air over the province.
+            set_battle_vision(w, reg, b, atk, def, params);
             step_campaign_battle(b.state, atk, def, params);
+        }
         const int fought = b.state.rounds_fought - rounds_before;
         if (fought > 0)
         {

@@ -48,6 +48,8 @@ std::string delta_text(const land_combat_stats& d)
     add(d.defence, "defence", false);
     add(d.breakthrough, "breakthrough", false);
     add(d.hardness, "hardness", true);
+    add(d.recon, "recon", false);     // BL-1453 (MILITARY.md § Recon)
+    add(d.stealth, "stealth", false);
     return out.empty() ? std::string("No change") : out;
 }
 
@@ -59,6 +61,8 @@ land_combat_stats minus(const land_combat_stats& a, const land_combat_stats& b)
     d.hardness     = a.hardness - b.hardness;
     d.defence      = a.defence - b.defence;
     d.breakthrough = a.breakthrough - b.breakthrough;
+    d.recon        = a.recon - b.recon;
+    d.stealth      = a.stealth - b.stealth;
     return d;
 }
 

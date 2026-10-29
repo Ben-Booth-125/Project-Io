@@ -227,7 +227,22 @@ struct land_combatant
     int               morale    = 1000; ///< Per-mille. Scales the hits this unit deals.
     int               supply    = 1000; ///< Per-mille. Scales the hits this unit deals.
     land_combat_stats stats{};          ///< unit_land_stats(), resolved at build.
+    /// BL-1453 (MILITARY.md § Recon): the share of THIS unit the enemy side sees,
+    /// per-mille — every hit landed on it is scaled by it. Set by the caller before
+    /// each round (`visible_share_permille`); 1000 (fully seen) for a caller that
+    /// models no recon, which leaves the round exactly as it was.
+    int               visible   = 1000;
 };
+
+/// BL-1453 (MILITARY.md § Recon, Ben 2026-10-29): THE VISIBLE SHARE of a target, per
+/// mille — min(1, side recon / target stealth), where the side's recon is
+/// @p side_recon_milli (its units' kit, its adjacent units and its air, in
+/// milli-points) plus the time term, the target's stealth x min(1, @p day /
+/// @p time_full_days), the whole sum scaled by @p side_permille (1500 for the
+/// defender). Two-way and floorless: no recon on day 0 sees nothing. A target with
+/// no stealth is fully seen. Integer per-mille throughout.
+int visible_share_permille(int64_t side_recon_milli, int target_stealth, int day,
+                           int time_full_days, int side_permille);
 
 /// Still in the fight: men standing and readiness left.
 inline bool land_combatant_fighting(const land_combatant& c)
