@@ -129,7 +129,7 @@ to move and end when readiness runs out. Some battles may easily take 90-180 day
 for as long as the attacking side still holds its order to move onto the defended tile, and it ends
 only when a side's readiness is spent (broken) or a side withdraws. Cancelling the attacker's move
 is the withdrawal verb, priced as any withdrawal. There is no round cap and no stalemate by
-exhaustion of rounds: the recon ramp (§ Recon, full vision by day 20) always completes inside a
+exhaustion of rounds: the seen stock (§ Recon), which grows every day, always reaches full vision inside a
 battle. **A battle is weeks long, not days (Ben, 2026-10-29):** the daily round's readiness
 damage is scaled so that a battle at parity runs about **30–60 days**, one at 1.5:1 runs longer
 still, and a rout stays fast. **Breaking a defender takes about 1.5:1 in men** (Ben, 2026-10-29,
@@ -203,8 +203,9 @@ reads is shown on the surface that reads it.
 | **Hardness** | class × equipment, 0..1 | Share of the unit that is armoured. |
 | **Defence** | class | Hits absorbed when defending. |
 | **Breakthrough** | class | Hits absorbed when attacking. |
-| **Recon** | class × equipment | Recon points the unit gives its side (§ Recon). |
-| **Stealth** | class × equipment | Recon points an enemy needs to see the whole unit (§ Recon). |
+| **Recon offence** | class × equipment | Recon the unit adds to its side's seen stock each day, and to the opening when it faces the tile (§ Recon). Every class has a base above zero. |
+| **Recon defence** | class × equipment | Counter-recon: divides the enemy's daily gain against the unit's side (§ Recon). |
+| **Stealth** | class × equipment | The seen amount an enemy needs to see the whole unit (§ Recon). |
 
 **The arithmetic.** A unit's hits on a target are
 `soft_attack × (1 − target.hardness) + hard_attack × target.hardness`, scaled by its morale and
@@ -258,28 +259,46 @@ scaling hits directly.
 ### Recon (Ben, 2026-10-29)
 
 **A unit damages only the part of its target its side can see.** Each target unit has a
-**stealth** — the recon points needed to see all of it — and each side has **recon points** over
-the battle. The visible share of a target is `min(1, side recon / target stealth)`, and **every
-hit on that target is scaled by it**: seeing 40% of a unit lands 40% of the hits on it.
+**stealth** — the recon needed to see all of it — and each side holds a **seen** amount of every
+enemy unit in the battle. The visible share of a target is `min(1, seen / target stealth)`, and
+**every hit on that target is scaled by it**: seeing 40% of a unit lands 40% of the hits on it.
 
-**Recon is two-way, with no floor, and the defender is favoured (Ben, 2026-10-29).** Both sides
-need vision to do damage, and a side with no recon on a fresh battle lands nothing. **The
-defender's recon counts 1.5×** — it knows its ground. A side's recon points are the sum of:
+**Seen is a stock that grows every day until it covers the target (Ben, 2026-10-29).** There is no
+fixed ramp: *"the in-battle recon should go up indefinitely until it reaches the maximum possible."*
+Each day of the battle a side adds its **recon offence** to what it has seen of each enemy unit,
+until that unit is fully seen; better recon sees sooner. **Every land class has a base recon
+offence above zero**, so every battle's vision grows and none is fought blind for good. **The
+defender's recon offence counts 1.5×** — it knows its ground (Ben, 2026-10-29: two-way, no floor,
+the defender favoured).
 
-- **Its units' kit.** Recon is a kit stat like soft attack (§ The kit): light armour, drones and
-  optics carry it; most kit carries none.
-- **Its units adjacent.** Each of its own nation's units on a tile adjacent to the defended tile adds
-  its recon, whether or not it joined the battle.
-- **Time in battle.** Each day of fighting reveals more: by **day 20, time alone gives full vision**
-  — a target's stealth × `min(1, days / 20)` — so every battle eventually sees.
+**Counter-recon slows the enemy's build-up (Ben, 2026-10-29).** Each unit carries a **recon
+defence** (counter-recon) beside its stealth: stealth stays the total an enemy must see, and the
+side's counter-recon divides the enemy's daily gain against it, as `offence × 1000 / (1000 +
+counter-recon)` — slowed, never stopped. Screens, camouflage and electronic warfare carry it.
+
+**A side's recon offence on a day is the sum of:**
+
+- **Its units in the battle.** Recon offence is a class × kit stat like soft attack (§ The kit):
+  every class has a base, and light armour, drones and optics raise it.
+- **Its units adjacent, at once (Ben, 2026-10-29).** Each of its own nation's units on a tile
+  adjacent to the defended tile adds its recon offence, whether or not it joined the battle. It is
+  counted the day it stands there, with nothing stored: **on the battle's opening day the seen stock
+  starts at the side's adjacent recon offence**, so a line that has been facing the enemy opens the
+  fight already seeing it — *"we should never see those battles where we are fighting with
+  insufficient recon"*.
 - **Air.** **Every one of the side's wings active over the province gives recon** (Ben, 2026-10-29:
   *"all air active in a region gives recon"*) — the recon class most, the others a base authored
   amount — and the side holding air superiority over the province adds recon in proportion to its
   share (§ Air).
 
+**Only haste attacks blind (Ben, 2026-10-29).** A unit counts toward its side's opening recon only if
+it stood on its tile for a **whole day** before the contact. A column that marches up and attacks on
+the day it arrives brings none of its own recon to the opening — it fights partly blind until its
+daily recon builds — while one that halted a day to face the enemy opens seeing it.
+
 **Stealth is a kit stat too.** Each class has a base stealth, and kit raises it: **better armour for
-infantry gives more stealth** (Ben's example). The designer shows recon and stealth beside the other
-stats (`../ui/ledgers/military.md` § The designer).
+infantry gives more stealth** (Ben's example). The designer shows recon offence, recon defence and stealth beside the
+other stats (`../ui/ledgers/military.md` § The designer).
 
 ### Land — the classes
 
@@ -321,7 +340,7 @@ tab (`../ui/ledgers/military.md`).
   rival nations field base kit, since no AI grant lets a rival design.
 - **The kit catalogue.** Every slot of every class lists its items: the **base item** first — the
   1960 standard, adding nothing and costing no goods — then **two to four later items**. A later
-  item carries a **stat delta** (soft attack, hard attack, hardness, defence, breakthrough, recon, stealth), its
+  item carries a **stat delta** (soft attack, hard attack, hardness, defence, breakthrough, recon offence, recon defence, stealth), its
   **goods** and the **research node** that opens it. A design's stats are its class's plus its
   kit's deltas, before the roster row's quality scale; hardness stays inside 0..1000. The catalogue
   is validated where it is authored, so a slot without a base item, or an item that fits no slot,
