@@ -928,6 +928,16 @@ Neither the vector fill nor the wash over the baked ground carries a Logistics c
 lens's read is the **road colour** and the **numbers**; the ground under them is the plain
 canvas's.
 
+**A unit off the road is joined to it by a dashed line (Ben, 2026-10-29).** Each of the player
+nation's units that stands off its network draws a **dashed line** from the road tile where its
+supply is paid — the closest road its network reaches, within 8 tiles ([LOGISTICS.md](../economy/LOGISTICS.md)
+§ A unit draws off the road) — to the unit. The dash is coloured on the road ramp below by the
+unit's own granted over requested, so a fed off-road unit reads green and a starved one red. A
+unit more than 8 tiles from any road draws nothing; its dash runs to the nearest road its
+network reaches and is drawn **red**, the gap itself made visible. A unit on a road draws no
+dash: its request is the road's own. The dashes are the player's units only, as every figure
+here is.
+
 **The roads carry the colour: supplied over requested, by the routed flow** (Ben,
 2026-10-24). Every road tile of the player's nation is coloured by the flow routed through
 it along the chains of `LOGISTICS.md` § How a tile's points get to it:

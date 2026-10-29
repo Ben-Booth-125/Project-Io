@@ -1236,6 +1236,35 @@
    ],
    "title": "Terrain and the classes: per-class terrain rows - blocked unless roaded, march multiplier, fight debuff, equipment wear, terrain stealth",
    "design": "Written in MILITARY.md § Terrain and the classes (Ben, 2026-10-29). Per land class x terrain (mountain, canyon/rift landforms; marsh, desert=dunes, forest, urban, snow covers) up to four effects: move multiplier on march days; blocked unless the tile has a road (refuses entry, never exit); fight scale on soft/hard attack, defence and breakthrough when the defended tile is that terrain, each unit by its own class, halved by a road on the defended tile; equipment wear (faster daily equipment drain, the carried-supplies stock). Motorised/mechanised infantry dismount to foot pace on mountain/canyon/rift. Medium armour blocked in desert unless roaded, -30% there. Worst row only when a tile matches two. Stealth: infantry x1.5 in forest/urban; open ground (plains/highland with no concealing cover) x0.75 for every unit. Authored rows in economy.military beside the march days, loader-checked. A block is a per-class wall in march_path: orders route around it or are refused with the reason; a retreat never steps onto a tile its class cannot enter. Wear lands on BL-1452 (carried supplies) and stealth on BL-1453 (land recon): it composes with whichever is merged first and owes the other its hook at merge. A harness; ACTIONS.json march preconditions name the refusal."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-29",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-10-29)",
+   "category": "Military",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "id": "BL-1456",
+   "short_name": "OFF_ROAD_SUPPLY_DRAW",
+   "priority": "A",
+   "difficulty": 2,
+   "requires": [
+    "BL-1445"
+   ],
+   "files": [
+    "src/world/logistic_points.cpp",
+    "src/world/logistic_points.hpp",
+    "src/world/economy_system.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/ui_state.hpp",
+    "scripts/verify/logistics_lens.lua"
+   ],
+   "title": "A unit draws off the road up to 8 tiles, paid at the closest road per item resupplied; the Logistics lens dashes the off-road leg",
+   "design": "Written in LOGISTICS.md § A unit draws off the road (Ben, 2026-10-29) and LENSES.md § Logistics lens (dashed line). A unit's quarterly supply request is scored at the closest road tile of its nation's network within 8 steps over crossable land (ties lowest tile id), served by that tile's routed cover; the request is the quantity of goods its resupply needs. More than 8 tiles from any road: draws nothing. The lens draws, for each player unit off its network, a dashed line from the paying road tile to the unit, coloured on the road ramp by its granted/requested; beyond 8 tiles, red to the nearest reached road. MILITARY.md § Carried supplies and § Upkeep carry the cross-references."
   }
  ]
 }
