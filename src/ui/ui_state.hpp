@@ -1829,6 +1829,22 @@ struct ui_state
     double lp_both_leg_supplied = 0.0, lp_both_leg_requested = 0.0;
     /// What the leg pass drew last frame: the cells it stroked, each in its tile's colour.
     int    lp_leg_cells_drawn = 0;
+    /// BL-1456 (Ben, 2026-10-29; LENSES.md § Logistics lens, "A unit off the road is
+    /// joined to it by a dashed line"): one dash per player unit standing off its
+    /// network - raster cells of the road tile its supply is paid at (or, past its 8
+    /// tiles, the nearest road its network reaches within a 32-step display search) and
+    /// of the unit; `t` its position on the road ramp (its granted share), `red` past
+    /// its roads. A photograph of the last resolve, never fed back.
+    struct lp_dash_view
+    {
+        int   road_cell = -1;
+        int   unit_cell = -1;
+        float t         = 1.0f;
+        bool  red       = false;
+    };
+    std::vector<lp_dash_view> lp_dashes;
+    /// What the dash pass stroked last frame (one per visible wrap copy), and of them red.
+    int    lp_dashes_drawn = 0, lp_dashes_red_drawn = 0;
 
     /// THE CAPITAL STAR (Ben, 2026-10-25): how many stars the Planetary canvas drew
     /// last frame (one per visible wrap copy), and whether the player's own was among

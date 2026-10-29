@@ -56,6 +56,12 @@
 //     starving its own industry is the intended, legible cost of an army in the
 //     field. A unit on a tile its network does not reach is granted nothing.
 //
+//     OFF THE ROAD, UP TO 8 TILES (BL-1456; LOGISTICS.md § A unit draws off the
+//     road, Ben 2026-10-29): a unit off its network is PAID AT THE CLOSEST ROAD -
+//     the nearest tile its network reaches within 8 steps over crossable land, ties
+//     to the lowest tile id (`unit_supply_draw_tile`) - and served by that tile's
+//     cover. More than 8 from any, it draws nothing. Recomputed every resolve.
+//
 //     WHOSE POOL: THE UNIT'S NATION'S, routed from that nation's own sources -
 //     never the pool of a foreign ground it stands on, which would fund an
 //     invasion out of the invaded nation's points.
@@ -206,7 +212,7 @@ struct lp_supply_claim
 {
     entity_id unit   = null_entity;
     entity_id nation = null_entity; ///< the unit's own nation, whose pool serves it; null = no pool
-    entity_id tile   = null_entity; ///< the tile it stands on, where the request is routed
+    entity_id tile   = null_entity; ///< the tile it stands on; the request is PAID at `unit_supply_draw_tile` of it (BL-1456)
     float     need   = 0.0f;        ///< the quantity of its supplies this quarter
 };
 
@@ -219,6 +225,14 @@ struct lp_supply_row
     float     need    = 0.0f;
     float     cover   = 0.0f; ///< the tile's routed cover from the nation's sources, [0,1]
     float     granted = 0.0f; ///< <= need x cover, and what the pool had left
+    /// BL-1456 (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road): the tile the
+    /// request was PAID at - the unit's own tile when its network reaches it, else the
+    /// closest tile of its network within `lp_offroad_draw_steps` steps over crossable
+    /// land (`unit_supply_draw_tile`), else null (past its roads: share 0). `cover` is
+    /// this tile's. Recomputed every resolve, never saved.
+    entity_id paid_tile  = null_entity;
+    /// Steps from the unit's tile to `paid_tile` (0 on the network); -1 with no paid tile.
+    int       draw_steps = -1;
     /// granted / need in integer per-mille (truncated); 1000 for a request of zero.
     /// The share `run_nation_garrison_upkeep` folds into the one decay rule.
     int       share_permille = 1000;
@@ -383,6 +397,28 @@ struct lp_route
 /// Route @p tile's request against @p nation's running sources on @p body.
 lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id body,
                      entity_id tile);
+
+/// BL-1456 (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road, up to 8 tiles from
+/// it): how far a unit may stand from its network and still draw its supply.
+inline constexpr int lp_offroad_draw_steps = 8;
+
+/// WHERE A UNIT'S SUPPLY IS PAID (BL-1456). @p unit_tile itself when @p nation's network
+/// reaches it (`lp_route_to`'s `reached`: a connected source of the nation reaches the
+/// tile - the resolver's one test of "on the network"); else the CLOSEST tile the network
+/// reaches within @p max_steps steps of it over crossable land - a breadth-first walk
+/// across the four cost-walk sides (`road_side_is_crossable`, the walk a retreat and every
+/// cost walk takes), entering only land tiles, so a water gap is no step - ties to the
+/// lowest tile id. null_entity when none is in bound: the unit is past its roads and
+/// draws nothing. Pure and deterministic (layer by layer, sides in order, the winner the
+/// minimum id of the first layer that holds one). The simulation calls it with the
+/// default bound; the Logistics lens with a wider one, for display only.
+/// @param steps_out Optional; receives the steps to the tile (0 on it), -1 with none.
+entity_id unit_supply_draw_tile(world& w, lp_reach_memo& memo, entity_id nation,
+                                entity_id unit_tile, int max_steps = lp_offroad_draw_steps,
+                                int* steps_out = nullptr);
+/// The same, on a memo of its own (a caller with no resolve in hand, e.g. placement).
+entity_id unit_supply_draw_tile(world& w, entity_id nation, entity_id unit_tile,
+                                int max_steps = lp_offroad_draw_steps, int* steps_out = nullptr);
 
 /// The hub chain @p target needs (BL-1395; LOGISTICS.md § Where generation puts the
 /// sources, "The chain is laid outward from the capital"): the road hubs, in the order

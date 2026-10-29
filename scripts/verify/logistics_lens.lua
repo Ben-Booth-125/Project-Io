@@ -19,6 +19,9 @@
 --       every road lands in one colour class, and what the routed requests were
 --       granted never exceeds what they asked. Close captures show the two stacked
 --       numbers (supplied over requested) and the stacked hover card.
+--   T8  THE OFF-ROAD LEG (BL-1456, Ben 2026-10-29): a player unit staged off its network
+--       is joined to the road its supply is paid at by a dash; one past its 8 tiles by a
+--       red dash. Counts only (verify.logistics_roads().dashes*).
 --
 -- Run with: ProjectIo --verify scripts/verify/logistics_lens.lua
 
@@ -189,3 +192,56 @@ if pt7.ok then
   verify.frames(40)
 end
 verify.capture("logistics_lens_stacked_card")
+
+-- T8 - THE OFF-ROAD LEG, DASHED (BL-1456; Ben, 2026-10-29; LENSES.md § Logistics lens,
+-- "A unit off the road is joined to it by a dashed line"). The fixture moves the
+-- player's lowest-id unit to own ground 3-6 steps off its network, and the next unit
+-- past its 8 tiles (a red dash, when such ground exists within the 32-step display
+-- search). One econ step so the resolve pays both; then the census is COUNTS ONLY, and
+-- the capture aims at the near unit through verify.units(), which lists positions.
+-- A network to be off: the --verify world's builder ties no source to the capital, so
+-- when the key generates nothing T8 stages the chain fixture (a hub on the capital and
+-- its links) first. Guarded, so it is not staged twice once an earlier step has.
+if verify.throughput_key().generated <= 0 then
+  local chain = verify.logistics_chain_fixture()
+  print("[logistics_lens] T8 staged the chain fixture: " .. tostring(chain.ok))
+  verify.econ_step(1)
+  verify.frames(3)
+end
+local off = verify.offroad_unit_fixture()
+verify.expect(off.ok, "T8: a player unit stages 3-6 steps off its network")
+verify.econ_step(1)
+verify.frames(3)
+local r8 = verify.logistics_roads()
+print(string.format("[logistics_lens] off-road: near %s, far %s; dashes %d (%d red), drawn %d (%d red)",
+      tostring(off.near), tostring(off.far), r8.dashes, r8.dashes_red, r8.dashes_drawn,
+      r8.dashes_red_drawn))
+verify.expect(r8.dashes >= 1, "T8: the off-road unit is joined to its road by a dash ("
+              .. r8.dashes .. ")")
+if off.far then
+  verify.expect(r8.dashes_red >= 1, "T8: the unit past its 8 tiles draws a RED dash ("
+                .. r8.dashes_red .. ")")
+end
+local ux, uy, fx, fy = nil, nil, nil, nil
+for _, u in ipairs(verify.units()) do
+  if off.near and u.id == off.near_unit then ux, uy = u.col, u.row end
+  if off.far  and u.id == off.far_unit  then fx, fy = u.col, u.row end
+end
+if ux then
+  frame_tile(ux, uy, 9)
+  verify.frames(3)
+  local r8b = verify.logistics_roads()
+  verify.expect(r8b.dashes_drawn >= 1, "T8: framed on the unit, the canvas strokes its dash ("
+                .. r8b.dashes_drawn .. ")")
+  shot("logistics_lens_offroad_dash")
+  frame_tile(ux, uy, 4)
+  shot("logistics_lens_offroad_dash_far_zoom")
+end
+if fx then
+  frame_tile(fx, fy, 6)
+  verify.frames(3)
+  local r8c = verify.logistics_roads()
+  verify.expect(r8c.dashes_red_drawn >= 1, "T8: framed on the far unit, its red dash is stroked ("
+                .. r8c.dashes_red_drawn .. ")")
+  shot("logistics_lens_offroad_dash_red")
+end

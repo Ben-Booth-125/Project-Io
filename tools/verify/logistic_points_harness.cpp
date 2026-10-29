@@ -23,6 +23,10 @@
 //   L5  CONTENTION in ascending unit id, identically across two independent runs.
 //   L6  SUPPLY CLAIMS FIRST: production's fraction falls by exactly the points the
 //       supply took; a march adds no claim; the same scenario twice agrees.
+//   L11 OFF THE ROAD (BL-1456): on the network a unit is paid at its own tile; off
+//       it, at the closest tile its network reaches within 8 steps over crossable
+//       land, ties to the lowest id; 8 off is served and 9 is not; another nation's
+//       road does not count; a water gap is no step; two runs agree bit for bit.
 //
 // The process exits non-zero if any assertion FAILs.
 
@@ -37,6 +41,7 @@
 #include "world/world.hpp"
 
 #include <cmath>
+#include <cstring>
 #include <cstdio>
 #include <string>
 #include <utility>
@@ -415,32 +420,37 @@ void l4_whose_pool()
     // (b) PAST THE ROADS, UNFED. Its own nation's hub at column 0, no road: the hub's
     // points reach only its own tile (Ben, 2026-10-24: off the network a step is
     // impassable), so a unit out in the wilderness asks on a tile no source reaches.
+    // BL-1456: "out in the wilderness" is MORE THAN 8 TILES from the network - a unit
+    // 6 tiles off would draw at the hub (L11) - so the row is 24 wide and the unit 10
+    // tiles from the hub either way round the wrap (10 east, 14 west).
     {
         world w;
-        const entity_id body   = make_row_body(w, 10);
-        const entity_id nation = add_nation(w, body, 0, 2); // columns 3..9 belong to nobody
+        const entity_id body   = make_row_body(w, 24);
+        const entity_id nation = add_nation(w, body, 0, 2); // columns 3..23 belong to nobody
         add_hub(w, tile_at(w, body, 0));
         const entity_id corp = add_corp(w, "Expedition", 10000.0f, nation);
-        const entity_id far  = add_unit(w, corp, tile_at(w, body, 6)); // out in the wilderness
+        const entity_id far  = add_unit(w, corp, tile_at(w, body, 10)); // out in the wilderness
         const entity_id home = add_unit(w, corp, tile_at(w, body, 0)); // on the hub
-        order_along_row(w, far, body, 6, 9);
+        order_along_row(w, far, body, 10, 13);
         const recipe_registry reg = make_registry(/*march_pts=*/2.0f, /*credit=*/0.0f);
         const supply_tick_result t = supply_tick(w, reg);
         const lp_supply_row* s = supply_row(t.lp, far);
         check(s != nullptr && approx(s->cover, 0.0f) && share_of(t.lp, far) == 0,
               "a unit on a tile its network does not reach is granted nothing (cover 0, share 0)");
         check(share_of(t.lp, home) == 1000, "while one on its hub's tile is granted whole");
-        check(w.units.at(far).position == tile_at(w, body, 8),
+        check(w.units.at(far).position == tile_at(w, body, 12),
               "the far unit is not stranded: it marches two tiles, on no points");
     }
 
     // (c) AN INVADER DRAWS ITS OWN POOL, at its own network's cover. Two nations, a hub
     // each; the invader stands on the defender's hub tile. The defender's network covers
     // that tile, the attacker's does not: the attacker's unit is unfed, and the
-    // defender's pool is untouched.
+    // defender's pool is untouched. BL-1456: the row is 30 wide, so the attacker's own
+    // hub is 11 tiles from the invader (19 round the wrap) - past its 8, not one step
+    // across the wrap, where it would draw at its own hub (L11).
     {
         world w;
-        const entity_id body     = make_row_body(w, 12);
+        const entity_id body     = make_row_body(w, 30);
         const entity_id attacker = add_nation(w, body, 0, 5,  "Attacker");
         const entity_id defender = add_nation(w, body, 6, 11, "Defender");
         add_hub(w, tile_at(w, body, 0));  // attacker's
@@ -1521,6 +1531,210 @@ void l10_port_lanes()
     }
 }
 
+// ---------------------------------------------------------------------------
+// L11 - BL-1456 (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road, up to 8
+// tiles from it). A unit's request is PAID AT THE CLOSEST ROAD of its own nation's
+// network - its own tile on the network, else the nearest tile the network reaches
+// within 8 steps over crossable land, ties to the lowest tile id - and served by THAT
+// tile's cover. More than 8 steps from any, it draws nothing.
+//
+// Every fixture is a 40-wide single row: in a row the only crossable sides are E and
+// W, so steps are column differences (the wrap is 40 round, far past every bound).
+// Tiles are created in column order, so a lower column is a lower tile id.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Lay a tier-1 road east along @p body's row from column @p from to @p to.
+void lay_row_road(world& w, entity_id body, int from, int to)
+{
+    const int east = hex_side_for_offset(1, 0, /*odd_row=*/false);
+    for (int c = from; c < to; ++c)
+        lay_road_edge(w, tile_at(w, body, c), east, 1);
+}
+
+int column_of(world& w, entity_id tile)
+{
+    const auto it = w.tiles.find(tile);
+    return it == w.tiles.end() ? -1 : it->second.grid_x;
+}
+
+} // namespace
+
+void l11_offroad_draw()
+{
+    std::printf("\n-- L11  BL-1456: a unit draws off the road, up to 8 tiles from it --\n");
+    const recipe_registry reg = make_registry(/*march_pts=*/1.0f, /*credit=*/0.0f, /*food=*/0.01f);
+
+    // (a) ON THE ROAD: scored at its own tile. A hub at column 4, a road 4..10; one unit
+    // on the hub, one on the road's far end.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 40);
+        const entity_id nation = add_nation(w, body, 0, 39);
+        add_hub(w, tile_at(w, body, 4));
+        lay_row_road(w, body, 4, 10);
+        const entity_id on_hub  = add_unit(w, nation, tile_at(w, body, 4));
+        const entity_id on_road = add_unit(w, nation, tile_at(w, body, 10));
+        const lp_tick t = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        const lp_supply_row* a = supply_row(t, on_hub);
+        const lp_supply_row* b = supply_row(t, on_road);
+        check(a && a->paid_tile == a->tile && a->draw_steps == 0 && share_of(t, on_hub) == 1000,
+              "on the hub's tile: paid at its own tile, 0 steps, share 1000");
+        check(b && b->paid_tile == b->tile && b->draw_steps == 0 && share_of(t, on_road) == 1000,
+              "on the road 6 steps out: paid at its own tile, 0 steps, full cover");
+        lp_reach_memo memo;
+        int steps = -2;
+        check(unit_supply_draw_tile(w, memo, nation, tile_at(w, body, 10), lp_offroad_draw_steps, &steps)
+                  == tile_at(w, body, 10) && steps == 0,
+              "unit_supply_draw_tile answers the same on its own");
+    }
+
+    // (b) THREE OFF: the closest road, ties to the lowest id. Two roads of one nation:
+    // hub A at 4 with road 4..10, hub B at 22 with road 16..22 (each end 6 road steps
+    // from its hub, so both are reached at full strength). A unit at 13 is 3 steps
+    // from both column 10 and column 16 - the tie goes to 10, the lower id; a unit at 14
+    // is 2 from 16 and 4 from 10, so the nearer wins whatever its id.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 40);
+        const entity_id nation = add_nation(w, body, 0, 39);
+        add_hub(w, tile_at(w, body, 4));
+        add_hub(w, tile_at(w, body, 22));
+        lay_row_road(w, body, 4, 10);
+        lay_row_road(w, body, 16, 22);
+        const entity_id tie  = add_unit(w, nation, tile_at(w, body, 13));
+        const entity_id near = add_unit(w, nation, tile_at(w, body, 14));
+        const lp_tick t = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        const lp_supply_row* a = supply_row(t, tie);
+        const lp_supply_row* b = supply_row(t, near);
+        std::printf("        tie: paid col %d at %d steps, cover %.3f, share %d; near: paid col %d at %d steps\n",
+                    a ? column_of(w, a->paid_tile) : -1, a ? a->draw_steps : -9, a ? a->cover : -1.0f,
+                    share_of(t, tie), b ? column_of(w, b->paid_tile) : -1, b ? b->draw_steps : -9);
+        check(a && a->paid_tile == tile_at(w, body, 10) && a->draw_steps == 3,
+              "3 tiles off, equidistant from columns 10 and 16: paid at 10, the lower tile id");
+        check(a && approx(a->cover, 1.0f) && share_of(t, tie) == 1000,
+              "and served by column 10's own cover (6 road steps from its hub: full), whole");
+        check(b && b->paid_tile == tile_at(w, body, 16) && b->draw_steps == 2,
+              "2 from column 16 and 4 from column 10: paid at the nearer, 16, though its id is higher");
+        check(a && approx(a->need, 0.5f), "the request is still its supplies' quantity (50 x 0.01), charged there");
+    }
+
+    // (c) EXACTLY 8 IS SERVED, 9 DRAWS NOTHING. Hub at 0, road 0..2.
+    {
+        world w;
+        const entity_id body   = make_row_body(w, 40);
+        const entity_id nation = add_nation(w, body, 0, 39);
+        add_hub(w, tile_at(w, body, 0));
+        lay_row_road(w, body, 0, 2);
+        const entity_id eight = add_unit(w, nation, tile_at(w, body, 10));
+        const entity_id nine  = add_unit(w, nation, tile_at(w, body, 11));
+        const lp_tick t = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        const lp_supply_row* a = supply_row(t, eight);
+        const lp_supply_row* b = supply_row(t, nine);
+        std::printf("        8 off: paid col %d, share %d; 9 off: paid %s, cover %.3f, share %d\n",
+                    a ? column_of(w, a->paid_tile) : -1, share_of(t, eight),
+                    (b && b->paid_tile == null_entity) ? "none" : "SOME", b ? b->cover : -1.0f,
+                    share_of(t, nine));
+        check(a && a->paid_tile == tile_at(w, body, 2) && a->draw_steps == 8 && share_of(t, eight) == 1000,
+              "exactly 8 tiles off: served, at the road's end (column 2), whole");
+        check(b && b->paid_tile == null_entity && b->draw_steps == -1 && approx(b->cover, 0.0f)
+                  && share_of(t, nine) == 0,
+              "9 tiles off: no paid tile, cover 0, share 0 - past its roads");
+        const lp_nation_row* r = nation_row(t, nation);
+        check(r && approx(r->supply_claim, 1.0f) && approx(r->supply_granted, 0.5f),
+              "the nation's row: both asked (1.0), only the one within 8 was granted (0.5)");
+        lp_reach_memo memo;
+        int steps = -2;
+        check(unit_supply_draw_tile(w, memo, nation, tile_at(w, body, 11), 32, &steps)
+                  == tile_at(w, body, 2) && steps == 9,
+              "a wider bound (the lens's display search) finds the same road at 9 steps");
+    }
+
+    // (d) ANOTHER NATION'S ROAD DOES NOT COUNT. A holds 0..19 with a lone hub at 0 (no
+    // road); B holds 20..39 with a hub at 25 and a road 22..28. A unit of A at 19 is 3
+    // steps from B's road and 19 from its own hub: it draws nothing. B's unit at 18, 4
+    // off, draws at B's road.
+    {
+        world w;
+        const entity_id body = make_row_body(w, 40);
+        const entity_id a_n  = add_nation(w, body, 0, 19, "A");
+        const entity_id b_n  = add_nation(w, body, 20, 39, "B");
+        add_hub(w, tile_at(w, body, 0));
+        add_hub(w, tile_at(w, body, 25));
+        lay_row_road(w, body, 22, 28);
+        const entity_id ua = add_unit(w, a_n, tile_at(w, body, 19));
+        const entity_id ub = add_unit(w, b_n, tile_at(w, body, 18));
+        const lp_tick t = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        const lp_supply_row* a = supply_row(t, ua);
+        const lp_supply_row* b = supply_row(t, ub);
+        check(a && a->paid_tile == null_entity && share_of(t, ua) == 0,
+              "3 tiles from another nation's road, 19 from its own hub: draws nothing");
+        check(b && b->paid_tile == tile_at(w, body, 22) && b->draw_steps == 4,
+              "while that road's own nation's unit, 4 off, is paid there");
+        const lp_nation_row* br = nation_row(t, b_n);
+        check(br && approx(br->supply_claim, 0.5f), "and B's pool carries only B's request");
+    }
+
+    // (e) A WATER GAP IS NOT CROSSABLE LAND. Hub at 0, road 0..3, a unit at 8 (5 off).
+    // With columns 5 and 6 water it has no land path within 8 (round the wrap is 32).
+    {
+        const auto paid = [&](bool water) {
+            world w;
+            const entity_id body   = make_row_body(w, 40);
+            const entity_id nation = add_nation(w, body, 0, 39);
+            add_hub(w, tile_at(w, body, 0));
+            lay_row_road(w, body, 0, 3);
+            if (water)
+                for (int c = 5; c <= 6; ++c)
+                    w.tiles.at(tile_at(w, body, c)).substrate = terrain_substrate::coast;
+            const entity_id u = add_unit(w, nation, tile_at(w, body, 8));
+            const lp_tick t = resolve_logistic_points(w, collect_supply_claims(w, reg));
+            const lp_supply_row* s = supply_row(t, u);
+            return s ? column_of(w, s->paid_tile) : -2;
+        };
+        const int dry = paid(false), wet = paid(true);
+        std::printf("        dry: paid col %d; across water: paid col %d\n", dry, wet);
+        check(dry == 3, "over dry land, 5 off: paid at the road's end (column 3)");
+        check(wet == -1, "with a water gap between: no land path within 8, nothing paid");
+    }
+
+    // (f) TWO RUNS, BYTE-IDENTICAL. A scenario mixing every case above, resolved in two
+    // independently built worlds; every supply row compared field by field, bitwise.
+    {
+        const auto run = []() {
+            const recipe_registry r = make_registry(1.0f, 0.0f, 0.01f);
+            world w;
+            const entity_id body = make_row_body(w, 40);
+            const entity_id a_n  = add_nation(w, body, 0, 19, "A");
+            const entity_id b_n  = add_nation(w, body, 20, 39, "B");
+            const entity_id hub  = add_hub(w, tile_at(w, body, 4));
+            w.buildings.at(hub).supply_factor_permille = 20; // 2.4 points: a short pool
+            add_hub(w, tile_at(w, body, 30));
+            lay_row_road(w, body, 4, 10);
+            lay_row_road(w, body, 24, 30);
+            for (int c : {4, 7, 13, 18, 19, 21, 27, 35})
+                add_unit(w, c < 20 ? a_n : b_n, tile_at(w, body, c), 100);
+            return resolve_logistic_points(w, collect_supply_claims(w, r)).supplies;
+        };
+        const std::vector<lp_supply_row> x = run(), y = run();
+        bool same = x.size() == y.size() && !x.empty();
+        for (std::size_t i = 0; same && i < x.size(); ++i)
+            same = x[i].unit == y[i].unit && x[i].nation == y[i].nation && x[i].tile == y[i].tile
+                && x[i].paid_tile == y[i].paid_tile && x[i].draw_steps == y[i].draw_steps
+                && std::memcmp(&x[i].need, &y[i].need, sizeof(float)) == 0
+                && std::memcmp(&x[i].cover, &y[i].cover, sizeof(float)) == 0
+                && std::memcmp(&x[i].granted, &y[i].granted, sizeof(float)) == 0
+                && x[i].share_permille == y[i].share_permille;
+        int paid = 0;
+        for (const lp_supply_row& s : x)
+            if (s.paid_tile != null_entity)
+                ++paid;
+        std::printf("        %zu rows, %d paid somewhere\n", x.size(), paid);
+        check(same, "two independent runs resolve every supply row bit for bit alike");
+    }
+}
+
 int main()
 {
     std::printf("=== logistic_points_harness (BL-1352, LP_ONE_SYSTEM) ===\n");
@@ -1535,6 +1749,7 @@ int main()
     l8_routed_requests();
     l9_shipment_draws();
     l10_port_lanes();
+    l11_offroad_draw();
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

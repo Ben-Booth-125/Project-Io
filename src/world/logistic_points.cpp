@@ -531,7 +531,16 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& su
                 lp_nation_row& r = rows[c.nation];
                 r.nation = c.nation;
                 r.supply_claim += c.need;
-                sr.cover = lp_route_to(w, memo, c.nation, tit->second.body, c.tile).cover;
+                // BL-1456 (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road):
+                // PAID AT THE CLOSEST ROAD. The unit's own tile when its network reaches
+                // it; else the nearest tile it reaches within 8 steps over crossable
+                // land, ties to the lowest id; else nothing - past its roads, unfed. The
+                // request stays the quantity of its supplies, charged at that tile's cover.
+                sr.paid_tile = unit_supply_draw_tile(w, memo, c.nation, c.tile,
+                                                     lp_offroad_draw_steps, &sr.draw_steps);
+                sr.cover = sr.paid_tile == null_entity
+                    ? 0.0f
+                    : lp_route_to(w, memo, c.nation, w.tiles.at(sr.paid_tile).body, sr.paid_tile).cover;
                 const float claim = c.need * std::clamp(sr.cover, 0.0f, 1.0f);
                 // `supply_granted` IS the running total, so what is left is the pool
                 // minus it - no second accumulator to keep in step with it.
@@ -964,6 +973,75 @@ lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id 
     out.network  = cands.front().net;
     out.distance = cands.front().dist;
     return out;
+}
+
+entity_id unit_supply_draw_tile(world& w, lp_reach_memo& memo, entity_id nation,
+                                entity_id unit_tile, int max_steps, int* steps_out)
+{
+    if (steps_out != nullptr)
+        *steps_out = -1;
+    const auto here = w.tiles.find(unit_tile);
+    if (nation == null_entity || here == w.tiles.end())
+        return null_entity;
+    const entity_id body = here->second.body;
+    const auto reached = [&](entity_id t) {
+        return lp_route_to(w, memo, nation, body, t).reached;
+    };
+    // On the network: the request is the road's own.
+    if (reached(unit_tile))
+    {
+        if (steps_out != nullptr)
+            *steps_out = 0;
+        return unit_tile;
+    }
+    // Breadth-first, ONE LAYER AT A TIME, bounded at @p max_steps. A layer is walked in
+    // the order it was found, each tile's sides in index order; the visited set is a
+    // lookup only, never iterated, so nothing here depends on hash layout. The winner
+    // is the LOWEST id among the first layer holding a reached tile - not the first
+    // found - so the tie rule is the doc's, not the walk's.
+    std::set<entity_id>    seen{unit_tile};
+    std::vector<entity_id> layer{unit_tile}, next;
+    for (int step = 1; step <= max_steps && !layer.empty(); ++step)
+    {
+        next.clear();
+        for (const entity_id cur : layer)
+        {
+            const int row = w.tiles.at(cur).grid_y;
+            for (int side = 0; side < 6; ++side)
+            {
+                if (!road_side_is_crossable(side, row))
+                    continue; // the four sides every cost walk crosses
+                const entity_id nb = road_edge_neighbour(w, cur, side);
+                if (nb == null_entity || seen.count(nb) != 0)
+                    continue;
+                const auto nit = w.tiles.find(nb);
+                if (nit == w.tiles.end() || nit->second.body != body
+                    || is_water(nit->second.substrate))
+                    continue; // crossable LAND only: a water gap is no step
+                seen.insert(nb);
+                next.push_back(nb);
+            }
+        }
+        entity_id best = null_entity;
+        for (const entity_id t : next)
+            if ((best == null_entity || t < best) && reached(t))
+                best = t;
+        if (best != null_entity)
+        {
+            if (steps_out != nullptr)
+                *steps_out = step;
+            return best;
+        }
+        layer.swap(next);
+    }
+    return null_entity; // past its roads
+}
+
+entity_id unit_supply_draw_tile(world& w, entity_id nation, entity_id unit_tile, int max_steps,
+                                int* steps_out)
+{
+    lp_reach_memo memo;
+    return unit_supply_draw_tile(w, memo, nation, unit_tile, max_steps, steps_out);
 }
 
 namespace {
