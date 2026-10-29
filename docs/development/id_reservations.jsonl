@@ -32,3 +32,9 @@
 {"id":"BL-1446","name":"UNIT_DESIGNER","ts":"2026-10-28T11:22:12.336Z","branch":"main"}
 {"id":"BL-1447","name":"KIT_GOODS_PRICED","ts":"2026-10-28T15:57:28.950Z","branch":"main"}
 {"id":"BL-1448","name":"designer-draft-save","ts":"2026-10-28T20:15:05.306Z","branch":"main"}
+{"id":"BL-1449","name":"air-combat-core","ts":"2026-10-28T21:05:34.327Z","branch":"main"}
+{"id":"BL-1450","name":"air-ui","ts":"2026-10-28T21:05:34.327Z","branch":"main"}
+{"id":"BL-1451","name":"rival-air","ts":"2026-10-28T21:05:34.327Z","branch":"main"}
+{"id":"BL-1452","name":"carried-supplies","ts":"2026-10-29T00:08:04.840Z","branch":"main"}
+{"id":"BL-1453","name":"land-recon","ts":"2026-10-29T00:08:04.840Z","branch":"main"}
+{"id":"BL-1454","name":"unit-stat-grid","ts":"2026-10-29T00:08:04.840Z","branch":"main"}

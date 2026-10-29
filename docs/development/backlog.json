@@ -1041,6 +1041,171 @@
    ],
    "title": "Designer picks draft; Save commits the live design, Revert drops the draft",
    "design": "Ben, 2026-10-28 (NR-1096 option C). The design is written in docs/ui/ledgers/military.md § The designer: a pick changes the draft only; changed slots are marked; Save sends set_unit_design for each changed slot; Revert drops the draft; closing with an unsaved draft asks save or discard; the fitted item stays disabled. UI-only: set_unit_design is unchanged. Needs a live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-28",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben air form 2026-10-28)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1449",
+   "short_name": "AIR_COMBAT_CORE",
+   "priority": "A",
+   "difficulty": 4,
+   "requires": [],
+   "files": [
+    "src/world/components.hpp",
+    "src/world/unit_roster.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/battle_system.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/unit_designs.cpp",
+    "src/world/world_save.cpp",
+    "scripts/economy.lua"
+   ],
+   "title": "Air combat: airbases, six wing classes, daily missions, superiority, air defence, tactical and strategic bombing with building condition",
+   "design": "Written in MILITARY.md § Air (Ben, 2026-10-28). Airbase is a new building, the one door a wing is hired at; orphan rule as muster_base. Six classes with authored range in tiles and designer slots airframe/armament/avionics. assign_air_mission verb: mission + provinces in straight-line range. Daily mission pass: superiority share per province (scales enemy bombing, slows enemy march, reveals enemy units), air defence shoots every mission, tactical bombing hits units in battle first then any enemy unit (land arithmetic, no terrain divisor), strategic bombing lowers a building condition that scales throughput and repairs by drawing goods. Wing supply drawn at its airbase tile. Save section, ACTIONS.json entries, a harness."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-28",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben air form 2026-10-28)",
+   "category": "UI",
+   "authority_doc": "docs/ui/ledgers/military.md",
+   "id": "BL-1450",
+   "short_name": "AIR_UI",
+   "priority": "A",
+   "difficulty": 3,
+   "requires": [
+    "BL-1449"
+   ],
+   "files": [
+    "src/ui/military_ledger.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/core/app.cpp",
+    "src/ui/unit_designer.cpp"
+   ],
+   "title": "Military ledger groups by theatre (collapsible); wing card; right-click a province assigns a wing; air designer slots",
+   "design": "Written in docs/ui/ledgers/military.md § Grouped by theatre (Ben, 2026-10-28). Recruit and Design group rows under collapsible Land / Air headers; airbases under Air in the base picker; right-click a province with a wing selected assigns it (out of range refused with distance and range); wing card sets mission and lists provinces; designer opens for air classes. Needs a live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-28",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben air form 2026-10-28)",
+   "category": "Military",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "id": "BL-1451",
+   "short_name": "RIVAL_AIR",
+   "priority": "B",
+   "difficulty": 3,
+   "requires": [
+    "BL-1449"
+   ],
+   "files": [
+    "src/world/corp_ai.cpp"
+   ],
+   "title": "Rival nations build airbases, hire wings and assign missions by scored utility",
+   "design": "Granted (Ben, 2026-10-28) in AI_OPPONENT.md § 11: own wings only, bombing only against a nation already hostile, no hostility declared for it, never a planner. Pure, seeded, deterministic."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-29",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben land battle form 2026-10-29)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1452",
+   "short_name": "CARRIED_SUPPLIES",
+   "priority": "A",
+   "difficulty": 3,
+   "requires": [
+    "BL-1445"
+   ],
+   "files": [
+    "src/world/components.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/battle_system.cpp",
+    "src/world/nation_step.cpp",
+    "src/world/world_save.cpp",
+    "scripts/economy.lua"
+   ],
+   "title": "Carried supplies: food, ammunition and equipment stocks per unit; hunger, starvation and proportional shortage",
+   "design": "Written in MILITARY.md § Carried supplies (Ben, 2026-10-29). Three stored per-mille stocks per unit, drained daily (food by ration, ammunition per day fighting, equipment by battle loss and attrition), resupplied daily at the quarterly LP share x daily need. Food below full: flat -15% attack and readiness recovery. Food at zero: HP loses full establishment over 180 days linearly, readiness capped at HP share. Ammunition and equipment each scale every combat stat proportionally; ammunition floored at 20%, equipment unfloored; they multiply with morale. The round reads the stocks, not supply_factor_permille directly. Save fields; a harness; first-cut rates authored in economy.lua. Needs BL-1445 (move by days) for the daily cadence and the quarterly supply share."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-29",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben land battle form 2026-10-29)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1453",
+   "short_name": "LAND_RECON",
+   "priority": "A",
+   "difficulty": 3,
+   "requires": [
+    "BL-1445",
+    "BL-1449"
+   ],
+   "files": [
+    "src/world/battle_system.cpp",
+    "src/world/campaign_battle.hpp",
+    "src/world/unit_designs.cpp",
+    "src/world/air_combat.cpp",
+    "scripts/economy.lua"
+   ],
+   "title": "Land recon and stealth: hits scale by the visible share of the target",
+   "design": "Written in MILITARY.md § Recon (Ben, 2026-10-29). Visible share = min(1, side recon / target stealth), every hit on that target scaled by it. Two-way, no floor, defender recon x1.5. Side recon = kit recon of its fighting units + its own units adjacent to the defended tile + target stealth x min(1, days/20) + every own wing active over the province (recon class most, others a base amount) + superiority share. Recon and stealth become kit stat deltas; base stealth per class; better infantry armour raises stealth. Air hook needs BL-1449 (air combat core). Harness cases: zero recon lands nothing, day 20 full vision, defender advantage, adjacency, air."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-29",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben land battle form 2026-10-29)",
+   "category": "Military",
+   "authority_doc": "docs/ui/ledgers/military.md",
+   "id": "BL-1454",
+   "short_name": "UNIT_STAT_GRID",
+   "priority": "B",
+   "difficulty": 2,
+   "requires": [
+    "BL-1452",
+    "BL-1453",
+    "BL-1448"
+   ],
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/military_ledger.cpp"
+   ],
+   "title": "Unit stat grid on the unit card and in the designer, with signed deltas while editing",
+   "design": "Written in docs/ui/ledgers/military.md § The stat grid and SELECTION.md § The unit element's layout (Ben, 2026-10-29). One shared grid: HP, readiness, morale, food, ammunition, equipment, soft, hard, defence, breakthrough, hardness, recon, stealth, speed. Unit card: class image left, grid fills the centre (Strength and Roster pages fold in). Designer: bottom right, design stats only, signed +/- deltas against the live design for the draft and the hovered item. Rival unit: design stats only once seen (battle or recon), internals hidden. Needs a live click."
   }
  ]
 }
