@@ -444,6 +444,10 @@ int main()
         fixture f;
         build_fixture(f);
         engage(f);
+        // ENTRENCHMENT (Ben, 2026-10-29): two fed infantry at parity dig in and hold, so
+        // a row that needs an END starves the attacker (supply 300): its hits fall out of
+        // the near-parity band and the defender breaks it - supply decides.
+        f.w.units.at(f.ua).supply_factor_permille = 300;
         bool saw_conclusion = false;
         for (int i = 0; i < 200 && !saw_conclusion; ++i) // a battle is weeks long (BL-1453)
         {
@@ -728,7 +732,9 @@ int main()
             check(province_holder_for(f.w, f.province) == third,
                   "B16c THE PROVINCE HOLDER STAYED PUT while it runs");
         }
-        // Fight it out: it ends on a break, never a stalemate, however long it takes.
+        // Fight it out: it ends on a break, never a stalemate. Fed and equal they would
+        // hold (entrenched); starved, the attacker breaks.
+        f.w.units.at(f.ua).supply_factor_permille = 300;
         campaign_battle_end last = campaign_battle_end::in_progress;
         int days = 0;
         for (int day = 1; day <= 400 && !f.w.battles.empty(); ++day)
@@ -769,6 +775,10 @@ int main()
                       && b.attacking_units == std::vector<entity_id>{ f.ua },
                   "B17d each side carries exactly its one unit; the attacking stack is the attacker's");
         }
+        // ENTRENCHMENT (Ben, 2026-10-29): two fed infantry at parity dig in and hold, so
+        // a row that needs an END starves the attacker (supply 300): its hits fall out of
+        // the near-parity band and the defender breaks it - supply decides.
+        f.w.units.at(f.ua).supply_factor_permille = 300;
         const int before = total_men(f.w);
         bool concluded = false;
         for (int i = 0; i < 200 && !concluded; ++i) // a battle is weeks long (BL-1453)
@@ -789,15 +799,16 @@ int main()
         fixture f;
         build_fixture(f);
         engage(f);
-        // BL-1453 (land recon): this row is about the RETREAT, so it fights in full
-        // vision from day 1 (time_full_days 1), so the retreat is not entangled with
-        // the vision ramp, which is land_recon_harness's subject.
-        recipe_registry seen = reg;
-        {
-            military_capability_params mp = seen.military();
-            mp.recon.time_full_days = 1;
-            seen.set_military(mp);
-        }
+        // BL-1453 (land recon): this row is about the RETREAT, so the attacker opens
+        // already seeing the defender in full - the recon stock is land_recon_harness's
+        // subject, not this row's.
+        for (active_battle& b : f.w.battles)
+            b.attacker_recon_milli = 1 << 20;
+        const recipe_registry& seen = reg;
+        // ENTRENCHMENT (Ben, 2026-10-29): two fed infantry at parity dig in and hold, so
+        // a row that needs an END starves the attacker (supply 300): its hits fall out of
+        // the near-parity band and the defender breaks it - supply decides.
+        f.w.units.at(f.ua).supply_factor_permille = 300;
         const entity_id start = f.w.units.at(f.ua).position;
         bool retreated = false;
         int morale_after = 1000;

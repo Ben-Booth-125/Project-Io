@@ -44,6 +44,7 @@
 // ---------------------------------------------------------------------------
 
 #include "campaign_battle.hpp"
+#include "land_recon_params.hpp" // BL-1453: the opening's defender x1.5
 #include "entity.hpp"
 
 #include <cstdint>
@@ -108,6 +109,11 @@ struct battle_dispatch
 
     int attacker_men_lost = 0;          ///< Actual men, this tick.
     int defender_men_lost = 0;
+
+    /// BL-1453 (cold review): a weeks-long battle reports every day it fights, but
+    /// a surface should SPEAK only on its opening day, a change of phase and its
+    /// end. This says which; the Field channel posts only these.
+    bool newsworthy = true;
 
     /// Set only when `phase` is `broke_off` or `concluded`.
     withdrawing_side withdrew = withdrawing_side::none;
@@ -193,6 +199,17 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
 int64_t battle_side_recon_milli(const world& w, const recipe_registry& reg, const active_battle& b,
                                 bool attacker_side);
 
+/// BL-1453 (MILITARY.md § Battles, "Like forces entrench, and supply decides the
+/// stalemate"): the readiness, per-mille, unit @p unit regains each DAY of an
+/// entrenched fight from its carried supplies — `p.entrench_recovery_permille` when
+/// it is fed and its ammunition is above its floor, else 0. THE ONE PREDICATE the
+/// battle pass reads. STAND-IN until the carried stocks land (BL-1452): it reads the
+/// unit's supply factor — full at or above `k_entrench_supply_floor_permille`,
+/// nothing below — so a fully supplied unit recovers. 0 for an unknown unit.
+inline constexpr int k_entrench_supply_floor_permille = 500;
+int unit_entrench_recovery_permille(const world& w, entity_id unit,
+                                    const campaign_battle_params& p = {});
+
 /// BL-1453: the day of battle @p b the next round is fought on, 1-based - its rounds
 /// fought / `rounds_per_day`, plus one. What the time term reads.
 int battle_day(const active_battle& b, const campaign_battle_params& p = {});
@@ -241,7 +258,8 @@ struct tile_attack
 /// ENTITY-ID-AGNOSTIC: the two sides are read only as unit owners. Exposed so a
 /// harness can open a battle without a march.
 bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, entity_id defender,
-                      const std::vector<entity_id>& attacking_units);
+                      const std::vector<entity_id>& attacking_units,
+                      const land_recon_params& rp = {});
 
 /// Open every battle @p attacks registered, in (tile, attacker, defender) order,
 /// each identity's units merged into one attacking stack. So two attacks onto
@@ -258,7 +276,8 @@ bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, en
 /// The restore runs in the same sorted order as the opens, so it adds no
 /// dependence on the visit order.
 /// @return battles opened.
-int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks);
+int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks,
+                      const land_recon_params& rp = {});
 
 /// Request that @p corp break off the battle it is fighting over @p tile.
 ///

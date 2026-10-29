@@ -633,7 +633,9 @@ air_day_tick run_air_day(world& w, const recipe_registry& reg, economy_report& r
                 // The land arithmetic, with no terrain divisor: from above.
                 const int64_t raw = (int64_t{s.st.soft} * (1000 - hardness)
                                      + int64_t{s.st.hard} * hardness) / 1000;
-                const int64_t hits = raw * factor / 1000;
+                // BOMBING A UNIT TAKES THE LAND ROUND'S DAY SCALE (Ben, 2026-10-29;
+                // MILITARY.md § Air): a weeks-long battle is not ended by a week's sorties.
+                const int64_t hits = raw * factor / 1000 * std::max(0, land.day_damage_permille) / 1000;
                 if (hits <= 0)
                     continue;
                 ++out.tactical_hits;

@@ -538,9 +538,11 @@ int main()
         check(f.w.air_hit_bank.count(idle) == 1 && f.w.air_hit_bank.count(engaged) == 0,
               "A5c with no battle, the lowest-id enemy unit in the province is hit");
         const int men0 = f.w.units.at(idle).count, rd0 = f.w.units.at(idle).readiness_permille;
-        fly(f, reg, 60);
+        // RE-SCOPED (Ben, 2026-10-29: bombing a unit takes the land round's day scale,
+        // 1/8): the same damage over eight times the days, so the row flies 480, not 60.
+        fly(f, reg, 480);
         check(f.w.units.at(idle).count < men0 && f.w.units.at(idle).readiness_permille < rd0,
-              "A5d a quarter's bombing kills men and spends readiness (" + std::to_string(men0) + " -> "
+              "A5d bombing at the day scale kills men and spends readiness (" + std::to_string(men0) + " -> "
                   + std::to_string(f.w.units.at(idle).count) + " men)");
     }
 

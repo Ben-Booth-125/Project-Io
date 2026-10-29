@@ -395,20 +395,23 @@ namespace {
 // passenger in a ground fight. The absolute scale is set against
 // campaign_battle_params (campaign_battle_harness prints the curve).
 constexpr std::array<land_combat_stats, land_class_count> k_land_stats = {{
-    // BL-1453 (land recon): the last two columns are PER UNIT recon points and
-    // stealth (MILITARY.md § Recon). A first cut: a side of two base infantry
-    // (recon 20) sees half of one infantry (stealth 40) on day one, a defending
-    // one 37.5 %, plus the time term (1/20 a day). Light armour is the recon
-    // class; tanks and vehicles are easy to see, infantry on foot hardest.
+    // BL-1453 (land recon; MILITARY.md § Recon, Ben 2026-10-29): the last two
+    // columns are PER UNIT recon (what an attacking unit adds to its side's recon
+    // stock each day) and stealth (what an attacker needs to land full hits on it).
+    // A first cut, so RECON BUILDS VERY QUICKLY: every class above zero, and one base
+    // unit attacking blind sees a base infantry (stealth 40) in full on its 4th day
+    // (infantry recon 14: 0, 14, 28, 42 by the morning of day 4); armour, the
+    // slowest, on its 6th. Light armour is the recon class; tanks and vehicles are
+    // easy to find, infantry on foot hardest.
     //  soft  hard  hardness defence breakthrough recon stealth
-    {   60,   15,     0,      90,     25,    10,    40 }, // infantry
-    {   60,   15,   100,      70,     35,    10,    30 }, // motorised
-    {   70,   45,   600,      70,     70,    10,    25 }, // mechanised
-    {  100,  140,   900,      35,    120,     5,    20 }, // armour
+    {   60,   15,     0,      90,     25,    14,    40 }, // infantry
+    {   60,   15,   100,      70,     35,    14,    30 }, // motorised
+    {   70,   45,   600,      70,     70,    12,    25 }, // mechanised
+    {  100,  140,   900,      35,    120,     8,    20 }, // armour
     {   90,   25,   500,      25,     70,    40,    30 }, // light armour
-    {  160,   25,   100,      15,     15,     5,    30 }, // artillery
-    {   10,   10,   200,      20,      5,    15,    25 }, // air defence
-    {    0,    0,     0,       5,      0,     0,    10 }, // none
+    {  160,   25,   100,      15,     15,    10,    30 }, // artillery
+    {   10,   10,   200,      20,      5,    12,    25 }, // air defence
+    {    0,    0,     0,       5,      0,     3,    10 }, // none
 }};
 
 } // namespace

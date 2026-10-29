@@ -102,9 +102,11 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 | `hp_cost` | 400 | Milli-hits of HP damage that kill one man |
 | `readiness_cost` | 185 | Milli-hits per man that spend a unit's whole readiness |
 | `day_damage_permille` | 125 | Every day's landed damage (men and readiness alike) is scaled by this — what makes a battle weeks long |
-| `rout_ratio_permille` | 1500 | Above this ratio of raw hits (the dealer's over the taker's, before the swing), the damage the taker takes rises by the excess ratio cubed — a rout stays fast |
+| `rout_ratio_permille` | 1500 | Above this ratio of raw hits (the dealer's over the taker's), the damage the taker takes rises by the excess ratio cubed — a rout stays fast |
 | `rout_cap_permille` | 12000 | The most the rout term multiplies the day's damage by |
-| `fortune_permille` | 250 | Each side's fortune for the whole battle — a multiplier on every hit it deals, uniform in [750, 1250], derived from the battle's seed (no draw) |
+| `entrench_ratio_permille` | 1250 | Within this ratio of raw hits either way, the battle is dug in that day |
+| `entrench_casualty_permille` | 100 | A dug-in day's men losses are scaled by this: the drop falls on the men, the readiness share lands in full |
+| `entrench_recovery_permille` | 40 | Readiness a fed, armed unit regains each dug-in day (`unit_entrench_recovery_permille`), never above its morale |
 | `terrain_attack_scale` | 1000 | How far `terrain_defence` divides the attacker's hits — a mountain halves them |
 | `wavering_readiness` | 300 | Side readiness at or below which the phase reads wavering |
 | `morale_win` / `morale_loss` | 50 / 100 | Morale a battle's winners gain, and its losers and every retreating unit lose |
@@ -119,10 +121,11 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 units still in the fight. The withdrawal price is charged **in men**, per-mille of the side's
 standing men.
 
-**The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio): attacking is
-dear, and breaking a defender takes about 2:1 in men — decisive 0% at 1:1, 15% at 1.5:1, 64% at
-1.75:1, 89% at 2:1, 99% from 2.5:1. With no swing (Ben, 2026-10-29, overturning NR-204's "a narrower
-swing made the edge too safe"), the same inputs always give the same battle.
+**The curve** (`campaign_battle_harness` C4, base infantry on plains, one fight a ratio, no supply
+recovery): attacking is dear, and the break is a **step at about 1.5:1 in men** — at 1:1 and 1.25:1
+the attacker breaks, from 1.5:1 the defender does (row "C4 TARGET the break sits at about 1.5:1").
+With no swing (Ben, 2026-10-29, overturning NR-204's "a narrower swing made the edge too safe"), the
+same inputs always give the same battle.
 
 **A battle has no maximum duration (Ben, 2026-10-29).** *"They continue while one unit is trying
 to move and end when readiness runs out. Some battles may easily take 90-180 days."* A battle runs
@@ -153,13 +156,21 @@ too").** No per-round swing and no per-battle roll: the same forces on the same 
 supply fight the same battle, every time. A long battle between unequal forces is therefore
 predictable, and that is accepted: what keeps a fight open is entrenchment and supply, not a draw.
 
-**The measured lengths** (`move_by_days_harness` D6, infantry on plains through the daily pass, with
-recon, 40 openings a ratio, days from contact to close): **39 days at parity** (the attacker breaks;
-the longest 60), **46 at 1.5:1** (the contested band, the longest fight; up to 92), 20 at 2:1 and
-**6 at 3:1** — a rout. The resolver alone (C4, 200 seeds) reads 51, 52, 18 and 4 days. **The recon
-ramp now sits inside every battle:** full vision by day 20 comes in the first half of a parity
-fight, so recon decides how the opening weeks go rather than how long the battle lasts — with or
-without it a base-infantry battle runs the same length (`land_recon_harness` M1).
+**The measured lengths.** Base infantry, one fight a ratio, with no supply recovery
+(`campaign_battle_harness` C4's sweep and its TARGET rows): **51 days at parity** (the attacker
+breaks; "C4 TARGET a parity battle is fought out in 30-60 days"), 72 at 1.25:1, **90 at 1.5:1** (the
+longest, the contested band; "C4 TARGET a 1.5:1 battle runs longer than parity"), 25 at 1.75:1, 12
+at 2:1 and **2 at 3:1** — a rout ("C4 TARGET a rout (3:1) is fast"). Through the daily pass, modern
+infantry on plains, fully supplied (`move_by_days_harness` D6): parity **entrenches and is still
+live at day 400**, 66 days at 1.5:1, 10 at 2:1 and 3 at 3:1. Two equal fully supplied sides hold a
+year (`campaign_battle_harness` "C7 two equal fully supplied sides hold each other for a year"); a
+starved side (supply 300) breaks on day 4 attacking and day 11 defending, because its supply also
+cuts its hits out of the band ("C7 a starved ... breaks"). Every fight that lands hits ends in time,
+however slowly — a day's sub-unit losses carry to the next ("C7 ... no freeze by truncation": supply
+50 a side, 300 men, breaks on day 2922); only a fight in which neither side lands anything runs on
+until the attacker withdraws. **Recon decides how a battle opens, not how long it lasts**
+(`land_recon_harness` M1): a blind base-infantry attack sees in full from day 4, and parity and
+1.5:1 run 51 and 89–92 days with recon or without.
 
 **Withdrawal is a first-class verb, not a failure state**, and it is never free. The cost has three
 terms — base, per-round, and pursuit — and the second and third are what make a late break-off

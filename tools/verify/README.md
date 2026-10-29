@@ -750,15 +750,14 @@ bash tools/verify/build_lua_harness.sh move_by_days_harness
 
 ## land_recon_harness (BL-1453, land recon)
 
-MILITARY.md § Recon: a unit damages only the share of its target its side can see,
-min(1, side recon / target stealth). R1 zero recon on day 1 lands exactly the time
-term (1/20; 1.5/20 for the defender); R2 day 20 is full vision from time alone; R3
-the defender's recon counts 1.5x; R4 an own unit beside the defended tile adds its
-recon, joined or not; R5 a wing active over the province adds (recon class most,
-others a base amount, x strength / provinces), superiority adds in proportion to its
-share; R6 stealth kit lowers the hits a unit takes; R7 twice-equal. M1 REPORTS (does
-not assert) base-infantry battles over 200 seeds with and without recon, at the
-shipped six-round cap and with it lifted, plus day-1 damage on typical kit.
+MILITARY.md § Recon: recon is the ATTACKER's. Its hits on a defending unit scale by
+min(1, its recon stock / the unit's stealth); the defender always hits in full. R0 every
+class has recon; R1 the share; R2 a blind (hasty) attack lands nothing on day 1 and sees in
+full within five days while the defender hits in full; R3 a faced attack opens at its
+facing units' recon; R4 an own unit beside the tile adds to the day's growth at once and
+nothing once gone; R5 a wing over the province adds; R6 stealth kit lowers hits taken; R7
+twice-equal. M1 REPORTS one deterministic fight a ratio, full vision vs recon faced vs
+blind.
 
 Reads the C++ defaults (equal to `economy.military.recon`), so it builds with the
 world builder.

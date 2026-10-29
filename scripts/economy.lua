@@ -1026,17 +1026,15 @@ economy = {
             },
         },
 
-        -- BL-1453 (MILITARY.md § Recon, Ben 2026-10-29): land recon. A unit damages
-        -- only the share of its target its side can see: min(1, side recon / target
-        -- stealth). Recon and stealth are POINTS per unit, from the class table and
-        -- the kit (unit_roster.cpp, unit_designs.cpp: base infantry recon 10, stealth
-        -- 40; light armour recon 40). A side's points: its fighting units' recon, its
-        -- own units adjacent to the defended tile, time (a target's stealth x
-        -- min(1, day / time_full_days)), and air over the province. A FIRST CUT; the
-        -- same numbers are the C++ defaults (src/world/land_recon_params.hpp).
+        -- BL-1453 (MILITARY.md § Recon, Ben 2026-10-29): land recon. The ATTACKER's
+        -- hits on a defending unit scale by min(1, its recon stock / the unit's
+        -- stealth); the defender always hits in full. The stock opens at the recon of
+        -- the attacker's units that faced the tile a whole day and grows every day by
+        -- the recon of its units in the battle, its adjacent units and its air. Recon
+        -- and stealth are per unit, from the class table and the kit (unit_roster.cpp,
+        -- unit_designs.cpp: infantry recon 14, stealth 40). The air's share is below;
+        -- the same numbers are the C++ defaults (land_recon_params.hpp).
         recon = {
-            time_full_days     = 20,   -- by day 20 time alone gives full vision
-            defender_permille  = 1500, -- the defender's recon counts 1.5x (its whole sum)
             recon_wing_points  = 40,   -- a recon-class wing over the province: a light armour unit's worth
             wing_points        = 10,   -- any other wing active over it: an infantry unit's worth
             superiority_points = 20,   -- the side flying superiority there, x its share

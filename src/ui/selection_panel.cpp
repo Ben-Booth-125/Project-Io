@@ -2272,7 +2272,8 @@ void draw_battle_selection(world& w, ui_state& ui)
     ImGui::SameLine();
     // The days fought so far, with no denominator: a battle has no maximum duration
     // (Ben, 2026-10-29) - it runs until a side is broken or withdraws.
-    ImGui::TextDisabled("day %d", b.state.rounds_fought / std::max(1, params.rounds_per_day));
+    // battle_day(): 1-based, the day the next round is fought on (BL-1453 cold review).
+    ImGui::TextDisabled("day %d", battle_day(b, params));
     ImGui::Separator();
 
     // --- the map ----------------------------------------------------------

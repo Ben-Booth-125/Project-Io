@@ -587,7 +587,8 @@ int main()
                                        + fronts_section_bytes(wd)    // BL-1427 (v62)
                                        + stack_section_bytes(wd)     // BL-1443 (v63)
                                        + designs_section_bytes(wd)   // BL-1434 (v64)
-                                       + air_section_bytes(wd);      // BL-1449 (v65), last
+                                       + air_section_bytes(wd)       // BL-1449 (v65)
+                                       + world_save_battle_carry_section_bytes(wd); // BL-1453 (v67), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -654,7 +655,8 @@ int main()
                                          + fronts_section_bytes(wu)    // BL-1427 (v62)
                                          + stack_section_bytes(wu)     // BL-1443 (v63)
                                          + designs_section_bytes(wu)   // BL-1434 (v64)
-                                         + air_section_bytes(wu);      // BL-1449 (v65), last
+                                         + air_section_bytes(wu)       // BL-1449 (v65)
+                                         + world_save_battle_carry_section_bytes(wu); // BL-1453 (v67), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 

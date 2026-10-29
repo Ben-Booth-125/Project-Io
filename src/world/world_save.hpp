@@ -563,10 +563,28 @@ inline constexpr uint32_t world_save_magic =
 /// condition). v64 is a STRICT PREFIX of v65 and is read too
 /// (`k_world_save_version_pre_air`), as a world with no air and every building whole.
 /// BL-1445 (move by days) claims v65 on another branch too: the second to merge renumbers.
-inline constexpr uint32_t world_save_version = 65;
+///
+/// Bumped to 67 (BL-1453, land recon; MILITARY.md § Recon, § Battles): A TRAILING
+/// SECTION after the air carries, after a u32 count, every unit off its defaults,
+/// ascending id, as (id, i32 readiness carry, i32 men carry, i32 tile_since_day) — the
+/// sub-unit damage a weeks-long battle carries day to day and the day the unit took
+/// its tile; then a u32 battle count and, per battle in order, the attacker's recon
+/// stock (`active_battle::attacker_recon_milli`, i32 milli-points). v66 is BL-1452's (carried supplies), not on this branch: its
+/// section stacks BEFORE this one at merge, and this section is gated on
+/// `k_world_save_version_battle_carry`. RENUMBER AT MERGE: if BL-1452 lands as v66,
+/// this stays 67 and `k_world_save_version_pre_battle_carry` (66) joins the accepted
+/// prefixes; until then a v65 stream is this one's strict prefix.
+inline constexpr uint32_t world_save_version = 67;
 
 /// v64, a strict prefix of v65 (the air section is v65's only addition).
 inline constexpr uint32_t k_world_save_version_pre_air = 64;
+
+/// BL-1453: the first version carrying the battle-carry section (see above).
+inline constexpr uint32_t k_world_save_version_battle_carry = 67;
+
+/// BL-1453: v65, accepted as a strict prefix of v67 on this branch (no battle carry:
+/// every remainder 0). BL-1452's v66 joins it at merge.
+inline constexpr uint32_t k_world_save_version_pre_battle_carry = 65;
 
 /// v63, a strict prefix of v64 (the designs section is v64's only addition).
 inline constexpr uint32_t k_world_save_version_pre_designs = 63;
@@ -661,6 +679,11 @@ std::size_t world_save_major_section_bytes(const world& w);
 /// BL-1407: the byte length of the v56 nation-books section `write_world_snapshot`
 /// writes for @p w — the LAST section of a v56 stream.
 std::size_t world_save_books_section_bytes(const world& w);
+
+/// BL-1453: the byte length of the v67 battle-carry section `w` writes — 4 + 16 per
+/// unit off its defaults (a carry or a tile day) + 4 + 4 per battle. For the harnesses
+/// that measure an older stream as today's less its later sections.
+std::size_t world_save_battle_carry_section_bytes(const world& w);
 
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and

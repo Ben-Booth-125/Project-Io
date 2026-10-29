@@ -857,8 +857,6 @@ void recipe_registry::load_from_lua(lua_state& lua)
                                              + key + " is outside [" + std::to_string(lo) + ", "
                                              + std::to_string(hi) + "]");
             };
-            read_int("time_full_days", 1, 3650, rp.time_full_days);
-            read_int("defender_permille", 0, 10000, rp.defender_permille);
             read_int("recon_wing_points", 0, 100000, rp.recon_wing_points);
             read_int("wing_points", 0, 100000, rp.wing_points);
             read_int("superiority_points", 0, 100000, rp.superiority_points);

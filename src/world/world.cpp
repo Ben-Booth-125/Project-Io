@@ -360,6 +360,14 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_i32(h, u.readiness_permille);
                 fnv1a_i32(h, u.morale_permille);
             }
+            // BL-1453: the battle carry, folded only off zero behind its own marker,
+            // so a world that never fights keeps every hash.
+            if (u.battle_ready_carry != 0 || u.battle_hp_carry != 0)
+            {
+                fnv1a_u32(h, 0xCA77B00Eu);
+                fnv1a_i32(h, u.battle_ready_carry);
+                fnv1a_i32(h, u.battle_hp_carry);
+            }
             // Refit to a newer type (Ben, 2026-10-27): folded only while the unit
             // refits, behind its own marker, so a world nobody refits keeps every hash.
             if (unit_refitting(u))
@@ -612,6 +620,7 @@ uint64_t world::state_hash(int tick) const
             for (const entity_id u : b.attacker_units) fnv1a_u32(h, u);
             for (const entity_id u : b.defender_units) fnv1a_u32(h, u);
             for (const entity_id u : b.attacking_units) fnv1a_u32(h, u);
+            fnv1a_i32(h, b.attacker_recon_milli); // BL-1453: the attacker's recon stock
         }
     }
 

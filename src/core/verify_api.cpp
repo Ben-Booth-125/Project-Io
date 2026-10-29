@@ -1883,10 +1883,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         for (int i = 0; i < days; ++i)
         {
             if (m_world.construction_quarter_day >= k_construction_quarter_days)
-            {
-                ++m_world.current_day_tick; // as econ_step does
-                step_economy();
-            }
+                step_economy(); // closes the quarter, as econ_step does
+            // A day passes, as the live loop's day tick does (BL-1453 cold review), so
+            // the day's Field dispatches carry its own stamp.
+            ++m_world.current_day_tick;
             std::vector<battle_dispatch> dispatches;
             advanced += advance_quarter_to(m_world, m_registry, m_world.construction_quarter_day + 1,
                                            military_quarter_day_base(static_cast<int>(m_econ_steps)),

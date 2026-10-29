@@ -619,8 +619,8 @@ struct seed_reading
     int    firms_handoff = 0, firms_survived = 0, firms_end = 0, last_tick = 0;
     // BL-1453 fix round (battles have no maximum duration, Ben 2026-10-29): a
     // REPORT-ONLY read of the play's battles. `bt_stuck` counts live battles at the
-    // end whose last round landed nothing on either side - the edge Ben named
-    // (neither side can hit: it runs until the attacker withdraws).
+    // end in which no readiness moved over the last 30 rounds - the edge Ben named
+    // (neither side can wear the other: it runs until the attacker withdraws).
     int    bt_peak_live = 0, bt_live_end = 0, bt_longest_rounds = 0, bt_stuck = 0;
     // G4
     entity_id seat = null_entity;
@@ -1678,9 +1678,20 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     for (const active_battle& b : w.battles)
     {
         r.bt_longest_rounds = std::max(r.bt_longest_rounds, b.state.rounds_fought);
-        if (!b.state.rounds.empty() && b.state.rounds.back().attacker_power == 0
-            && b.state.rounds.back().defender_power == 0)
-            ++r.bt_stuck;
+        // STUCK (BL-1453 cold review): no readiness moved on either side over its last
+        // 30 rounds (the strength reading is men-weighted readiness, so men lost move it
+        // too) — not merely a last round that landed nothing.
+        constexpr std::size_t k_stuck_rounds = 30;
+        const auto& rs = b.state.rounds;
+        if (rs.size() >= k_stuck_rounds)
+        {
+            bool still = true;
+            for (std::size_t k = rs.size() - k_stuck_rounds + 1; k < rs.size() && still; ++k)
+                still = rs[k].attacker_strength_permille == rs[k - 1].attacker_strength_permille
+                     && rs[k].defender_strength_permille == rs[k - 1].defender_strength_permille;
+            if (still)
+                ++r.bt_stuck;
+        }
     }
     for (const auto& [bid, rec] : g5)
     {
@@ -1808,7 +1819,7 @@ int main(int argc, char** argv)
                     r.firms_handoff ? pct(static_cast<double>(r.firms_survived) / r.firms_handoff) : 0.0,
                     r.firms_end);
         std::printf(" B battles (report only): peak live %d, live at the end %d, longest live %d rounds,"
-                    " live with a last round landing nothing on either side %d\n",
+                    " live with no readiness moved in 30 rounds %d\n",
                     r.bt_peak_live, r.bt_live_end, r.bt_longest_rounds, r.bt_stuck);
         if (r.t_ticks > 0)
             std::printf(" T trade (play 1-%d, per tick): points made %.1f spent %.1f | shipments auto %.1f manual %.1f"
