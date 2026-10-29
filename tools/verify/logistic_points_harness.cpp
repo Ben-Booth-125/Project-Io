@@ -1733,6 +1733,50 @@ void l11_offroad_draw()
         std::printf("        %zu rows, %d paid somewhere\n", x.size(), paid);
         check(same, "two independent runs resolve every supply row bit for bit alike");
     }
+
+    // (g) THE LENS'S SHORTCUT IS ROUTING'S ANSWER. `lp_reached_tiles` (the set the lens
+    // builds once per miss) holds a tile exactly when `lp_route_to` says reached, and
+    // the predicate form of the search, fed that set, pays every unit tile at the same
+    // road and step count as the routed form. A short-pool, two-nation row with an
+    // unconnected hub (B's at 30, off its capital's chain) so "reached" is not trivial.
+    {
+        world w;
+        const entity_id body = make_row_body(w, 40);
+        const entity_id a_n  = add_nation(w, body, 0, 19, "A");
+        const entity_id b_n  = add_nation(w, body, 20, 39, "B");
+        w.nations.at(a_n).capital_tile = tile_at(w, body, 4);
+        w.nations.at(b_n).capital_tile = tile_at(w, body, 22);
+        add_hub(w, tile_at(w, body, 4));
+        add_hub(w, tile_at(w, body, 22));
+        add_hub(w, tile_at(w, body, 36)); // B's, not tied to B's capital
+        lay_row_road(w, body, 4, 12);
+        lay_row_road(w, body, 22, 26);
+        lay_row_road(w, body, 33, 38);
+        int set_agree = 0, set_total = 0, walk_agree = 0, walk_total = 0;
+        for (const entity_id n : {a_n, b_n})
+        {
+            lp_reach_memo memo;
+            const std::unordered_set<entity_id> reach = lp_reached_tiles(w, memo, n, body);
+            for (int c = 0; c < 40; ++c)
+            {
+                const entity_id t = tile_at(w, body, c);
+                ++set_total;
+                if ((reach.count(t) != 0) == lp_route_to(w, memo, n, body, t).reached)
+                    ++set_agree;
+                int s1 = -9, s2 = -9;
+                const entity_id p1 = unit_supply_draw_tile(w, memo, n, t, 32, &s1);
+                const entity_id p2 = unit_supply_draw_tile(
+                    w, [&](entity_id x) { return reach.count(x) != 0; }, t, 32, &s2);
+                ++walk_total;
+                if (p1 == p2 && s1 == s2)
+                    ++walk_agree;
+            }
+        }
+        std::printf("        reached set agrees on %d/%d tiles; the two searches on %d/%d\n",
+                    set_agree, set_total, walk_agree, walk_total);
+        check(set_agree == set_total, "lp_reached_tiles holds a tile exactly when lp_route_to says reached");
+        check(walk_agree == walk_total, "the predicate search over that set pays every tile as the routed one does");
+    }
 }
 
 int main()

@@ -1684,6 +1684,26 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1456: ONE UNIT'S DASH, by unit id - whether the lens joins it to a road, in
+    // which rhythm (past its roads), whether its colour is a forecast, the share it is
+    // coloured by, and how many wrap copies the canvas stroked last frame. Flags, a
+    // share and a count: no position crosses the seam (the census rule above).
+    v.set_function("logistics_dash", [this](unsigned unit) {
+        sol::table out = m_lua.state().create_table();
+        out["exists"] = false;
+        for (const auto& d : m_ui.lp_dashes)
+            if (d.unit == static_cast<entity_id>(unit))
+            {
+                out["exists"]   = true;
+                out["past"]     = d.red;
+                out["forecast"] = d.forecast;
+                out["share"]    = d.t;
+                out["drawn"]    = d.drawn;
+                break;
+            }
+        return out;
+    });
+
     // The capital star (Ben, 2026-10-25): what the Planetary canvas drew last frame -
     // a count of stars (one per visible wrap copy) and whether the player's was one.
     v.set_function("capital_stars", [this]() {
@@ -7632,7 +7652,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // BL-1456: THE OFF-ROAD FIXTURE (LENSES.md § Logistics lens, "A unit off the road is
     // joined to it by a dashed line"). Moves the player's lowest-id unit on the active body
     // to the first own land tile (raster order) that its network does not reach but whose
-    // supply is paid 3-6 steps away (`unit_supply_draw_tile`), and the next unit, if there
+    // supply is paid 3-6 steps away at a road of FULL cover (`unit_supply_draw_tile`), so
+    // a pool that is not short grants it whole, and the next unit, if there
     // is one, to the first own land tile PAST its 8 tiles that still has a road of its
     // network within the lens's 32-step display search - a fed dash and a red one. Each
     // loses its order. Returns WHICH UNITS moved and whether each part staged - unit ids,
@@ -7678,7 +7699,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             const entity_id paid = unit_supply_draw_tile(m_world, memo, pn, t, lp_offroad_draw_steps, &steps);
             if (paid != null_entity)
             {
-                if (near_tile == null_entity && steps >= 3 && steps <= 6)
+                if (near_tile == null_entity && steps >= 3 && steps <= 6
+                    && lp_route_to(m_world, memo, pn, body, paid).cover >= 0.999f)
                     near_tile = t;
                 continue;
             }

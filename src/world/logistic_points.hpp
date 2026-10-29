@@ -48,13 +48,15 @@
 //     claims first", Ben 2026-10-28, overturning the 2026-10-16 march draw).
 //     Movement draws no points: a march is paid in days. Once a quarter each unit
 //     asks the points its supplies need - their QUANTITY, as a shipment's draw is
-//     its cargo - AT THE TILE IT STANDS ON, routed against its own nation's
+//     its cargo - PAID AT THE CLOSEST ROAD of its network (its own tile when the
+//     network reaches it; BL-1456, below), routed against its own nation's
 //     sources exactly as a building's request is (`lp_route_to`: the claim is
 //     need x cover). The supply claims are served in ascending unit id, BEFORE any
 //     producer (NR-917 kept), and PRODUCTION'S GRANTS ARE COMPUTED ON WHAT IS LEFT.
 //     So guns, butter and freight compete in one currency, and a campaign visibly
 //     starving its own industry is the intended, legible cost of an army in the
-//     field. A unit on a tile its network does not reach is granted nothing.
+//     field. A unit more than 8 tiles from any tile its network reaches is
+//     granted nothing.
 //
 //     OFF THE ROAD, UP TO 8 TILES (BL-1456; LOGISTICS.md § A unit draws off the
 //     road, Ben 2026-10-29): a unit off its network is PAID AT THE CLOSEST ROAD -
@@ -83,6 +85,7 @@
 #include <utility>
 #include <cstddef>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class recipe_registry;
@@ -419,6 +422,21 @@ entity_id unit_supply_draw_tile(world& w, lp_reach_memo& memo, entity_id nation,
 /// The same, on a memo of its own (a caller with no resolve in hand, e.g. placement).
 entity_id unit_supply_draw_tile(world& w, entity_id nation, entity_id unit_tile,
                                 int max_steps = lp_offroad_draw_steps, int* steps_out = nullptr);
+/// The same walk with "on the network" handed in as @p reached - the one search the
+/// two forms above wrap (they pass `lp_route_to`'s `reached`). For a caller asking of
+/// many units at once, which builds the set once (`lp_reached_tiles`) and tests a tile
+/// by a lookup rather than routing it.
+entity_id unit_supply_draw_tile(world& w, const std::function<bool(entity_id)>& reached,
+                                entity_id unit_tile, int max_steps = lp_offroad_draw_steps,
+                                int* steps_out = nullptr);
+
+/// Every tile on @p body where `lp_route_to(w, memo, nation, body, tile).reached` holds:
+/// some source of @p nation that is connected to its capital reaches it with reach > 0.
+/// Built from the same per-source fields routing reads, so a tile is in it exactly when
+/// routing would say reached. For LOOKUP ONLY - its iteration order is a hash table's and
+/// must never reach state. A derived read, never serialised.
+std::unordered_set<entity_id> lp_reached_tiles(world& w, lp_reach_memo& memo, entity_id nation,
+                                               entity_id body);
 
 /// The hub chain @p target needs (BL-1395; LOGISTICS.md § Where generation puts the
 /// sources, "The chain is laid outward from the capital"): the road hubs, in the order

@@ -1833,14 +1833,19 @@ struct ui_state
     /// joined to it by a dashed line"): one dash per player unit standing off its
     /// network - raster cells of the road tile its supply is paid at (or, past its 8
     /// tiles, the nearest road its network reaches within a 32-step display search) and
-    /// of the unit; `t` its position on the road ramp (its granted share), `red` past
-    /// its roads. A photograph of the last resolve, never fed back.
+    /// of the unit; `t` its granted share, LINEARLY (Ben, 2026-10-29: 1 green, 0.5
+    /// yellow, 0 red); `red` past its roads, drawn in the short PAST-ITS-ROADS rhythm.
+    /// `forecast`: the unit has moved off the road its last resolve paid at, so `t` is
+    /// the cover at the road it would be paid at now. A photograph, never fed back.
     struct lp_dash_view
     {
-        int   road_cell = -1;
-        int   unit_cell = -1;
-        float t         = 1.0f;
-        bool  red       = false;
+        entity_id unit      = null_entity;
+        int       road_cell = -1;
+        int       unit_cell = -1;
+        float     t         = 1.0f;
+        bool      red       = false;
+        bool      forecast  = false;
+        int       drawn     = 0; ///< wrap copies the canvas stroked last frame
     };
     std::vector<lp_dash_view> lp_dashes;
     /// What the dash pass stroked last frame (one per visible wrap copy), and of them red.
