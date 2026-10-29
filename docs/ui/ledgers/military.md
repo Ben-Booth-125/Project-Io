@@ -79,7 +79,7 @@ this kind of unit carrying, and what can it carry instead?"
   research would buy is half of what the screen is for. A pick the seam refuses is disabled with
   its reason. Pressing the box again closes its list.
 - **The stat grid sits at the bottom right (Ben, 2026-10-29)**, in place of a summary line: the
-  design's soft attack, hard attack, defence, breakthrough, hardness, recon and stealth, its kit
+  design's soft attack, hard attack, defence, breakthrough, hardness, recon offence, recon defence and stealth, its kit
   goods per unit, and the class's speed, read-only (speed is the class's alone, Ben, 2026-10-28).
   It is the same grid the unit card carries (§ The stat grid). **While editing, each stat shows its
   change against the live design as a signed delta** — `+12` or `−5` beside the value — for the
@@ -102,7 +102,7 @@ this kind of unit carrying, and what can it carry instead?"
 and is the one grid the unit card and the designer share, so the two cannot disagree.
 
 - **Cells.** HP, readiness, morale; food, ammunition, equipment (the carried stocks); soft attack,
-  hard attack, defence, breakthrough, hardness; recon, stealth; speed. Each cell is a label and a
+  hard attack, defence, breakthrough, hardness; recon offence, recon defence, stealth; speed. Each cell is a label and a
   value; the stored stats carry a bar in the canvas counter's colours.
 - **On the unit card** the grid takes the width beside the unit's portrait on the Selection band
   (`../SELECTION.md`) — the class image on the left, the grid filling the rest.
