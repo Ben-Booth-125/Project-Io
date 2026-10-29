@@ -246,6 +246,41 @@ state_reserve_report reserve_state_first_tick(world& w, const recipe_registry& r
 /// Print the reserve's one `[state_reserve]` log line.
 void print_state_reserve(const state_reserve_report& r);
 
+/// A POOR NATION OPENS WITH FEWER STATE BUILDINGS (Ben, 2026-10-29;
+/// NATION_GENERATION.md, "A poor nation opens with fewer state buildings"). After the
+/// foundings' reserve and the stacked hubs, a nation whose chest is still short of
+/// `k_state_founding_reserve_ticks` (16) ticks of its RUNNING BILL - its garrison's
+/// wage (the credit half of every unit's upkeep) plus its state bill
+/// (`state_first_tick_bill`) - opens with only what that chest can run for 16 ticks:
+/// a tick's allowance of chest / 16 less the garrison's wage, spent in this order:
+///   1. the CAPITAL'S SOURCE (every Logistic Point source on the capital tile) stands
+///      first, whatever it costs - so no capital starts dark;
+///   2. the rest in the order the funding gate pays them (`gate_walk_buildings`:
+///      network nodes first, then every other state building, each in stored order),
+///      each kept while its bound fits what is left of the allowance.
+/// Whatever the chest cannot carry is LEFT UNBUILT: removed through the state's own
+/// demolish door (construction.hpp `demolish_building`), before the settle. Nothing is
+/// minted: a site's paid credits refund to the treasury exactly as a cancelled site's
+/// do. A MILITARY BASE left unbuilt takes no army with it: its garrison keeps its post
+/// with no base recorded (never orphaned), and an opening muster queued there is
+/// dropped. Ascending nation id; deterministic.
+struct opening_state_cut_report
+{
+    int   nations_short = 0;  ///< nations under 16 ticks of their running bill
+    int   nations_cut   = 0;  ///< of them, a building left unbuilt
+    int   unbuilt       = 0;  ///< state buildings left unbuilt
+    int   unbuilt_nodes = 0;  ///< of them, network nodes (hubs, stations, ports)
+    int   bases_unbuilt = 0;  ///< of them, military bases
+    int   garrisons_unbased = 0; ///< units whose cut base was their muster base (kept, base cleared)
+    int   musters_dropped   = 0; ///< opening musters queued at a cut base
+    float bill_cut      = 0.0f; ///< their summed bounds: the running bill removed, a tick
+    std::map<entity_id, int> per_nation; ///< nation -> buildings left unbuilt
+};
+opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_registry& reg);
+
+/// Print the cut's one `[state_cut]` log line.
+void print_opening_state_cut(const opening_state_cut_report& r);
+
 /// BL-1398 (Ben, 2026-10-22; NATION_GENERATION.md § Pass 7, "No capital starts
 /// dark"): THE FIRMS ON A NATION'S GROUND FUND ITS OPENING NODE BILL. Every nation
 /// holding network nodes (hubs, stations, ports - a minor's too, NATIONS.md § State

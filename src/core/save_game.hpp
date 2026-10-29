@@ -10,6 +10,8 @@
 #include <unordered_map>
 #include <vector>
 
+struct military_capability_params; // world/recipe_registry.hpp (BL-1455)
+
 // ---------------------------------------------------------------------------
 // Save game -- the world snapshot plus its app-layer envelope (BL-536)
 // ---------------------------------------------------------------------------
@@ -414,4 +416,7 @@ bool write_save_game(const std::string& path, const world& w, const save_envelop
 /// @param w    Destination world, untouched unless the whole read succeeds.
 /// @param env  Destination envelope, same guarantee.
 /// @return     True if the save was read whole; false on any rejection.
-bool read_save_game(const std::string& path, world& w, save_envelope& env);
+/// @p mil (BL-1455): the class terrain rows, threaded to `read_world_snapshot` so a
+/// legacy stream's load-time step-off never lands a unit on a class wall.
+bool read_save_game(const std::string& path, world& w, save_envelope& env,
+                    const military_capability_params* mil = nullptr);

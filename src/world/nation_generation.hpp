@@ -552,10 +552,6 @@ int seat_capitals_on_centres(world& w, int* unseated = nullptr);
 /// Exposed so centre_census C16 asserts the rule against the same function.
 entity_id garrison_border_post(world& w, const province& pr, entity_id guarded);
 
-/// A UNIT DRAWS OFF THE ROAD (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road):
-/// its supply is drawn at the closest road its network reaches within this many tiles.
-inline constexpr int k_unit_draw_reach_tiles = 8;
-
 /// The memo `unit_tile_drawable` keeps across calls in one pass.
 struct unit_draw_memo
 {
@@ -564,10 +560,9 @@ struct unit_draw_memo
     std::map<std::pair<entity_id, entity_id>, bool>   drawable; ///< (nation, tile) -> result
 };
 
-/// THE ONE PLACEMENT PREDICATE (BL-1452): can a unit of @p nation standing on @p tile
-/// draw its supply there? Today: the tile's routed cover > 0, or a tile of the nation's
-/// ground within `k_unit_draw_reach_tiles` steps over crossable land has cover > 0. The
-/// draw-off-the-road lane replaces its body with its claim's rule at merge.
+/// THE PLACEMENT PREDICATE (BL-1452): can a unit of @p nation standing on @p tile draw
+/// its supply there? `unit_tile_within_draw` (logistic_points.hpp, the one rule the
+/// draw-off-the-road lane replaces) over `lp_coverage_at` > 0, memoised.
 bool unit_tile_drawable(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile);
 
 /// What `repost_garrisons_on_cover` did, for the finish log and the harnesses.

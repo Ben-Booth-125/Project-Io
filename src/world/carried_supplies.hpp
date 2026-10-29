@@ -42,6 +42,7 @@
 #include <set>
 
 struct world;
+struct military_capability_params;
 
 /// The authored daily rates, `scripts/economy.lua` § `economy.military.carried_supplies`.
 /// Per-mille of a full stock per day. The defaults match the authored values so a
@@ -102,10 +103,14 @@ struct carried_supplies_day
 /// drain, resupply at the supply factor's share, starvation, the readiness cap.
 /// @p fought is the units in contact today (they fought today's rounds). A unit it
 /// reduces to zero men is removed by the one disband path (`disband_orphaned_units`).
+/// @p mil, when given, wires BL-1455's terrain hook: the equipment drain x
+/// `unit_terrain_effects(w, *mil, u).wear` at the unit's tile.
 carried_supplies_day run_carried_supplies_day(world& w, const carried_supply_params& p,
-                                              const std::set<entity_id>& fought);
+                                              const std::set<entity_id>& fought,
+                                              const military_capability_params* mil = nullptr);
 
 /// True when `run_carried_supplies_day` would change some unit out of contact today
 /// — what keeps the daily military pass walking a quiet quarter while a unit's
 /// stocks are moving. A unit fully supplied and full is inert.
-bool carried_supplies_pending(const world& w, const carried_supply_params& p);
+bool carried_supplies_pending(const world& w, const carried_supply_params& p,
+                              const military_capability_params* mil = nullptr);

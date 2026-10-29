@@ -614,7 +614,7 @@ conquest at generation time) and `tools/verify/world_audit.cpp`.
 
 **Ground treats the classes differently: tanks cannot cross mountains without a road, and fight
 worse in them.** On top of the shared terrain table above, which every unit reads alike, each land
-class carries a **per-terrain row** with up to four effects:
+class carries a **per-terrain row** with up to five effects (the fifth, stealth, is below the table):
 
 - **Move** — a multiplier on the march days (§ Marching), on top of the tile's traversal cost.
 - **Blocked unless roaded** — the class cannot enter the tile without a road on it. A block refuses
@@ -623,7 +623,7 @@ class carries a **per-terrain row** with up to four effects:
   battle's ground (the defended tile, § Battles) is that terrain. It applies to each unit by its own
   class, on both sides. **A road on the defended tile halves the fight debuff.**
 - **Wear** — the unit's carried equipment (§ Carried supplies) drains faster each day it stands
-  there.
+  there: ×1.5 wherever the table says "wear".
 
 Desert is the **dunes** cover; mountain, canyon and rift are landforms; marsh, forest, urban and
 snow are covers.
@@ -652,8 +652,14 @@ snow are covers.
 
 The rows are authored data beside the march days (`economy.military`), keyed by class and terrain,
 and checked by the loader as the march days are. **A block is a per-class wall in the path**: a
-march or a front's order routes around it, an order with no legal route is refused with the reason,
-and a retreat never steps onto a tile its class cannot enter.
+march or a front's order routes around it, an order with no legal route is refused with the reason
+(`rejected_terrain`), and a retreat never steps onto a tile its class cannot enter. On a front
+(§ Fronts) a slot the class cannot enter gives way to the nearest span tile it can, ties to the
+lower index; a unit with no such slot holds where it stands. A push skips a target the class
+cannot enter or reach for the next in the push's order. "A road on it"
+is any road edge on the tile. The move rows price a hop's days but do not steer the route: the
+path is the shared terrain-weighted one, solved around the walls. A pre-modern row, which declares
+no land class, reads none of these rows.
 
 ---
 

@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <set>
 #include <unordered_map>
@@ -172,8 +173,14 @@ const logistics_path& intra_body_path(world& w, entity_id body, entity_id src_ti
 /// blocked set is the units' positions, which move every tick — and returned by
 /// value, `tiles` in the same canonical lo -> hi order. Deterministic: the queue
 /// is fed in a fixed order and nothing reads a hash layout.
+///
+/// @p wall, when given, is a second per-tile test of the same kind (BL-1455, terrain
+/// and the classes: a class's blocked-unless-roaded ground): a tile it answers true for
+/// is never entered either, save @p src_tile (a unit may leave a wall it stands on).
+/// The destination is not tested - the caller refuses a walled destination itself.
 logistics_path intra_body_path_avoiding(world& w, entity_id body, entity_id src_tile,
-                                        entity_id dst_tile, const std::set<entity_id>& blocked);
+                                        entity_id dst_tile, const std::set<entity_id>& blocked,
+                                        const std::function<bool(const tile_component&)>* wall = nullptr);
 
 /// Every cell of @p body whose travel cost TO @p anchor_tile is at most
 /// @p max_cost, as (raster index, cost) pairs in settle order (cost

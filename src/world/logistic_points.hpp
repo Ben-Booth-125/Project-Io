@@ -497,6 +497,13 @@ struct lp_seed_report
     /// BL-1367: the building ids counted in `unconnectable`, ascending - so the coverage
     /// census checks each uncovered consumer against the seeding's own reason, not a count.
     std::vector<entity_id> unconnectable_ids;
+    /// BL-1452 (LOGISTICS.md § Where generation puts the sources, Ben 2026-10-29: logistics
+    /// serves the armies from generation): the garrison posts the seeding counted as
+    /// requests, the ones whose ground its sources had to be laid toward, and the ones
+    /// still past the draw after it.
+    int garrison_posts        = 0;
+    int garrison_posts_served = 0; ///< not within the draw before the seeding laid toward them
+    int garrison_posts_short  = 0; ///< still past the draw afterwards
     /// BL-1356: ports laid to bridge ground cut off from its capital by water, and the
     /// islands so bridged (a home port, where none was connected, plus an island port).
     int   ports_placed    = 0;
@@ -528,6 +535,21 @@ struct lp_seed_report
 /// ground cut off from the capital by water is bridged by a pair of ports; pool hubs stand only
 /// where they join the chain. Owned by the nation (state industry) for a major, else by the
 /// consumer's owner. Complete and zero-staffed, as every generated holding is. Deterministic.
+/// A UNIT DRAWS OFF THE ROAD (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road):
+/// its supply is drawn at the closest road its network reaches within this many tiles.
+inline constexpr int k_unit_draw_reach_tiles = 8;
+
+/// THE ONE DRAW PREDICATE (BL-1452): can a unit of @p nation standing on @p tile draw
+/// its supply? PLACEHOLDER BODY for the draw-off-the-road lane (BL-1456), which
+/// replaces it with its claim's own rule at merge: true when @p has_cover holds for
+/// the tile itself, or for some tile of @p nation's own ground within
+/// `k_unit_draw_reach_tiles` steps over crossable land (the march's four sides, never
+/// water). @p has_cover is the caller's "this tile's routed cover > 0", so a caller
+/// mid-seeding reads its own live memo. Garrison placement (`unit_tile_drawable`,
+/// nation_generation.hpp) and the source seeding's garrison step both ask this.
+bool unit_tile_within_draw(world& w, entity_id nation, entity_id tile,
+                           const std::function<bool(entity_id)>& has_cover);
+
 lp_seed_report seed_logistics_sources(world& w);
 
 /// The seeding's READING (consumers, coverage, pool, grant), refilled on @p w

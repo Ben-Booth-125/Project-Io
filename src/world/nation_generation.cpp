@@ -2317,56 +2317,17 @@ void seed_nation_garrisons(world& w, const nation_garrison_params& params)
 
 bool unit_tile_drawable(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile)
 {
-    // PLACEHOLDER BODY (BL-1452, coordinator 2026-10-29): the draw-off-the-road lane
-    // replaces it with its claim's own rule at merge. Today: the tile's routed cover
-    // > 0, or some tile of the nation's own ground within k_unit_draw_reach_tiles steps
-    // over crossable land (the march's four sides, never water) has cover > 0.
     const auto memo_hit = memo.drawable.find({nation, tile});
     if (memo_hit != memo.drawable.end())
         return memo_hit->second;
-    const auto cover_at = [&](entity_id t) {
-        const auto own = w.tile_to_nation.find(t);
-        if (own == w.tile_to_nation.end() || own->second != nation)
-            return false;
+    const bool found = unit_tile_within_draw(w, nation, tile, [&](entity_id t) {
         const auto c = memo.cover.find(t);
         if (c != memo.cover.end())
             return c->second;
         const bool v = lp_coverage_at(w, memo.lp, t) > 0.0f;
         memo.cover.emplace(t, v);
         return v;
-    };
-    bool found = false;
-    std::map<entity_id, int> dist{{tile, 0}};
-    std::vector<entity_id> q{tile};
-    for (std::size_t head = 0; head < q.size() && !found; ++head)
-    {
-        const entity_id t = q[head];
-        if (cover_at(t))
-        {
-            found = true;
-            break;
-        }
-        const int d = dist[t];
-        if (d >= k_unit_draw_reach_tiles)
-            continue;
-        const auto tit = w.tiles.find(t);
-        if (tit == w.tiles.end())
-            continue;
-        const int row = tit->second.grid_y;
-        for (int side = 0; side < 6; ++side)
-        {
-            if (!road_side_is_crossable(side, row))
-                continue;
-            const entity_id n = road_edge_neighbour(w, t, side);
-            if (n == null_entity || dist.count(n) != 0)
-                continue;
-            const auto nit = w.tiles.find(n);
-            if (nit == w.tiles.end() || is_water(nit->second.substrate))
-                continue;
-            dist.emplace(n, d + 1);
-            q.push_back(n);
-        }
-    }
+    });
     memo.drawable.emplace(std::make_pair(nation, tile), found);
     return found;
 }

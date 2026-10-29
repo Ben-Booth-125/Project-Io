@@ -976,6 +976,89 @@ economy = {
             restock_permille            = 500,
         },
 
+        -- BL-1455 (Ben, 2026-10-29; MILITARY.md § Terrain and the classes): GROUND
+        -- TREATS THE CLASSES DIFFERENTLY. A row per (land class, terrain). Terrain keys:
+        -- mountain, canyon, rift (landforms); marsh, desert (the dunes cover), forest,
+        -- urban, snow (covers). Effects, every one optional and neutral when absent:
+        --   move                  x the march days of a hop onto the tile (>= 1)
+        --   blocked_unless_roaded the class cannot ENTER the tile without a road on it
+        --                         (a unit already there may leave)
+        --   dismount              march at foot infantry's days there (carriers on high ground)
+        --   fight                 x soft, hard, defence and breakthrough when the tile is the
+        --                         battle ground, (0, 1]; a road there halves the debuff
+        --   wear                  x the daily drain of carried equipment standing there (>= 1)
+        --   stealth               x the unit's stealth standing there (> 0)
+        -- A tile matching two rows (a forested mountain) takes the WORST of them per
+        -- effect; rows never multiply. A pre-modern row (no land class) reads none of
+        -- this. The loader rejects a non-finite or out-of-range number, a non-boolean
+        -- flag, and any key naming no class, terrain or effect.
+        -- WEAR: the doc names the cells, not the rate; 1.5 is the authored first cut,
+        -- the same step as the move rows.
+        terrain_class = {
+            infantry = {
+                forest = { stealth = 1.5 },
+                urban  = { stealth = 1.5 },
+            },
+            motorised = {
+                mountain = { dismount = true },
+                canyon   = { dismount = true },
+                rift     = { dismount = true },
+                marsh    = { blocked_unless_roaded = true },
+                desert   = { move = 1.25 },
+                forest   = { move = 1.25 },
+                snow     = { move = 1.25 },
+            },
+            mechanised = {
+                mountain = { dismount = true },
+                canyon   = { dismount = true },
+                rift     = { dismount = true },
+                marsh    = { blocked_unless_roaded = true },
+                forest   = { move = 1.25 },
+                urban    = { fight = 0.85 },
+            },
+            light_armour = {
+                mountain = { blocked_unless_roaded = true, fight = 0.60 },
+                canyon   = { blocked_unless_roaded = true },
+                rift     = { blocked_unless_roaded = true },
+                marsh    = { blocked_unless_roaded = true },
+                desert   = { move = 1.25, wear = 1.5 },
+                forest   = { fight = 0.75 },
+                urban    = { fight = 0.70 },
+                snow     = { move = 1.5 },
+            },
+            armour = { -- medium armour
+                mountain = { blocked_unless_roaded = true, fight = 0.50 },
+                canyon   = { blocked_unless_roaded = true, fight = 0.60 },
+                rift     = { blocked_unless_roaded = true, fight = 0.60 },
+                marsh    = { blocked_unless_roaded = true, fight = 0.50 },
+                desert   = { blocked_unless_roaded = true, fight = 0.70 },
+                forest   = { move = 1.5, fight = 0.70 },
+                urban    = { fight = 0.60 },
+                snow     = { move = 1.25 },
+            },
+            artillery = {
+                mountain = { blocked_unless_roaded = true },
+                canyon   = { blocked_unless_roaded = true },
+                rift     = { blocked_unless_roaded = true },
+                marsh    = { blocked_unless_roaded = true },
+                desert   = { move = 1.25 },
+                forest   = { move = 1.5 },
+                urban    = { fight = 0.80 },
+                snow     = { move = 1.5 },
+            },
+            air_defence = {
+                mountain = { blocked_unless_roaded = true },
+                canyon   = { blocked_unless_roaded = true },
+                rift     = { blocked_unless_roaded = true },
+                marsh    = { blocked_unless_roaded = true },
+                desert   = { wear = 1.5 },
+                snow     = { move = 1.25 },
+            },
+        },
+        -- OPEN GROUND EXPOSES EVERYONE: plains or highland with no concealing cover
+        -- (none, grass, salt, snow, dunes) multiplies every unit's stealth by this.
+        terrain_open_ground_stealth = 0.75,
+
         -- BL-596 / BL-1352 / BL-1445: a UNIT'S SUPPLY draws Logistic Points, never its
         -- march (Ben, 2026-10-28: movement takes no Logistic Points; a march is paid in
         -- days). Once a quarter each unit requests the QUANTITY of its supplies - its

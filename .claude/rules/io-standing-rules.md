@@ -60,6 +60,13 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   `fold_to_ground` on the `--verify` world, whose builder does not go through
   `finish_campaign_world`, and `verify.buildings()` may then list the nation buildings it folded.
   Verify-only, behind `--verify`.
+  **Eighth (Ben, 2026-10-29):** the verify STAGING call `verify.offroad_unit_fixture()` may move
+  player units off their nation's network - one 3-6 steps off, one past the 8-tile draw - and
+  return their unit ids and which staged, nothing else; the script aims through `verify.units()`.
+  Its read sibling `verify.logistics_dash(unit)` (Ben, 2026-10-29) returns that unit's dash flags
+  (exists, past, forecast), its share and a drawn count - what the lens draws - never a position.
+  Reason: the Logistics lens's off-road dash (BL-1456) can only be checked on a unit known to stand
+  off the road, and generation's garrisons now open within the draw. Verify-only, behind `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of

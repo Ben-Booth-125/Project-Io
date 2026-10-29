@@ -45,13 +45,16 @@
 
 #include "campaign_battle.hpp"
 #include "entity.hpp"
+#include "terrain_class.hpp" // BL-1455: terrain_class_effect, the terrain hook's answer
 
 #include <cstdint>
+#include <functional>
 #include <set>
 #include <vector>
 
 struct world;
 class recipe_registry;
+struct military_capability_params;
 
 /// THE PHASE VOCABULARY (BL-468/BL-469), and the reason it lives in the WORLD
 /// layer rather than in either surface that reads it.
@@ -319,12 +322,35 @@ struct shared_tile_fix
 /// lowest tile id. A unit that steps off loses its order (its path started where it
 /// no longer stands). A unit with nowhere to go is DISBANDED - erased, and struck
 /// from every battle's lists. A world that keeps the rule is untouched.
-shared_tile_fix resolve_shared_tiles(world& w);
+/// With @p mil given (BL-1455), a step never lands on a tile the unit's class cannot
+/// enter (`retreat_tile`'s wall test); a unit with no other way off is disbanded.
+shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params* mil = nullptr);
 
 /// The march path @p from -> @p dest on @p body for a unit of @p owner, in TRAVEL
 /// order (path[0] == @p from), solved around every tile in @p blocked save @p dest
 /// itself. The cached `intra_body_path` when its route crosses no blocked tile —
 /// so a world with no contact marches exactly as before — else a search around
 /// them (`intra_body_path_avoiding`). Empty if unreachable.
+///
+/// @p wall (BL-1455, terrain and the classes), when given, is the marching class's
+/// per-tile wall (`class_wall`): the path never enters a tile it answers true for,
+/// save @p from - a unit may leave a wall it stands on - and a walled @p dest is
+/// unreachable (an empty path).
 std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, entity_id dest,
-                                  const std::set<entity_id>& blocked);
+                                  const std::set<entity_id>& blocked,
+                                  const std::function<bool(const tile_component&)>* wall = nullptr);
+
+/// THE PER-CLASS WALL (BL-1455; MILITARY.md § Terrain and the classes): true for a
+/// tile a unit of roster row @p type cannot ENTER - a matching row blocks it unless
+/// roaded, and it carries no road (`terrain_class_effects_for_type(...).walled`). A
+/// pre-modern row and an unknown row are walled nowhere. @p mil must outlive the test.
+std::function<bool(const tile_component&)> class_wall(const military_capability_params& mil,
+                                                      uint16_t type);
+
+/// THE TERRAIN HOOK for a unit standing where it stands (BL-1455): all five effects of
+/// its tile on its class (`terrain_class_effects_for_type` at `u.position`). Neutral
+/// when the tile is unknown. The consumers outside march and battle read this:
+///   - carried supplies (BL-1452): `.wear`, x the daily equipment drain;
+///   - land recon (BL-1453): `.stealth`, x the unit's stealth.
+terrain_class_effect unit_terrain_effects(const world& w, const military_capability_params& mil,
+                                          const unit_component& u);
