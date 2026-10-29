@@ -36,6 +36,7 @@
 #include "world/air_combat.hpp"    // BL-1450: wings, the air roster — the air readouts and stage_wing
 #include "world/unit_designs.hpp"  // BL-1450: air_design_of
 #include "world/unit_roster.hpp"   // unit_roster_table — military_ledger() names its rows
+#include "world/unit_designs.hpp"  // set_kit_research_waived_for_harness — waive_kit_research()
 #include "ui/fonts.hpp"
 #include "ui/frame_stats.hpp"
 #include "ui/market_ledger.hpp"
@@ -3263,6 +3264,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["back_y"]      = d.back_y;
         out["stale_units"] = d.stale_units;
         out["message"]     = d.last_message;
+        // The draft (NR-1096): how many slots differ from the live design, the
+        // Save / Revert presses, and the close prompt's presses (x < 0 = not up).
+        out["changed_slots"]    = d.changed_slots;
+        out["confirm_close"]    = d.confirm_close;
+        out["save_x"]           = d.save_x;           out["save_y"]           = d.save_y;
+        out["revert_x"]         = d.revert_x;         out["revert_y"]         = d.revert_y;
+        out["prompt_save_x"]    = d.prompt_save_x;    out["prompt_save_y"]    = d.prompt_save_y;
+        out["prompt_discard_x"] = d.prompt_discard_x; out["prompt_discard_y"] = d.prompt_discard_y;
+        out["prompt_keep_x"]    = d.prompt_keep_x;    out["prompt_keep_y"]    = d.prompt_keep_y;
         out["card_type_x"] = d.card_type_x;
         out["card_type_y"] = d.card_type_y;
         sol::table boxes = st.create_table();
@@ -3271,6 +3281,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         {
             sol::table e = st.create_table();
             e["slot"] = b.slot; e["name"] = b.name; e["fitted"] = b.fitted;
+            e["live"] = b.live; e["changed"] = b.changed;
             e["x"] = b.x; e["y"] = b.y; e["anchor_x"] = b.anchor_x; e["anchor_y"] = b.anchor_y;
             boxes[++k] = e;
         }
@@ -3288,6 +3299,20 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         out["items"] = items;
         return out;
+    });
+
+    // STAGING: waive the kit research lock (unit_designs.hpp), so a check can draft
+    // and save a non-base pick before the age tree holds any kit node (BL-1436).
+    // Process-global, never saved; the script turns it back off. Verify-only.
+    v.set_function("waive_kit_research", [](bool on) { set_kit_research_waived_for_harness(on); });
+
+    // Press Escape through the app's own key handler (its precedence ladder: exit
+    // confirm, system menu, roll-up drill, the takeover's fold, the menu), so a
+    // check drives the real Escape rung rather than calling fold() itself.
+    v.set_function("press_escape", [this]() {
+        SDL_KeyboardEvent k{};
+        k.scancode = SDL_SCANCODE_ESCAPE;
+        handle_key_down(k);
     });
 
     // Turn the unit card's accordion to page @p n (0 = strength, 1 = roster), as
@@ -4792,6 +4817,23 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         cmd.workforce = wf;
         // BL-1296: the state industry a command acts for (0 = the corp's own book).
         cmd.as_nation = static_cast<entity_id>(t.get_or("as_nation", 0u));
+        // BL-1449: assign_air_mission's provinces, `provinces = { id, id, ... }` — at
+        // most k_air_mission_provinces_max integers, each a uint32 other than
+        // no_province, range-checked before the narrowing cast; anything else
+        // rejects the whole command. Whether each names a province is the seam's.
+        if (const sol::optional<sol::table> pt = t["provinces"]; pt)
+        {
+            const std::size_t n = pt->size();
+            if (n > k_air_mission_provinces_max) return "rejected_invalid";
+            for (std::size_t i = 1; i <= n; ++i)
+            {
+                const sol::optional<double> v = (*pt)[i];
+                if (!v || !std::isfinite(*v) || *v < 0.0 || *v >= static_cast<double>(no_province)
+                    || *v != std::floor(*v))
+                    return "rejected_invalid";
+                cmd.air_provinces[i - 1] = static_cast<uint32_t>(*v);
+            }
+        }
         if (const sol::optional<int> ty = t["type"]; ty)
         {
             if (*ty < 0 || *ty >= static_cast<int>(building_type_count)) return "rejected_invalid";
@@ -7910,6 +7952,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         m_screen = app_screen::in_game;
         reset_verify_transients();
+        set_kit_research_waived_for_harness(false); // a script's waive never outlives it
         ui::clear_overflows();
 
         // Goldens live in a "golden" directory beside each verify script, so

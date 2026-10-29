@@ -209,6 +209,9 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
         // what it is actually running at, or the Build door would quote a
         // starved factory at its nominal.
         bc.supply_factor_permille = existing->supply_factor_permille;
+        // BL-1449: and its real CONDITION — a bombed factory is priced at the rate
+        // building_supply_scalar gives it, as the tick runs it.
+        bc.condition_permille = existing->condition_permille;
     }
     // `wt_scalar` is workforce_target/100 inside compute_building_opex, and the
     // revenue terms below assume target 100 scales to 1. Carry the real scalar

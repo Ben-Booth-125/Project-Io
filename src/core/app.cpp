@@ -1851,6 +1851,7 @@ void app::finish_new_game()
     }
 
     open_play_log(std::string());
+    ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
     m_screen = app_screen::in_game;
 }
 
@@ -2497,6 +2498,7 @@ bool app::load_game_from(const std::string& path)
     // Selection state that indexes into the replaced world.
     m_ui.clear_battle_selection();
     m_ui.clear_front_selection();
+    ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
 
     m_screen = app_screen::in_game;
     open_play_log(path);
@@ -2825,8 +2827,8 @@ void app::render()
     // the hire block below executes through `hire_unit`.
     ui::draw_military_ledger(m_world, m_registry, m_ui, m_ui.show_military_ledger);
     // The unit designer (military.md § The designer): a full-canvas takeover the
-    // Design tab's class rows and the unit card's type name open. Its picks queue
-    // `designer.pending_*`, sent below as `set_unit_design`.
+    // Design tab's class rows and the unit card's type name open. Its picks draft;
+    // Save queues `designer.pending`, sent below as `set_unit_design`.
     ui::draw_unit_designer(m_world, m_ui);
     // BL-1450: the same rung opened on an air class (`set_air_design`, below).
     ui::draw_air_designer(m_world, m_registry, m_ui);
@@ -3346,30 +3348,42 @@ void app::render()
         m_ui.pending_disband_unit = null_entity; // consume the request
     }
 
-    // The unit designer's pick (military.md § The designer; BL-1434): one slot per
-    // press, through the same seam any caller uses (`set_unit_design`). The pick is
-    // at once the class's live design. A refusal mutates nothing.
-    if (m_ui.designer.pending_cls >= 0)
+    // The unit designer's Save (military.md § The designer, "A pick drafts; Save
+    // commits"; NR-1096): one `set_unit_design` per changed slot, through the same
+    // seam any caller uses. The saved draft is at once the class's live design. A
+    // refusal mutates nothing; the message names how much landed.
+    if (!m_ui.designer.pending.empty())
     {
-        corp_command cmd;
-        cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
-        cmd.corp      = m_world.player_entity;
-        cmd.verb      = corp_verb::set_unit_design;
-        cmd.order     = static_cast<uint32_t>(m_ui.designer.pending_cls);
-        cmd.recipe    = static_cast<uint16_t>(m_ui.designer.pending_slot);
-        cmd.unit_type = m_ui.designer.pending_item;
-        switch (player_command(cmd))
+        int         applied = 0, sent = 0;
+        std::string why;
+        for (const auto& p : m_ui.designer.pending)
         {
-            case corp_command_result::applied:
-                m_ui.designer.last_message = "Saved: new units are raised with this design."; break;
-            case corp_command_result::rejected_tech_locked:
-                m_ui.designer.last_message = "Not researched yet."; break;
-            case corp_command_result::rejected_state:
-                m_ui.designer.last_message = "Already fitted."; break;
-            default:
-                m_ui.designer.last_message = "That kit does not fit this slot."; break;
+            corp_command cmd;
+            cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
+            cmd.corp      = m_world.player_entity;
+            cmd.verb      = corp_verb::set_unit_design;
+            cmd.order     = static_cast<uint32_t>(p.cls);
+            cmd.recipe    = static_cast<uint16_t>(p.slot);
+            cmd.unit_type = p.item;
+            ++sent;
+            const corp_command_result r = player_command(cmd);
+            if (r != corp_command_result::applied)
+                m_ui.designer.refused.push_back(p); // back into the draft next draw
+            switch (r)
+            {
+                case corp_command_result::applied:              ++applied; break;
+                case corp_command_result::rejected_tech_locked: if (why.empty()) why = "not researched yet"; break;
+                case corp_command_result::rejected_state:       if (why.empty()) why = "already fitted"; break;
+                default:                                        if (why.empty()) why = "that kit does not fit its slot"; break;
+            }
         }
-        m_ui.designer.pending_cls = -1; // consume the request
+        if (applied == sent)
+            m_ui.designer.last_message = "Saved: new units are raised with this design.";
+        else
+            m_ui.designer.last_message = "Saved " + std::to_string(applied) + " of " + std::to_string(sent)
+                                       + " changes; the rest were refused: " + why + ".";
+        m_ui.designer.pending.clear(); // consume the request
+        m_ui.designer.save_answered = true;
     }
 
     // BL-1450 (air UI): the three air presses, each through the same seam any caller

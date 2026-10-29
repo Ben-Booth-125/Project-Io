@@ -32,10 +32,16 @@ float building_trade_points(const recipe_registry& reg, const building_component
     if (!trade_building_active(b) || !upkeep_met)
         return 0.0f;
     const trade_params& tp = reg.trade();
+    // BL-1449: a bombed trade building makes its points at its condition (1.0 exactly
+    // when whole, so an undamaged world is bit-identical).
+    const float cond = (b.condition_permille >= 1000) ? 1.0f
+                     : static_cast<float>(std::max(0, b.condition_permille)) / 1000.0f;
     if (b.type == building_type::port)
-        return tp.port_points;
+        return b.condition_permille >= 1000 ? tp.port_points : tp.port_points * cond;
     const float wt_scalar = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
-    const float pts = tp.marketplace_points * b.workforce_assigned * contention * wt_scalar;
+    float pts = tp.marketplace_points * b.workforce_assigned * contention * wt_scalar;
+    if (b.condition_permille < 1000)
+        pts *= cond;
     return (std::isfinite(pts) && pts > 0.0f) ? pts : 0.0f;
 }
 

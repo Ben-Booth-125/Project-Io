@@ -96,5 +96,31 @@
    "Saving is the pick"
   ],
   "owner": "BL-1448 (designer draft and Save)"
+ },
+ {
+  "ruling": "Units carry food, ammunition and equipment stocks (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "### Carried supplies (Ben, 2026-10-29)",
+  "stale": [
+   "there is no starvation model here",
+   "hits at half strength, since the land round scales"
+  ],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "Hits scale by the visible share of the target (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "### Recon (Ben, 2026-10-29)",
+  "stale": [],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "One stat grid on the unit card and in the designer (Ben, 2026-10-29)",
+  "doc": "docs/ui/ledgers/military.md",
+  "anchor": "### The stat grid (Ben, 2026-10-29)",
+  "stale": [
+   "The summary** under the image"
+  ],
+  "owner": "BL-1454 (unit stat grid)"
  }
 ]

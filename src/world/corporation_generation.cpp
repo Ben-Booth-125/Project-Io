@@ -3189,7 +3189,10 @@ void disarm_corporation(world& w, entity_id corp)
             units.push_back(uid);
     std::sort(units.begin(), units.end());
     for (const entity_id uid : units)
+    {
         w.units.erase(uid);
+        w.forget_air_unit(uid); // BL-1449
+    }
     std::set<entity_id> held; // the bases a surviving garrison records
     for (const auto& [uid, uc] : w.units)
         if (uc.owner == owner && uc.muster_base != null_entity)
@@ -3951,7 +3954,10 @@ int remove_specialist_roster(world& w)
             if (kv.second.owner == cid)
                 owned.push_back(kv.first);
         for (const entity_id uid : owned)
+        {
             w.units.erase(uid);
+            w.forget_air_unit(uid); // BL-1449
+        }
 
         w.corp_embargo_conditions.erase(cid);
 

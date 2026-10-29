@@ -78,9 +78,12 @@ this kind of unit carrying, and what can it carry instead?"
   badge and names the research node that opens it, and its numbers stay readable, because what
   research would buy is half of what the screen is for. A pick the seam refuses is disabled with
   its reason. Pressing the box again closes its list.
-- **The summary** under the image is the design's soft attack, hard attack, defence, breakthrough
-  and hardness and its kit goods per unit; hovering an item previews them with it fitted. There is
-  no speed: speed is the class's alone (Ben, 2026-10-28).
+- **The stat grid sits at the bottom right (Ben, 2026-10-29)**, in place of a summary line: the
+  design's soft attack, hard attack, defence, breakthrough, hardness, recon and stealth, its kit
+  goods per unit, and the class's speed, read-only (speed is the class's alone, Ben, 2026-10-28).
+  It is the same grid the unit card carries (§ The stat grid). **While editing, each stat shows its
+  change against the live design as a signed delta** — `+12` or `−5` beside the value — for the
+  draft, and for the hovered item previewed fitted.
 - **A pick drafts; Save commits (Ben, 2026-10-28, NR-1096).** A pick changes the open design's
   **draft** only — the boxes and summary show the draft, and a slot whose draft differs from the
   live design is marked changed. **Save** sends the draft as the class's **one live design**
@@ -92,6 +95,22 @@ this kind of unit carrying, and what can it carry instead?"
   their unit card offers the refit.
 - Closing the designer (the toggle rule — the press that opened it — its return control, or
   Escape) returns to the ledger or card it was opened from, which the takeover never covered.
+
+### The stat grid (Ben, 2026-10-29)
+
+**Every stat a land unit fights with, in one grid.** It answers "what is this unit, in numbers?"
+and is the one grid the unit card and the designer share, so the two cannot disagree.
+
+- **Cells.** HP, readiness, morale; food, ammunition, equipment (the carried stocks); soft attack,
+  hard attack, defence, breakthrough, hardness; recon, stealth; speed. Each cell is a label and a
+  value; the stored stats carry a bar in the canvas counter's colours.
+- **On the unit card** the grid takes the width beside the unit's portrait on the Selection band
+  (`../SELECTION.md`) — the class image on the left, the grid filling the rest.
+- **In the designer** it sits at the bottom right, design stats only (a design has no HP or stocks),
+  with the signed deltas of § The designer.
+- **A rival's unit (Ben, 2026-10-29)** shows its **design stats only once seen** — in a battle with
+  one of the player's units, or revealed by recon. Its internals (HP, readiness, morale and the
+  three stocks) stay hidden (BL-068); unseen, the cells read "—".
 
 ## 3. Lens on open
 

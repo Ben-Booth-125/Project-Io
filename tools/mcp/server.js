@@ -96,6 +96,9 @@ const VERBS = [
   'assign_front',                                      // BL-1427 -- assign unit subject to the actor's front holding tile (null tile unassigns)
   'set_front_order',                                   // BL-1427 -- set the actor's front holding tile to order (0 hold, 1 push)
   'set_unit_design',                                   // BL-1434 -- the seat's nation fits kit item unit_type into slot recipe of land class order's design
+  'hire_wing',                                         // BL-1449 -- raise a wing of air row unit_type at the actor's own airbase on tile
+  'assign_air_mission',                                // BL-1449 -- give wing subject mission order over provinces (1-8 ids; none with none)
+  'set_air_design',                                    // BL-1449 -- the seat's nation fits air kit item unit_type into slot recipe of air class order's design
 ];
 
 // io::dg::node_count (src/world/digitisation_tree_data.hpp, generated from
@@ -246,6 +249,7 @@ const TOOLS = [
         order: { type: 'integer', description: 'remove_sell_order: the sell_order id to erase. accept_quote / cancel_contract: the procurement quote / contract id. hold_convoy: the convoy id to stop or release — TRANSIENT, valid only while that convoy is in flight (a handful of ticks). accept_offer / abandon_contract: the mercenary offer / contract id (BL-573). queue_research: the Digitisation node index (0..159). unqueue_research: the queued node to take off with every queued entry that needs it, or -1 / omitted for the last entry (BL-1276). set_logistics_shares: 0 sets the shares, 1 clears the rule back to the mechanical default (BL-1309). set_tax_tier: the tax tier, 1..5 (I..V) (BL-1335). set_front_order: 0 hold, 1 push (push only toward a neighbour the actor is hostile to; BL-1427). set_unit_design: the land class (0 infantry, 1 motorised, 2 mechanised, 3 armour, 4 light armour, 5 artillery, 6 air defence; BL-1434).' },
         counterparty: { type: 'integer', description: 'request_quote: the supplier corporation being asked (BL-350). dispatch_convoy: the DESTINATION market entity (BL-452; `subject` is the source market). Stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral): the other corporation (BL-448). withdraw_from_battle: the opposing corp, null for first-in-sorted-order (BL-467). accept_offer: the client NATION (BL-573 — the one verb whose counterparty is not a corp).' },
         province: { type: 'integer', description: 'No verb reads it since 2026-10-27: march_unit and withdraw_from_battle name a tile (`tile`). Kept so an old caller parses; a march naming only a province names no tile and is refused.' },
+        provinces: { type: 'array', items: { type: 'integer' }, maxItems: 8, description: 'assign_air_mission (BL-1449): the 1-8 province ids the wing flies over, any order; omit for mission none (order 0). Each must be in straight-line range of the wing\'s airbase; a strategic mission only over provinces held by a nation the actor is hostile to.' },
         nation: { type: 'integer', description: "BL-1296 state industry: the NATION whose state buildings this command acts on, paid from its treasury. Omit (0) for the corporation's own book. Must be the acting corporation's own home nation, and that corporation its champion; only build (a processing_facility on a strategic recipe, on the nation's own ground; or, by the seat only, a railway_station on a city tile touching track), lay_track (the seat only: one tile of rail track at tile), set_logistics_shares (the seat only), set_tax_tier (the seat only: order = the tier, 1..5), demolish, set_recipe, set_workforce, set_workforce_auto, idle and resume are legal. The champion's blackboard lists its nation's state buildings (state_building_* facts) and treasury." },
         // NB no `units` arg: agent_protocol.cpp parses no such key, so
         // accept_offer's unit commitment cannot cross the wire yet — the verb
@@ -315,6 +319,14 @@ async function callTool(name, args) {
     // BL-387: writes carry the pinned session actor, not the caller's corp.
     const actor = await sessionActor();
     const wire = { ...args, verb: verbIdx };
+    // BL-1449: the provinces list goes on the wire as one comma-separated token; a
+    // malformed list is refused HERE, whole (the child refuses it again).
+    if (args.provinces !== undefined) {
+      const ps = args.provinces;
+      if (!Array.isArray(ps) || ps.length > 8 || !ps.every((p) => Number.isInteger(p) && p >= 0 && p < 4294967295))
+        throw new Error(`provinces must be at most 8 province ids (non-negative integers), got ${JSON.stringify(ps)}`);
+      if (ps.length > 0) wire.provinces = ps.join(','); else delete wire.provinces;
+    }
     if (actor !== null) wire.corp = actor;
     // BL-1276: the research verbs name a Digitisation node by index in `order`
     // (0..RESEARCH_NODE_COUNT-1). unqueue_research also takes -1 = "the last

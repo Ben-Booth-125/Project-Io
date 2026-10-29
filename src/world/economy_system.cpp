@@ -4131,6 +4131,7 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
     for (const entity_id id : disband)
     {
         w.units.erase(id);
+        w.forget_air_unit(id); // BL-1449
         ++out.disbanded;
     }
     return out;

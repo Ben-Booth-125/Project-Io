@@ -1654,11 +1654,23 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // world_save_version 65 (BL-1449, air combat): THE AIR, the last section — the
     // wings, the superiority map, the reveal set, the hit bank, the air designs and
     // every building off full condition. Every container is ordered or sorted here.
+    // PRUNED ON WRITE (BL-1449 fix round): a record naming a unit, nation or building
+    // the world no longer holds is never written — every erase path forgets its air
+    // records too (world::forget_air_unit), and this is the second guard, so a save
+    // taken between an erase and the next tick still loads under the strict reader.
     if (version == world_save_version)
     {
-        w_u32(out, static_cast<uint32_t>(w.wings.size()));
+        const auto wing_ok = [&](const air_wing& wg) {
+            return w.nations.count(wg.owner) != 0 && w.buildings.count(wg.airbase) != 0;
+        };
+        uint32_t live_wings = 0;
+        for (const auto& [wid, wg] : w.wings)
+            live_wings += wing_ok(wg) ? 1u : 0u;
+        w_u32(out, live_wings);
         for (const auto& [wid, wg] : w.wings)
         {
+            if (!wing_ok(wg))
+                continue;
             w_id(out, wid);
             w_id(out, wg.owner);
             w_id(out, wg.airbase);
@@ -1673,24 +1685,39 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             for (const uint32_t p : wg.provinces) w_u32(out, p);
         }
 
-        w_u32(out, static_cast<uint32_t>(w.air_superiority.size()));
+        uint32_t n_sup = 0;
+        for (const auto& [key, v] : w.air_superiority)
+            n_sup += (v > 0 && w.nations.count(key.second) != 0) ? 1u : 0u;
+        w_u32(out, n_sup);
         for (const auto& [key, v] : w.air_superiority)
         {
+            if (!(v > 0 && w.nations.count(key.second) != 0))
+                continue;
             w_u32(out, key.first);
             w_id(out, key.second);
             w_i32(out, v);
         }
 
-        w_u32(out, static_cast<uint32_t>(w.air_revealed.size()));
+        uint32_t n_rev = 0;
+        for (const auto& [viewer, unit] : w.air_revealed)
+            n_rev += (w.nations.count(viewer) != 0 && w.units.count(unit) != 0) ? 1u : 0u;
+        w_u32(out, n_rev);
         for (const auto& [viewer, unit] : w.air_revealed)
         {
+            if (!(w.nations.count(viewer) != 0 && w.units.count(unit) != 0))
+                continue;
             w_id(out, viewer);
             w_id(out, unit);
         }
 
-        w_u32(out, static_cast<uint32_t>(w.air_hit_bank.size()));
+        uint32_t n_bank = 0;
+        for (const auto& [uid, bank] : w.air_hit_bank)
+            n_bank += w.units.count(uid) != 0 ? 1u : 0u;
+        w_u32(out, n_bank);
         for (const auto& [uid, bank] : w.air_hit_bank)
         {
+            if (w.units.count(uid) == 0)
+                continue;
             w_id(out, uid);
             w_i32(out, bank.first);
             w_i32(out, bank.second);
@@ -2854,7 +2881,13 @@ bool read_world_snapshot(world& w, std::istream& in)
             if (!r_u8(in, mission) || !r_u32(in, n))
                 return false;
             prev = wid;
-            if (s.nations.count(wg.owner) == 0 || wg.airbase == null_entity || wg.type >= air_rows
+            // BL-1449 fix round: the id is one the world handed out and no other
+            // entity holds; the airbase is a building in the stream.
+            if (wid >= next_entity || s.units.count(wid) != 0 || s.buildings.count(wid) != 0
+                || s.nations.count(wid) != 0 || s.tiles.count(wid) != 0 || s.markets.count(wid) != 0
+                || s.bodies.count(wid) != 0)
+                return false;
+            if (s.nations.count(wg.owner) == 0 || s.buildings.count(wg.airbase) == 0 || wg.type >= air_rows
                 || wg.hp_ppm < 0 || wg.hp_ppm > k_wing_hp_full
                 || wg.morale_permille < 0 || wg.morale_permille > 1000
                 || wg.supply_factor_permille < 0 || wg.supply_factor_permille > 1000
