@@ -1502,6 +1502,40 @@ std::unordered_map<entity_id, lp_flow> lp_route_flow(world& w, lp_reach_memo& me
 // Generation
 // ---------------------------------------------------------------------------
 
+bool unit_tile_within_draw(world& w, entity_id nation, entity_id tile,
+                           const std::function<bool(entity_id)>& has_cover)
+{
+    std::map<entity_id, int> dist{{tile, 0}};
+    std::vector<entity_id> q{tile};
+    for (std::size_t head = 0; head < q.size(); ++head)
+    {
+        const entity_id t = q[head];
+        if (host_nation(w, t) == nation && has_cover(t))
+            return true;
+        const int d = dist[t];
+        if (d >= k_unit_draw_reach_tiles)
+            continue;
+        const auto tit = w.tiles.find(t);
+        if (tit == w.tiles.end())
+            continue;
+        const int row = tit->second.grid_y;
+        for (int side = 0; side < 6; ++side)
+        {
+            if (!road_side_is_crossable(side, row))
+                continue;
+            const entity_id n = road_edge_neighbour(w, t, side);
+            if (n == null_entity || dist.count(n) != 0)
+                continue;
+            const auto nit = w.tiles.find(n);
+            if (nit == w.tiles.end() || is_water(nit->second.substrate))
+                continue;
+            dist.emplace(n, d + 1);
+            q.push_back(n);
+        }
+    }
+    return false;
+}
+
 lp_seed_report seed_logistics_sources(world& w)
 {
     lp_seed_report rep;
@@ -1676,15 +1710,18 @@ lp_seed_report seed_logistics_sources(world& w)
     };
     // The road chain laid outward to one consumer (step 1 below; re-run after a bridge).
     // @p avoid: a tile the chain must not take - the shore tile a bridge's port needs.
+    // @p done: when given, the chain stops as soon as it holds (a garrison post needs
+    // only the draw, BL-1452), instead of at the tile's full cover.
     const auto lay_chain = [&](entity_id nation, entity_id body, entity_id ct, entity_id tile,
-                               entity_id owner, entity_id avoid = null_entity) -> bool {
+                               entity_id owner, entity_id avoid = null_entity,
+                               const std::function<bool()>* done = nullptr) -> bool {
         const auto fc = lp_distance_field(w, body, lp_network::road, {tile});
         const auto steps = own_steps(nation, body, tile);
         int last_gap = std::numeric_limits<int>::max();
         bool covered = false;
         for (int step = 0; step < k_chain_steps && rep.hubs_placed < k_max_hubs; ++step)
         {
-            if (coverage_of(nation, body, tile) >= 1.0f)
+            if (done != nullptr ? (*done)() : coverage_of(nation, body, tile) >= 1.0f)
             {
                 covered = true;
                 break;
@@ -1745,7 +1782,7 @@ lp_seed_report seed_logistics_sources(world& w)
             last_gap = ext_gap;
             place_hub(nation, ext, owner);
         }
-        return covered || coverage_of(nation, body, tile) >= 1.0f;
+        return covered || (done != nullptr ? (*done)() : coverage_of(nation, body, tile) >= 1.0f);
     };
 
     // The nation's dry ground a 4-neighbour walk reaches from @p start (an island).
@@ -2112,6 +2149,66 @@ lp_seed_report seed_logistics_sources(world& w)
         }
     }
 
+    // 1b. THE ARMIES (BL-1452; LOGISTICS.md § Where generation puts the sources, Ben
+    //     2026-10-29: "logistics serves the armies from generation"). Every garrison post -
+    //     the capital's and each border post - is a request beside the producing
+    //     buildings: where no source's cover reaches within the unit's draw
+    //     (`unit_tile_within_draw`), the chain is laid out toward the post, bridged by sea
+    //     where its ground is cut off, exactly as for a consumer, and stops as soon as the
+    //     post is within the draw. Ascending unit id: order-independent.
+    {
+        std::vector<world::generated_garrison> posts = w.gen_garrisons;
+        std::sort(posts.begin(), posts.end(),
+                  [](const world::generated_garrison& a, const world::generated_garrison& b) {
+                      return a.unit < b.unit;
+                  });
+        for (const world::generated_garrison& g : posts)
+        {
+            if (rep.hubs_placed >= k_max_hubs)
+                break;
+            const auto uit = w.units.find(g.unit);
+            if (uit == w.units.end() || uit->second.count <= 0)
+                continue;
+            const entity_id tile   = uit->second.position;
+            const entity_id nation = g.nation;
+            const auto tit = w.tiles.find(tile);
+            if (tit == w.tiles.end() || host_nation(w, tile) != nation)
+                continue;
+            ++rep.garrison_posts;
+            const entity_id body = tit->second.body;
+            const std::function<bool()> drawable = [&]() {
+                return unit_tile_within_draw(w, nation, tile, [&](entity_id t) {
+                    return coverage_of(nation, body, t) > 0.0f;
+                });
+            };
+            if (drawable())
+                continue;
+            ++rep.garrison_posts_served;
+            const entity_id owner = nation;
+            const entity_id ct = chain_anchor(w, nation, body);
+            if (ct == null_entity)
+            {
+                if (placeable(tile, nation))
+                    place_hub(nation, tile, owner);
+            }
+            else if (!lay_chain(nation, body, ct, tile, owner, null_entity, &drawable)
+                     && region_of(nation, body, ct).count(tile) == 0)
+            {
+                const std::set<entity_id> island = flood_own(nation, body, tile);
+                const auto key = std::make_tuple(nation, body, *island.begin());
+                if (bridged.count(key) == 0 && bridge(nation, body, ct, island, tile, owner))
+                {
+                    bridged.insert(key);
+                    bridged_ground[{nation, body}].insert(island.begin(), island.end());
+                }
+                if (!lay_chain(nation, body, ct, tile, owner, null_entity, &drawable))
+                    (void)rejoin_linked(nation, body, ct, tile, owner);
+            }
+            if (!drawable())
+                ++rep.garrison_posts_short;
+        }
+    }
+
     // 2. SUFFICIENCY: each pool meets its need with margin; a further hub stands
     //    at the market centre of the first consumer (ascending id) whose centre
     //    holds none. BL-1356 (Ben, 2026-10-21, NR-1057): only a CONNECTED hub adds to
@@ -2391,5 +2488,8 @@ void print_lp_seed_report(const lp_seed_report& r)
     std::printf("[lp] port lanes: %d laid between ports within fifty, %d sea tiles added, "
                 "%d pairs no sea joins\n",
                 r.port_lanes_laid, r.port_lane_tiles, r.port_lanes_unreachable);
+    std::printf("[lp] garrison posts: %d counted, %d the sources were laid toward, %d still past "
+                "the draw\n",
+                r.garrison_posts, r.garrison_posts_served, r.garrison_posts_short);
     std::fflush(stdout);
 }

@@ -238,6 +238,10 @@ keeps every stock full, and the stocks move only once the campaign begins.
   attack, defence and breakthrough. **Ammunition is floored at 20%**: a unit out of shells still
   fights with small arms at close quarters. Equipment has no floor. The two multiply, with morale.
 
+The daily drain rates are authored in `scripts/economy.lua` § `economy.military.carried_supplies`
+(food per day, ammunition per day fighting, equipment per day and per day fighting, and the restock); the hunger
+step, the ammunition floor and the 180 days are the design's own numbers, not rates.
+
 The three stocks are what the round reads for supply; `supply_factor_permille` is the delivered
 share that feeds them, so the one decay rule (§ Upkeep) now moves the stocks' resupply rather than
 scaling hits directly.

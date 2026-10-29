@@ -4,6 +4,7 @@
 #include "economy_system.hpp" // BL-1335: corp_budget, nation_tax_due
 #include "nation_tech.hpp"    // BL-1335: research_age_open (no tax in the settle)
 #include "unit_roster.hpp" // BL-454: resolve_unit_upkeep (the credit half)
+#include "state_industry.hpp" // BL-1452: capital_free_source - the capital's source runs free
 
 #include <algorithm>
 #include <cstddef>
@@ -256,6 +257,8 @@ void apply_budget(world& w,
                     book_value += reg.economics(b.type).build_cost;
                     if (b.state_idle)
                         continue; // unfunded: ran nothing, pays nothing
+                    if (capital_free_source(w, bid))
+                        continue; // BL-1452 (Ben, 2026-10-29): the capital's source runs free
                     entity_id body = null_entity;
                     if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
                         body = tit->second.body;

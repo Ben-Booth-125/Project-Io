@@ -6,6 +6,7 @@
 #include "world/hard_coded_world.hpp"  // generation_progress
 #include "world/logistics.hpp"         // the network: reach and traversal cost
 #include "world/market_clearing.hpp"   // clear_markets
+#include "world/nation_generation.hpp" // BL-1452: repost_garrisons_on_cover, at the handoff
 #include "world/nation_step.hpp"       // run_nation_step
 #include "world/nation_tech.hpp"       // clear_research_at_handover (BL-1273)
 #include "world/recipe_registry.hpp"   // logistics_cost, firm_exit
@@ -39,6 +40,20 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // per step across the settle, live play and --verify, which is the schedule
     // every harness certifies.
     w.current_econ_tick = econ_step;
+
+    // BL-1452 (Ben, 2026-10-29; AI_OPPONENT.md § 11): THE SETTLE BUILDS ONLY FROM SURPLUS.
+    // On the settle's steps (0..11) every nation's spendable money is capped at what it
+    // has gained since the settle began (`state_uncommitted_treasury`); the chest each
+    // nation opened the settle on is recorded on its first settle step. Lowered, and the
+    // record dropped, on every live step.
+    w.settle_build_gate = econ_step < k_campaign_settle_ticks;
+    if (w.settle_build_gate)
+    {
+        for (const auto& [nid, nc] : w.nations)
+            w.settle_chest.emplace(nid, nc.treasury); // first sight only: emplace never overwrites
+    }
+    else
+        w.settle_chest.clear();
 
     // BL-597: one shared passive/active Logistic Point pool for this tick --
     // handed to both dispatch_convoys (passive) and run_economy_step's march
@@ -98,7 +113,22 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // the pass itself.
     out.standings = compute_corp_standings(w, out.flows);
     // BL-1407: firm exit retired with the corporation (FINANCE.md § Firm exit).
-    lap_done(5); // standings + exits
+
+    // BL-1452 (Ben, 2026-10-29; MILITARY.md § Nation garrisons): A GARRISON IS POSTED
+    // ONLY WHERE ITS NETWORK COVERS - the cover its nation's network reaches AT THE
+    // HANDOFF. So at the end of the settle's last tick, whichever path ran it (the
+    // app's `run_settle`, a harness's own loop), each generated garrison still standing
+    // on its post is re-chosen on covered ground. Inside the lap, so a digest after it
+    // sees the posted world. A no-op on a world with no generation record (a load).
+    if (econ_step == k_campaign_settle_ticks - 1 && !w.gen_garrisons.empty())
+        print_garrison_repost(repost_garrisons_on_cover(w));
+    // The settle ends here: from the handoff every nation spends its whole treasury again.
+    if (econ_step == k_campaign_settle_ticks - 1)
+    {
+        w.settle_build_gate = false;
+        w.settle_chest.clear();
+    }
+    lap_done(5); // standings + exits (+ the handoff's garrison posts)
 
     return out;
 }
