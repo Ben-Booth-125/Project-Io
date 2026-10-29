@@ -645,9 +645,13 @@ endowment floor stays at 500 per mille: swept from 500 to the cap, it lifted few
 and pushed more seeds' medians out of the band, and no floor reaches a nation the history never held.
 The top-up that made **the firms on a nation's ground fund its opening node bill** (2026-10-22) is
 retired with the firms (Ben, 2026-10-23): it was a transfer from their balances, and every building's
-money is now the treasury's. A nation still short of sixteen ticks of its node bill once the
-foundings' reserve is taken keeps what it has; its capital's source stands but the funding gate idles
-it, and the coverage census reports it as dark rather than failing. No nation, the player's or a
+money is now the treasury's. **A poor nation opens with fewer state buildings (Ben, 2026-10-29, overturning "keeps what it has").**
+A nation still short of sixteen ticks of its running bill once the foundings' reserve is taken does
+not open with a state it cannot run: generation sizes its opening state to what its chest can run
+for sixteen ticks — the garrison wage and the state bill together — standing the capital's source
+first and the rest in the order the funding gate pays them, and leaving unbuilt whatever the chest
+cannot carry. Nothing is minted; the nation is smaller, not richer. So no capital starts dark: the
+settle drains no capital source idle. No nation, the player's or a
 rival's, takes on debt before the game starts. How much
 more, and through which earnings, is settled by measurement (BL-1298) against these rulings
 (Ben, 2026-10-11):
