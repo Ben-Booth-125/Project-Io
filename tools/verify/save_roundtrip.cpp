@@ -112,13 +112,31 @@ std::size_t designs_section_bytes(const world& w)
     return n;
 }
 
-/// The v66 carried-supplies section (BL-1452): u32 count + 32 bytes a unit off full.
+/// BL-1449 (v65): the air section, the stream's last since — six counts, then a record
+/// per wing, superiority entry, reveal, hit-bank entry, air-designed nation and
+/// damaged building.
+std::size_t air_section_bytes(const world& w)
+{
+    std::size_t n = 24;
+    for (const auto& [wid, wg] : w.wings)
+        n += 4 + 4 + 4 + 2 + 16 + 3 + 1 + 4 + 4 * wg.provinces.size();
+    n += 12 * w.air_superiority.size() + 8 * w.air_revealed.size() + 12 * w.air_hit_bank.size();
+    for (const auto& [nid, nc] : w.nations)
+        if (!nc.air_design_kit.empty())
+            n += 4 + 4 + 2 * nc.air_design_kit.size();
+    for (const auto& [bid, b] : w.buildings)
+        if (b.condition_permille != 1000)
+            n += 8;
+    return n;
+}
+
+/// The v66 carried-supplies section (BL-1452): u32 count + 36 bytes a unit off full.
 std::size_t supplies_section_bytes(const world& w)
 {
     std::size_t n = 4;
     for (const auto& [uid, u] : w.units)
         if (!unit_supplies_full(u))
-            n += 4 + 28;
+            n += 4 + 32;
     return n;
 }
 
@@ -579,6 +597,7 @@ int main()
                                        + fronts_section_bytes(wd)    // BL-1427 (v62)
                                        + stack_section_bytes(wd)     // BL-1443 (v63)
                                        + designs_section_bytes(wd)   // BL-1434 (v64)
+                                       + air_section_bytes(wd)       // BL-1449 (v65)
                                        + supplies_section_bytes(wd); // BL-1452 (v66), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
@@ -646,6 +665,7 @@ int main()
                                          + fronts_section_bytes(wu)    // BL-1427 (v62)
                                          + stack_section_bytes(wu)     // BL-1443 (v63)
                                          + designs_section_bytes(wu)   // BL-1434 (v64)
+                                         + air_section_bytes(wu)       // BL-1449 (v65)
                                          + supplies_section_bytes(wu); // BL-1452 (v66), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");

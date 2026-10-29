@@ -13,19 +13,24 @@
 //       gone from the world by day 181 — and returning food stops the loss;
 //   S5  a starving unit's readiness is capped at its men over establishment;
 //   S6  ammunition is floored at 20%; equipment is not: at 0 equipment a unit lands no hits;
-//   S7  the save round-trips the stocks and the carry; a v64 stream loads full; a
+//   S7  the save round-trips the stocks and the carry; v66 (air then supplies), v65
+//       (air, stocks full) and v64 (neither) streams all read; a
 //       corrupt record is refused whole;
 //   S8  determinism: the same fixture twice is byte-identical;
 //   S9  the loader rejects a rate that is not an integer per-mille;
 //   S10 the remainder carry: cover at or past break-even never drains a full stock,
 //       a fractional gain accrues exactly, and an exact break-even holds for years;
-//   S11 the quiet world: a fed world at peace costs no daily churn.
+//   S11 the quiet world: a fed world at peace costs no daily churn;
+//   S12 the settle keeps every stock full: a settle-stamped day moves none;
+//   S13 only the road gap starves: an unpaid unit on covered ground keeps its stocks
+//       full while its supply factor (and so its morale) falls.
 //
 // Build: bash tools/verify/build_lua_harness.sh carried_supplies_harness. Run from the
 // repo root.
 
 #include "world/battle_system.hpp"
 #include "world/campaign_battle.hpp"
+#include "world/campaign_settle.hpp"
 #include "world/carried_supplies.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
@@ -48,6 +53,11 @@
 namespace {
 
 int g_pass = 0, g_fail = 0;
+
+/// The first LIVE day stamp (Ben, 2026-10-29: starvation runs from the handoff). Every
+/// fixture day below is stamped from here, as the campaign's are; a day stamped below
+/// it is a settle day and leaves the stocks full (S12).
+const int k_live = military_quarter_day_base(k_campaign_settle_ticks);
 
 void check(bool ok, const char* what)
 {
@@ -155,7 +165,7 @@ void build_camp(camp& c, int supply, int men = 1000)
     const entity_id body = make_row_body(c.w, 6);
     const entity_id n    = add_nation(c.w, body, 0, 5);
     c.u = add_unit(c.w, n, tile_at(c.w, body, 2), infantry(), men);
-    c.w.units.at(c.u).supply_factor_permille = supply;
+    c.w.units.at(c.u).supply_factor_permille = c.w.units.at(c.u).lp_share_permille = supply;
 }
 
 /// Two hostile nations, the attacker's stack adjacent to the defender's and ordered onto it.
@@ -241,7 +251,7 @@ int main()
     {
         camp c;
         build_camp(c, 1000);
-        (void)advance_quarter_to(c.w, reg, 90, 0);
+        (void)advance_quarter_to(c.w, reg, 90, k_live);
         const unit_component& u = c.w.units.at(c.u);
         check(u.food_permille == 1000 && u.ammo_permille == 1000 && u.equipment_permille == 1000,
               "S1a a fully supplied unit in camp ends a quarter full");
@@ -253,7 +263,7 @@ int main()
         bool full = true;
         for (int day = 1; day <= 6; ++day)
         {
-            (void)run_military_day(d.w, reg, day);
+            (void)run_military_day(d.w, reg, k_live + day);
             fought_days += d.w.battles.empty() ? 0 : 1;
             for (const entity_id id : { d.ua, d.ud })
                 if (d.w.units.count(id) != 0)
@@ -272,7 +282,7 @@ int main()
     {
         camp c;
         build_camp(c, 500);
-        (void)advance_quarter_to(c.w, reg, 10, 0);
+        (void)advance_quarter_to(c.w, reg, 10, k_live);
         const unit_component& u = c.w.units.at(c.u);
         const int64_t food_net = net_u(sp, sp.food_per_day, sp.food_per_day, 500);
         std::printf("      after 10 days at 500 supply: food %d (net %.2f a day), ammunition %d, equipment %d\n",
@@ -286,9 +296,9 @@ int main()
 
         duel d;
         build_duel(d, 2000, 2000);
-        d.w.units.at(d.ua).supply_factor_permille = 500;
-        (void)run_military_day(d.w, reg, 1); // the march opens the battle
-        (void)run_military_day(d.w, reg, 2); // a day fought
+        d.w.units.at(d.ua).supply_factor_permille = d.w.units.at(d.ua).lp_share_permille = 500;
+        (void)run_military_day(d.w, reg, k_live + 1); // the march opens the battle
+        (void)run_military_day(d.w, reg, k_live + 2); // a day fought
         const unit_component& a = d.w.units.at(d.ua);
         const int64_t ammo_net = net_u(sp, sp.ammo_per_battle_day, sp.ammo_per_battle_day, 500);
         std::printf("      a day fought at 500 supply: ammunition %d, equipment %d\n",
@@ -323,7 +333,7 @@ int main()
         a.w.units.at(a.u).readiness_permille = 0;
         b.w.units.at(b.u).readiness_permille = 0;
         b.w.units.at(b.u).food_permille = 999;
-        b.w.units.at(b.u).supply_factor_permille = 1000;
+        b.w.units.at(b.u).supply_factor_permille = b.w.units.at(b.u).lp_share_permille = 1000;
         const campaign_battle_params bp{};
         recover_out_of_contact(a.w, bp);
         recover_out_of_contact(b.w, bp);
@@ -361,7 +371,7 @@ int main()
         int gone_day = -1;
         for (int day = 1; day <= 200 && gone_day < 0; ++day)
         {
-            (void)run_military_day(c.w, reg, day);
+            (void)run_military_day(c.w, reg, k_live + day);
             if (c.w.units.count(c.u) == 0) gone_day = day;
         }
         std::printf("      through the daily pass: removed on day %d\n", gone_day);
@@ -370,10 +380,10 @@ int main()
         camp f;
         build_camp(f, 0, 1000);
         f.w.units.at(f.u).food_permille = 0;
-        for (int day = 1; day <= 30; ++day) (void)run_military_day(f.w, reg, day);
+        for (int day = 1; day <= 30; ++day) (void)run_military_day(f.w, reg, k_live + day);
         const int men30 = f.w.units.at(f.u).count;
-        f.w.units.at(f.u).supply_factor_permille = 1000; // food returns
-        for (int day = 31; day <= 60; ++day) (void)run_military_day(f.w, reg, day);
+        f.w.units.at(f.u).supply_factor_permille = f.w.units.at(f.u).lp_share_permille = 1000; // food returns
+        for (int day = 31; day <= 60; ++day) (void)run_military_day(f.w, reg, k_live + day);
         const unit_component& fu = f.w.units.at(f.u);
         std::printf("      30 days starving: %d men; 30 more fed: %d men, food %d\n", men30, fu.count, fu.food_permille);
         check(men30 == 1000 - 1000 * 30 / 180 && fu.count == men30 && fu.starvation_carry == 0,
@@ -388,7 +398,7 @@ int main()
         camp c;
         build_camp(c, 600, 1000);
         c.w.units.at(c.u).food_permille = 0;
-        for (int day = 1; day <= 90; ++day) (void)run_military_day(c.w, reg, day);
+        for (int day = 1; day <= 90; ++day) (void)run_military_day(c.w, reg, k_live + day);
         const unit_component& u = c.w.units.at(c.u);
         std::printf("      after 90 days starving: %d of %d men, readiness %d, morale %d\n",
                     u.count, u.establishment, u.readiness_permille, u.morale_permille);
@@ -423,8 +433,8 @@ int main()
         duel d;
         build_duel(d, 2000, 2000);
         d.w.units.at(d.ua).equipment_permille = 0;
-        d.w.units.at(d.ua).supply_factor_permille = 0;
-        for (int day = 1; day <= 4; ++day) (void)run_military_day(d.w, reg, day);
+        d.w.units.at(d.ua).supply_factor_permille = d.w.units.at(d.ua).lp_share_permille = 0;
+        for (int day = 1; day <= 4; ++day) (void)run_military_day(d.w, reg, k_live + day);
         const int def_men = d.w.units.count(d.ud) ? d.w.units.at(d.ud).count : -1;
         std::printf("      a bare attacker after 4 days: defender %d of 2000\n", def_men);
         check(def_men == 2000, "S6d the round reads the stocks: the bare attacker kills no one");
@@ -438,7 +448,7 @@ int main()
         c.w.units.at(c.u).food_permille = 0;
         c.w.units.at(c.u).ammo_permille = 400;
         c.w.units.at(c.u).equipment_permille = 730;
-        for (int day = 1; day <= 7; ++day) (void)run_military_day(c.w, reg, day);
+        for (int day = 1; day <= 7; ++day) (void)run_military_day(c.w, reg, k_live + day);
         const unit_component& src = c.w.units.at(c.u);
         const std::string bytes = to_bytes(c.w);
         world back;
@@ -458,23 +468,51 @@ int main()
               "S7b the loaded world hashes and re-saves as the original");
         for (int day = 8; day <= 20; ++day)
         {
-            (void)run_military_day(c.w, reg, day);
-            (void)run_military_day(back, reg, day);
+            (void)run_military_day(c.w, reg, k_live + day);
+            (void)run_military_day(back, reg, k_live + day);
         }
         check(to_bytes(back) == to_bytes(c.w), "S7c and starves on identically");
 
-        std::ostringstream o(std::ios::binary);
-        write_world_snapshot_pre_supplies(c.w, o);
-        world old;
-        const bool old_ok = from_bytes(o.str(), old);
-        const bool old_full = old_ok && old.units.count(c.u) != 0
-            && old.units.at(c.u).food_permille == 1000 && old.units.at(c.u).ammo_permille == 1000
-            && old.units.at(c.u).equipment_permille == 1000 && old.units.at(c.u).starvation_carry == 0;
-        check(old_full, "S7d a v64 stream loads with every unit's stocks full");
+        // THE SAVE STACK (v64 designs, v65 air, v66 supplies): a damaged building is the
+        // air section's witness (its condition is that section's last record).
+        const entity_id hub = c.w.create_entity();
+        {
+            building_component bc{};
+            bc.type               = building_type::inland_logistics_hub;
+            bc.tile               = c.w.units.at(c.u).position;
+            bc.ticks_remaining    = 0;
+            bc.condition_permille = 700;
+            c.w.buildings[hub]    = bc;
+        }
+        const auto stocks_full = [&](const world& x) {
+            return x.units.count(c.u) != 0 && unit_supplies_full(x.units.at(c.u));
+        };
+        const auto read_as = [&](void (*writer)(const world&, std::ostream&), world& into) {
+            std::ostringstream o(std::ios::binary);
+            writer(c.w, o);
+            return from_bytes(o.str(), into);
+        };
+        world v66, v65, v64;
+        const bool r66 = from_bytes(to_bytes(c.w), v66);
+        const bool r65 = read_as(&write_world_snapshot_pre_supplies, v65);
+        const bool r64 = read_as(&write_world_snapshot_pre_air, v64);
+        const auto cond = [&](const world& x) {
+            return x.buildings.count(hub) != 0 ? x.buildings.at(hub).condition_permille : -1;
+        };
+        std::printf("      v66 read %d (stocks off full %d, condition %d) | v65 read %d (%d, %d) | v64 read %d (%d, %d)\n",
+                    r66, r66 && !stocks_full(v66), cond(v66), r65, r65 && !stocks_full(v65), cond(v65),
+                    r64, r64 && !stocks_full(v64), cond(v64));
+        check(r66 && !stocks_full(v66) && cond(v66) == 700 && to_bytes(v66) == to_bytes(c.w),
+              "S7d a v66 stream round-trips the air section and then the supplies, byte for byte");
+        check(r65 && stocks_full(v65) && cond(v65) == 700,
+              "S7d2 a v65 stream (air, no supplies) loads its air and every unit's stocks full");
+        check(r64 && stocks_full(v64) && cond(v64) == 1000,
+              "S7d3 a v64 stream (no air, no supplies) loads whole buildings and full stocks");
+        c.w.buildings.erase(hub);
 
         // Corrupt the food of the one record (the section is the stream's tail).
         std::string bad = bytes;
-        const std::size_t food_at = bad.size() - 28; // (id, food, ammo, equip, carry, 3 remainders)
+        const std::size_t food_at = bad.size() - 32; // (id, food, ammo, equip, carry, 3 remainders, share)
         bad[food_at] = static_cast<char>(0xE9); bad[food_at + 1] = static_cast<char>(0x03); // 1001
         world untouched;
         const bool refused = !from_bytes(bad, untouched) && untouched.units.empty();
@@ -489,9 +527,9 @@ int main()
         build_duel(b, 2000, 1500);
         for (duel* d : { &a, &b })
         {
-            d->w.units.at(d->ua).supply_factor_permille = 300;
-            d->w.units.at(d->ud).supply_factor_permille = 700;
-            for (int day = 1; day <= 40; ++day) (void)run_military_day(d->w, reg, day);
+            d->w.units.at(d->ua).supply_factor_permille = d->w.units.at(d->ua).lp_share_permille = 300;
+            d->w.units.at(d->ud).supply_factor_permille = d->w.units.at(d->ud).lp_share_permille = 700;
+            for (int day = 1; day <= 40; ++day) (void)run_military_day(d->w, reg, k_live + day);
         }
         check(to_bytes(a.w) == to_bytes(b.w) && a.w.state_hash(40) == b.w.state_hash(40),
               "S8 the same under-supplied fight twice is byte-identical");
@@ -578,10 +616,43 @@ int main()
             quiet = quiet && !carried_supplies_pending(c.w, sp);
             // The military days alone (advance_quarter_to also moves the construction
             // cursor, which is not the military pass's to keep still).
-            for (int day = 1; day <= 90; ++day) (void)run_military_day(c.w, reg, day);
+            for (int day = 1; day <= 90; ++day) (void)run_military_day(c.w, reg, k_live + day);
             quiet = quiet && c.w.state_hash(1) == before && to_bytes(c.w) == bytes;
         }
         check(quiet, "S11 a full unit at full or past-break-even cover is inert: no pending day, a quarter writes nothing");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nS12 - the settle keeps every stock full\n");
+    {
+        camp c;
+        build_camp(c, 0);
+        c.w.units.at(c.u).food_permille = 0; // even a unit already starving starves no more in the settle
+        const int men = c.w.units.at(c.u).count;
+        for (int day = 1; day <= 360; ++day) (void)run_military_day(c.w, reg, day);
+        camp d;
+        build_camp(d, 0);
+        for (int day = 1; day <= 360; ++day) (void)run_military_day(d.w, reg, day);
+        std::printf("      four settle quarters uncovered: food %d (a fresh unit), men %d of %d (one at zero food)\n",
+                    d.w.units.at(d.u).food_permille, c.w.units.at(c.u).count, men);
+        check(d.w.units.at(d.u).food_permille == 1000 && c.w.units.at(c.u).count == men,
+              "S12 a day stamped in the settle neither drains a stock nor starves a man");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nS13 - only the road gap starves\n");
+    {
+        camp c;
+        build_camp(c, 1000);
+        c.w.units.at(c.u).supply_factor_permille = 0; // the wage unpaid: the factor falls...
+        c.w.units.at(c.u).lp_share_permille      = 1000; // ...but the road reaches it
+        for (int day = 1; day <= 90; ++day) (void)run_military_day(c.w, reg, k_live + day);
+        const unit_component& u = c.w.units.at(c.u);
+        std::printf("      unpaid, on covered ground, a quarter: food %d, morale %d\n",
+                    u.food_permille, u.morale_permille);
+        check(u.food_permille == 1000 && u.ammo_permille == 1000 && u.equipment_permille == 1000
+                  && u.morale_permille < 1000,
+              "S13 an unpaid unit on covered ground stays fed; its morale falls through the supply factor");
     }
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);

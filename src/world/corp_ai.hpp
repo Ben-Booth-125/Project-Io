@@ -503,6 +503,15 @@ bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
 /// with no home nation, and never from the player corp (never evaluated).
 /// Recorded only — the national budget pass that pays it runs later in the
 /// tick, and is not this function's.
+/// BL-1451 (AI_OPPONENT.md § 11, "Rival nations fly air wings", Ben 2026-10-28):
+/// a rival nation's air pass — build its own airbase while mobilised, hire a wing
+/// there under a soft cap of three, and give each of its own raised wings the one
+/// best mission over one province in range — all through the legal verbs. Bombing
+/// only a nation it is already hostile to (tactical: its units, anywhere; strategic:
+/// over a province it holds); it never declares. Does nothing for the player's nation (or an unknown one). Called by
+/// run_corp_strategic_step for each due nation; exported for the harness.
+void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, int tick);
+
 void run_corp_strategic_step(world& w, const recipe_registry& reg,
                              economy_report& report, int tick,
                              const corp_ai_params& p = {});

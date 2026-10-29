@@ -309,6 +309,7 @@ const char* category_of(building_type t)
     case building_type::extraction_site:     return "Extraction";
     case building_type::processing_facility: return "Processing";
     case building_type::military_base:
+    case building_type::airbase:
     case building_type::research_institute:  return "Military";
     default:                                 return "Infrastructure";
     }
@@ -347,6 +348,7 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
         {building_type::launchpad, "Launchpad"},
         {building_type::inland_logistics_hub, "Inland Logistics Hub"},
         {building_type::military_base, "Military Base"},
+        {building_type::airbase, "Airbase"},
         {building_type::research_institute, "Research Institute"},
     };
     for (const auto& [t, name] : fixed)

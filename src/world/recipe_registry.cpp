@@ -567,6 +567,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "university",           building_type::university },           // BL-615
             { "planetary_marketplace", building_type::planetary_marketplace }, // BL-1266
             { "railway_station",      building_type::railway_station },      // BL-1255
+            { "airbase",              building_type::airbase },              // BL-1449
         };
         for (const named_type& nt : types)
         {
@@ -781,6 +782,100 @@ void recipe_registry::load_from_lua(lua_state& lua)
         mp.active_lp_credit_per_unit_distance =
             military->get_or("active_lp_credit_per_unit_distance", mp.active_lp_credit_per_unit_distance);
 
+        // BL-1449 (MILITARY.md § Air): economy.military.air. Absent = the C++
+        // defaults (which equal the shipped Lua). Every class named must be one of
+        // the six, every mission one of the four; an out-of-domain number THROWS,
+        // never clamps (the authoring boundary's untrusted-input rule).
+        sol::optional<sol::table> air = (*military)["air"];
+        if (air)
+        {
+            air_params ap = mp.air;
+            const auto bad = [](const std::string& what) {
+                throw std::runtime_error("recipe_registry: economy.military.air." + what);
+            };
+            const auto read_int = [&](sol::table& t, const char* key, int lo, int hi, int& out,
+                                      const std::string& where) {
+                out = t.get_or(key, out);
+                if (out < lo || out > hi)
+                    bad(where + key + " is outside [" + std::to_string(lo) + ", "
+                        + std::to_string(hi) + "]");
+            };
+            sol::table at = *air;
+            read_int(at, "bombing_penalty_permille", 0, 1000, ap.bombing_penalty_permille, "");
+            read_int(at, "march_slow_permille", 0, 5000, ap.march_slow_permille, "");
+            read_int(at, "reveal_share_permille", 0, 1000, ap.reveal_share_permille, "");
+            read_int(at, "recon_cap_permille", 0, 5000, ap.recon_cap_permille, "");
+            read_int(at, "ad_attack", 0, 1000000, ap.ad_attack, "");
+            read_int(at, "repair_permille_per_day", 0, 1000, ap.repair_permille_per_day, "");
+            if (sol::optional<sol::table> rg = at["repair_goods_per_permille"])
+            {
+                ap.repair_goods_per_permille = {};
+                read_resource_map(*rg, ap.repair_goods_per_permille,
+                                  "military.air.repair_goods_per_permille");
+            }
+            if (sol::optional<sol::table> ug = at["wing_upkeep_goods"])
+            {
+                ap.wing_upkeep_goods = {};
+                read_resource_map(*ug, ap.wing_upkeep_goods, "military.air.wing_upkeep_goods");
+            }
+            static const char* const k_class_keys[air_class_count] = {
+                "fighter", "multirole", "bomber", "helicopter", "drone", "recon",
+            };
+            static const char* const k_mission_keys[air_mission_count] = {
+                "none", "superiority", "tactical", "strategic", "recon",
+            };
+            if (sol::optional<sol::table> classes = at["classes"])
+            {
+                for (const auto& kv : *classes)
+                {
+                    const std::string key = kv.first.as<std::string>();
+                    int ci = -1;
+                    for (int i = 0; i < air_class_count; ++i)
+                        if (key == k_class_keys[i]) ci = i;
+                    if (ci < 0)
+                        bad("classes names an unknown class '" + key + "'");
+                    sol::table t = kv.second.as<sol::table>();
+                    air_class_stats& c = ap.cls[static_cast<std::size_t>(ci)];
+                    const std::string where = "classes." + key + ".";
+                    read_int(t, "hp", 1, 100000, c.hp, where);
+                    read_int(t, "air", 0, 1000000, c.air, where);
+                    read_int(t, "superiority_permille", 0, 1000, c.superiority_permille, where);
+                    read_int(t, "soft", 0, 1000000, c.soft, where);
+                    read_int(t, "hard", 0, 1000000, c.hard, where);
+                    read_int(t, "strategic", 0, 1000, c.strategic, where);
+                    read_int(t, "recon", 0, 5000, c.recon, where);
+                    read_int(t, "range", 0, 100000, c.range, where);
+                    read_int(t, "ad_vulnerability_permille", 0, 10000, c.ad_vulnerability_permille, where);
+                    read_int(t, "muster_days", 1, 3650, c.muster_days, where);
+                    c.has_morale = t.get_or("has_morale", c.has_morale);
+                    c.hire_cost  = t.get_or("hire_cost", c.hire_cost);
+                    if (!std::isfinite(c.hire_cost) || c.hire_cost < 0.0f)
+                        bad(where + "hire_cost is not a finite non-negative number");
+                    if (sol::optional<sol::table> hg = t["hire_goods"])
+                    {
+                        c.hire_goods = {};
+                        read_resource_map(*hg, c.hire_goods, "military.air." + where + "hire_goods");
+                    }
+                    if (sol::optional<sol::table> ms = t["missions"])
+                    {
+                        c.missions = 0;
+                        for (const auto& mkv : *ms)
+                        {
+                            const std::string mk = mkv.second.as<std::string>();
+                            int mi = -1;
+                            for (int i = 1; i < air_mission_count; ++i)
+                                if (mk == k_mission_keys[i]) mi = i;
+                            if (mi < 0)
+                                bad(where + "missions names an unknown mission '" + mk + "'");
+                            c.missions = static_cast<uint8_t>(c.missions
+                                | air_mission_bit(static_cast<air_mission>(mi)));
+                        }
+                    }
+                }
+            }
+            mp.air = ap;
+        }
+
         m_military = mp;
     }
 
@@ -813,6 +908,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "university",           building_type::university },
             { "planetary_marketplace", building_type::planetary_marketplace }, // BL-1266
             { "railway_station",      building_type::railway_station },      // BL-1255
+            { "airbase",              building_type::airbase },              // BL-1449
         };
         struct named_band { const char* key; era_band band; };
         const named_band bands[] = {

@@ -119,6 +119,10 @@ inline constexpr ImU32 order_move    = IM_COL32( 90, 230, 120, 235); ///< A marc
 inline constexpr ImU32 order_attack  = IM_COL32(232,  84,  72, 240); ///< A march onto a hostile stack: the attack (front_hostile's red).
 inline constexpr ImU32 order_declare = IM_COL32(240, 150,  60, 240); ///< An attack that first asks to declare hostility.
 
+// --- an air wing's provinces (BL-1450; MILITARY.md § Air) ---
+inline constexpr ImU32 air_assigned = IM_COL32(140, 150, 255, 235); ///< A province the selected wing flies over; its right-click assign preview.
+inline constexpr ImU32 air_refused  = IM_COL32(232,  84,  72, 240); ///< A right-click the seam would refuse (order_attack's red).
+
 // --- the placement lens (Ben, 2026-10-25; LENSES.md § The placement lens) ---
 // A site the chosen building may take, a site with no Logistic Points operating
 // (amber: it will build, but it will not run until a source reaches it), and the

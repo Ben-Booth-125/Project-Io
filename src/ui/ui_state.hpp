@@ -8,6 +8,7 @@
 #include <imgui.h>
 #include <array>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -363,29 +364,119 @@ struct military_ledger_state
     /// Design tab: each land class row's press (opens the designer), drawn order.
     struct drawn_class { int cls = 0; float x = -1.0f, y = -1.0f; };
     std::vector<drawn_class> class_rows;
+
+    // ── BL-1450: grouped by theatre (military.md § Grouped by theatre) ──────────
+    /// Each theatre header's fold, per tab: [tab][theatre], theatre 0 Land, 1 Air.
+    /// A header is a toggle — its press folds or unfolds its rows. Open by default.
+    bool      theatre_open[2][2] = {{true, true}, {true, true}};
+    /// The chosen AIRBASE (Recruit's Air picker), as `base` is the military base's.
+    entity_id air_base = null_entity;
+    /// An air Raise press queued for app::render, which sends `hire_wing` at the
+    /// chosen airbase's tile. `null_entity` = nothing pending.
+    entity_id     pending_wing_tile = null_entity;
+    std::uint16_t pending_wing_row  = 0;
+    std::string   air_message;          ///< The hire seam's answer to the last air Raise (app writes it).
+
+    // Published each frame (x < 0 = absent).
+    struct drawn_header { int tab = 0, theatre = 0; float x = -1.0f, y = -1.0f; bool open = false; int count = 0; };
+    std::vector<drawn_header> headers;
+    std::vector<drawn_base>   air_bases;   ///< The Air picker's rows (`units` = wings based there).
+    struct drawn_air_raise
+    {
+        std::uint16_t row = 0;              ///< air_roster_table() index.
+        float         x = -1.0f, y = -1.0f;
+        bool          fieldable = false, enabled = false;
+        float         price = 0.0f;
+        std::string   reason;
+    };
+    std::vector<drawn_air_raise> air_raises;
+    struct drawn_wing { entity_id id = null_entity; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_wing> wing_rows;     ///< Recruit's "Your wings" rows: each press selects the wing.
+    std::vector<drawn_class> air_class_rows; ///< Design's Air rows (cls = air_class): each opens the designer.
+};
+
+/// BL-1450: the wing card (SELECTION.md; military.md § Grouped by theatre) and the
+/// canvas's right-click assignment. VIEW state plus the one queued order.
+struct wing_ui_state
+{
+    /// The mission a wing with NO provinces is set to fly next: `assign_air_mission`
+    /// refuses a mission with no province, so the card holds the choice until the
+    /// first right-click names one. Keyed by wing; dropped once the wing flies it.
+    std::map<entity_id, std::uint8_t> intent;
+
+    /// An assignment queued for app::render (`assign_air_mission`).
+    entity_id             pending_wing = null_entity;
+    std::uint8_t          pending_mission = 0;
+    std::vector<uint32_t> pending_provinces;
+    std::string           last_message;  ///< The seam's answer (app writes it).
+
+    // Published each frame the card draws.
+    struct drawn_mission { int mission = 0; float x = -1.0f, y = -1.0f; bool enabled = false, active = false; std::string reason; };
+    std::vector<drawn_mission> missions;
+    struct drawn_province { uint32_t province = 0; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_province> removes;  ///< Each assigned province's remove press.
+    entity_id drawn_wing = null_entity;   ///< The wing the card drew this frame.
+
+    // Published by the Planetary canvas: what a right-click on the hovered province would do.
+    int         hover_kind = 0;          ///< 0 nothing, 1 assign, 2 refused.
+    uint32_t    hover_province = 0;
+    std::string hover_text;
+    int         markers_drawn = 0;       ///< Wing markers drawn this frame.
+    struct drawn_marker { entity_id wing = null_entity; float x = -1.0f, y = -1.0f; int count = 0; };
+    std::vector<drawn_marker> markers;   ///< Ground-space centres (the press point).
 };
 
 /// The unit designer (docs/ui/ledgers/military.md § The designer): the full-canvas
 /// takeover `detail_surface::unit_designer`, keyed by land class. Which class is
 /// open lives in `ui_state::expanded`; this holds the rest of its view state, the
-/// one queued pick, and where its controls landed so a verify script presses the
+/// draft and its queued Save, and where its controls landed so a verify script presses the
 /// REAL control. VIEW state, not serialised.
 struct unit_designer_state
 {
     int  slot_open = -1;    ///< The slot whose item list is open; -1 = none.
     int  open_cls  = -1;    ///< The class the state above belongs to (a class change resets it).
+    detail_surface open_surface = detail_surface::none; ///< BL-1450: the surface `open_cls` belongs to.
 
-    /// A pick queued for app::render, which sends `set_unit_design` (one slot per press).
-    int           pending_cls  = -1; ///< -1 = nothing pending.
-    int           pending_slot = 0;
-    std::uint16_t pending_item = 0;
-    std::string   last_message;      ///< The seam's answer to the last pick (app writes it).
+    /// THE DRAFT (military.md § The designer, "A pick drafts; Save commits"; Ben,
+    /// 2026-10-28, NR-1096). A pick changes only this: one kit catalogue id per slot
+    /// for class `draft_cls`, 0xFFFF where the slot keeps the live design's item.
+    /// The boxes and summary show the draft; Save sends it; Revert drops it.
+    /// Read the drafted design through `unit_designer_draft_design`.
+    int                          draft_cls = -1;
+    /// BL-1450: which designer the draft belongs to — `unit_designer` (a land class)
+    /// or `air_designer` (an air class). One draft at a time, across both.
+    detail_surface               draft_surface = detail_surface::unit_designer;
+    std::array<std::uint16_t, 3> draft{0xFFFFu, 0xFFFFu, 0xFFFFu}; ///< k_kit_slot_max slots.
+
+    /// The close prompt: a close (toggle press, return control, Escape, another
+    /// takeover) asked for while the draft differs from the live design. The
+    /// designer stays open and asks Save or Discard; `after_*` is where the close
+    /// was going, applied once the prompt is answered.
+    bool           confirm_close = false;
+    detail_surface after_surface = detail_surface::none;
+    int            after_key     = 0;
+
+    /// Save's picks, queued for app::render, which sends one `set_unit_design`
+    /// per changed slot (the seam is per slot).
+    struct pending_pick { int cls = -1; int slot = 0; std::uint16_t item = 0; bool air = false; }; ///< `air`: an air class, sent as `set_air_design` (BL-1450).
+    std::vector<pending_pick> pending;
+    /// The seam's answer to the last Save, written by app::render after sending
+    /// `pending`: `save_answered` is set, and `refused` holds the picks it refused.
+    /// The next draw puts the refused picks back in the draft, so a refusal is
+    /// never lost — and a prompt Save (`close_after_save`) closes only when every
+    /// pick landed.
+    bool                      save_answered    = false;
+    bool                      close_after_save = false;
+    std::vector<pending_pick> refused;
+    std::string   last_message;      ///< The seam's answer to the last Save (app writes it).
 
     // Published each frame the designer draws; x < 0 = absent.
     struct drawn_box
     {
         int         slot = 0;
-        std::string name, fitted;
+        std::string name, fitted;                 ///< `fitted`: the DRAFT's item, what the box shows.
+        std::string live;                         ///< The live design's item in this slot.
+        bool        changed = false;              ///< The draft differs from the live design here.
         float       x = -1.0f, y = -1.0f;         ///< The box's centre (its press).
         float       anchor_x = -1.0f, anchor_y = -1.0f;
     };
@@ -400,8 +491,16 @@ struct unit_designer_state
     std::vector<drawn_box>  boxes;
     std::vector<drawn_item> items;    ///< The open slot's list, drawn order.
     float back_x = -1.0f, back_y = -1.0f;
+    float save_x = -1.0f, save_y = -1.0f;     ///< The Save press (live only with a changed slot).
+    float revert_x = -1.0f, revert_y = -1.0f; ///< The Revert press.
+    /// The close prompt's presses; x < 0 when the prompt is not up.
+    float prompt_save_x = -1.0f, prompt_save_y = -1.0f;
+    float prompt_discard_x = -1.0f, prompt_discard_y = -1.0f;
+    float prompt_keep_x = -1.0f, prompt_keep_y = -1.0f;
+    int   changed_slots = 0;          ///< Slots whose draft differs from the live design.
     int   stale_units = 0;            ///< Field units of the class on an older design.
     int   drawn_cls   = -1;           ///< The class drawn this frame; -1 = closed.
+    bool  drawn_air   = false;        ///< BL-1450: the class drawn is an AIR class (`detail_surface::air_designer`).
 
     /// The unit card's type-name press (opens the designer for the unit's class).
     float card_type_x = -1.0f, card_type_y = -1.0f;
@@ -878,6 +977,7 @@ struct ui_state
     /// See `military_ledger_state`.
     military_ledger_state military;
     unit_designer_state   designer; ///< The full-canvas unit designer (military.md § The designer).
+    wing_ui_state         wing;         ///< BL-1450: the wing card and the canvas right-click assignment.
 
 
     // THE CONTRACTS LEDGER'S VIEW STATE IS GONE (BL-693). The mercenary

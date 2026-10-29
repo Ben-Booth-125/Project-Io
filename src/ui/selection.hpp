@@ -33,6 +33,10 @@ enum class selection_kind
     /// for. It lives in its own `ui_state` field (`selected_contract_id`), the
     /// same precedent `selected_province` and the battle triple established.
     contract,
+    /// BL-1450: an air WING (`world::wings`, air_combat.hpp). Its id comes from
+    /// `create_entity`, so it travels in `selected_entity` and `selection_kind_of`
+    /// resolves it; its card is its own element (wing_card.hpp).
+    wing,
     // Future kinds (logistics vessel, …) slot in here once their component
     // stores exist; see SELECTION.md (§ Polymorphism).
 };

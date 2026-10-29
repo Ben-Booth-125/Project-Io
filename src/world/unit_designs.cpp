@@ -480,3 +480,324 @@ bool unit_design_stale(const world& w, const unit_component& u)
 {
     return u.kit != design_of(w, u.owner, unit_land_class(u));
 }
+
+// ===========================================================================
+// BL-1449 — the AIR kit catalogue (MILITARY.md § Air). Same rules as the land
+// catalogue above: per (air class, slot) a base item first, then two later items,
+// each naming a research node under a KIT-AIR branch the age tree does not hold
+// yet (so every later item reads locked until the kit nodes are placed) and the
+// existing goods it is made of. Deltas are on air_class_stats' scales: hp in HP,
+// air in milli-HP a day, soft/hard in milli-hits a day, strategic in condition
+// per-mille a day, recon in per-mille, range in tiles. APPEND-ONLY within a slot.
+// ===========================================================================
+
+namespace {
+
+using ac = air_class;
+
+constexpr kit_good AL(float q) { return {resource_type::alloys, q}; }
+constexpr kit_good EL(float q) { return {resource_type::electronics, q}; }
+constexpr kit_good MA(float q) { return {resource_type::machinery, q}; }
+constexpr kit_good OR(float q) { return {resource_type::ordnance, q}; }
+
+constexpr air_kit_item abase(const char* id, const char* name, ac c, uint8_t slot)
+{
+    return {id, name, c, slot, {}, {}, 0, nullptr};
+}
+
+/// Delta order is air_combat_stats': hp, air, soft, hard, strategic, recon, range.
+constexpr air_kit_item alater(const char* id, const char* name, ac c, uint8_t slot,
+                              air_combat_stats d, const char* node,
+                              kit_good g0, kit_good g1 = {}, kit_good g2 = {})
+{
+    const uint8_t n = static_cast<uint8_t>(1 + (g1.qty > 0.0f ? 1 : 0) + (g2.qty > 0.0f ? 1 : 0));
+    return {id, name, c, slot, d, {g0, g1, g2}, n, node};
+}
+
+constexpr air_kit_item k_air_items[] = {
+    // --- Fighter: Airframe (0) · Armament (1) · Avionics (2) ------------------
+    abase ("ftr.airframe.swept_wing",      "Swept-wing interceptor",               ac::fighter, 0),
+    alater("ftr.airframe.twin_engine",     "Twin-engine air superiority fighter",  ac::fighter, 0, {20, 300, 0, 0, 0, 0, 2}, "DG-KIT-AIR-FTR-AIRFRAME-1", AL(3), MA(2)),
+    alater("ftr.airframe.low_observable",  "Low-observable fighter",               ac::fighter, 0, {10, 600, 0, 0, 0, 0, 3}, "DG-KIT-AIR-FTR-AIRFRAME-2", AL(4), EL(2)),
+    abase ("ftr.armament.cannon_heat",     "Cannon and heat-seeking missiles",     ac::fighter, 1),
+    alater("ftr.armament.radar_guided",    "Radar-guided missiles",                ac::fighter, 1, {0, 400, 0, 0, 0, 0, 0}, "DG-KIT-AIR-FTR-ARMAMENT-1", EL(1), OR(2)),
+    alater("ftr.armament.beyond_visual",   "Beyond-visual-range missiles",         ac::fighter, 1, {0, 800, 0, 0, 0, 0, 0}, "DG-KIT-AIR-FTR-ARMAMENT-2", EL(2), OR(2)),
+    abase ("ftr.avionics.ranging_radar",   "Ranging radar",                        ac::fighter, 2),
+    alater("ftr.avionics.pulse_doppler",   "Pulse-doppler radar",                  ac::fighter, 2, {0, 200, 0, 0, 0, 0, 2}, "DG-KIT-AIR-FTR-AVIONICS-1", EL(2)),
+    alater("ftr.avionics.scanned_array",   "Electronically scanned radar",         ac::fighter, 2, {0, 400, 0, 0, 0, 0, 4}, "DG-KIT-AIR-FTR-AVIONICS-2", EL(3)),
+
+    // --- Strike / multirole ---------------------------------------------------
+    abase ("mr.airframe.fighter_bomber",   "Fighter-bomber",                       ac::multirole, 0),
+    alater("mr.airframe.multirole",        "Multirole fighter",                    ac::multirole, 0, {15, 200, 0, 0, 0, 0, 2}, "DG-KIT-AIR-MR-AIRFRAME-1", AL(3), MA(2)),
+    alater("mr.airframe.stealth_strike",   "Low-observable strike airframe",       ac::multirole, 0, {10, 200, 10, 10, 0, 0, 4}, "DG-KIT-AIR-MR-AIRFRAME-2", AL(4), EL(2)),
+    abase ("mr.armament.unguided",         "Unguided bombs and rockets",           ac::multirole, 1),
+    alater("mr.armament.laser_guided",     "Laser-guided bombs",                   ac::multirole, 1, {0, 0, 20, 30, 0, 0, 0}, "DG-KIT-AIR-MR-ARMAMENT-1", EL(1), OR(2)),
+    alater("mr.armament.standoff",         "Precision stand-off weapons",          ac::multirole, 1, {0, 0, 30, 50, 0, 0, 2}, "DG-KIT-AIR-MR-ARMAMENT-2", EL(2), OR(3)),
+    abase ("mr.avionics.bombsight",        "Bombsight radar",                      ac::multirole, 2),
+    alater("mr.avionics.targeting_pod",    "Targeting pod",                        ac::multirole, 2, {0, 0, 10, 10, 0, 0, 0}, "DG-KIT-AIR-MR-AVIONICS-1", EL(2)),
+    alater("mr.avionics.sensor_fusion",    "Networked sensor fusion",              ac::multirole, 2, {0, 200, 15, 15, 0, 0, 0}, "DG-KIT-AIR-MR-AVIONICS-2", EL(3)),
+
+    // --- Strategic bomber -----------------------------------------------------
+    abase ("bmr.airframe.subsonic",        "Subsonic heavy bomber",                ac::bomber, 0),
+    alater("bmr.airframe.supersonic",      "Supersonic bomber",                    ac::bomber, 0, {20, 0, 0, 0, 0, 0, 5}, "DG-KIT-AIR-BMR-AIRFRAME-1", AL(5), MA(3)),
+    alater("bmr.airframe.low_observable",  "Low-observable bomber",                ac::bomber, 0, {30, 0, 0, 0, 0, 0, 5}, "DG-KIT-AIR-BMR-AIRFRAME-2", AL(6), EL(3)),
+    abase ("bmr.armament.free_fall",       "Free-fall bombs",                      ac::bomber, 1),
+    alater("bmr.armament.guided_bombs",    "Guided bombs",                         ac::bomber, 1, {0, 0, 0, 0, 3, 0, 0}, "DG-KIT-AIR-BMR-ARMAMENT-1", EL(1), OR(3)),
+    alater("bmr.armament.cruise_missiles", "Air-launched cruise missiles",         ac::bomber, 1, {0, 0, 0, 0, 6, 0, 10}, "DG-KIT-AIR-BMR-ARMAMENT-2", EL(2), OR(4)),
+    abase ("bmr.avionics.navigation",      "Navigation radar",                     ac::bomber, 2),
+    alater("bmr.avionics.terrain_follow",  "Terrain-following radar",              ac::bomber, 2, {10, 0, 0, 0, 0, 0, 0}, "DG-KIT-AIR-BMR-AVIONICS-1", EL(2)),
+    alater("bmr.avionics.countermeasures", "Electronic countermeasures suite",     ac::bomber, 2, {25, 0, 0, 0, 0, 0, 0}, "DG-KIT-AIR-BMR-AVIONICS-2", EL(3)),
+
+    // --- Attack helicopter ----------------------------------------------------
+    abase ("hel.airframe.utility_gunship", "Utility gunship",                      ac::helicopter, 0),
+    alater("hel.airframe.attack",          "Dedicated attack helicopter",          ac::helicopter, 0, {15, 0, 0, 20, 0, 0, 1}, "DG-KIT-AIR-HEL-AIRFRAME-1", AL(2), MA(2)),
+    alater("hel.airframe.armoured",        "Armoured tandem-seat helicopter",      ac::helicopter, 0, {25, 0, 0, 30, 0, 0, 1}, "DG-KIT-AIR-HEL-AIRFRAME-2", AL(3), MA(2)),
+    abase ("hel.armament.rockets",         "Rockets and door guns",                ac::helicopter, 1),
+    alater("hel.armament.wire_guided",     "Wire-guided anti-tank missiles",       ac::helicopter, 1, {0, 0, 0, 40, 0, 0, 0}, "DG-KIT-AIR-HEL-ARMAMENT-1", EL(1), OR(2)),
+    alater("hel.armament.fire_and_forget", "Fire-and-forget anti-tank missiles",   ac::helicopter, 1, {0, 0, 10, 70, 0, 0, 0}, "DG-KIT-AIR-HEL-ARMAMENT-2", EL(2), OR(2)),
+    abase ("hel.avionics.day_optics",      "Day optics",                           ac::helicopter, 2),
+    alater("hel.avionics.night_vision",    "Night-vision sights",                  ac::helicopter, 2, {0, 0, 10, 10, 0, 0, 0}, "DG-KIT-AIR-HEL-AVIONICS-1", EL(2)),
+    alater("hel.avionics.mast_radar",      "Mast-mounted radar",                   ac::helicopter, 2, {0, 0, 15, 20, 0, 50, 0}, "DG-KIT-AIR-HEL-AVIONICS-2", EL(3)),
+
+    // --- Strike drone ---------------------------------------------------------
+    abase ("drn.airframe.target_drone",    "Converted target drone",               ac::drone, 0),
+    alater("drn.airframe.long_endurance",  "Medium-altitude long-endurance drone", ac::drone, 0, {15, 0, 0, 0, 0, 0, 4}, "DG-KIT-AIR-DRN-AIRFRAME-1", AL(2), EL(1)),
+    alater("drn.airframe.jet_combat",      "Jet-powered combat drone",             ac::drone, 0, {20, 0, 0, 0, 0, 0, 6}, "DG-KIT-AIR-DRN-AIRFRAME-2", AL(3), EL(2)),
+    abase ("drn.armament.light_rockets",   "Light guided rockets",                 ac::drone, 1),
+    alater("drn.armament.guided_missiles", "Guided missiles",                      ac::drone, 1, {0, 0, 20, 25, 0, 0, 0}, "DG-KIT-AIR-DRN-ARMAMENT-1", EL(1), OR(2)),
+    alater("drn.armament.loitering",       "Loitering munitions",                  ac::drone, 1, {0, 0, 30, 40, 0, 0, 0}, "DG-KIT-AIR-DRN-ARMAMENT-2", EL(2), AL(1)),
+    abase ("drn.avionics.line_of_sight",   "Line-of-sight datalink",               ac::drone, 2),
+    alater("drn.avionics.satellite_link",  "Satellite datalink",                   ac::drone, 2, {0, 0, 0, 0, 0, 50, 6}, "DG-KIT-AIR-DRN-AVIONICS-1", EL(2)),
+    alater("drn.avionics.autonomous",      "Autonomous targeting",                 ac::drone, 2, {0, 0, 10, 10, 0, 50, 0}, "DG-KIT-AIR-DRN-AVIONICS-2", EL(3)),
+
+    // --- Recon / AWACS --------------------------------------------------------
+    abase ("rcn.airframe.recon_jet",       "Reconnaissance jet",                   ac::recon, 0),
+    alater("rcn.airframe.high_altitude",   "High-altitude reconnaissance aircraft", ac::recon, 0, {20, 0, 0, 0, 0, 0, 5}, "DG-KIT-AIR-RCN-AIRFRAME-1", AL(3), EL(1)),
+    alater("rcn.airframe.early_warning",   "Airborne early-warning aircraft",      ac::recon, 0, {15, 0, 0, 0, 0, 100, 0}, "DG-KIT-AIR-RCN-AIRFRAME-2", AL(3), EL(3)),
+    abase ("rcn.armament.defensive_guns",  "Defensive guns",                       ac::recon, 1),
+    alater("rcn.armament.self_defence",    "Self-defence missiles",                ac::recon, 1, {10, 0, 0, 0, 0, 0, 0}, "DG-KIT-AIR-RCN-ARMAMENT-1", EL(1), OR(1)),
+    alater("rcn.armament.towed_decoys",    "Towed decoys",                         ac::recon, 1, {20, 0, 0, 0, 0, 0, 0}, "DG-KIT-AIR-RCN-ARMAMENT-2", EL(2)),
+    abase ("rcn.avionics.cameras",         "Cameras",                              ac::recon, 2),
+    alater("rcn.avionics.side_looking",    "Side-looking radar",                   ac::recon, 2, {0, 0, 0, 0, 0, 80, 0}, "DG-KIT-AIR-RCN-AVIONICS-1", EL(2)),
+    alater("rcn.avionics.signals_intel",   "Signals-intelligence suite",           ac::recon, 2, {0, 0, 0, 0, 0, 150, 0}, "DG-KIT-AIR-RCN-AVIONICS-2", EL(3)),
+};
+
+constexpr std::size_t k_air_item_count = sizeof(k_air_items) / sizeof(k_air_items[0]);
+
+constexpr bool air_zero(const air_combat_stats& d)
+{
+    return d.hp == 0 && d.air == 0 && d.soft == 0 && d.hard == 0 && d.strategic == 0
+        && d.recon == 0 && d.range == 0;
+}
+
+constexpr const char* air_first_error()
+{
+    if (k_air_item_count >= k_no_kit_item)
+        return "air catalogue too large for a u16 id";
+    for (std::size_t i = 0; i < k_air_item_count; ++i)
+    {
+        const air_kit_item& it = k_air_items[i];
+        if (it.id == nullptr || it.id[0] == '\0' || it.name == nullptr || it.name[0] == '\0')
+            return "an air item has no id or name";
+        if (static_cast<int>(it.cls) >= air_class_count || it.slot >= k_air_kit_slot_count)
+            return "an air item names a class or slot that does not exist";
+        for (std::size_t j = 0; j < i; ++j)
+        {
+            if (str_eq(k_air_items[j].id, it.id))
+                return "two air items share an id";
+            if (it.research_node != nullptr && str_eq(k_air_items[j].research_node, it.research_node))
+                return "two air items share a research node";
+        }
+        for (std::size_t j = 0; j < k_item_count; ++j)
+            if (it.research_node != nullptr && str_eq(k_items[j].research_node, it.research_node))
+                return "an air item shares a research node with a land item";
+        if (it.goods_count > k_kit_goods_max)
+            return "an air item names too many goods";
+        if (it.research_node == nullptr)
+        {
+            if (!air_zero(it.delta) || it.goods_count != 0)
+                return "a base air item carries a delta or goods";
+        }
+        else
+        {
+            if (it.research_node[0] == '\0' || it.goods_count == 0)
+                return "a later air item names no research node or no goods";
+            for (std::size_t g = 0; g < it.goods_count; ++g)
+                if (!(it.goods[g].qty > 0.0f))
+                    return "a later air item names a good of no quantity";
+        }
+    }
+    for (int c = 0; c < air_class_count; ++c)
+        for (int s = 0; s < k_air_kit_slot_count; ++s)
+        {
+            int count = 0, bases = 0;
+            bool base_first = false;
+            for (std::size_t i = 0; i < k_air_item_count; ++i)
+            {
+                const air_kit_item& it = k_air_items[i];
+                if (static_cast<int>(it.cls) != c || static_cast<int>(it.slot) != s)
+                    continue;
+                if (it.research_node == nullptr)
+                {
+                    ++bases;
+                    base_first = (count == 0);
+                }
+                ++count;
+            }
+            if (bases != 1 || !base_first)
+                return "an air slot has no base item listed first, or more than one";
+            if (count - 1 < 2 || count - 1 > 4)
+                return "an air slot has fewer than two or more than four later items";
+        }
+    return nullptr;
+}
+
+static_assert(air_first_error() == nullptr, "the air kit catalogue is malformed: see air_first_error()");
+
+struct air_slot_index
+{
+    std::vector<uint16_t> items[air_class_count][k_air_kit_slot_count];
+    std::vector<uint8_t>  variant;
+};
+
+const air_slot_index& air_index()
+{
+    static const air_slot_index idx = [] {
+        air_slot_index s;
+        s.variant.assign(k_air_item_count, 0);
+        for (std::size_t i = 0; i < k_air_item_count; ++i)
+        {
+            const air_kit_item& it = k_air_items[i];
+            std::vector<uint16_t>& v = s.items[static_cast<std::size_t>(it.cls)][it.slot];
+            s.variant[i] = static_cast<uint8_t>(v.size());
+            v.push_back(static_cast<uint16_t>(i));
+        }
+        return s;
+    }();
+    return idx;
+}
+
+bool air_class_ok(air_class c, int slot)
+{
+    return static_cast<int>(c) < air_class_count && slot >= 0 && slot < k_air_kit_slot_count;
+}
+
+} // namespace
+
+const std::vector<air_kit_item>& air_kit_catalogue()
+{
+    static const std::vector<air_kit_item> v(std::begin(k_air_items), std::end(k_air_items));
+    return v;
+}
+
+const char* air_kit_catalogue_first_error()
+{
+    return air_first_error();
+}
+
+const char* air_kit_slot_name(int slot)
+{
+    static const char* const names[k_air_kit_slot_count] = {"Airframe", "Armament", "Avionics"};
+    return (slot >= 0 && slot < k_air_kit_slot_count) ? names[slot] : "";
+}
+
+const std::vector<uint16_t>& air_kit_items_for(air_class c, int slot)
+{
+    if (!air_class_ok(c, slot))
+        return k_no_items;
+    return air_index().items[static_cast<std::size_t>(c)][slot];
+}
+
+uint16_t air_kit_item_at(air_class c, int slot, uint8_t variant)
+{
+    const std::vector<uint16_t>& v = air_kit_items_for(c, slot);
+    return variant < v.size() ? v[variant] : k_no_kit_item;
+}
+
+uint16_t air_kit_item_by_id(std::string_view id)
+{
+    for (std::size_t i = 0; i < k_air_item_count; ++i)
+        if (id == k_air_items[i].id)
+            return static_cast<uint16_t>(i);
+    return k_no_kit_item;
+}
+
+uint8_t air_kit_variant_of(uint16_t item)
+{
+    return item < k_air_item_count ? air_index().variant[item] : uint8_t{0};
+}
+
+bool air_kit_item_researched(const world& w, entity_id nation, uint16_t item)
+{
+    if (item >= k_air_item_count)
+        return false;
+    const air_kit_item& it = k_air_items[item];
+    if (it.research_node == nullptr)
+        return true;
+    if (g_waived)
+        return true;
+    const int node = io::dg::find_node(it.research_node);
+    return node >= 0 && nation_holds(w, nation, node);
+}
+
+unit_design air_design_of(const world& w, entity_id nation, air_class c)
+{
+    unit_design d;
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end() || static_cast<int>(c) >= air_class_count)
+        return d;
+    for (const uint16_t item : nit->second.air_design_kit)
+    {
+        if (item >= k_air_item_count || k_air_items[item].cls != c)
+            continue;
+        d.fit[k_air_items[item].slot] = air_kit_variant_of(item);
+    }
+    return d;
+}
+
+uint16_t air_design_fitted(const world& w, entity_id nation, air_class c, int slot)
+{
+    if (!air_class_ok(c, slot))
+        return k_no_kit_item;
+    return air_kit_item_at(c, slot, air_design_of(w, nation, c).fit[static_cast<std::size_t>(slot)]);
+}
+
+air_combat_stats air_kit_delta(air_class c, const unit_design& d)
+{
+    air_combat_stats s;
+    for (int slot = 0; slot < k_air_kit_slot_count; ++slot)
+    {
+        const uint16_t item = air_kit_item_at(c, slot, d.fit[static_cast<std::size_t>(slot)]);
+        if (item == k_no_kit_item)
+            continue;
+        const air_combat_stats& k = k_air_items[item].delta;
+        s.hp += k.hp; s.air += k.air; s.soft += k.soft; s.hard += k.hard;
+        s.strategic += k.strategic; s.recon += k.recon; s.range += k.range;
+    }
+    return s;
+}
+
+std::array<float, resource_count> air_kit_goods(air_class c, const unit_design& d)
+{
+    std::array<float, resource_count> out{};
+    for (int slot = 0; slot < k_air_kit_slot_count; ++slot)
+    {
+        const uint16_t item = air_kit_item_at(c, slot, d.fit[static_cast<std::size_t>(slot)]);
+        if (item >= k_air_item_count)
+            continue;
+        const air_kit_item& it = k_air_items[item];
+        for (std::size_t g = 0; g < it.goods_count; ++g)
+            out[static_cast<std::size_t>(it.goods[g].res)] += it.goods[g].qty;
+    }
+    return out;
+}
+
+bool air_design_valid(air_class c, const unit_design& d)
+{
+    if (static_cast<int>(c) >= air_class_count)
+        return false;
+    for (int s = 0; s < k_air_kit_slot_count; ++s)
+        if (d.fit[static_cast<std::size_t>(s)] >= air_kit_items_for(c, s).size())
+            return false;
+    return true;
+}

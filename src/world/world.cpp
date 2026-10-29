@@ -388,6 +388,7 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_i32(h, u.food_remainder);
                 fnv1a_i32(h, u.ammo_remainder);
                 fnv1a_i32(h, u.equipment_remainder);
+                fnv1a_i32(h, u.lp_share_permille);
             }
             // BL-1434 (unit designs): the recorded design and a refit's target design,
             // each folded only when not base kit, behind its own marker, so a world of
@@ -483,6 +484,93 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, nid);
                 fnv1a_u32(h, static_cast<uint32_t>(v.size()));
                 for (const uint16_t r : v) fnv1a_u32(h, r);
+            }
+        }
+    }
+
+    // BL-1449 (air combat): the wings, the superiority map, the reveal set, the hit
+    // bank, the nations' air designs and every building off full condition. Each is
+    // folded only when non-empty, so a world with no air hashes exactly as before.
+    if (!wings.empty())
+    {
+        fnv1a_u32(h, 0x57494E47u); // "WING"
+        fnv1a_u32(h, static_cast<uint32_t>(wings.size()));
+        for (const auto& [wid, wg] : wings) // std::map: ascending id
+        {
+            fnv1a_u32(h, wid);
+            fnv1a_u32(h, wg.owner);
+            fnv1a_u32(h, wg.airbase);
+            fnv1a_u32(h, wg.type);
+            fnv1a_i32(h, wg.hp_ppm);
+            fnv1a_i32(h, wg.morale_permille);
+            fnv1a_i32(h, wg.supply_factor_permille);
+            fnv1a_i32(h, wg.muster_days);
+            for (const uint8_t v : wg.kit.fit) fnv1a_u32(h, v);
+            fnv1a_u32(h, static_cast<uint32_t>(wg.mission));
+            fnv1a_u32(h, static_cast<uint32_t>(wg.provinces.size()));
+            for (const uint32_t p : wg.provinces) fnv1a_u32(h, p);
+        }
+    }
+    if (!air_superiority.empty())
+    {
+        fnv1a_u32(h, 0x41535550u); // "ASUP"
+        for (const auto& [key, v] : air_superiority)
+        {
+            fnv1a_u32(h, key.first);
+            fnv1a_u32(h, key.second);
+            fnv1a_i32(h, v);
+        }
+    }
+    if (!air_revealed.empty())
+    {
+        fnv1a_u32(h, 0x41524556u); // "AREV"
+        for (const auto& [viewer, unit] : air_revealed)
+        {
+            fnv1a_u32(h, viewer);
+            fnv1a_u32(h, unit);
+        }
+    }
+    if (!air_hit_bank.empty())
+    {
+        fnv1a_u32(h, 0x4142414Eu); // "ABAN"
+        for (const auto& [uid, bank] : air_hit_bank)
+        {
+            fnv1a_u32(h, uid);
+            fnv1a_i32(h, bank.first);
+            fnv1a_i32(h, bank.second);
+        }
+    }
+    {
+        std::vector<entity_id> designed;
+        for (const auto& [nid, nc] : nations)
+            if (!nc.air_design_kit.empty())
+                designed.push_back(nid);
+        if (!designed.empty())
+        {
+            std::sort(designed.begin(), designed.end());
+            fnv1a_u32(h, 0x41445347u); // "ADSG"
+            for (const entity_id nid : designed)
+            {
+                const std::vector<uint16_t>& v = nations.at(nid).air_design_kit;
+                fnv1a_u32(h, nid);
+                fnv1a_u32(h, static_cast<uint32_t>(v.size()));
+                for (const uint16_t r : v) fnv1a_u32(h, r);
+            }
+        }
+    }
+    {
+        std::vector<entity_id> damaged;
+        for (const auto& [bid, bc] : buildings)
+            if (bc.condition_permille != 1000)
+                damaged.push_back(bid);
+        if (!damaged.empty())
+        {
+            std::sort(damaged.begin(), damaged.end());
+            fnv1a_u32(h, 0x434F4E44u); // "COND"
+            for (const entity_id bid : damaged)
+            {
+                fnv1a_u32(h, bid);
+                fnv1a_i32(h, buildings.at(bid).condition_permille);
             }
         }
     }

@@ -359,6 +359,7 @@ const char* building_type_name(building_type t)
         case building_type::university:           return "University";           // BL-615
         case building_type::planetary_marketplace: return "Planetary Marketplace"; // BL-1266
         case building_type::railway_station:      return "Railway Station";      // BL-1255
+        case building_type::airbase:              return "Airbase";              // BL-1449
     }
     return "None";
 }
@@ -777,6 +778,7 @@ ImU32 building_kind_colour(building_type type)
         case building_type::university:           return IM_COL32(150, 170, 244, 255); // periwinkle — BL-615
         case building_type::planetary_marketplace: return IM_COL32( 72, 186, 104, 255); // emerald — BL-1269, the trade house
         case building_type::railway_station:      return IM_COL32(150, 150, 160, 255); // iron grey — BL-1255
+        case building_type::airbase:              return IM_COL32( 84, 100, 236, 255); // ultramarine — BL-1450, the air theatre (clear of hover blue and periwinkle)
         case building_type::none:                 break;
     }
     return neutral;

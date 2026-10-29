@@ -673,12 +673,13 @@ int main()
         bool none = from_bytes(v61, old) && stamped == k_world_save_version_pre_fronts && old.front_orders.empty();
         for (const auto& [id, uu] : old.units) none = none && uu.front == null_entity;
         // BL-1434 (v64): today's stream ends with the designs section, three empty counts (12 bytes).
-        check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9) - 4 - 12,
+        // BL-1449 (v65): and then the air section, six empty counts (24 bytes).
+        check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9) - 4 - 12 - 24,
               "F7c a v61 stream (the section's 33 bytes, v63's 4-byte stack count and v64's 12-byte designs section shorter) reads as no fronts");
 
         // A row naming nothing: the first assignment's key -> a ghost tile.
         std::string bad = bytes;
-        const std::size_t tail = 4 + 12; // v63's attacking-stack section (a zero battle count), v64's empty designs section
+        const std::size_t tail = 4 + 12 + 24; // v63's attacking-stack section (a zero battle count), v64's empty designs section, v65's empty air section
         const std::size_t key0 = bytes.size() - tail - (4 + 9) - 2 * 8 + 4;
         const entity_id ghost = 0x7FFFFFF0u;
         std::memcpy(&bad[key0], &ghost, sizeof ghost);

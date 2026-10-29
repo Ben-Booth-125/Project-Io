@@ -4,6 +4,8 @@
 
 #include "icons.hpp"
 #include "presentation.hpp"
+#include "wing_card.hpp"      // BL-1450: the wing marker's card
+#include "world/air_combat.hpp"
 #include "world/components.hpp"
 #include "world/logistics.hpp" // landform_logistics_cost — the landform's real cost (BL-232)
 #include "world/logistic_points.hpp" // BL-1353: lp_full_reach / lp_fade_length for the ground card
@@ -371,6 +373,25 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid,
     // No market dispatch: the Planetary canvas's market-centre marker and its
     // hover target retired (Ben, 2026-10-10), so a market never reaches here —
     // under the Market lens the card's subject is the tile (BL-664).
+
+    // BL-1450: an air wing's marker at its airbase. What it is and what it flies;
+    // a rival's wing names its class only (BL-068: internals stay private).
+    if (const auto wit = w.wings.find(eid); wit != w.wings.end())
+    {
+        ImGui::TextUnformatted(wing_display_name(w, eid));
+        ImGui::TextDisabled("%s", air_class_label(wing_class(wit->second)));
+        if (wing_is_players(w, eid))
+        {
+            if (wit->second.mission == air_mission::none)
+                ImGui::TextDisabled("No mission");
+            else
+                ImGui::TextDisabled("%s over %d province%s", air_mission_label(wit->second.mission),
+                                    static_cast<int>(wit->second.provinces.size()),
+                                    wit->second.provinces.size() == 1 ? "" : "s");
+            ImGui::TextDisabled("Press to select the wing");
+        }
+        return;
+    }
 
     // Fallback: unknown entity kind — show nothing rather than crashing.
     ImGui::TextDisabled("Entity %u", static_cast<unsigned>(eid));

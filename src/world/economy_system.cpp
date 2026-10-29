@@ -19,6 +19,7 @@
 #include "state_industry.hpp"  // BL-1296: plan_state_funding, the state ledger
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
+#include "campaign_settle.hpp" // BL-1452: k_campaign_settle_ticks - the settle keeps the stocks full
 
 #include <algorithm>
 #include <array>
@@ -3470,6 +3471,12 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // NR-344 ("war flips the queue") lives in the daily march's visit order.
     advance_musters(w);
     advance_refits(w); // Ben, 2026-10-27: a refit completes on the tick, as a muster does
+
+    // BL-1449 (MILITARY.md § Air): the air missions, still flown over the quarter's 90
+    // days HERE rather than in the daily military pass (run_military_day), until they
+    // move onto it (owed). The superiority they leave is read by the next quarter's
+    // daily marches and battles.
+    report.air = run_air_missions(w, reg, report, econ_tick_days_world);
     phase_stamp(10); // (the battle phase is daily now: run_military_day)
     phase_stamp(11); // (recovery and the march are daily now: run_military_day)
 
@@ -3478,6 +3485,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // after it means a muster base torn down THIS tick orphans its units in the
     // same tick rather than leaving them live for one. See run_unit_upkeep.
     run_unit_upkeep(w, reg, report);
+    // BL-1449: the wings' half of the same pass — orphans disbanded, supply drawn at
+    // the airbase — straight after, on the same rule and for the same reason (last).
+    report.wing_upkeep = run_wing_upkeep(w, reg, report);
     phase_stamp(12); // unit_upkeep
 
     // BL-641: the building pass — the goods half of a building's upkeep and the
@@ -3943,6 +3953,28 @@ int step_building_supply(int factor, bool unmet, const building_upkeep_params& u
 
 } // namespace
 
+int draw_goods_at_tile(world& w, const recipe_registry& reg, economy_report& report,
+                       entity_id owner, entity_id tile,
+                       const std::array<float, resource_count>& need)
+{
+    bool any = false;
+    for (const float q : need)
+        any = any || q > 0.0f;
+    if (!any)
+        return 1000;
+    const auto tit = w.tiles.find(tile);
+    const entity_id body = (tit != w.tiles.end()) ? tit->second.body : null_entity;
+    draw_outcome rec;
+    if (!draw_goods_or_bid(w, reg, report, owner, body, tile, need, &rec))
+        return 1000;
+    return draw_share_permille(rec);
+}
+
+int step_unit_supply_toward(int factor, int target_permille, const unit_upkeep_params& up)
+{
+    return step_unit_supply(factor, target_permille, up);
+}
+
 unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_report& report)
 {
     unit_upkeep_tick out;
@@ -4065,6 +4097,7 @@ unit_upkeep_tick run_unit_upkeep(world& w, const recipe_registry& reg, economy_r
     for (const entity_id id : disband)
     {
         w.units.erase(id);
+        w.forget_air_unit(id); // BL-1449
         ++out.disbanded;
     }
     return out;
@@ -4720,8 +4753,18 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
             // bridged water node at its deck — so a unit marching over a bridge pays the
             // road, as a convoy does, and neither invents a second model.
             const int march_side = road_side_between(w, u.position, next_id);
-            const float step_cost =
+            float step_cost =
                 edge_traversal_cost(cur_it->second, next_it->second, march_side);
+            // BL-1449 (MILITARY.md § Air): air superiority SLOWS the side that lacks
+            // it — a step into a province where the marcher's share is short costs up
+            // to (1000 + march_slow) per-mille. Exactly 1000 (the unchanged path) when
+            // no superiority is flown anywhere.
+            if (!w.air_superiority.empty())
+            {
+                const int slow = air_march_cost_permille(w, reg, u.owner, next_id);
+                if (slow != 1000)
+                    step_cost *= static_cast<float>(slow) / 1000.0f;
+            }
             if (step_cost <= 0.0f || points + 1e-6f >= step_cost)
             {
                 points -= step_cost;
@@ -4765,10 +4808,22 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
 
 namespace {
 
+/// STARVATION RUNS FROM THE HANDOFF (Ben, 2026-10-29; MILITARY.md § Carried supplies):
+/// is @p day_tick a day of the campaign rather than of the pre-game settle? Keyed on the
+/// ONE day-stamp base (`military_quarter_day_base`): the settle's quarters close at econ
+/// ticks 0..11, so their days are stamped below the base of tick 12, and every live day
+/// - the app's day loop and the headless catch-up alike - is stamped at or above it. A
+/// negative stamp reads the world's day tick, as the march does.
+bool carried_supplies_live(const world& w, int day_tick)
+{
+    const int stamp = day_tick >= 0 ? day_tick : w.current_day_tick;
+    return stamp >= military_quarter_day_base(k_campaign_settle_ticks);
+}
+
 /// Is there anything for a military day to do? A unit with an order or a front, or a
 /// live battle. Nothing else issues a march between economy ticks on a headless path
 /// (the scorers are quarterly), so a quarter that goes quiet stays quiet.
-bool military_active(const world& w, const recipe_registry& reg)
+bool military_active(const world& w, const recipe_registry& reg, int day_tick)
 {
     if (!w.battles.empty())
         return true;
@@ -4780,7 +4835,9 @@ bool military_active(const world& w, const recipe_registry& reg)
     // unit is out of contact).
     // BL-1452: so is a day on which some unit's carried stocks still move (an
     // under-supplied or starving unit, or one refilling).
-    return recovery_pending(w) || carried_supplies_pending(w, reg.military().supplies);
+    // In the settle the stocks are held full, so they keep no day walking.
+    return recovery_pending(w)
+        || (carried_supplies_live(w, day_tick) && carried_supplies_pending(w, reg.military().supplies));
 }
 
 } // namespace
@@ -4788,7 +4845,7 @@ bool military_active(const world& w, const recipe_registry& reg)
 military_day_result run_military_day(world& w, const recipe_registry& reg, int day_tick)
 {
     military_day_result out;
-    if (!military_active(w, reg))
+    if (!military_active(w, reg, day_tick))
         return out;
 
     // THE FRONTS FIRST, after yesterday's musters and before today's battles, so a
@@ -4811,10 +4868,12 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     const std::set<entity_id> fought = units_in_live_battles(w);
     out.battles = run_battles(w, reg, day_tick);
     // THE CARRIED SUPPLIES' DAY (BL-1452; MILITARY.md § Carried supplies): after the
-    // rounds that read the stocks, drain and refill them at the supply factor's share,
-    // and starve a unit with no food - before the disband, so a unit starvation takes
-    // to zero men is removed today as a battle-killed one is.
-    out.supplies = run_carried_supplies_day(w, reg.military().supplies, fought);
+    // rounds that read the stocks, drain and refill them at the unit's road share, and
+    // starve a unit with no food - before the disband, so a unit starvation takes to
+    // zero men is removed today as a battle-killed one is. Live days only: the settle
+    // keeps every stock full.
+    if (carried_supplies_live(w, day_tick))
+        out.supplies = run_carried_supplies_day(w, reg.military().supplies, fought);
     // A UNIT A BATTLE KILLS IS REMOVED THE SAME DAY (Ben, 2026-10-28; MILITARY.md
     // § Marching), by the one disband path the upkeep pass also runs, so it never
     // stands on its tile blocking today's march.
@@ -4838,7 +4897,7 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
     // completes on day d is under the march from that day on, on every path alike.
     for (int d = from + 1; d <= to; ++d)
     {
-        if (!military_active(w, reg))
+        if (!military_active(w, reg, quarter_first_day_tick + d))
         {
             // Nothing military left to walk: construction takes the rest in one call,
             // which walks the identical days (advance_construction_to is days-outer).

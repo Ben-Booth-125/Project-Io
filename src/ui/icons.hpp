@@ -515,6 +515,20 @@ void acquisition(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 ///                  landing needs no further change here.
 void unit_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, bool committed);
 
+/// BL-1450 (MILITARY.md § Air): the AIRCRAFT — a top-down silhouette, nose up: a
+/// narrow fuselage, swept main wings and a small tailplane, filled in @p colour and
+/// outlined dark on its outside edge. The airbase's building glyph
+/// (`building(…, airbase, …)` draws it), and what the wing marker carries.
+void aircraft(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// BL-1450: an air WING marker — a round dark plate of radius @p r ringed in the
+/// owner's colour (@p fill) with the aircraft on it; @p count (> 1) prints as a
+/// badge at its lower right; @p hovered rings it in `palette::hover`. Round where
+/// the land counter is square: a wing is based at its airbase, it never stands on
+/// a tile as a unit does.
+void wing_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count,
+                 bool hovered = false);
+
 /// BL-1425: a land unit COUNTER — a rectangle 2.2r wide and 1.5r tall centred on
 /// @p centre. An owner-colour band (@p fill) on its left; the number of units on
 /// the tile (@p count) in the middle; and, when @p show_bars, two VERTICAL bars at

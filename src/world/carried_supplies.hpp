@@ -12,15 +12,22 @@
 //             `equipment_per_battle_day` on a day it fought;
 //   resupply  share x (today's spend + restock) (Ben, 2026-10-29: "Delivery is share x
 //             (daily need + a restock rate); half cover then drains more slowly, full
-//             cover refills"), capped at full. The share is supply_factor_permille; the
+//             cover refills"), capped at full. The share is the unit's ROAD share,
+//             `lp_share_permille` (Ben, 2026-10-29: only the road gap starves); the
 //             restock is `restock_permille` of the stock's FULL daily rate (food: the
 //             ration; ammunition: a battle day; equipment: attrition + a battle day).
 //             At the authored half, full cover refills an empty stock at half its rate a
 //             day, and a stock drawn at its full rate breaks even at 2/3 cover (667‰).
 //             The sub-per-mille remainder is CARRIED per stock (`*_remainder`, units of
 //             1/1,000,000 of full), so a cover at break-even does not drift from rounding.
-//             The supply factor is the ONE supply quantity (the one decay rule,
-//             nation_step.cpp `run_nation_garrison_upkeep`); there is no second.
+//             The supply factor (the one decay rule, nation_step.cpp
+//             `run_nation_garrison_upkeep`) still moves readiness and morale; an unpaid
+//             wage or an unmet goods draw lowers it, but never the stocks.
+//   when      FROM THE HANDOFF (Ben, 2026-10-29): the pre-game settle keeps every stock
+//             full. The daily pass runs this step only on a LIVE day stamp
+//             (economy_system.cpp `carried_supplies_live`): the settle's quarters are
+//             stamped below `military_quarter_day_base(k_campaign_settle_ticks)` on
+//             both the app's day loop and the headless catch-up.
 //
 // The round reads the stocks, not the supply factor (`carried_attack_permille`,
 // `carried_combat_permille`): ammunition (floored at 20%) and equipment each scale

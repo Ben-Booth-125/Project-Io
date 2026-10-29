@@ -51,6 +51,7 @@
 #include <array>     // tile-metric cache (per-resource p90 slots)
 #include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
 #include <cstddef>   // std::ptrdiff_t (nth_element iterator offset)
+#include "wing_card.hpp" // BL-1450: the wing card
 #include <cstdio>    // std::snprintf (tile coord caption + chart labels)
 #include <cfloat>    // FLT_MAX (net-profit PlotLines auto-scale)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
@@ -2976,6 +2977,8 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
             return "Launches convoys into space";
         case building_type::military_base:
             return "Musters units";
+        case building_type::airbase:
+            return "Bases air wings";
         case building_type::research_institute:
         case building_type::university:
             return "Makes research points for its nation";
@@ -4293,6 +4296,10 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     // with its stack expanded. Both are dispatched before the shared header,
     // because the tile element draws none — its 'go to' is a no-op and the
     // canvas already shows the name (Ben, 2026-10-13). Every other kind keeps it.
+    // BL-1450: an air WING owns its whole card (wing_card.hpp), header included.
+    if (kind == selection_kind::wing && draw_wing_selection(w, reg, ui))
+        return;
+
     if (kind == selection_kind::tile)
     {
         draw_tile_selection(w, reg, report, ui, ui.selected_entity, null_entity);
@@ -4487,6 +4494,8 @@ std::string candidate_effect_line(const recipe_registry& reg, building_type type
             return "Launches convoys into space";
         case building_type::military_base:
             return "Musters units";
+        case building_type::airbase:
+            return "Bases air wings";
         case building_type::research_institute:
         case building_type::university:
             return "Makes research points for its nation";
@@ -4772,6 +4781,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
     cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
     cands.push_back({building_type::military_base,        resource_type::iron_ore, "Military Base"});        // BL-325 S1
+    cands.push_back({building_type::airbase,              resource_type::iron_ore, "Airbase"});              // BL-1450: the door to every wing
     cands.push_back({building_type::research_institute,   resource_type::iron_ore, "Research Institute"});   // BL-332
 
     // BL-433: drop types outside the campaign's era band, so a 0 CE player is never
@@ -4826,6 +4836,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         c.category = (c.type == building_type::extraction_site)     ? "Extraction"
                     : (c.type == building_type::processing_facility) ? "Processing"
                     : (c.type == building_type::military_base)       ? "Military"
+                    : (c.type == building_type::airbase)             ? "Military"
                     : (c.type == building_type::research_institute)  ? "Military"
                                                                       : "Infrastructure";
 

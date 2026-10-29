@@ -38,7 +38,7 @@ void stock_day(int& stock, int32_t& rem, int spend, int full_rate, int restock_p
 void stocks_after_day(const unit_component& u, const carried_supply_params& p, bool fought,
                       unit_component& out)
 {
-    const int share      = u.supply_factor_permille;
+    const int share      = u.lp_share_permille; // only the road gap starves (Ben, 2026-10-29)
     const int ammo_rate  = p.ammo_per_battle_day;
     const int equip_rate = p.equipment_attrition_per_day + p.equipment_per_battle_day;
     out.food_permille      = u.food_permille;      out.food_remainder      = u.food_remainder;

@@ -24,6 +24,8 @@
 #include "world/logistic_points.hpp" // BL-1352: the Throughput lens reads the REAL sources
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
+#include "wing_card.hpp"          // BL-1450: the wing right-click assignment
+#include "world/air_combat.hpp"     // BL-1450: wings, their airbase tile
 #include "world/stance.hpp"           // is_hostile: right-click attack vs declare (BL-1443)
 #include "world/river_generation.hpp"   // BL-1340: hex_side_for_offset — a road draws across its edge
 #include "world/survey_system.hpp"   // survey_tile_visible (region mask, BL-067)
@@ -2977,6 +2979,32 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
 
     }
+
+    // AIR WINGS (BL-1450; MILITARY.md § Air). A wing never stands on a tile: it is
+    // BASED at its airbase, so its marker draws at the airbase's tile — a round
+    // plate at the hex's upper right, clear of the land counter below the centre
+    // and the battle glyph at it. The player's own wings only: a rival's air is not
+    // on the ground to be seen. Ascending wing id per tile. Rebuilt per frame — a
+    // handful of wings, and a mission change moves nothing the stamp would see.
+    std::unordered_map<entity_id, std::vector<entity_id>> tile_wings;
+    for (const auto& [wid, wg] : w.wings)
+    {
+        if (!is_player_side(w, wg.owner))
+            continue;
+        const entity_id bt = wing_base_tile(w, wg);
+        const auto tit = w.tiles.find(bt);
+        if (tit == w.tiles.end() || tit->second.body != state.active_body)
+            continue;
+        tile_wings[bt].push_back(wid); // w.wings is ordered: ascending already
+    }
+    prune_wing_intents(w, state); // a held mission never outlives its wing, nor overrides a real one
+    state.wing.markers.clear();
+    state.wing.markers_drawn = 0;
+    // The selected wing's provinces, outlined on the ground (sorted, as saved).
+    std::vector<uint32_t> wing_assigned;
+    if (const auto sw = w.wings.find(state.selected_entity);
+        sw != w.wings.end() && is_player_side(w, sw->second.owner))
+        wing_assigned = sw->second.provinces;
 
     // Spatial index (BL-268): the per-body raster logistics already caches on
     // world.body_tile_index (grid_y*gw + grid_x -> tile entity, null_entity for an
@@ -6119,6 +6147,37 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
+            // AIR WINGS (BL-1450): the player's wings based on this tile, one round
+            // marker carrying their count. Its press selects a wing; a repeat press
+            // walks to the next wing based here, so every wing is reachable from the
+            // map. The hit zone carries the wing the press would select.
+            if ((tflags & 2u) && draw_r >= 6.0f && !tile_wings.empty())
+            {
+                if (const auto tw = tile_wings.find(id); tw != tile_wings.end() && !tw->second.empty())
+                {
+                    const std::vector<entity_id>& ws = tw->second;
+                    const float  wr   = std::max(8.0f, draw_r * 0.26f);
+                    const ImVec2 wpos { cx + draw_r * 0.48f, cy - draw_r * 0.46f };
+                    entity_id    next = ws.front();
+                    for (std::size_t wi = 0; wi < ws.size(); ++wi)
+                        if (ws[wi] == state.selected_entity)
+                            next = ws[(wi + 1) % ws.size()];
+                    const bool hovered = state.overlay == overlay_mode::none
+                                      && std::find(ws.begin(), ws.end(), state.hovered_entity) != ws.end();
+                    const bool lit = std::find(ws.begin(), ws.end(), state.selected_entity) != ws.end();
+                    icons::wing_marker(dl, wpos, wr, corp_identity(player_owner),
+                                       static_cast<int>(ws.size()), hovered || lit);
+                    marker_hit_zone hz;
+                    hz.id     = next;
+                    hz.kind   = marker_hit_zone::kind::unit; // a marker the player aimed at, ahead of the ground
+                    hz.centre = wpos;
+                    hz.radius = wr * 1.25f;
+                    state.marker_hit_zones.push_back(hz);
+                    state.wing.markers.push_back({next, wpos.x, wpos.y, static_cast<int>(ws.size())});
+                    ++state.wing.markers_drawn;
+                }
+            }
+
             pm.mark(canvas_pass_meter::markers, dl);
             // Selection outline is drawn on every visible copy of the selected
             // tile; hover is deferred to a single nearest copy, resolved below.
@@ -6169,6 +6228,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // (A province lights only when one is selected or hovered, so the
             // test is membership of THOSE two — a binary search of their sorted
             // tile lists, not a province lookup on every tile.)
+            // BL-1450: the selected wing's provinces, outlined on their outer edge,
+            // so the player sees what it flies over beside the card's list.
+            if (revealed && !wing_assigned.empty())
+            {
+                const uint32_t wp = prov_id_of();
+                if (wp != 0 && std::binary_search(wing_assigned.begin(), wing_assigned.end(), wp))
+                    for (int s = 0; s < 6; ++s)
+                    {
+                        const auto nc   = hex_neighbors::neighbour(t_col, t_row, s);
+                        const int  ncol = ((nc.gx % gw) + gw) % gw;
+                        const entity_id nid = tile_at_rc(ncol, nc.gy);
+                        if (nid != null_entity && w.provinces.province_of(nid) == wp)
+                            continue;
+                        dl->AddLine(verts[k_side_verts[s][0]], verts[k_side_verts[s][1]],
+                                    palette::air_assigned, 2.5f);
+                    }
+            }
             const bool in_sel_prov = sel_prov
                 && std::binary_search(sel_prov->tiles.begin(), sel_prov->tiles.end(), id);
             const bool in_hov_prov = !in_sel_prov && hov_prov
@@ -6307,7 +6383,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const entity_id over_marker =
             resolve_marker_hit(state.marker_hit_zones, mouse_g.x, mouse_g.y);
         const bool pointer_free = hovered_tile != null_entity
-                               && (over_marker == null_entity || w.units.count(over_marker) == 0);
+                               && (over_marker == null_entity || (w.units.count(over_marker) == 0 && w.wings.count(over_marker) == 0));
 
         // Pass 1: geometry per wrap copy, and the hover.
         struct seg { ImVec2 a, b; std::size_t front; std::size_t edge; };
@@ -7277,6 +7353,46 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         fdl->AddText({ tl.x + pad, tl.y + pad }, IM_COL32(230, 230, 235, 255), line); // fit-exempt: the card is sized to its measured text
     }
 
+    // WING ASSIGNMENT (BL-1450; military.md § Grouped by theatre). With the
+    // player's own wing selected, the hovered province says what a right-click
+    // would do: assign it on the wing's current mission (its outline in the air
+    // colour), or why the seam refuses — out of range with the distance and the
+    // wing's range, not hostile for a bombing mission, eight already assigned.
+    // `preview_wing_assign` reads `air_mission_check`, so the line cannot
+    // disagree with the press. Reads only; the press is below.
+    state.wing.hover_kind     = 0;
+    state.wing.hover_province = 0;
+    state.wing.hover_text.clear();
+    wing_assign_preview wing_preview;
+    const bool wing_orders = !state.construction.active
+                          && state.construction.road_arm_tile == null_entity
+                          && state.pending_march_unit == null_entity
+                          && state.overlay == overlay_mode::none
+                          && wing_is_players(w, state.selected_entity);
+    if (wing_orders && have_hover && hovered_tile != null_entity)
+    {
+        const uint32_t pid = w.provinces.province_of(hovered_tile);
+        wing_preview = preview_wing_assign(w, reg, state, state.selected_entity, pid);
+        state.wing.hover_kind     = wing_preview.kind;
+        state.wing.hover_province = pid;
+        state.wing.hover_text     = wing_preview.text;
+    }
+    if (wing_preview.kind != 0)
+    {
+        const ImU32 oc = wing_preview.kind == 1 ? palette::air_assigned : palette::air_refused;
+        for (int s = 0; s < 6; ++s)
+            dl->AddLine(hover_verts[s], hover_verts[(s + 1) % 6], oc, 3.0f);
+        ImDrawList*  fdl = ImGui::GetForegroundDrawList();
+        const char*  txt = wing_preview.text.c_str();
+        const ImVec2 ts  = ImGui::CalcTextSize(txt);
+        const float  pad = 4.0f;
+        const ImVec2 tl { mouse.x + 16.0f, mouse.y + 16.0f };
+        const ImVec2 br { tl.x + ts.x + pad * 2.0f, tl.y + ts.y + pad * 2.0f };
+        fdl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
+        fdl->AddRect(tl, br, oc, 3.0f, 0, 1.5f);
+        fdl->AddText({ tl.x + pad, tl.y + pad }, IM_COL32(230, 230, 235, 255), txt); // fit-exempt: the card is sized to its measured text
+    }
+
     // Building-placement ghost preview. When construction mode is active and a tile
     // is hovered, draw a translucent-intent marker of the chosen building type at the
     // hovered copy's centre, tinted green when the placement-rules seam accepts the
@@ -8084,6 +8200,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (marker_hit != null_entity)
                 if (const auto mu = w.units.find(marker_hit); mu != w.units.end())
                     unit_of_other_tile = (mu->second.position != hovered_tile);
+            // BL-1450: a wing marker is aimed at too — a press on it selects a wing,
+            // never a cycle step on the airbase tile under it.
+            if (marker_hit != null_entity && w.wings.count(marker_hit) != 0)
+                unit_of_other_tile = true;
             if (hovered_tile != null_entity && state.selection_cycle_tile == hovered_tile
                 && !unit_of_other_tile)
             {
@@ -8249,6 +8369,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             state.pending_unit_order_declare  = null_entity;
             state.pending_unit_order_attack   = (order_target.kind == 2);
         }
+    }
+
+    // The wing's right-click (BL-1450): only a press the preview named an assign
+    // queues anything; a refused one does nothing but what the hover already said.
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && wing_preview.kind == 1)
+    {
+        state.wing.pending_wing      = state.selected_entity;
+        state.wing.pending_mission   = static_cast<std::uint8_t>(wing_preview.mission);
+        state.wing.pending_provinces = wing_preview.provinces;
     }
 
     // BL-737: the camera. One squash over every map-space vertex emitted since

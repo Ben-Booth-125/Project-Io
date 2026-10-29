@@ -292,6 +292,7 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
         case building_type::military_base:        // BL-325 S1: any non-ocean land tile, no deposit — the
                                                   // reach rule still applies at the world level, and the
                                                   // base is NOT an anchor, so it earns no exemption there.
+        case building_type::airbase:              // BL-1449: as the military base — any non-ocean land tile.
         case building_type::research_institute:  // BL-332: same shape as military_base — passive,
                                                   // no deposit needed, any non-ocean land tile.
         case building_type::none:
