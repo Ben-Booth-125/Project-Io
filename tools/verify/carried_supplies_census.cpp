@@ -1,11 +1,13 @@
 // carried_supplies_census.cpp — BL-1452 (carried supplies). A MEASUREMENT, not a gate:
-// on a generated campaign world (the app's start, its settle, then live quarters as
-// market_viability steps them), what the units' supply factors and carried stocks do.
+// on a generated campaign world (the app's start, its 12-tick settle, then live quarters
+// as market_viability steps them), what the units' supply factors and carried stocks do.
 //
 // Per Ben's ruling (2026-10-29: a garrison past its roads is unfed even at home), it
-// counts HOME GARRISONS — units standing on their own nation's ground — that reach
-// zero food at a tick end, and how many of those then starve to death inside the
-// window (gone from the world after being seen at zero food and not in a battle).
+// counts HOME GARRISONS — units standing on their own nation's ground — that reach zero
+// food at a tick end, and how many of those then STARVE TO DEATH: gone from the world
+// after being seen at zero food and not in a battle at that tick end (a unit that was
+// starving and then died in a battle it entered later is still counted — an upper
+// bound). The settle and the 50-tick window (market_viability's) are counted apart.
 //
 //   build_gen/verify/carried_supplies_census.exe [--seed N] [--ticks T]
 //
@@ -18,12 +20,13 @@
 #include "world/campaign_settle.hpp"
 #include "world/carried_supplies.hpp"
 #include "world/components.hpp"
+#include "world/economy_system.hpp"
+#include "world/nation_budget.hpp"
 #include "world/world.hpp"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include <map>
 #include <memory>
 #include <set>
 
@@ -62,6 +65,75 @@ void census(const world& w, const char* when)
                 starving, food / n, ammo / n, equip / n);
 }
 
+/// Which trigger holds the units under cover: their tile's Logistic Point share, or a
+/// garrison bill the nation's military line does not pay (no weight on it, or no money).
+void triggers(const world& w, const lp_tick& lp, int tick)
+{
+    int lp_known = 0, lp_short = 0, lp_below = 0, unpaid_line = 0, under = 0;
+    for (const auto& [uid, u] : w.units)
+    {
+        if (u.count <= 0) continue;
+        under += u.supply_factor_permille < 1000 ? 1 : 0;
+        if (const auto it = lp.supply_share.find(uid); lp.resolved && it != lp.supply_share.end())
+        {
+            ++lp_known;
+            lp_short += it->second < 1000 ? 1 : 0;
+            lp_below += it->second < 667 ? 1 : 0;
+        }
+        const auto nit = w.nations.find(u.owner);
+        const auto bit = w.nation_budgets.find(u.owner);
+        const std::size_t mi = static_cast<std::size_t>(budget_priority::military_research);
+        const bool line = nit != w.nations.end() && nit->second.treasury > 0.0f
+                       && bit != w.nation_budgets.end() && bit->second.weights[mi] > 0.0f;
+        unpaid_line += line ? 0 : 1;
+    }
+    std::printf("  triggers settle t%-2d: under full cover %3d | LP share known %3d, <1000 %3d, <667 %3d | "
+                "owner with no paid military line %3d\n", tick, under, lp_known, lp_short, lp_below,
+                unpaid_line);
+}
+
+/// Zero-food and starved-to-death tracking over one phase.
+struct tracker
+{
+    std::set<entity_id> home_zero, any_zero, starved_home, starved_any, watch, watch_home;
+
+    void observe(const world& w)
+    {
+        for (auto it = watch.begin(); it != watch.end();)
+        {
+            if (w.units.count(*it) == 0)
+            {
+                starved_any.insert(*it);
+                if (watch_home.count(*it)) starved_home.insert(*it);
+                it = watch.erase(it);
+            }
+            else
+                ++it;
+        }
+        const std::set<entity_id> fighting = units_in_live_battles(w);
+        for (const auto& [uid, u] : w.units)
+        {
+            if (u.count <= 0 || !unit_starving(u)) continue;
+            any_zero.insert(uid);
+            const bool home = at_home(w, u);
+            if (home) home_zero.insert(uid);
+            if (fighting.count(uid) == 0)
+            {
+                watch.insert(uid);
+                if (home) watch_home.insert(uid);
+            }
+        }
+    }
+
+    void print(std::uint32_t seed, const char* phase) const
+    {
+        std::printf("  STARVATION seed %u %-7s: home garrisons at zero food %3zu (any unit %3zu); "
+                    "starved to death: home %3zu (any %3zu)\n",
+                    seed, phase, home_zero.size(), any_zero.size(), starved_home.size(),
+                    starved_any.size());
+    }
+};
+
 } // namespace
 
 int main(int argc, char** argv)
@@ -82,12 +154,27 @@ int main(int argc, char** argv)
     build_app_start_world(lua, p, *start);
     world& w = start->w;
     census(w, "start");
-    run_app_validation_settle(w, start->reg);
+
+    // The settle, a tick at a time, as run_app_validation_settle steps it.
+    tracker settle;
+    for (int step = 0; step < k_app_validation_ticks; ++step)
+    {
+        const settle_tick_result res = run_settle_tick(w, start->reg, step, /*day_tick=*/0,
+                                                       /*spectating=*/true);
+        settle.observe(w);
+        if (step == 3) census(w, "settle4");
+        if (step == 3 || step == k_app_validation_ticks - 1)
+            triggers(w, res.report.logistic_points, step + 1);
+    }
+    clear_research_at_handover(w);
     census(w, "handoff");
 
-    // The live window, a tick at a time, exactly as run_app_live_window steps it.
-    std::set<entity_id> home_zero_food, any_zero_food, starved_home, starved_any;
-    std::map<entity_id, bool> seen_zero; // unit -> seen at zero food, not in a battle
+    // The live window, a tick at a time, exactly as run_app_live_window steps it. The
+    // watch carries over: a unit starving at the handoff that dies in the window
+    // counts in the window.
+    tracker live;
+    live.watch      = settle.watch;
+    live.watch_home = settle.watch_home;
     for (int k = 1; k <= ticks; ++k)
     {
         const int day = k * 90;
@@ -95,34 +182,15 @@ int main(int argc, char** argv)
         advance_surveys(w, 90);
         w.current_day_tick = day;
         (void)run_settle_tick(w, start->reg, k_app_validation_ticks + (k - 1), day, /*spectating=*/false);
-
-        for (auto it = seen_zero.begin(); it != seen_zero.end(); ++it)
-            if (w.units.count(it->first) == 0)
-            {
-                starved_any.insert(it->first);
-                if (home_zero_food.count(it->first)) starved_home.insert(it->first);
-            }
-        for (const entity_id g : starved_any) seen_zero.erase(g);
-
-        const std::set<entity_id> fighting = units_in_live_battles(w);
-        for (const auto& [uid, u] : w.units)
-        {
-            if (u.count <= 0 || !unit_starving(u)) continue;
-            any_zero_food.insert(uid);
-            if (at_home(w, u)) home_zero_food.insert(uid);
-            if (fighting.count(uid) == 0) seen_zero[uid] = true;
-            else seen_zero.erase(uid);
-        }
-        if (k == 10 || k == 25 || k == ticks)
+        live.observe(w);
+        if (k == 10 || k == ticks)
         {
             char label[16];
             std::snprintf(label, sizeof(label), "t%d", k);
             census(w, label);
         }
     }
-    std::printf("  STARVATION seed %u: home garrisons at zero food %zu (any unit %zu); "
-                "starved to death in the window: home %zu (any %zu)\n",
-                seed, home_zero_food.size(), any_zero_food.size(), starved_home.size(),
-                starved_any.size());
+    settle.print(seed, "settle");
+    live.print(seed, "t1-t50");
     return 0;
 }
