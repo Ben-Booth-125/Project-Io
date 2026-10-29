@@ -199,7 +199,10 @@ else
     end
 end
 
--- 7. A pick drafts; Save commits.
+-- 7. A pick drafts; Save commits. The kit-lock waive is process-global, so the
+--    whole section runs under pcall and the waive is turned off whatever happens
+--    (the batch runner also clears it before every script).
+local function section7()
 verify.waive_kit_research(true)
 local function open_ledger_design()
     if not verify.military_ledger().open then
@@ -217,7 +220,7 @@ local function box_of(dd, slot)
     for _, b in ipairs(dd.boxes) do if b.slot == slot then return b end end
     return nil
 end
-local function open_armour_slot0()
+local function open_armour_slot(n)
     open_ledger_design()
     if not verify.unit_designer().open then
         local r = class_row(ARMOUR)
@@ -225,12 +228,17 @@ local function open_armour_slot0()
         settle()
     end
     local dd = verify.unit_designer()
-    if dd.slot_open ~= 0 then
-        local b = box_of(dd, 0)
+    if dd.slot_open ~= n then
+        local b = box_of(dd, n)
         verify.click(b.x, b.y)
         settle()
     end
     return verify.unit_designer()
+end
+local function open_armour_slot0() return open_armour_slot(0) end
+local function item_named(dd, name)
+    for _, i in ipairs(dd.items) do if i.name == name then return i end end
+    return nil
 end
 local function live_pick(dd)
     for _, i in ipairs(dd.items) do
@@ -342,7 +350,72 @@ else
     verify.click(class_row(ARMOUR).x, class_row(ARMOUR).y)
     settle()
     if not verify.unit_designer().open then ok("with no draft the class press closes at once") else fail("clean close was blocked") end
+
+    -- 7g. A prompt Save the seam partly refuses stays open on the refused slot.
+    --     Save a non-base Armour (slot 1); then draft it back to base (always
+    --     researched) and a non-base Armament (slot 0); lift the waive so slot 0
+    --     is locked again; close; Save from the prompt.
+    d = open_armour_slot(1)
+    local base1 = box_of(d, 1).live
+    local pick1 = live_pick(d)
+    verify.click(pick1.x, pick1.y)
+    settle()
+    d = verify.unit_designer()
+    verify.click(d.save_x, d.save_y)
+    settle()
+    d = open_armour_slot(1)
+    if box_of(d, 1).live ~= pick1.name then fail("staging: slot 1 did not save '" .. pick1.name .. "'") end
+    local back1 = item_named(d, base1)
+    verify.click(back1.x, back1.y)
+    settle()
+    d = open_armour_slot(0)
+    local pick0 = live_pick(d)
+    verify.click(pick0.x, pick0.y)
+    settle()
+    d = verify.unit_designer()
+    if d.changed_slots ~= 2 then fail("staging: expected 2 changed slots, got " .. d.changed_slots) end
+    verify.waive_kit_research(false)
+    verify.click(class_row(ARMOUR).x, class_row(ARMOUR).y)
+    settle()
+    d = verify.unit_designer()
+    if not d.confirm_close then fail("staging: the class press did not raise the prompt") end
+    verify.click(d.prompt_save_x, d.prompt_save_y)
+    settle()
+    d = show("partly refused")
+    local b0, b1 = box_of(d, 0), box_of(d, 1)
+    if d.open and not d.confirm_close and d.changed_slots == 1 and b0.changed and b0.fitted == pick0.name
+        and b1.live == base1 and not b1.changed and string.find(d.message, "Saved 1 of 2", 1, true) then
+        ok("a partly refused prompt Save stays open on the refused slot: " .. d.message)
+    else
+        fail(string.format("partly refused Save: open=%s confirm=%s changed=%d slot0 '%s' changed=%s slot1 live '%s' msg '%s'",
+            tostring(d.open), tostring(d.confirm_close), d.changed_slots, b0.fitted, tostring(b0.changed), b1.live, d.message))
+    end
+    verify.capture("unit_designer_save_refused")
+    verify.waive_kit_research(true)
+    verify.click(d.revert_x, d.revert_y)
+    settle()
+
+    -- 7h. A load drops the draft: a draft from another world is never offered.
+    d = open_armour_slot(0)
+    pick0 = live_pick(d)
+    verify.click(pick0.x, pick0.y)
+    settle()
+    if verify.unit_designer().changed_slots ~= 1 then fail("staging: the pre-load draft did not take") end
+    if not verify.save("unit_designer_reset.iosave") then fail("staging: save failed") end
+    if not verify.load("unit_designer_reset.iosave") then fail("staging: load failed") end
+    settle()
+    d = verify.unit_designer()
+    if d.changed_slots == 0 and not d.confirm_close then ok("a load drops the draft (open=" .. tostring(d.open) .. ")") else
+        fail("after load: changed_slots=" .. d.changed_slots .. " confirm=" .. tostring(d.confirm_close)) end
+    if d.open then
+        verify.click(class_row(ARMOUR).x, class_row(ARMOUR).y)
+        settle()
+        if verify.unit_designer().open then fail("after load the clean designer did not close") end
+    end
 end
+end
+local ok7, err7 = pcall(section7)
 verify.waive_kit_research(false)
+if not ok7 then fail("section 7 raised: " .. tostring(err7)) end
 
 print(string.format("unit_designer: done, %d failure(s)", fails))

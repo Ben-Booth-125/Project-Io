@@ -1850,6 +1850,7 @@ void app::finish_new_game()
     }
 
     open_play_log(std::string());
+    ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
     m_screen = app_screen::in_game;
 }
 
@@ -2496,6 +2497,7 @@ bool app::load_game_from(const std::string& path)
     // Selection state that indexes into the replaced world.
     m_ui.clear_battle_selection();
     m_ui.clear_front_selection();
+    ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
 
     m_screen = app_screen::in_game;
     open_play_log(path);
@@ -3361,7 +3363,10 @@ void app::render()
             cmd.recipe    = static_cast<uint16_t>(p.slot);
             cmd.unit_type = p.item;
             ++sent;
-            switch (player_command(cmd))
+            const corp_command_result r = player_command(cmd);
+            if (r != corp_command_result::applied)
+                m_ui.designer.refused.push_back(p); // back into the draft next draw
+            switch (r)
             {
                 case corp_command_result::applied:              ++applied; break;
                 case corp_command_result::rejected_tech_locked: if (why.empty()) why = "not researched yet"; break;
@@ -3375,6 +3380,7 @@ void app::render()
             m_ui.designer.last_message = "Saved " + std::to_string(applied) + " of " + std::to_string(sent)
                                        + " changes; the rest were refused: " + why + ".";
         m_ui.designer.pending.clear(); // consume the request
+        m_ui.designer.save_answered = true;
     }
 
     // Refit to a newer type (Ben, 2026-10-27): the unit card's Refit menu, through the

@@ -36,6 +36,11 @@ void draw_unit_designer(const world& w, ui_state& s);
 /// class row in the Military ledger's Design tab, and the type name on a unit card.
 void toggle_unit_designer(ui_state& s, land_class c);
 
+/// Drop the designer's draft, its close prompt and any queued or answered Save:
+/// called when the world is replaced (a load, a new campaign), so a draft from
+/// another world is never offered.
+void reset_unit_designer(ui_state& s);
+
 /// Whether the designer is open on @p c.
 bool unit_designer_open_on(const ui_state& s, land_class c);
 

@@ -115,7 +115,6 @@ std::string refusal_text(corp_command_result r, const kit_item& it)
         case corp_command_result::applied:             return {};
         case corp_command_result::rejected_tech_locked: return "Locked: needs research " + node_text(it.research_node);
         case corp_command_result::rejected_state:      return "Already fitted";
-        case corp_command_result::rejected_not_owner:  return "Only your own nation's design can be changed";
         default:                                       return "Does not fit this slot";
     }
 }
@@ -212,7 +211,7 @@ void save_draft(const world& w, unit_designer_state& d, entity_id nation)
     clear_draft(d);
 }
 
-/// Answer the close prompt: carry the interrupted close to where it was going.
+/// Carry the interrupted close to where it was going.
 void finish_close(ui_state& s)
 {
     unit_designer_state& d = s.designer;
@@ -224,6 +223,22 @@ void finish_close(ui_state& s)
 }
 
 } // namespace
+
+void reset_unit_designer(ui_state& s)
+{
+    unit_designer_state& d = s.designer;
+    clear_draft(d);
+    d.confirm_close    = false;
+    d.after_surface    = detail_surface::none;
+    d.after_key        = 0;
+    d.pending.clear();
+    d.refused.clear();
+    d.save_answered    = false;
+    d.close_after_save = false;
+    d.last_message.clear();
+    d.slot_open = -1;
+    d.open_cls  = -1;
+}
 
 void draw_unit_designer(const world& w, ui_state& s)
 {
@@ -240,6 +255,29 @@ void draw_unit_designer(const world& w, ui_state& s)
 
     const entity_id nation = player_nation(w);
 
+    // THE SAVE'S ANSWER (app::render sent `pending` after the last draw). Refused
+    // picks go back into the draft, so the Save row shows them still changed with
+    // the seam's message beside them; a prompt Save closes only when all landed.
+    if (d.save_answered)
+    {
+        d.save_answered = false;
+        if (!d.refused.empty())
+        {
+            clear_draft(d);
+            d.draft_cls = d.refused.front().cls;
+            for (const auto& r : d.refused)
+                if (r.cls == d.draft_cls && r.slot >= 0 && r.slot < static_cast<int>(k_kit_slot_max))
+                    d.draft[static_cast<std::size_t>(r.slot)] = r.item;
+            d.refused.clear();
+            d.close_after_save = false; // stay open on what was refused
+        }
+        else if (d.close_after_save)
+        {
+            d.close_after_save = false;
+            finish_close(s);
+        }
+    }
+
     // THE CLOSE CATCH. Every close path — the toggle press (toggle_unit_designer),
     // the return control (fold_overlay_begin), Escape (app.cpp's rung), a press
     // opening another takeover — ends in `fold` or `expand` on `ui_state::expanded`,
@@ -247,12 +285,21 @@ void draw_unit_designer(const world& w, ui_state& s)
     // without each knowing about drafts: if the draft has unsaved changes and the
     // takeover is no longer the draft's class, put the designer back, remember
     // where the close was going, and ask.
+    //
+    // A close drawn by a surface that draws BEFORE this one (another takeover's
+    // opening press) shows that surface for one frame before the catch puts the
+    // designer back. Accepted: one frame, and only with an unsaved draft.
     if (d.draft_cls >= 0 && !is_expanded(s, detail_surface::unit_designer, d.draft_cls))
     {
         if (unit_designer_changed_slots(w, s, nation) > 0)
         {
-            d.after_surface = s.expanded.surface;
-            d.after_key     = s.expanded.key;
+            // A second close over an open prompt (Escape again, the class press)
+            // keeps the FIRST close's destination.
+            if (!d.confirm_close)
+            {
+                d.after_surface = s.expanded.surface;
+                d.after_key     = s.expanded.key;
+            }
             d.confirm_close = true;
             s.expanded.surface = detail_surface::unit_designer;
             s.expanded.key     = d.draft_cls;
@@ -663,8 +710,16 @@ void draw_unit_designer(const world& w, ui_state& s)
         ImGui::EndDisabled();
         ImGui::SameLine();
         if (d.changed_slots > 0)
+        {
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::pinned), "%d slot%s changed, not saved.",
                                d.changed_slots, d.changed_slots == 1 ? "" : "s");
+            // A partly refused Save leaves its refused slots changed: say why beside them.
+            if (!d.last_message.empty())
+            {
+                ImGui::SameLine();
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", d.last_message.c_str());
+            }
+        }
         else if (!d.last_message.empty())
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", d.last_message.c_str());
         else
@@ -708,8 +763,13 @@ void draw_unit_designer(const world& w, ui_state& s)
     // another takeover); Keep editing stays.
     if (answer == 1)
     {
+        // The close waits for the seam's answer (next draw): it goes on only if
+        // every pick landed, else the designer stays open on the refused ones.
         save_draft(w, d, nation);
-        finish_close(s);
+        d.confirm_close    = false;
+        d.close_after_save = true;
+        if (d.pending.empty())
+            finish_close(s); // nothing to send (the draft matched the live design)
     }
     else if (answer == 2)
     {

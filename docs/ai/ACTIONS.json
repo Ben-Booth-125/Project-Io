@@ -2859,7 +2859,7 @@
    "id": "ledger.military_open_designer",
    "family": "ledger",
    "surface": "Military ledger (nav rail slot 7), Design tab: a land class row (Infantry, Motorised infantry, Mechanised infantry, Armour, Light armour, Artillery, Air defence), its name a press with its live design's numbers under it.",
-   "press": "Click the class name. Clicking the lit row of the class the designer is open on closes it (the toggle rule); clicking another class switches the designer to it.",
+   "press": "Click the class name. Clicking the lit row of the class the designer is open on closes it (the toggle rule); clicking another class switches the designer to it. Either one, while a slot's draft is unsaved, keeps the designer on its class and asks Save or Discard first (canvas.designer_save); the switch or close goes on once answered.",
    "args": [
     {
      "name": "class",
@@ -2914,7 +2914,7 @@
     "Save design and Revert are live only while at least one slot's draft differs from the live design, and not while the prompt is up.",
     "The prompt's buttons exist only while the prompt is up."
    ],
-   "expected_output": "Save issues gameplay.set_unit_design {order = class, recipe = slot, unit_type = item} once per changed slot at the frame's end through the player's seat, then drops the draft: the saved design is the class's live design at once (new hires are raised with it and buy its kit goods; units in the field keep their recorded design until refitted - gameplay.refit_unit to their own row). The designer then shows 'Saved: new units are raised with this design.', or 'Saved N of M changes; the rest were refused: <reason>.' Revert and Discard issue nothing; the boxes return to the live design. The prompt's Save and Discard carry the interrupted close on to where it was going (the ledger or card the designer was opened from, or the other view).",
+   "expected_output": "Save issues gameplay.set_unit_design {order = class, recipe = slot, unit_type = item} once per changed slot at the frame's end through the player's seat, then drops the draft: the saved design is the class's live design at once (new hires are raised with it and buy its kit goods; units in the field keep their recorded design until refitted - gameplay.refit_unit to their own row). The designer then shows 'Saved: new units are raised with this design.', or 'Saved N of M changes; the rest were refused: <reason>.' Revert and Discard issue nothing; the boxes return to the live design. A refused slot stays in the draft, still marked Changed, with the message beside the Save row. The prompt's Discard, and its Save once every slot landed, carry the interrupted close on to where it was going (the ledger or card the designer was opened from, or the other view). A prompt Save with any refusal keeps the designer open on the refused slots.",
    "reason_to_select": "Save once the draft is the design you want new hires raised to; Revert to abandon it."
   },
   {

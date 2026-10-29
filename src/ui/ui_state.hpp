@@ -395,6 +395,14 @@ struct unit_designer_state
     /// per changed slot (the seam is per slot).
     struct pending_pick { int cls = -1; int slot = 0; std::uint16_t item = 0; };
     std::vector<pending_pick> pending;
+    /// The seam's answer to the last Save, written by app::render after sending
+    /// `pending`: `save_answered` is set, and `refused` holds the picks it refused.
+    /// The next draw puts the refused picks back in the draft, so a refusal is
+    /// never lost — and a prompt Save (`close_after_save`) closes only when every
+    /// pick landed.
+    bool                      save_answered    = false;
+    bool                      close_after_save = false;
+    std::vector<pending_pick> refused;
     std::string   last_message;      ///< The seam's answer to the last Save (app writes it).
 
     // Published each frame the designer draws; x < 0 = absent.

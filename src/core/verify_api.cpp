@@ -7735,6 +7735,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         m_screen = app_screen::in_game;
         reset_verify_transients();
+        set_kit_research_waived_for_harness(false); // a script's waive never outlives it
         ui::clear_overflows();
 
         // Goldens live in a "golden" directory beside each verify script, so
