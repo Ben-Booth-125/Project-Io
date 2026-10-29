@@ -670,6 +670,10 @@
    "The unit designer (full canvas): a slot's box, and the item list it opens beside it."
   ],
   [
+   "canvas.designer_save",
+   "The unit designer (full canvas): the Save design and Revert buttons under the summary, and the close prompt ('Unsaved changes to the <class> design' - Save / Discard / Keep editing) that a close with an unsaved draft raises."
+  ],
+  [
    "ledger.selection_unit_type_designer",
    "Selection band, the unit card's Roster page (the card's second page): the unit type's name under 'Type', for the player's own unit."
   ],
