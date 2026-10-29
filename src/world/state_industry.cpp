@@ -468,7 +468,10 @@ float gate_walk_buildings(W& w, const recipe_registry& reg, const nation_compone
             lp_network net;
             if (lp_source_network(bit->second.type, net) != nodes)
                 continue;
-            const float bound = gate_bound(w, reg, bit->second);
+            // THE CAPITAL'S SOURCE RUNS FREE (Ben, 2026-10-29; LOGISTICS.md § Every capital
+            // holds a source): its bound is 0, so it always fits, the gate never idles it,
+            // and `state_first_tick_bill` counts it at 0.
+            const float bound = capital_free_source(w, bid) ? 0.0f : gate_bound(w, reg, bit->second);
             const bool  fits  = std::isfinite(bound) && bound <= left;
             if (fits)
                 left -= bound;
@@ -670,7 +673,45 @@ float state_uncommitted_treasury(const world& w, entity_id nation)
     float committed = 0.0f;
     if (const auto lit = w.state_ledger.find(nation); lit != w.state_ledger.end())
         committed = lit->second.committed;
-    return std::max(0.0f, nit->second.treasury - committed);
+    const float free = std::max(0.0f, nit->second.treasury - committed);
+    // BL-1452 (Ben, 2026-10-29): IN THE SETTLE A NATION BUILDS ONLY FROM SURPLUS - what
+    // it has gained since the settle began, never the chest it opened on.
+    if (w.settle_build_gate)
+    {
+        const auto cit = w.settle_chest.find(nation);
+        const float chest = cit != w.settle_chest.end() ? cit->second : nit->second.treasury;
+        return std::min(free, std::max(0.0f, nit->second.treasury - chest));
+    }
+    return free;
+}
+
+bool capital_free_source(const world& w, entity_id building)
+{
+    // The ONE source standing on its nation's capital: the lowest-id network node on
+    // the capital tile among the nation's own buildings.
+    const auto bit = w.buildings.find(building);
+    if (bit == w.buildings.end())
+        return false;
+    lp_network net;
+    if (!lp_source_network(bit->second.type, net))
+        return false;
+    const auto own = w.tile_to_nation.find(bit->second.tile);
+    if (own == w.tile_to_nation.end())
+        return false;
+    const auto nit = w.nations.find(own->second);
+    if (nit == w.nations.end() || nit->second.capital_tile != bit->second.tile)
+        return false;
+    entity_id lowest = null_entity;
+    for (const entity_id bid : nit->second.state_assets)
+    {
+        const auto it = w.buildings.find(bid);
+        if (it == w.buildings.end() || it->second.tile != bit->second.tile
+            || !lp_source_network(it->second.type, net))
+            continue;
+        if (lowest == null_entity || bid < lowest)
+            lowest = bid;
+    }
+    return lowest == building;
 }
 
 // ---------------------------------------------------------------------------
@@ -812,24 +853,13 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
             continue;
         ++rep.nations_short;
 
-        float left = chest / ticks - pay; // a tick's allowance once the army is paid
-        const auto always = [&](const building_component& b) {
-            lp_network net;
-            return b.tile == nc.capital_tile && lp_source_network(b.type, net);
-        };
-        for (const entity_id bid : nc.state_assets) // 1: it stands, and its cost comes first
-        {
-            const auto bit = w.buildings.find(bid);
-            if (bit != w.buildings.end() && always(bit->second))
-            {
-                const float bound = gate_bound(w, reg, bit->second);
-                if (std::isfinite(bound)) left -= bound;
-            }
-        }
+        // A tick's allowance once the army is paid. The capital's source stands first and
+        // runs free (capital_free_source), so it reserves nothing.
+        float left = chest / ticks - pay;
         std::vector<entity_id> cut;
         (void)gate_walk_buildings(w, reg, nc, std::numeric_limits<float>::infinity(),
             [&](entity_id bid, const building_component& b, float bound, bool) {
-                if (always(b))
+                if (capital_free_source(w, bid))
                     return;
                 if (std::isfinite(bound) && bound <= left)
                 {

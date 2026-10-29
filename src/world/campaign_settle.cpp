@@ -41,6 +41,20 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // every harness certifies.
     w.current_econ_tick = econ_step;
 
+    // BL-1452 (Ben, 2026-10-29; AI_OPPONENT.md § 11): THE SETTLE BUILDS ONLY FROM SURPLUS.
+    // On the settle's steps (0..11) every nation's spendable money is capped at what it
+    // has gained since the settle began (`state_uncommitted_treasury`); the chest each
+    // nation opened the settle on is recorded on its first settle step. Lowered, and the
+    // record dropped, on every live step.
+    w.settle_build_gate = econ_step < k_campaign_settle_ticks;
+    if (w.settle_build_gate)
+    {
+        for (const auto& [nid, nc] : w.nations)
+            w.settle_chest.emplace(nid, nc.treasury); // first sight only: emplace never overwrites
+    }
+    else
+        w.settle_chest.clear();
+
     // BL-597: one shared passive/active Logistic Point pool for this tick --
     // handed to both dispatch_convoys (passive) and run_economy_step's march
     // pass (active) so the two genuinely contend for one anchor's capacity,
@@ -108,6 +122,12 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // sees the posted world. A no-op on a world with no generation record (a load).
     if (econ_step == k_campaign_settle_ticks - 1 && !w.gen_garrisons.empty())
         print_garrison_repost(repost_garrisons_on_cover(w));
+    // The settle ends here: from the handoff every nation spends its whole treasury again.
+    if (econ_step == k_campaign_settle_ticks - 1)
+    {
+        w.settle_build_gate = false;
+        w.settle_chest.clear();
+    }
     lap_done(5); // standings + exits (+ the handoff's garrison posts)
 
     return out;

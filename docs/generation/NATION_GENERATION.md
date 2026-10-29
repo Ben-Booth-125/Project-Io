@@ -650,8 +650,12 @@ A nation still short of sixteen ticks of its running bill once the foundings' re
 not open with a state it cannot run: generation sizes its opening state to what its chest can run
 for sixteen ticks — the garrison wage and the state bill together — standing the capital's source
 first and the rest in the order the funding gate pays them, and leaving unbuilt whatever the chest
-cannot carry. Nothing is minted; the nation is smaller, not richer. So no capital starts dark: the
-settle drains no capital source idle. No nation, the player's or a
+cannot carry. Nothing is minted; the nation is smaller, not richer. **Military bases are cut like any
+building (Ben, 2026-10-29)**, in the gate's order; a garrison whose base is cut keeps its men and
+stands with no recorded base. The capital's source costs nothing to run (`../economy/LOGISTICS.md`
+§ Every capital holds a source), so even a nation with an empty chest opens with its capital lit.
+**The settle builds only from surplus (Ben, 2026-10-29):** a nation's scorer in the settle may build
+only from income above its running bill, so it never spends the chest the cut sized. No nation, the player's or a
 rival's, takes on debt before the game starts. How much
 more, and through which earnings, is settled by measurement (BL-1298) against these rulings
 (Ben, 2026-10-11):

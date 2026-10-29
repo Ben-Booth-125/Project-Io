@@ -583,6 +583,16 @@ struct world
     };
     std::vector<generated_garrison> gen_garrisons;
 
+    /// BL-1452 (Ben, 2026-10-29: "the settle builds only from surplus"; AI_OPPONENT.md
+    /// § 11): while `settle_build_gate` is up - raised by `run_settle_tick` on the
+    /// settle's econ steps 0..11 and lowered on every live one - a nation's spendable
+    /// money (`state_uncommitted_treasury`) is capped at what it has GAINED since the
+    /// settle began, max(0, treasury - `settle_chest`): its income above its running bill
+    /// (garrison wage and state bill), net of what it already built. Never its chest.
+    /// TRANSIENT: not serialised, not hashed; a world is never saved mid-settle.
+    bool                      settle_build_gate = false;
+    std::map<entity_id, float> settle_chest;
+
     /// BL-1042 — the carved centres that were NEVER founded, in carve order,
     /// with why. Their slots' share of a region's points is counted unspent
     /// under its own reason rather than spread over the region's founded

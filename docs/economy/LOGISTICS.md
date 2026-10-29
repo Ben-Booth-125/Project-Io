@@ -855,8 +855,10 @@ Three things follow, and each is a check rather than a preference:
 
 - **Every capital holds a source.** A nation whose capital makes no points has no centre for its
   chain to be anchored to (§ How a tile's points get to it), so a capital with no source is a
-  generation defect, not a poor nation. The one exception is a source that stands but cannot be paid
-  for: a nation too poor to fund it is reported as dark, not failed (Ben, 2026-10-22).
+  generation defect, not a poor nation. **The capital's source runs free (Ben, 2026-10-29,
+  overturning the 2026-10-22 dark exception):** the one source standing on a nation's capital carries
+  no upkeep bill and the funding gate never idles it, so a capital is never dark however poor its
+  nation. Every other source, a second hub stacked on the capital included, is billed as before.
 - **The capital is the peak of its own nation's field.** No other tile of that nation may hold more
   points than its capital at generation. A later build may overtake it — that is the player's doing
   and is allowed — but the world does not start that way.

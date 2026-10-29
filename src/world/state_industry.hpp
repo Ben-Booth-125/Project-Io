@@ -176,6 +176,14 @@ float state_building_cost_bound(const world& w, const recipe_registry& reg,
 /// `run_economy_step`, before anything this tick charges an owner.
 void plan_state_funding(world& w, const recipe_registry& reg);
 
+/// THE CAPITAL'S SOURCE RUNS FREE (Ben, 2026-10-29; LOGISTICS.md § Every capital holds a
+/// source): is @p building the ONE source standing on its nation's capital - the
+/// lowest-id network node (hub, station, port) of that nation on the capital tile? It
+/// carries no upkeep bill: the funding gate bounds it at 0 and never idles it,
+/// `apply_budget` charges it no maintenance or wages, and it draws no upkeep goods.
+/// Every other source, a second hub stacked on the capital included, is billed as before.
+bool capital_free_source(const world& w, entity_id building);
+
 /// What @p nation's treasury may spend on a command right now: the treasury
 /// less what this tick's funded state buildings are committed to. Never
 /// negative.

@@ -23,7 +23,9 @@
 //   S11 the quiet world: a fed world at peace costs no daily churn;
 //   S12 the settle keeps every stock full: a settle-stamped day moves none;
 //   S13 only the road gap starves: an unpaid unit on covered ground keeps its stocks
-//       full while its supply factor (and so its morale) falls.
+//       full while its supply factor (and so its morale) falls;
+//   S14 the ground wears kit (BL-1455's hook): light armour on dunes (authored wear 1.5)
+//       drains its equipment half again as fast as on plains.
 //
 // Build: bash tools/verify/build_lua_harness.sh carried_supplies_harness. Run from the
 // repo root.
@@ -662,6 +664,29 @@ int main()
         check(u.food_permille == 1000 && u.ammo_permille == 1000 && u.equipment_permille == 1000
                   && u.morale_permille < 1000,
               "S13 an unpaid unit on covered ground stays fed; its morale falls through the supply factor");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nS14 - the ground wears kit (BL-1455: unit_terrain_effects(...).wear)\n");
+    {
+        const uint16_t la = static_cast<uint16_t>(modern_row_for(land_class::light_armour));
+        const auto equip_after = [&](terrain_cover cover, float& wear_out) {
+            camp c;
+            build_camp(c, 0);
+            c.w.units.at(c.u).type = la;
+            c.w.tiles.at(c.w.units.at(c.u).position).cover = cover;
+            wear_out = unit_terrain_effects(c.w, reg.military(), c.w.units.at(c.u)).wear;
+            for (int day = 1; day <= 10; ++day) (void)run_military_day(c.w, reg, k_live + day);
+            return c.w.units.at(c.u).equipment_permille;
+        };
+        float wear_dunes = 0.0f, wear_plain = 0.0f;
+        const int dunes = equip_after(terrain_cover::dunes, wear_dunes);
+        const int plain = equip_after(terrain_cover::grass, wear_plain);
+        std::printf("      light armour, no cover, 10 days: equipment %d on grass (wear %.2f), %d on dunes (wear %.2f)\n",
+                    plain, static_cast<double>(wear_plain), dunes, static_cast<double>(wear_dunes));
+        check(wear_dunes > 1.0f && wear_plain == 1.0f
+                  && 1000 - dunes == (1000 - plain) * 3 / 2,
+              "S14 on dunes the equipment drain is x1.5 the plains drain (15 against 10 over ten days)");
     }
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
