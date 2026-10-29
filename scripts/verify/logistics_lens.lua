@@ -46,8 +46,23 @@ end
 -- A REAL SOURCE, not the largest city (BL-1352). The disc is drawn where points are
 -- MADE, so the frame has to land on a hub, station or port; a city draws nothing now,
 -- and a capture aimed at one would show bare ground whether the lens worked or not.
+--
+-- THE CHAIN'S ROOT IS STAGED FIRST. Only a source chained to the capital adds to the
+-- pool (NR-1057; LOGISTICS.md § The chain is laid outward from the capital), and the
+-- campaign's sources are seeded by `finish_campaign_world` (seed_logistics_sources) -
+-- a step the --verify world's builder never runs. Without this the world's one source
+-- is a port no road ties to the capital, the pool is empty, and T4-T7 read 0 whatever
+-- the lens does. A hub ON the capital is what the seeding stands first ("the capital
+-- first"), staged as logistics_chain_fixture stages its root; it is the source framed.
 local sx, sy, stype = nil, nil, nil
+local cs = verify.capital_stars()
+if cs.has_capital and cs.body == home_body
+   and verify.stage_building(cs.x, cs.y, "logistics_hub") ~= 0 then
+  sx, sy, stype = cs.x, cs.y, "Inland Logistics Hub"
+  print("[logistics_lens] staged the chain's root: a logistics hub on the capital")
+end
 for _, b in ipairs(verify.buildings()) do
+  if sx then break end
   if b.body == home_body and b.complete
      and (b.type == "Inland Logistics Hub" or b.type == "Port"
           or b.type == "Railway Station") then
@@ -168,6 +183,14 @@ verify.capture("logistics_lens_staged_card")
 -- T7 - THE ROAD CENSUS (Ben, 2026-10-24). Counts and totals only; no tile figure
 -- crosses the seam. Supplied is what the resolver GRANTED the requests routed through
 -- a road, so it can never exceed what they requested.
+-- A ROUTED REQUEST IS STAGED FIRST, for the root's reason: the --verify world skips
+-- the campaign's site-road call (BL-1347) as it skips the source seeding, so its
+-- producers stand off the network and nothing routes through any road. The lens's own
+-- chain fixture stands a processing works at the far end of a rail and a sea leg tied
+-- to the capital, so a request travels the chain; one tick puts it in the resolve.
+local chain = verify.logistics_chain_fixture()
+verify.expect(chain.ok, "T7: the chain fixture stages on the player's ground")
+verify.econ_step(1)
 verify.clear_selection()
 verify.mouse(-100, -100)
 verify.frames(3)

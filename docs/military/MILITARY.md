@@ -89,15 +89,14 @@ window is a real window rather than a parameter pretending to be one.
 plan. It adds no rules of its own, so a scripted run and a stepped one resolve identically.
 
 **Each round.** Every participating unit deals its hits by the soft/hard arithmetic (§ The
-campaign force model), then exactly two draws apply a swing — attacker first, defender second,
-always in that order. A side breaks when its units' readiness is spent, not at a strength
+campaign force model), with **no draw and no swing** (Ben, 2026-10-29: battles carry no
+randomness). A side breaks when its units' readiness is spent, not at a strength
 threshold.
 
 Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` precedent:
 
 | Field | Default | Meaning |
 |---|---|---|
-| `swing_permille` | 600 | Half-width of the per-round power swing — a uniform draw in [400, 1600] |
 | `absorbed_land_permille` | 250 | Share at which hits within the target's defence (or breakthrough) land; hits beyond it land in full |
 | `hp_share_permille` | 300 | Share of landed damage that kills men; the rest spends readiness |
 | `hp_cost` | 400 | Milli-hits of HP damage that kill one man |
@@ -117,15 +116,15 @@ standing men.
 
 **The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio): attacking is
 dear, and breaking a defender takes about 2:1 in men — decisive 0% at 1:1, 15% at 1.5:1, 64% at
-1.75:1, 89% at 2:1, 99% from 2.5:1. `swing_permille` stays at 600 (NR-204: a narrower swing made the
-edge too safe).
+1.75:1, 89% at 2:1, 99% from 2.5:1. With no swing (Ben, 2026-10-29, overturning NR-204's "a narrower
+swing made the edge too safe"), the same inputs always give the same battle.
 
 **A battle has no maximum duration (Ben, 2026-10-29).** *"They continue while one unit is trying
 to move and end when readiness runs out. Some battles may easily take 90-180 days."* A battle runs
 for as long as the attacking side still holds its order to move onto the defended tile, and it ends
 only when a side's readiness is spent (broken) or a side withdraws. Cancelling the attacker's move
 is the withdrawal verb, priced as any withdrawal. There is no round cap and no stalemate by
-exhaustion of rounds: the recon ramp (§ Recon, full vision by day 20) always completes inside a
+exhaustion of rounds: the attacker's recon (§ Recon) builds within days, always inside a
 battle. **A battle is weeks long, not days (Ben, 2026-10-29):** the daily round's readiness
 damage is scaled so that a battle at parity runs about **30–60 days**, one at 1.5:1 runs longer
 still, and a rout stays fast. **Breaking a defender takes about 1.5:1 in men** (Ben, 2026-10-29,
@@ -133,13 +132,29 @@ keeping the ratio the uncapped battle produced). The round's damage is calibrate
 per-round numbers above are a day's — and a commander gets a decision every day of the fight, a
 withdrawal honoured at the next day's boundary.
 
+**Like forces entrench, and supply decides the stalemate (Ben, 2026-10-29).** When the two sides'
+raw hits stand near parity — neither side dealing much more than the other — the
+battle **digs in**: its landed damage drops further, and each side **recovers readiness from its
+carried supplies** (§ Carried supplies) while it fights — a unit that is fed and holds ammunition
+above its floor recovers; a hungry unit, or one at the ammunition floor, does not. An entrenched
+battle spends ammunition and food every day like any other, so it is **decided by which side's
+stocks give out first** — by its network, not its dice. Two sides both fully supplied hold each
+other for as long as the attacker presses: that is the stalemate, and its price is the supply both
+networks pay to keep it. A battle that leaves the near-parity band leaves entrenchment, and fights
+on at the ordinary rate.
+
+**A battle has no randomness (Ben, 2026-10-29: "Let's not add battle randomness … remove the swing
+too").** No per-round swing and no per-battle roll: the same forces on the same ground with the same
+supply fight the same battle, every time. A long battle between unequal forces is therefore
+predictable, and that is accepted: what keeps a fight open is entrenchment and supply, not a draw.
+
 **Withdrawal is a first-class verb, not a failure state**, and it is never free. The cost has three
 terms — base, per-round, and pursuit — and the second and third are what make a late break-off
 dear. Because a battle has no cap, the per-round term is bounded so that a late exit stays dear but
 never costs more men than the side has. Rounds already fought have separately cost their own attrition, so a late exit is expensive
 twice over.
 
-Withdrawing consumes **no draws** — disengaging is a decision, not another gamble.
+Withdrawing is a decision, not a gamble — no battle step draws at all.
 
 **Who holds the field.** On a withdrawal, the side that stayed holds it, even if it was losing on
 points; ground is held by being on it. Breaking is checked *after* a round resolves, so a routed
@@ -175,12 +190,12 @@ reads is shown on the surface that reads it.
 | **Hardness** | class × equipment, 0..1 | Share of the unit that is armoured. |
 | **Defence** | class | Hits absorbed when defending. |
 | **Breakthrough** | class | Hits absorbed when attacking. |
-| **Recon** | class × equipment | Recon points the unit gives its side (§ Recon). |
-| **Stealth** | class × equipment | Recon points an enemy needs to see the whole unit (§ Recon). |
+| **Recon** | class × equipment | Recon the unit adds to its side's recon stock each day it attacks, and to the opening when it faces the tile (§ Recon). Every class has a base above zero. |
+| **Stealth** | class × equipment | The recon an attacker needs to land its full hits on the unit (§ Recon). |
 
 **The arithmetic.** A unit's hits on a target are
 `soft_attack × (1 − target.hardness) + hard_attack × target.hardness`, scaled by its morale and
-its carried supplies (§ Carried supplies), then by the **share of the target its side can see**
+its carried supplies (§ Carried supplies), then — for an attacker — by its **recon against the target's stealth**
 (§ Recon). The defender's ground divides the attacker's hits (`terrain_defence`: a mountain halves
 them). The target absorbs up to its defence (defending) or breakthrough (attacking), raised by
 fortification; absorbed hits land at a fraction, the rest in full. Landed damage
@@ -229,29 +244,40 @@ scaling hits directly.
 
 ### Recon (Ben, 2026-10-29)
 
-**A unit damages only the part of its target its side can see.** Each target unit has a
-**stealth** — the recon points needed to see all of it — and each side has **recon points** over
-the battle. The visible share of a target is `min(1, side recon / target stealth)`, and **every
-hit on that target is scaled by it**: seeing 40% of a unit lands 40% of the hits on it.
+**An attacker damages only what its recon has found (Ben, 2026-10-29).** Each unit carries a
+**stealth** — how hard it is to find — and an attacking side carries **recon**. The
+attacker's hits on a defending unit are scaled by `min(1, attacker recon / target stealth)`,
+capped at 1: an attacker with half the recon its target's stealth asks for lands half its
+hits. **The defender's hits are always full** — it is dug in on its own ground and the attacker is
+the one exposed by moving. Recon is therefore one-sided: it is the attacker's problem, and the
+defender's stealth is its answer.
 
-**Recon is two-way, with no floor, and the defender is favoured (Ben, 2026-10-29).** Both sides
-need vision to do damage, and a side with no recon on a fresh battle lands nothing. **The
-defender's recon counts 1.5×** — it knows its ground. A side's recon points are the sum of:
+**Recon builds very quickly in battle (Ben, 2026-10-29).** The attacker's recon is a stock that grows
+every day of the fight by the **recon its units bring** — and grows fast, so a battle is seen within days of
+opening, not weeks: recon decides how a battle *opens*, not how long it lasts. It stops growing once
+it covers the target's stealth. **Every land class has a base recon above zero**, so
+every attack's recon grows.
 
-- **Its units' kit.** Recon is a kit stat like soft attack (§ The kit): light armour, drones and
-  optics carry it; most kit carries none.
-- **Its units adjacent.** Each of its own nation's units on a tile adjacent to the defended tile adds
-  its recon, whether or not it joined the battle.
-- **Time in battle.** Each day of fighting reveals more: by **day 20, time alone gives full vision**
-  — a target's stealth × `min(1, days / 20)` — so every battle eventually sees.
-- **Air.** **Every one of the side's wings active over the province gives recon** (Ben, 2026-10-29:
-  *"all air active in a region gives recon"*) — the recon class most, the others a base authored
-  amount — and the side holding air superiority over the province adds recon in proportion to its
-  share (§ Air).
+**What the attacker's recon grows by each day is the recon stat of:**
 
-**Stealth is a kit stat too.** Each class has a base stealth, and kit raises it: **better armour for
-infantry gives more stealth** (Ben's example). The designer shows recon and stealth beside the other
-stats (`../ui/ledgers/military.md` § The designer).
+- **Its units in the battle.** Recon is a class × kit stat like soft attack (§ The kit):
+  every class has a base, and light armour, drones and optics raise it.
+- **Its units adjacent, at once.** Each of its own nation's units on a tile adjacent to the defended
+  tile adds its recon stat, whether or not it joined the battle — counted the day it stands
+  there, with nothing stored. **On the opening day the recon stock starts at that adjacent recon**, so an attacker whose line has been facing the enemy opens already seeing it — *"we
+  should never see those battles where we are fighting with insufficient recon"*.
+- **Air.** **Every one of its wings active over the province gives recon** (Ben, 2026-10-29: *"all
+  air active in a region gives recon"*) — the recon class most, the others a base authored amount
+  — and air superiority over the province adds recon in proportion to its share (§ Air).
+
+**Only haste attacks blind.** A unit counts toward the opening recon only if it stood on its tile for
+a **whole day** before the contact. A column that marches up and attacks on the day it arrives
+brings none of its own recon to the opening, and fights partly blind for the few days its recon
+takes to build.
+
+**Stealth is a kit stat.** Each class has a base stealth, and kit raises it: **better
+armour for infantry gives more stealth** (Ben's example). The designer shows recon and stealth beside the other stats
+(`../ui/ledgers/military.md` § The designer).
 
 ### Land — the classes
 
@@ -469,7 +495,9 @@ there, and superiority adds recon in proportion to its share (§ Recon).
 tactical mission spends its hits on enemy units fighting a battle in the province first, and on any
 other enemy unit there once none is in battle. Its hits use the land arithmetic (soft and hard
 attack against the target's hardness), with no terrain divisor, since an aircraft attacks from
-above.
+above. **Bombing a unit takes the land round's day scale (Ben, 2026-10-29):** its landed damage is
+scaled by the same per-day factor a battle's round is (§ Battles, "A battle is weeks long"), so air
+stays one arm of a weeks-long fight rather than outpacing it.
 
 **Strategic bombing damages a building, and damage slows its throughput (Ben, 2026-10-28).** Each
 building carries a **condition**, full when built. A strategic mission lowers the condition of an
@@ -1219,6 +1247,14 @@ costs-twice-annual-salary anchor prices a garrison's count off the nation's own
 `nation_component::treasury`, so a rich nation fields a bigger standing force and a poor one a
 token one — no separate garrison-strength dial. A garrison holds its seeded tile until it is
 assigned to a front (§ Fronts). A rival assigns its border garrisons and keeps its capital's home.
+
+**No unit is assigned to a front by default (Ben, 2026-10-29).** Generation and the settle assign
+none of any nation's units to a front: every garrison opens on its post. After the handoff the
+player decides where its units move and how they are supplied — *"ensuring units get their supply
+and where they should move is up to the player"* — and a rival's scorer assigns its own under its
+grant (`../ai/AI_OPPONENT.md` § 11). **An army sent past its roads starves, as ruled (Ben,
+2026-10-29)**: a front never bends its slots to supply reach; keeping a front fed is the commander's
+job.
 
 **There is ONE battle trigger: nation-vs-nation directed hostility** (§ Battles, above).
 

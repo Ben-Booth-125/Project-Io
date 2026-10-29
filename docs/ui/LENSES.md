@@ -931,8 +931,10 @@ canvas's.
 **A unit off the road is joined to it by a dashed line (Ben, 2026-10-29).** Each of the player
 nation's units that stands off its network draws a **dashed line** from the road tile where its
 supply is paid — the closest road its network reaches, within 8 tiles ([LOGISTICS.md](../economy/LOGISTICS.md)
-§ A unit draws off the road) — to the unit. The dash is coloured on the road ramp below by the
-unit's own granted over requested, so a fed off-road unit reads green and a starved one red. A
+§ A unit draws off the road) — to the unit. **The dash is coloured by the share of its request the
+unit was granted, linearly (Ben, 2026-10-29)**: all of it green, half yellow, none red — the road
+ramp's colours on a straight scale, since a grant can never exceed its request and the log2 ramp
+would never show a fed unit green. A
 unit more than 8 tiles from any road draws nothing; its dash runs to the nearest road its
 network reaches and is drawn **red**, the gap itself made visible. A unit on a road draws no
 dash: its request is the road's own. The dashes are the player's units only, as every figure
