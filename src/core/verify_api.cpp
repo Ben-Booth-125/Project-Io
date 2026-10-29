@@ -33,6 +33,8 @@
 #include "ui/detail_level.hpp"
 #include "ui/foldout_column.hpp"
 #include "ui/nav_pane.hpp"
+#include "world/air_combat.hpp"    // BL-1450: wings, the air roster — the air readouts and stage_wing
+#include "world/unit_designs.hpp"  // BL-1450: air_design_of
 #include "world/unit_roster.hpp"   // unit_roster_table — military_ledger() names its rows
 #include "ui/fonts.hpp"
 #include "ui/frame_stats.hpp"
@@ -1716,6 +1718,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case ui::selection_kind::unit:        k = "unit";        break;
             case ui::selection_kind::nation:      k = "nation";      break;
             case ui::selection_kind::corporation: k = "corporation"; break;
+            case ui::selection_kind::wing:        k = "wing";        break; // BL-1450
             default:                              k = "none";        break;
             }
             // BL-1427: a front is a fourth non-entity channel; the band draws it
@@ -1740,6 +1743,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case ui::selection_kind::tile:     k = "tile";     break;
             case ui::selection_kind::building: k = "building"; break;
             case ui::selection_kind::unit:     k = "unit";     break;
+            case ui::selection_kind::wing:     k = "wing";     break; // BL-1450: a wing marker
             default:                           k = "none";     break;
             }
             out["hovered_kind"] = std::string(k);
@@ -3046,6 +3050,199 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             classes[++k] = e;
         }
         out["classes"] = classes;
+        // BL-1450 (grouped by theatre): each theatre header drawn (its press, fold
+        // and count), the Air picker's airbases, every air row's Raise press, the
+        // player's wing rows and the Design tab's air class rows. On screen already.
+        sol::table headers = st.create_table();
+        k = 0;
+        for (const auto& h : m.headers)
+        {
+            sol::table e = st.create_table();
+            e["tab"] = h.tab; e["theatre"] = std::string(h.theatre == 0 ? "land" : "air");
+            e["x"] = h.x; e["y"] = h.y; e["open"] = h.open; e["count"] = h.count;
+            headers[++k] = e;
+        }
+        out["headers"] = headers;
+        sol::table abases = st.create_table();
+        k = 0;
+        for (const auto& b : m.air_bases)
+        {
+            sol::table e = st.create_table();
+            e["id"] = static_cast<unsigned>(b.id); e["x"] = b.x; e["y"] = b.y; e["wings"] = b.units;
+            abases[++k] = e;
+        }
+        out["air_bases"]   = abases;
+        out["air_base"]    = static_cast<unsigned>(m.air_base);
+        out["air_message"] = m.raise_pressed ? m.air_message : std::string();
+        sol::table araises = st.create_table();
+        k = 0;
+        for (const auto& r : m.air_raises)
+        {
+            sol::table e = st.create_table();
+            e["row"] = static_cast<int>(r.row);
+            e["name"] = std::string(air_roster_table()[r.row].name);
+            e["x"] = r.x; e["y"] = r.y;
+            e["fieldable"] = r.fieldable; e["enabled"] = r.enabled;
+            e["price"] = r.price; e["reason"] = r.reason;
+            araises[++k] = e;
+        }
+        out["air_raises"] = araises;
+        sol::table wrows = st.create_table();
+        k = 0;
+        for (const auto& r : m.wing_rows)
+        {
+            sol::table e = st.create_table();
+            e["id"] = static_cast<unsigned>(r.id); e["x"] = r.x; e["y"] = r.y;
+            wrows[++k] = e;
+        }
+        out["wing_rows"] = wrows;
+        sol::table aclasses = st.create_table();
+        k = 0;
+        for (const auto& c : m.air_class_rows)
+        {
+            sol::table e = st.create_table();
+            e["cls"] = c.cls; e["x"] = c.x; e["y"] = c.y;
+            aclasses[++k] = e;
+        }
+        out["air_classes"] = aclasses;
+        return out;
+    });
+
+    // BL-1450: the wing card and the canvas's right-click assignment — the wing the
+    // card drew, its mission presses (enabled, lit, the seam's reason when not),
+    // each assigned province's remove press, the wing markers the canvas drew (in
+    // GROUND space, the press space), and what a right-click on the hovered
+    // province would do with its hover line. All of it is on screen. UI state only.
+    v.set_function("wing_card", [this]() {
+        sol::state& st = m_lua.state();
+        const auto& u = m_ui.wing;
+        sol::table out = st.create_table();
+        out["wing"]       = static_cast<unsigned>(u.drawn_wing);
+        out["message"]    = u.last_message;
+        out["hover_kind"] = std::string(u.hover_kind == 1 ? "assign" : u.hover_kind == 2 ? "refused" : "none");
+        out["hover_text"] = u.hover_text;
+        out["markers_drawn"] = u.markers_drawn;
+        sol::table ms = st.create_table();
+        int k = 0;
+        for (const auto& mi : u.missions)
+        {
+            sol::table e = st.create_table();
+            e["mission"] = mi.mission; e["x"] = mi.x; e["y"] = mi.y;
+            e["enabled"] = mi.enabled; e["active"] = mi.active; e["reason"] = mi.reason;
+            ms[++k] = e;
+        }
+        out["missions"] = ms;
+        sol::table rs = st.create_table();
+        k = 0;
+        for (const auto& r : u.removes)
+        {
+            sol::table e = st.create_table();
+            e["province"] = r.province; e["x"] = r.x; e["y"] = r.y;
+            rs[++k] = e;
+        }
+        out["removes"] = rs;
+        sol::table mk = st.create_table();
+        k = 0;
+        for (const auto& r : u.markers)
+        {
+            sol::table e = st.create_table();
+            e["wing"] = static_cast<unsigned>(r.wing); e["x"] = r.x; e["y"] = r.y; e["count"] = r.count;
+            mk[++k] = e;
+        }
+        out["markers"] = mk;
+        return out;
+    });
+
+    // BL-1450: every wing — id, whether the player's, roster row, class, mission,
+    // how many provinces it flies, muster days left, and its airbase's building id.
+    // Counts and ids only; no tile data.
+    v.set_function("wings", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int k = 0;
+        for (const auto& [wid, wg] : m_world.wings)
+        {
+            sol::table e = st.create_table();
+            e["id"] = static_cast<unsigned>(wid);
+            e["player"] = (wg.owner == m_world.player_entity);
+            e["row"] = static_cast<int>(wg.type);
+            e["cls"] = static_cast<int>(wing_class(wg));
+            e["mission"] = static_cast<int>(wg.mission);
+            e["provinces"] = static_cast<int>(wg.provinces.size());
+            e["muster_days"] = wg.muster_days;
+            e["airbase"] = static_cast<unsigned>(wg.airbase);
+            out[++k] = e;
+        }
+        return out;
+    });
+
+    // BL-1450 STAGING: a wing of air roster row @p row at the player's airbase
+    // @p airbase (a building id), ready to fly — bypassing the hire's price and
+    // shelf gate, as stage_building bypasses placement. Returns the wing id, or 0
+    // when @p airbase is not an airbase. Verify-only, behind --verify.
+    v.set_function("stage_wing", [this](unsigned airbase, int row) -> unsigned {
+        const auto bit = m_world.buildings.find(static_cast<entity_id>(airbase));
+        if (bit == m_world.buildings.end() || bit->second.type != building_type::airbase
+            || row < 0 || row >= static_cast<int>(air_roster_table().size()))
+            return 0u;
+        air_wing wg;
+        wg.owner   = m_world.player_entity;
+        wg.airbase = bit->first;
+        wg.type    = static_cast<std::uint16_t>(row);
+        wg.kit     = air_design_of(m_world, m_world.player_entity,
+                                   air_roster_table()[static_cast<std::size_t>(row)].cls);
+        const entity_id wid = m_world.create_entity();
+        m_world.wings.emplace(wid, std::move(wg));
+        return static_cast<unsigned>(wid);
+    });
+
+    // Select a wing (its card on the Selection band), as select_unit does a unit.
+    v.set_function("select_wing", [this](unsigned id) -> bool {
+        const entity_id wid = static_cast<entity_id>(id);
+        if (m_world.wings.find(wid) == m_world.wings.end())
+            return false;
+        m_ui.clear_battle_selection();
+        m_ui.clear_front_selection();
+        m_ui.selected_entity      = wid;
+        m_ui.selection_unit_group = false;
+        m_ui.selected_province    = 0;
+        m_ui.province_sync_entity = wid;
+        return true;
+    });
+
+    // BL-1450: the air designer — what it drew this frame (as unit_designer()).
+    v.set_function("air_designer", [this]() {
+        sol::state& st = m_lua.state();
+        const auto& d = m_ui.air_designer;
+        sol::table out = st.create_table();
+        out["open"]      = d.drawn_cls >= 0;
+        out["cls"]       = d.drawn_cls;
+        out["slot_open"] = d.slot_open;
+        out["back_x"]    = d.back_x;
+        out["back_y"]    = d.back_y;
+        out["message"]   = d.last_message;
+        sol::table boxes = st.create_table();
+        int k = 0;
+        for (const auto& b : d.boxes)
+        {
+            sol::table e = st.create_table();
+            e["slot"] = b.slot; e["name"] = b.name; e["fitted"] = b.fitted;
+            e["x"] = b.x; e["y"] = b.y;
+            boxes[++k] = e;
+        }
+        out["boxes"] = boxes;
+        sol::table items = st.create_table();
+        k = 0;
+        for (const auto& i : d.items)
+        {
+            sol::table e = st.create_table();
+            e["item"] = static_cast<int>(i.item); e["name"] = i.name;
+            e["x"] = i.x; e["y"] = i.y;
+            e["fitted"] = i.fitted; e["enabled"] = i.enabled; e["locked"] = i.locked;
+            e["reason"] = i.reason;
+            items[++k] = e;
+        }
+        out["items"] = items;
         return out;
     });
 
@@ -3375,6 +3572,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (n == "generation_stage") s = detail_surface::generation_stage;
         else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
         else if (n == "unit_designer")    s = detail_surface::unit_designer; // key = land class
+        else if (n == "air_designer")     s = detail_surface::air_designer;  // BL-1450: key = air class
         if (s == detail_surface::none) ui::fold(m_ui);
         else                           ui::expand(m_ui, s, key.value_or(0));
     });
@@ -4204,6 +4402,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             else if (type == "launchpad")  bt = building_type::launchpad;
             else if (type == "logistics_hub") bt = building_type::inland_logistics_hub;
             else if (type == "military_base") bt = building_type::military_base; // BL-325 S1
+            else if (type == "airbase")       bt = building_type::airbase;       // BL-1450
             else if (type == "marketplace") bt = building_type::planetary_marketplace; // BL-1269
             // "none" leaves placement mode, so a script that placed a building can
             // press the canvas as a player again (BL-1425's group press).
@@ -7087,6 +7286,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (kind == "launchpad")          bc.type = building_type::launchpad;
         else if (kind == "logistics_hub")      bc.type = building_type::inland_logistics_hub;
         else if (kind == "military_base")      bc.type = building_type::military_base;
+        else if (kind == "airbase")            bc.type = building_type::airbase; // BL-1450
         else if (kind == "research_institute") bc.type = building_type::research_institute;
         else if (kind == "schooling")          bc.type = building_type::schooling;
         else if (kind == "university")         bc.type = building_type::university;

@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*178 entries — 46 gameplay · 30 canvas · 16 lens · 53 ledger · 33 chrome.*
+*188 entries — 46 gameplay · 33 canvas · 16 lens · 60 ledger · 33 chrome.*
 
 ---
 
@@ -43,12 +43,12 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 
 ### `gameplay.build` — Tile construction ledger (fold-out column), opened from the Selection band of a selected tile; a shortcut lives on a selected owned building ('Build another here').
 
-**Press.** Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. SINCE BL-1365 a candidate row is ONE LINE of a fixed-column grid and reads in glyphs: building glyph | name | cost in credits (abbreviated) | a resource pip for what it makes | the stack as n/N | a state mark (grey it will build, amber it will stretch, red it will stall or the tile refuses it) | the expected-net bar | the Build press, which sits in the SAME column on every row and is DISABLED (never replaced) when the tile refuses it or the balance is short. Every sentence the line dropped - the materials with their quantities, what the building makes in words, the stack's own sentence, the stall's named good, the refusal with the rules' own counts, 'Can't afford' - is on the row's HOVER CARD. Rows are one per extractable resource deposited on the tile (plus a Fishing Wharf row on a land tile bordering the sea with no produce deposit - never on the water itself - and a Well row on a land tile with no ice deposit that a river runs along or a lake borders), one per processing recipe, then Port, Launchpad, Inland Logistics Hub, Military Base. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.
+**Press.** Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. SINCE BL-1365 a candidate row is ONE LINE of a fixed-column grid and reads in glyphs: building glyph | name | cost in credits (abbreviated) | a resource pip for what it makes | the stack as n/N | a state mark (grey it will build, amber it will stretch, red it will stall or the tile refuses it) | the expected-net bar | the Build press, which sits in the SAME column on every row and is DISABLED (never replaced) when the tile refuses it or the balance is short. Every sentence the line dropped - the materials with their quantities, what the building makes in words, the stack's own sentence, the stall's named good, the refusal with the rules' own counts, 'Can't afford' - is on the row's HOVER CARD. Rows are one per extractable resource deposited on the tile (plus a Fishing Wharf row on a land tile bordering the sea with no produce deposit - never on the water itself - and a Well row on a land tile with no ice deposit that a river runs along or a lake borders), one per processing recipe, then Port, Launchpad, Inland Logistics Hub, Military Base, Airbase. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.
 
 | Arg | Type | Meaning |
 |---|---|---|
 | `tile` | `entity_id` | The selected tile the building goes on. |
-| `type` | `building_type` | Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base, research_institute, schooling, university. Set by which row is pressed. Schooling and university (BL-615) are passive education buildings with no ledger row yet; the seam accepts them and the stratum gate below decides where they may stand. |
+| `type` | `building_type` | Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base, airbase, research_institute, schooling, university. Set by which row is pressed. Schooling and university (BL-615) are passive education buildings with no ledger row yet; the seam accepts them and the stratum gate below decides where they may stand. |
 | `target` | `resource_type` | Extraction rows only: the deposited resource the site extracts. Ignored for other types. |
 | `recipe` | `uint16 recipe id` | Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe. Forwarded through the seam since BL-388 (2026-08-13): the built facility carries exactly the recipe named. A recipe on any non-processing type, or an id the registry does not resolve, is rejected_invalid — stated-but-wrong is refused, never silently coerced. |
 
@@ -796,9 +796,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Fit the best researched kit in each slot of the classes you raise, weighing its goods against what your shelves hold: a design whose kit cannot be bought cannot be hired.
 
-### `gameplay.hire_wing` — No surface yet: the Military ledger's air rows (BL-1450, air UI) will carry the press. A corp_verb (corp_verb::hire_wing, 44) on the command seam today.
+### `gameplay.hire_wing` — The Military ledger's air rows (nav rail slot 7, Recruit tab, under the Air header; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too.
 
-**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=44 tile=<the airbase's tile> unit_type=<air roster row: 0 Interceptor Wing (fighter), 1 Strike Wing (multirole), 2 Strategic Bomber Wing, 3 Attack Helicopter Wing, 4 Strike Drone Wing, 5 Airborne Early Warning Wing (recon)>.
+**Press.** UI: open the Military ledger on Recruit, unfold the Air header, choose an airbase in its 'Raise at' picker, and click 'Raise' on an air row. Over the seam: COMMAND corp=<nation> nation=<nation> verb=44 tile=<the airbase's tile> unit_type=<air roster row: 0 Interceptor Wing (fighter), 1 Strike Wing (multirole), 2 Strategic Bomber Wing, 3 Attack Helicopter Wing, 4 Strike Drone Wing, 5 Airborne Early Warning Wing (recon)>.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -815,9 +815,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Raise air power: fighters to hold the air over a front, strike wings and helicopters to hit enemy units, bombers to wear down an enemy's industry, drones and early-warning aircraft to spot.
 
-### `gameplay.assign_air_mission` — No surface yet: right-clicking a province with the wing selected (docs/ui/ledgers/military.md; BL-1450, air UI) will issue it. A corp_verb (corp_verb::assign_air_mission, 45) on the command seam today.
+### `gameplay.assign_air_mission` — The wing card on the Selection band (ledger.selection_wing_mission, ledger.selection_wing_remove_province) and a right-click on a province of the Planetary canvas with the wing selected (canvas.wing_assign_province). Also a corp_verb (corp_verb::assign_air_mission, 45) on the command seam.
 
-**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=45 subject=<wing id> order=<0 none, 1 superiority, 2 tactical, 3 strategic, 4 recon> provinces=<id>,<id>,... (1 to 8 province ids; omitted for none).
+**Press.** UI: select a wing (canvas.wing_select or ledger.military_select_wing), set its mission on its card, then right-click provinces on the Planetary canvas; the card's 'x' beside a province removes it. Each press sends the WHOLE list. Over the seam: COMMAND corp=<nation> nation=<nation> verb=45 subject=<wing id> order=<0 none, 1 superiority, 2 tactical, 3 strategic, 4 recon> provinces=<id>,<id>,... (1 to 8 province ids; omitted for none).
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -838,9 +838,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Put a raised wing to work: contest the air over a front, strike the enemy's units or industry, or spot for your own.
 
-### `gameplay.set_air_design` — No surface yet: the Design tab's air classes (BL-1450, air UI). A corp_verb (corp_verb::set_air_design, 46) on the command seam today.
+### `gameplay.set_air_design` — The designer opened on an air class (ledger.military_open_air_designer; canvas.air_designer_slot_pick). Also a corp_verb (corp_verb::set_air_design, 46) on the command seam.
 
-**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=46 order=<air class 0..5> recipe=<slot: 0 airframe, 1 armament, 2 avionics> unit_type=<air kit catalogue id>.
+**Press.** UI: Military ledger > Design > Air > an air class row; in the designer press a slot box (Airframe, Armament, Avionics) and a live row of its list. Over the seam: COMMAND corp=<nation> nation=<nation> verb=46 order=<air class 0..5> recipe=<slot: 0 airframe, 1 armament, 2 avionics> unit_type=<air kit catalogue id>.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -1275,6 +1275,55 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Hostile target: each unit marches onto the tile (a front-assigned unit is unassigned once its march is accepted). Status line: 'N attacking', 'N attacking, M refused', or 'Can't attack there.'. Not hostile: the declare confirm opens.
 
 **Reason to select.** Attack an enemy stack directly from the map.
+
+### `canvas.air_designer_slot_pick` — The designer opened on an air class (full canvas): a slot's box, and the item list it opens beside it.
+
+**Press.** Click a slot's box to open its list (again to close it). The list holds the slot's air kit, base first: each row with its stat change against the fitted item, its goods per wing, and - when your nation lacks its research node - a LOCKED badge naming the node. Click a live row to fit it; hovering a row previews the design's numbers with it fitted.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `slot` | `0 airframe, 1 armament, 2 avionics` | The box pressed. |
+| `item` | `air kit catalogue id` | The row pressed. |
+
+**Valid when:**
+- The air designer is open on a class.
+- A row is live only when air_design_check would apply it: researched and not already fitted. A locked row is disabled with 'Locked: needs research <node>'; the fitted row reads 'Fitted'.
+
+**Expected output.** Issues gameplay.set_air_design {order = class, recipe = slot, unit_type = item} at the frame's end through the player's seat, one slot per press; the pick is the class's live design at once. The designer shows 'Saved: new wings are raised with this design.', 'Not researched yet.', 'Already fitted.' or 'That kit does not fit this slot.'.
+
+**Reason to select.** Fit the best researched air kit in each slot of the classes you raise.
+
+### `canvas.wing_select` — Planetary canvas: the wing marker - a round plate with the aircraft, at the upper right of the hex of each of your airbases that bases a wing, with the number of wings based there when more than one.
+
+**Press.** Left-click the marker. A repeat click walks to the next wing based at that airbase, in id order, and wraps. The hover card names the wing the press would select.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `airbase tile` | `tile on the canvas` | The marker pressed. |
+
+**Valid when:**
+- Plain canvas (no lens); the hex drawn at a radius of 6 px or more.
+- Only your own wings draw a marker: a wing never stands on a tile, and a rival's air is not on the ground to be seen.
+
+**Expected output.** Selects the wing: its card on the Selection band, its provinces outlined on the canvas, its marker ringed. No world change.
+
+**Reason to select.** Pick up a wing from the map at the airbase it flies from.
+
+### `canvas.wing_assign_province` — Planetary canvas with one of your wings selected: the hovered hex is outlined in the air colour with a line at the cursor saying what a right-click would do, or in red with why it is refused.
+
+**Press.** Right-click a tile: its province is added to the wing's provinces on the wing's current mission (the one it flies, or the one its card holds while it flies none).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `province` | `the province of the right-clicked tile` | Appended to the wing's list. |
+
+**Valid when:**
+- Your own wing is selected; no construction or road tool is armed, no march pick is armed, no lens is on.
+- The hover line reads from air_mission_check, so it cannot disagree with the press. It refuses - and the right-click does nothing - when: the card holds no mission ('Choose the wing's mission on its card first'); the province is already assigned; eight are already assigned ('Eight provinces already assigned: remove one on the wing card'); the province is out of range ('Out of range: <place> is N tiles away, range R' - the straight-line distance from the airbase to the province's nearest tile against the class's range plus its kit); or a bombing mission names a province not held by a nation you are hostile to.
+
+**Expected output.** Issues gameplay.assign_air_mission {subject = wing, order = mission, provinces = the wing's list plus this one} at the frame's end through the player's seat. The wing card's list grows and the province is outlined; the card shows 'Mission assigned.' or the seam's refusal.
+
+**Reason to select.** Send a wing where it is needed: over a front for superiority, over an enemy's units or industry to bomb, over ground you want spotted.
 
 ---
 
@@ -2221,6 +2270,111 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** The player is hostile toward the nation (every stance surface reads it), and the units march onto the tile. Status line as canvas.unit_right_click_attack, or "Couldn't declare hostility.".
 
 **Reason to select.** Start a war with a nation by attacking its stack — with a deliberate second press, since hostility is a stance change.
+
+### `ledger.military_theatre_header` — Military ledger (nav rail slot 7), Recruit and Design tabs: the collapsible theatre headers 'Land (N)' and 'Air (N)' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes).
+
+**Press.** Click a header to fold its rows; click it again to unfold them (the toggle rule). Each tab keeps its own folds; both open by default.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tab` | `0 Recruit, 1 Design` | The tab the header sits on. |
+| `theatre` | `0 Land, 1 Air` | The header pressed. |
+
+**Valid when:**
+- The Military ledger is open (nav rail slot 7).
+
+**Expected output.** The theatre's rows hide or show; the arrow on the header turns. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Design's Land holds the land classes and the obsolete toggles; Design's Air holds the six air classes. No world change.
+
+**Reason to select.** Keep the theatre you are working in on screen: the ledger column is narrow and both theatres together are long.
+
+### `ledger.military_air_raise` — Military ledger, Recruit tab, under the Air header: the airbase picker ('Raise at' - one row per completed airbase of your nation, with the wings based there) and one row per air class (Interceptor Wing, Strike Wing, Strategic Bomber Wing, Attack Helicopter Wing, Strike Drone Wing, Airborne Early Warning Wing), each with its class, the missions it flies, its live design's numbers (air, soft, hard, strategic, recon, range), its price and a 'Raise' press. With no airbase the theatre reads 'No airbase' and offers 'Find a site for an airbase'.
+
+**Press.** Click an airbase in the picker to choose it (a target selector: pressing the chosen one keeps it), then click 'Raise' on an air row. 'Find a site for an airbase' opens the Construction ledger's site finder armed on the Airbase.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `airbase` | `entity_id (building)` | The chosen airbase; the press sends its tile. |
+| `row` | `uint16 air roster row` | The row pressed (0..5). |
+
+**Valid when:**
+- The Military ledger is open (nav rail slot 7).
+- Raise is DISABLED, with the reason under the row and on hover, when: the nation's shelves cannot field the row ('Needs steel or iron ore and coal or fuel on the shelf.' - available_air_rows), there is no airbase ('No airbase to raise it at.'), hire_wing_check refuses the airbase, or the treasury's uncommitted part is below the class's hire credits. The goods leg is the seam's answer on the press. A military base hosts no wings: only airbases are listed.
+
+**Expected output.** Issues gameplay.hire_wing {tile = the airbase's tile, unit_type = row} at the frame's end through the player's seat. The ledger shows the seam's answer: 'Wing mustering.', 'Can't afford or supply it.', 'No airbase of yours there.' or 'Raising the wing failed.'. A raised wing appears under 'Your wings' with its muster days left.
+
+**Reason to select.** Raise air power at an airbase: fighters to hold the air, strike wings and helicopters to hit units, bombers for industry, drones and early warning to spot.
+
+### `ledger.military_find_airbase_site` — Military ledger, Recruit tab, Air header: 'Find a site for an airbase' - shown only when your nation has no completed airbase.
+
+**Press.** Click 'Find a site for an airbase'.
+
+**Valid when:**
+- Your nation holds no completed, non-decommissioned airbase.
+
+**Expected output.** Closes the Military ledger and opens the Construction ledger on its Construction view with the site finder armed on the Airbase. No world change.
+
+**Reason to select.** The airbase is the one door every wing is hired at, so with none the next move is to place one.
+
+### `ledger.military_select_wing` — Military ledger, Recruit tab, Air header, 'Your wings': one row per wing of your nation - its type and what it is doing ('mustering, N d left', 'no mission', or '<mission> over N provinces').
+
+**Press.** Click a wing's row.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `wing` | `entity_id (wing)` | The row pressed. |
+
+**Valid when:**
+- The Military ledger is open (nav rail slot 7).
+
+**Expected output.** Selects the wing: the Selection band shows its card (ledger.selection_wing_mission), the canvas outlines the provinces it flies over and rings its marker at the airbase. No world change.
+
+**Reason to select.** Reach any wing from one list, wherever its airbase stands.
+
+### `ledger.military_open_air_designer` — Military ledger, Design tab, under the Air header: one row per air class (Fighter, Strike / multirole, Strategic bomber, Attack helicopter, Strike drone, Recon / AWACS), its name a press with the missions it flies and its live design's numbers under it.
+
+**Press.** Click the class name. Clicking the lit row of the class the designer is open on closes it (the toggle rule); clicking another class switches it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `class` | `air_class (0 fighter .. 5 recon)` | The row pressed. |
+
+**Valid when:**
+- The Military ledger is open on Design, the Air header unfolded.
+
+**Expected output.** The designer takes the canvas region on the air class: the aircraft in the middle (a placeholder image until air art lands), one box per slot - Airframe, Armament, Avionics - beside it with a leader line, each showing the slot, the fitted item and its change; under it the design's HP, air attack, soft and hard attack, strategic, recon and range, its kit goods per wing, and how many of your wings fly an older design. Closes on the same press, its return control, or Esc. No world change.
+
+**Reason to select.** See what each air slot holds, what research would open, and change the class's live design.
+
+### `ledger.selection_wing_mission` — Selection band, the wing card: header (aircraft, the wing's type, its class and its airbase); left, its HP, morale, supply, muster days left, range and numbers; middle, the Mission buttons - None and only the missions its class flies - the active one lit; right, 'Provinces (n of 8)'.
+
+**Press.** Click a mission. With provinces assigned it re-flies them on that mission; with none it is held on the card until a right-click names one. Clicking the lit mission stands the wing down - back to None, its provinces cleared (the toggle rule); the lit None does nothing.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `mission` | `air_mission (0 none, 1 superiority, 2 tactical, 3 strategic, 4 recon)` | The button pressed. |
+
+**Valid when:**
+- A wing of yours is selected (a rival's card shows its class and owner only, and no presses).
+- A mission is DISABLED, with the seam's reason on hover, when air_mission_check would refuse it over the provinces already assigned - e.g. a bombing mission while a province is held by a nation you are not hostile to.
+
+**Expected output.** Issues gameplay.assign_air_mission at the frame's end (or, with no province yet, holds the choice on the card and sends nothing). The card shows 'Mission assigned.', 'Wing stood down.' or the refusal.
+
+**Reason to select.** Choose what the wing does before naming where.
+
+### `ledger.selection_wing_remove_province` — Selection band, the wing card's 'Provinces' column: one row per assigned province (its population centre's name, or 'Province N', and who holds it) with an 'x' press.
+
+**Press.** Click 'x' beside a province.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `province` | `province id` | The province removed. |
+
+**Valid when:**
+- A wing of yours is selected and flies at least one province.
+
+**Expected output.** Issues gameplay.assign_air_mission with the rest of the list on the same mission; removing the last one stands the wing down, the mission staying held on the card for the next right-click.
+
+**Reason to select.** Pull a wing back off a province, or make room under the eight-province cap.
 
 ---
 

@@ -8,6 +8,7 @@
 #include <imgui.h>
 #include <array>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -363,6 +364,102 @@ struct military_ledger_state
     /// Design tab: each land class row's press (opens the designer), drawn order.
     struct drawn_class { int cls = 0; float x = -1.0f, y = -1.0f; };
     std::vector<drawn_class> class_rows;
+
+    // ── BL-1450: grouped by theatre (military.md § Grouped by theatre) ──────────
+    /// Each theatre header's fold, per tab: [tab][theatre], theatre 0 Land, 1 Air.
+    /// A header is a toggle — its press folds or unfolds its rows. Open by default.
+    bool      theatre_open[2][2] = {{true, true}, {true, true}};
+    /// The chosen AIRBASE (Recruit's Air picker), as `base` is the military base's.
+    entity_id air_base = null_entity;
+    /// An air Raise press queued for app::render, which sends `hire_wing` at the
+    /// chosen airbase's tile. `null_entity` = nothing pending.
+    entity_id     pending_wing_tile = null_entity;
+    std::uint16_t pending_wing_row  = 0;
+    std::string   air_message;          ///< The hire seam's answer to the last air Raise (app writes it).
+
+    // Published each frame (x < 0 = absent).
+    struct drawn_header { int tab = 0, theatre = 0; float x = -1.0f, y = -1.0f; bool open = false; int count = 0; };
+    std::vector<drawn_header> headers;
+    std::vector<drawn_base>   air_bases;   ///< The Air picker's rows (`units` = wings based there).
+    struct drawn_air_raise
+    {
+        std::uint16_t row = 0;              ///< air_roster_table() index.
+        float         x = -1.0f, y = -1.0f;
+        bool          fieldable = false, enabled = false;
+        float         price = 0.0f;
+        std::string   reason;
+    };
+    std::vector<drawn_air_raise> air_raises;
+    struct drawn_wing { entity_id id = null_entity; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_wing> wing_rows;     ///< Recruit's "Your wings" rows: each press selects the wing.
+    std::vector<drawn_class> air_class_rows; ///< Design's Air rows (cls = air_class): each opens the designer.
+};
+
+/// BL-1450: the AIR designer — the unit designer's full-canvas rung opened on an air
+/// class (`detail_surface::air_designer`, key = air_class), with the air slots
+/// airframe / armament / avionics (MILITARY.md § Air). Its own state, beside the land
+/// designer's, so the two never share a queued pick. VIEW state, not serialised.
+struct air_designer_state
+{
+    int  slot_open = -1;
+    int  open_cls  = -1;
+    int           pending_cls  = -1;    ///< A pick queued for app (`set_air_design`); -1 = none.
+    int           pending_slot = 0;
+    std::uint16_t pending_item = 0;
+    std::string   last_message;
+
+    // Published each frame it draws; x < 0 = absent. Its own shapes, beside the
+    // land designer's, so the two surfaces change independently.
+    struct drawn_box
+    {
+        int         slot = 0;
+        std::string name, fitted;
+        float       x = -1.0f, y = -1.0f;
+        float       anchor_x = -1.0f, anchor_y = -1.0f;
+    };
+    struct drawn_item
+    {
+        std::uint16_t item = 0;
+        std::string   name;
+        float         x = -1.0f, y = -1.0f;
+        bool          fitted = false, enabled = false, locked = false;
+        std::string   reason;
+    };
+    std::vector<drawn_box>  boxes;
+    std::vector<drawn_item> items;
+    float back_x = -1.0f, back_y = -1.0f;
+    int   drawn_cls = -1;
+};
+
+/// BL-1450: the wing card (SELECTION.md; military.md § Grouped by theatre) and the
+/// canvas's right-click assignment. VIEW state plus the one queued order.
+struct wing_ui_state
+{
+    /// The mission a wing with NO provinces is set to fly next: `assign_air_mission`
+    /// refuses a mission with no province, so the card holds the choice until the
+    /// first right-click names one. Keyed by wing; dropped once the wing flies it.
+    std::map<entity_id, std::uint8_t> intent;
+
+    /// An assignment queued for app::render (`assign_air_mission`).
+    entity_id             pending_wing = null_entity;
+    std::uint8_t          pending_mission = 0;
+    std::vector<uint32_t> pending_provinces;
+    std::string           last_message;  ///< The seam's answer (app writes it).
+
+    // Published each frame the card draws.
+    struct drawn_mission { int mission = 0; float x = -1.0f, y = -1.0f; bool enabled = false, active = false; std::string reason; };
+    std::vector<drawn_mission> missions;
+    struct drawn_province { uint32_t province = 0; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_province> removes;  ///< Each assigned province's remove press.
+    entity_id drawn_wing = null_entity;   ///< The wing the card drew this frame.
+
+    // Published by the Planetary canvas: what a right-click on the hovered province would do.
+    int         hover_kind = 0;          ///< 0 nothing, 1 assign, 2 refused.
+    uint32_t    hover_province = 0;
+    std::string hover_text;
+    int         markers_drawn = 0;       ///< Wing markers drawn this frame.
+    struct drawn_marker { entity_id wing = null_entity; float x = -1.0f, y = -1.0f; int count = 0; };
+    std::vector<drawn_marker> markers;   ///< Ground-space centres (the press point).
 };
 
 /// The unit designer (docs/ui/ledgers/military.md § The designer): the full-canvas
@@ -878,6 +975,8 @@ struct ui_state
     /// See `military_ledger_state`.
     military_ledger_state military;
     unit_designer_state   designer; ///< The full-canvas unit designer (military.md § The designer).
+    air_designer_state    air_designer; ///< BL-1450: the designer opened on an air class.
+    wing_ui_state         wing;         ///< BL-1450: the wing card and the canvas right-click assignment.
 
 
     // THE CONTRACTS LEDGER'S VIEW STATE IS GONE (BL-693). The mercenary

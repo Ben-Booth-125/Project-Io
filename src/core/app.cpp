@@ -24,6 +24,7 @@
 #include "ui/military_ledger.hpp"
 #include "ui/unit_art.hpp"        // the unit designer's class art, loaded once
 #include "ui/unit_designer.hpp"   // the full-canvas unit designer
+#include "ui/air_designer.hpp"    // BL-1450: the designer on an air class
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
@@ -2827,6 +2828,8 @@ void app::render()
     // Design tab's class rows and the unit card's type name open. Its picks queue
     // `designer.pending_*`, sent below as `set_unit_design`.
     ui::draw_unit_designer(m_world, m_ui);
+    // BL-1450: the same rung opened on an air class (`set_air_design`, below).
+    ui::draw_air_designer(m_world, m_registry, m_ui);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;
         // the rank table's change column reads the ranking from ~4 econ ticks back.
@@ -3367,6 +3370,83 @@ void app::render()
                 m_ui.designer.last_message = "That kit does not fit this slot."; break;
         }
         m_ui.designer.pending_cls = -1; // consume the request
+    }
+
+    // BL-1450 (air UI): the three air presses, each through the same seam any caller
+    // uses. A refusal mutates nothing and is worded where the press was made.
+    //
+    // The air designer's pick: `set_air_design`, one slot per press.
+    if (m_ui.air_designer.pending_cls >= 0)
+    {
+        corp_command cmd;
+        cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::set_air_design;
+        cmd.order     = static_cast<uint32_t>(m_ui.air_designer.pending_cls);
+        cmd.recipe    = static_cast<uint16_t>(m_ui.air_designer.pending_slot);
+        cmd.unit_type = m_ui.air_designer.pending_item;
+        switch (player_command(cmd))
+        {
+            case corp_command_result::applied:
+                m_ui.air_designer.last_message = "Saved: new wings are raised with this design."; break;
+            case corp_command_result::rejected_tech_locked:
+                m_ui.air_designer.last_message = "Not researched yet."; break;
+            case corp_command_result::rejected_state:
+                m_ui.air_designer.last_message = "Already fitted."; break;
+            default:
+                m_ui.air_designer.last_message = "That kit does not fit this slot."; break;
+        }
+        m_ui.air_designer.pending_cls = -1; // consume the request
+    }
+    // The Military ledger's air Raise: `hire_wing` at the chosen airbase's tile.
+    if (m_ui.military.pending_wing_tile != null_entity)
+    {
+        corp_command cmd;
+        cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::hire_wing;
+        cmd.tile      = m_ui.military.pending_wing_tile;
+        cmd.unit_type = m_ui.military.pending_wing_row;
+        entity_id wing = null_entity;
+        switch (player_command(cmd, &wing))
+        {
+            case corp_command_result::applied:
+                m_ui.military.air_message = "Wing mustering."; break;
+            case corp_command_result::rejected_funds:
+                m_ui.military.air_message = "Can't afford or supply it."; break;
+            case corp_command_result::rejected_placement:
+                m_ui.military.air_message = "No airbase of yours there."; break;
+            default:
+                m_ui.military.air_message = "Raising the wing failed."; break;
+        }
+        m_ui.military.pending_wing_tile = null_entity; // consume the request
+    }
+    // The wing card's mission and remove presses, and the canvas right-click:
+    // `assign_air_mission` with the whole province list.
+    if (m_ui.wing.pending_wing != null_entity)
+    {
+        corp_command cmd;
+        cmd.tick    = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp    = m_world.player_entity;
+        cmd.verb    = corp_verb::assign_air_mission;
+        cmd.subject = m_ui.wing.pending_wing;
+        cmd.order   = m_ui.wing.pending_mission;
+        cmd.air_provinces = no_air_provinces();
+        for (std::size_t i = 0; i < m_ui.wing.pending_provinces.size() && i < cmd.air_provinces.size(); ++i)
+            cmd.air_provinces[i] = m_ui.wing.pending_provinces[i];
+        switch (player_command(cmd))
+        {
+            case corp_command_result::applied:
+                m_ui.wing.last_message = m_ui.wing.pending_mission == 0 ? "Wing stood down." : "Mission assigned."; break;
+            case corp_command_result::rejected_placement:
+                m_ui.wing.last_message = "Out of range."; break;
+            case corp_command_result::rejected_state:
+                m_ui.wing.last_message = "Bombing only over a nation you are hostile to."; break;
+            default:
+                m_ui.wing.last_message = "The wing can't fly that."; break;
+        }
+        m_ui.wing.pending_wing = null_entity; // consume the request
+        m_ui.wing.pending_provinces.clear();
     }
 
     // Refit to a newer type (Ben, 2026-10-27): the unit card's Refit menu, through the

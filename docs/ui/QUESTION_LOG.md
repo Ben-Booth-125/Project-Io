@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**71 surfaces** — 4 settled, 67 awaiting Ben's wording.
+**75 surfaces** — 4 settled, 71 awaiting Ben's wording.
 
 ---
 
@@ -19,6 +19,14 @@ These were **drafted by an implementer for Ben to accept or rewrite**, not autho
 him. BL-260 is explicit that writing the pair *is* the design check — so each of these
 is an open question wearing a sentence, and they sit first rather than being buried in
 alphabetical order.
+
+### Unit designer on an air class - the full-canvas designer opened from an air class row in the Military ledger's Design tab
+
+**Answers:** What is this kind of aircraft carrying in its airframe, armament and avionics, and what could it carry instead?
+
+**Because:** military.md § Grouped by theatre: Design lists the air classes beside the land ones and each opens the same full-canvas designer with its own slots (airframe, armament, avionics; MILITARY.md § Air, on the one-live-design rule). The same rung and geometry as the land designer - the class centred, one box per slot with a leader line, a box's press listing the slot's kit base first with locked kit readable and its research node named - so the two theatres read as one tool. The summary carries the air numbers a wing fights with (HP, air attack, soft and hard attack, strategic, recon, range) rather than the land ones, and counts wings flying an older design. Picks are greyed by air_design_check, the seam's own test. There is no air art yet, so the image is the aircraft glyph on the placeholder panel.
+
+*Demanded by BL-1450 · `src/ui/air_designer.cpp`, `src/ui/air_designer.hpp`, `src/ui/detail_level.hpp`, `src/ui/ui_state.hpp` · id `air_designer`*
 
 ### Balance Ledger
 
@@ -262,9 +270,9 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 **Answers:** What force can I raise, where, at what cost - and what is it raised with?
 
-**Because:** Force became a system with types, prices and kit, and hiring was one press on one base's tile card: a player could not see every base and every unit type side by side, nor what a type they cannot field is waiting on. Recruit is the act the ledger exists for - a base picker over the nation's completed military bases with the units standing at each, the roster with each type's land class, numbers and price, dimmed rows saying the goods or port they lack so the roster shows the ladder rather than only the rungs in reach, a Raise press that is a door onto the hire_unit verb rather than a second hire path, and the muster queue (raising takes time, Ben 2026-10-27). Design is set once and revisited when a technology lands: one row per land class with its base numbers until military research opens kit choices. It takes slot 7, where the reserved Corp. Strategy stood, because both halves are broad - MENU.md's test for a rail slot - and Conflict had no broad ledger (Ben, 2026-10-27; docs/ui/ledgers/military.md). BL-1437 (Ben, 2026-10-27: "the recruit options give plenty of completely outdated unit types"): Recruit hides obsolete unit types behind a "Show obsolete (N)" switch, and the Design tab lists every type with an obsolete toggle — every pre-modern type starts obsolete, so the roster opens on the seven types a 1960 nation raises.
+**Because:** Force became a system with types, prices and kit, and hiring was one press on one base's tile card: a player could not see every base and every unit type side by side, nor what a type they cannot field is waiting on. Recruit is the act the ledger exists for - a base picker over the nation's completed military bases with the units standing at each, the roster with each type's land class, numbers and price, dimmed rows saying the goods or port they lack so the roster shows the ladder rather than only the rungs in reach, a Raise press that is a door onto the hire_unit verb rather than a second hire path, and the muster queue (raising takes time, Ben 2026-10-27). Design is set once and revisited when a technology lands: one row per land class with its base numbers until military research opens kit choices. It takes slot 7, where the reserved Corp. Strategy stood, because both halves are broad - MENU.md's test for a rail slot - and Conflict had no broad ledger (Ben, 2026-10-27; docs/ui/ledgers/military.md). BL-1437 (Ben, 2026-10-27: "the recruit options give plenty of completely outdated unit types"): Recruit hides obsolete unit types behind a "Show obsolete (N)" switch, and the Design tab lists every type with an obsolete toggle — every pre-modern type starts obsolete, so the roster opens on the seven types a 1960 nation raises. BL-1450 (Ben, 2026-10-28; military.md § Grouped by theatre): Recruit and Design group their rows under collapsible Land and Air headers, each with its count, because the air theatre doubled what the column holds and a player works one theatre at a time; a header press folds or unfolds it (the toggle rule). Recruit's Air carries its own picker over airbases, since a wing raises only at an airbase and a military base hosts none, the six air rows with their class, missions and numbers, and the player's wings, each a press that selects it - the one place every wing is listed wherever it is based.
 
-*Demanded by BL-1433, BL-1437 · `src/ui/military_ledger.cpp`, `src/ui/nav_pane.cpp` · id `military_ledger`*
+*Demanded by BL-1433, BL-1437, BL-1450 · `src/ui/military_ledger.cpp`, `src/ui/nav_pane.cpp`, `src/ui/wing_card.cpp` · id `military_ledger`*
 
 ### National border band (Planetary canvas, plain-canvas chrome)
 
@@ -497,6 +505,30 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** Coastal water and lakes carry an owner, derived from the shore that claims them; open ocean structurally does not (PROVINCES.md § Who owns water). That asymmetry is the load-bearing shape of the water model, and it was invisible on every surface the game had — the hover card reported terrain and habitability and said nothing about title, no lens colours ground by owning nation, and clicking water did not move the Selection band at all. A claim nobody can look at can only be trusted, which is not the standard this project holds a generated world to. It earns its space by reusing the tile element rather than adding one: same header, same hex ring (which is where a shoreline reads at all), same action grid; only the centre column forks, and it forks because four of the five ground sections — buildings, deposits, resources, population — ask questions about ground there is none of. The single most important word on it is 'Unowned', stated positively: an empty owner row and an owner row reading 'Unowned' cost the same pixels and mean opposite things, the first looking like the panel failed and the second being the model's central assertion.
 
 *Demanded by BL-785 · `src/ui/selection_panel.cpp` · id `water_tile_selection`*
+
+### Wing assignment preview (Planetary canvas: the hovered hex's outline and cursor line with a wing selected; the selected wing's provinces outlined)
+
+**Answers:** If I right-click here, will the wing fly over this province - and if not, why not?
+
+**Because:** The right-click is the assignment (military.md § Grouped by theatre: right-clicking a province with the wing selected assigns it on its current mission; out of range is refused with its distance and the wing's range). A right-click that silently did nothing would teach the player nothing about range, so the hover says the answer before the press: an air-coloured outline and 'Right-click: assign <place> (<mission>) - d of R tiles', or a red one with the refusal - out of range with the distance and the range, a bombing mission over ground not held by a nation the player is hostile to, already assigned, eight already assigned, or no mission chosen yet. It reads air_mission_check, the seam's own test, so the line and the press cannot disagree. The provinces the selected wing already flies are outlined on their outer edge, so the map and the card's list say the same thing.
+
+*Demanded by BL-1450 · `src/ui/body_surface_canvas.cpp`, `src/ui/wing_card.cpp`, `src/ui/presentation.hpp` · id `wing_assign_preview`*
+
+### Selection band - Wing card (an air wing of the player, selected from its marker at the airbase or its row in the Military ledger)
+
+**Answers:** What is this wing, how worn is it, what is it flying and over which provinces - and how do I change that?
+
+**Because:** MILITARY.md § Air (Ben, 2026-10-28): a wing is based at an airbase and assigned a mission over provinces in range; it never stands on a tile, so there is no counter to open and the unit card's shape (march, front, refit) does not fit it. military.md § Grouped by theatre names the card: it sets the mission and lists the provinces assigned. Three columns, the band's shape: the wing's condition (HP, morale - a drone has none - supply, muster days left, range and numbers) on the left; the Mission buttons in the middle, None plus only the missions its class flies, so a fighter is never offered bombing; the provinces on the right, each with who holds it and an 'x' to take it back off. A mission with no province is held on the card rather than sent, because the seam refuses a mission with none - the card is where the player says what before the map says where. Pressing the lit mission stands the wing down (the toggle rule). A mission the seam would refuse over the provinces already assigned is disabled with the seam's own reason, so the card cannot disagree with air_mission_check. A rival's wing shows its class and owner only (BL-068).
+
+*Demanded by BL-1450 · `src/ui/wing_card.cpp`, `src/ui/wing_card.hpp`, `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `wing_card`*
+
+### Wing marker (Planetary canvas, one per airbase tile basing the player's wings)
+
+**Answers:** Where are my wings based, how many at each airbase - and which one do I pick up?
+
+**Because:** A wing must be selectable from the map (military.md § Grouped by theatre), and a wing has no tile of its own: it is based at its airbase (MILITARY.md § Air). So its marker draws at the airbase's tile - at the hex's upper right, clear of the land counter below the centre and the battle glyph at it - as a ROUND plate where the land counter is square, because a wing is based, not standing. One marker per airbase carries the count of wings based there; a press selects one and a repeat press walks the rest, so every wing is reachable from the map without a stack element of its own. The player's own wings only: a rival's air is not on the ground to be seen.
+
+*Demanded by BL-1450 · `src/ui/body_surface_canvas.cpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp` · id `wing_marker`*
 
 ### New World wizard - round 2, Life: the homeworld map (and its hold through the Culture round's wait)
 
