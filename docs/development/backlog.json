@@ -13,8 +13,8 @@
  ],
  "items": [
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-15",
    "parked": false,
@@ -31,11 +31,11 @@
    "difficulty": 4,
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "title": "Nation and corporation AI steer economies towards digitisation across Era 1",
-   "design": "SPRINT 55 (Ben, 2026-10-15). Scorers weigh Digitisation-tree goods and research. Target: every major nation past the tree's midpoint by 2040."
+   "design": "SPRINT 55 (Ben, 2026-10-15). Scorers weigh Digitisation-tree goods and research. Target: every major nation past the tree's midpoint by 2040. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-15",
    "parked": false,
@@ -52,11 +52,11 @@
    "difficulty": 3,
    "authority_doc": "docs/economy/SPACE_ASSETS.md",
    "title": "Launch sites, tracking stations and rocket/propellant industry as buildings",
-   "design": "SPRINT 55 (Ben, 2026-10-15). PRODUCTION recipes for rockets and propellant; launch site gates every launch."
+   "design": "SPRINT 55 (Ben, 2026-10-15). PRODUCTION recipes for rockets and propellant; launch site gates every launch. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-15",
    "parked": false,
@@ -74,11 +74,11 @@
    "difficulty": 3,
    "authority_doc": "docs/economy/SPACE_ASSETS.md",
    "title": "Satellites in orbit and rovers landed on other bodies, with what each yields",
-   "design": "SPRINT 55 (Ben, 2026-10-15). Yields (survey, RP, prestige, deeds) set at the cut."
+   "design": "SPRINT 55 (Ben, 2026-10-15). Yields (survey, RP, prestige, deeds) set at the cut. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-15",
    "parked": false,
@@ -95,11 +95,11 @@
    "difficulty": 3,
    "authority_doc": "docs/economy/SPACE_ASSETS.md",
    "title": "Crewed missions to the home world's moon and back",
-   "design": "SPRINT 55 (Ben, 2026-10-15). A mission is a launch plus a return; first landing a quest deed candidate."
+   "design": "SPRINT 55 (Ben, 2026-10-15). A mission is a launch plus a return; first landing a quest deed candidate. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-15",
    "parked": false,
@@ -116,11 +116,11 @@
    "difficulty": 4,
    "authority_doc": "docs/economy/SPACE_ASSETS.md",
    "title": "Crewed orbital stations assembled from successive launches",
-   "design": "SPRINT 55 (Ben, 2026-10-15). Modules launched one at a time; upkeep and crew resupply."
+   "design": "SPRINT 55 (Ben, 2026-10-15). Modules launched one at a time; upkeep and crew resupply. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-15",
    "parked": false,
@@ -137,11 +137,11 @@
    "difficulty": 3,
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "title": "AI nations run space programmes by scored utility",
-   "design": "SPRINT 55 (Ben, 2026-10-15). Grant: AI_OPPONENT.md § 11, 2026-10-15. Never for the player's nation; no multi-launch plan."
+   "design": "SPRINT 55 (Ben, 2026-10-15). Grant: AI_OPPONENT.md § 11, 2026-10-15. Never for the player's nation; no multi-launch plan. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-15",
    "parked": false,
@@ -158,11 +158,11 @@
    "difficulty": 3,
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "title": "Spectator GDP and output charts over the whole run, per nation",
-   "design": "SPRINT 55 (Ben, 2026-10-15). Ben chose GDP and output charts. Needs a question_log entry and a live click."
+   "design": "SPRINT 55 (Ben, 2026-10-15). Ben chose GDP and output charts. Needs a question_log entry and a live click. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-16",
    "parked": false,
@@ -181,11 +181,11 @@
     "src/world/nation_ai.cpp"
    ],
    "title": "AI nations set taxes by real need, so tiers move and Discontent can bite",
-   "design": "SPRINT 55 (Ben, 2026-10-16: leave it for now, revisit after the live run). As built in BL-1335 (taxes and Discontent), the AI tier scorer counts a nation short whenever its research queue owes, so every nation sits at III with one year at IV; Discontent peaks at 0.25 and never bites in 80 years; treasuries end 7x main because the budget does not spend the new revenue. Option offered: raise taxes only when the treasury cannot cover the budget lines, cut them on surplus. Compare against Ben's play log first."
+   "design": "SPRINT 55 (Ben, 2026-10-16: leave it for now, revisit after the live run). As built in BL-1335 (taxes and Discontent), the AI tier scorer counts a nation short whenever its research queue owes, so every nation sits at III with one year at IV; Discontent peaks at 0.25 and never bites in 80 years; treasuries end 7x main because the budget does not spend the new revenue. Option offered: raise taxes only when the treasury cannot cover the budget lines, cut them on surplus. Compare against Ben's play log first. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-16",
    "parked": false,
@@ -202,11 +202,11 @@
    ],
    "files": [],
    "title": "A tech-unlocked building family stands on a market centre, making trade points and raising the market pull",
-   "design": "SPRINT 55 (Ben, 2026-10-16): \"We can also add buildings to unlock from the tech tree which can be placed on a market centre, giving trade points and market attraction.\" DESIGNED (shape only): TRADE.md section A building on a market centre makes trade points and pull. One building, two effects - trade points for its owner at a staffed rate as a Marketplace makes them, and a multiplier on that centre's pull (BL-1346). Still to settle: how many rungs the family has, the trade points and pull each rung gives, its placement rule (one per centre?), its cost and upkeep, and which tech nodes unlock it (BL-1350 holds the provisional nodes). Needs PRODUCTION.md section Infrastructure buildings for the building itself."
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"We can also add buildings to unlock from the tech tree which can be placed on a market centre, giving trade points and market attraction.\" DESIGNED (shape only): TRADE.md section A building on a market centre makes trade points and pull. One building, two effects - trade points for its owner at a staffed rate as a Marketplace makes them, and a multiplier on that centre's pull (BL-1346). Still to settle: how many rungs the family has, the trade points and pull each rung gives, its placement rule (one per centre?), its cost and upkeep, and which tech nodes unlock it (BL-1350 holds the provisional nodes). Needs PRODUCTION.md section Infrastructure buildings for the building itself. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-16",
    "parked": false,
@@ -225,11 +225,11 @@
     "docs/economy/tech/digitisation_tree.json"
    ],
    "title": "Provisional Digitisation nodes that raise market pull, for Ben to approve later",
-   "design": "SPRINT 55 (Ben, 2026-10-16): \"We can add provisional techs for market pull and approve them later.\" The nodes grant the market-pull modifier BL-1346 reads, and unlock the building family in BL-1349. PROVISIONAL by Ben's own word: file them as the tree's placeholder kind (RESEARCH.md section The grammar of an age's tree) so the tree stays honest about what is authored and what is pending approval. The store is canonical - add them with node tools/session/tech_tree_store.js and re-render DIGITISATION_TREE.md's tables from it; never hand-edit the mirror, and run tech_tree_store.js --check after. Report the node count (160 before) and which branch each node joins."
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"We can add provisional techs for market pull and approve them later.\" The nodes grant the market-pull modifier BL-1346 reads, and unlock the building family in BL-1349. PROVISIONAL by Ben's own word: file them as the tree's placeholder kind (RESEARCH.md section The grammar of an age's tree) so the tree stays honest about what is authored and what is pending approval. The store is canonical - add them with node tools/session/tech_tree_store.js and re-render DIGITISATION_TREE.md's tables from it; never hand-edit the mirror, and run tech_tree_store.js --check after. Report the node count (160 before) and which branch each node joins. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-16",
    "parked": false,
@@ -246,11 +246,11 @@
    ],
    "files": [],
    "title": "LOGISTICS.md prints the superseded bifold LP model as the model, and LENSES.md justifies the lens from a quantity BL-1309 replaced",
-   "design": "SPRINT 55 (found mapping Ben's 2026-10-16 message). The doc stacks two models and only soft-marks the older one, so a top-down reader passes the 2026-10-14 ruling and then reads the overturned text as current. (1) The 'What it is' section still declares LP 'is BIFOLD' with a passive/active table and 'Cities generate it.' (2) 'Passive LP caps trade' is false in code: the convoy gate is retired, market_lp_left returns 0, so the 'Armies claim first' arbitration has no contention left to arbitrate - trade draws nothing. (3) Constraint 2's 'Cities are the locus' is false: the locus is a nation-wide scalar pool plus a per-source reach field, and that pool is arguably the pooled haul allowance the constraint was written to forbid, now pooled per nation - which deserves a sentence saying why that is acceptable rather than leaving the contradiction silent. (4) 'Where the parts live' has no row for src/world/logistic_points.* - the file that now IS the model. (5) LENSES.md:1016-1030 names the legacy pools as 'the magnitude' and argues per-tile LP is constant. Reconcile against the code after BL-1352 lands, so the doc describes one system; keep the history clearly fenced as history."
+   "design": "SPRINT 55 (found mapping Ben's 2026-10-16 message). The doc stacks two models and only soft-marks the older one, so a top-down reader passes the 2026-10-14 ruling and then reads the overturned text as current. (1) The 'What it is' section still declares LP 'is BIFOLD' with a passive/active table and 'Cities generate it.' (2) 'Passive LP caps trade' is false in code: the convoy gate is retired, market_lp_left returns 0, so the 'Armies claim first' arbitration has no contention left to arbitrate - trade draws nothing. (3) Constraint 2's 'Cities are the locus' is false: the locus is a nation-wide scalar pool plus a per-source reach field, and that pool is arguably the pooled haul allowance the constraint was written to forbid, now pooled per nation - which deserves a sentence saying why that is acceptable rather than leaving the contradiction silent. (4) 'Where the parts live' has no row for src/world/logistic_points.* - the file that now IS the model. (5) LENSES.md:1016-1030 names the legacy pools as 'the magnitude' and argues per-tile LP is constant. Reconcile against the code after BL-1352 lands, so the doc describes one system; keep the history clearly fenced as history. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-16",
    "parked": false,
@@ -267,11 +267,11 @@
    ],
    "files": [],
    "title": "The player can construct a market centre, at a high cost in materials",
-   "design": "SPRINT 55 (Ben, 2026-10-16): \"We also want to give the player a way to construct market centres, this can just be a high cost for the materials needed. This should help to reduce the number of tiles pulled towards neighbouring markets.\" DESIGNED (shape): MARKETS.md section A market centre can be built. Expensive in materials and gated by nothing else - the cost IS the constraint. A rival nation may build one too, by the same verb, so it is not an asymmetric player power. Still to settle: the material bill, whether a new centre must stand a minimum distance from an existing one, and what it does to the spontaneous-emergence pass (MARKETS.md section Spontaneous market emergence) which already creates centres on its own. Needs the verb on the corp_command seam with an ACTIONS.json entry, and the surface to press it."
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"We also want to give the player a way to construct market centres, this can just be a high cost for the materials needed. This should help to reduce the number of tiles pulled towards neighbouring markets.\" DESIGNED (shape): MARKETS.md section A market centre can be built. Expensive in materials and gated by nothing else - the cost IS the constraint. A rival nation may build one too, by the same verb, so it is not an asymmetric player power. Still to settle: the material bill, whether a new centre must stand a minimum distance from an existing one, and what it does to the spontaneous-emergence pass (MARKETS.md section Spontaneous market emergence) which already creates centres on its own. Needs the verb on the corp_command seam with an ACTIONS.json entry, and the surface to press it. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 55,
    "written": "2026-10-16",
    "parked": false,
@@ -290,11 +290,12 @@
     "src/world/logistic_points.cpp"
    ],
    "title": "Generation starts a market centre with several levels of logistics building",
-   "design": "SPRINT 55 (Ben, 2026-10-16): \"I imagine we might start generation with multiple levels in logistics buildings at the market centre.\" RULED (Ben, 2026-10-16): SEVERAL HUBS STACKED, not a tier ladder - generation puts more than one hub building on the centre tile. The stack rule already permits it (2-12 in aggregate, PRODUCTION.md section Building stacks) and a hub already makes a flat 120 points a tick scaled by its upkeep supply, so this is seeding, not new mechanism: seed_logistics_sources (logistic_points.cpp:382) already sites hubs at the serving market centre_tile where the ground allows and adds them one at a time until coverage and pool margin are met - it should start a centre with several. Gives Ben's picture: a centralised capital with a high number of points, diminishing with distance, extended by outlying hubs. Report points made at the centre against an outlying tile, per nation."
+   "design": "SPRINT 55 (Ben, 2026-10-16): \"I imagine we might start generation with multiple levels in logistics buildings at the market centre.\" RULED (Ben, 2026-10-16): SEVERAL HUBS STACKED, not a tier ladder - generation puts more than one hub building on the centre tile. The stack rule already permits it (2-12 in aggregate, PRODUCTION.md section Building stacks) and a hub already makes a flat 120 points a tick scaled by its upkeep supply, so this is seeding, not new mechanism: seed_logistics_sources (logistic_points.cpp:382) already sites hubs at the serving market centre_tile where the ground allows and adds them one at a time until coverage and pool margin are met - it should start a centre with several. Gives Ben's picture: a centralised capital with a high number of points, diminishing with distance, extended by outlying hubs. Report points made at the centre against an outlying tile, per nation. DELIVERED: stack_logistics_hubs (logistic_points.cpp) stacks hubs at capitals and market centres, called from finish_campaign_world; landed in bdb1c851 (2026-10-26) and closed at the sprint 60 close.",
+   "delivered": "2026-10-26"
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-17",
    "parked": false,
@@ -311,11 +312,11 @@
     "src/ui/selection_panel.cpp"
    ],
    "title": "The road ladder is the last tall row on the build list, and its first rung is called Track like the rail row above it",
-   "design": "SPRINT 55 (found delivering BL-1366/1368, 2026-10-17). TWO THINGS, one surface. (1) Every construction row is now one line in the shared eight-column grid - build list, queue, tile-card stacks, expanded site card, and as of BL-1366 the rail rows too. The ROAD LADDER's three tier rows are the last exception: tall bordered boxes with a 56 px glyph, and now the only tall rows on the panel. Bring them into ui::construction_begin_build_grid and the per-column explainers, as the rail rows were. (2) A NAME COLLISION, pre-existing but newly visible now both are compact: the road ladder's first rung is 'Track' (LOGISTICS.md's road tier 1) and the rail row directly above it is also 'Track' (the railway line). Two adjacent one-line rows, same word, different networks. BEN'S CALL whether to rename one - the road tier names Track/Road/Highway are LOGISTICS.md's ladder and the rail 'Track' is GLOSSARY-adjacent, so a rename moves a term, not a label. Raise it rather than pick. BEN RULED 2026-10-18: the ROAD rung is the name that moves; the rail row keeps Track. He offered 'Trail / Path' as examples and left the pick in-band - TRAIL is chosen, so the ladder reads Trail -> Road -> Highway and the ancient ladder's first rung moves with it (it promotes into the same field). THE WORK is a term move, not a label: GLOSSARY.md, LOGISTICS.md section 4 and 4a, RENDERING.md, the history-lapse ladder, ACTIONS.json, and app.cpp's kName."
+   "design": "SPRINT 55 (found delivering BL-1366/1368, 2026-10-17). TWO THINGS, one surface. (1) Every construction row is now one line in the shared eight-column grid - build list, queue, tile-card stacks, expanded site card, and as of BL-1366 the rail rows too. The ROAD LADDER's three tier rows are the last exception: tall bordered boxes with a 56 px glyph, and now the only tall rows on the panel. Bring them into ui::construction_begin_build_grid and the per-column explainers, as the rail rows were. (2) A NAME COLLISION, pre-existing but newly visible now both are compact: the road ladder's first rung is 'Track' (LOGISTICS.md's road tier 1) and the rail row directly above it is also 'Track' (the railway line). Two adjacent one-line rows, same word, different networks. BEN'S CALL whether to rename one - the road tier names Track/Road/Highway are LOGISTICS.md's ladder and the rail 'Track' is GLOSSARY-adjacent, so a rename moves a term, not a label. Raise it rather than pick. BEN RULED 2026-10-18: the ROAD rung is the name that moves; the rail row keeps Track. He offered 'Trail / Path' as examples and left the pick in-band - TRAIL is chosen, so the ladder reads Trail -> Road -> Highway and the ancient ladder's first rung moves with it (it promotes into the same field). THE WORK is a term move, not a label: GLOSSARY.md, LOGISTICS.md section 4 and 4a, RENDERING.md, the history-lapse ladder, ACTIONS.json, and app.cpp's kName. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-18",
    "parked": false,
@@ -333,11 +334,11 @@
     "src/world/world_save.cpp"
    ],
    "title": "lp_pool_harness's L7 old-version row has been red since roads became edges",
-   "design": "SPRINT 55 (found running BL-1352's gates, 2026-10-18; NOT caused by it - that change touches no serialisation and save_roundtrip is green). lp_pool_harness reads 18 pass, 1 fail: 'L7 a v49 stream reads, every nation on the mechanical default'. CAUSE, read in the code rather than guessed: the row FABRICATES an old stream by writing a CURRENT snapshot, truncating the trailing share/space/tax sections, and overwriting the version word with k_world_save_version_pre_lp (49). That worked while the tile RECORD was version-independent. BL-1340 (v53) made it version-dependent - r_tile_v reads a u16 road_edges at the current version and a u8 legacy road_level below it - so a v53 body of bytes labelled v49 desyncs at the first tile and the reader refuses the whole stream. The assertion is therefore failing for a true reason: that stream is not a v49 stream. THE FIX is to produce a REAL old stream the way BL-1340 already does for its own case - world_save.cpp has write_world_snapshot_pre_road_edges / write_world_snapshot_at for exactly this - rather than relabelling bytes, and NOT to relax the row. Worth doing because the row guards a real migration (a pre-LP save must load with every nation on the mechanical share default) and a red row nobody owns is how a gate set rots."
+   "design": "SPRINT 55 (found running BL-1352's gates, 2026-10-18; NOT caused by it - that change touches no serialisation and save_roundtrip is green). lp_pool_harness reads 18 pass, 1 fail: 'L7 a v49 stream reads, every nation on the mechanical default'. CAUSE, read in the code rather than guessed: the row FABRICATES an old stream by writing a CURRENT snapshot, truncating the trailing share/space/tax sections, and overwriting the version word with k_world_save_version_pre_lp (49). That worked while the tile RECORD was version-independent. BL-1340 (v53) made it version-dependent - r_tile_v reads a u16 road_edges at the current version and a u8 legacy road_level below it - so a v53 body of bytes labelled v49 desyncs at the first tile and the reader refuses the whole stream. The assertion is therefore failing for a true reason: that stream is not a v49 stream. THE FIX is to produce a REAL old stream the way BL-1340 already does for its own case - world_save.cpp has write_world_snapshot_pre_road_edges / write_world_snapshot_at for exactly this - rather than relabelling bytes, and NOT to relax the row. Worth doing because the row guards a real migration (a pre-LP save must load with every nation on the mechanical share default) and a red row nobody owns is how a gate set rots. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-18",
    "parked": false,
@@ -356,11 +357,11 @@
     "tools/verify/lp_anchor_field_check.cpp"
    ],
    "title": "lp_anchor_field_check's F1 row lost its subject when the march stopped reading the anchor field",
-   "design": "SPRINT 55, from BL-1352. F1 asks whether the field THE TICKS BUILT survives invalidate_logistics_caches - a question that needs a live consumer to have built one. The march was that consumer (it looked up its nearest anchor every tick); BL-1352 moved the march onto the nation's pool, so a play year now leaves no cached field and F1 is counted on 0 of 1 anchored bodies. It is reported as a loud SKIP naming this item rather than passed quietly (BL-714: a check that never looked is not a pass) and rather than failed, since there is no failure - there is no subject. THE WORK, once BL-1361 lands (a shipment draws points at the anchor it leaves, which reads this same field): turn the SKIP back into the assertion, and check that the warm field the trade pass builds is the one the read reuses. If BL-1361 ends up reading something else entirely, retire F1 and say so in the harness header."
+   "design": "SPRINT 55, from BL-1352. F1 asks whether the field THE TICKS BUILT survives invalidate_logistics_caches - a question that needs a live consumer to have built one. The march was that consumer (it looked up its nearest anchor every tick); BL-1352 moved the march onto the nation's pool, so a play year now leaves no cached field and F1 is counted on 0 of 1 anchored bodies. It is reported as a loud SKIP naming this item rather than passed quietly (BL-714: a check that never looked is not a pass) and rather than failed, since there is no failure - there is no subject. THE WORK, once BL-1361 lands (a shipment draws points at the anchor it leaves, which reads this same field): turn the SKIP back into the assertion, and check that the warm field the trade pass builds is the one the read reuses. If BL-1361 ends up reading something else entirely, retire F1 and say so in the harness header. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-19",
    "parked": false,
@@ -378,11 +379,11 @@
     "scripts/verify/ground_bake.lua"
    ],
    "title": "A press on a single-building tile selects the tile, not the building",
-   "design": "SPRINT 55 (found smoke-testing BL-1386, 2026-10-19). ground_bake.lua is RED on nine assertions, all the same shape: 'a press on a single-building tile selects the building (hit zone kept)' and its off-centre variants at zoom 5 and 10 - every one reporting 'got tile'. SELECTION.md's repeat-click cycle has the building outrank the tile on the FIRST press (BL-575 moved unit above building for the same reason: a thing standing on the ground must be reachable without cycling). PROVEN PRE-EXISTING: the same nine lines fail on the binary built before BL-1386's renderer change, so the structure hit zone was already missing or mis-sized. SUSPECT: the zones the bake's installation pass publishes (structure_hit_zone, emitted beside the baked stamps) versus what resolve_marker_hit reads - a building drawn INTO the ground has no marker glyph to hit any more (BL-1241 retired the canvas building draw), so the hit zone is the only thing standing in for it. THE WORK: find which side stopped publishing, fix it, and keep the nine rows as the check. A SIBLING ROW (found 2026-10-20 during BL-1353's hover card): lens_one_tier.lua's 'no lens: the first press on a built tile still gives the building' is red too, and its last edit (2026-08-29) predates Ben's 2026-10-13 ruling (BL-1312, a plain-canvas press selects the TILE, never the building). Settle it with the nine rows above: if the ruling stands, that row is stale and is rewritten to the ruling, not relaxed."
+   "design": "SPRINT 55 (found smoke-testing BL-1386, 2026-10-19). ground_bake.lua is RED on nine assertions, all the same shape: 'a press on a single-building tile selects the building (hit zone kept)' and its off-centre variants at zoom 5 and 10 - every one reporting 'got tile'. SELECTION.md's repeat-click cycle has the building outrank the tile on the FIRST press (BL-575 moved unit above building for the same reason: a thing standing on the ground must be reachable without cycling). PROVEN PRE-EXISTING: the same nine lines fail on the binary built before BL-1386's renderer change, so the structure hit zone was already missing or mis-sized. SUSPECT: the zones the bake's installation pass publishes (structure_hit_zone, emitted beside the baked stamps) versus what resolve_marker_hit reads - a building drawn INTO the ground has no marker glyph to hit any more (BL-1241 retired the canvas building draw), so the hit zone is the only thing standing in for it. THE WORK: find which side stopped publishing, fix it, and keep the nine rows as the check. A SIBLING ROW (found 2026-10-20 during BL-1353's hover card): lens_one_tier.lua's 'no lens: the first press on a built tile still gives the building' is red too, and its last edit (2026-08-29) predates Ben's 2026-10-13 ruling (BL-1312, a plain-canvas press selects the TILE, never the building). Settle it with the nine rows above: if the ruling stands, that row is stale and is rewritten to the ruling, not relaxed. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-17",
    "parked": false,
@@ -399,11 +400,11 @@
     "scripts/verify/lib.lua"
    ],
    "title": "construction_ledger_tabs dies in staging: its fixture is refused for want of a road, not for want of funds",
-   "design": "SPRINT 55 (found verifying BL-1370/1371 on main, 2026-10-17). scripts/verify/construction_ledger_tabs.lua exits 1 with ZERO assertions run - it dies in base.stage_ui_fixture (lib.lua:340, raised at :223) with 'fixture could not place a military base near the player's works: insufficient_funds'. The fixture runs up to 20 verify.econ_step(1) waiting out tech_locked and then places; the corp cannot pay by then. The delivering lane flagged it rather than claiming it pre-existing, which was right, and I could not attribute it either without a build at an older commit. CANDIDATES, in order: (1) BL-1335 taxes, merged the day before, now charge a share of operating profit every quarter the fixture steps - though the tax is floored at 0 so a loss-making fixture corp should pay nothing, which is the first thing to check; (2) the construction rate work changed what a build charges per tick; (3) market prices moved under the fixture so the base simply costs more. NOT a defect in the road or grid work: construction_progress (910), tile_card (71) and roads (31) all pass on the same build with zero failures. THE WORK: find which, then either fix the cause or fund the fixture honestly - never by widening the loop count, which would hide a real cost change. CORRECTED 2026-10-18, and MY FILED PREMISE WAS WRONG. The refusal is not affordability: once verify_api stopped collapsing refusals into 'failed' (see below), the message reads 'fixture could not place a military base near the player's works: needs_road' (lib.lua:249). It is the same BL-1347 gate, reached through place_near_player, which walks up to a 24-ring and is refused needs_road on every tile - so the three candidates I listed (taxes, construction rate, market prices) were all wrong, and the insufficient_funds text I quoted came from the collapsed enum, not from the treasury. THE SHAPE OF THE FIX IS A REAL DECISION, not a one-liner: roading every candidate before trying it would stamp about 2400 crossings, so the honest form is road-on-demand - try build_at, and only on needs_road road THAT tile and retry - which is correct ONLY IF needs_road is the LAST refusal can_place_in_world returns (otherwise a tile refused for the stack or the ceiling gets a road it never needed). Check that ordering first. It reaches about 20 scripts through stage_ui_fixture, so measure what roading each fixture switches on (reach discounts, and in one case the power-wire path) rather than assuming the placement is the only effect. RULED (Ben, 2026-10-18): CHECK THE ORDERING FIRST, then road-on-demand. Confirm needs_road is the LAST refusal can_place_in_world returns before building the retry, so a tile refused for a full stack or a full province ceiling never gets a road it did not need; if the ordering does not hold, fix the ordering or pick a different shape, and say which. Then road only the tile that was actually refused, never the whole candidate ring (about 2400 crossings). verify.stage_road exists for this and Ben granted its report of whether the write landed the same day. ID MOVED on integration, 2026-10-19: filed as BL-1374 in sprint 55's session while sprint 56's worktree filed a different BL-1374 (ZOOM_STAND_INS) at the same time. Sprint 56's keeps the id; this row is the same work under BL-1392. The same collision moved sprint 55's road-halves item to BL-1390 - two in one merge, because next_id.js cannot see an unmerged branch's store."
+   "design": "SPRINT 55 (found verifying BL-1370/1371 on main, 2026-10-17). scripts/verify/construction_ledger_tabs.lua exits 1 with ZERO assertions run - it dies in base.stage_ui_fixture (lib.lua:340, raised at :223) with 'fixture could not place a military base near the player's works: insufficient_funds'. The fixture runs up to 20 verify.econ_step(1) waiting out tech_locked and then places; the corp cannot pay by then. The delivering lane flagged it rather than claiming it pre-existing, which was right, and I could not attribute it either without a build at an older commit. CANDIDATES, in order: (1) BL-1335 taxes, merged the day before, now charge a share of operating profit every quarter the fixture steps - though the tax is floored at 0 so a loss-making fixture corp should pay nothing, which is the first thing to check; (2) the construction rate work changed what a build charges per tick; (3) market prices moved under the fixture so the base simply costs more. NOT a defect in the road or grid work: construction_progress (910), tile_card (71) and roads (31) all pass on the same build with zero failures. THE WORK: find which, then either fix the cause or fund the fixture honestly - never by widening the loop count, which would hide a real cost change. CORRECTED 2026-10-18, and MY FILED PREMISE WAS WRONG. The refusal is not affordability: once verify_api stopped collapsing refusals into 'failed' (see below), the message reads 'fixture could not place a military base near the player's works: needs_road' (lib.lua:249). It is the same BL-1347 gate, reached through place_near_player, which walks up to a 24-ring and is refused needs_road on every tile - so the three candidates I listed (taxes, construction rate, market prices) were all wrong, and the insufficient_funds text I quoted came from the collapsed enum, not from the treasury. THE SHAPE OF THE FIX IS A REAL DECISION, not a one-liner: roading every candidate before trying it would stamp about 2400 crossings, so the honest form is road-on-demand - try build_at, and only on needs_road road THAT tile and retry - which is correct ONLY IF needs_road is the LAST refusal can_place_in_world returns (otherwise a tile refused for the stack or the ceiling gets a road it never needed). Check that ordering first. It reaches about 20 scripts through stage_ui_fixture, so measure what roading each fixture switches on (reach discounts, and in one case the power-wire path) rather than assuming the placement is the only effect. RULED (Ben, 2026-10-18): CHECK THE ORDERING FIRST, then road-on-demand. Confirm needs_road is the LAST refusal can_place_in_world returns before building the retry, so a tile refused for a full stack or a full province ceiling never gets a road it did not need; if the ordering does not hold, fix the ordering or pick a different shape, and say which. Then road only the tile that was actually refused, never the whole candidate ring (about 2400 crossings). verify.stage_road exists for this and Ben granted its report of whether the write landed the same day. ID MOVED on integration, 2026-10-19: filed as BL-1374 in sprint 55's session while sprint 56's worktree filed a different BL-1374 (ZOOM_STAND_INS) at the same time. Sprint 56's keeps the id; this row is the same work under BL-1392. The same collision moved sprint 55's road-halves item to BL-1390 - two in one merge, because next_id.js cannot see an unmerged branch's store. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-18",
    "parked": false,
@@ -420,11 +421,11 @@
     "src/core/verify_api.cpp"
    ],
    "title": "The verify world can hold a building on a roadless tile, because its roster is stamped after generation lays site roads",
-   "design": "SPRINT 55 (found delivering BL-1347, 2026-10-18). PRODUCTION.md rules that no building may stand on a tile with no road, and generation now lays a Track to every site it stamps (lay_site_roads, called from make_hard_coded_world and again in finish_campaign_world). But verify_lay_roster is a THIRD stamper - it lays the roster or charter web AFTER generation's pass - so the --verify world can hold a roadless site, which is the one world where the rule does not hold. Measured there: 346 site tiles, 131 unroaded, 130 joinable, 1 unreachable, 135 crossings - so wiring it costs almost nothing. The delivering lane tried it and its run stalled in roads.lua's first wide capture past 5 GB; it then reproduced the SAME stall twice with the call removed, on a machine that had just run two 16-shard sweeps and where wc -l itself timed out, so the stall is UNATTRIBUTED and not evidence against the pass. A comment at verify_api.cpp ~871 carries that finding. THE WORK: wire the pass after verify_lay_roster, then re-run roads.lua on an idle machine - and note that the 40/40 currently recorded for roads.lua came from an earlier run of the same logic, not a fresh one. ID MOVED on integration, 2026-10-19: filed as BL-1377 in sprint 55's session while sprint 56's worktree filed a different BL-1377 (GROUND_UNDER_SIX_GB) at the same time. Sprint 56's keeps the id; this row is the same work under BL-1393. The same collision moved sprint 55's road-halves item to BL-1390 - two in one merge, because next_id.js cannot see an unmerged branch's store."
+   "design": "SPRINT 55 (found delivering BL-1347, 2026-10-18). PRODUCTION.md rules that no building may stand on a tile with no road, and generation now lays a Track to every site it stamps (lay_site_roads, called from make_hard_coded_world and again in finish_campaign_world). But verify_lay_roster is a THIRD stamper - it lays the roster or charter web AFTER generation's pass - so the --verify world can hold a roadless site, which is the one world where the rule does not hold. Measured there: 346 site tiles, 131 unroaded, 130 joinable, 1 unreachable, 135 crossings - so wiring it costs almost nothing. The delivering lane tried it and its run stalled in roads.lua's first wide capture past 5 GB; it then reproduced the SAME stall twice with the call removed, on a machine that had just run two 16-shard sweeps and where wc -l itself timed out, so the stall is UNATTRIBUTED and not evidence against the pass. A comment at verify_api.cpp ~871 carries that finding. THE WORK: wire the pass after verify_lay_roster, then re-run roads.lua on an idle machine - and note that the 40/40 currently recorded for roads.lua came from an earlier run of the same logic, not a fresh one. ID MOVED on integration, 2026-10-19: filed as BL-1377 in sprint 55's session while sprint 56's worktree filed a different BL-1377 (GROUND_UNDER_SIX_GB) at the same time. Sprint 56's keeps the id; this row is the same work under BL-1393. The same collision moved sprint 55's road-halves item to BL-1390 - two in one merge, because next_id.js cannot see an unmerged branch's store. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: dropped as BL-1412 (roadless generated building) was)."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": 55,
    "written": "2026-10-18",
    "parked": false,
@@ -443,7 +444,7 @@
     "src/ui/road_tool.cpp"
    ],
    "title": "A newly built road reads as connected in every direction, though the build is pairwise",
-   "design": "SPRINT 55. BEN, in play on 2026-10-18: \"It looks like roads are still rendered as adjoining even if the build is pairwise. When I build a new road tile, I see it connect in all possible directions, not just the direction it was built in.\" WHAT THE CODE SAYS, read the same day: the simulation is right - construction.cpp's lay_road_edge raises ONE crossing (both halves of that one edge), and BOTH draw paths gate on the edge mask, not on the neighbour: body_surface_canvas's draw_network skips a direction where road_tier_on_side is 0 ('nothing is laid across THIS boundary'), and the bake's road_links_of does the same before tile_pieces. So the all-directions read is NOT the two paths disagreeing with the mask, and three candidate causes remain, in order of likelihood: (1) the ARMED HIGHLIGHT persists after the lay, so the legal crossings still drawn around the new tile read as built road (BL-1370's highlight, drawn by the same press); (2) the NEIGHBOUR already carried generated edges on its other sides, so the junction genuinely connects several ways and only the new edge is new; (3) a stale bake chunk re-derived from road rather than road_sides. THE WORK: reproduce live at the zoom Ben was at, name which of the three it is, and fix that one - it is a visual triage item, so the live look comes before any code. It matters beyond itself because BL-1353's lens honesty rests on the road picture being true. ID MOVED on integration, 2026-10-19: filed as BL-1382 in sprint 55's session while sprint 56's worktree filed a different BL-1382 (PROVINCE_NORMALISING_PASS) at the same time. Sprint 56's keeps the id; this row is the same work under BL-1394. The same collision moved sprint 55's road-halves item to BL-1390 - two in one merge, because next_id.js cannot see an unmerged branch's store."
+   "design": "SPRINT 55. BEN, in play on 2026-10-18: \"It looks like roads are still rendered as adjoining even if the build is pairwise. When I build a new road tile, I see it connect in all possible directions, not just the direction it was built in.\" WHAT THE CODE SAYS, read the same day: the simulation is right - construction.cpp's lay_road_edge raises ONE crossing (both halves of that one edge), and BOTH draw paths gate on the edge mask, not on the neighbour: body_surface_canvas's draw_network skips a direction where road_tier_on_side is 0 ('nothing is laid across THIS boundary'), and the bake's road_links_of does the same before tile_pieces. So the all-directions read is NOT the two paths disagreeing with the mask, and three candidate causes remain, in order of likelihood: (1) the ARMED HIGHLIGHT persists after the lay, so the legal crossings still drawn around the new tile read as built road (BL-1370's highlight, drawn by the same press); (2) the NEIGHBOUR already carried generated edges on its other sides, so the junction genuinely connects several ways and only the new edge is new; (3) a stale bake chunk re-derived from road rather than road_sides. THE WORK: reproduce live at the zoom Ben was at, name which of the three it is, and fix that one - it is a visual triage item, so the live look comes before any code. It matters beyond itself because BL-1353's lens honesty rests on the road picture being true. ID MOVED on integration, 2026-10-19: filed as BL-1382 in sprint 55's session while sprint 56's worktree filed a different BL-1382 (PROVINCE_NORMALISING_PASS) at the same time. Sprint 56's keeps the id; this row is the same work under BL-1394. The same collision moved sprint 55's road-halves item to BL-1390 - two in one merge, because next_id.js cannot see an unmerged branch's store. CANCELLED 2026-10-30 (Ben, at the sprint 60 close: the sprint 55 carries left unbuilt are cancelled)."
   },
   {
    "status": "proposed",
@@ -763,8 +764,8 @@
    "design": "RELATIONS.md § 7 (Ben, 2026-10-30: the full war, not declaration only). War score -100..100 from occupation of goals (province_holder, tile-weighted) and battle strength destroyed, weights authored; exhaustion 0-100 per party from strength lost, days in the field and provinces held by the enemy, decaying at peace, moving unit morale (MILITARY.md stats table). Peace offers in their own table, one pending per war: white peace or cession of held goals; impose at 100; both hostility rows clear; the record closes to history; a truce bars re-declaration. Cession's territorial half is BL-1460 (cession moves territory). Declaration and the record are BL-1459."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "cancelled",
+   "glyph": "✕",
    "sprint": null,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
@@ -782,7 +783,7 @@
     "src/world/components.hpp"
    ],
    "title": "Air wings at airbases fly superiority, strategic and tactical missions over provinces",
-   "design": "MILITARY.md § Air. Planes and strike drones; HP, morale, air attack, ground soft/hard attack, no hardness; air superiority share per province; ground air defence engages every mission."
+   "design": "MILITARY.md § Air. Planes and strike drones; HP, morale, air attack, ground soft/hard attack, no hardness; air superiority share per province; ground air defence engages every mission. CANCELLED 2026-10-30 at the sprint 60 close: superseded by BL-1449 (air combat core), BL-1450 (air UI) and BL-1451 (rival air)."
   },
   {
    "status": "proposed",

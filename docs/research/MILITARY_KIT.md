@@ -113,7 +113,7 @@ row's quality scale. Numbers are a first cut, to be tuned against `campaign_batt
 | 2 | Medium-range missiles | (Air) | Integrated network | (Air) |
 | 3 | Layered defence with counter-drone | (Air) | Electronic warfare | enemy drone kit −50% in its province |
 
-Air defence's kit is mostly for the air theatre (BL-1429), which does not exist yet; its numbers
+Air defence's kit is mostly for the air theatre (BL-1449 (air combat core)); its numbers
 there are that item's work. Its ground effects stay small.
 
 **Munitions are kit, not a separate ladder.** Guided shells, top-attack missiles and submunitions

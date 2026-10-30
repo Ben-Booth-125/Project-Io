@@ -556,7 +556,7 @@ satellite lifts fog over enemy ground and reveals unit stacks; the satellite cla
 
 *Owners: BL-1421 (soft hard resolver), BL-1422 (land classes and kit), BL-1423 (refit and
 retreat), BL-1424 (soldiers from labour), BL-1425 (unit counter render), BL-1426 (bunkers),
-BL-1427 (fronts), BL-1429 (air theatre), BL-1430 (sea theatre), BL-1431 (missiles and
+BL-1427 (fronts), BL-1449 (air combat core), BL-1430 (sea theatre), BL-1431 (missiles and
 satellites).*
 
 ---

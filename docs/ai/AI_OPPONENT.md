@@ -192,6 +192,34 @@ not an absolute wealth band, which says nothing about whether anyone was played 
 > (`DEVELOPMENT_PRACTICES.md` § Cutting a release; NR-167, ruled 2026-08-13). This block is the
 > baseline the next one diffs against — keep it at the top, one entry per sweep, newest first.
 >
+> **2026-10-30 (v0.2.4).** Verdict: **the map below stands as written; no amendment required.** The
+> window ran 2026-10-23 → 2026-10-30, seven days, and was nearly empty, as a week should be.
+>
+> Areas 1, 2 and 4: no material change. Victoria 3 1.15 (2026-10-22) was recorded by the last sweep;
+> Stellaris 4.5 "Cygnus" is dated 2026-09-22, inside the last window - a date correction, still on
+> aggregators. No Paradox AI diary in the window.
+>
+> Area 3: one finding, the last sweep's announced-only item now released. **NVIDIA Nemotron 3.5 Bolt
+> E4B 4GB** (2026-10-23; open weights, data and recipes under OpenMDW-1.1; Hugging Face
+> nvidia/NVIDIA-Nemotron-3.5-Bolt-E4B-4GB). 8B total, ~4B active, post-trained on Gemma 4 E4B, the
+> third generation of NVIDIA ACE's NPC models: in-character conversation with tool calls, demoed on a
+> Jetson Orin Nano 8GB. Its roleplay and EQ figures are vendor or secondhand, unverified here. It is
+> the closest public match yet to § 10g's **Stage C** seat, near Cicero's 2.7B and inside C1/C2. It
+> changes no decision: Stage A/B is the action generator for determinism and legibility, never
+> capability, and Stage C's open problems (no Io dialogue corpus, no cross-hardware determinism) stand.
+>
+> MCP: no change in the window. The current specification is still 2026-07-28 (stateless core,
+> `Mcp-Session-Id` removed, `server/discover` mandatory, HTTP+SSE deprecated). It predates both
+> windows and is new only to this map; checking § 10e against it is work, not a finding.
+>
+> *Limits of the 2026-10-30 sweep, recorded because the next one inherits them.* The agent's
+> knowledge cutoff (June 2026) again sat before the window; "new" was judged by published date alone.
+> Unconfirmed or excluded: SpeedrunBench (Patronus AI, arXiv 2610.08076; date unconfirmed, action
+> games); llama.cpp issue #23302 (draft-mtp committing tokens that differ from the baseline, which
+> bears on Stage C replayability; undated, unread; MTP stays opt-in); Qwen 4 27B (no weights as of
+> 2026-10-24); Civ VII (nothing in the window; the 1.5.0 gap stays open). arXiv new-submission
+> listings still could not be enumerated; treat the empty areas as a quiet week, not proof of one.
+>
 > **2026-10-23 (v0.2.0).** Verdict: **the map below stands as written; no amendment required.** One
 > optional sentence for Area 2 is offered below. The window ran 2026-08-26 → 2026-10-23, fifty-eight
 > days, four times the last one, and it was not empty.
