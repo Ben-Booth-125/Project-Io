@@ -358,9 +358,9 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 
 **Answers:** Which nation am I?
 
-**Because:** Identity is carried by emblem and colour across every canvas and ledger (BL-090). One place has to establish that vocabulary, or the marker colours are arbitrary everywhere else. Re-subjected to the NATION (BL-1406; PROFILE.md § Contents): the card names the player's nation, its emblem shape keyed by the nation and its colour the nation's identity colour - the one the Nations lens and the border band read - and the former 'Parent:' line retired with the corporation.
+**Because:** Identity is carried by colour across every canvas and ledger (BL-090). One place has to establish that vocabulary, or the marker colours are arbitrary everywhere else. Re-subjected to the NATION (BL-1406; PROFILE.md § Contents): the card names the player's nation beside a thin rule in the nation's identity colour - the one the Nations lens and the border band read - and the former 'Parent:' line retired with the corporation. No emblem (BL-1417; Ben, 2026-10-26): a nation carries none until one is designed, so the retired corporation's geometric shape is not borrowed for it.
 
-*Demanded by BL-090, BL-091, BL-1406 · `src/ui/profile_panel.cpp` · id `profile_panel`*
+*Demanded by BL-090, BL-091, BL-1406, BL-1417 · `src/ui/profile_panel.cpp` · id `profile_panel`*
 
 ### Selection band - the tile element's PROVINCE card (second column): one header row (title, a narrowed capacity bar, the population count right-aligned), then one Built / Max / Resource table taking the rest of the card and scrolling inside itself
 

@@ -21,7 +21,7 @@ Give the player a persistent, at-a-glance sense of *who they are* in the world �
 - **Nation name** — read live from the nation table; a placeholder name appears only as a lookup-failure fallback, e.g. a spectated world with nobody seated.
 - The former **`Parent: <home nation>`** and **`Focus: <industrial focus>`** lines retire with the corporation (Ben, 2026-10-23): the player is the nation, and the corporation's industrial focus has no subject. A nation's economic focus is a scorer input, not an identity line (`../GLOSSARY.md` § Economic focus; Ben, 2026-10-26).
 
-Long lines **ellipsize** to the width remaining beside the portrait, so generated names never spill past the fixed card edge; the full text is available as a hover tooltip.
+The nation's identity colour shows as a thin rule beside the name — a colour, not a shape. Long lines **ellipsize** to the width remaining beside it, so generated names never spill past the fixed card edge; the full text is available as a hover tooltip.
 
 The panel is a static identity readout. It may later become the entry point to a fuller nation screen.
 

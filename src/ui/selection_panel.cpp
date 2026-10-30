@@ -473,10 +473,10 @@ namespace {
 
 // A small kind glyph for the header (BL-093) — a coloured primitive so each
 // selection kind reads at a glance in place of the former placeholder portrait
-// column. BL-090 promotes the corporation and building kinds to the shared corp
-// emblem (shape + identity colour), so the header reads *whose* it is and matches
-// the identity card and the on-canvas markers; body/tile keep their plain
-// primitives. @p id is the selected entity, used to resolve the owning corp.
+// column. BL-1417 (PROFILE.md § Emblem; Ben, 2026-10-26): no emblem stands in for
+// an owner until one is designed, so no shape is keyed off an owner's id. A
+// building's square takes its owner's identity COLOUR (ownership is public,
+// BL-068) — the colour is the only mark a nation has. @p id is the selected entity.
 void draw_selection_icon(const world& w, ImDrawList* dl, selection_kind kind,
                          entity_id id, ImVec2 c, float r)
 {
@@ -486,25 +486,17 @@ void draw_selection_icon(const world& w, ImDrawList* dl, selection_kind kind,
         case selection_kind::body:
             dl->AddCircleFilled(c, r, col, 20);
             break;
-        case selection_kind::corporation:
-            // The selected entity *is* the corporation.
-            icons::corp_emblem(dl, c, r, palette::corp_emblem_shape(id),
-                               palette::corp_identity_colour(id, w.player_entity));
-            break;
         case selection_kind::building:
         {
-            // The owning corp's emblem (player or rival — ownership is public,
-            // BL-068). Falls back to the plain square if the owner won't resolve.
-            // BL-1406: the owner is a corporation or a NATION (building_owner_of);
-            // the player's nation wears the player's emblem, as the profile does.
+            // BL-1406: the owner is a NATION (building_owner_of); the player's
+            // nation takes the player identity colour, as the canvas does.
             entity_id owner = building_owner_of(w, id).id;
             if (owner != null_entity && owner == player_actor(w))
                 owner = w.player_entity;
-            if (owner != null_entity)
-                icons::corp_emblem(dl, c, r, palette::corp_emblem_shape(owner),
-                                   palette::corp_identity_colour(owner, w.player_entity));
-            else
-                dl->AddRectFilled({c.x - r, c.y - r}, {c.x + r, c.y + r}, col, 2.0f);
+            const ImU32 fill = owner != null_entity
+                                   ? palette::corp_identity_colour(owner, w.player_entity)
+                                   : col;
+            dl->AddRectFilled({c.x - r, c.y - r}, {c.x + r, c.y + r}, fill, 2.0f);
             break;
         }
         case selection_kind::tile:

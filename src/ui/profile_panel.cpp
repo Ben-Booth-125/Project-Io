@@ -1,6 +1,6 @@
 #include "profile_panel.hpp"
 #include "foldout_column.hpp"
-#include "icons.hpp"
+
 #include "presentation.hpp"
 #include "text_fit.hpp"
 
@@ -32,37 +32,31 @@ void draw_profile_panel(const world& w)
     ImGui::Begin("##profile_panel", nullptr, flags);
 
     // BL-1406 (PROFILE.md § Contents): the card names the player's NATION — the
-    // player IS its nation (CONCEPT.md § Player identity). The emblem's shape is
-    // keyed by the nation's id and its colour is the nation's identity colour, the
-    // one pinned table the Nations lens and the border band read. The former
-    // `Parent:` line retired with the corporation. A world with nobody seated
-    // (spectate) falls back to the placeholder.
-    const char*     nation_name  = "Unseated";
-    const entity_id nation       = player_nation(w);
-    const ImU32     emblem_col   = nation != null_entity
-                                       ? palette::nation_colour(nation)
-                                       : palette::corp_identity_colour(w.player_entity, w.player_entity);
-    const int       emblem_shape = palette::corp_emblem_shape(nation != null_entity ? nation
-                                                                                    : w.player_entity);
+    // player IS its nation (CONCEPT.md § Player identity). BL-1417 (PROFILE.md §
+    // Emblem; Ben, 2026-10-26): NO EMBLEM until one is designed, so nothing keys a
+    // shape off the nation's id. The nation's identity colour — the one pinned
+    // table the Nations lens and the border band read — is its only mark: a thin
+    // rule beside the name. A world with nobody seated (spectate) falls back to the
+    // placeholder.
+    const char*     nation_name = "Unseated";
+    const entity_id nation      = player_nation(w);
+    const ImU32     nation_col  = nation != null_entity
+                                      ? palette::nation_colour(nation)
+                                      : palette::corp_identity_colour(w.player_entity, w.player_entity);
     if (const auto nat_it = w.nations.find(nation); nat_it != w.nations.end())
     {
         if (!nat_it->second.name.empty())
             nation_name = nat_it->second.name.c_str();
     }
 
-    // Portrait slot: a dark rounded plate carrying the nation's geometric emblem
-    // (shape + identity colour), with its name beside it.
-    constexpr float portrait = 56.0f;
-    const ImVec2    p0       = ImGui::GetCursorScreenPos();
-    ImDrawList*     dl       = ImGui::GetWindowDrawList();
-    dl->AddRectFilled(p0, {p0.x + portrait, p0.y + portrait}, IM_COL32(28, 32, 42, 255), 4.0f);
-    ui::icons::corp_emblem(dl, {p0.x + portrait * 0.5f, p0.y + portrait * 0.5f},
-                           portrait * 0.34f, emblem_shape, emblem_col);
-    dl->AddRect(p0, {p0.x + portrait, p0.y + portrait}, IM_COL32(110, 120, 140, 255), 4.0f);
+    constexpr float rule_w = 4.0f;
+    const ImVec2    p0     = ImGui::GetCursorScreenPos();
+    const float     line_h = ImGui::GetTextLineHeight();
+    ImGui::GetWindowDrawList()->AddRectFilled(p0, {p0.x + rule_w, p0.y + line_h}, nation_col, 1.0f);
+    ImGui::SetCursorScreenPos({p0.x + rule_w + ImGui::GetStyle().ItemSpacing.x, p0.y});
 
-    ImGui::SameLine(portrait + ImGui::GetStyle().ItemSpacing.x * 2.0f);
     ImGui::BeginGroup();
-    // Ellipsize each line to the width remaining beside the portrait so long
+    // Ellipsize each line to the width remaining beside the colour rule so long
     // generated names never spill past the fixed card edge; a truncated line
     // carries the full text as a hover tooltip (BL-091).
     const float avail = ImGui::GetContentRegionAvail().x;

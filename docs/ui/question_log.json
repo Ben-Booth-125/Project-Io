@@ -441,11 +441,12 @@
   "profile_panel": {
    "surface": "Profile panel",
    "answers": "Which nation am I?",
-   "because": "Identity is carried by emblem and colour across every canvas and ledger (BL-090). One place has to establish that vocabulary, or the marker colours are arbitrary everywhere else. Re-subjected to the NATION (BL-1406; PROFILE.md § Contents): the card names the player's nation, its emblem shape keyed by the nation and its colour the nation's identity colour - the one the Nations lens and the border band read - and the former 'Parent:' line retired with the corporation.",
+   "because": "Identity is carried by colour across every canvas and ledger (BL-090). One place has to establish that vocabulary, or the marker colours are arbitrary everywhere else. Re-subjected to the NATION (BL-1406; PROFILE.md § Contents): the card names the player's nation beside a thin rule in the nation's identity colour - the one the Nations lens and the border band read - and the former 'Parent:' line retired with the corporation. No emblem (BL-1417; Ben, 2026-10-26): a nation carries none until one is designed, so the retired corporation's geometric shape is not borrowed for it.",
    "backlog_item": [
     "BL-090",
     "BL-091",
-    "BL-1406"
+    "BL-1406",
+    "BL-1417"
    ],
    "files": [
     "src/ui/profile_panel.cpp"
