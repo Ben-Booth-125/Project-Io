@@ -1265,6 +1265,28 @@
    ],
    "title": "A unit draws off the road up to 8 tiles, paid at the closest road per item resupplied; the Logistics lens dashes the off-road leg",
    "design": "Written in LOGISTICS.md § A unit draws off the road (Ben, 2026-10-29) and LENSES.md § Logistics lens (dashed line). A unit's quarterly supply request is scored at the closest road tile of its nation's network within 8 steps over crossable land (ties lowest tile id), served by that tile's routed cover; the request is the quantity of goods its resupply needs. More than 8 tiles from any road: draws nothing. The lens draws, for each player unit off its network, a dashed line from the paying road tile to the unit, coloured on the road ramp by its granted/requested; beyond 8 tiles, red to the nearest reached road. MILITARY.md § Carried supplies and § Upkeep carry the cross-references."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 60,
+   "version_goal": "v0.2.4",
+   "written": "2026-10-30",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (2026-10-30)",
+   "category": "Verification",
+   "authority_doc": "docs/ui/SELECTION.md",
+   "id": "BL-1457",
+   "short_name": "BUILDING_ELEMENT_STALE_AIM",
+   "priority": "B",
+   "difficulty": 1,
+   "requires": [],
+   "files": [
+    "scripts/verify/building_element.lua"
+   ],
+   "title": "building_element.lua aims at hard-coded coordinates that no longer accept an iron extraction site",
+   "design": "The script sweeps a 7x7 box around (155,37) for a tile that accepts an iron_ore extraction placement and errors when none does. On main 2652c244's build_rel it fails: 44 tiles refuse invalid_tile and 5 foreign_ground; none for funds. Aim the placement without fixed coordinates - verify.find_deposit_tile(\"iron_ore\") on the player's own ground, or the site finder rows - so generation moves cannot rot it. Script-only; no new verify grant."
   }
  ]
 }
