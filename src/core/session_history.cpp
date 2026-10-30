@@ -42,6 +42,10 @@ void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& 
 
     for (const battle_dispatch& d : dispatches)
     {
+        // BL-1453 (cold review): a weeks-long battle speaks on its opening, a change
+        // of phase and its end — not every day it fights.
+        if (!d.newsworthy)
+            continue;
         // VOICED BY THE ATTACKER'S CORP, and only for fights the player is in.
         // BL-212 keeps corporations out of Public precisely so a rival's
         // internals never leak through comms; a dispatch naming two rivals'

@@ -64,21 +64,17 @@ arithmetic in § The campaign force model; `resolve_battle` is a generation func
 ### `resolve_campaign_battle` — campaign scale
 
 `src/world/campaign_battle.{hpp,cpp}` (BL-315, armed house conflict spine). Campaign-scale: two
-forces in a province, fought over a bounded number of rounds, with priced withdrawal. Its
+forces over a tile, fought round by round until a side breaks or withdraws, with priced withdrawal. Its
 production caller is `run_battles` (§ Battles); `tools/verify/campaign_battle_harness.cpp`
 asserts it in isolation.
 
-**The randomness is real to the player and absent to the engine.** Every draw comes from a
-splitmix64 stream folded from the battle's own identity, consumed in a fixed order. The same save
-replays the same battle; the player, who cannot see the seed, faces a genuinely uncertain fight.
-
-The **`campaign_battle_identity`** folded into that seed is
-`{attacker, defender, province, tick, world_seed}`. The attacker/defender pair is packed in role
-order, not sorted — swapping the roles is a different battle and must be a different stream. The
-province sits in the fold where a tile index otherwise would (Ben's ruling 1, 2026-08-19: the
-province frames the fight), keeping the stream one field wide. `world_seed` is the province
-partition's seed — `world` carries none of its own, and the partition's is stable for the
-world's lifetime.
+**A battle has no randomness** (Ben, 2026-10-29; § Battles): no draw, no swing, no per-battle
+roll, so the same forces on the same ground with the same supply fight the same battle, and the
+same save replays it. The battle's identity is still folded into a **seed** —
+`campaign_battle_identity`, `{attacker, defender, tile, tick, world_seed}`, the pair packed in role
+order — but nothing in the fight reads it: it only varies the wording of the battle's dispatches
+(§ Dispatches and the card). `world_seed` is the province partition's seed — `world` carries none
+of its own, and the partition's is stable for the world's lifetime.
 
 **The span is modelled explicitly.** `begin_campaign_battle` opens a fight and resolves nothing;
 `step_campaign_battle` fights one round; `withdraw_campaign_battle` breaks off;
@@ -101,12 +97,19 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 | `hp_share_permille` | 300 | Share of landed damage that kills men; the rest spends readiness |
 | `hp_cost` | 400 | Milli-hits of HP damage that kill one man |
 | `readiness_cost` | 185 | Milli-hits per man that spend a unit's whole readiness |
+| `day_damage_permille` | 125 | Every day's landed damage (men and readiness alike) is scaled by this — what makes a battle weeks long |
+| `rout_ratio_permille` | 1500 | Above this ratio of raw hits (the dealer's over the taker's), the damage the taker takes rises by the excess ratio cubed — a rout stays fast |
+| `rout_cap_permille` | 12000 | The most the rout term multiplies the day's damage by |
+| `entrench_ratio_permille` | 1250 | Within this ratio of raw hits either way, the battle is dug in that day |
+| `entrench_casualty_permille` | 100 | A dug-in day's men losses are scaled by this: the drop falls on the men, the readiness share lands in full |
+| `entrench_recovery_permille` | 40 | Readiness a fed, armed unit regains each dug-in day (`unit_entrench_recovery_permille`), never above its morale |
 | `terrain_attack_scale` | 1000 | How far `terrain_defence` divides the attacker's hits — a mountain halves them |
 | `wavering_readiness` | 300 | Side readiness at or below which the phase reads wavering |
 | `morale_win` / `morale_loss` | 50 / 100 | Morale a battle's winners gain, and its losers and every retreating unit lose |
 | `readiness_recovery_permille` / `morale_recovery_permille` | 100 / 10 | Out of contact, per day (§ Marching, Ben 2026-10-28): readiness regained (by supply, never above morale), and morale's step toward supply |
 | `withdraw_base_permille` | 20 | Flat price of turning your back at all |
-| `withdraw_per_round_permille` | 25 | Added per round already fought |
+| `withdraw_per_round_permille` | 6 | Added per round already fought |
+| `withdraw_per_round_cap_permille` | 250 | The most the per-round term reaches (day 42, about a parity battle's length), so the dearest exit is 670 per-mille of the leaving side's men |
 | `withdraw_pursuit_scale` | 400 | Share of how far behind the withdrawing side is |
 | `rounds_per_day` | 1 | Rounds fought per day (§ Battles ruling 3, Ben 2026-10-28) |
 
@@ -114,10 +117,11 @@ Tuning lives in `campaign_battle_params`, as data, on the `corp_ai_params` prece
 units still in the fight. The withdrawal price is charged **in men**, per-mille of the side's
 standing men.
 
-**The curve** (`campaign_battle_harness` C4, infantry on plains, 200 seeds a ratio): attacking is
-dear, and breaking a defender takes about 2:1 in men — decisive 0% at 1:1, 15% at 1.5:1, 64% at
-1.75:1, 89% at 2:1, 99% from 2.5:1. With no swing (Ben, 2026-10-29, overturning NR-204's "a narrower
-swing made the edge too safe"), the same inputs always give the same battle.
+**The curve** (`campaign_battle_harness` C4, base infantry on plains, one fight a ratio, no supply
+recovery): attacking is dear, and the break is a **step at about 1.5:1 in men** — at 1:1 and 1.25:1
+the attacker breaks, from 1.5:1 the defender does (row "C4 TARGET the break sits at about 1.5:1").
+With no swing (Ben, 2026-10-29, overturning NR-204's "a narrower swing made the edge too safe"), the
+same inputs always give the same battle.
 
 **A battle has no maximum duration (Ben, 2026-10-29).** *"They continue while one unit is trying
 to move and end when readiness runs out. Some battles may easily take 90-180 days."* A battle runs
@@ -147,6 +151,22 @@ on at the ordinary rate.
 too").** No per-round swing and no per-battle roll: the same forces on the same ground with the same
 supply fight the same battle, every time. A long battle between unequal forces is therefore
 predictable, and that is accepted: what keeps a fight open is entrenchment and supply, not a draw.
+
+**The measured lengths.** Base infantry, one fight a ratio, with no supply recovery
+(`campaign_battle_harness` C4's sweep and its TARGET rows): **51 days at parity** (the attacker
+breaks; "C4 TARGET a parity battle is fought out in 30-60 days"), 72 at 1.25:1, **90 at 1.5:1** (the
+longest, the contested band; "C4 TARGET a 1.5:1 battle runs longer than parity"), 25 at 1.75:1, 12
+at 2:1 and **2 at 3:1** — a rout ("C4 TARGET a rout (3:1) is fast"). Through the daily pass, modern
+infantry on plains, fully supplied (`move_by_days_harness` D6): parity **entrenches and is still
+live at day 400**, 65 days at 1.5:1, 9 at 2:1 and 2 at 3:1. Two equal fully supplied sides hold a
+year (`campaign_battle_harness` "C7 two equal fully supplied sides hold each other for a year"); a
+starved side (supply 300) breaks on day 4 attacking and day 11 defending, because its supply also
+cuts its hits out of the band ("C7 a starved ... breaks"). Every fight that lands hits ends in time,
+however slowly — a day's sub-unit losses carry to the next ("C7 ... no freeze by truncation": supply
+50 a side, 300 men, breaks on day 2922); only a fight in which neither side lands anything runs on
+until the attacker withdraws. **Recon decides how a battle opens, not how long it lasts**
+(`land_recon_harness` M1): a blind base-infantry attack sees in full from day 4, and parity and
+1.5:1 run 51 and 89–92 days with recon or without.
 
 **Withdrawal is a first-class verb, not a failure state**, and it is never free. The cost has three
 terms — base, per-round, and pursuit — and the second and third are what make a late break-off
@@ -1170,7 +1190,8 @@ defended tile (Ben, 2026-10-27)**; adjacent stacks that joined stay where they s
 never puts two nations on one tile: a defender with nowhere to retreat stays put, and the attacking
 stack then stays where it stood. `world::province_holder` is what tracks *who currently holds a province*
 across battles (BL-569, province holder): seeded at generation from the territorial plurality,
-moved by a decisive battle's `field_held_by`, and left untouched by a stalemate. **A won battle
+moved by a decisive battle's `field_held_by`, and left untouched by a stalemate (which a saved
+battle alone can carry). **A won battle
 moves the holder only when the beaten side has no unit left anywhere in the province (Ben,
 2026-10-27)**: a battle is one tile, so beating one stack takes that tile, and the province changes
 hands when its last defending stack falls. It is deliberately
@@ -1181,8 +1202,8 @@ still unowned work. Battle state survives a save under BL-536 (world snapshot sa
 ### Dispatches and the card
 
 A battle **reports**. `battle_tick::dispatches` carries one pure-data `battle_dispatch` per battle
-that acted this day — the defended tile and its province, sides, phase, rounds fought / today / max, both strengths and
-swings, men lost, and for an ending the `withdrew`, `end` and `field_held_by` fields. It includes
+that acted this day — the defended tile and its province, sides, phase, rounds fought and today's, both strengths and
+changes of readiness across the day, men lost, and for an ending the `withdrew`, `end` and `field_held_by` fields. It includes
 battles that **concluded** that day and are already erased from `world::battles`; that is the only
 way the aftermath — who held the field, what it cost — can reach a surface at all.
 

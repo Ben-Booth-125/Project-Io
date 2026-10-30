@@ -30,13 +30,12 @@
 // shared a calibration is overturned: they answer different questions with
 // different models, and only terrain_combat's table is read by both.
 //
-// DETERMINISM. The randomness is real to the player and absent to the engine:
-// every draw comes from a splitmix64 stream folded from the battle's own
-// identity (participants + tile + tick + world seed), consumed in a fixed
-// order — attacker swing, then defender swing, once per round. No wall clock,
-// no global generator, and nothing whose consumption order depends on the
-// iteration order of a container. The same save replayed fights the same
-// battle; the player, who cannot see the seed, faces a genuinely uncertain one.
+// DETERMINISM. A battle carries NO RANDOMNESS (Ben, 2026-10-29): no draw, no
+// swing, no per-battle roll. Every round is the deterministic arithmetic of the
+// forces, the ground, the vision and the supply, so the same inputs fight the same
+// battle every time. The seed folded from the battle's identity (participants +
+// tile + tick + world seed) survives only to vary the dispatch wording. Nothing
+// here depends on the iteration order of a container.
 //
 // HEADLESS. Pure world-layer: no SDL, no Lua, no rendering, no input.
 // ---------------------------------------------------------------------------
@@ -64,21 +63,19 @@ struct campaign_battle_identity
 /// per-mille unless named otherwise.
 struct campaign_battle_params
 {
-    /// How many rounds a fight runs before it is called a stalemate. "A short
-    /// time" (Ben) — long enough to read the fight and pull out, short enough
-    /// that a campaign tick is not a tactical game.
-    int max_rounds = 6;
+    // NO ROUND CAP (Ben, 2026-10-29: "Battles shouldn't have maximum durations.
+    // They continue while one unit is trying to move and end when readiness runs
+    // out. Some battles may easily take 90-180 days."). The `max_rounds` stalemate
+    // that stood here (6) is gone: a fight ends only when a side is broken (no unit
+    // of it left fighting) or a side withdraws, and the attacker cancelling its move
+    // IS its withdrawal (`attacker_withdrew`, priced below).
 
-    /// Half-width of the per-round power swing. 600 = each side's scored power
-    /// is multiplied by a uniform draw in [400, 1600] that round. This is the
-    /// whole uncertainty budget: raise it and strength predicts victory less.
-    /// Widened from 300 (BL-400, NR-204): at 300 a 1.4:1 attacker won 99% of
-    /// fights, which Ben ruled too safe. Measured at 600 over 1000 seeds per
-    /// ratio: 1.0:1 -> 50%, 1.1:1 -> 63%, 1.2:1 -> 76%, 1.4:1 -> 89%,
-    /// 2.0:1 -> 99.8% — a 1.4:1 edge now loses about one fight in ten while
-    /// a 2:1 edge stays near-certain. Picked from the printed sweep curve
-    /// (campaign_battle_harness's C4 table), not asserted from arithmetic.
-    int swing_permille = 600;
+    // NO SWING (Ben, 2026-10-29: "Let's not add battle randomness ... remove the
+    // swing too"; MILITARY.md § Battles). The per-round power swing (`swing_permille`
+    // 600, a uniform draw in [400, 1600] per side per round) is gone with its two
+    // draws: every round's hits are the deterministic arithmetic, so the same forces
+    // on the same ground with the same supply fight the same battle. This overturns
+    // NR-204 ("a narrower swing made the edge too safe").
 
     /// BL-1421: THE LAND ROUND. Hits are milli-hits, per man per round, on the
     /// scale of unit_roster.cpp's class table.
@@ -100,6 +97,51 @@ struct campaign_battle_params
     /// Milli-hits of readiness damage, per man, that spend a unit's whole
     /// readiness.
     int readiness_cost = 185;
+
+    /// A BATTLE IS WEEKS LONG, NOT DAYS (Ben, 2026-10-29; MILITARY.md § Battles).
+    /// Two terms on the damage a side takes in a day, applied to the landed hits
+    /// after the visible share, so men and readiness slow together and a battle
+    /// kills the same share of its men it always did, over more days:
+    ///
+    ///   day_damage_permille — every day's landed damage x this. At 125 (1/8) a
+    ///     parity fight of base infantry, which the round once spent in about seven
+    ///     days, runs about forty (move_by_days D6; 167 measured 29.8, the low edge).
+    ///   the ROUT TERM — when the side dealing the damage out-hits the side taking
+    ///     it by more than `rout_ratio_permille` (raw hits, the
+    ///     ground included), the damage is raised by the excess ratio CUBED:
+    ///     x (ratio / rout_ratio)^3, capped at `rout_cap_permille`. Below the line
+    ///     nothing changes, so the contested band (about 1.5:1, where breaking a
+    ///     defender lies) is the longest fight; above it a rout stays fast — at
+    ///     3:1 the beaten side takes 8x the base, about the old pace.
+    /// Measured in campaign_battle_harness C4 and move_by_days_harness D6.
+    int day_damage_permille = 125;
+    int rout_ratio_permille = 1500;
+    int rout_cap_permille   = 12000;
+
+    /// LIKE FORCES ENTRENCH, AND SUPPLY DECIDES THE STALEMATE (Ben, 2026-10-29;
+    /// MILITARY.md § Battles). When neither side out-hits the other by more than
+    /// `entrench_ratio_permille` (raw hits, the ground included —
+    /// the rout term's measure, mirrored), the battle is DUG IN for that day:
+    ///   - the day's landed damage KILLS fewer men: its men share is scaled by
+    ///     `entrench_casualty_permille` (dug-in troops lose cohesion, not lives); the
+    ///     readiness share lands in full, so it is the stocks that decide;
+    ///   - every fighting unit regains `land_combatant::entrench_recovery` readiness
+    ///     after the day's damage, never above its morale - the caller sets it from
+    ///     the unit's carried supplies (`unit_entrench_recovery_permille`), so a fed,
+    ///     armed side holds and a starved one erodes and breaks.
+    /// Leaving the band leaves entrenchment the same day. No randomness is added (Ben,
+    /// 2026-10-29): a battle has no draw at all.
+    /// THE CALIBRATION (BL-1453): 1250 is the rout line's mirror nearer parity. An
+    /// open parity fight of base infantry spends the attacker's readiness at about
+    /// 20 a day (day_damage 125: some fifty days with no recovery - the 30-60 the
+    /// ruling asks of a parity battle its supplies do not cover); a fully supplied
+    /// unit regains 40 a day, above the 28 or so a modern row (quality 1.44) loses at
+    /// parity, so two fed sides hold (move_by_days D6: live at day 400); and a dug-in day
+    /// kills a tenth of the men an open one does, so a year of holding does not
+    /// bleed the fed side out.
+    int entrench_ratio_permille    = 1250;
+    int entrench_casualty_permille = 100;
+    int entrench_recovery_permille = 40;
 
     /// How much the battle ground's terrain_defence divides the ATTACKER's hits:
     /// hits x 1000 / (1000 + terrain_defence x this / 1000). At 1000 a mountain
@@ -135,22 +177,34 @@ struct campaign_battle_params
     ///                 breaking off while losing badly is where armies die.
     /// Note the rounds already fought have ALSO cost their own attrition, so
     /// the total price of a late withdrawal compounds twice over.
-    int withdraw_base_permille      = 20;
-    int withdraw_per_round_permille = 25;
-    int withdraw_pursuit_scale      = 400;
+    ///
+    /// THE PER-ROUND TERM IS CAPPED (BL-1453 fix round, 2026-10-29). With no round
+    /// cap a battle can run 90-180 days, and 25 a round uncapped would reach the
+    /// side's whole force by day 40. It grows 25 a round to `withdraw_per_round_cap`
+    /// 250 (day 10) and holds there, so the first ten days price as they always did
+    /// and the dearest exit — 20 + 250 + a pursuit of at most 400 — is 670 per-mille
+    /// of the leaving side's men: a late exit stays dear and never takes them all.
+    ///
+    /// RE-CUT FOR WEEKS-LONG BATTLES (BL-1453 retune, 2026-10-29): 6 a round to the
+    /// cap of 250 (day 42, about a parity battle's length), so a break-off in the
+    /// first week of a forty-day fight is cheap and one at its end is dear. The
+    /// dearest exit is still 20 + 250 + 400 = 670 per-mille of the leaving side's men.
+    int withdraw_base_permille          = 20;
+    int withdraw_per_round_permille     = 6;
+    int withdraw_per_round_cap_permille = 250;
+    int withdraw_pursuit_scale          = 400;
 
     /// PACING IS BY THE DAY (Ben, 2026-10-28; MILITARY.md § Battles ruling 3,
     /// BL-1445 move by days): rounds fought per DAY. Battles step every day, from
     /// the daily military pass (`run_military_day`), and contact is checked every
     /// day, so the day a march meets a hostile stack is the day its battle opens.
     ///
-    /// One round a day against `max_rounds` 6: a battle is fought out in at most
-    /// six days, and in about six at parity (campaign_battle_harness C4's mean
-    /// rounds, measured in days by move_by_days_harness D6). The round's damage is
-    /// unchanged - its scale was already a day's fighting once a round is a day.
-    /// Withdrawal is honoured at the day boundary, so a commander has a decision
-    /// every day of the fight rather than one between two quarters. Was
-    /// `rounds_per_tick = 3` (two economy ticks, 180 days, to a stalemate).
+    /// One round a day, with no cap on the rounds: a battle runs until a side is
+    /// broken or withdraws (move_by_days_harness D6 measures the days by force
+    /// ratio). The round's damage is unchanged - its scale was already a day's
+    /// fighting once a round is a day. Withdrawal is honoured at the day boundary,
+    /// so a commander has a decision every day of the fight. Was `rounds_per_tick
+    /// = 3` (two economy ticks, 180 days, to a stalemate).
     int rounds_per_day = 1;
 };
 
@@ -171,7 +225,10 @@ enum class campaign_battle_end : uint8_t
     defender_broken   = 2,
     attacker_withdrew = 3,
     defender_withdrew = 4,
-    stalemate         = 5, ///< max_rounds elapsed with both sides still standing.
+    /// PRODUCED BY NOTHING since 2026-10-29 (Ben: battles have no maximum duration;
+    /// the `max_rounds` stalemate is gone). Kept so a saved battle or dispatch that
+    /// ended on it still reads; never renumber.
+    stalemate         = 5,
 };
 
 /// One round's public record — what a watching player is shown, and what a
@@ -237,7 +294,28 @@ struct land_combatant
     /// Scales its soft and hard hits AND its defence and breakthrough. 1000 = no effect.
     int               terrain   = 1000;
     land_combat_stats stats{};          ///< unit_land_stats(), resolved at build.
+    /// BL-1453 (MILITARY.md § Recon): the share of THIS unit the enemy side sees,
+    /// per-mille — every hit landed on it is scaled by it. Set by the caller before
+    /// each round (`visible_share_permille`); 1000 (fully seen) for a caller that
+    /// models no recon, which leaves the round exactly as it was.
+    int               visible   = 1000;
+    /// BL-1453 (entrenchment): readiness, per-mille, this unit regains each DAY of
+    /// an entrenched fight, from its carried supplies. Set by the caller
+    /// (`unit_entrench_recovery_permille`); 0 for a caller that models none.
+    int               entrench_recovery = 0;
+    /// BL-1453 (cold review): the sub-unit remainders carried day to day - readiness
+    /// in (milli-hits x 1000) against men x readiness_cost, men in milli-hits against
+    /// hp_cost. Built from and written back to the unit (`unit_component::
+    /// battle_ready_carry` / `battle_hp_carry`, saved).
+    int64_t           ready_carry = 0;
+    int64_t           hp_carry    = 0;
 };
+
+/// BL-1453 (MILITARY.md § Recon, Ben 2026-10-29): THE VISIBLE SHARE of a defending
+/// unit, per-mille — min(1, the attacker's recon stock / the unit's stealth), the stock
+/// in milli-points. A target with no stealth is fully seen. The attacker's units are
+/// always fully seen: the defender's hits are always full.
+int visible_share_permille(int64_t recon_milli, int target_stealth);
 
 /// Still in the fight: men standing and readiness left.
 inline bool land_combatant_fighting(const land_combatant& c)
@@ -282,8 +360,14 @@ struct campaign_battle_state
     int attacker_strength_permille = 1000; ///< `side_readiness`, refreshed after every round.
     int defender_strength_permille = 1000;
 
-    uint64_t rng_state  = 0; ///< Advanced once per draw; never re-seeded mid-fight.
-    uint64_t stream_seed = 0; ///< The folded seed, kept for the outcome record.
+    /// UNUSED since 2026-10-29 (battles carry no randomness, so no step draws).
+    /// Still set to `stream_seed` at open, hashed and saved in the battle section, so an
+    /// older save loads and the battle record's layout is unchanged. Nothing advances or
+    /// reads it.
+    uint64_t rng_state  = 0;
+    /// The folded seed. No longer drives any draw; still read by the dispatch text,
+    /// which folds it with the round index to vary wording (battle_dispatch_text.cpp).
+    uint64_t stream_seed = 0;
 
     int rounds_fought = 0;
     campaign_battle_end end = campaign_battle_end::in_progress;
@@ -342,6 +426,13 @@ struct active_battle
     /// campaign resolver stays the single source of what a round does.
     campaign_battle_state state;
 
+    /// BL-1453 (MILITARY.md § Recon): THE ATTACKER'S RECON STOCK, milli-points — one per
+    /// battle, every defending unit's stealth compared against it. Opened at the recon
+    /// of the attacker's units that faced the tile a whole day, grown after every day's
+    /// round by the recon of its units in the battle, its adjacent units and its air,
+    /// until it covers the stealthiest defender. Saved (world_save_version 67).
+    int32_t attacker_recon_milli = 0;
+
     /// A withdrawal asked for since the last round batch, honoured at the TICK
     /// BOUNDARY before the next one. Held here rather than applied on request
     /// because that delay IS the withdrawal window — applying it the instant it
@@ -360,6 +451,12 @@ inline bool battle_order_less(const active_battle& a, const active_battle& b)
     if (a.attacker != b.attacker) return a.attacker < b.attacker;
     return a.defender < b.defender;
 }
+
+/// BL-1453: is a fight in which one side deals @p a raw hits and the other @p b
+/// ENTRENCHED — neither out-hitting the other by more than `entrench_ratio_permille`?
+/// Two sides that deal nothing are not (a fight with no hits has nothing to dig in
+/// against; it runs until the attacker withdraws).
+bool battle_entrenched(int64_t a, int64_t b, const campaign_battle_params& params = {});
 
 /// Fold @p id into the battle's stream seed. Exposed so a caller can log it
 /// and so a harness can assert that two different identities really do produce
@@ -383,8 +480,8 @@ campaign_battle_state begin_campaign_battle(const campaign_battle_identity&    i
 /// round deals nothing and absorbs nothing — its spent units are overrun, the
 /// enemy's hits landing on them in full — and is broken. Returns false once the
 /// battle is over (@p st.end set), at which point further calls are no-ops.
-/// Consumes exactly two draws from the stream — attacker swing, then defender
-/// swing — in that fixed order.
+/// Consumes NO draw (Ben, 2026-10-29: battles carry no randomness): the round is
+/// the deterministic arithmetic of its inputs.
 bool step_campaign_battle(campaign_battle_state&        st,
                           std::vector<land_combatant>&  attacker,
                           std::vector<land_combatant>&  defender,
@@ -419,6 +516,11 @@ campaign_battle_outcome campaign_battle_result(const campaign_battle_state& st);
 ///
 /// @p attacker and @p defender are taken by value and fought on copies; pass
 /// out-params to read the men and readiness each side ended on.
+///
+/// @p round_budget (BL-1453): a battle has no maximum duration, and an entrenched
+/// fully supplied pair holds by design, so this headless runner stops after that
+/// many rounds and returns the fight as it stands (`end` in_progress). A harness
+/// budget, never a game rule.
 campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity& id,
                                                 std::vector<land_combatant>     attacker,
                                                 std::vector<land_combatant>     defender,
@@ -430,4 +532,5 @@ campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity& 
                                                 int                             withdraw_after_round = 0,
                                                 const campaign_battle_params&   params = {},
                                                 std::vector<land_combatant>*    attacker_out = nullptr,
-                                                std::vector<land_combatant>*    defender_out = nullptr);
+                                                std::vector<land_combatant>*    defender_out = nullptr,
+                                                int                             round_budget = 3650);

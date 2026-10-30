@@ -748,6 +748,25 @@ bash tools/verify/build_lua_harness.sh move_by_days_harness
 ./build_gen/verify/move_by_days_harness.exe
 ```
 
+## land_recon_harness (BL-1453, land recon)
+
+MILITARY.md § Recon: recon is the ATTACKER's. Its hits on a defending unit scale by
+min(1, its recon stock / the unit's stealth); the defender always hits in full. R0 every
+class has recon; R1 the share; R2 a blind (hasty) attack lands nothing on day 1 and sees in
+full within five days while the defender hits in full; R3 a faced attack opens at its
+facing units' recon; R4 an own unit beside the tile adds to the day's growth at once and
+nothing once gone; R5 a wing over the province adds; R6 stealth kit lowers hits taken; R7
+twice-equal. M1 REPORTS one deterministic fight a ratio, full vision vs recon faced vs
+blind.
+
+Reads the C++ defaults (equal to `economy.military.recon`), so it builds with the
+world builder.
+
+```
+node tools/verify/build_harness.js land_recon_harness
+./build_gen/verify/land_recon_harness.exe
+```
+
 ## condition_set_harness (BL-342, extended by BL-570)
 
 The shared predicate laws/techs/embargo/contracts all read (`src/world/condition_set.{hpp,cpp}`).

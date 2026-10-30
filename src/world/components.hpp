@@ -1912,6 +1912,20 @@ struct unit_component
     /// at 0 the unit leaves the fight and retreats. Recovers out of contact,
     /// never above `morale_permille`.
     int32_t   readiness_permille = 1000;
+    /// BL-1453 (cold review): THE BATTLE CARRY. A weeks-long battle lands a fraction of
+    /// a man, and of a per-mille of readiness, a day on a small or poorly seen force;
+    /// flooring each day would freeze the fight. The sub-unit remainder of each is
+    /// carried here day to day (the land round's own units: readiness in milli-hits x
+    /// 1000 against men x readiness_cost, men in milli-hits against hp_cost), so a side
+    /// that lands any hits always wears the other down. Saved (world_save_version 67).
+    int32_t   battle_ready_carry = 0;
+    int32_t   battle_hp_carry    = 0;
+    /// BL-1453 (MILITARY.md § Recon, "Only haste attacks blind"): the day stamp on
+    /// which the unit came onto its tile (the march, a retreat, an advance), or -1
+    /// when it has stood there since before any stamp (raised there, generated). A
+    /// unit counts toward its side's OPENING recon only if it took its tile before
+    /// the contact's day — it stood a whole day facing the enemy. Saved (v67).
+    int32_t   tile_since_day     = -1;
 
     /// Will to fight, per-mille. Scales the unit's attack and caps its readiness.
     /// Moved by a battle's result and, out of contact, toward its supply.

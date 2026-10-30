@@ -20,7 +20,7 @@ The centre column comes in two idioms. The **tile** takes a true **accordion** �
 | **Building** (player) | three-column card (`draw_building_selection_body`) | glyph grid: Manage, Mothball / Reopen, Auto workforce, Dismantle, Go to | `building_pages()`: Profitability (revenue vs segmented expenses, Net 6 mo., input basket) · Status · Workforce · Production method (every era-allowed recipe side by side, switched through `try_switch_recipe`) | host tile |
 | **Building** (rival) | three-column card | none — intel only | type-keyed glyph (type is public); owner; `Production: private` (no stockpile row: no nation holds one — `MARKETS.md` § The shelf economy), lifted only under spectator god view | host tile |
 | **Unit** | three-column card (`draw_unit_selection_body`) | **Go to** plus reserved slots | `unit_pages()`: Strength (`strength`, `count`) · Roster (type via `unit_roster_table()`, owner) | unit position |
-| **Battle** | own card (`draw_battle_selection`) | — | phase word, `round i / max_rounds`, each side's stack (`draw_battle_side`), redacted for the side the player cannot see | province |
+| **Battle** | own card (`draw_battle_selection`) | — | phase word, `day i` (the days fought; a battle has no maximum duration), each side's stack (`draw_battle_side`), redacted for the side the player cannot see | province |
 | **Market** | action \| facts | **Go to** — locate on canvas | (empty) | market centre |
 | **Nation** | action \| facts | none — "Open its ledger via [>]." | empty, except the internals readout under spectator god view | its ledger |
 
@@ -44,7 +44,7 @@ I'd fix the lens **on selection** (not follow a sub-view), and only when the kin
 - Survey: `survey.phase`, `survey_cost` / `survey_eta_days`.
 - Profitability: `estimate_building_profit(w, reg, report, id)` (needs one economy tick to have run, else "Run an economy tick to estimate."); Production method: `recipe_registry` era-allowed recipes, `try_switch_recipe`.
 - Commercial activity: `body_activity_visibility` + per-market throughput.
-- Unit: `unit_component::strength`, `count`, `type`, `owner`; Battle: `active_battle` state and `params.max_rounds`.
+- Unit: `unit_component::strength`, `count`, `type`, `owner`; Battle: `active_battle` state and `params.rounds_per_day`.
 
 **Redaction** is a UI rule, not a world one: rival production, stockpile and treasury internals are withheld per the competitor-visibility rule (`DISCOVERY.md`), and the spectator god view lifts it at the read-site only.
 

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 
 namespace {
 
@@ -19,25 +20,6 @@ uint64_t splitmix64(uint64_t x)
     z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
     z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
     return z ^ (z >> 31);
-}
-
-/// One draw. Advances the state in place so the CONSUMPTION ORDER is visible at
-/// every call site — the property that keeps replay stable (see the header).
-uint64_t next_draw(uint64_t& state)
-{
-    state = splitmix64(state);
-    return state;
-}
-
-/// A uniform per-mille multiplier in [1000 - swing, 1000 + swing]. Modulo bias
-/// over a 64-bit draw into a ~601-wide range is far below the resolution of
-/// anything downstream, and — the part that matters here — it is deterministic.
-int swing_multiplier(uint64_t& state, int swing)
-{
-    swing = std::clamp(swing, 0, 1000);
-    if (swing == 0) return 1000;
-    const uint64_t span = static_cast<uint64_t>(2 * swing + 1);
-    return 1000 - swing + static_cast<int>(next_draw(state) % span);
 }
 
 /// Men standing among a side's FIGHTING units.
@@ -98,6 +80,32 @@ int64_t side_absorb(const std::vector<land_combatant>& side, bool defending)
     return absorb;
 }
 
+/// BL-1453 retune (Ben, 2026-10-29: "a battle is weeks long, not days"): THE DAY'S
+/// DAMAGE SCALE on @p landed milli-hits a side takes — `day_damage_permille`, raised
+/// by the rout term when the dealer's raw hits @p dealt exceed the taker's own
+/// @p taken by more than `rout_ratio_permille` (x (ratio / line)^3, capped).
+int64_t day_scaled(int64_t landed, int64_t dealt, int64_t taken, const campaign_battle_params& p)
+{
+    if (landed <= 0)
+        return landed;
+    int64_t scale = std::max(0, p.day_damage_permille); // per-mille
+    const int64_t line = std::max(1, p.rout_ratio_permille);
+    if (dealt > 0)
+    {
+        // ratio x 1000 / line, per-mille; a taker who deals nothing is out-hit at the cap.
+        const int64_t over = taken > 0 ? dealt * 1000 / taken * 1000 / line
+                                       : std::numeric_limits<int64_t>::max() / 4;
+        if (over > 1000)
+        {
+            const int64_t cap = std::max<int64_t>(1000, p.rout_cap_permille);
+            const int64_t o = std::min<int64_t>(over, 100000); // keeps the cube in range
+            const int64_t cube = std::min<int64_t>(o * o / 1000 * o / 1000, cap);
+            scale = scale * cube / 1000;
+        }
+    }
+    return landed * scale / 1000;
+}
+
 /// What actually lands of @p hits against @p absorb.
 int64_t landed_hits(int64_t hits, int64_t absorb, const campaign_battle_params& p)
 {
@@ -106,17 +114,39 @@ int64_t landed_hits(int64_t hits, int64_t absorb, const campaign_battle_params& 
     return within * clamp_permille(p.absorbed_land_permille) / 1000 + beyond;
 }
 
-/// Kill exactly @p to_remove men across @p targets (indices into @p side),
-/// proportional to men, floor shares first and the remainder one man at a time
-/// in vector order — ascending unit id by the combatant contract. Integer
-/// throughout, so the split cannot depend on a rounding mode. @return removed.
-int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::size_t>& targets,
-                   int64_t to_remove)
+/// BL-1453: a target's weight in the split of a side's landed hits — its men x the
+/// share of it the enemy sees, so every hit on a unit is scaled by its own visible
+/// share (MILITARY.md § Recon). With every unit fully seen this is men x 1000, and
+/// the split is the men-proportional one exactly.
+int64_t seen_men(const land_combatant& c)
 {
-    int64_t total = 0;
+    return static_cast<int64_t>(c.men) * clamp_permille(c.visible);
+}
+
+/// Kill exactly @p to_remove men across @p targets (indices into @p side),
+/// proportional to men seen (`seen_men`), floor shares first and the remainder one
+/// man at a time in vector order — ascending unit id by the combatant contract.
+/// Integer throughout, so the split cannot depend on a rounding mode. @return removed.
+int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::size_t>& targets,
+                   int64_t to_remove, bool by_seen = true)
+{
+    // BL-1453 (cold review): a WITHDRAWAL's price is split by plain men, never by what
+    // the enemy sees — a side that leaves unseen still pays.
+    if (!by_seen)
+    {
+        std::vector<land_combatant> plain = side;
+        for (land_combatant& c : plain) c.visible = 1000;
+        const int64_t removed = remove_men(plain, targets, to_remove, true);
+        for (std::size_t k = 0; k < side.size(); ++k) side[k].men = plain[k].men;
+        return removed;
+    }
+    int64_t total = 0, weight = 0;
     for (const std::size_t k : targets)
-        total += side[k].men;
-    if (to_remove <= 0 || total <= 0)
+    {
+        total  += side[k].men;
+        weight += seen_men(side[k]);
+    }
+    if (to_remove <= 0 || total <= 0 || weight <= 0)
         return 0;
     to_remove = std::min(to_remove, total);
 
@@ -124,7 +154,8 @@ int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::siz
     int64_t assigned = 0;
     for (std::size_t t = 0; t < targets.size(); ++t)
     {
-        hit[t]    = to_remove * side[targets[t]].men / total;
+        hit[t]    = std::min<int64_t>(to_remove * seen_men(side[targets[t]]) / weight,
+                                      side[targets[t]].men);
         assigned += hit[t];
     }
     // Bounded: to_remove <= total, so while assigned < to_remove some unit has room.
@@ -132,7 +163,7 @@ int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::siz
     {
         bool progressed = false;
         for (std::size_t t = 0; t < targets.size() && assigned < to_remove; ++t)
-            if (hit[t] < side[targets[t]].men)
+            if (hit[t] < side[targets[t]].men && seen_men(side[targets[t]]) > 0)
             {
                 ++hit[t];
                 ++assigned;
@@ -152,11 +183,41 @@ int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::siz
     return removed;
 }
 
+/// BL-1453 (MILITARY.md § Recon): THE VISIBLE-SHARE TERM. @p landed milli-hits on
+/// @p side, scaled by the share of it the enemy sees — the men-weighted mean of its
+/// units' `visible` over the units the hits fall on (`apply_landed`'s targets: the
+/// fighting units, or every unit standing when none is). Each unit then takes its
+/// share in proportion to its men seen, so every hit on a unit is scaled by its
+/// own visible share. 1000 everywhere returns @p landed unchanged.
+int64_t visible_landed(const std::vector<land_combatant>& side, int64_t landed)
+{
+    if (landed <= 0)
+        return landed;
+    bool any_fighting = false;
+    for (const land_combatant& c : side)
+        any_fighting = any_fighting || land_combatant_fighting(c);
+    int64_t men = 0, seen = 0;
+    for (const land_combatant& c : side)
+        if (any_fighting ? land_combatant_fighting(c) : c.men > 0)
+        {
+            men  += c.men;
+            seen += seen_men(c);
+        }
+    return men > 0 ? landed * seen / (men * 1000) : landed;
+}
+
 /// Land @p landed milli-hits on @p side. The HP share kills men across the
 /// side's fighting units (or, if none is fighting, across every unit still
 /// standing — the overrun); the rest spends each fighting unit's readiness by
-/// its men's share of the hits.
-void apply_landed(std::vector<land_combatant>& side, int64_t landed, const campaign_battle_params& p)
+/// its share of the hits (men seen). @p hp_scale_permille scales the men share
+/// (an entrenched day's, `entrench_casualty_permille`).
+///
+/// THE CARRY (BL-1453, cold review): each unit's sub-unit remainder of readiness
+/// and of men is carried in its `ready_carry` / `hp_carry` and added to the next
+/// day's, so a side that lands any hits always wears the other down; nothing is
+/// floored away and nothing is floored up.
+void apply_landed(std::vector<land_combatant>& side, int64_t landed, int64_t hp_scale_permille,
+                  const campaign_battle_params& p)
 {
     if (landed <= 0)
         return;
@@ -172,29 +233,55 @@ void apply_landed(std::vector<land_combatant>& side, int64_t landed, const campa
     if (targets.empty())
         return;
 
-    // Readiness first, read against the men standing BEFORE this round's deaths,
-    // so the two halves of the same hits are measured against the same force.
-    if (!overrun)
+    // The overrun: the hits land in full, as men, across every unit standing.
+    if (overrun)
     {
-        int64_t men = 0;
-        for (const std::size_t k : targets)
-            men += side[k].men;
-        const int64_t ready_hits = landed * (1000 - clamp_permille(p.hp_share_permille)) / 1000;
-        for (const std::size_t k : targets)
-        {
-            land_combatant& c = side[k];
-            const int64_t own = ready_hits * c.men / men;
-            const int64_t cost = static_cast<int64_t>(c.men) * std::max(1, p.readiness_cost);
-            const int64_t loss = own * 1000 / cost;
-            c.readiness = static_cast<int>(std::max<int64_t>(0, c.readiness - loss));
-        }
+        remove_men(side, targets, landed / std::max(1, p.hp_cost));
+        return;
     }
 
-    const int64_t hp_hits = overrun ? landed : landed * clamp_permille(p.hp_share_permille) / 1000;
-    remove_men(side, targets, hp_hits / std::max(1, p.hp_cost));
+    int64_t seen = 0;
+    for (const std::size_t k : targets)
+        seen += seen_men(side[k]);
+    if (seen <= 0)
+        return;
+    const int64_t share      = clamp_permille(p.hp_share_permille);
+    const int64_t ready_hits = landed * (1000 - share) / 1000;
+    const int64_t hp_hits    = landed * share / 1000 * std::clamp<int64_t>(hp_scale_permille, 0, 1000) / 1000;
+    const int64_t hp_cost    = std::max(1, p.hp_cost);
+
+    // Readiness first, read against the men standing BEFORE this round's deaths,
+    // so the two halves of the same hits are measured against the same force.
+    for (const std::size_t k : targets)
+    {
+        land_combatant& c = side[k];
+        const int64_t own  = ready_hits * seen_men(c) / seen;
+        const int64_t cost = static_cast<int64_t>(c.men) * std::max(1, p.readiness_cost);
+        const int64_t num  = own * 1000 + std::max<int64_t>(0, c.ready_carry);
+        const int64_t loss = num / cost;
+        c.ready_carry = num % cost;
+        c.readiness   = static_cast<int>(std::max<int64_t>(0, c.readiness - loss));
+        if (c.readiness == 0)
+            c.ready_carry = 0; // spent: nothing left to carry against
+    }
+    for (const std::size_t k : targets)
+    {
+        land_combatant& c = side[k];
+        const int64_t own  = hp_hits * seen_men(c) / seen + std::max<int64_t>(0, c.hp_carry);
+        const int64_t dead = std::min<int64_t>(own / hp_cost, c.men);
+        c.hp_carry = dead < c.men ? own - dead * hp_cost : 0;
+        c.men     -= static_cast<int>(dead);
+    }
 }
 
 } // namespace
+
+int visible_share_permille(int64_t recon_milli, int target_stealth)
+{
+    if (target_stealth <= 0)
+        return 1000;
+    return static_cast<int>(std::clamp<int64_t>(std::max<int64_t>(0, recon_milli) / target_stealth, 0, 1000));
+}
 
 int side_readiness(const std::vector<land_combatant>& side)
 {
@@ -206,6 +293,14 @@ int side_readiness(const std::vector<land_combatant>& side)
             ready += static_cast<int64_t>(c.men) * clamp_permille(c.readiness);
         }
     return men > 0 ? static_cast<int>(ready / men) : 0;
+}
+
+bool battle_entrenched(int64_t a, int64_t b, const campaign_battle_params& params)
+{
+    if (a <= 0 || b <= 0)
+        return false;
+    const int64_t hi = std::max(a, b), lo = std::min(a, b);
+    return hi * 1000 / lo <= std::max(1000, params.entrench_ratio_permille);
 }
 
 uint64_t campaign_battle_seed(const campaign_battle_identity& id)
@@ -260,11 +355,7 @@ bool step_campaign_battle(campaign_battle_state&        st,
     if (st.end != campaign_battle_end::in_progress)
         return false;
 
-    // FIXED DRAW ORDER: attacker, then defender, exactly two per round — drawn
-    // even when a side cannot fight, so the stream position is a function of
-    // rounds fought alone.
-    const int atk_swing = swing_multiplier(st.rng_state, params.swing_permille);
-    const int def_swing = swing_multiplier(st.rng_state, params.swing_permille);
+    // NO DRAW (Ben, 2026-10-29): the round is the deterministic arithmetic alone.
 
     // BOTH SIDES' HITS FROM THE STATE BEFORE THE ROUND, applied together: neither
     // side's losses this round weaken what it deals this round.
@@ -275,16 +366,39 @@ bool step_campaign_battle(campaign_battle_state&        st,
     const int64_t terrain_d = terrain_defence(st.terrain_sub, st.terrain_cov,
                                               st.terrain_density, st.terrain_lf);
     const int64_t ground = 1000 + std::max<int64_t>(0, terrain_d) * params.terrain_attack_scale / 1000;
-    const int64_t atk_hits = side_hits(attacker, side_hardness(defender)) * atk_swing / 1000 * 1000 / ground;
-    const int64_t def_hits = side_hits(defender, side_hardness(attacker)) * def_swing / 1000;
-    const int64_t on_def = landed_hits(atk_hits, side_absorb(defender, true), params);
-    const int64_t on_atk = landed_hits(def_hits, side_absorb(attacker, false), params);
+    const int64_t atk_hits = side_hits(attacker, side_hardness(defender)) * 1000 / ground;
+    const int64_t def_hits = side_hits(defender, side_hardness(attacker));
+    // The rout and entrenchment terms read the raw hits (the ground included).
+    const int64_t atk_raw = atk_hits;
+    const int64_t def_raw = def_hits;
+    // LIKE FORCES ENTRENCH (Ben, 2026-10-29): near parity the day's damage drops
+    // further, and each side recovers from its supplies after it (below).
+    const bool dug_in = battle_entrenched(atk_raw, def_raw, params);
+    const int64_t casualties = dug_in ? std::clamp(params.entrench_casualty_permille, 0, 1000) : 1000;
+    const int64_t on_def = day_scaled(visible_landed(defender, landed_hits(atk_hits, side_absorb(defender, true), params)),
+                                      atk_raw, def_raw, params);
+    const int64_t on_atk = day_scaled(visible_landed(attacker, landed_hits(def_hits, side_absorb(attacker, false), params)),
+                                      def_raw, atk_raw, params);
 
     const bool atk_could_fight = fighting_men(attacker) > 0;
     const bool def_could_fight = fighting_men(defender) > 0;
 
-    apply_landed(defender, on_def, params);
-    apply_landed(attacker, on_atk, params);
+    apply_landed(defender, on_def, casualties, params);
+    apply_landed(attacker, on_atk, casualties, params);
+
+    // ENTRENCHED RECOVERY: every unit still fighting after the day's damage regains
+    // its supplies' share of readiness, never above its morale. Per round, a day's
+    // worth spread over `rounds_per_day`. A spent unit (readiness 0) is out of the
+    // fight and recovers nothing here.
+    if (dug_in)
+    {
+        const int rpd = std::max(1, params.rounds_per_day);
+        for (auto* side : {&attacker, &defender})
+            for (land_combatant& c : *side)
+                if (land_combatant_fighting(c) && c.readiness < c.morale)
+                    c.readiness = std::min(clamp_permille(c.morale),
+                                           c.readiness + std::max(0, c.entrench_recovery) / rpd);
+    }
 
     st.attacker_strength_permille = side_readiness(attacker);
     st.defender_strength_permille = side_readiness(defender);
@@ -307,10 +421,10 @@ bool step_campaign_battle(campaign_battle_state&        st,
     const bool atk_broken = !atk_could_fight || fighting_men(attacker) == 0;
     const bool def_broken = !def_could_fight || fighting_men(defender) == 0;
 
+    // NO ROUND CAP (Ben, 2026-10-29): nothing else ends a fight here. A side breaks
+    // or withdraws (withdraw_campaign_battle); `stalemate` is produced by nothing.
     if (atk_broken)                     st.end = campaign_battle_end::attacker_broken;
     else if (def_broken)                st.end = campaign_battle_end::defender_broken;
-    else if (st.rounds_fought >= std::max(1, params.max_rounds))
-                                        st.end = campaign_battle_end::stalemate;
 
     return st.end == campaign_battle_end::in_progress;
 }
@@ -330,9 +444,13 @@ int withdrawal_cost_permille(const campaign_battle_state& st, withdrawing_side s
     // break-off is dear twice over. Nothing here is clamped to produce that
     // ordering; it falls out of the shape.
     const int behind = std::max(0, enemy - own);
-    return clamp_permille(params.withdraw_base_permille +
-                          st.rounds_fought * params.withdraw_per_round_permille +
-                          behind * params.withdraw_pursuit_scale / 1000);
+    // The per-round term holds at its cap (BL-1453 fix round): a battle has no
+    // round cap now, and an uncapped term would reach the whole force.
+    const int64_t per_round = std::min<int64_t>(
+        int64_t{st.rounds_fought} * params.withdraw_per_round_permille,
+        std::max(0, params.withdraw_per_round_cap_permille));
+    return clamp_permille(static_cast<int>(params.withdraw_base_permille + per_round +
+                                           behind * params.withdraw_pursuit_scale / 1000));
 }
 
 int withdraw_campaign_battle(campaign_battle_state&        st,
@@ -354,7 +472,7 @@ int withdraw_campaign_battle(campaign_battle_state&        st,
             standing.push_back(k);
             men += leaving[k].men;
         }
-    const int removed = static_cast<int>(remove_men(leaving, standing, men * parting / 1000));
+    const int removed = static_cast<int>(remove_men(leaving, standing, men * parting / 1000, false));
 
     const bool attacker_leaving = (side == withdrawing_side::attacker);
     if (attacker_leaving) st.attacker_strength_permille = side_readiness(leaving);
@@ -390,8 +508,8 @@ campaign_battle_outcome campaign_battle_result(const campaign_battle_state& st)
             out.result = battle_result::attacker_victory;
             break;
         default:
-            // Stalemate (or read mid-fight): the side with more readiness left
-            // holds, defender on an exact tie.
+            // Read mid-fight (or a pre-2026-10-29 stalemate): the side with more
+            // readiness left holds, defender on an exact tie.
             out.result = st.attacker_strength_permille > st.defender_strength_permille
                              ? battle_result::attacker_victory
                              : battle_result::defender_victory;
@@ -416,14 +534,15 @@ campaign_battle_outcome resolve_campaign_battle(const campaign_battle_identity& 
                                                 int                             withdraw_after_round,
                                                 const campaign_battle_params&   params,
                                                 std::vector<land_combatant>*    attacker_out,
-                                                std::vector<land_combatant>*    defender_out)
+                                                std::vector<land_combatant>*    defender_out,
+                                                int                             round_budget)
 {
     campaign_battle_state st = begin_campaign_battle(id, attacker, defender, terrain_sub,
                                                      terrain_cov, terrain_density, terrain_lf);
 
     const bool scripted = (withdrawer != withdrawing_side::none) && (withdraw_after_round > 0);
 
-    while (st.end == campaign_battle_end::in_progress)
+    while (st.end == campaign_battle_end::in_progress && st.rounds_fought < std::max(1, round_budget))
     {
         // The window is checked BEFORE each round, so "withdraw after round N"
         // means N rounds were actually fought — the same instant a watching

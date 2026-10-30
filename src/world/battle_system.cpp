@@ -1,5 +1,6 @@
 #include "battle_system.hpp"
 
+#include "air_combat.hpp" // air_land_recon_milli: the air's recon over a battle (BL-1453)
 #include "carried_supplies.hpp" // BL-1452: the round's supply term and the recovery step
 #include "logistics.hpp" // road_edge_neighbour: the retreat step (BL-1421)
 #include "placement_rules.hpp"
@@ -11,6 +12,7 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <cmath> // std::lround: terrain stealth (BL-1453)
 #include <map>
 #include <set>
 #include <vector>
@@ -88,8 +90,17 @@ std::vector<land_combatant> build_combatants(const world& w, const std::vector<e
         c.supply    = carried_attack_permille(u);
         c.carried   = carried_combat_permille(u);
         c.stats     = unit_land_stats(u);
+        c.ready_carry = std::max(0, u.battle_ready_carry); // BL-1453: the day-to-day remainders
+        c.hp_carry    = std::max(0, u.battle_hp_carry);
         if (ground_tc != nullptr)
             c.terrain = terrain_fight_permille(terrain_class_effects_for_type(*mil, u.type, *ground_tc));
+        // BL-1453 x BL-1455 (MILITARY.md § Terrain and the classes): the unit's stealth
+        // on the tile IT stands, x its class's terrain stealth (infantry x1.5 in forest
+        // and urban ground, x0.75 in the open). Integer, rounded to nearest.
+        if (mil != nullptr)
+            c.stats.stealth = static_cast<int>(
+                std::lround(static_cast<double>(std::max(0, c.stats.stealth))
+                            * static_cast<double>(unit_terrain_effects(w, *mil, u).stealth)));
         out.push_back(c);
     }
     return out;
@@ -110,6 +121,8 @@ int write_back(world& w, const std::vector<land_combatant>& side)
         removed += std::max(0, it->second.count - c.men);
         it->second.count              = std::max(0, c.men);
         it->second.readiness_permille = std::clamp(c.readiness, 0, 1000);
+        it->second.battle_ready_carry = static_cast<int32_t>(std::clamp<int64_t>(c.ready_carry, 0, 1 << 30));
+        it->second.battle_hp_carry    = static_cast<int32_t>(std::clamp<int64_t>(c.hp_carry, 0, 1 << 30));
     }
     return removed;
 }
@@ -200,7 +213,8 @@ entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
 /// the order units retreat in cannot change where they go (a side is one nation, so
 /// its own units sharing a tile is a stack, never a breach). @return units retreated.
 int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint32_t province,
-                 bool all, const campaign_battle_params& p, const military_capability_params* mil)
+                 bool all, const campaign_battle_params& p, const military_capability_params* mil,
+                 int day)
 {
     std::vector<entity_id> leaving;
     for (const entity_id uid : units)
@@ -218,9 +232,14 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
     {
         unit_component& u = w.units.at(uid);
         if (const entity_id to = retreat_tile(w, u, province, foreign, true, mil); to != null_entity)
-            u.position = to;
+        {
+            u.position       = to;
+            u.tile_since_day = day; // BL-1453: it came onto this tile today
+        }
         u.order           = movement_order{};
         u.morale_permille = std::clamp(u.morale_permille - p.morale_loss, 0, 1000);
+        u.battle_ready_carry = 0; // BL-1453: out of the battle, no carry
+        u.battle_hp_carry    = 0;
     }
 
     const std::set<entity_id> gone(leaving.begin(), leaving.end());
@@ -249,6 +268,27 @@ std::vector<entity_id> hex_neighbours(const world& w, entity_id tile)
     std::sort(out.begin(), out.end());
     out.erase(std::unique(out.begin(), out.end()), out.end());
     return out;
+}
+
+/// BL-1453 (MILITARY.md § Recon): THE STEALTH A DEFENDING UNIT PRESENTS — its kit
+/// stealth x its class's terrain stealth on the tile it stands (BL-1455:
+/// `unit_terrain_effects(...).stealth`), applied where the battle pass builds the
+/// combatant (`build_combatants`, given the registry). Nothing else reads a target's
+/// stealth.
+int battle_target_stealth(const active_battle& b, const land_combatant& c)
+{
+    (void)b;
+    return std::max(0, c.stats.stealth);
+}
+
+/// The most stealth any standing defender presents: the attacker's stock stops there.
+int64_t recon_cap_milli(const active_battle& b, const std::vector<land_combatant>& def)
+{
+    int64_t cap = 0;
+    for (const land_combatant& c : def)
+        if (c.men > 0)
+            cap = std::max<int64_t>(cap, battle_target_stealth(b, c));
+    return cap * 1000;
 }
 
 } // namespace
@@ -369,7 +409,8 @@ withdrawal_price quote_withdrawal(const active_battle& b, withdrawing_side side,
     const int behind = std::max(0, enemy - own);
 
     q.base      = params.withdraw_base_permille;
-    q.per_round = b.state.rounds_fought * params.withdraw_per_round_permille;
+    q.per_round = std::min(b.state.rounds_fought * params.withdraw_per_round_permille,
+                           std::max(0, params.withdraw_per_round_cap_permille)); // capped (BL-1453)
     q.pursuit   = behind * params.withdraw_pursuit_scale / 1000;
     // One price: the resolver's own total, which is what withdraw_campaign_battle
     // charges (in men since BL-1421).
@@ -565,7 +606,7 @@ std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, enti
 }
 
 bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, entity_id defender,
-                      const std::vector<entity_id>& attacking_units)
+                      const std::vector<entity_id>& attacking_units, const land_recon_params& rp)
 {
     if (attacker == defender || w.tiles.find(tile) == w.tiles.end())
         return false;
@@ -658,12 +699,28 @@ bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, en
     nb.attacking_units = stack;
     nb.state = begin_campaign_battle(id, atk, def, g.sub, g.cov, g.density, g.lf);
 
+    // BL-1453 (MILITARY.md § Recon): THE OPENING. The attacker's recon stock starts at
+    // the recon of its own units on tiles adjacent to the defended tile (joined or not),
+    // each counted only if it took its tile before today: ONLY HASTE ATTACKS BLIND.
+    // The defender needs none: it hits in full.
+    {
+        int64_t milli = 0;
+        for (const auto& [uid, u] : w.units) // a sum: walk order cannot reach it
+            if (u.owner == attacker && u.count > 0 && u.tile_since_day < tick
+                && std::binary_search(beside.begin(), beside.end(), u.position))
+                milli += int64_t{std::max(0, unit_land_stats(u).recon)} * 1000;
+        // Not capped here: the opening's combatants carry no terrain stealth (no registry
+        // at open), and the daily growth stops at the stealthiest defender it sees.
+        nb.attacker_recon_milli = static_cast<int32_t>(std::clamp<int64_t>(milli, 0, 1 << 30));
+    }
+    (void)rp; // the opening reads no rate: the stock is the units' recon
+
     w.battles.push_back(std::move(nb));
     std::sort(w.battles.begin(), w.battles.end(), battle_order_less);
     return true;
 }
 
-int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks)
+int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks, const land_recon_params& rp)
 {
     std::sort(attacks.begin(), attacks.end(), [](const tile_attack& a, const tile_attack& b) {
         if (a.tile != b.tile) return a.tile < b.tile;
@@ -681,7 +738,7 @@ int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks)
                && attacks[j].defender == attacks[i].defender)
             stack.push_back(attacks[j++].unit);
         const bool ok =
-            open_tile_battle(w, tick, attacks[i].tile, attacks[i].attacker, attacks[i].defender, stack);
+            open_tile_battle(w, tick, attacks[i].tile, attacks[i].attacker, attacks[i].defender, stack, rp);
         if (ok)
             ++opened;
         // An order is spent only by the battle it opens: every unit of this group the
@@ -746,8 +803,9 @@ shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params*
             const entity_id to = retreat_tile(w, u, 0, foreign, false, mil);
             if (to != null_entity)
             {
-                u.position = to;
-                u.order    = movement_order{};
+                u.position       = to;
+                u.order          = movement_order{};
+                u.tile_since_day = w.current_day_tick; // BL-1453: it came onto this tile now
                 ++out.stepped;
             }
             else
@@ -780,14 +838,109 @@ shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params*
     return out;
 }
 
+int unit_entrench_recovery_permille(const world& w, entity_id unit, const campaign_battle_params& p)
+{
+    const auto it = w.units.find(unit);
+    if (it == w.units.end() || it->second.count <= 0)
+        return 0;
+    const unit_component& u = it->second;
+    // BL-1452 (MILITARY.md § Battles, "Like forces entrench, and supply decides the
+    // stalemate"): FROM THE CARRIED STOCKS. "A unit that is fed and holds ammunition
+    // above its floor recovers; a hungry unit, or one at the ammunition floor, does
+    // not." Full rate or nothing.
+    if (unit_hungry(u) || u.ammo_permille <= k_ammo_floor_permille)
+        return 0;
+    return std::max(0, p.entrench_recovery_permille);
+}
+
+int battle_day(const active_battle& b, const campaign_battle_params& p)
+{
+    return std::max(0, b.state.rounds_fought) / std::max(1, p.rounds_per_day) + 1;
+}
+
+namespace {
+
+/// The kit term: the recon of a side's FIGHTING combatants, milli-points.
+int64_t fighting_recon_milli(const std::vector<land_combatant>& side)
+{
+    int64_t milli = 0;
+    for (const land_combatant& c : side)
+        if (land_combatant_fighting(c))
+            milli += int64_t{std::max(0, c.stats.recon)} * 1000;
+    return milli;
+}
+
+/// The adjacency and air terms, milli-points: what the side's nation adds to the
+/// battle beyond the units fighting it.
+int64_t support_recon_milli(const world& w, const recipe_registry& reg, const active_battle& b,
+                            bool attacker_side)
+{
+    const std::vector<entity_id>& ids = attacker_side ? b.attacker_units : b.defender_units;
+    const entity_id nation = attacker_side ? b.attacker : b.defender;
+    int64_t milli = 0;
+    // Its nation's other units beside the defended tile, joined or not.
+    const std::vector<entity_id> beside = hex_neighbours(w, b.tile);
+    for (const auto& [uid, u] : w.units) // a sum: walk order cannot reach it
+    {
+        if (u.owner != nation || u.count <= 0
+            || !std::binary_search(beside.begin(), beside.end(), u.position)
+            || std::find(ids.begin(), ids.end(), uid) != ids.end())
+            continue;
+        milli += int64_t{std::max(0, unit_land_stats(u).recon)} * 1000;
+    }
+    // Its air over the province.
+    milli += air_land_recon_milli(w, reg, b.province, nation);
+    return milli;
+}
+
+} // namespace
+
+int64_t battle_side_recon_milli(const world& w, const recipe_registry& reg, const active_battle& b,
+                                bool attacker_side)
+{
+    return fighting_recon_milli(build_combatants(w, attacker_side ? b.attacker_units : b.defender_units))
+         + support_recon_milli(w, reg, b, attacker_side);
+}
+
+namespace {
+
+/// BL-1453 (MILITARY.md § Recon): every combatant's `visible` before a round. The
+/// attacker's hits on a defending unit scale by min(1, its recon stock / the unit's
+/// stealth); the attacker's units are fully seen — the defender's hits are always full.
+void set_battle_vision(const active_battle& b, std::vector<land_combatant>& atk,
+                       std::vector<land_combatant>& def)
+{
+    for (land_combatant& c : def)
+        c.visible = visible_share_permille(b.attacker_recon_milli, battle_target_stealth(b, c));
+    for (land_combatant& c : atk)
+        c.visible = 1000;
+}
+
+/// BL-1453: THE DAY'S GROWTH, after the round — the attacker's stock grows by the
+/// recon of its fighting units, its own units adjacent to the defended tile (counted
+/// at once, nothing stored) and its air over the province, until it covers the
+/// stealthiest defender.
+void grow_recon(const world& w, const recipe_registry& reg, active_battle& b,
+                const std::vector<land_combatant>& atk, const std::vector<land_combatant>& def)
+{
+    const int64_t gain = fighting_recon_milli(atk) + support_recon_milli(w, reg, b, true);
+    const int64_t cap  = std::min<int64_t>(recon_cap_milli(b, def), INT32_MAX);
+    b.attacker_recon_milli = static_cast<int32_t>(
+        std::clamp<int64_t>(int64_t{b.attacker_recon_milli} + gain, 0, std::max<int64_t>(cap, b.attacker_recon_milli)));
+}
+
+} // namespace
+
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
 {
     battle_tick out;
     // The resolver's tuning is campaign_battle_params, not the registry; the registry
-    // supplies the class terrain rows (BL-1455): the fight scale and the retreat's walls.
+    // supplies the class terrain rows (BL-1455): the fight scale and the retreat's walls,
+    // and land recon's rates (BL-1453, the air's share of the attacker's recon).
     const campaign_battle_params params{};
 
-    (void)tick; // a battle's stream was seeded when it opened (open_tile_battle)
+    // `tick` is today's day stamp: a battle's seed was folded when it opened, and the
+    // day stamps the tiles units retreat or advance onto (BL-1453).
 
     // -----------------------------------------------------------------------
     // 2. STEP — `rounds_per_day` rounds a day (ruling 3, Ben 2026-10-28)
@@ -826,7 +979,16 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         const int budget = std::max(1, params.rounds_per_day);
         while (b.state.end == campaign_battle_end::in_progress
                && b.state.rounds_fought - rounds_before < budget)
+        {
+            // BL-1453: the round fights on what each side has SEEN so far; the day's
+            // gain is added after it, so tomorrow sees more.
+            set_battle_vision(b, atk, def);
+            for (auto* side : {&atk, &def}) // entrenched recovery, from each unit's supplies
+                for (land_combatant& c : *side)
+                    c.entrench_recovery = unit_entrench_recovery_permille(w, c.unit, params);
             step_campaign_battle(b.state, atk, def, params);
+            grow_recon(w, reg, b, atk, def);
+        }
         const int fought = b.state.rounds_fought - rounds_before;
         if (fought > 0)
         {
@@ -847,9 +1009,9 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         // A spent unit leaves the fight one tile away from its enemies; a side that
         // withdrew leaves whole.
         retreat_side(w, b.attacker_units, b.attacker, b.province,
-                     left == withdrawing_side::attacker, params, &reg.military());
+                     left == withdrawing_side::attacker, params, &reg.military(), tick);
         retreat_side(w, b.defender_units, b.defender, b.province,
-                     left == withdrawing_side::defender, params, &reg.military());
+                     left == withdrawing_side::defender, params, &reg.military(), tick);
 
         // The strength reading follows the units STILL IN the fight, so the next
         // withdrawal price and phase are read against the force that is there, not
@@ -862,7 +1024,33 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         }
 
         if (b.state.end != campaign_battle_end::in_progress)
+        {
             ++out.concluded;
+            // BL-1453: the battle is over - every unit in it leaves carrying nothing.
+            for (const auto* side : {&b.attacker_units, &b.defender_units})
+                for (const entity_id uid : *side)
+                    if (const auto it = w.units.find(uid); it != w.units.end())
+                    {
+                        it->second.battle_ready_carry = 0;
+                        it->second.battle_hp_carry    = 0;
+                    }
+        }
+
+        // BL-1453 (cold review): the phase YESTERDAY, read off the round records the
+        // way `read_battle_phase` reads today (wavering, a crisis swing of 150, the
+        // opening day, committed), so a dispatch is newsworthy only on a change.
+        const auto phase_after_round = [&](int k) { // k: 0-based round index
+            const campaign_battle_round& r = b.state.rounds[static_cast<std::size_t>(k)];
+            if (r.attacker_strength_permille <= params.wavering_readiness
+                || r.defender_strength_permille <= params.wavering_readiness)
+                return battle_phase::wavering;
+            const int pa = k > 0 ? b.state.rounds[static_cast<std::size_t>(k - 1)].attacker_strength_permille : 1000;
+            const int pd = k > 0 ? b.state.rounds[static_cast<std::size_t>(k - 1)].defender_strength_permille : 1000;
+            if (std::max(pa - r.attacker_strength_permille, pd - r.defender_strength_permille) >= 150)
+                return battle_phase::crisis;
+            return (k + 1 <= std::max(1, params.rounds_per_day)) ? battle_phase::opening
+                                                                 : battle_phase::committed;
+        };
 
         // -------------------------------------------------------------------
         // 3b. THE DISPATCH RECORD (BL-468 / BL-469)
@@ -887,9 +1075,13 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             d.attacker = b.attacker;
             d.defender = b.defender;
             d.phase    = read_battle_phase(b, swing_a, swing_d, params);
+            // Newsworthy: the opening day, the end, or a phase unlike yesterday's.
+            const int n = static_cast<int>(b.state.rounds.size());
+            d.newsworthy = rounds_before == 0 || b.state.end != campaign_battle_end::in_progress
+                        || fought <= 0 || n - fought - 1 < 0
+                        || phase_after_round(n - 1) != phase_after_round(n - fought - 1);
             d.rounds_fought    = b.state.rounds_fought;
             d.rounds_this_tick = fought;
-            d.max_rounds       = params.max_rounds;
             d.attacker_strength_permille = b.state.attacker_strength_permille;
             d.defender_strength_permille = b.state.defender_strength_permille;
             d.attacker_swing_permille = swing_a;
@@ -911,8 +1103,8 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
 
             // BL-569 (province holder): a DECISIVE close moves the holder to
             // whoever field_held_by already names — every ending except
-            // stalemate, mirroring MILITARY.md's "moved by a decisive
-            // battle's field_held_by, left untouched by a stalemate". Reuses
+            // stalemate (which nothing produces since 2026-10-29; a loaded
+            // pre-ruling one is still left alone), mirroring MILITARY.md. Reuses
             // `province_partition::find` (province.hpp) to translate the
             // province id into `province_holder`'s positional index; a world
             // whose holder vector was never seeded (empty, or a fixture that
@@ -973,8 +1165,9 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                                 && terrain_class_effects_for_type(reg.military(), it->second.type,
                                                                   tt->second).walled)
                                 continue;
-                            it->second.position = b.tile;
-                            it->second.order    = movement_order{};
+                            it->second.position       = b.tile;
+                            it->second.order          = movement_order{};
+                            it->second.tile_since_day = tick; // BL-1453: it advanced today
                         }
                 }
             }

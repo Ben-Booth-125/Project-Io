@@ -8,14 +8,22 @@
 //
 //   C1  REPLAY DETERMINISM. The same identity and the same inputs produce a
 //       byte-identical outcome, per-round records included, across two runs.
-//   C2  THE RANDOMNESS IS REAL. Different battle identities produce different
-//       fights — the swing reaches the outcome, it is not decoration.
+//   C2  NO RANDOMNESS (Ben, 2026-10-29: "Let's not add battle randomness ...
+//       remove the swing too"). RE-SCOPED from "the randomness is real" and "a
+//       fight near the edge is genuinely uncertain": the battle's identity no
+//       longer reaches the fight — the same forces on the same ground fight the
+//       same battle under any seed, and a step consumes no draw.
 //   C3  WITHDRAWAL IS PRICED BY TIME AND POSITION, IN MEN. Breaking off late
-//       usually costs more men than breaking off early on the same stream, and
-//       where it ever costs fewer, the withdrawing side's deficit narrowed.
-//   C4  STRENGTH USUALLY WINS. Monotone in force, uncertain somewhere, and
-//       near-unloseable at a large edge. Attacking is dear: at parity the
-//       defender holds.
+//       costs more men than breaking off early, and where it ever costs fewer,
+//       the withdrawing side's deficit narrowed. (Its twenty seeds are now one
+//       fight, since a seed changes nothing; the rows stand.)
+//   C4  STRENGTH DECIDES, AS A STEP. Monotone in force; the same ratio always
+//       gives the same result (RE-SCOPED from "uncertain somewhere", by the same
+//       ruling); a large edge wins; attacking is dear: at parity the defender
+//       holds, and a tie goes to the defender.
+//   C7  LIKE FORCES ENTRENCH, AND SUPPLY DECIDES THE STALEMATE (Ben, 2026-10-29).
+//       Near parity a fully supplied pair holds for a year; a starved side breaks;
+//       a rout stays fast; the round budget stops the headless runner.
 //   C5  THE CLASSES AND THE GROUND (R3). Armour beats infantry in the open; a
 //       mountain costs an attacker; hardness turns soft attack away.
 //   C6  READINESS TAKES THE LARGER SHARE (R2). A fight spends readiness faster
@@ -175,34 +183,44 @@ int main()
                     a.attacker_strength_permille, a.defender_strength_permille);
 
         check(campaign_battle_seed(id_at(1)) != campaign_battle_seed(id_at(2)),
-              "C1 a different tick folds to a different stream seed");
+              "C1 a different tick folds to a different seed (it varies the dispatch wording only)");
         campaign_battle_identity swapped = id_at(1);
         swapped.attacker = 22; swapped.defender = 11;
         check(campaign_battle_seed(id_at(1)) != campaign_battle_seed(swapped),
-              "C1 swapping attacker and defender is a different battle, so a different stream");
+              "C1 swapping attacker and defender folds to a different seed");
     }
 
-    // --- C2: different seeds give different fights -------------------------
+    // --- C2: no randomness (Ben, 2026-10-29) ----------------------------------
     {
-        // An edge inside the uncertain band (1.5:1 — C4's finer sweep), where the
-        // swing has the most room.
+        // RE-SCOPED by the ruling: the battle's identity (its seed) no longer reaches
+        // the fight. Equal fights under 64 identities must be the same fight in every
+        // number but the seed itself.
         const std::vector<land_combatant> atk = side_of(land_class::infantry, 750);
         const std::vector<land_combatant> def = side_of(land_class::infantry, 500, 201);
 
         int distinct = 0, attacker_wins = 0;
-        const campaign_battle_outcome first = fight(id_at(1), atk, def);
+        campaign_battle_outcome first = fight(id_at(1), atk, def);
         for (uint64_t t = 1; t <= 64; ++t)
         {
-            const campaign_battle_outcome o = fight(id_at(t), atk, def);
+            campaign_battle_outcome o = fight(id_at(t), atk, def);
+            o.stream_seed = first.stream_seed; // the one field a seed still sets
             if (!same_outcome(o, first)) ++distinct;
             if (o.result == battle_result::attacker_victory) ++attacker_wins;
         }
-        std::printf("      64 battles at 1.5:1: %d differ from the first, attacker took %d\n",
+        std::printf("      64 battles at 1.5:1 under 64 identities: %d differ from the first, attacker took %d\n",
                     distinct, attacker_wins);
-        check(distinct > 0,
-              "C2 different battle identities produce different fights - the randomness reaches the outcome");
-        check(attacker_wins > 0 && attacker_wins < 64,
-              "C2 a fight near the edge is genuinely uncertain: both sides win some of the 64");
+        check(distinct == 0,
+              "C2 the battle's identity does not reach the fight: the same forces fight the same battle under any seed");
+        check(attacker_wins == 0 || attacker_wins == 64,
+              "C2 the same ratio always gives the same result - no draw decides a battle");
+
+        // A step consumes no draw: the state's stream fields are untouched by a round.
+        std::vector<land_combatant> a = atk, d = def;
+        campaign_battle_state st = begin_campaign_battle(id_at(3), a, d, k_plains.sub, k_plains.cov,
+                                                         k_plains.density, k_plains.lf);
+        const uint64_t rng0 = st.rng_state, seed0 = st.stream_seed;
+        for (int r = 0; r < 10 && step_campaign_battle(st, a, d); ++r) {}
+        check(st.rng_state == rng0 && st.stream_seed == seed0, "C2 a step consumes no draw (rng_state is never advanced)");
     }
 
     // --- C3: withdrawing early costs fewer men than withdrawing late -------
@@ -247,7 +265,7 @@ int main()
                     monotone, compared, explained, inversions);
         check(compared > 0, "C3 setup: at least one seed leaves a withdrawal window open through round 5");
         check(compared > 0 && monotone * 2 > compared,
-              "C3 withdrawing later usually costs more men than withdrawing earlier, on the same stream");
+              "C3 withdrawing later costs more men than withdrawing earlier");
         check(explained == inversions,
               "C3 a later exit only ever gets cheaper because the deficit narrowed - time is never free");
 
@@ -298,8 +316,8 @@ int main()
         const int trials = 200;
 
         int  prev_wins = -1, first_wins = -1;
-        bool monotone = true, any_uncertain = false, decisive_at_the_top = false;
-        std::printf("      defender 500 infantry on plains, 200 seeds per ratio:\n");
+        bool monotone = true, a_step = true, decisive_at_the_top = false;
+        std::printf("      defender 500 infantry on plains, 200 identities per ratio:\n");
         for (std::size_t i = 0; i < sizeof(probes) / sizeof(probes[0]); ++i)
         {
             const int wins = win_rate(side_of(land_class::infantry, probes[i].atk_men), def,
@@ -310,33 +328,51 @@ int main()
             if (prev_wins >= 0 && wins < prev_wins) monotone = false;
             if (first_wins < 0) first_wins = wins;
             prev_wins = wins;
-            if (wins > 0 && wins < trials) any_uncertain = true;
+            if (wins > 0 && wins < trials) a_step = false;
             if (i + 1 == sizeof(probes) / sizeof(probes[0]) && rate >= 95) decisive_at_the_top = true;
         }
         check(monotone, "C4 more strength never wins less often - the curve is monotone in force");
-        check(any_uncertain,
-              "C4 there is a band where the fight is genuinely uncertain, not a lookup of who is bigger");
-        check(decisive_at_the_top,
-              "C4 a large edge is near-unloseable - the swing colours the result, it does not decide it");
-        check(first_wins * 2 < trials, "C4 attacking is dear: at parity the defender usually holds");
+        check(a_step,
+              "C4 the curve is a step: every ratio gives one result under every identity (no randomness)");
+        check(decisive_at_the_top, "C4 a large edge wins");
+        check(first_wins == 0, "C4 attacking is dear: at parity the defender holds");
+
+        // A tie goes to the defender: two sides broken in the same round.
+        {
+            std::vector<land_combatant> a = { unit_of(101, land_class::infantry, 500, 0) };
+            std::vector<land_combatant> d = { unit_of(201, land_class::infantry, 500, 0) };
+            campaign_battle_state st = begin_campaign_battle(id_at(4), a, d, k_plains.sub, k_plains.cov,
+                                                             k_plains.density, k_plains.lf);
+            step_campaign_battle(st, a, d);
+            check(campaign_battle_result(st).result == battle_result::defender_victory,
+                  "C4 a tie goes to the defender (both sides broken in one round)");
+        }
 
         // THE INSTRUMENT: a finer sweep, reporting BOTH the result (which counts
         // a stalemate the attacker leads on readiness) and the DECISIVE rate (the
         // defender broken — what moves a province's holder). Printed, not asserted.
-        std::printf("      finer sweep, 200 seeds each: ratio  result%%  decisive%%  mean rounds\n");
+        // No seed changes a fight, so one fight a ratio is the whole curve. Without
+        // supply recovery (entrench_recovery 0) — C7 measures the supplied case.
+        std::printf("      finer sweep (one fight each, no supply recovery): ratio  end  days\n");
+        int days_at[9] = {};
+        campaign_battle_end end_at[9] = {};
         for (int atk_men = 500; atk_men <= 1500; atk_men += 125)
         {
-            int res = 0, dec = 0, rounds = 0;
-            for (uint64_t t = 20000 + atk_men * 10; t < 20000 + atk_men * 10 + 200; ++t)
-            {
-                const campaign_battle_outcome o = fight(id_at(t), side_of(land_class::infantry, atk_men), def);
-                if (o.result == battle_result::attacker_victory) ++res;
-                if (o.end == campaign_battle_end::defender_broken) ++dec;
-                rounds += o.rounds_fought;
-            }
-            std::printf("        %4.2f:1   %3d      %3d       %.1f\n", atk_men / 500.0,
-                        res * 100 / 200, dec * 100 / 200, rounds / 200.0);
+            const campaign_battle_outcome o = fight(id_at(20000), side_of(land_class::infantry, atk_men), def);
+            std::printf("        %4.2f:1   %-18s %d\n", atk_men / 500.0, end_name(o.end), o.rounds_fought);
+            days_at[(atk_men - 500) / 125] = o.rounds_fought;
+            end_at[(atk_men - 500) / 125]  = o.end;
         }
+        // THE RULED TARGETS (Ben, 2026-10-29; MILITARY.md § Battles), one deterministic
+        // fight a ratio, with no supply recovery (a supplied parity pair entrenches and
+        // holds: C7). Index k is (500 + 125k):500 - 0 parity, 1 is 1.25:1, 2 is 1.5:1, 8 is 3:1.
+        check(end_at[0] == campaign_battle_end::attacker_broken && days_at[0] >= 30 && days_at[0] <= 60,
+              "C4 TARGET a parity battle is fought out in 30-60 days");
+        check(days_at[2] > days_at[0], "C4 TARGET a 1.5:1 battle runs longer than parity");
+        check(end_at[8] == campaign_battle_end::defender_broken && days_at[8] < 10,
+              "C4 TARGET a rout (3:1) is fast: under ten days");
+        check(end_at[1] == campaign_battle_end::attacker_broken && end_at[2] == campaign_battle_end::defender_broken,
+              "C4 TARGET the break sits at about 1.5:1 in men (1.25:1 fails, 1.5:1 breaks the defender)");
     }
 
     // --- C5: the classes and the ground (R3) -------------------------------
@@ -388,7 +424,20 @@ int main()
         std::printf("      armour vs infantry 1:1 on plains: %d/100; infantry 2:1 on plains %d/100,"
                     " on a mountain %d/100\n", open, plain, moun);
         check(open >= 90, "C5 armour beats infantry of equal men in the open");
-        check(moun < plain, "C5 a mountain costs an attacker: the same assault wins less often");
+        // RE-SCOPED (no randomness): a win rate is 0 or 100, so the ground's cost is
+        // read as the assault going from a win on plains to a loss on a mountain.
+        {
+            std::vector<land_combatant> ap, am;
+            const campaign_battle_outcome op = fight(id_at(6000), side_of(land_class::infantry, 1000), foot,
+                                                     withdrawing_side::none, 0, k_plains, &ap);
+            const campaign_battle_outcome om = fight(id_at(6000), side_of(land_class::infantry, 1000), foot,
+                                                     withdrawing_side::none, 0, k_mountain, &am);
+            std::printf("      2:1 assault: plains %s in %d days losing %d men; mountain %s in %d days losing %d men\n",
+                        end_name(op.end), op.rounds_fought, 1000 - men_of(ap),
+                        end_name(om.end), om.rounds_fought, 1000 - men_of(am));
+            check(moun < plain || (om.rounds_fought > op.rounds_fought && men_of(am) < men_of(ap)),
+                  "C5 a mountain costs an attacker: the same assault loses, or takes longer and costs more men");
+        }
 
         // Hardness turns soft attack away: artillery (soft-heavy) does far less to
         // armour than to infantry, one round, same men, same stream.
@@ -432,6 +481,91 @@ int main()
               "C6 a side with no unit left fighting is broken");
         check(men_of(fresh) == fresh_before && men_of(spent) < spent_before,
               "C6 spent units deal nothing and are overrun - the enemy's hits land on them in full");
+    }
+
+    // --- C7: like forces entrench, supply decides the stalemate ----------------
+    {
+        const campaign_battle_params p{};
+        auto supplied = [&](std::vector<land_combatant> s, bool fed) {
+            // As the battle pass builds a unit: its supply factor scales its hits, and
+            // its recovery is `unit_entrench_recovery_permille`'s (the stand-in reads
+            // the same factor). A starved unit is at supply 300.
+            for (land_combatant& c : s)
+            {
+                c.supply            = fed ? 1000 : 300;
+                c.entrench_recovery = fed ? p.entrench_recovery_permille : 0;
+            }
+            return s;
+        };
+        const std::vector<land_combatant> a500 = side_of(land_class::infantry, 500);
+        const std::vector<land_combatant> d500 = side_of(land_class::infantry, 500, 201);
+        check(battle_entrenched(1000, 1000) && battle_entrenched(1250, 1000) && !battle_entrenched(1300, 1000)
+                  && !battle_entrenched(0, 0),
+              "C7 the entrenchment band: within 1.25:1 either way; a fight with no hits is not dug in");
+
+        // Two equal, fully supplied sides: a year, run on the round budget.
+        const campaign_battle_outcome year =
+            resolve_campaign_battle(id_at(1), supplied(a500, true), supplied(d500, true), k_plains.sub,
+                                    k_plains.cov, k_plains.density, k_plains.lf, withdrawing_side::none, 0, p,
+                                    nullptr, nullptr, 365);
+        std::printf("      equal, both supplied: %s after %d days; readiness %d / %d\n", end_name(year.end),
+                    year.rounds_fought, year.attacker_strength_permille, year.defender_strength_permille);
+        check(year.end == campaign_battle_end::in_progress && year.rounds_fought == 365,
+              "C7 two equal fully supplied sides hold each other for a year (live at day 365)");
+
+        // The attacker starved, the defender fed; then the reverse.
+        const campaign_battle_outcome atk_starved =
+            resolve_campaign_battle(id_at(1), supplied(a500, false), supplied(d500, true), k_plains.sub,
+                                    k_plains.cov, k_plains.density, k_plains.lf, withdrawing_side::none, 0, p,
+                                    nullptr, nullptr, 3650);
+        const campaign_battle_outcome def_starved =
+            resolve_campaign_battle(id_at(1), supplied(a500, true), supplied(d500, false), k_plains.sub,
+                                    k_plains.cov, k_plains.density, k_plains.lf, withdrawing_side::none, 0, p,
+                                    nullptr, nullptr, 3650);
+        std::printf("      attacker starved: %s on day %d; defender starved: %s on day %d\n",
+                    end_name(atk_starved.end), atk_starved.rounds_fought,
+                    end_name(def_starved.end), def_starved.rounds_fought);
+        check(atk_starved.end == campaign_battle_end::attacker_broken,
+              "C7 a starved attacker against a fed defender breaks");
+        check(def_starved.end == campaign_battle_end::defender_broken,
+              "C7 a starved defender against a fed attacker breaks - supply, not the dice, decides the stalemate");
+
+        // A rout stays fast: 3:1, both fed.
+        const campaign_battle_outcome rout =
+            resolve_campaign_battle(id_at(1), supplied(side_of(land_class::infantry, 1500), true),
+                                    supplied(d500, true), k_plains.sub, k_plains.cov, k_plains.density,
+                                    k_plains.lf, withdrawing_side::none, 0, p, nullptr, nullptr, 3650);
+        std::printf("      3:1, both fed: %s on day %d\n", end_name(rout.end), rout.rounds_fought);
+        check(rout.end == campaign_battle_end::defender_broken && rout.rounds_fought <= 10,
+              "C7 a rout stays fast (3:1 breaks the defender within ten days)");
+
+        // THE FREEZE (cold review, 2026-10-29): at supply 50 on both sides, 300 men a
+        // side, a day lands a fraction of a man and of a per-mille of readiness. With
+        // the carry the fight still wears down to a break; without it, it froze at
+        // 1000/1000 for 20,000 rounds.
+        {
+            std::vector<land_combatant> la = side_of(land_class::infantry, 300);
+            std::vector<land_combatant> ld = side_of(land_class::infantry, 300, 201);
+            for (auto* sd : {&la, &ld})
+                for (land_combatant& c : *sd) c.supply = 50;
+            const campaign_battle_outcome slow =
+                resolve_campaign_battle(id_at(1), la, ld, k_plains.sub, k_plains.cov, k_plains.density,
+                                        k_plains.lf, withdrawing_side::none, 0, p, nullptr, nullptr, 20000);
+            std::printf("      supply 50 both sides, 300 men: %s after %d days\n", end_name(slow.end), slow.rounds_fought);
+            check(slow.end == campaign_battle_end::attacker_broken || slow.end == campaign_battle_end::defender_broken,
+                  "C7 a side that lands any hits wears the other down: no freeze by truncation (the carry)");
+        }
+
+        // The headless runner's budget: a fight with no hits at all stops on it.
+        std::vector<land_combatant> mute_a = { unit_of(101, land_class::none, 500) };
+        std::vector<land_combatant> mute_d = { unit_of(201, land_class::none, 500) };
+        const campaign_battle_outcome mute =
+            resolve_campaign_battle(id_at(1), mute_a, mute_d, k_plains.sub, k_plains.cov, k_plains.density,
+                                    k_plains.lf, withdrawing_side::none, 0, p, nullptr, nullptr, 50);
+        std::printf("      no hits on either side: %s after %d rounds (budget 50)\n", end_name(mute.end),
+                    mute.rounds_fought);
+        check(mute.end == campaign_battle_end::in_progress && mute.rounds_fought == 50,
+              "C7 a fight that lands nothing runs until withdrawn - the headless runner stops on its budget");
     }
 
     std::printf("\n=== %s (%d pass, %d fail) ===\n",

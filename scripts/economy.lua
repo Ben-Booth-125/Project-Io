@@ -1139,6 +1139,20 @@ economy = {
                 },
             },
         },
+
+        -- BL-1453 (MILITARY.md § Recon, Ben 2026-10-29): land recon. The ATTACKER's
+        -- hits on a defending unit scale by min(1, its recon stock / the unit's
+        -- stealth); the defender always hits in full. The stock opens at the recon of
+        -- the attacker's units that faced the tile a whole day and grows every day by
+        -- the recon of its units in the battle, its adjacent units and its air. Recon
+        -- and stealth are per unit, from the class table and the kit (unit_roster.cpp,
+        -- unit_designs.cpp: infantry recon 14, stealth 40). The air's share is below;
+        -- the same numbers are the C++ defaults (land_recon_params.hpp).
+        recon = {
+            recon_wing_points  = 40,   -- a recon-class wing over the province: a light armour unit's worth
+            wing_points        = 10,   -- any other wing active over it: an infantry unit's worth
+            superiority_points = 20,   -- the side flying superiority there, x its share
+        },
     },
 
     -- BL-350: the procurement/contract seam — "a build order placed with

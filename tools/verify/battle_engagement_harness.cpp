@@ -24,7 +24,9 @@
 //   B10-B14 the dispatch record and its text.
 //   B15 BL-569: A DECISIVE CLOSE MOVES world::province_holder (the defended
 //       tile's province) to the winner.
-//   B16 BL-569: A STALEMATE LEAVES IT UNTOUCHED.
+//   B16 NO ROUND CAP (Ben, 2026-10-29): a battle past the old six-round cap
+//       fights on, ends only on a break or a withdrawal - never a stalemate -
+//       and leaves the province holder untouched while it runs.
 //   B17 open_tile_battle is ENTITY-ID-AGNOSTIC: it opens a battle with no stance
 //       row (the capability the retired mercenary trigger used).
 //   B18-B22 retreat, morale, recovery, a quiet world, a unit in two battles.
@@ -425,8 +427,8 @@ int main()
             const battle_dispatch& d = t1.dispatches.front();
             check(d.tile == f.tile && d.province == f.province && d.attacker == f.att && d.defender == f.def,
                   "B10b the record names the fight (tile, attacker, defender) and the tile's province");
-            check(d.rounds_this_tick > 0 && d.max_rounds > 0,
-                  "B10c it carries round/max so a surface need not know campaign_battle_params");
+            check(d.rounds_this_tick > 0 && d.rounds_fought > 0,
+                  "B10c it carries the rounds fought (a battle has no maximum, so no denominator)");
             check(d.stream_seed != 0,
                   "B10d it carries the battle's stream seed, so phrasing can vary per fight without a draw");
         }
@@ -442,8 +444,12 @@ int main()
         fixture f;
         build_fixture(f);
         engage(f);
+        // ENTRENCHMENT (Ben, 2026-10-29): two fed infantry at parity dig in and hold, so
+        // a row that needs an END starves the attacker (its ammunition at the floor, 200): its hits fall out of
+        // the near-parity band and the defender breaks it - supply decides.
+        f.w.units.at(f.ua).ammo_permille = 200; // BL-1452: at its ammunition floor (the round reads the carried stocks)
         bool saw_conclusion = false;
-        for (int i = 0; i < 10 && !saw_conclusion; ++i)
+        for (int i = 0; i < 200 && !saw_conclusion; ++i) // a battle is weeks long (BL-1453)
         {
             const battle_tick t = run_battles(f.w, reg, i);
             for (const battle_dispatch& d : t.dispatches)
@@ -459,7 +465,7 @@ int main()
                       "B11c its phase reads as an ending");
             }
         }
-        check(saw_conclusion, "B11  a battle concluded within ten ticks (the row was exercised)");
+        check(saw_conclusion, "B11  a battle concluded within 200 days (the row was exercised)");
     }
 
     // -----------------------------------------------------------------------
@@ -679,7 +685,7 @@ int main()
     }
 
     // -----------------------------------------------------------------------
-    std::printf("\nB16 — BL-569: a stalemate leaves the province holder untouched\n");
+    std::printf("\nB16 — no round cap: a battle fights on past the old cap, and never ends a stalemate\n");
     {
         fixture f;
         build_fixture(f, /*declare=*/false);
@@ -696,11 +702,10 @@ int main()
             f.w.province_holder[idx] = third;
         }
 
-        // Hand-built battle, ONE ROUND SHORT of max_rounds (6), both units fresh
-        // and equal. One round at the widest swing spends at most a few hundred
-        // per-mille of either side's readiness (campaign_battle_harness C6 prints
-        // a whole parity fight spending 1000 over six), so neither side can be
-        // spent by round 6 and it concludes as a stalemate by construction.
+        // Hand-built battle at round 5 - one short of the retired six-round cap -
+        // both units fresh and equal. One round spends at most a few hundred
+        // per-mille of either side's readiness, so neither can be spent by round 6:
+        // under the old cap it concluded a stalemate; now it fights on.
         active_battle b;
         b.tile            = f.tile;
         b.province        = f.province;
@@ -722,11 +727,29 @@ int main()
         if (!t.dispatches.empty())
         {
             const battle_dispatch& d = t.dispatches.front();
-            check(d.end == campaign_battle_end::stalemate,
-                  "B16b round 6 elapsed with both sides still standing -- guaranteed by two fresh equal units");
+            check(d.end == campaign_battle_end::in_progress && f.w.battles.size() == 1,
+                  "B16b round 6 fought with both sides standing: the battle is still live (no cap)");
             check(province_holder_for(f.w, f.province) == third,
-                  "B16c THE PROVINCE HOLDER STAYED PUT -- a stalemate mutates nothing here");
+                  "B16c THE PROVINCE HOLDER STAYED PUT while it runs");
         }
+        // Fight it out: it ends on a break, never a stalemate. Fed and equal they would
+        // hold (entrenched); starved, the attacker breaks.
+        f.w.units.at(f.ua).ammo_permille = 200; // BL-1452: at its ammunition floor (the round reads the carried stocks)
+        campaign_battle_end last = campaign_battle_end::in_progress;
+        int days = 0;
+        for (int day = 1; day <= 400 && !f.w.battles.empty(); ++day)
+        {
+            const battle_tick tk = run_battles(f.w, reg, day);
+            for (const battle_dispatch& d : tk.dispatches)
+                last = d.end;
+            days = day + 1;
+        }
+        std::printf("        concluded after %d days: %s\n", days,
+                    last == campaign_battle_end::attacker_broken ? "attacker broken"
+                    : last == campaign_battle_end::defender_broken ? "defender broken" : "other");
+        check(f.w.battles.empty() && (last == campaign_battle_end::attacker_broken
+                                      || last == campaign_battle_end::defender_broken),
+              "B16d it fights on until a side's readiness is spent - never a stalemate");
     }
 
     // -----------------------------------------------------------------------
@@ -752,16 +775,20 @@ int main()
                       && b.attacking_units == std::vector<entity_id>{ f.ua },
                   "B17d each side carries exactly its one unit; the attacking stack is the attacker's");
         }
+        // ENTRENCHMENT (Ben, 2026-10-29): two fed infantry at parity dig in and hold, so
+        // a row that needs an END starves the attacker (its ammunition at the floor, 200): its hits fall out of
+        // the near-parity band and the defender breaks it - supply decides.
+        f.w.units.at(f.ua).ammo_permille = 200; // BL-1452: at its ammunition floor (the round reads the carried stocks)
         const int before = total_men(f.w);
         bool concluded = false;
-        for (int i = 0; i < 10 && !concluded; ++i)
+        for (int i = 0; i < 200 && !concluded; ++i) // a battle is weeks long (BL-1453)
         {
             const battle_tick bt = run_battles(f.w, reg, i);
             for (const battle_dispatch& d : bt.dispatches)
                 if (d.end != campaign_battle_end::in_progress)
                     concluded = true;
         }
-        check(concluded, "B17e the battle RESOLVED within ten ticks");
+        check(concluded, "B17e the battle RESOLVED within 200 days");
         check(f.w.battles.empty(), "B17f ...and is erased on conclusion");
         check(total_men(f.w) < before, "B17g men died through the real step");
     }
@@ -772,12 +799,22 @@ int main()
         fixture f;
         build_fixture(f);
         engage(f);
+        // BL-1453 (land recon): this row is about the RETREAT, so the attacker opens
+        // already seeing the defender in full - the recon stock is land_recon_harness's
+        // subject, not this row's.
+        for (active_battle& b : f.w.battles)
+            b.attacker_recon_milli = 1 << 20;
+        const recipe_registry& seen = reg;
+        // ENTRENCHMENT (Ben, 2026-10-29): two fed infantry at parity dig in and hold, so
+        // a row that needs an END starves the attacker (its ammunition at the floor, 200): its hits fall out of
+        // the near-parity band and the defender breaks it - supply decides.
+        f.w.units.at(f.ua).ammo_permille = 200; // BL-1452: at its ammunition floor (the round reads the carried stocks)
         const entity_id start = f.w.units.at(f.ua).position;
         bool retreated = false;
         int morale_after = 1000;
-        for (int i = 0; i < 10 && !retreated; ++i)
+        for (int i = 0; i < 200 && !retreated; ++i) // a battle is weeks long (BL-1453)
         {
-            run_battles(f.w, reg, i);
+            run_battles(f.w, seen, i);
             const unit_component& u = f.w.units.at(f.ua);
             if (u.position != start)
             {

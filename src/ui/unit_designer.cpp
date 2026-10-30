@@ -221,7 +221,9 @@ private:
                 {"Hard attack", "hard attack", s.hard, false},
                 {"Defence", "defence", s.defence, false},
                 {"Breakthrough", "breakthrough", s.breakthrough, false},
-                {"Hardness", "hardness", s.hardness, true}};
+                {"Hardness", "hardness", s.hardness, true},
+                {"Recon", "recon", s.recon, false},       // BL-1453 (MILITARY.md § Recon)
+                {"Stealth", "stealth", s.stealth, false}};
     }
     const world& w_;
     entity_id    nation_;

@@ -435,19 +435,25 @@ int main()
     std::printf("\nD6 - battle length in days (infantry on plains, one round a day)\n");
     {
         const campaign_battle_params bp{};
-        std::printf("      rounds_per_day %d, max_rounds %d\n", bp.rounds_per_day, bp.max_rounds);
-        double mean_parity = 0.0, mean_two = 0.0;
+        // NO ROUND CAP (Ben, 2026-10-29): a battle runs until a side breaks or
+        // withdraws, so the window is 400 days and a battle still live at its end
+        // is counted, not clipped silently. Under land recon (BL-1453) the 20-day
+        // vision ramp is part of what this measures.
+        std::printf("      rounds_per_day %d, no round cap\n", bp.rounds_per_day);
+        constexpr int k_window = 400;
+        double mean_parity = 0.0, mean_one_half = 0.0, mean_two = 0.0, mean_three = 0.0;
+        int unfinished_all = 0, unfinished_parity = 0;
         for (const int ratio_x100 : { 100, 150, 200, 300 })
         {
             const int trials = 40;
-            int days_total = 0, decided = 0, att_won = 0;
+            int days_total = 0, decided = 0, att_won = 0, unfinished = 0, longest = 0;
             for (int s = 0; s < trials; ++s)
             {
                 duel d;
                 build_duel(d, 1, 300 * ratio_x100 / 100, 300, modern(land_class::infantry));
                 const int base = 1000 * s; // a different opening day is a different stream
                 int open = -1, end = -1;
-                for (int day = 1; day <= 60 && end < 0; ++day)
+                for (int day = 1; day <= k_window && end < 0; ++day)
                 {
                     const military_day_result r = run_military_day(d.w, reg, base + day);
                     if (open < 0 && r.march.battles_opened > 0)
@@ -463,17 +469,37 @@ int main()
                             }
                     }
                 }
-                days_total += (end >= open && open >= 0) ? (end - open) : 60;
+                const int len = (end >= open && open >= 0) ? (end - open) : k_window;
+                if (end < 0) ++unfinished;
+                longest = std::max(longest, len);
+                days_total += len;
             }
+            if (ratio_x100 == 100) unfinished_parity = unfinished;
+            else unfinished_all += unfinished;
             const double mean = static_cast<double>(days_total) / trials;
-            std::printf("      %.2f:1  mean %.1f days from contact to close; decisive %d/%d, attacker held %d/%d\n",
-                        ratio_x100 / 100.0, mean, decided, trials, att_won, trials);
+            std::printf("      %.2f:1  mean %.1f days from contact to close (longest %d); decisive %d/%d, "
+                        "attacker held %d/%d, still live at day %d: %d\n",
+                        ratio_x100 / 100.0, mean, longest, decided, trials, att_won, trials, k_window,
+                        unfinished);
             if (ratio_x100 == 100) mean_parity = mean;
+            if (ratio_x100 == 150) mean_one_half = mean;
             if (ratio_x100 == 200) mean_two = mean;
+            if (ratio_x100 == 300) mean_three = mean;
         }
-        check(mean_parity >= 4.0 && mean_parity <= 6.0,
-              "D6a infantry against infantry at parity on plains is fought out in about five days (4-6)");
-        check(mean_two < mean_parity, "D6b a 2:1 assault ends sooner");
+        // D6a WAS "fought out in about five days (4-6)" - a pin on the six-round cap
+        // Ben retired (2026-10-29). What stays true is that every battle ends.
+        // RE-SCOPED (Ben, 2026-10-29: "Like forces entrench, and supply decides the
+        // stalemate"): a fully supplied parity pair digs in and holds while the attacker
+        // presses, so parity is the one ratio still live at day 400; every fight outside
+        // the near-parity band is fought out to a break.
+        check(unfinished_all == 0 && unfinished_parity == 40,
+              "D6a outside the near-parity band every battle breaks inside 400 days; a fully supplied parity pair is entrenched and still live at 400");
+        // D6b WAS "a 2:1 assault ends sooner [than parity]". With no cap a parity
+        // assault ends when the ATTACKER breaks, which is quick (attacking is dear),
+        // so parity is no longer the long case: the contested band (1.5:1) is, and a
+        // growing edge shortens the fight from there.
+        check(mean_three < mean_two && mean_two < mean_one_half,
+              "D6b past the contested band a bigger edge ends sooner (3:1 < 2:1 < 1.5:1)");
     }
 
     // -----------------------------------------------------------------------

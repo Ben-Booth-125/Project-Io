@@ -574,13 +574,29 @@ inline constexpr uint32_t world_save_magic =
 /// a full stock. v65 is a
 /// STRICT PREFIX of v66 and is read too (`k_world_save_version_pre_supplies`), as is
 /// v64 (`k_world_save_version_pre_air`): a world where every unit's stocks are full.
-inline constexpr uint32_t world_save_version = 66;
+///
+/// Bumped to 67 (BL-1453, land recon; MILITARY.md § Recon, § Battles): A TRAILING
+/// SECTION after the carried supplies carries, after a u32 count, every unit off its
+/// defaults, ascending id, as (id, i32 readiness carry, i32 men carry, i32
+/// tile_since_day) — the sub-unit damage a weeks-long battle carries day to day and the
+/// day the unit took its tile; then a u32 battle count and, per battle in order, the
+/// attacker's recon stock (`active_battle::attacker_recon_milli`, i32 milli-points).
+/// v66 is a STRICT PREFIX of v67 and is read too (`k_world_save_version_pre_battle_carry`),
+/// as a world with every remainder 0, every unit on its tile since before any stamp and
+/// every live battle's attacker fully seeing its defenders (`legacy_battle_recon_milli`).
+inline constexpr uint32_t world_save_version = 67;
 
 /// v65, a strict prefix of v66 (the carried-supplies section is v66's only addition).
 inline constexpr uint32_t k_world_save_version_pre_supplies = 65;
 
 /// v64, a strict prefix of v65 (the air section is v65's only addition).
 inline constexpr uint32_t k_world_save_version_pre_air = 64;
+
+/// BL-1453: the first version carrying the battle-carry section (see above).
+inline constexpr uint32_t k_world_save_version_battle_carry = 67;
+
+/// BL-1453: v66, a strict prefix of v67 (the battle-carry section is v67's only addition).
+inline constexpr uint32_t k_world_save_version_pre_battle_carry = 66;
 
 /// v63, a strict prefix of v64 (the designs section is v64's only addition).
 inline constexpr uint32_t k_world_save_version_pre_designs = 63;
@@ -676,6 +692,11 @@ std::size_t world_save_major_section_bytes(const world& w);
 /// writes for @p w — the LAST section of a v56 stream.
 std::size_t world_save_books_section_bytes(const world& w);
 
+/// BL-1453: the byte length of the v67 battle-carry section `w` writes — 4 + 16 per
+/// unit off its defaults (a carry or a tile day) + 4 + 4 per battle. For the harnesses
+/// that measure an older stream as today's less its later sections.
+std::size_t world_save_battle_carry_section_bytes(const world& w);
+
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and
 /// folds them away (`fold_legacy_firms`); the verification writer below writes
@@ -750,6 +771,15 @@ void write_world_snapshot_pre_air(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1452): @p w as a v65 stream — no carried-supplies section.
 void write_world_snapshot_pre_supplies(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1453): @p w as a v66 stream — no battle-carry section.
+void write_world_snapshot_pre_battle_carry(const world& w, std::ostream& out);
+
+/// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
+/// see every defending unit in full (twice the stealthiest defender's kit stealth, in
+/// milli-points: headroom over any terrain multiplier), so a fight already in progress
+/// is not blinded by the load.
+int32_t legacy_battle_recon_milli(const world& w, const active_battle& b);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

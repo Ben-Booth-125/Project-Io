@@ -39,3 +39,4 @@
 {"version":52,"kind":"world","owner":"BL-1335 taxes and Discontent","ts":"2026-10-16T00:54:00.547Z","branch":"main"}
 {"version":53,"kind":"world","owner":"BL-1340 roads are edges","ts":"2026-10-16T20:22:41.764Z","branch":"main"}
 {"version":54,"kind":"world","owner":"BL-1337 return net crosses zero","ts":"2026-10-16T21:59:34.754Z","branch":"worktree-agent-a940568c7a9946e1d"}
+{"version":67,"kind":"world","owner":"BL-1453 land recon (the battle carry, tile_since_day, the attacker recon stock)","ts":"2026-10-30T00:00:00.000Z","branch":"worktree-agent-a4d96b447ea9af82c"}

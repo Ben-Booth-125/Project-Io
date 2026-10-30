@@ -1659,7 +1659,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // the world no longer holds is never written — every erase path forgets its air
     // records too (world::forget_air_unit), and this is the second guard, so a save
     // taken between an erase and the next tick still loads under the strict reader.
-    if (version >= k_world_save_version_pre_supplies) // v65 and v66 carry the air
+    if (version > k_world_save_version_pre_air) // v65 on (was `== world_save_version`; BL-1453)
     {
         const auto wing_ok = [&](const air_wing& wg) {
             return w.nations.count(wg.owner) != 0 && w.buildings.count(wg.airbase) != 0;
@@ -1751,10 +1751,10 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 66 (BL-1452, carried supplies): THE STOCKS, the last section, after the air —
+    // world_save_version 66 (BL-1452, carried supplies): THE STOCKS, after the air —
     // every unit off full (or with a starvation carry), ascending id, as (id, food,
     // ammunition, equipment, carry). Only deviations.
-    if (version == world_save_version)
+    if (version > k_world_save_version_pre_supplies) // v66 on
     {
         std::vector<entity_id> uids;
         for (const auto& [uid, u] : w.units)
@@ -1776,12 +1776,53 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, u.lp_share_permille);
         }
     }
+
+    // world_save_version 67 (BL-1453): THE BATTLE STATE OF LAND RECON AND THE CARRY,
+    // the last section, after the stocks. First every unit off
+    // its defaults, ascending id, as (id, readiness carry, men carry, tile_since_day);
+    // then a u32 battle count and, per battle in `w.battles` order, the attacker's recon
+    // stock (i32 milli-points).
+    if (version >= k_world_save_version_battle_carry)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [uid, u] : w.units)
+            if (u.battle_ready_carry != 0 || u.battle_hp_carry != 0 || u.tile_since_day != -1)
+                ids.push_back(uid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id uid : ids)
+        {
+            const unit_component& u = w.units.at(uid);
+            w_id(out, uid);
+            w_i32(out, u.battle_ready_carry);
+            w_i32(out, u.battle_hp_carry);
+            w_i32(out, u.tile_since_day);
+        }
+        w_u32(out, static_cast<uint32_t>(w.battles.size()));
+        for (const active_battle& b : w.battles)
+            w_i32(out, b.attacker_recon_milli);
+    }
 }
 
 void write_world_snapshot_pre_air(const world& w, std::ostream& out)
 {
     // VERIFICATION ONLY (BL-1449): the v64 stream shape — no air section.
     write_world_snapshot_at(w, out, k_world_save_version_pre_air);
+}
+
+void write_world_snapshot_pre_battle_carry(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1453): the v66 stream shape — no battle-carry section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_battle_carry);
+}
+
+int32_t legacy_battle_recon_milli(const world& w, const active_battle& b)
+{
+    int64_t stealth = 0;
+    for (const entity_id uid : b.defender_units)
+        if (const auto it = w.units.find(uid); it != w.units.end())
+            stealth = std::max<int64_t>(stealth, unit_land_stats(it->second).stealth);
+    return static_cast<int32_t>(std::min<int64_t>(stealth * 2000, 1 << 30));
 }
 
 void write_world_snapshot_pre_supplies(const world& w, std::ostream& out)
@@ -1838,6 +1879,15 @@ void write_world_snapshot_pre_days(const world& w, std::ostream& out)
     // VERIFICATION ONLY (Ben, 2026-10-24): the v56 stream shape — no construction-days
     // section — so the v56 reader has a producer. The game never writes an old version.
     write_world_snapshot_at(w, out, k_world_save_version_pre_days);
+}
+
+std::size_t world_save_battle_carry_section_bytes(const world& w)
+{
+    std::size_t n = 4 + 4 + 4 * w.battles.size();
+    for (const auto& [uid, u] : w.units)
+        if (u.battle_ready_carry != 0 || u.battle_hp_carry != 0 || u.tile_since_day != -1)
+            n += 16;
+    return n;
 }
 
 std::size_t world_save_books_section_bytes(const world& w)
@@ -1931,7 +1981,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_tile       // BL-1443: v62, battles keyed by province
             && version != k_world_save_version_pre_designs    // BL-1434: v63, every design base kit
             && version != k_world_save_version_pre_air        // BL-1449: v64, no air
-            && version != k_world_save_version_pre_supplies)) // BL-1452: v65, every unit's stocks full
+            && version != k_world_save_version_pre_supplies     // BL-1452: v65, every unit's stocks full
+            && version != k_world_save_version_pre_battle_carry)) // BL-1453: v66, no battle carry
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2892,7 +2943,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // most one per (class, slot); a condition is a real building's, in [0, 999].
     // Refused whole otherwise. A v64 (and older) stream ends before it: no air, every
     // building whole.
-    if (version >= k_world_save_version_pre_supplies) // v65 and v66 carry the air
+    if (version > k_world_save_version_pre_air) // v65 on (was `== world_save_version`; BL-1453)
     {
         constexpr uint32_t k_max = 1u << 22;
         uint32_t count = 0;
@@ -3031,7 +3082,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // [0, 180) and non-zero only on a starving unit (food 0) — the only records the
     // writer and the supply day can produce. Refused whole otherwise. A v65 (and older)
     // stream ends before it: every unit's stocks are full.
-    if (version == world_save_version)
+    if (version > k_world_save_version_pre_supplies) // v66 on
     {
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.units.size())
@@ -3070,6 +3121,56 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             if (unit_supplies_full(u))
                 return false; // only units off full are written
         }
+    }
+
+    // v67 (BL-1453): land recon's battle state and the carry. Untrusted: unit rows
+    // strictly ascending, each a unit in the stream, carries in [0, 2^30], the tile day
+    // >= -1, not all at their defaults; exactly one recon stock per battle, in
+    // [0, 2^30]. Refused whole
+    // otherwise. A v66 (and older) stream ends before it: every remainder 0, every unit
+    // on its tile since before any stamp, every live battle's recon stock at full sight
+    // (`legacy_battle_recon_milli`).
+    if (version >= k_world_save_version_battle_carry)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            int32_t rc = 0, hc = 0, since = -1;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev)
+                || !r_i32(in, rc) || !r_i32(in, hc) || !r_i32(in, since))
+                return false;
+            prev = uid;
+            if (rc < 0 || hc < 0 || rc > (1 << 30) || hc > (1 << 30) || since < -1
+                || (rc == 0 && hc == 0 && since == -1))
+                return false;
+            const auto uit = s.units.find(uid);
+            if (uit == s.units.end())
+                return false;
+            uit->second.battle_ready_carry = rc;
+            uit->second.battle_hp_carry    = hc;
+            uit->second.tile_since_day     = since;
+        }
+        uint32_t nb = 0;
+        if (!r_u32(in, nb) || nb != s.battles.size())
+            return false;
+        for (active_battle& b : s.battles)
+        {
+            int32_t v = 0;
+            if (!r_i32(in, v) || v < 0 || v > (1 << 30))
+                return false;
+            b.attacker_recon_milli = v;
+        }
+    }
+    else
+    {
+        // A pre-v67 stream carries no recon stock: a battle already in progress loads
+        // SEEN, never blinded by the load (cold review).
+        for (active_battle& b : s.battles)
+            b.attacker_recon_milli = legacy_battle_recon_milli(s, b);
     }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct

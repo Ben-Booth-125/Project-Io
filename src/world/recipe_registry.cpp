@@ -997,6 +997,26 @@ void recipe_registry::load_from_lua(lua_state& lua)
             mp.air = ap;
         }
 
+        // BL-1453 (MILITARY.md § Recon): economy.military.recon. Absent = the C++
+        // defaults (which equal the shipped Lua). An out-of-domain number THROWS,
+        // never clamps.
+        if (sol::optional<sol::table> recon = (*military)["recon"])
+        {
+            land_recon_params rp = mp.recon;
+            sol::table rt = *recon;
+            const auto read_int = [&](const char* key, int lo, int hi, int& out) {
+                out = rt.get_or(key, out);
+                if (out < lo || out > hi)
+                    throw std::runtime_error(std::string("recipe_registry: economy.military.recon.")
+                                             + key + " is outside [" + std::to_string(lo) + ", "
+                                             + std::to_string(hi) + "]");
+            };
+            read_int("recon_wing_points", 0, 100000, rp.recon_wing_points);
+            read_int("wing_points", 0, 100000, rp.wing_points);
+            read_int("superiority_points", 0, 100000, rp.superiority_points);
+            mp.recon = rp;
+        }
+
         m_military = mp;
     }
 

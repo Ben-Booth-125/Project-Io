@@ -44,6 +44,7 @@
 // ---------------------------------------------------------------------------
 
 #include "campaign_battle.hpp"
+#include "land_recon_params.hpp" // BL-1453: the open-time recon parameter (unused today)
 #include "entity.hpp"
 #include "terrain_class.hpp" // BL-1455: terrain_class_effect, the terrain hook's answer
 
@@ -103,7 +104,6 @@ struct battle_dispatch
 
     int rounds_fought = 0;   ///< Total, not this tick's batch.
     int rounds_this_tick = 0;
-    int max_rounds = 0;      ///< So a surface can print "round 4 / 6" without knowing params.
 
     int attacker_strength_permille = 0; ///< After this tick's rounds.
     int defender_strength_permille = 0;
@@ -112,6 +112,11 @@ struct battle_dispatch
 
     int attacker_men_lost = 0;          ///< Actual men, this tick.
     int defender_men_lost = 0;
+
+    /// BL-1453 (cold review): a weeks-long battle reports every day it fights, but
+    /// a surface should SPEAK only on its opening day, a change of phase and its
+    /// end. This says which; the Field channel posts only these.
+    bool newsworthy = true;
 
     /// Set only when `phase` is `broke_off` or `concluded`.
     withdrawing_side withdrew = withdrawing_side::none;
@@ -185,6 +190,29 @@ struct battle_tick
 /// stands there. Joined stacks stay where they stood.
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
 
+/// BL-1453 (MILITARY.md § Recon): what a side's recon stock would GROW by today over
+/// battle @p b, in MILLI-points — the recon of its FIGHTING units, of every other unit
+/// of its nation with men standing on a tile adjacent to the defended tile (counted
+/// at once, nothing stored; a unit in the side's list counts once, through the first
+/// term), and of its air over the province (`air_land_recon_milli`). Only the
+/// attacker's is used (recon is one-sided); a sum over keyed walks, so no visit order
+/// reaches it.
+int64_t battle_side_recon_milli(const world& w, const recipe_registry& reg, const active_battle& b,
+                                bool attacker_side);
+
+/// BL-1453 (MILITARY.md § Battles, "Like forces entrench, and supply decides the
+/// stalemate"): the readiness, per-mille, unit @p unit regains each DAY of an
+/// entrenched fight from its CARRIED STOCKS (BL-1452) — `p.entrench_recovery_permille`
+/// when it is fed (food full) and its ammunition is above its floor, else 0 (a hungry
+/// unit, or one at the ammunition floor, does not recover). THE ONE PREDICATE the
+/// battle pass reads. 0 for an unknown unit.
+int unit_entrench_recovery_permille(const world& w, entity_id unit,
+                                    const campaign_battle_params& p = {});
+
+/// BL-1453: the day of battle @p b the next round is fought on, 1-based - its rounds
+/// fought / `rounds_per_day`, plus one. What the battle card shows.
+int battle_day(const active_battle& b, const campaign_battle_params& p = {});
+
 /// Out of contact, every unit recovers: readiness toward its morale (scaled by its
 /// supply, never above it), morale toward its supply. DAILY (Ben, 2026-10-28), from
 /// the daily military pass after the march; the authored rates
@@ -228,8 +256,11 @@ struct tile_attack
 /// attacker starts nothing; spent defenders are still caught and overrun).
 /// ENTITY-ID-AGNOSTIC: the two sides are read only as unit owners. Exposed so a
 /// harness can open a battle without a march.
+/// @p rp is UNUSED today (the opening reads no rate: the stock is the units' recon);
+/// kept so a future opening rate needs no signature change at every caller.
 bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, entity_id defender,
-                      const std::vector<entity_id>& attacking_units);
+                      const std::vector<entity_id>& attacking_units,
+                      const land_recon_params& rp = {});
 
 /// Open every battle @p attacks registered, in (tile, attacker, defender) order,
 /// each identity's units merged into one attacking stack. So two attacks onto
@@ -246,7 +277,8 @@ bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, en
 /// The restore runs in the same sorted order as the opens, so it adds no
 /// dependence on the visit order.
 /// @return battles opened.
-int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks);
+int open_tile_battles(world& w, int tick, std::vector<tile_attack> attacks,
+                      const land_recon_params& rp = {});
 
 /// Request that @p corp break off the battle it is fighting over @p tile.
 ///

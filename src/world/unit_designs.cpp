@@ -46,7 +46,8 @@ constexpr kit_item base(const char* id, const char* name, lc c, uint8_t slot)
     return {id, name, c, slot, {}, {}, 0, nullptr};
 }
 
-/// A later item. Delta order is land_combat_stats': soft, hard, hardness, defence, breakthrough.
+/// A later item. Delta order is land_combat_stats': soft, hard, hardness, defence, breakthrough,
+/// recon, stealth (BL-1453: the last two are per unit; MILITARY.md § Recon).
 constexpr kit_item later(const char* id, const char* name, lc c, uint8_t slot,
                          land_combat_stats d, const char* node,
                          kit_good g0, kit_good g1 = {}, kit_good g2 = {})
@@ -63,17 +64,17 @@ constexpr kit_item k_items[] = {
     later("inf.weapon.wire_guided_atgm",      "Wire-guided anti-tank missile",     lc::infantry, 0, {0, 25, 0, 0, 0}, "DG-KIT-INF-WEAPON-3", M(1), E(1), O(2)),
     later("inf.weapon.fire_and_forget_atgm",  "Fire-and-forget anti-tank missile", lc::infantry, 0, {0, 40, 0, 0, 0}, "DG-KIT-INF-WEAPON-4", E(2), O(2)),
     base ("inf.armour.steel_helmet",          "Steel helmet",                      lc::infantry, 1),
-    later("inf.armour.flak_vest",             "Flak vest",                         lc::infantry, 1, {0, 0, 0, 10, 0}, "DG-KIT-INF-ARMOUR-1", S(1), A(1)),
-    later("inf.armour.ceramic_plates",        "Ceramic plate carrier",             lc::infantry, 1, {0, 0, 0, 20, 0}, "DG-KIT-INF-ARMOUR-2", A(2)),
-    later("inf.armour.networked_kit",         "Networked soldier kit",             lc::infantry, 1, {10, 0, 0, 15, 10}, "DG-KIT-INF-ARMOUR-3", A(1), E(2)),
+    later("inf.armour.flak_vest",             "Flak vest",                         lc::infantry, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-KIT-INF-ARMOUR-1", S(1), A(1)),
+    later("inf.armour.ceramic_plates",        "Ceramic plate carrier",             lc::infantry, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-KIT-INF-ARMOUR-2", A(2)),
+    later("inf.armour.networked_kit",         "Networked soldier kit",             lc::infantry, 1, {10, 0, 0, 15, 10, 10, 15}, "DG-KIT-INF-ARMOUR-3", A(1), E(2)),
 
     // --- Motorised infantry: Weapon (0) · Armour (1) · Vehicle (2) ---------
     base ("mot.weapon.battle_rifle",          "Battle rifle",                      lc::motorised, 0),
     later("mot.weapon.assault_rifle",         "Assault rifle",                     lc::motorised, 0, {10, 0, 0, 0, 0}, "DG-KIT-MOT-WEAPON-1", S(2), M(1)),
     later("mot.weapon.wire_guided_atgm",      "Wire-guided anti-tank missile",     lc::motorised, 0, {0, 25, 0, 0, 0}, "DG-KIT-MOT-WEAPON-2", M(1), E(1), O(2)),
     base ("mot.armour.steel_helmet",          "Steel helmet",                      lc::motorised, 1),
-    later("mot.armour.flak_vest",             "Flak vest",                         lc::motorised, 1, {0, 0, 0, 10, 0}, "DG-KIT-MOT-ARMOUR-1", S(1), A(1)),
-    later("mot.armour.ceramic_plates",        "Ceramic plate carrier",             lc::motorised, 1, {0, 0, 0, 20, 0}, "DG-KIT-MOT-ARMOUR-2", A(2)),
+    later("mot.armour.flak_vest",             "Flak vest",                         lc::motorised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-KIT-MOT-ARMOUR-1", S(1), A(1)),
+    later("mot.armour.ceramic_plates",        "Ceramic plate carrier",             lc::motorised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-KIT-MOT-ARMOUR-2", A(2)),
     base ("mot.vehicle.trucks",               "Trucks",                            lc::motorised, 2),
     later("mot.vehicle.protected_trucks",     "Protected trucks",                  lc::motorised, 2, {0, 0, 150, 10, 0}, "DG-KIT-MOT-VEHICLE-1", S(3), M(1)),
     later("mot.vehicle.wheeled_carriers",     "Wheeled carriers",                  lc::motorised, 2, {0, 0, 250, 0, 15}, "DG-KIT-MOT-VEHICLE-2", S(4), M(2), A(1)),
@@ -83,18 +84,18 @@ constexpr kit_item k_items[] = {
     later("mech.weapon.assault_rifle",        "Assault rifle",                     lc::mechanised, 0, {10, 0, 0, 0, 0}, "DG-KIT-MECH-WEAPON-1", S(2), M(1)),
     later("mech.weapon.fire_and_forget_atgm", "Fire-and-forget anti-tank missile", lc::mechanised, 0, {0, 40, 0, 0, 0}, "DG-KIT-MECH-WEAPON-2", E(2), O(2)),
     base ("mech.armour.steel_helmet",         "Steel helmet",                      lc::mechanised, 1),
-    later("mech.armour.flak_vest",            "Flak vest",                         lc::mechanised, 1, {0, 0, 0, 10, 0}, "DG-KIT-MECH-ARMOUR-1", S(1), A(1)),
-    later("mech.armour.ceramic_plates",       "Ceramic plate carrier",             lc::mechanised, 1, {0, 0, 0, 20, 0}, "DG-KIT-MECH-ARMOUR-2", A(2)),
+    later("mech.armour.flak_vest",            "Flak vest",                         lc::mechanised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-KIT-MECH-ARMOUR-1", S(1), A(1)),
+    later("mech.armour.ceramic_plates",       "Ceramic plate carrier",             lc::mechanised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-KIT-MECH-ARMOUR-2", A(2)),
     base ("mech.vehicle.apc",                 "Armoured personnel carrier",        lc::mechanised, 2),
     later("mech.vehicle.ifv_autocannon",      "Infantry fighting vehicle (autocannon)", lc::mechanised, 2, {20, 15, 0, 0, 0}, "DG-KIT-MECH-VEHICLE-1", S(4), M(2)),
     later("mech.vehicle.ifv_missiles",        "Fighting vehicle with missiles",    lc::mechanised, 2, {20, 30, 0, 0, 0}, "DG-KIT-MECH-VEHICLE-2", S(4), M(2), E(1)),
-    later("mech.vehicle.heavy_ifv",           "Heavy fighting vehicle, active protection", lc::mechanised, 2, {20, 30, 150, 20, 0}, "DG-KIT-MECH-VEHICLE-3", S(5), A(2), E(2)),
+    later("mech.vehicle.heavy_ifv",           "Heavy fighting vehicle, active protection", lc::mechanised, 2, {20, 30, 150, 20, 0, 5, 0}, "DG-KIT-MECH-VEHICLE-3", S(5), A(2), E(2)),
 
     // --- Medium armour (the armour class): Armament (0) · Armour (1) · Tracks (2)
     base ("arm.armament.rifled_gun",          "Rifled gun",                        lc::armour, 0),
     later("arm.armament.smoothbore_gun",      "Smoothbore gun",                    lc::armour, 0, {0, 30, 0, 0, 0}, "DG-KIT-ARM-ARMAMENT-1", S(3), M(2)),
-    later("arm.armament.penetrators_thermal", "Improved penetrators, thermal sights", lc::armour, 0, {15, 55, 0, 0, 0}, "DG-KIT-ARM-ARMAMENT-2", S(3), M(2), E(1)),
-    later("arm.armament.gun_missiles",        "Gun-launched missiles, networked fire control", lc::armour, 0, {30, 80, 0, 0, 0}, "DG-KIT-ARM-ARMAMENT-3", M(2), E(3), O(2)),
+    later("arm.armament.penetrators_thermal", "Improved penetrators, thermal sights", lc::armour, 0, {15, 55, 0, 0, 0, 5, 0}, "DG-KIT-ARM-ARMAMENT-2", S(3), M(2), E(1)),
+    later("arm.armament.gun_missiles",        "Gun-launched missiles, networked fire control", lc::armour, 0, {30, 80, 0, 0, 0, 10, 0}, "DG-KIT-ARM-ARMAMENT-3", M(2), E(3), O(2)),
     base ("arm.armour.rolled_steel",          "Rolled steel",                      lc::armour, 1),
     later("arm.armour.composite",             "Composite armour",                  lc::armour, 1, {0, 0, 0, 15, 15}, "DG-KIT-ARM-ARMOUR-1", S(2), A(3)),
     later("arm.armour.reactive",              "Reactive armour",                   lc::armour, 1, {0, 0, 0, 30, 15}, "DG-KIT-ARM-ARMOUR-2", A(3), O(2)),
@@ -106,13 +107,13 @@ constexpr kit_item k_items[] = {
     // --- Light armour: Armament (0) · Armour (1) · Wheels (2) --------------
     base ("lt.armament.heavy_mg",             "Heavy machine gun",                 lc::light_armour, 0),
     later("lt.armament.autocannon",           "Autocannon",                        lc::light_armour, 0, {15, 10, 0, 0, 0}, "DG-KIT-LT-ARMAMENT-1", S(2), M(1)),
-    later("lt.armament.thermal_autocannon",   "Autocannon with thermal imaging",   lc::light_armour, 0, {30, 10, 0, 0, 0}, "DG-KIT-LT-ARMAMENT-2", S(2), M(1), E(1)),
+    later("lt.armament.thermal_autocannon",   "Autocannon with thermal imaging",   lc::light_armour, 0, {30, 10, 0, 0, 0, 20, 0}, "DG-KIT-LT-ARMAMENT-2", S(2), M(1), E(1)),
     later("lt.armament.atgm_mount",           "Anti-tank missile mount",           lc::light_armour, 0, {0, 30, 0, 0, 0}, "DG-KIT-LT-ARMAMENT-3", M(1), E(1), O(2)),
     base ("lt.armour.light_plate",            "Light steel plate",                 lc::light_armour, 1),
     later("lt.armour.spaced",                 "Spaced armour",                     lc::light_armour, 1, {0, 0, 0, 10, 0}, "DG-KIT-LT-ARMOUR-1", S(2)),
     later("lt.armour.composite_applique",     "Composite applique",                lc::light_armour, 1, {0, 0, 100, 15, 0}, "DG-KIT-LT-ARMOUR-2", A(2)),
     base ("lt.wheels.scout_car",              "Scout car",                         lc::light_armour, 2),
-    later("lt.wheels.six_wheeler",            "Run-flat six-wheeler",              lc::light_armour, 2, {0, 0, 0, 0, 10}, "DG-KIT-LT-WHEELS-1", S(2), M(1)),
+    later("lt.wheels.six_wheeler",            "Run-flat six-wheeler",              lc::light_armour, 2, {0, 0, 0, 0, 10, 0, 5}, "DG-KIT-LT-WHEELS-1", S(2), M(1)),
     later("lt.wheels.tracked_scout",          "Tracked scout",                     lc::light_armour, 2, {0, 0, 100, 0, 15}, "DG-KIT-LT-WHEELS-2", S(3), M(2)),
 
     // --- Artillery: Gun (0) · Munitions (1) · Tow (2) ----------------------
@@ -123,7 +124,7 @@ constexpr kit_item k_items[] = {
     base ("art.munitions.he_shells",          "High-explosive shells",             lc::artillery, 1),
     later("art.munitions.guided_shells",      "Guided shells",                     lc::artillery, 1, {20, 20, 0, 0, 0}, "DG-KIT-ART-MUNITIONS-1", O(2), E(1)),
     later("art.munitions.submunitions",       "Anti-armour submunitions",          lc::artillery, 1, {0, 40, 0, 0, 0}, "DG-KIT-ART-MUNITIONS-2", O(3), E(1)),
-    later("art.munitions.loitering_drones",   "Loitering drones",                  lc::artillery, 1, {20, 40, 0, 0, 0}, "DG-KIT-ART-MUNITIONS-3", E(2), A(2)),
+    later("art.munitions.loitering_drones",   "Loitering drones",                  lc::artillery, 1, {20, 40, 0, 0, 0, 25, 0}, "DG-KIT-ART-MUNITIONS-3", E(2), A(2)),
     base ("art.tow.gun_tractor",              "Gun tractor",                       lc::artillery, 2),
     later("art.tow.self_propelled",           "Self-propelled chassis",            lc::artillery, 2, {0, 0, 300, 0, 15}, "DG-KIT-ART-TOW-1", S(4), M(2)),
     later("art.tow.armoured_sp",              "Armoured self-propelled chassis",   lc::artillery, 2, {0, 0, 400, 10, 15}, "DG-KIT-ART-TOW-2", S(5), M(2), A(1)),
@@ -135,8 +136,8 @@ constexpr kit_item k_items[] = {
     later("ad.launcher.medium_range",         "Medium-range missiles",             lc::air_defence, 0, {0, 10, 0, 0, 0}, "DG-KIT-AD-LAUNCHER-2", E(2), O(2)),
     later("ad.launcher.layered",              "Layered defence with counter-drone", lc::air_defence, 0, {5, 10, 0, 0, 0}, "DG-KIT-AD-LAUNCHER-3", E(3), O(2)),
     base ("ad.fire_control.optical",          "Optical",                           lc::air_defence, 1),
-    later("ad.fire_control.search_radar",     "Search radar",                      lc::air_defence, 1, {0, 0, 0, 5, 0}, "DG-KIT-AD-FIRE-1", E(2)),
-    later("ad.fire_control.integrated",       "Integrated network",                lc::air_defence, 1, {0, 0, 0, 10, 0}, "DG-KIT-AD-FIRE-2", E(3)),
+    later("ad.fire_control.search_radar",     "Search radar",                      lc::air_defence, 1, {0, 0, 0, 5, 0, 5, 0}, "DG-KIT-AD-FIRE-1", E(2)),
+    later("ad.fire_control.integrated",       "Integrated network",                lc::air_defence, 1, {0, 0, 0, 10, 0, 10, 0}, "DG-KIT-AD-FIRE-2", E(3)),
     later("ad.fire_control.electronic_warfare", "Electronic warfare",              lc::air_defence, 1, {5, 0, 0, 10, 0}, "DG-KIT-AD-FIRE-3", E(3), A(1)),
     base ("ad.vehicle.towed_mount",           "Towed mount",                       lc::air_defence, 2),
     later("ad.vehicle.truck_mounted",         "Truck-mounted",                     lc::air_defence, 2, {0, 0, 0, 0, 5}, "DG-KIT-AD-VEHICLE-1", S(2), M(1)),
@@ -183,7 +184,8 @@ constexpr bool str_eq(const char* a, const char* b)
 
 constexpr bool is_zero(const land_combat_stats& d)
 {
-    return d.soft == 0 && d.hard == 0 && d.hardness == 0 && d.defence == 0 && d.breakthrough == 0;
+    return d.soft == 0 && d.hard == 0 && d.hardness == 0 && d.defence == 0 && d.breakthrough == 0
+        && d.recon == 0 && d.stealth == 0;
 }
 
 /// The class hardness the validator keeps a delta inside (k_land_stats' column;
@@ -227,6 +229,10 @@ constexpr const char* first_error()
             return "a hardness delta takes its class outside 0..1000";
         if (it.goods_count > k_kit_goods_max)
             return "an item names too many goods";
+        // BL-1453: kit only ADDS recon and stealth (MILITARY.md § Recon: light armour,
+        // drones and optics carry recon; better infantry armour raises stealth).
+        if (it.delta.recon < 0 || it.delta.stealth < 0)
+            return "a recon or stealth delta is negative";
         if (it.research_node == nullptr)
         {
             if (!is_zero(it.delta) || it.goods_count != 0)
@@ -408,12 +414,16 @@ land_combat_stats kit_stats(land_class c, const unit_design& d)
         s.hardness += k.hardness;
         s.defence += k.defence;
         s.breakthrough += k.breakthrough;
+        s.recon += k.recon;
+        s.stealth += k.stealth;
     }
     s.soft         = std::max(0, s.soft);
     s.hard         = std::max(0, s.hard);
     s.defence      = std::max(0, s.defence);
     s.breakthrough = std::max(0, s.breakthrough);
     s.hardness     = std::clamp(s.hardness, 0, 1000);
+    s.recon        = std::max(0, s.recon);
+    s.stealth      = std::max(0, s.stealth);
     return s;
 }
 
