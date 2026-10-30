@@ -438,6 +438,7 @@ int main()
                                + world_save_major_section_bytes(w) + world_save_books_section_bytes(w)
                                + 12  // BL-1434 (v64): the designs section, three empty counts
                                + 24  // BL-1449 (v65): the air section, six empty counts
+                               + 4   // BL-1452 (v66): the carried-supplies section, one empty count
                                + world_save_battle_carry_section_bytes(w); // BL-1453 (v67)
         const std::string b55 = v55_of(w);
         std::string v50 = b55.substr(0, b55.size() - tail55_of(w));

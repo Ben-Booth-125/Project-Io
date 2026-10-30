@@ -162,7 +162,7 @@ breaks; "C4 TARGET a parity battle is fought out in 30-60 days"), 72 at 1.25:1, 
 longest, the contested band; "C4 TARGET a 1.5:1 battle runs longer than parity"), 25 at 1.75:1, 12
 at 2:1 and **2 at 3:1** — a rout ("C4 TARGET a rout (3:1) is fast"). Through the daily pass, modern
 infantry on plains, fully supplied (`move_by_days_harness` D6): parity **entrenches and is still
-live at day 400**, 66 days at 1.5:1, 10 at 2:1 and 3 at 3:1. Two equal fully supplied sides hold a
+live at day 400**, 65 days at 1.5:1, 9 at 2:1 and 2 at 3:1. Two equal fully supplied sides hold a
 year (`campaign_battle_harness` "C7 two equal fully supplied sides hold each other for a year"); a
 starved side (supply 300) breaks on day 4 attacking and day 11 defending, because its supply also
 cuts its hits out of the band ("C7 a starved ... breaks"). Every fight that lands hits ends in time,
@@ -208,7 +208,7 @@ reads is shown on the surface that reads it.
 | **Food** | stored, per unit, ‰ | The carried food stock (§ Carried supplies). Below full, a flat penalty; at zero, the unit starves. |
 | **Ammunition** | stored, per unit, ‰ | The carried ammunition stock. Scales every combat stat, floored at 20%. |
 | **Equipment** | stored, per unit, ‰ | The carried equipment stock — the kit fit to use. Scales every combat stat. |
-| **Supply** | stored, per unit | `supply_factor_permille`: the share of its supplies the network delivers (§ Upkeep). It is what resupplies the three stocks, not a scale on the round of its own. |
+| **Supply** | stored, per unit | Two quantities. The **Logistic Point share** granted at the unit's tile (§ Upkeep, "Supply is drawn where the unit stands") is what resupplies the three stocks. `supply_factor_permille`, moved by the one decay rule (an unpaid wage, an unmet goods draw, the share), moves readiness and morale. Neither scales the round of its own. |
 | **Soft attack** | class × equipment | Hits per round against a target's soft share. |
 | **Hard attack** | class × equipment | Hits per round against its hard share. |
 | **Hardness** | class × equipment, 0..1 | Share of the unit that is armoured. |
@@ -262,9 +262,13 @@ keeps every stock full, and the stocks move only once the campaign begins.
   attack, defence and breakthrough. **Ammunition is floored at 20%**: a unit out of shells still
   fights with small arms at close quarters. Equipment has no floor. The two multiply, with morale.
 
-The three stocks are what the round reads for supply; `supply_factor_permille` is the delivered
-share that feeds them, so the one decay rule (§ Upkeep) now moves the stocks' resupply rather than
-scaling hits directly.
+The daily drain rates are authored in `scripts/economy.lua` § `economy.military.carried_supplies`
+(food per day, ammunition per day fighting, equipment per day and per day fighting, and the restock); the hunger
+step, the ammunition floor and the 180 days are the design's own numbers, not rates.
+
+The three stocks are what the round reads for supply. They are fed by the **Logistic Point share**
+granted at the unit's tile — only the road gap starves — while `supply_factor_permille` and the
+one decay rule (§ Upkeep) move readiness and morale; neither scales hits directly.
 
 ### Recon (Ben, 2026-10-29)
 
@@ -634,7 +638,7 @@ conquest at generation time) and `tools/verify/world_audit.cpp`.
 
 **Ground treats the classes differently: tanks cannot cross mountains without a road, and fight
 worse in them.** On top of the shared terrain table above, which every unit reads alike, each land
-class carries a **per-terrain row** with up to four effects:
+class carries a **per-terrain row** with up to five effects (the fifth, stealth, is below the table):
 
 - **Move** — a multiplier on the march days (§ Marching), on top of the tile's traversal cost.
 - **Blocked unless roaded** — the class cannot enter the tile without a road on it. A block refuses
@@ -643,7 +647,7 @@ class carries a **per-terrain row** with up to four effects:
   battle's ground (the defended tile, § Battles) is that terrain. It applies to each unit by its own
   class, on both sides. **A road on the defended tile halves the fight debuff.**
 - **Wear** — the unit's carried equipment (§ Carried supplies) drains faster each day it stands
-  there.
+  there: ×1.5 wherever the table says "wear".
 
 Desert is the **dunes** cover; mountain, canyon and rift are landforms; marsh, forest, urban and
 snow are covers.
@@ -672,8 +676,14 @@ snow are covers.
 
 The rows are authored data beside the march days (`economy.military`), keyed by class and terrain,
 and checked by the loader as the march days are. **A block is a per-class wall in the path**: a
-march or a front's order routes around it, an order with no legal route is refused with the reason,
-and a retreat never steps onto a tile its class cannot enter.
+march or a front's order routes around it, an order with no legal route is refused with the reason
+(`rejected_terrain`), and a retreat never steps onto a tile its class cannot enter. On a front
+(§ Fronts) a slot the class cannot enter gives way to the nearest span tile it can, ties to the
+lower index; a unit with no such slot holds where it stands. A push skips a target the class
+cannot enter or reach for the next in the push's order. "A road on it"
+is any road edge on the tile. The move rows price a hop's days but do not steer the route: the
+path is the shared terrain-weighted one, solved around the walls. A pre-modern row, which declares
+no land class, reads none of these rows.
 
 ---
 
@@ -1273,6 +1283,14 @@ costs-twice-annual-salary anchor prices a garrison's count off the nation's own
 token one — no separate garrison-strength dial. A garrison holds its seeded tile until it is
 assigned to a front (§ Fronts). A rival assigns its border garrisons and keeps its capital's home.
 
+**No unit is assigned to a front by default (Ben, 2026-10-29).** Generation and the settle assign
+none of any nation's units to a front: every garrison opens on its post. After the handoff the
+player decides where its units move and how they are supplied — *"ensuring units get their supply
+and where they should move is up to the player"* — and a rival's scorer assigns its own under its
+grant (`../ai/AI_OPPONENT.md` § 11). **An army sent past its roads starves, as ruled (Ben,
+2026-10-29)**: a front never bends its slots to supply reach; keeping a front fed is the commander's
+job.
+
 **There is ONE battle trigger: nation-vs-nation directed hostility** (§ Battles, above).
 
 There were two. The second opened a corporation-vs-nation fight automatically over an ACTIVE mercenary
@@ -1377,15 +1395,15 @@ everything that keeps a unit in the field: food upkeep, ammunition resupply, the
 attrition, and the recruits and equipment that refill its HP (§ Land — equipment, refit and
 manpower). The request is the quantity of those goods, as a convoy's draw is its cargo. Where the
 tile's cover meets only part of it, the unit is supplied at that share, and the one decay rule above
-moves its supply factor toward it — a third trigger of the same rule, not a second rule. The
-supply factor is the rate at which the unit's carried food, ammunition and equipment are refilled
-(§ Carried supplies). A unit off the road draws at the closest road within 8 tiles, paid per item
+moves its supply factor toward it — a third trigger of the same rule, not a second rule. That
+share, as granted, is the rate at which the unit's carried food, ammunition and equipment are
+refilled (§ Carried supplies); the supply factor moves its readiness and morale. A unit off the road draws at the closest road within 8 tiles, paid per item
 resupplied (`../economy/LOGISTICS.md` § A unit draws off the road); an army deep past its roads is
 an army its network cannot feed.
 
 **Supply is measurably real in the resolver, not merely expensive.** The land round reads each
-unit's carried food, ammunition and equipment (§ Carried supplies), which its supply factor refills,
-so an unsupplied army is weaker where it counts.
+unit's carried food, ammunition and equipment (§ Carried supplies), which its Logistic Point share
+refills, so an army its network cannot reach is weaker where it counts.
 
 ---
 

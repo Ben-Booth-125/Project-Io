@@ -356,7 +356,7 @@ void run_seed(lua_state& lua, std::uint32_t seed, bool mechanics)
         const auto run = [&](world c, const char* label) {
             const auto t0 = std::chrono::steady_clock::now();
             for (int k = 0; k < g_time_ticks; ++k)
-                (void)run_settle_tick(c, reg, k, 90 * (k + 1), /*spectating=*/true);
+                (void)run_settle_tick(c, reg, k_campaign_settle_ticks + k, 90 * (k + 1), /*spectating=*/true); // live ticks (BL-1452: below 12 is the settle)
             const double s = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
             std::printf("    TIME %-18s %d ticks %.2f s\n", label, g_time_ticks, s);
         };

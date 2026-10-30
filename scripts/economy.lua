@@ -945,6 +945,120 @@ economy = {
             siege    = 3.0,
         },
 
+        -- BL-1452 (carried supplies; MILITARY.md § Carried supplies, Ben 2026-10-29): A
+        -- UNIT CARRIES FOOD, AMMUNITION AND EQUIPMENT, each per-mille of full, drained
+        -- once a DAY and refilled at its LOGISTIC POINT SHARE (Ben, 2026-10-29: only the
+        -- road gap starves - an unpaid wage moves morale, never the stocks): share x
+        -- (today's need + the restock below), capped at full. Per-mille of a full stock per day; integers in [0, 1000]
+        -- (the loader rejects anything else, and any unknown key). FIRST CUT, argued:
+        --   food 33: a full stock feeds a cut-off unit ~30 days (1000 / 33), a month of
+        --     carried rations - long enough that a quarter's short grant bites inside
+        --     the quarter, short enough that an army cut off for a season starves;
+        --   ammunition 50 per day fighting: 20 days of fire from full, the day by which
+        --     recon gives full vision (§ Recon), so an unsupplied stack runs dry about
+        --     when a battle matures; the 20% floor keeps it fighting after;
+        --   equipment 1 a day attrition, 10 per day fighting: a quarter in camp
+        --     unsupplied wears a tenth of the kit; a battle wears it ten times faster.
+        -- RESTOCK (Ben, 2026-10-29: "Delivery is share x (daily need + a restock rate);
+        -- half cover then drains more slowly, full cover refills"): restock_permille
+        -- of each stock's full daily rate rides on top of today's need, at the share.
+        -- 500 (half): full cover refills an empty stock at half its rate a day (food
+        -- 16.5/day, ~61 days from empty), and a stock spent at its full rate breaks
+        -- even at 1000 / 1.5 = 667 permille cover; half cover now loses 8.25 food a day
+        -- (a full stock lasts ~121 days) instead of 16.5.
+        -- The hunger step (-15%), the ammunition floor (20%) and starvation's 180 days
+        -- are the design's own numbers (carried_supplies.hpp), not rates.
+        carried_supplies = {
+            food_per_day                = 33,
+            ammo_per_battle_day         = 50,
+            equipment_attrition_per_day = 1,
+            equipment_per_battle_day    = 10,
+            restock_permille            = 500,
+        },
+
+        -- BL-1455 (Ben, 2026-10-29; MILITARY.md § Terrain and the classes): GROUND
+        -- TREATS THE CLASSES DIFFERENTLY. A row per (land class, terrain). Terrain keys:
+        -- mountain, canyon, rift (landforms); marsh, desert (the dunes cover), forest,
+        -- urban, snow (covers). Effects, every one optional and neutral when absent:
+        --   move                  x the march days of a hop onto the tile (>= 1)
+        --   blocked_unless_roaded the class cannot ENTER the tile without a road on it
+        --                         (a unit already there may leave)
+        --   dismount              march at foot infantry's days there (carriers on high ground)
+        --   fight                 x soft, hard, defence and breakthrough when the tile is the
+        --                         battle ground, (0, 1]; a road there halves the debuff
+        --   wear                  x the daily drain of carried equipment standing there (>= 1)
+        --   stealth               x the unit's stealth standing there (> 0)
+        -- A tile matching two rows (a forested mountain) takes the WORST of them per
+        -- effect; rows never multiply. A pre-modern row (no land class) reads none of
+        -- this. The loader rejects a non-finite or out-of-range number, a non-boolean
+        -- flag, and any key naming no class, terrain or effect.
+        -- WEAR: the doc names the cells, not the rate; 1.5 is the authored first cut,
+        -- the same step as the move rows.
+        terrain_class = {
+            infantry = {
+                forest = { stealth = 1.5 },
+                urban  = { stealth = 1.5 },
+            },
+            motorised = {
+                mountain = { dismount = true },
+                canyon   = { dismount = true },
+                rift     = { dismount = true },
+                marsh    = { blocked_unless_roaded = true },
+                desert   = { move = 1.25 },
+                forest   = { move = 1.25 },
+                snow     = { move = 1.25 },
+            },
+            mechanised = {
+                mountain = { dismount = true },
+                canyon   = { dismount = true },
+                rift     = { dismount = true },
+                marsh    = { blocked_unless_roaded = true },
+                forest   = { move = 1.25 },
+                urban    = { fight = 0.85 },
+            },
+            light_armour = {
+                mountain = { blocked_unless_roaded = true, fight = 0.60 },
+                canyon   = { blocked_unless_roaded = true },
+                rift     = { blocked_unless_roaded = true },
+                marsh    = { blocked_unless_roaded = true },
+                desert   = { move = 1.25, wear = 1.5 },
+                forest   = { fight = 0.75 },
+                urban    = { fight = 0.70 },
+                snow     = { move = 1.5 },
+            },
+            armour = { -- medium armour
+                mountain = { blocked_unless_roaded = true, fight = 0.50 },
+                canyon   = { blocked_unless_roaded = true, fight = 0.60 },
+                rift     = { blocked_unless_roaded = true, fight = 0.60 },
+                marsh    = { blocked_unless_roaded = true, fight = 0.50 },
+                desert   = { blocked_unless_roaded = true, fight = 0.70 },
+                forest   = { move = 1.5, fight = 0.70 },
+                urban    = { fight = 0.60 },
+                snow     = { move = 1.25 },
+            },
+            artillery = {
+                mountain = { blocked_unless_roaded = true },
+                canyon   = { blocked_unless_roaded = true },
+                rift     = { blocked_unless_roaded = true },
+                marsh    = { blocked_unless_roaded = true },
+                desert   = { move = 1.25 },
+                forest   = { move = 1.5 },
+                urban    = { fight = 0.80 },
+                snow     = { move = 1.5 },
+            },
+            air_defence = {
+                mountain = { blocked_unless_roaded = true },
+                canyon   = { blocked_unless_roaded = true },
+                rift     = { blocked_unless_roaded = true },
+                marsh    = { blocked_unless_roaded = true },
+                desert   = { wear = 1.5 },
+                snow     = { move = 1.25 },
+            },
+        },
+        -- OPEN GROUND EXPOSES EVERYONE: plains or highland with no concealing cover
+        -- (none, grass, salt, snow, dunes) multiplies every unit's stealth by this.
+        terrain_open_ground_stealth = 0.75,
+
         -- BL-596 / BL-1352 / BL-1445: a UNIT'S SUPPLY draws Logistic Points, never its
         -- march (Ben, 2026-10-28: movement takes no Logistic Points; a march is paid in
         -- days). Once a quarter each unit requests the QUANTITY of its supplies - its

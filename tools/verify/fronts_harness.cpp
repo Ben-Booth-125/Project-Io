@@ -32,6 +32,7 @@
 
 #include "harness_params.hpp"
 #include "world/battle_system.hpp"
+#include "world/campaign_settle.hpp" // BL-1452: k_campaign_settle_ticks
 #include "world/components.hpp"
 #include "world/corp_ai.hpp"
 #include "world/corp_command.hpp"
@@ -674,14 +675,15 @@ int main()
         for (const auto& [id, uu] : old.units) none = none && uu.front == null_entity;
         // BL-1434 (v64): today's stream ends with the designs section, three empty counts (12 bytes).
         // BL-1449 (v65): and then the air section, six empty counts (24 bytes).
+        // BL-1452 (v66): and then the carried-supplies section, one empty count (4 bytes).
         // BL-1453 (v67): and then the battle-carry section.
-        check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9) - 4 - 12 - 24
+        check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9) - 4 - 12 - 24 - 4
                                      - world_save_battle_carry_section_bytes(f.w),
               "F7c a v61 stream (the section's 33 bytes, v63's 4-byte stack count and v64's 12-byte designs section shorter) reads as no fronts");
 
         // A row naming nothing: the first assignment's key -> a ghost tile.
         std::string bad = bytes;
-        const std::size_t tail = 4 + 12 + 24 // v63's attacking-stack section (a zero battle count), v64's empty designs section, v65's empty air section
+        const std::size_t tail = 4 + 12 + 24 + 4 // v63's attacking-stack section (a zero battle count), v64's empty designs section, v65's empty air section, v66's empty supplies section
                                + world_save_battle_carry_section_bytes(f.w); // BL-1453: v67's battle carry
         const std::size_t key0 = bytes.size() - tail - (4 + 9) - 2 * 8 + 4;
         const entity_id ghost = 0x7FFFFFF0u;
@@ -807,8 +809,8 @@ int main()
         corp_ai_params p; p.cadence_k = 1;
         {
             economy_report ra, rb;
-            run_corp_strategic_step(wa, reg, ra, 1, p);
-            run_corp_strategic_step(wb, reg, rb, 1, p);
+            run_corp_strategic_step(wa, reg, ra, k_campaign_settle_ticks, p); // a live tick: the settle scores no fronts (BL-1452)
+            run_corp_strategic_step(wb, reg, rb, k_campaign_settle_ticks, p); // a live tick: the settle scores no fronts (BL-1452)
         }
         std::size_t assigned = 0;
         bool own_only = true, never_player = true, capital_home = true;
@@ -835,6 +837,18 @@ int main()
         check(never_player, "F8c the player's nation is never assigned or ordered (seated session)");
         check(capital_home, "F8d no unit standing in its nation's capital province is assigned");
         check(wa.state_hash(1) == wb.state_hash(1), "F8e the rival scoring is deterministic (twins hash alike)");
+        {
+            // BL-1452 (Ben, 2026-10-29): no unit is assigned to a front by default - a
+            // settle tick (econ 0..11, under spectate) scores no fronts at all.
+            world ws = w;
+            corp_ai_params sp = p; sp.spectating = true;
+            economy_report rs;
+            run_corp_strategic_step(ws, reg, rs, 1, sp);
+            std::size_t settle_assigned = 0;
+            for (const auto& [id, u] : ws.units) settle_assigned += u.front != null_entity ? 1 : 0;
+            check(settle_assigned == 0 && ws.front_orders.empty(),
+                  "F8h a settle tick, spectating, assigns no unit to a front and sets no front order");
+        }
 
         // Ticks: twins agree, and a mid-run save/load replays as the original.
         world wc = wa;
@@ -885,8 +899,8 @@ int main()
         world twin = f.w;
         corp_ai_params p; p.cadence_k = 1;
         economy_report r1, r2;
-        run_corp_strategic_step(f.w, reg, r1, 1, p);
-        run_corp_strategic_step(twin, reg, r2, 1, p);
+        run_corp_strategic_step(f.w, reg, r1, k_campaign_settle_ticks, p); // a live tick: the settle scores no fronts (BL-1452)
+        run_corp_strategic_step(twin, reg, r2, k_campaign_settle_ticks, p); // a live tick: the settle scores no fronts (BL-1452)
         const entity_id key = f.at(0, 2);
         bool all_a = true;
         for (const entity_id u : us) all_a = all_a && f.w.units.at(u).front == key;

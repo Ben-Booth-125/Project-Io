@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+struct military_capability_params; // recipe_registry.hpp (BL-1455: the load-time step-off's walls)
+
 // ---------------------------------------------------------------------------
 // World snapshot -- the flat-binary save (BL-536)
 // ---------------------------------------------------------------------------
@@ -562,19 +564,30 @@ inline constexpr uint32_t world_save_magic =
 /// kit ids ascending); and every building off full condition, ascending, as (id, i32
 /// condition). v64 is a STRICT PREFIX of v65 and is read too
 /// (`k_world_save_version_pre_air`), as a world with no air and every building whole.
-/// BL-1445 (move by days) claims v65 on another branch too: the second to merge renumbers.
+///
+/// Bumped to 66 (BL-1452, carried supplies; MILITARY.md § Carried supplies): A
+/// TRAILING SECTION after the air carries,
+/// after a u32 count, every unit whose carried stocks are not all full or whose
+/// starvation carry is not zero, ascending id, as (id, i32 food, i32 ammunition,
+/// i32 equipment, i32 carry, 3 x i32 sub-per-mille remainders, i32 road share) — stocks
+/// and the share in [0, 1000], carry in [0, 180), remainders in [0, 1000000) and zero on
+/// a full stock. v65 is a
+/// STRICT PREFIX of v66 and is read too (`k_world_save_version_pre_supplies`), as is
+/// v64 (`k_world_save_version_pre_air`): a world where every unit's stocks are full.
 ///
 /// Bumped to 67 (BL-1453, land recon; MILITARY.md § Recon, § Battles): A TRAILING
-/// SECTION after the air carries, after a u32 count, every unit off its defaults,
-/// ascending id, as (id, i32 readiness carry, i32 men carry, i32 tile_since_day) — the
-/// sub-unit damage a weeks-long battle carries day to day and the day the unit took
-/// its tile; then a u32 battle count and, per battle in order, the attacker's recon
-/// stock (`active_battle::attacker_recon_milli`, i32 milli-points). v66 is BL-1452's (carried supplies), not on this branch: its
-/// section stacks BEFORE this one at merge, and this section is gated on
-/// `k_world_save_version_battle_carry`. RENUMBER AT MERGE: if BL-1452 lands as v66,
-/// this stays 67 and `k_world_save_version_pre_battle_carry` (66) joins the accepted
-/// prefixes; until then a v65 stream is this one's strict prefix.
+/// SECTION after the carried supplies carries, after a u32 count, every unit off its
+/// defaults, ascending id, as (id, i32 readiness carry, i32 men carry, i32
+/// tile_since_day) — the sub-unit damage a weeks-long battle carries day to day and the
+/// day the unit took its tile; then a u32 battle count and, per battle in order, the
+/// attacker's recon stock (`active_battle::attacker_recon_milli`, i32 milli-points).
+/// v66 is a STRICT PREFIX of v67 and is read too (`k_world_save_version_pre_battle_carry`),
+/// as a world with every remainder 0, every unit on its tile since before any stamp and
+/// every recon stock 0.
 inline constexpr uint32_t world_save_version = 67;
+
+/// v65, a strict prefix of v66 (the carried-supplies section is v66's only addition).
+inline constexpr uint32_t k_world_save_version_pre_supplies = 65;
 
 /// v64, a strict prefix of v65 (the air section is v65's only addition).
 inline constexpr uint32_t k_world_save_version_pre_air = 64;
@@ -582,9 +595,8 @@ inline constexpr uint32_t k_world_save_version_pre_air = 64;
 /// BL-1453: the first version carrying the battle-carry section (see above).
 inline constexpr uint32_t k_world_save_version_battle_carry = 67;
 
-/// BL-1453: v65, accepted as a strict prefix of v67 on this branch (no battle carry:
-/// every remainder 0). BL-1452's v66 joins it at merge.
-inline constexpr uint32_t k_world_save_version_pre_battle_carry = 65;
+/// BL-1453: v66, a strict prefix of v67 (the battle-carry section is v67's only addition).
+inline constexpr uint32_t k_world_save_version_pre_battle_carry = 66;
 
 /// v63, a strict prefix of v64 (the designs section is v64's only addition).
 inline constexpr uint32_t k_world_save_version_pre_designs = 63;
@@ -757,6 +769,9 @@ void write_world_snapshot_pre_designs(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1449): the v64 stream shape, with no air section.
 void write_world_snapshot_pre_air(const world& w, std::ostream& out);
 
+/// VERIFICATION ONLY (BL-1452): @p w as a v65 stream — no carried-supplies section.
+void write_world_snapshot_pre_supplies(const world& w, std::ostream& out);
+
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///
 /// ATOMIC ON FAILURE. The stream is read into a scratch `world` and moved into
@@ -770,8 +785,12 @@ void write_world_snapshot_pre_air(const world& w, std::ostream& out);
 ///
 /// @param w  Destination world, untouched unless the whole read succeeds.
 /// @param in Source stream, opened binary.
+/// @param mil BL-1455 (terrain and the classes): the class terrain rows, when the
+///            caller holds a registry. A pre-v63 stream's shared tiles step their units
+///            off by the retreat rule (`resolve_shared_tiles`), and with the rows given
+///            no unit steps onto a tile its class cannot enter. Null = no class walls.
 /// @return   True if the snapshot was read whole; false on any rejection.
-bool read_world_snapshot(world& w, std::istream& in);
+bool read_world_snapshot(world& w, std::istream& in, const military_capability_params* mil = nullptr);
 
 /// Drop every derived cache on @p w so the next read of each rebuilds.
 ///

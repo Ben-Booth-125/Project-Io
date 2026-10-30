@@ -9,6 +9,7 @@
 #include "state_industry.hpp"
 #include "unit_designs.hpp" // BL-1434: the designs section's range checks
 #include "air_combat.hpp"   // BL-1449: air_roster_table — the air section's range checks
+#include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <algorithm>
@@ -1750,8 +1751,34 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 67 (BL-1453): THE BATTLE STATE OF LAND RECON AND THE CARRY.
-    // After BL-1452's v66 section at merge (see world_save.hpp). First every unit off
+    // world_save_version 66 (BL-1452, carried supplies): THE STOCKS, after the air —
+    // every unit off full (or with a starvation carry), ascending id, as (id, food,
+    // ammunition, equipment, carry). Only deviations.
+    if (version > k_world_save_version_pre_supplies) // v66 on
+    {
+        std::vector<entity_id> uids;
+        for (const auto& [uid, u] : w.units)
+            if (!unit_supplies_full(u))
+                uids.push_back(uid);
+        std::sort(uids.begin(), uids.end());
+        w_u32(out, static_cast<uint32_t>(uids.size()));
+        for (const entity_id uid : uids)
+        {
+            const unit_component& u = w.units.at(uid);
+            w_id(out, uid);
+            w_i32(out, u.food_permille);
+            w_i32(out, u.ammo_permille);
+            w_i32(out, u.equipment_permille);
+            w_i32(out, u.starvation_carry);
+            w_i32(out, u.food_remainder);
+            w_i32(out, u.ammo_remainder);
+            w_i32(out, u.equipment_remainder);
+            w_i32(out, u.lp_share_permille);
+        }
+    }
+
+    // world_save_version 67 (BL-1453): THE BATTLE STATE OF LAND RECON AND THE CARRY,
+    // the last section, after the stocks. First every unit off
     // its defaults, ascending id, as (id, readiness carry, men carry, tile_since_day);
     // then a u32 battle count and, per battle in `w.battles` order, the attacker's recon
     // stock (i32 milli-points).
@@ -1781,6 +1808,12 @@ void write_world_snapshot_pre_air(const world& w, std::ostream& out)
 {
     // VERIFICATION ONLY (BL-1449): the v64 stream shape — no air section.
     write_world_snapshot_at(w, out, k_world_save_version_pre_air);
+}
+
+void write_world_snapshot_pre_supplies(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1452): the v65 stream shape — no carried-supplies section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_supplies);
 }
 
 void write_world_snapshot_pre_designs(const world& w, std::ostream& out)
@@ -1899,7 +1932,7 @@ void write_world_snapshot_pre_road_edges(const world& w, std::ostream& out)
     write_world_snapshot_at(w, out, k_world_save_version_pre_road_edges);
 }
 
-bool read_world_snapshot(world& w, std::istream& in)
+bool read_world_snapshot(world& w, std::istream& in, const military_capability_params* mil)
 {
     uint32_t magic = 0;
     if (!r_u32(in, magic) || magic != world_save_magic)
@@ -1933,7 +1966,8 @@ bool read_world_snapshot(world& w, std::istream& in)
             && version != k_world_save_version_pre_tile       // BL-1443: v62, battles keyed by province
             && version != k_world_save_version_pre_designs    // BL-1434: v63, every design base kit
             && version != k_world_save_version_pre_air        // BL-1449: v64, no air
-            && version != k_world_save_version_pre_battle_carry)) // BL-1453: v65, no battle carry
+            && version != k_world_save_version_pre_supplies     // BL-1452: v65, every unit's stocks full
+            && version != k_world_save_version_pre_battle_carry)) // BL-1453: v66, no battle carry
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -3028,13 +3062,59 @@ bool read_world_snapshot(world& w, std::istream& in)
         }
     }
 
+    // v66 (BL-1452, carried supplies): every unit off full. Untrusted: units strictly
+    // ascending and in the stream, each actually off full, stocks in [0, 1000], carry in
+    // [0, 180) and non-zero only on a starving unit (food 0) — the only records the
+    // writer and the supply day can produce. Refused whole otherwise. A v65 (and older)
+    // stream ends before it: every unit's stocks are full.
+    if (version > k_world_save_version_pre_supplies) // v66 on
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity;
+            int32_t food = 0, ammo = 0, equip = 0, carry = 0, rf = 0, ra = 0, re = 0, share = 0;
+            if (!r_id(in, uid) || uid == null_entity || (k > 0 && uid <= prev)
+                || !r_i32(in, food) || !r_i32(in, ammo) || !r_i32(in, equip) || !r_i32(in, carry)
+                || !r_i32(in, rf) || !r_i32(in, ra) || !r_i32(in, re) || !r_i32(in, share))
+                return false;
+            prev = uid;
+            const auto uit = s.units.find(uid);
+            const auto in_pm = [](int32_t v) { return v >= 0 && v <= 1000; };
+            // A remainder is below one per-mille, and a full stock carries none (the
+            // step clamps it away), so a remainder on a full stock is not a record the
+            // writer can produce.
+            const auto rem_ok = [](int32_t stock, int32_t rem) {
+                return rem >= 0 && rem < k_supply_remainder_unit && (stock < 1000 || rem == 0);
+            };
+            if (uit == s.units.end() || !in_pm(food) || !in_pm(ammo) || !in_pm(equip)
+                || carry < 0 || carry >= k_starvation_days || (carry != 0 && food != 0)
+                || !rem_ok(food, rf) || !rem_ok(ammo, ra) || !rem_ok(equip, re) || !in_pm(share))
+                return false;
+            unit_component& u = uit->second;
+            u.food_permille       = food;
+            u.ammo_permille       = ammo;
+            u.equipment_permille  = equip;
+            u.starvation_carry    = carry;
+            u.food_remainder      = rf;
+            u.ammo_remainder      = ra;
+            u.equipment_remainder = re;
+            u.lp_share_permille   = share;
+            if (unit_supplies_full(u))
+                return false; // only units off full are written
+        }
+    }
+
     // v67 (BL-1453): land recon's battle state and the carry. Untrusted: unit rows
     // strictly ascending, each a unit in the stream, carries in [0, 2^30], the tile day
     // >= -1, not all at their defaults; exactly one recon stock per battle, in
     // [0, 2^30]. Refused whole
-    // otherwise. A v65 (and older) stream ends before it: every remainder 0, every unit
+    // otherwise. A v66 (and older) stream ends before it: every remainder 0, every unit
     // on its tile since before any stamp, every battle's recon stock 0 (it builds from
-    // the next day). (BL-1452's v66 reads before this.)
+    // the next day).
     if (version >= k_world_save_version_battle_carry)
     {
         uint32_t count = 0;
@@ -3118,7 +3198,7 @@ bool read_world_snapshot(world& w, std::istream& in)
     // (`resolve_shared_tiles`). A v63 stream keeps the rule already and is not touched,
     // so save -> load -> save of the fixed world is byte-stable.
     if (version <= k_world_save_version_pre_tile)
-        (void)resolve_shared_tiles(s);
+        (void)resolve_shared_tiles(s, mil); // BL-1455: never onto a class wall
 
     clear_derived_state(s);
     w = std::move(s); // replace only on full success

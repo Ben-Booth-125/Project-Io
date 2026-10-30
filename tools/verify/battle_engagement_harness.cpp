@@ -445,9 +445,9 @@ int main()
         build_fixture(f);
         engage(f);
         // ENTRENCHMENT (Ben, 2026-10-29): two fed infantry at parity dig in and hold, so
-        // a row that needs an END starves the attacker (supply 300): its hits fall out of
+        // a row that needs an END starves the attacker (its ammunition at the floor, 200): its hits fall out of
         // the near-parity band and the defender breaks it - supply decides.
-        f.w.units.at(f.ua).supply_factor_permille = 300;
+        f.w.units.at(f.ua).ammo_permille = 200; // BL-1452: at its ammunition floor (the round reads the carried stocks)
         bool saw_conclusion = false;
         for (int i = 0; i < 200 && !saw_conclusion; ++i) // a battle is weeks long (BL-1453)
         {
@@ -734,7 +734,7 @@ int main()
         }
         // Fight it out: it ends on a break, never a stalemate. Fed and equal they would
         // hold (entrenched); starved, the attacker breaks.
-        f.w.units.at(f.ua).supply_factor_permille = 300;
+        f.w.units.at(f.ua).ammo_permille = 200; // BL-1452: at its ammunition floor (the round reads the carried stocks)
         campaign_battle_end last = campaign_battle_end::in_progress;
         int days = 0;
         for (int day = 1; day <= 400 && !f.w.battles.empty(); ++day)
@@ -776,9 +776,9 @@ int main()
                   "B17d each side carries exactly its one unit; the attacking stack is the attacker's");
         }
         // ENTRENCHMENT (Ben, 2026-10-29): two fed infantry at parity dig in and hold, so
-        // a row that needs an END starves the attacker (supply 300): its hits fall out of
+        // a row that needs an END starves the attacker (its ammunition at the floor, 200): its hits fall out of
         // the near-parity band and the defender breaks it - supply decides.
-        f.w.units.at(f.ua).supply_factor_permille = 300;
+        f.w.units.at(f.ua).ammo_permille = 200; // BL-1452: at its ammunition floor (the round reads the carried stocks)
         const int before = total_men(f.w);
         bool concluded = false;
         for (int i = 0; i < 200 && !concluded; ++i) // a battle is weeks long (BL-1453)
@@ -806,9 +806,9 @@ int main()
             b.attacker_recon_milli = 1 << 20;
         const recipe_registry& seen = reg;
         // ENTRENCHMENT (Ben, 2026-10-29): two fed infantry at parity dig in and hold, so
-        // a row that needs an END starves the attacker (supply 300): its hits fall out of
+        // a row that needs an END starves the attacker (its ammunition at the floor, 200): its hits fall out of
         // the near-parity band and the defender breaks it - supply decides.
-        f.w.units.at(f.ua).supply_factor_permille = 300;
+        f.w.units.at(f.ua).ammo_permille = 200; // BL-1452: at its ammunition floor (the round reads the carried stocks)
         const entity_id start = f.w.units.at(f.ua).position;
         bool retreated = false;
         int morale_after = 1000;

@@ -2,6 +2,7 @@
 
 #include "battle_system.hpp"   // units_in_live_battles
 #include "campaign_battle.hpp" // campaign_battle_params: the land round's hit conversion
+#include "carried_supplies.hpp" // BL-1452: carried_attack_permille - air-defence fire reads the stocks
 #include "economy_system.hpp"  // draw_goods_at_tile, step_unit_supply_toward, economy_report
 #include "province.hpp"        // province_holder_for
 #include "recipe_registry.hpp"
@@ -419,12 +420,15 @@ bool wing_flies(const world& w, const air_wing& wg)
         && bit->second.ticks_remaining <= 0 && !bit->second.decommissioned;
 }
 
-/// A unit's strength, per-mille: men over establishment x supply x morale.
+/// A unit's strength, per-mille: men over establishment x its carried supplies' attack
+/// term x morale. BL-1452: the stocks, not the supply factor (which only refills them),
+/// are what a unit fights with, in the air-defence fire as in the land round
+/// (`carried_attack_permille`: ammunition x equipment, with the flat hunger step).
 int64_t unit_strength_permille(const unit_component& u)
 {
     const int est = std::max(1, unit_establishment(u));
     const int64_t men = std::clamp<int64_t>(int64_t{u.count} * 1000 / est, 0, 1000);
-    return men * std::clamp<int64_t>(u.supply_factor_permille, 0, 1000) / 1000
+    return men * carried_attack_permille(u) / 1000
                * std::clamp<int64_t>(u.morale_permille, 0, 1000) / 1000;
 }
 

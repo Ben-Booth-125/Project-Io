@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*14 entries — 12 open, 2 resolved.*
+*15 entries — 13 open, 2 resolved.*
 
 ---
 
@@ -177,6 +177,13 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 (a) Wear is x1.5 equipment drain - the ruling named the cells but no rate. (b) "Blocked unless roaded" means any road edge on the tile, so armour may enter a mountain tile from a roadless side if some road touches it. (c) The move rows change a march's days but not its route: the path stays the shared terrain-weighted one, so medium armour may be routed through forest at x1.5 when a faster route for it exists. (d) Pre-modern rows (no land class) read none of the rows, not even the open-ground stealth x0.75 the doc gives every unit. Also: carriers dismount even on a mountain road, as the doc reads.
 
 **Why it matters.** (b) and (c) decide whether terrain shapes WHERE armour goes or only how slowly; (c) in particular lets an armoured column walk into a forest debuff it could have avoided. Written into MILITARY.md § Terrain and the classes. Work: BL-1455 (terrain class modifiers).
+
+### NR-1099 — Carried supplies: a hub on every capital, and one purse gate caps surveys too
+*decision · raised 2026-10-30 · from BL-1452 (carried supplies) lane, cold-review round 2026-10-30*
+
+(a) The free source is the lowest-id running inland logistics hub on the capital. Seeds 10, 11, 12, 25 and 31 had a railway station or port standing as the capital's source and no hub, so nothing ran free and the opening cut removed their capitals' buildings (dark at the handoff). The seeding's step 0 now stands a hub on EVERY capital, beside any station or port already there. (b) purse_room_of now carries the settle cap for every spend - builds, retools, hires, refits, roads and survey dispatch alike; surveys in the settle were not separately ruled.
+
+**Why it matters.** (a) changes world shape: every capital opens with one more building (the shape probe was not re-run). The alternative is to let a station or port on the capital be the free source instead. (b) a poor nation may send fewer surveys in the settle. Merged at b0a9e9b5, G1t50 full 84.6. Work: BL-1452 (carried supplies).
 
 ---
 

@@ -3,6 +3,7 @@
 #include "recipe_registry.hpp" // era_band — BL-461
 #include "settlement.hpp"
 #include "unit_designs.hpp" // BL-1434: kit_stats, the unit's recorded design
+#include "carried_supplies.hpp" // BL-1452: carried_attack_permille - strength reads the stocks
 #include "world.hpp"
 
 #include <algorithm>
@@ -354,11 +355,14 @@ int64_t unit_strength(const world& w, const unit_component& u)
 
     const int64_t heads   = static_cast<int64_t>(u.count);
     const int64_t quality = static_cast<int64_t>(roster_type_quality_permille(u.type));
-    const int64_t supply  = std::clamp<int64_t>(u.supply_factor_permille, 0, 1000);
+    // BL-1452: the CARRIED STOCKS, as the land round reads them (`carried_attack_permille`:
+    // ammunition x equipment, the flat hunger step) - so a scorer sees a starving,
+    // shell-less enemy as the weak force it is. The supply factor only refills them.
+    const int64_t supply  = std::clamp<int64_t>(carried_attack_permille(u), 0, 1000);
 
-    // count x (quality/1000) x (supply/1000) x 100, evaluated as ONE integer
+    // count x (quality/1000) x (carried/1000) x 100, evaluated as ONE integer
     // expression so there is no rounding step in the middle. At quality 1000 and
-    // supply 1000 this is exactly count * 100 (the documented scale anchor).
+    // full stocks this is exactly count * 100 (the documented scale anchor).
     return heads * quality * supply / 10000;
 }
 

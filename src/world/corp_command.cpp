@@ -142,6 +142,44 @@ bool hire_goods_affordable(const world& w, entity_id nation, const roster_row* r
     return true;
 }
 
+/// BL-1452 (one purse gate): an UPPER BOUND on what buying @p need off @p nation's
+/// shelves costs - each good at the highest posted price among its markets. A hire
+/// proves its credits AND its goods fit the purse room together, so the settle's cap
+/// (and the never-debt rule) cannot leave a paid hire short of its kit.
+float hire_goods_price_bound(const world& w, entity_id nation, const std::array<float, resource_count>& need)
+{
+    float total = 0.0f;
+    const std::vector<entity_id> mids = corp_markets(w, nation);
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (!(need[r] > 0.0f))
+            continue;
+        float px = 0.0f;
+        for (const entity_id mid : mids)
+            if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+                px = std::max(px, posted_price(mit->second, r));
+        total += need[r] * px;
+    }
+    return total;
+}
+
+/// The goods a hire draws: @p kit plus each of @p row's gated axes at the resource
+/// `hire_axis_resource` would take (none when @p row is null).
+std::array<float, resource_count> hire_goods_need(const world& w, entity_id nation, const roster_row* row,
+                                                  const std::array<float, resource_count>& kit)
+{
+    std::array<float, resource_count> need = kit;
+    if (row != nullptr)
+        for (std::size_t i = 0; i < hire_axis_count; ++i)
+        {
+            const hire_axis axis = static_cast<hire_axis>(i);
+            if (gate_axis_q(row->gate, axis) <= 0 || !corp_can_afford_axis(w, nation, axis))
+                continue;
+            need[static_cast<std::size_t>(hire_axis_resource(w, nation, axis))] += hire_axis_cost;
+        }
+    return need;
+}
+
 /// BL-1434: buy the kit goods @p kit off @p nation's shelves, ascending resource.
 /// Only called once `hire_goods_affordable` has passed.
 void debit_kit_goods(world& w, entity_id nation, const std::array<float, resource_count>& kit)
@@ -625,7 +663,8 @@ corp_command_result unit_design_check(const world& w, entity_id nation, uint32_t
 // retired). A nation is never bought and never goes insolvent.
 
 corp_command_result march_check(world& w, entity_id actor, entity_id unit, entity_id tile,
-                                entity_id assume_hostile, std::vector<entity_id>* out_path)
+                                entity_id assume_hostile, std::vector<entity_id>* out_path,
+                                const military_capability_params* mil)
 {
     const auto uit = w.units.find(unit);
     if (uit == w.units.end())
@@ -724,11 +763,30 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
     // actor is hostile to) or a block, decided as the march steps
     // (run_unit_march). Read-only: nothing is written until the single
     // `order` assignment in apply_corp_command, so a refusal mutates nothing.
+    //
+    // TERRAIN AND THE CLASSES (BL-1455; MILITARY.md § Terrain and the classes): a block
+    // is a per-class WALL in the path. The route is solved around it; an order with no
+    // legal route because of it is refused with its own reason - a walled destination,
+    // or a destination the unit could reach were it not for the walls.
+    const std::set<entity_id> foreign = foreign_held_tiles(w, uit->second.owner);
+    std::function<bool(const tile_component&)> wall;
+    if (mil != nullptr)
+    {
+        wall = class_wall(*mil, uit->second.type); // empty when the class has no blocking row
+        if (wall && wall(dit->second))
+            return corp_command_result::rejected_terrain; // the class cannot enter it
+    }
     const std::vector<entity_id> path =
-        march_path(w, sit->second.body, uit->second.position, tile,
-                   foreign_held_tiles(w, uit->second.owner));
+        march_path(w, sit->second.body, uit->second.position, tile, foreign,
+                   wall ? &wall : nullptr);
     if (path.size() < 2)
+    {
+        // The second search names the reason, and runs only where walls exist.
+        if (wall
+            && march_path(w, sit->second.body, uit->second.position, tile, foreign).size() >= 2)
+            return corp_command_result::rejected_terrain; // only the walls stand in the way
         return corp_command_result::rejected_invalid; // unreachable
+    }
     if (out_path != nullptr)
         *out_path = path;
     return corp_command_result::applied;
@@ -860,6 +918,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             const std::array<float, resource_count> kit = kit_goods(lc, design);
             if (!hire_goods_affordable(w, cmd.corp, &row, kit))
                 return corp_command_result::rejected_funds;
+            if (purse_room_of(w, cmd.corp)
+                < hire_cost + hire_goods_price_bound(w, cmd.corp, hire_goods_need(w, cmd.corp, &row, kit)))
+                return corp_command_result::rejected_funds; // BL-1452: the goods' price counts too
 
             if (!debit_hire_cost(w, cmd.corp, row))
                 return corp_command_result::rejected_funds;
@@ -905,6 +966,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 goods[g] += cs.hire_goods[g];
             if (!hire_goods_affordable(w, cmd.corp, nullptr, goods))
                 return corp_command_result::rejected_funds;
+            if (purse_room_of(w, cmd.corp) < cs.hire_cost + hire_goods_price_bound(w, cmd.corp, goods))
+                return corp_command_result::rejected_funds; // BL-1452: the goods' price counts too
             debit_kit_goods(w, cmd.corp, goods);
             *purse_of(w, cmd.corp) -= cs.hire_cost;
 
@@ -1131,7 +1194,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // refusal mutates nothing; the single `order` assignment below applies it.
             std::vector<entity_id> path;
             const corp_command_result r =
-                march_check(w, cmd.corp, cmd.subject, cmd.tile, null_entity, &path);
+                march_check(w, cmd.corp, cmd.subject, cmd.tile, null_entity, &path, &reg.military());
             if (r != corp_command_result::applied)
                 return r;
             movement_order mo;

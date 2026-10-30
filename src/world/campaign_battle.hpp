@@ -282,7 +282,17 @@ struct land_combatant
     int               men       = 0;    ///< HP: men fit to fight. Mutated by the round.
     int               readiness = 1000; ///< Per-mille. Mutated by the round; 0 = out of the fight.
     int               morale    = 1000; ///< Per-mille. Scales the hits this unit deals.
-    int               supply    = 1000; ///< Per-mille. Scales the hits this unit deals.
+    /// Per-mille. Scales the hits this unit deals: its CARRIED SUPPLIES' term on
+    /// attack (BL-1452, `carried_attack_permille` — ammunition x equipment, with the
+    /// flat hunger step), not the network's supply factor, which only refills them.
+    int               supply    = 1000;
+    /// Per-mille. Scales the hits this unit ABSORBS (defence / breakthrough): its
+    /// carried ammunition x equipment (BL-1452, `carried_combat_permille`).
+    int               carried   = 1000;
+    /// Per-mille. BL-1455 (terrain and the classes): the unit's class's fight scale on
+    /// the battle ground, a road there halving the debuff (`terrain_fight_permille`).
+    /// Scales its soft and hard hits AND its defence and breakthrough. 1000 = no effect.
+    int               terrain   = 1000;
     land_combat_stats stats{};          ///< unit_land_stats(), resolved at build.
     /// BL-1453 (MILITARY.md § Recon): the share of THIS unit the enemy side sees,
     /// per-mille — every hit landed on it is scaled by it. Set by the caller before

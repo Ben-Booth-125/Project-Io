@@ -4,6 +4,7 @@
 #include "recipe_registry.hpp"
 #include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
 #include "air_combat.hpp"    // air_day_tick, wing_upkeep_tick (BL-1449)
+#include "carried_supplies.hpp" // BL-1452: carried_supplies_day, the daily stock step
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
 #include "nation_step.hpp"   // earmark_result (Sprint N3 T6)
@@ -909,8 +910,8 @@ float march_days_per_tile(const military_capability_params& mil, uint16_t type);
 /// MOVEMENT TAKES NO LOGISTIC POINTS (Ben, 2026-10-28; MILITARY.md § Marching): a march
 /// is paid in days, never in points or a per-hop price, so an order given mid-quarter
 /// moves at once. What a unit costs the network is its supply, drawn once a quarter at
-/// the tile it stands on (`collect_supply_claims`, LOGISTICS.md § A unit's supply draws
-/// on the pool).
+/// the closest road of its network within 8 tiles (`collect_supply_claims`; LOGISTICS.md § A unit draws
+/// off the road).
 ///
 /// A march that reaches a tile a hostile nation's units hold registers an ATTACK on
 /// the day it gets there, and the battles open over the defenders' tiles once every
@@ -928,9 +929,10 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
 float unit_supply_need(const unit_component& u, const unit_upkeep_params& up);
 
 /// BL-1445: every unit's supply request for the quarter, in ASCENDING UNIT ID - its
-/// supplies' quantity (`unit_supply_need`), on the tile it stands on, from its own
-/// nation's pool. Handed to `resolve_logistic_points`, which routes each on its tile
-/// and serves it ahead of every producer (NR-917).
+/// supplies' quantity (`unit_supply_need`), from the tile it stands on, from its own
+/// nation's pool. Handed to `resolve_logistic_points`, which pays each at the closest
+/// road of the unit's network within 8 tiles (`unit_supply_draw_tile`, BL-1456) and
+/// serves it ahead of every producer (NR-917).
 std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_registry& reg);
 
 /// BL-1445: the credit price of the quarter's supply draws - `active_lp_credit_per_
@@ -943,7 +945,8 @@ void charge_supply_draws(world& w, const recipe_registry& reg, const lp_tick& lp
 struct military_day_result
 {
     battle_tick     battles;       ///< The battle step (rounds, losses, dispatches).
-    int             disbanded = 0; ///< Units removed after the battles (`disband_orphaned_units`).
+    carried_supplies_day supplies; ///< BL-1452: the day's drain, resupply and starvation.
+    int             disbanded = 0; ///< Units removed after the battles and starvation (`disband_orphaned_units`).
     unit_march_tick march;         ///< The march, including the attacks it opened.
 };
 

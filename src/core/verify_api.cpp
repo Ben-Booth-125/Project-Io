@@ -1672,6 +1672,37 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["both_leg_supplied"]   = m_ui.lp_both_leg_supplied;
         out["both_leg_requested"]  = m_ui.lp_both_leg_requested;
         out["leg_cells_drawn"]     = m_ui.lp_leg_cells_drawn;
+        // BL-1456: the off-road dashes - COUNTS ONLY, no position crosses the seam.
+        // `dashes` / `dashes_red` are the player units the lens joins to a road (red:
+        // past their 8 tiles); `dashes_drawn` / `dashes_red_drawn` what the canvas
+        // stroked last frame, one per visible wrap copy.
+        int dashes_red = 0;
+        for (const auto& d : m_ui.lp_dashes)
+            if (d.red) ++dashes_red;
+        out["dashes"]           = static_cast<int>(m_ui.lp_dashes.size());
+        out["dashes_red"]       = dashes_red;
+        out["dashes_drawn"]     = m_ui.lp_dashes_drawn;
+        out["dashes_red_drawn"] = m_ui.lp_dashes_red_drawn;
+        return out;
+    });
+
+    // BL-1456: ONE UNIT'S DASH, by unit id - whether the lens joins it to a road, in
+    // which rhythm (past its roads), whether its colour is a forecast, the share it is
+    // coloured by, and how many wrap copies the canvas stroked last frame. Flags, a
+    // share and a count: no position crosses the seam (the census rule above).
+    v.set_function("logistics_dash", [this](unsigned unit) {
+        sol::table out = m_lua.state().create_table();
+        out["exists"] = false;
+        for (const auto& d : m_ui.lp_dashes)
+            if (d.unit == static_cast<entity_id>(unit))
+            {
+                out["exists"]   = true;
+                out["past"]     = d.red;
+                out["forecast"] = d.forecast;
+                out["share"]    = d.t;
+                out["drawn"]    = d.drawn;
+                break;
+            }
         return out;
     });
 
@@ -4908,6 +4939,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case corp_command_result::rejected_tech_locked: return "rejected_tech_locked";
             case corp_command_result::rejected_era_locked:  return "rejected_era_locked";
             case corp_command_result::rejected_wrong_air:   return "rejected_wrong_air";
+            case corp_command_result::rejected_terrain:     return "rejected_terrain"; // BL-1455
             case corp_command_result::rejected_cooldown:    return "rejected_cooldown";
             case corp_command_result::rejected_embargo:     return "rejected_embargo";
             case corp_command_result::rejected_no_capacity: return "rejected_no_capacity";
@@ -7647,6 +7679,86 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             out["y"]  = tit->second.grid_y;
             return out;
         }
+        return out;
+    });
+
+    // BL-1456: THE OFF-ROAD FIXTURE (LENSES.md § Logistics lens, "A unit off the road is
+    // joined to it by a dashed line"). Moves the player's lowest-id unit on the active body
+    // to the first own land tile (raster order) that its network does not reach but whose
+    // supply is paid 3-6 steps away at a road of FULL cover (`unit_supply_draw_tile`), so
+    // a pool that is not short grants it whole, and the next unit, if there
+    // is one, to the first own land tile PAST its 8 tiles that still has a road of its
+    // network within the lens's 32-step display search - a fed dash and a red one. Each
+    // loses its order. Returns WHICH UNITS moved and whether each part staged - unit ids,
+    // no position and no tile data; the script aims through `verify.units()`, which
+    // already lists every unit's position. Verify-only staging, behind --verify.
+    v.set_function("offroad_unit_fixture", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["ok"] = false;
+        out["near"] = false;
+        out["far"]  = false;
+        const entity_id pn   = player_nation(m_world);
+        const entity_id body = m_ui.active_body;
+        if (pn == null_entity || m_world.bodies.find(body) == m_world.bodies.end())
+            return out;
+        std::vector<entity_id> mine;
+        std::set<entity_id> foreign;
+        for (const auto& [uid, u] : m_world.units)
+        {
+            const auto ut = m_world.tiles.find(u.position);
+            if (u.count <= 0 || ut == m_world.tiles.end())
+                continue;
+            if (u.owner != pn)
+                foreign.insert(u.position);
+            else if (ut->second.body == body)
+                mine.push_back(uid);
+        }
+        std::sort(mine.begin(), mine.end());
+        if (mine.empty())
+            return out;
+        lp_reach_memo memo;
+        entity_id near_tile = null_entity, far_tile = null_entity;
+        const std::vector<entity_id> grid = body_tile_grid(m_world, body);
+        for (const entity_id t : grid)
+        {
+            if (near_tile != null_entity && (far_tile != null_entity || mine.size() < 2))
+                break;
+            const auto tit = m_world.tiles.find(t);
+            const auto tn  = m_world.tile_to_nation.find(t);
+            if (tit == m_world.tiles.end() || is_water(tit->second.substrate) || foreign.count(t) != 0
+                || tn == m_world.tile_to_nation.end() || tn->second != pn)
+                continue;
+            int steps = -1;
+            const entity_id paid = unit_supply_draw_tile(m_world, memo, pn, t, lp_offroad_draw_steps, &steps);
+            if (paid != null_entity)
+            {
+                if (near_tile == null_entity && steps >= 3 && steps <= 6
+                    && lp_route_to(m_world, memo, pn, body, paid).cover >= 0.999f)
+                    near_tile = t;
+                continue;
+            }
+            if (far_tile == null_entity && mine.size() >= 2
+                && unit_supply_draw_tile(m_world, memo, pn, t, 32, &steps) != null_entity)
+                far_tile = t;
+        }
+        const auto move = [&](entity_id uid, entity_id t) {
+            unit_component& u = m_world.units.at(uid);
+            u.position = t;
+            u.order    = movement_order{};
+        };
+        if (near_tile != null_entity)
+        {
+            move(mine[0], near_tile);
+            out["near"]      = true;
+            out["near_unit"] = static_cast<unsigned>(mine[0]);
+        }
+        if (far_tile != null_entity)
+        {
+            move(mine[1], far_tile);
+            out["far"]      = true;
+            out["far_unit"] = static_cast<unsigned>(mine[1]);
+        }
+        out["ok"] = near_tile != null_entity;
         return out;
     });
 
