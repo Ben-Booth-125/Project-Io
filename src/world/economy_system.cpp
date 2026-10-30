@@ -2765,8 +2765,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     //
     // BL-1445 (Ben, 2026-10-28; LOGISTICS.md § A unit's supply draws on the pool, and
     // claims first): MOVEMENT TAKES NO LOGISTIC POINTS - a march is paid in days. What
-    // draws is each unit's SUPPLY, once a quarter, AT THE TILE IT STANDS ON: its
-    // requests are gathered here, before the resolve, so they claim ahead of every
+    // draws is each unit's SUPPLY, once a quarter, PAID AT THE CLOSEST ROAD of its
+    // network within 8 tiles (BL-1456; the resolver picks the tile,
+    // `unit_supply_draw_tile`): its requests are gathered here, before the resolve, so they claim ahead of every
     // producer (NR-917 kept), and the share each was granted is what the one decay
     // rule reads (`run_nation_garrison_upkeep`, through `lp_tick::supply_share`). The
     // draw is priced in credits as it is granted (`charge_supply_draws`).
@@ -4663,7 +4664,7 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
         // MOVEMENT TAKES NO LOGISTIC POINTS (Ben, 2026-10-28; MILITARY.md § Marching): a
         // march is paid in days, never in points, so an order given mid-quarter moves at
         // once and nothing halts it but the ground. What a unit costs the network is its
-        // supply, drawn once a quarter at its tile (`collect_supply_claims`).
+        // supply, drawn once a quarter at the closest road (`collect_supply_claims`).
         float points = u.order.progress + rate; // today's movement, the bank included
         u.order.progress = 0.0f;
 

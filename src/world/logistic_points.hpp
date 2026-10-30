@@ -48,13 +48,21 @@
 //     claims first", Ben 2026-10-28, overturning the 2026-10-16 march draw).
 //     Movement draws no points: a march is paid in days. Once a quarter each unit
 //     asks the points its supplies need - their QUANTITY, as a shipment's draw is
-//     its cargo - AT THE TILE IT STANDS ON, routed against its own nation's
+//     its cargo - PAID AT THE CLOSEST ROAD of its network (its own tile when the
+//     network reaches it; BL-1456, below), routed against its own nation's
 //     sources exactly as a building's request is (`lp_route_to`: the claim is
 //     need x cover). The supply claims are served in ascending unit id, BEFORE any
 //     producer (NR-917 kept), and PRODUCTION'S GRANTS ARE COMPUTED ON WHAT IS LEFT.
 //     So guns, butter and freight compete in one currency, and a campaign visibly
 //     starving its own industry is the intended, legible cost of an army in the
-//     field. A unit on a tile its network does not reach is granted nothing.
+//     field. A unit more than 8 tiles from any tile its network reaches is
+//     granted nothing.
+//
+//     OFF THE ROAD, UP TO 8 TILES (BL-1456; LOGISTICS.md § A unit draws off the
+//     road, Ben 2026-10-29): a unit off its network is PAID AT THE CLOSEST ROAD -
+//     the nearest tile its network reaches within 8 steps over crossable land, ties
+//     to the lowest tile id (`unit_supply_draw_tile`) - and served by that tile's
+//     cover. More than 8 from any, it draws nothing. Recomputed every resolve.
 //
 //     WHOSE POOL: THE UNIT'S NATION'S, routed from that nation's own sources -
 //     never the pool of a foreign ground it stands on, which would fund an
@@ -77,6 +85,7 @@
 #include <utility>
 #include <cstddef>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class recipe_registry;
@@ -206,7 +215,7 @@ struct lp_supply_claim
 {
     entity_id unit   = null_entity;
     entity_id nation = null_entity; ///< the unit's own nation, whose pool serves it; null = no pool
-    entity_id tile   = null_entity; ///< the tile it stands on, where the request is routed
+    entity_id tile   = null_entity; ///< the tile it stands on; the request is PAID at `unit_supply_draw_tile` of it (BL-1456)
     float     need   = 0.0f;        ///< the quantity of its supplies this quarter
 };
 
@@ -219,6 +228,14 @@ struct lp_supply_row
     float     need    = 0.0f;
     float     cover   = 0.0f; ///< the tile's routed cover from the nation's sources, [0,1]
     float     granted = 0.0f; ///< <= need x cover, and what the pool had left
+    /// BL-1456 (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road): the tile the
+    /// request was PAID at - the unit's own tile when its network reaches it, else the
+    /// closest tile of its network within `lp_offroad_draw_steps` steps over crossable
+    /// land (`unit_supply_draw_tile`), else null (past its roads: share 0). `cover` is
+    /// this tile's. Recomputed every resolve, never saved.
+    entity_id paid_tile  = null_entity;
+    /// Steps from the unit's tile to `paid_tile` (0 on the network); -1 with no paid tile.
+    int       draw_steps = -1;
     /// granted / need in integer per-mille (truncated); 1000 for a request of zero.
     /// The share `run_nation_garrison_upkeep` folds into the one decay rule.
     int       share_permille = 1000;
@@ -384,6 +401,43 @@ struct lp_route
 lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id body,
                      entity_id tile);
 
+/// BL-1456 (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road, up to 8 tiles from
+/// it): how far a unit may stand from its network and still draw its supply.
+inline constexpr int lp_offroad_draw_steps = 8;
+
+/// WHERE A UNIT'S SUPPLY IS PAID (BL-1456). @p unit_tile itself when @p nation's network
+/// reaches it (`lp_route_to`'s `reached`: a connected source of the nation reaches the
+/// tile - the resolver's one test of "on the network"); else the CLOSEST tile the network
+/// reaches within @p max_steps steps of it over crossable land - a breadth-first walk
+/// across the four cost-walk sides (`road_side_is_crossable`, the walk a retreat and every
+/// cost walk takes), entering only land tiles, so a water gap is no step - ties to the
+/// lowest tile id. null_entity when none is in bound: the unit is past its roads and
+/// draws nothing. Pure and deterministic (layer by layer, sides in order, the winner the
+/// minimum id of the first layer that holds one). The simulation calls it with the
+/// default bound; the Logistics lens with a wider one, for display only.
+/// @param steps_out Optional; receives the steps to the tile (0 on it), -1 with none.
+entity_id unit_supply_draw_tile(world& w, lp_reach_memo& memo, entity_id nation,
+                                entity_id unit_tile, int max_steps = lp_offroad_draw_steps,
+                                int* steps_out = nullptr);
+/// The same, on a memo of its own (a caller with no resolve in hand, e.g. placement).
+entity_id unit_supply_draw_tile(world& w, entity_id nation, entity_id unit_tile,
+                                int max_steps = lp_offroad_draw_steps, int* steps_out = nullptr);
+/// The same walk with "on the network" handed in as @p reached - the one search the
+/// two forms above wrap (they pass `lp_route_to`'s `reached`). For a caller asking of
+/// many units at once, which builds the set once (`lp_reached_tiles`) and tests a tile
+/// by a lookup rather than routing it.
+entity_id unit_supply_draw_tile(world& w, const std::function<bool(entity_id)>& reached,
+                                entity_id unit_tile, int max_steps = lp_offroad_draw_steps,
+                                int* steps_out = nullptr);
+
+/// Every tile on @p body where `lp_route_to(w, memo, nation, body, tile).reached` holds:
+/// some source of @p nation that is connected to its capital reaches it with reach > 0.
+/// Built from the same per-source fields routing reads, so a tile is in it exactly when
+/// routing would say reached. For LOOKUP ONLY - its iteration order is a hash table's and
+/// must never reach state. A derived read, never serialised.
+std::unordered_set<entity_id> lp_reached_tiles(world& w, lp_reach_memo& memo, entity_id nation,
+                                               entity_id body);
+
 /// The hub chain @p target needs (BL-1395; LOGISTICS.md § Where generation puts the
 /// sources, "The chain is laid outward from the capital"): the road hubs, in the order
 /// they would be built, that bring @p target to full coverage on @p nation's chain -
@@ -537,14 +591,12 @@ struct lp_seed_report
 /// consumer's owner. Complete and zero-staffed, as every generated holding is. Deterministic.
 /// A UNIT DRAWS OFF THE ROAD (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road):
 /// its supply is drawn at the closest road its network reaches within this many tiles.
-inline constexpr int k_unit_draw_reach_tiles = 8;
+inline constexpr int k_unit_draw_reach_tiles = lp_offroad_draw_steps; // one constant (BL-1456)
 
 /// THE ONE DRAW PREDICATE (BL-1452): can a unit of @p nation standing on @p tile draw
-/// its supply? PLACEHOLDER BODY for the draw-off-the-road lane (BL-1456), which
-/// replaces it with its claim's own rule at merge: true when @p has_cover holds for
-/// the tile itself, or for some tile of @p nation's own ground within
-/// `k_unit_draw_reach_tiles` steps over crossable land (the march's four sides, never
-/// water). @p has_cover is the caller's "this tile's routed cover > 0", so a caller
+/// its supply? The claim's own rule (BL-1456, `unit_supply_draw_tile`): true when
+/// @p has_cover holds for the tile itself or for a tile within `lp_offroad_draw_steps`
+/// steps over crossable land (the march's four sides, never water). @p has_cover is the caller's "this tile's routed cover > 0", so a caller
 /// mid-seeding reads its own live memo. Garrison placement (`unit_tile_drawable`,
 /// nation_generation.hpp) and the source seeding's garrison step both ask this.
 bool unit_tile_within_draw(world& w, entity_id nation, entity_id tile,
