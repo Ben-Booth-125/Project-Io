@@ -722,7 +722,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `gameplay.refit_unit` — The unit card's Refit press in the Selection element (the fifth action slot), for the player's own unit: a menu of the newer types it can refit to - led, when the unit's recorded design differs from its class's live design, by its own type marked '(live design)', a design refit. Also a corp_verb (corp_verb::refit_unit, 40) on the command seam.
 
-**Press.** Select your unit, press Refit, and pick a type from the menu (each row shows its credit price, '+ kit' when it also buys goods, and its days; a disabled row says why). The press queues the command, applied through apply_corp_command at the frame's end. Over the seam: COMMAND corp=<nation> verb=40 subject=<unit id> unit_type=<roster row>.
+**Press.** Select your unit, press Refit, and pick a type from the menu (each row shows its credit price, '+ kit' when a type refit also buys the target row's gated goods, then '+ <qty> <good>' for each good the changed design slots buy, and its days; a disabled row says why; the '(live design)' row stays first even when its row is obsolete). The press queues the command, applied through apply_corp_command at the frame's end. Over the seam: COMMAND corp=<nation> verb=40 subject=<unit id> unit_type=<roster row>.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -734,7 +734,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - `unit_type` is a newer model of the unit's land class - the same `land_class_for`, a later band or the same band with a higher power_mod - that the actor fields now (`available_rows`); rejected_invalid otherwise. An obsolete row is allowed.
 - The unit is not in a battle and not already refitting (rejected_state otherwise).
 - The unit stands on its own nation's ground (rejected_placement otherwise).
-- The actor can pay: the hire price difference (hire_cost_per_power x the power_mod difference, floored at 0) from its uncommitted treasury, and the target's gated goods off the shelves of its markets, both checked before either is taken (rejected_funds otherwise).
+- The actor can pay: the hire price difference (hire_cost_per_power x the power_mod difference, floored at 0) from its uncommitted treasury, and the goods off the shelves of its markets - the target row's gated goods (none for a design refit) plus the kit goods of each slot the live design changes - checked by quantity AND by price: the credits plus the goods at their highest posted price must fit the uncommitted treasury, all before any is taken (rejected_funds otherwise; BL-1447).
 - Rival nations' scorers never issue it: no AI grant covers a refit.
 
 **Expected output.** Paid at once (credits and goods; no refund). The unit records the target and the target's muster days (90, 135 or 180 by class) and keeps its old type, fighting as it, until each economy tick has taken a quarter's days off; then its type becomes the target, keeping its men, establishment, readiness and morale. A standing march order is cleared, and march_unit refuses it (rejected_state) while it refits. Saved (world_save_version 61). A unit whose recorded design differs from its class's live design may also refit to its OWN row (a design refit, no credits, no row goods); every refit brings the unit to the live design and buys the kit goods of each slot that changes (BL-1434).

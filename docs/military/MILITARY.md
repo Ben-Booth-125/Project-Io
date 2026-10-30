@@ -927,7 +927,9 @@ the new type and keeps its men, establishment, readiness and morale. The press i
 its class's live design may refit to its **own row**: a design refit, under the same conditions,
 which pays no credits and no row goods. Every refit, to a newer row or the same one, brings the
 unit to the live design as it stood when the refit was ordered, and buys the kit goods of each slot
-whose item changes; a slot going back to its base kit buys nothing. It takes the row's muster days,
+whose item changes; a slot going back to its base kit buys nothing. Those goods are bought at their
+price, so a design refit that costs no credits is still refused when the goods' price does not fit
+the uncommitted treasury - the credits and every good are proven together, as a hire's are. It takes the row's muster days,
 and the unit fights on its old kit until it completes. Rival nations do not refit; no AI grant covers it. This is distinct from the
 **Refit** of § Land — equipment, refit and manpower, which refills a wounded unit's HP.
 

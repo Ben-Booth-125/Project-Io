@@ -61,19 +61,11 @@ namespace {
 // military_capability_params) and debited from the corp's balance.
 // ---------------------------------------------------------------------------
 
-/// The resource an axis actually spends: the first candidate on the SHARED
-/// table (unit_roster.hpp § hire_axis_table) the corp holds enough of. The
-/// gate reads the same table, so a hire can never spend a resource the gate
-/// didn't already confirm access to — BL-498 made that structural rather than
-/// a comment asking two hand-written lists to stay in step.
-resource_type hire_axis_resource(const world& w, entity_id corp, hire_axis axis)
-{
-    const hire_axis_entry& e = hire_axis_resources(axis);
-    for (const resource_type r : e)
-        if (corp_stockpile_total(w, corp, r) >= hire_axis_cost)
-            return r;
-    return e.candidates[0]; // unreachable if affordability already passed; a safe fallback.
-}
+// BL-1447: the resource an axis actually spends is chosen by `plan_hire_goods`
+// below — the first candidate on the SHARED table (unit_roster.hpp §
+// hire_axis_table) that covers the axis WITH the kit and earlier axes drawn on it.
+// The gate reads the same table, so a hire can never spend a resource the gate
+// didn't already confirm access to (BL-498).
 
 /// Can @p corp cover one axis's hire cost from a SINGLE candidate resource?
 bool corp_can_afford_axis(const world& w, entity_id corp, hire_axis axis)
@@ -90,53 +82,68 @@ bool corp_can_afford_axis(const world& w, entity_id corp, hire_axis axis)
 /// called after affordability is confirmed against the same shelves
 /// (`corp_shelf_stock`). The fair-price ceiling is off for a hire's draw (0):
 /// the gate counted the whole shelf, so the debit must be able to take it.
+///
+/// BL-1447: the debit ASSERTS the bought amount. Every caller proved the goods on
+/// the shelves AND their price inside the purse room first, so a short buy is a
+/// broken gate, not a refusal the player should ever see as a free kit.
 void debit_from_corp(world& w, entity_id corp, resource_type res, float amount)
 {
-    buy_from_corp_shelves(w, corp, static_cast<std::size_t>(res), amount, 0.0f);
+    const float bought = buy_from_corp_shelves(w, corp, static_cast<std::size_t>(res), amount, 0.0f);
+    assert(bought >= amount - 1e-3f * std::max(1.0f, amount)
+           && "debit_from_corp: the gate proved this buy, the shelves or the purse refused it");
+    (void)bought;
 }
 
-/// Debit the roster row's gated axes from the corp's pools. All-or-nothing:
-/// checks every gated axis is affordable before debiting any of them.
-bool debit_hire_cost(world& w, entity_id corp, const roster_row& row)
+/// BL-1447 (2): the resource each of @p row's gated axes spends, chosen WITH the
+/// goods already drawn on it — @p kit plus the earlier axes — so an axis whose first
+/// candidate the kit has used up moves to the next candidate rather than refusing a
+/// hire the shelves can pay. Fills @p need (kit plus the row's axes) and @p axis_res
+/// (the chosen resource per gated axis); false when some gated axis has no
+/// candidate that covers it. With no kit and distinct axis resources each axis takes
+/// its first candidate holding `hire_axis_cost`, the pick the hire always made.
+bool plan_hire_goods(const world& w, entity_id nation, const roster_row* row,
+                     const std::array<float, resource_count>& kit,
+                     std::array<float, resource_count>& need,
+                     std::array<resource_type, hire_axis_count>& axis_res)
 {
-    // Walk the axes in table order — ore, farm, energy — checking every gated
-    // one is affordable BEFORE debiting any, so a part-paid hire is impossible.
-    // port_q is a building check (corp_owns_port), not a resource: it is not on
-    // the table and there is nothing to debit for it.
+    need = kit;
+    for (std::size_t i = 0; i < hire_axis_count; ++i)
+        axis_res[i] = hire_axis_resources(static_cast<hire_axis>(i)).candidates[0];
+    if (row == nullptr)
+        return true;
     for (std::size_t i = 0; i < hire_axis_count; ++i)
     {
         const hire_axis axis = static_cast<hire_axis>(i);
-        if (gate_axis_q(row.gate, axis) > 0 && !corp_can_afford_axis(w, corp, axis))
+        if (gate_axis_q(row->gate, axis) <= 0)
+            continue;
+        bool found = false;
+        for (const resource_type r : hire_axis_resources(axis))
+            if (corp_stockpile_total(w, nation, r) >= need[static_cast<std::size_t>(r)] + hire_axis_cost)
+            {
+                axis_res[i] = r;
+                found       = true;
+                break;
+            }
+        if (!found)
             return false;
-    }
-
-    for (std::size_t i = 0; i < hire_axis_count; ++i)
-    {
-        const hire_axis axis = static_cast<hire_axis>(i);
-        if (gate_axis_q(row.gate, axis) > 0)
-            debit_from_corp(w, corp, hire_axis_resource(w, corp, axis), hire_axis_cost);
+        need[static_cast<std::size_t>(axis_res[i])] += hire_axis_cost;
     }
     return true;
 }
 
 /// BL-1434 (unit designs): can @p nation buy @p row's gated goods (when @p row is
-/// named) AND the kit goods @p kit, together? The row's axes are priced at the
-/// resource `debit_hire_cost` would spend, so a resource both legs draw is counted
-/// once, as the sum. With no kit this is exactly debit_hire_cost's own test.
+/// named) AND the kit goods @p kit, together? BL-1447: the row's axes are planned
+/// with the kit on the same resource (`plan_hire_goods`), so a resource both legs
+/// draw is counted once, as the sum, and an axis moves to its next candidate when
+/// the kit has taken its first. QUANTITY only; the price leg is
+/// `hire_goods_price_bound` against the purse room.
 bool hire_goods_affordable(const world& w, entity_id nation, const roster_row* row,
                            const std::array<float, resource_count>& kit)
 {
-    std::array<float, resource_count> need = kit;
-    if (row != nullptr)
-        for (std::size_t i = 0; i < hire_axis_count; ++i)
-        {
-            const hire_axis axis = static_cast<hire_axis>(i);
-            if (gate_axis_q(row->gate, axis) <= 0)
-                continue;
-            if (!corp_can_afford_axis(w, nation, axis))
-                return false;
-            need[static_cast<std::size_t>(hire_axis_resource(w, nation, axis))] += hire_axis_cost;
-        }
+    std::array<float, resource_count> need{};
+    std::array<resource_type, hire_axis_count> axis_res{};
+    if (!plan_hire_goods(w, nation, row, kit, need, axis_res))
+        return false;
     for (std::size_t r = 0; r < resource_count; ++r)
         if (need[r] > 0.0f && corp_stockpile_total(w, nation, static_cast<resource_type>(r)) < need[r])
             return false;
@@ -165,20 +172,35 @@ float hire_goods_price_bound(const world& w, entity_id nation, const std::array<
 }
 
 /// The goods a hire draws: @p kit plus each of @p row's gated axes at the resource
-/// `hire_axis_resource` would take (none when @p row is null).
+/// `plan_hire_goods` chose (none when @p row is null).
 std::array<float, resource_count> hire_goods_need(const world& w, entity_id nation, const roster_row* row,
                                                   const std::array<float, resource_count>& kit)
 {
-    std::array<float, resource_count> need = kit;
+    std::array<float, resource_count> need{};
+    std::array<resource_type, hire_axis_count> axis_res{};
+    plan_hire_goods(w, nation, row, kit, need, axis_res);
+    return need;
+}
+
+/// BL-1447: buy @p row's gated axes (in axis order, at the resources
+/// `plan_hire_goods` chose with @p kit) and then @p kit, ascending resource — the
+/// order the hire always bought in. Only called once the plan, its quantities and
+/// its price bound have all passed.
+void debit_hire_goods(world& w, entity_id nation, const roster_row* row,
+                      const std::array<float, resource_count>& kit)
+{
+    std::array<float, resource_count> need{};
+    std::array<resource_type, hire_axis_count> axis_res{};
+    const bool planned = plan_hire_goods(w, nation, row, kit, need, axis_res);
+    assert(planned && "debit_hire_goods: called without a passing plan");
+    (void)planned;
     if (row != nullptr)
         for (std::size_t i = 0; i < hire_axis_count; ++i)
-        {
-            const hire_axis axis = static_cast<hire_axis>(i);
-            if (gate_axis_q(row->gate, axis) <= 0 || !corp_can_afford_axis(w, nation, axis))
-                continue;
-            need[static_cast<std::size_t>(hire_axis_resource(w, nation, axis))] += hire_axis_cost;
-        }
-    return need;
+            if (gate_axis_q(row->gate, static_cast<hire_axis>(i)) > 0)
+                debit_from_corp(w, nation, axis_res[i], hire_axis_cost);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (kit[r] > 0.0f)
+            debit_from_corp(w, nation, static_cast<resource_type>(r), kit[r]);
 }
 
 /// BL-1434: buy the kit goods @p kit off @p nation's shelves, ascending resource.
@@ -691,12 +713,19 @@ corp_command_result refit_check(const world& w, const recipe_registry& reg, enti
     // the target row, unless the refit keeps the row (a design refit buys no new
     // unit type); and, BL-1434, the kit goods of each slot the live design changes —
     // the goods legs together (`hire_goods_affordable`).
-    if (purse_room_of(w, nation) < refit_credit_cost(reg, u.type, target))
+    const float credits = refit_credit_cost(reg, u.type, target);
+    if (purse_room_of(w, nation) < credits)
         return corp_command_result::rejected_funds;
     const land_class lc = unit_land_class(u);
     const std::array<float, resource_count> kit =
         kit_refit_goods(lc, u.kit, design_of(w, nation, lc));
-    if (!hire_goods_affordable(w, nation, target == u.type ? nullptr : &table[target], kit))
+    const roster_row* row = target == u.type ? nullptr : &table[target];
+    if (!hire_goods_affordable(w, nation, row, kit))
+        return corp_command_result::rejected_funds;
+    // BL-1447: the goods' PRICE counts too, as a hire's does (BL-1452). A design
+    // refit costs no credits, and without this its kit came free off a committed
+    // treasury: the shelf buy is capped by the purse room and bought nothing.
+    if (purse_room_of(w, nation) < credits + hire_goods_price_bound(w, nation, hire_goods_need(w, nation, row, kit)))
         return corp_command_result::rejected_funds;
     return corp_command_result::applied;
 }
@@ -964,7 +993,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // the game). Every row now costs credits: a floor plus a
             // power-scaled component, authored in economy.lua (§ military).
             // Checked BEFORE the resource debit so a refusal on either leg
-            // leaves the corp wholly uncharged, preserving debit_hire_cost's
+            // leaves the corp wholly uncharged, preserving debit_hire_goods's
             // own all-or-nothing contract.
             const military_capability_params& mil = reg.military();
             const float hire_cost = mil.hire_base_cost
@@ -988,9 +1017,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 < hire_cost + hire_goods_price_bound(w, cmd.corp, hire_goods_need(w, cmd.corp, &row, kit)))
                 return corp_command_result::rejected_funds; // BL-1452: the goods' price counts too
 
-            if (!debit_hire_cost(w, cmd.corp, row))
-                return corp_command_result::rejected_funds;
-            debit_kit_goods(w, cmd.corp, kit);
+            debit_hire_goods(w, cmd.corp, &row, kit); // BL-1447: the plan the gate priced
             *purse_of(w, cmd.corp) -= hire_cost; // the actor exists: proven at the seam's top
 
             // BL-1435: RAISING TAKES TIME (Ben, 2026-10-27; MILITARY.md § The muster
@@ -1341,12 +1368,11 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             const land_class lc    = unit_land_class(u);
             const unit_design live = design_of(w, cmd.corp, lc);
             const std::array<float, resource_count> kit = kit_refit_goods(lc, u.kit, live);
-            // The goods leg is the hire's own path; its affordability was proven above.
-            // A design refit keeps the row, so it buys no row goods.
-            if (cmd.unit_type != u.type
-                && !debit_hire_cost(w, cmd.corp, unit_roster_table()[cmd.unit_type]))
-                return corp_command_result::rejected_funds;
-            debit_kit_goods(w, cmd.corp, kit);
+            // The goods leg is the hire's own path; its quantity AND price were proven
+            // above (refit_check). A design refit keeps the row, so it buys no row goods.
+            debit_hire_goods(w, cmd.corp,
+                             cmd.unit_type != u.type ? &unit_roster_table()[cmd.unit_type] : nullptr,
+                             kit);
             *purse_of(w, cmd.corp) -= credits; // the actor exists: proven at the seam's top
             u.refit_kit  = live;
             u.refit_type = cmd.unit_type;

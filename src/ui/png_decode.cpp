@@ -17,6 +17,11 @@ struct bit_reader
     std::uint32_t       buf = 0;
     int                 cnt = 0;
     bool                bad = false;
+    /// BL-1447 (3): the most bytes the inflate may write — the image's own
+    /// h x (stride + 1). A stream that would exceed it is REFUSED, never grown
+    /// into: a small corrupt or hostile file cannot make the decoder allocate
+    /// without bound.
+    std::size_t         cap = 0;
 
     int bits(int need)
     {
@@ -98,7 +103,10 @@ bool codes(bit_reader& s, std::vector<std::uint8_t>& out, const huffman& lencode
         int sym = decode(s, lencode);
         if (sym < 0) return false;
         if (sym < 256)
+        {
+            if (out.size() >= s.cap) return false; // BL-1447: over the image's size
             out.push_back(static_cast<std::uint8_t>(sym));
+        }
         else if (sym == 256)
             return true;
         else
@@ -110,6 +118,7 @@ bool codes(bit_reader& s, std::vector<std::uint8_t>& out, const huffman& lencode
             if (ds < 0 || ds >= 30) return false;
             const std::size_t dist = static_cast<std::size_t>(k_dist_base[ds] + s.bits(k_dist_extra[ds]));
             if (s.bad || dist > out.size()) return false;
+            if (out.size() + static_cast<std::size_t>(len) > s.cap) return false; // BL-1447
             const std::size_t from = out.size() - dist;
             for (int i = 0; i < len; ++i)
                 out.push_back(out[from + static_cast<std::size_t>(i)]);
@@ -126,6 +135,7 @@ bool inflate_stored(bit_reader& s, std::vector<std::uint8_t>& out)
     const unsigned nlen = s.in[s.pos + 2] | (s.in[s.pos + 3] << 8);
     s.pos += 4;
     if (len != (~nlen & 0xFFFFu) || s.pos + len > s.len) return false;
+    if (out.size() + len > s.cap) return false; // BL-1447: over the image's size
     out.insert(out.end(), s.in + s.pos, s.in + s.pos + len);
     s.pos += len;
     return true;
@@ -195,7 +205,7 @@ bool inflate_dynamic(bit_reader& s, std::vector<std::uint8_t>& out)
     return codes(s, out, lencode, distcode);
 }
 
-bool zlib_inflate(const std::vector<std::uint8_t>& z, std::vector<std::uint8_t>& out)
+bool zlib_inflate(const std::vector<std::uint8_t>& z, std::vector<std::uint8_t>& out, std::size_t cap)
 {
     if (z.size() < 2) return false;
     if ((z[0] & 0x0F) != 8 || ((z[0] << 8) | z[1]) % 31 != 0 || (z[1] & 0x20) != 0)
@@ -203,6 +213,7 @@ bool zlib_inflate(const std::vector<std::uint8_t>& z, std::vector<std::uint8_t>&
     bit_reader s;
     s.in  = z.data() + 2;
     s.len = z.size() - 2;
+    s.cap = cap;
     int last = 0;
     do
     {
@@ -276,10 +287,11 @@ bool png_decode_rgba(const std::vector<std::uint8_t>& file, int& width, int& hei
     }
     if (colour == 3 && palette.size() < 3) { err = "palette image without PLTE"; return false; }
 
-    std::vector<std::uint8_t> raw;
-    raw.reserve(static_cast<std::size_t>(h) * (w * channels + 1));
-    if (!zlib_inflate(idat, raw)) { err = "corrupt image data"; return false; }
     const std::size_t stride = static_cast<std::size_t>(w) * channels;
+    const std::size_t expect = static_cast<std::size_t>(h) * (stride + 1);
+    std::vector<std::uint8_t> raw;
+    raw.reserve(expect);
+    if (!zlib_inflate(idat, raw, expect)) { err = "corrupt image data"; return false; }
     if (raw.size() < static_cast<std::size_t>(h) * (stride + 1)) { err = "short image data"; return false; }
 
     // Unfilter in place, row by row.

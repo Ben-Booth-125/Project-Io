@@ -1760,9 +1760,25 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             const entity_id       nation = w.player_entity;
             std::vector<uint16_t> targets =
                 refit_targets(w, nation, u, campaign_roster_band_for(reg.era())); // BL-1434: own row first when its design is stale
+            // BL-1447 (4): the live-design entry (the unit's own row) stays FIRST even
+            // when that row is obsolete; only the newer rows sink when obsolete.
             std::stable_partition(targets.begin(), targets.end(), [&](uint16_t t) {
-                return !roster_row_obsolete(w, nation, t);
+                return t == u.type || !roster_row_obsolete(w, nation, t);
             });
+            // The goods of each slot the live design changes — bought by EVERY refit,
+            // a design refit and a type refit alike (`kit_refit_goods`).
+            const land_class lc = unit_land_class(u);
+            const std::array<float, resource_count> slot_goods =
+                kit_refit_goods(lc, u.kit, design_of(w, nation, lc));
+            std::string slot_text;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (slot_goods[r] > 0.0f)
+                {
+                    char part[64];
+                    std::snprintf(part, sizeof part, " + %.0f %s", static_cast<double>(slot_goods[r]),
+                                  resource_name(static_cast<resource_type>(r)));
+                    slot_text += part;
+                }
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Refit to");
             ImGui::Separator();
             if (targets.empty())
@@ -1772,14 +1788,17 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
                 const corp_command_result why = refit_check(w, reg, nation, sel, t);
                 const bool        ok   = (why == corp_command_result::applied);
                 const roster_gate& g   = unit_roster_table()[t].gate;
-                const bool        kit  = g.ore_q > 0 || g.farm_q > 0 || g.energy_q > 0;
-                char label[160];
-                std::snprintf(label, sizeof label, "%s%s%s \xe2\x80\x94 %s%s, %d d##refit%u",
+                // BL-1447 (4): a design refit keeps its row, so it buys none of the
+                // row's gated goods — "+ kit" names those, and only a type refit pays.
+                const bool        kit  = t != u.type && (g.ore_q > 0 || g.farm_q > 0 || g.energy_q > 0);
+                char label[256];
+                std::snprintf(label, sizeof label, "%s%s%s \xe2\x80\x94 %s%s%s, %d d##refit%u",
                               unit_roster_display_name(t).c_str(),
                               t == u.type ? " (live design)" : "",
                               roster_row_obsolete(w, nation, t) ? " (obsolete)" : "",
                               fmt::credits(refit_credit_cost(reg, u.type, t)).c_str(),
-                              kit ? " + kit" : "", muster_days_for(t), static_cast<unsigned>(t));
+                              kit ? " + kit" : "", slot_text.c_str(), muster_days_for(t),
+                              static_cast<unsigned>(t));
                 ImGui::BeginDisabled(!ok);
                 if (ImGui::Selectable(label) && ok)
                 {

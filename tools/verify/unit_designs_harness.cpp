@@ -374,6 +374,31 @@ int main()
               "U4g the same shelves raise a base-kit hire (base kit buys no goods)");
     }
 
+    std::printf("\nU5p - a design refit pays its kit goods' price (BL-1447)\n");
+    {
+        set_kit_research_waived_for_harness(true);
+        fixture f;
+        build(f);
+        const entity_id u = add_unit(f, rifle, f.nation, f.home);
+        design(f, reg, f.nation, INF, 1, item("inf.armour.ceramic_plates"));
+        // A design refit costs no credits; its kit goods cost 10 cr each on the
+        // shelf. With 1 cr of room the goods do not fit the purse: refused, and
+        // nothing moves (before BL-1447 the shelf buy was capped to nothing and the
+        // kit came free).
+        f.w.nations.at(f.nation).treasury = 1.0f;
+        const std::string pre = to_bytes(f.w);
+        check(refit_check(f.w, reg, f.nation, u, static_cast<uint16_t>(rifle))
+                      == corp_command_result::rejected_funds
+                  && refit(f, reg, u, rifle) == corp_command_result::rejected_funds && to_bytes(f.w) == pre,
+              "U5p a design refit whose kit goods' price exceeds the purse room is refused, nothing changed");
+        f.w.nations.at(f.nation).treasury = 100000.0f;
+        const float tre = f.w.nations.at(f.nation).treasury;
+        check(refit(f, reg, u, rifle) == corp_command_result::applied
+                  && f.w.nations.at(f.nation).treasury < tre,
+              "U5q with room it applies and the kit goods are paid for out of the treasury");
+        set_kit_research_waived_for_harness(false);
+    }
+
     std::printf("\nU5 - a refit to the live design\n");
     {
         set_kit_research_waived_for_harness(true);
