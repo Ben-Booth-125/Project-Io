@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*17 entries — 15 open, 2 resolved.*
+*18 entries — 14 open, 4 resolved.*
 
 ---
 
@@ -185,19 +185,18 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 
 **Why it matters.** (a) changes world shape: every capital opens with one more building (the shape probe was not re-run). The alternative is to let a station or port on the capital be the free source instead. (b) a poor nation may send fewer surveys in the settle. Merged at b0a9e9b5, G1t50 full 84.6. Work: BL-1452 (carried supplies).
 
-### NR-1100 — Does the stance grant cover a rival answering, offering and accepting peace, and so ceding ground?
-*question · raised 2026-10-30 · from Sprint 61 design (diplomacy and war), 2026-10-30*
+### NR-1102 — A ceded capital, and a nation ceded away
+*question · raised 2026-10-30 · from NR-1101 ruling (capitals may be goals), 2026-10-30*
 
-Ben ruled the 2026-08-18 stance grant covers a rival DECLARING war. A whole war also needs the rival to answer a declaration (naming goals), offer peace, accept or refuse one, and impose at 100. Accepting a cession is a rival choosing to give up ground, which is a new subject (territory), not a stance. Recommended: yes, same terms (pure, seeded, deterministic, legal verbs, never a planner), recorded as a dated entry in AI_OPPONENT.md § 11. Alternative: rivals answer and accept white peace only; cession happens only when imposed at 100.
+With capitals open as goals, two cases now exist that nothing owned. (a) A nation that cedes its capital province takes as its new capital the remaining province with the largest population centre, ties to the lower id. The capital is where the treasury sits and where the free logistics hub stands (NR-1099), so the hub must move too. (b) Three goals can take every province of a small nation. Strawman: it leaves the map, its wars close, and its sentiment rows are erased. The alternative is a floor: the last province can never be a goal or ceded.
 
-**Why it matters.** Without it, a war against a rival can only end by imposition, and a rival never ends a war it started. Blocks the peace half of BL-1461 (rivals declare war). RELATIONS.md § 1 and § 7 cite this entry.
+**Why it matters.** (b) is elimination, and nothing else in the campaign removes a nation, so every consumer of the nation list meets it for the first time (fronts, markets, the scorer, saves, spectating). Both rules are strawman in RELATIONS.md § 7. Work: BL-1460 (cession moves territory).
 
-### NR-1101 — The war strawman: goals, score weights, imposing at 100, truce, the free answer
-*question · raised 2026-10-30 · from Sprint 61 design (diplomacy and war), 2026-10-30*
+- A: both strawman rules as written
+- B: the capital moves as written; a nation's last province can never be ceded
+- C: a capital can never be ceded (a goal, but not cedable)
 
-RELATIONS.md § 7 sets shapes I proposed, not ones you ruled: (a) 1-3 goals, each a defender province bordering the declarer or coastal, never a capital; (b) score = occupation + battles, strawman 60/40; (c) a side at 100 may impose; (d) a truce after peace, strawman 8 ticks (two years); (e) the defender's answer is free and names its own goals; (f) a war ends only in peace (return_to_neutral refused between parties); (g) a justification cuts the third-party price, strawman by half. Numbers inside these shapes are delegated calibration; the shapes are not.
-
-**Why it matters.** Each shape is a rule a player learns. Overturning one after BL-1459 and BL-1428 build is a save-format change. Answer before those lanes start; numbers can follow.
+> **Recommendation:** B. Elimination is a whole subject. The floor keeps every nation on the map until it is designed on purpose.
 
 ---
 
@@ -240,4 +239,22 @@ Two UI calls the lane made. (1) Each pick in a slot list sends set_unit_design a
 > **RESOLVED.** Ben, 2026-10-28: C - a pick drafts and Save commits; the fitted item stays disabled. Written into docs/ui/ledgers/military.md § The designer; the work is BL-1448 (designer draft and Save).
 
 *Files: `src/ui/unit_designer.cpp`, `docs/ui/ledgers/military.md`*
+
+### NR-1100 — Does the stance grant cover a rival answering, offering and accepting peace, and so ceding ground?
+*question · raised 2026-10-30 · from Sprint 61 design (diplomacy and war), 2026-10-30*
+
+Ben ruled the 2026-08-18 stance grant covers a rival DECLARING war. A whole war also needs the rival to answer a declaration (naming goals), offer peace, accept or refuse one, and impose at 100. Accepting a cession is a rival choosing to give up ground, which is a new subject (territory), not a stance. Recommended: yes, same terms (pure, seeded, deterministic, legal verbs, never a planner), recorded as a dated entry in AI_OPPONENT.md § 11. Alternative: rivals answer and accept white peace only; cession happens only when imposed at 100.
+
+**Why it matters.** Without it, a war against a rival can only end by imposition, and a rival never ends a war it started. Blocks the peace half of BL-1461 (rivals declare war). RELATIONS.md § 1 and § 7 cite this entry.
+
+> **RESOLVED.** Ben, 2026-10-30: yes - full peace including cession, on the same grant terms, dated in AI_OPPONENT.md § 11 ("Rival nations wage war whole"). Written into RELATIONS.md § 1 and § 7.
+
+### NR-1101 — The war strawman: goals, score weights, imposing at 100, truce, the free answer
+*question · raised 2026-10-30 · from Sprint 61 design (diplomacy and war), 2026-10-30*
+
+RELATIONS.md § 7 sets shapes I proposed, not ones you ruled: (a) 1-3 goals, each a defender province bordering the declarer or coastal, never a capital; (b) score = occupation + battles, strawman 60/40; (c) a side at 100 may impose; (d) a truce after peace, strawman 8 ticks (two years); (e) the defender's answer is free and names its own goals; (f) a war ends only in peace (return_to_neutral refused between parties); (g) a justification cuts the third-party price, strawman by half. Numbers inside these shapes are delegated calibration; the shapes are not.
+
+**Why it matters.** Each shape is a rule a player learns. Overturning one after BL-1459 and BL-1428 build is a save-format change. Answer before those lanes start; numbers can follow.
+
+> **RESOLVED.** Ben, 2026-10-30: (a) any of the defender's provinces may be a goal, capitals included, no reach rule; (b) occupation and battles carry half each; (c) a side at 100 imposes; (d) truce sixteen ticks (four years); (e) the answer is free and names its own goals; (f) only peace ends a war; (g) a justification halves the price. The goal count was not addressed; one to three stands. Written into RELATIONS.md § 7 and ledgers/diplomacy.md. Allowing capitals raised NR-1102.
 

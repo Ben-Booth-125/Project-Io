@@ -761,7 +761,7 @@
     "tools/verify/war_harness.cpp"
    ],
    "title": "A war has a score, exhaustion, and a peace: white, ceded, or imposed at 100; then a truce",
-   "design": "RELATIONS.md § 7 (Ben, 2026-10-30: the full war, not declaration only). War score -100..100 from occupation of goals (province_holder, tile-weighted) and battle strength destroyed, weights authored; exhaustion 0-100 per party from strength lost, days in the field and provinces held by the enemy, decaying at peace, moving unit morale (MILITARY.md stats table). Peace offers in their own table, one pending per war: white peace or cession of held goals; impose at 100; both hostility rows clear; the record closes to history; a truce bars re-declaration. Cession's territorial half is BL-1460 (cession moves territory). Declaration and the record are BL-1459."
+   "design": "RELATIONS.md § 7 (Ben, 2026-10-30: the full war, not declaration only). War score -100..100 from occupation of goals (province_holder, tile-weighted) and battle strength destroyed, half each; exhaustion 0-100 per party from strength lost, days in the field and provinces held by the enemy, decaying at peace, moving unit morale (MILITARY.md stats table). Peace offers in their own table, one pending per war: white peace or cession of held goals; impose at 100; both hostility rows clear; the record closes to history; a sixteen-tick truce bars re-declaration. Cession's territorial half is BL-1460 (cession moves territory). Declaration and the record are BL-1459."
   },
   {
    "status": "cancelled",
@@ -1351,7 +1351,7 @@
     "tools/verify/war_harness.cpp"
    ],
    "title": "A war is a record: declare_war with goals, a priced declaration, justifications, the free answer",
-   "design": "RELATIONS.md § 7 (Ben, 2026-10-30). The war record per (declarer, defender) on world and in the snapshot (save version bump). declare_war(declarer, defender, goals) writes hostility and the record atomically; refused with nothing mutated on an existing war, a truce or an invalid goal (1-3 of the defender's provinces, bordering the declarer's ground or coastal, never a capital). The defender's answer is free and names its own goals. return_to_neutral refused between war parties. Justifications as condition_set rows (grievance, embargo, lost ground, a friend attacked) cutting the war_declared price; a price preview read for the ledger. The right-click declare-and-attack routes here with the attacked province as first goal. New verbs cross the AI-facing seam as untrusted input; ACTIONS.json entries. Strawman numbers: NR-1101."
+   "design": "RELATIONS.md § 7 (Ben, 2026-10-30). The war record per (declarer, defender) on world and in the snapshot (save version bump). declare_war(declarer, defender, goals) writes hostility and the record atomically; refused with nothing mutated on an existing war, a truce or an invalid goal (1-3 of the defender's provinces, any of them, capitals included). The defender's answer is free and names its own goals. return_to_neutral refused between war parties. Justifications as condition_set rows (grievance, embargo, lost ground, a friend attacked) halving the war_declared price; a price preview read for the ledger. The right-click declare-and-attack routes here with the attacked province as first goal. New verbs cross the AI-facing seam as untrusted input; ACTIONS.json entries. Rules ruled 2026-10-30 (NR-1101)."
   },
   {
    "status": "proposed",
@@ -1379,7 +1379,7 @@
     "tools/verify/cession_harness.cpp"
    ],
    "title": "A peace that cedes moves tile_to_nation; a white peace hands occupied goals back",
-   "design": "RELATIONS.md § 7, Cession moves the territory (Ben, 2026-10-30); MILITARY.md § Battles, the holder paragraph. For each ceded province tile_to_nation follows province_holder: buildings change owner with the ground, the population centre, law jurisdiction, road network membership, and fronts re-derive; the loser's units on ceded ground withdraw by the retreat rule. A white peace resets every occupied goal's holder to its owner and withdraws the occupiers. The heaviest seam in the sprint: check money_conservation, fold_census, save_roundtrip, world_determinism and the front harnesses, plus a cession_harness that cedes on a library seed and walks every consumer of tile_to_nation. File names are a guess; read the code first."
+   "design": "RELATIONS.md § 7, Cession moves the territory (Ben, 2026-10-30); MILITARY.md § Battles, the holder paragraph. For each ceded province tile_to_nation follows province_holder: buildings change owner with the ground, the population centre, law jurisdiction, road network membership, and fronts re-derive; the loser's units on ceded ground withdraw by the retreat rule. A white peace resets every occupied goal's holder to its owner and withdraws the occupiers. The heaviest seam in the sprint: check money_conservation, fold_census, save_roundtrip, world_determinism and the front harnesses, plus a cession_harness that cedes on a library seed and walks every consumer of tile_to_nation. File names are a guess; read the code first. A ceded capital moves to the largest remaining population centre with its hub; whether a nation's last province may be ceded is NR-1102."
   },
   {
    "status": "proposed",
@@ -1404,8 +1404,8 @@
     "src/world/corp_ai.cpp",
     "tools/verify/stance_determinism.cpp"
    ],
-   "title": "A rival nation scores and declares war, naming goals, under the stance grant",
-   "design": "RELATIONS.md § 1 Who declares and § 7 (Ben, 2026-10-30: the 2026-08-18 stance grant covers a rival declaring war). The scorer reads its own sentiment and Alarm toward a nation, the price and justifications, front strength and trade exposure; it declares via declare_war only, never on a threshold alone, and never as a planner. Pure, seeded, deterministic, replayable. Answering and peace scoring wait on NR-1100. The player's nation is never scored. Check: stance_determinism, spectator_determinism, a war-count band across the 16 library seeds (no world where every nation is at war by tick 40, none where none ever is)."
+   "title": "A rival nation wages war: declares with goals, answers, makes and imposes peace",
+   "design": "RELATIONS.md § 1 Who declares and § 7 (Ben, 2026-10-30: the 2026-08-18 stance grant covers a rival declaring war). The scorer reads its own sentiment and Alarm toward a nation, the price and justifications, front strength and trade exposure; it declares via declare_war only, never on a threshold alone, and never as a planner. Pure, seeded, deterministic, replayable. Answering, offering, accepting, refusing and imposing peace are granted on the same terms (Ben, 2026-10-30, NR-1100; AI_OPPONENT.md § 11, \"Rival nations wage war whole\"), so a peace it scores may cede ground. The player's nation is never scored. Check: stance_determinism, spectator_determinism, a war-count band across the 16 library seeds (no world where every nation is at war by tick 40, none where none ever is)."
   },
   {
    "status": "proposed",

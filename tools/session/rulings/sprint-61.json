@@ -41,5 +41,52 @@
   "anchor": "Extras in the ledger",
   "stale": [],
   "owner": "BL-1462 (diplomacy ledger)"
+ },
+ {
+  "ruling": "Rivals answer, make and impose peace, and may cede ground (Ben, 2026-10-30, NR-1100)",
+  "doc": "docs/ai/AI_OPPONENT.md",
+  "anchor": "Rival nations wage war whole",
+  "stale": [
+   "its answering and peace are NR-1100",
+   "Answering and peace scoring wait"
+  ],
+  "owner": "BL-1461 (rivals declare war)"
+ },
+ {
+  "ruling": "Any province may be a war goal, capitals included (Ben, 2026-10-30, NR-1101)",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "Goals are provinces \\(Ben, 2026-10-30, NR-1101\\)",
+  "stale": [
+   "A capital province is never a goal",
+   "A capital is not markable"
+  ],
+  "owner": "BL-1459 (war record and declaration)"
+ },
+ {
+  "ruling": "War score is half occupation, half battles (Ben, 2026-10-30)",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "Each part carries half \\(Ben, 2026-10-30\\)",
+  "stale": [
+   "The weights are authored. The score"
+  ],
+  "owner": "BL-1428 (war goals and peace)"
+ },
+ {
+  "ruling": "A truce lasts sixteen ticks (Ben, 2026-10-30)",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "sixteen ticks — four years",
+  "stale": [
+   "for an authored span"
+  ],
+  "owner": "BL-1428 (war goals and peace)"
+ },
+ {
+  "ruling": "A justification halves the declaration price (Ben, 2026-10-30)",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "halves.. the third-party price",
+  "stale": [
+   "by an authored fraction"
+  ],
+  "owner": "BL-1459 (war record and declaration)"
  }
 ]

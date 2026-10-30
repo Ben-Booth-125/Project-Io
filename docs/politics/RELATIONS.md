@@ -307,7 +307,9 @@ seeded, scored-utility, legal verbs only. Hostility stays a declared state a nat
 rival may score and declare it, never acquire it ambiently. **That grant covers a rival declaring
 war (Ben, 2026-10-30)** — `declare_war` with its goals (§ 7), toward a rival or the player alike.
 Whether it also covers a rival answering, offering and accepting peace, and so ceding ground, is
-raised as its own question (NR-1100) rather than read into it.
+raised as its own question and granted on the same terms (Ben, 2026-10-30, NR-1100): a rival
+answers, offers, accepts or refuses peace, imposes at 100, and so may cede ground
+(`../ai/AI_OPPONENT.md` § 11).
 
 **A declaration against the player is SIGNALLED** (Ben, 2026-08-22). This overturns NR-350, which
 had a declaration *"stay silent, discovered on contact rather than announced"*; newest-dated wins,
@@ -430,8 +432,13 @@ stands between them, or a goal is invalid. Friendship dissolves as § 1 says. Wh
 declare-and-attack (`../military/MILITARY.md` § Marching) opens the same declaration, with the
 attacked tile's province as its first goal.
 
-**Goals are provinces.** The declarer names one to three of the defender's provinces, each bordering
-the declarer's ground or touching the coast. A capital province is never a goal.
+**Goals are provinces (Ben, 2026-10-30, NR-1101).** The declarer names one to three of the
+defender's provinces — **any** of them, with no reach rule, and the capital included.
+
+**Ceding a capital moves it.** A nation whose capital province is ceded takes as its new capital
+the remaining province with the largest population centre, ties to the lower province id. A nation
+that cedes its last province leaves the map: its wars close, and its sentiment rows are erased as
+neutral rows are. Both are strawman rules (NR-1102).
 
 **The defender answers, for free.** Its hostility back costs nothing — it is the act of being
 attacked. Answering names its own goals among the declarer's provinces, by the same rule. Until it
@@ -453,7 +460,7 @@ opening set:
 | Lost ground | a goal is a province the declarer ceded to the defender at an earlier peace |
 | A friend attacked | the defender is the declarer in a war against the declarer's friend |
 
-Any one that holds cuts the third-party price by an authored fraction. The declaration shows which
+Any one that holds **halves** the third-party price (Ben, 2026-10-30). The declaration shows which
 hold, and the price, before it is confirmed. This reads sentiment to **price** a declaration; it
 never makes one, so the invariant holds.
 
@@ -464,7 +471,7 @@ never makes one, so the invariant holds.
 - **Battles** — strength destroyed in battles between the pair: the declarer's share less the
   defender's, over the war.
 
-The weights are authored. The score is public because both parts are.
+**Each part carries half (Ben, 2026-10-30).** The score is public because both parts are.
 
 **Exhaustion.** Each party carries 0–100. It rises with its own strength lost, each day its units
 stand in the field, and each of its provinces the enemy holds. It decays once the nation is at peace.
@@ -479,7 +486,7 @@ and lives in its own table as friendship offers do (§ 1). There is one pending 
 
 A side whose score stands at 100 in its favour may **impose** its terms without acceptance. At
 peace, both hostility rows clear and the record closes into the nation's history. A **truce** then
-bars either party declaring on the other for an authored span. `peace_concluded` warms both rows;
+bars either party declaring on the other for **sixteen ticks — four years** (Ben, 2026-10-30). `peace_concluded` warms both rows;
 `province_ceded` lands hard on the loser's row toward the winner. Each ceded province becomes a
 *lost ground* justification for the loser, so revanchism is a loop with a visible cause.
 
@@ -491,7 +498,7 @@ ground withdraw by the retreat rule. A white peace hands every occupied goal's h
 owner, and the occupying units withdraw the same way.
 
 **Who scores a war.** The player declares, answers and makes peace through the Diplomacy ledger. A
-rival declares under the stance grant (§ 1); its answering and peace are NR-1100.
+rival declares, answers and makes peace under the stance grant (§ 1), on its standing terms.
 
 ## Open questions
 
@@ -502,8 +509,8 @@ rival declares under the stance grant (§ 1); its answering and peace are NR-110
 2. **Which reading does passage take** — reach-field contribution (recommended) or placement
    permission? Owned by BL-549 (friendship permits two things).
 
-3. **The war's strawman numbers and shapes** (§ 7) — goal count and reach, the score's weights,
-   imposing at 100, truce length, the defender's free answer. Raised as NR-1101.
+3. **Where a ceded capital goes, and whether a nation can be ceded away** (§ 7). Raised as
+   NR-1102.
 
 ---
 

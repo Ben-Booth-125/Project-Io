@@ -61,8 +61,8 @@ Rows sort hostile first, then by Alarm toward you, highest first.
 
 Pressing Declare war turns the expanded row into the declaration, in place:
 
-- **Goals.** The canvas marks the target's provinces that may be goals. Clicking one toggles it, to
-  at most three. A capital is not markable.
+- **Goals.** The canvas marks the target's provinces, every one a possible goal, its capital
+  included (Ben, 2026-10-30). Clicking one toggles it, to at most three.
 - **Justifications** — every opening justification, each marked as holding or not.
 - **The price** — the Trust fall and Alarm rise with every other nation, summed and per neighbour,
   updated as goals change.
@@ -111,6 +111,10 @@ while active lifts it. Cancel or Escape closes the declaration without effect.
 
 ## Settled (Ben, 2026-10-30)
 
+- **War rules (NR-1101)**: any province may be a goal, capitals included; the score is half
+  occupation and half battles; a side at 100 imposes; a truce lasts sixteen ticks; the defender's
+  answer is free and names goals; only peace ends a war; a justification halves the price.
+- **Rivals make peace too (NR-1100)**: they answer, offer, accept and impose, and so may cede ground.
 - **The war is whole**: declaration with a price and justification, goals, score, exhaustion, white
   peace and cession (RELATIONS § 7).
 - **Alarm is shown**, as the third sentiment bar.

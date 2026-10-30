@@ -2348,3 +2348,12 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   declaring the hostility a bombing mission needs (that stays the stance scorer's, BL-450); a
   campaign of missions planned beyond the next assignment. Pure, seeded, deterministic, replayable,
   legal verbs only, never a planner.
+  **Rival nations wage war whole — granted (Ben, 2026-10-30, resolving NR-1100;
+  `../politics/RELATIONS.md` § 7).** The stance grant (BL-450) already covers a rival declaring
+  war, and Ben confirmed it does, goals included. The rest of a war is a new subject — territory,
+  not stance — and is granted on the same terms. A rival nation's scorer may answer a declaration
+  against it (naming goals), offer, accept or refuse peace, and impose terms at a score of 100, so a
+  peace it scores may cede its own ground or take another's, over the same legal verbs the player's
+  Diplomacy ledger issues. **Not admitted:** a war, offer or peace that is not its own; acting for
+  the player's nation, whose wars only the player answers and ends; a war planned beyond the next
+  verb. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
