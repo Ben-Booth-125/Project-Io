@@ -487,6 +487,17 @@ bool state_commit_change(world& w, const recipe_registry& reg, entity_id nation,
 {
     if (before.state_idle)
         return true; // unfunded this tick: it runs nothing whatever changes
+    // BL-1452: the capital's free source commits no delta - it is bound at 0 whatever
+    // changes. `before` is the stored building (every caller passes it), so it is found
+    // by address among the nation's own.
+    if (const auto nit = w.nations.find(nation); nit != w.nations.end())
+        for (const entity_id bid : nit->second.state_assets)
+            if (const auto it = w.buildings.find(bid); it != w.buildings.end() && &it->second == &before)
+            {
+                if (capital_free_source(w, bid))
+                    return true;
+                break;
+            }
     const float delta = gate_bound(w, reg, after) - gate_bound(w, reg, before); // the gate's own headroom
     if (!(delta > 0.0f))
         return true;
@@ -673,27 +684,34 @@ float state_uncommitted_treasury(const world& w, entity_id nation)
     float committed = 0.0f;
     if (const auto lit = w.state_ledger.find(nation); lit != w.state_ledger.end())
         committed = lit->second.committed;
-    const float free = std::max(0.0f, nit->second.treasury - committed);
     // BL-1452 (Ben, 2026-10-29): IN THE SETTLE A NATION BUILDS ONLY FROM SURPLUS - what
-    // it has gained since the settle began, never the chest it opened on.
-    if (w.settle_build_gate)
-    {
-        const auto cit = w.settle_chest.find(nation);
-        const float chest = cit != w.settle_chest.end() ? cit->second : nit->second.treasury;
-        return std::min(free, std::max(0.0f, nit->second.treasury - chest));
-    }
-    return free;
+    // it has gained since the settle began, never the chest it opened on. The scorer
+    // acts before this step's bills are paid, so what is already committed AND this
+    // step's pending garrison wage are kept back too: max(0, treasury - committed -
+    // wage - chest). The same reading as `purse_room_of` (world.cpp).
+    (void)committed;
+    return purse_room_of(w, nation);
 }
+
+namespace {
+
+/// A source that may hold the free status: the capital's GENERATED type (an inland
+/// logistics hub), complete and not decommissioned. A costlier node rebuilt on the
+/// capital buys no free upgrade, and a dead hub holds nothing.
+bool free_source_candidate(const building_component& b)
+{
+    return b.type == building_type::inland_logistics_hub && b.ticks_remaining <= 0
+        && !b.decommissioned;
+}
+
+} // namespace
 
 bool capital_free_source(const world& w, entity_id building)
 {
-    // The ONE source standing on its nation's capital: the lowest-id network node on
-    // the capital tile among the nation's own buildings.
+    // THE ONE SOURCE STANDING ON ITS NATION'S CAPITAL: the lowest-id running inland
+    // logistics hub its nation holds on the capital tile. None standing: nothing is free.
     const auto bit = w.buildings.find(building);
-    if (bit == w.buildings.end())
-        return false;
-    lp_network net;
-    if (!lp_source_network(bit->second.type, net))
+    if (bit == w.buildings.end() || !free_source_candidate(bit->second))
         return false;
     const auto own = w.tile_to_nation.find(bit->second.tile);
     if (own == w.tile_to_nation.end())
@@ -702,16 +720,18 @@ bool capital_free_source(const world& w, entity_id building)
     if (nit == w.nations.end() || nit->second.capital_tile != bit->second.tile)
         return false;
     entity_id lowest = null_entity;
+    bool held = false;
     for (const entity_id bid : nit->second.state_assets)
     {
+        held = held || bid == building;
         const auto it = w.buildings.find(bid);
         if (it == w.buildings.end() || it->second.tile != bit->second.tile
-            || !lp_source_network(it->second.type, net))
+            || !free_source_candidate(it->second))
             continue;
         if (lowest == null_entity || bid < lowest)
             lowest = bid;
     }
-    return lowest == building;
+    return held && lowest == building;
 }
 
 // ---------------------------------------------------------------------------
@@ -874,6 +894,14 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
         if (cut.empty())
             continue;
         ++rep.nations_cut;
+        // The refund a cut site owes (its paid flat cost, as any cancelled site's), so
+        // the no-mint check below can tell a refund from a mint.
+        float owed_refund = 0.0f;
+        for (const entity_id bid : cut)
+            if (const auto bit = w.buildings.find(bid);
+                bit != w.buildings.end() && bit->second.ticks_remaining > 0)
+                owed_refund += std::max(0.0f, bit->second.build_credit_paid);
+        const float treasury_before = w.nations.at(nid).treasury;
         for (const entity_id bid : cut)
         {
             const bool base = w.buildings.at(bid).type == building_type::military_base;
@@ -900,6 +928,20 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
                             w.musters.end());
             rep.musters_dropped += static_cast<int>(before - w.musters.size());
         }
+        // NOTHING IS MINTED, AND THE SIZING HOLDS: the treasury rose by no more than the
+        // refunds, and what is kept (bar the track, which the cut does not touch) runs
+        // for 16 ticks on the chest - or nothing but the free source is left.
+        const float rise = w.nations.at(nid).treasury - treasury_before;
+        rep.refunded += std::max(0.0f, rise);
+        if (rise > owed_refund + 1.0e-3f)
+            ++rep.minted;
+        float track = 0.0f;
+        const std::map<entity_id, int> rail = gate_rail_tiles(w);
+        if (const auto t = rail.find(nid); t != rail.end())
+            track = gate_track_bill(reg, t->second);
+        const float kept = state_first_tick_bill(w, reg, nid) - track;
+        if (kept > 1.0e-3f && chest + 1.0e-3f < ticks * (pay + kept))
+            ++rep.still_short;
     }
     if (rep.unbuilt > 0)
         invalidate_logistics_caches(w);
@@ -914,8 +956,9 @@ void print_opening_state_cut(const opening_state_cut_report& r)
                 r.nations_short, k_state_founding_reserve_ticks, r.nations_cut, r.unbuilt,
                 r.unbuilt_nodes, static_cast<double>(r.bill_cut));
     std::printf(" %d military base(s) among them (%d garrison(s) left with no base, %d opening "
-                "muster(s) dropped);",
-                r.bases_unbuilt, r.garrisons_unbased, r.musters_dropped);
+                "muster(s) dropped); refunded %.1f, minted %d, still short %d;",
+                r.bases_unbuilt, r.garrisons_unbased, r.musters_dropped,
+                static_cast<double>(r.refunded), r.minted, r.still_short);
     for (const auto& [nid, n] : r.per_nation)
         std::printf(" nation %u:%d", static_cast<unsigned>(nid), n);
     std::printf("\n");

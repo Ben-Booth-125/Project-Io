@@ -178,10 +178,14 @@ void plan_state_funding(world& w, const recipe_registry& reg);
 
 /// THE CAPITAL'S SOURCE RUNS FREE (Ben, 2026-10-29; LOGISTICS.md § Every capital holds a
 /// source): is @p building the ONE source standing on its nation's capital - the
-/// lowest-id network node (hub, station, port) of that nation on the capital tile? It
+/// lowest-id RUNNING source of the capital's generated type (an inland logistics hub,
+/// complete and not decommissioned) that the nation holds on the capital tile? It
 /// carries no upkeep bill: the funding gate bounds it at 0 and never idles it,
-/// `apply_budget` charges it no maintenance or wages, and it draws no upkeep goods.
-/// Every other source, a second hub stacked on the capital included, is billed as before.
+/// `apply_budget` charges it no maintenance or wages, `state_commit_change` commits no
+/// delta for it, it draws no upkeep goods and its supply factor reads 1000. Every other
+/// source - a second hub stacked on the capital, a station or port there, any node
+/// rebuilt in its place of another type - is billed as before. With no running hub on
+/// the capital, NOTHING is free: the capital's sources are billed and may idle like any.
 bool capital_free_source(const world& w, entity_id building);
 
 /// What @p nation's treasury may spend on a command right now: the treasury
@@ -281,6 +285,9 @@ struct opening_state_cut_report
     int   bases_unbuilt = 0;  ///< of them, military bases
     int   garrisons_unbased = 0; ///< units whose cut base was their muster base (kept, base cleared)
     int   musters_dropped   = 0; ///< opening musters queued at a cut base
+    float refunded      = 0.0f; ///< credits cut sites refunded (their paid flat cost)
+    int   minted        = 0;    ///< nations whose treasury rose by more than the refunds (0 by construction)
+    int   still_short   = 0;    ///< nations still under 16 ticks of their kept bill with something kept (0 by construction)
     float bill_cut      = 0.0f; ///< their summed bounds: the running bill removed, a tick
     std::map<entity_id, int> per_nation; ///< nation -> buildings left unbuilt
 };

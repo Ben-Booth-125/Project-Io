@@ -592,6 +592,10 @@ struct world
     /// TRANSIENT: not serialised, not hashed; a world is never saved mid-settle.
     bool                      settle_build_gate = false;
     std::map<entity_id, float> settle_chest;
+    /// This settle step's PENDING garrison wage per nation (the credit half of every
+    /// unit's upkeep, resolve_unit_upkeep), taken at the step's start: the scorer acts
+    /// before the step's bills are paid, so the cap keeps it back as well as the chest.
+    std::map<entity_id, float> settle_wage;
 
     /// BL-1042 — the carved centres that were NEVER founded, in carve order,
     /// with why. Their slots' share of a region's points is counted unspent
@@ -1435,6 +1439,11 @@ const float* purse_of(const world& w, entity_id owner);
 /// What @p owner may commit now: a nation's UNCOMMITTED treasury
 /// (state_industry.hpp), never below zero. 0 for anything else.
 float purse_room_of(const world& w, entity_id owner);
+
+/// BL-1452: the same room WITHOUT the settle's surplus cap - for a RUNNING cost a
+/// nation owes whatever its surplus (the active-LP credit its units' supply draws).
+/// Every spend a scorer or a command chooses reads `purse_room_of`.
+float purse_room_ungated_of(const world& w, entity_id owner);
 
 /// True when nation @p owner holds @p building (`state_assets`).
 bool owner_holds(const world& w, entity_id owner, entity_id building);

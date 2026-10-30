@@ -227,6 +227,7 @@ struct shipped_landscape
     state_reserve_report    reserve; ///< BL-1382 economy follow-up
     rail_handover_report    rail; ///< BL-1255
     lp_seed_report          lp;   ///< BL-1309
+    opening_state_cut_report cut; ///< BL-1452: the poor nations' opening state, sized to the chest
 };
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
@@ -394,7 +395,8 @@ inline shipped_landscape apply_shipped_landscape(
         out.reserve = reserve_state_first_tick(w, reg, out.state);
         print_state_reserve(out.reserve);
         stack_logistics_hubs(w, reg, out.lp); // finish_campaign_world's, verbatim (Ben, 2026-10-26)
-        print_opening_state_cut(size_opening_state_to_chest(w, reg)); // BL-1452: finish_campaign_world's, verbatim
+        out.cut = size_opening_state_to_chest(w, reg); // BL-1452: finish_campaign_world's, verbatim
+        print_opening_state_cut(out.cut);
         // BL-1398's firm top-up retired with the fold (finish_campaign_world).
         if (charter.skip_fold)
             print_state_node_fund(fund_state_nodes_from_firms(w, reg));

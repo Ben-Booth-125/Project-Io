@@ -947,9 +947,9 @@ economy = {
 
         -- BL-1452 (carried supplies; MILITARY.md § Carried supplies, Ben 2026-10-29): A
         -- UNIT CARRIES FOOD, AMMUNITION AND EQUIPMENT, each per-mille of full, drained
-        -- once a DAY and refilled at its supply factor's share of the stock's full daily
-        -- rate (a unit covered in full stays full; one covered at half loses half its
-        -- daily need a day). Per-mille of a full stock per day; integers in [0, 1000]
+        -- once a DAY and refilled at its LOGISTIC POINT SHARE (Ben, 2026-10-29: only the
+        -- road gap starves - an unpaid wage moves morale, never the stocks): share x
+        -- (today's need + the restock below), capped at full. Per-mille of a full stock per day; integers in [0, 1000]
         -- (the loader rejects anything else, and any unknown key). FIRST CUT, argued:
         --   food 33: a full stock feeds a cut-off unit ~30 days (1000 / 33), a month of
         --     carried rations - long enough that a quarter's short grant bites inside

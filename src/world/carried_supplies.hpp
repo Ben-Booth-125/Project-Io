@@ -4,7 +4,7 @@
 // A unit carries three stocks — food, ammunition and equipment — each per-mille of
 // full (`unit_component::food_permille`, `ammo_permille`, `equipment_permille`). Once a
 // DAY (`run_carried_supplies_day`, from the daily military pass) each stock is drained
-// by what the unit did and refilled by the share its supply factor names:
+// by what the unit did and refilled at its Logistic Point share (lp_share_permille):
 //
 //   drain     food: `food_per_day` every day (the ration);
 //             ammunition: `ammo_per_battle_day` on a day the unit fought;
@@ -100,7 +100,7 @@ struct carried_supplies_day
 };
 
 /// ONE DAY of carried supplies for every unit with men standing, ascending unit id:
-/// drain, resupply at the supply factor's share, starvation, the readiness cap.
+/// drain, resupply at the unit's Logistic Point share, starvation, the readiness cap.
 /// @p fought is the units in contact today (they fought today's rounds). A unit it
 /// reduces to zero men is removed by the one disband path (`disband_orphaned_units`).
 /// @p mil, when given, wires BL-1455's terrain hook: the equipment drain x

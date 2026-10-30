@@ -615,20 +615,80 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         else
         {
             world c = w;
+            // BL-1452: this harness skips the source seeding (skip_state_handover), so no
+            // capital hub stands; the free-source rows need one, so the copy stands it - a
+            // running hub of the nation's on its capital, as generation's step 0 places.
+            {
+                bool has_free = false;
+                for (const entity_id bid : c.nations.at(victim).state_assets)
+                    has_free = has_free || capital_free_source(c, bid);
+                const entity_id cap = c.nations.at(victim).capital_tile;
+                if (!has_free && cap != null_entity)
+                {
+                    const entity_id hub = c.create_entity();
+                    building_component bc;
+                    bc.tile            = cap;
+                    bc.type            = building_type::inland_logistics_hub;
+                    bc.ticks_remaining = 0;
+                    bc.workforce_target = default_workforce_target(bc.type);
+                    c.buildings[hub]  = bc;
+                    c.stockpiles[hub] = stockpile_component{};
+                    c.nations.at(victim).state_assets.push_back(hub);
+                    std::printf("  [info] S4: stood a capital hub (%u) for nation %u - the seeding is skipped here\n",
+                                static_cast<unsigned>(hub), static_cast<unsigned>(victim));
+                }
+            }
             c.nations.at(victim).treasury = 0.0f;
             const settle_tick_result r = run_settle_tick(c, reg, next_tick, 90 * (next_tick + 1),
                                                          /*spectating=*/false);
             const world::state_tick_ledger& L = c.state_ledger.at(victim);
-            bool all_idle = true, none_ran = true;
+            bool all_idle = true, none_ran = true, free_runs = true;
+            int  n_free = 0;
             std::set<entity_id> sa(c.nations.at(victim).state_assets.begin(),
                                    c.nations.at(victim).state_assets.end());
+            // BL-1452 (Ben, 2026-10-29; LOGISTICS.md § Every capital holds a source): THE
+            // CAPITAL'S SOURCE RUNS FREE - funded at a zero balance, never idled - so a zero
+            // treasury idles every state building EXCEPT it.
             for (const entity_id bid : sa)
-                if (!c.buildings.at(bid).state_idle) all_idle = false;
+            {
+                if (capital_free_source(c, bid))
+                {
+                    ++n_free;
+                    if (c.buildings.at(bid).state_idle) free_runs = false;
+                }
+                else if (!c.buildings.at(bid).state_idle)
+                    all_idle = false;
+            }
             for (const building_report& br : r.report.buildings)
                 if (sa.count(br.building) && br.output_quantity > 0.0f) none_ran = false;
-            check(all_idle && L.funded == 0 && L.idled == static_cast<int>(sa.size()), "S4",
-                  fmt("a zero treasury idles all %zu of nation %u's state buildings", sa.size(),
-                      static_cast<unsigned>(victim)));
+            check(all_idle && L.funded == n_free && L.idled == static_cast<int>(sa.size()) - n_free,
+                  "S4", fmt("a zero treasury idles every one of nation %u's %zu state buildings "
+                            "except the capital's source (%d free)",
+                            static_cast<unsigned>(victim), sa.size(), n_free));
+            check(n_free == 1 && free_runs, "S4",
+                  "the capital's source stays funded at a zero treasury (it runs free)");
+            // ...and it paid nothing for it: no credits, no wages, no goods (the ledger's
+            // maintenance, wages and shelf expenditure are all zero above), its supply full.
+            entity_id free_bid = null_entity;
+            for (const entity_id bid : sa)
+                if (capital_free_source(c, bid)) free_bid = bid;
+            check(free_bid != null_entity && c.buildings.at(free_bid).supply_factor_permille == 1000,
+                  "S4", "the free source's supply factor reads full (it draws no upkeep goods)");
+            // THE IDENTITY (cold review): only a RUNNING hub of the capital's generated type.
+            if (free_bid != null_entity)
+            {
+                world d = c;
+                d.buildings.at(free_bid).decommissioned = true;
+                const bool dead_not_free = !capital_free_source(d, free_bid);
+                world e = c;
+                e.buildings.at(free_bid).type = building_type::railway_station;
+                const bool other_type_not_free = !capital_free_source(e, free_bid);
+                world f = c;
+                f.buildings.at(free_bid).ticks_remaining = 2;
+                const bool site_not_free = !capital_free_source(f, free_bid);
+                check(dead_not_free && other_type_not_free && site_not_free, "S4",
+                      "a decommissioned hub, a station in its place, or an unfinished site is not free");
+            }
             check(none_ran, "S4", "an idled state building produces nothing");
             check(L.expenditure == 0.0f && L.maintenance == 0.0f && L.wages == 0.0f
                       && L.construction == 0.0f && L.income == 0.0f,

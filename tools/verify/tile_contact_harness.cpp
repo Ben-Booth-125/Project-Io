@@ -684,7 +684,7 @@ int main()
         check(old_ok && stamped == k_world_save_version_pre_tile && old.battles.size() == 1
                   && old.battles.front().tile == T && old.battles.front().attacking_units.empty(),
               "T13c a v62 stream reads: its battle keyed by its ground tile, with no attacking stack");
-        check(v62.size() == bytes.size() - (4 + 4 + 4) - 12 - 24, // BL-1434: v64's empty designs section; BL-1449: v65's empty air section
+        check(v62.size() == bytes.size() - (4 + 4 + 4) - 12 - 24 - 4, // BL-1434: v64's empty designs section; BL-1449: v65's empty air section; BL-1452: v66's empty supplies section
               "T13d ...and the v62 stream is today's less exactly the stack section (one battle of one unit) and the empty designs section");
         // An attacking stack naming a unit not on the attacker's side is refused.
         std::string bad = bytes;

@@ -4198,12 +4198,17 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
     std::map<entity_id, entity_id> owner_of; // BL-1407: every owner is a nation
     // BL-1296: a state building draws its basket under its nation's id, billed
     // to the treasury at the clear — unless the gate idled it this tick.
-    // BL-1452 (Ben, 2026-10-29): the capital's source runs free - it draws no basket.
+    // BL-1452 (Ben, 2026-10-29): the capital's source runs free - it draws no basket,
+    // and its supply factor reads full.
     for (const auto& [nid, nc] : w.nations)
         for (const entity_id bid : nc.state_assets)
-            if (const auto bit = w.buildings.find(bid);
-                bit != w.buildings.end() && !bit->second.state_idle && !capital_free_source(w, bid))
-                owner_of[bid] = nid;
+            if (const auto bit = w.buildings.find(bid); bit != w.buildings.end())
+            {
+                if (capital_free_source(w, bid))
+                    bit->second.supply_factor_permille = 1000;
+                else if (!bit->second.state_idle)
+                    owner_of[bid] = nid;
+            }
 
     // Ascending building id. The pass writes a SHARED pool (two buildings of one
     // corp on one body draw the same stock), so the visit order decides which one
@@ -4588,7 +4593,8 @@ void charge_supply_draws(world& w, const recipe_registry& reg, const lp_tick& lp
         const entity_id owner = uit->second.owner;
         if (float* purse = purse_of(w, owner); purse != nullptr)
         {
-            const float cost = std::min(rate * s.granted, purse_room_of(w, owner));
+            // A running cost of the supply draw: never capped by the settle's surplus gate.
+            const float cost = std::min(rate * s.granted, purse_room_ungated_of(w, owner));
             if (cost > 0.0f)
                 *purse -= cost;
         }

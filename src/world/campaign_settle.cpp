@@ -8,6 +8,7 @@
 #include "world/market_clearing.hpp"   // clear_markets
 #include "world/nation_generation.hpp" // BL-1452: repost_garrisons_on_cover, at the handoff
 #include "world/nation_step.hpp"       // run_nation_step
+#include "world/unit_roster.hpp"       // BL-1452: resolve_unit_upkeep - the settle cap keeps the wage back
 #include "world/nation_tech.hpp"       // clear_research_at_handover (BL-1273)
 #include "world/recipe_registry.hpp"   // logistics_cost, firm_exit
 #include "world/standing.hpp"          // compute_corp_standings
@@ -47,10 +48,21 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // nation opened the settle on is recorded on its first settle step. Lowered, and the
     // record dropped, on every live step.
     w.settle_build_gate = econ_step < k_campaign_settle_ticks;
+    w.settle_wage.clear();
     if (w.settle_build_gate)
     {
         for (const auto& [nid, nc] : w.nations)
             w.settle_chest.emplace(nid, nc.treasury); // first sight only: emplace never overwrites
+        // This step's pending garrison wage, per nation (ascending unit id).
+        std::vector<entity_id> uids;
+        for (const auto& kv : w.units) uids.push_back(kv.first);
+        std::sort(uids.begin(), uids.end());
+        for (const entity_id uid : uids)
+        {
+            const unit_component& u = w.units.at(uid);
+            if (u.count > 0 && w.nations.count(u.owner) != 0)
+                w.settle_wage[u.owner] += resolve_unit_upkeep(u, reg.military().upkeep).credits;
+        }
     }
     else
         w.settle_chest.clear();
@@ -121,12 +133,13 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // on its post is re-chosen on covered ground. Inside the lap, so a digest after it
     // sees the posted world. A no-op on a world with no generation record (a load).
     if (econ_step == k_campaign_settle_ticks - 1 && !w.gen_garrisons.empty())
-        print_garrison_repost(repost_garrisons_on_cover(w));
+        print_garrison_repost(repost_garrisons_on_cover(w, &reg.military()));
     // The settle ends here: from the handoff every nation spends its whole treasury again.
     if (econ_step == k_campaign_settle_ticks - 1)
     {
         w.settle_build_gate = false;
         w.settle_chest.clear();
+        w.settle_wage.clear();
     }
     lap_done(5); // standings + exits (+ the handoff's garrison posts)
 
