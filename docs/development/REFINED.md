@@ -17,8 +17,30 @@ and NR-1102 (a ceded capital moves; a last province is never ceded). Nothing gat
 - BL-1459 (war record and declaration): `declare_war` with goals, the price, justifications, the free answer. Save bump.
 - BL-1428 (war goals and peace): score, exhaustion, white peace, cession offers, imposing at 100, truce.
 - BL-1460 (cession moves territory): `tile_to_nation` follows the holder at a ceding peace. The heaviest seam.
-- BL-1461 (rivals declare war): the scorer declares under the stance grant; peace waits on NR-1100.
+- BL-1461 (rivals declare war): the scorer declares, answers and makes peace under the stance grant (NR-1100).
 - BL-1462 (diplomacy ledger): slot 9, Nations and Wars, the declaration and peace flows. Live click.
+
+**Carried from sprint 60** (re-tagged in 81daeec5).
+- BL-1442 (post-capacity starvation): G1t50 under its gate; measure the starving recipes, fix the cause, keep the gate.
+- BL-1440 (R0b budget world): rival_military_seeding_harness R0b fails three rows.
+- BL-1441 (front edge cases): no front without a free key tile; unreachable fronts.
+- BL-1444 (battle card march stall): battle_card.lua's march is accepted but the unit never moves.
+- BL-1457 (building element stale aim): building_element.lua aims at hard-coded coordinates.
+- BL-1422 (land classes and kit): the roster half is done; kit as goods remains.
+- BL-1423 (refit and retreat): wounded units refit from the shelf.
+- BL-1424 (soldiers from labour): conscript or professional, from the labour pool.
+- BL-1426 (bunkers): defence and hardness for the units on a tile.
+- BL-1436 (kit in the age tree): name the research nodes that unlock the locked kit items.
+- BL-1447 (kit goods priced): hire and refit check goods by price; the PNG inflate output cap.
+- BL-1454 (unit stat grid): the grid on the unit card and in the designer, with signed deltas.
+- BL-1413 (re-curate six seeds): six library seeds no longer serve their purpose.
+- BL-1414 (Trade-flow room without rivals): no-room ignores rivals' cargo in flight.
+- BL-1415 (header NET excludes refunds): the header shows operating net.
+- BL-1416 (drop the identity wash): keep the outline.
+- BL-1417 (no nation emblem): the profile and Selection header still draw it.
+- BL-1418 (embargo bars goods): an embargo bars a nation's goods from your markets. The ledger's embargo press (BL-1462) needs it.
+- BL-1419 (Industry lens fills): it shows other nations' plants.
+- BL-1420 (lane and port defects and checks): five defects, two missing checks.
 
 **Lanes.** BL-1458 and BL-1432 both touch `sentiment.*`, so one world lane. BL-1459 → BL-1428 →
 BL-1460 is a chain on `war.*`. BL-1462 can start on stubs once BL-1459's verbs are fixed. Every lane
