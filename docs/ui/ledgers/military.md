@@ -102,8 +102,18 @@ this kind of unit carrying, and what can it carry instead?"
 and is the one grid the unit card and the designer share, so the two cannot disagree.
 
 - **Cells.** HP, readiness, morale; food, ammunition, equipment (the carried stocks); soft attack,
-  hard attack, defence, breakthrough, hardness; recon, stealth; speed. Each cell is a label and a
-  value; the stored stats carry a bar in the canvas counter's colours.
+  hard attack, defence, breakthrough, hardness; recon, stealth; speed.
+- **Layout (Ben, 2026-10-30): labelled bands, at most three cells a row.** Four bands, each named
+  at its left: **Condition** (HP, readiness, morale), **Supply** (food, ammunition, equipment),
+  **Combat** (soft attack, hard attack, defence, breakthrough, hardness) and **Field** (recon,
+  stealth, speed). A band holds at most three cells a row, so Combat wraps to two rows. A cell is
+  the stat's **icon on the left and its value on the right** (glyphs in `../ICONS.md`); the stored
+  stats carry a thin bar beneath in the canvas counter's colours.
+- **Names live in the tooltip (Ben, 2026-10-30).** A cell carries no text label. Hovering it shows
+  the stat's name and one line on what it does (`../TOOLTIP.md`).
+- **A stack shows its averages (Ben, 2026-10-30).** With a unit group selected (`../SELECTION.md`
+  § The unit group element), each cell shows the group's mean, with its lowest-to-highest range in
+  smaller type beneath.
 - **On the unit card** the grid takes the width beside the unit's portrait on the Selection band
   (`../SELECTION.md`) — the class image on the left, the grid filling the rest.
 - **In the designer** it sits at the bottom right, design stats only (a design has no HP or stocks),
