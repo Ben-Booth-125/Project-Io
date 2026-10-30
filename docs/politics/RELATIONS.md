@@ -5,7 +5,8 @@
 > refused trade outright (embargo) · how threatened A feels by B (Alarm) · what a surface reads back
 > as standing · which of these may
 > become hostility and which may never do so on its own · what
-> each one gates.
+> each one gates · what a war is: its declaration, price, goals, score, exhaustion, and the
+> peace that ends it and may cede ground.
 > **Not here:** what hostility permits militarily — interdiction, engagement, the march queue
 > (MILITARY) · what a nation holds and may enact (NATIONS) · how a rival *scores* a stance
 > (AI_OPPONENT).
@@ -28,11 +29,12 @@ This table is the reason the document exists. Read it before touching any of the
 | Quantity | Question it answers | Shape | Origin | Gates |
 |---|---|---|---|---|
 | **Stance** | *How does A feel about B?* | hostile (directed) / friend (symmetric) | **declared** | interdiction, battle, march; passage and immunity |
-| **Sentiment** | *What has B's conduct earned with A?* | two floats (Access, Trust) per (observer nation, subject nation) | **derived** | informs a declaration; never makes one |
+| **Sentiment** | *What has B's conduct earned with A?* | three floats (Access, Trust, Alarm) per (observer nation, subject nation) | **derived** | informs a declaration; never makes one |
 | **Alarm** | *How threatened does A feel by B?* | **a third sentiment dimension**, per (observer nation, subject nation) | **derived** | informs a rival's embargo, coalition and war scoring; never makes one (§ 6) |
 | **Reputation** | *Will B do business with A again?* | **a VIEW of sentiment's Trust**, not a store | **earned** | nothing — its procurement-quote consumer retired (§ 2) |
 | **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per actor | **authored** | B's goods entering A's markets (§ 3) |
 | **Standing** | *How strong is A?* | five bands on three axes | **derived** | nothing — it is a readout |
+| **War** | *Why are A and B fighting, and how does it end?* | a record per (declarer, defender): goals, score, exhaustion | **declared**, then **derived** | peace terms; cession (§ 7) |
 
 **Settled 2026-08-22 (Ben, ruling on NR-520): sentiment is the substrate.** The model is **two
 layers, not four quantities**, and the first two rows are the layers rather than siblings. See
@@ -112,12 +114,13 @@ retired (Ben, 2026-10-23).*
 ## The substrate — `src/world/sentiment.{hpp,cpp}`
 
 `world::sentiment` is a `sentiment_table`: a `std::map` keyed on the ordered pair (observer,
-subject), holding two floats per row. Four properties, all load-bearing:
+subject), holding three floats per row. Four properties, all load-bearing:
 
 1. **Directed.** A→B is not B→A.
-2. **Two dimensions — Access and Trust — at every grain** (Ben, NR-522: not one, not per-grain).
-   *A substrate whose shape varies by grain is not a substrate.* They move independently and decay
-   independently. A third dimension must gate something before it is added.
+2. **Three dimensions — Access, Trust and Alarm — at every grain** (Ben, NR-522: not one, not
+   per-grain; Alarm added 2026-10-26, § 6). *A substrate whose shape varies by grain is not a
+   substrate.* They move independently and decay independently. A further dimension must gate
+   something before it is added.
 3. **Derived from conduct, folded through authored factors.** A row is written only by
    `world::note_conduct(params, observer, subject, factor)`: one occurrence of one
    `sentiment_factor_kind`, multiplied by that factor's authored weight on each dimension. The
@@ -147,6 +150,31 @@ conduct retired with the corporations keeps its enumerator and moves nothing (Be
 | `lobbied_against` | **retired** (Ben, 2026-10-23) with the lobbying channel |
 | `force_used` | force was used against the observer's interest — the sharpest input, and still only an input |
 | `historical_grudge` | an Era −1 grudge, seeded once at world setup — see § Where a grudge lands |
+| `war_declared` | the subject declared war on a third nation — the world watching a declaration (§ 7) |
+| `peace_concluded` | a war between the pair ended in peace, on any terms |
+| `province_ceded` | the observer ceded provinces to the subject at a peace |
+
+### Who emits each factor (Ben, 2026-10-30)
+
+**Every live factor has an emitter, and each emitter is one call site.** Until now only the opening
+grudge wrote a row, and it fades within about three campaign years; past that, every pair read
+neutral. A factor's direction on each dimension is fixed below; its size is an authored weight in
+`economy.sentiment.factors`, and an occurrence with a natural size passes it as the magnitude.
+
+| Factor | Emitted by | Observer → subject | Access | Trust | Alarm |
+|---|---|---|---|---|---|
+| `trade_conducted` | the trade flow, once a tick per pair with cargo landed; magnitude is the value landed | each party → the other | + | + | − |
+| `hostility_declared` | `declare_war` | defender → declarer | − | − | + |
+| `war_declared` | `declare_war` | every other nation → declarer; magnitude doubled for a nation bordering either party, and raised per goal past the first (§ 7) | | − | + |
+| `friendship_accepted` | `accept_friendship` | each party → the other | + | + | − |
+| `embargo_imposed` | enacting the embargo law | the embargoed → the author | − | − | |
+| `force_used` | a battle between the pair; magnitude is the strength the observer lost | the side that lost strength → the other | | − | + |
+| `peace_concluded` | a peace, any terms | each party → the other | | + | − |
+| `province_ceded` | a peace that cedes; magnitude is the provinces ceded | loser → winner | − | − | + |
+
+**Alarm's capability factors** — visible technology, a large single-site facility, standing force on
+the observer's border, severed trade, unrest — are § 6's, and arrive with it. A factor whose emitter
+retired, or has none yet, is authored at zero.
 
 ### Where a grudge lands
 
@@ -204,8 +232,8 @@ for Access. The loader (`recipe_registry.cpp`) rejects either rate unless it is 
 The factor weights for `contract_completed` and `contract_cancelled` are **seeded from the
 procurement rates** (`seed_procurement_sentiment`, `recipe_registry.hpp`: `reputation_on_complete`
 1.0, `reputation_on_cancel` −2.0 on Trust) and may be overridden by `economy.sentiment.factors`.
-Every other factor's weight is authored at zero — each is a named seat for its emitter, and a
-factor whose emitter has nothing to say moves nothing.
+Every other factor's weight is authored per § Who emits each factor; a factor with no emitter is
+authored at zero and moves nothing.
 
 **`historical_grudge` is the one factor with no Lua row, and that is its definition rather than a
 gap.** It fires exactly once, at world setup, before the first tick, and nothing in the campaign
@@ -276,7 +304,10 @@ overlaps Access at a different grain). *Owned by BL-549 (friendship permits two 
 player's included — BL-450 (rivals score stance), granted 2026-08-18 on the standing terms and
 carried to the nation unchanged (Ben, 2026-10-23; `../ai/AI_OPPONENT.md` § 11): deterministic,
 seeded, scored-utility, legal verbs only. Hostility stays a declared state a nation opts into; a
-rival may score and declare it, never acquire it ambiently.
+rival may score and declare it, never acquire it ambiently. **That grant covers a rival declaring
+war (Ben, 2026-10-30)** — `declare_war` with its goals (§ 7), toward a rival or the player alike.
+Whether it also covers a rival answering, offering and accepting peace, and so ceding ground, is
+raised as its own question (NR-1100) rather than read into it.
 
 **A declaration against the player is SIGNALLED** (Ben, 2026-08-22). This overturns NR-350, which
 had a declaration *"stay silent, discovered on contact rather than announced"*; newest-dated wins,
@@ -284,9 +315,12 @@ and the reversal is recorded rather than quietly applied. The cost is real: dire
 exists so *"an actor can be at war and not know it yet"* — the ambush property interdiction was
 designed around — and signalling removes that property *for the player*. Interdiction becomes a
 known risk rather than a surprise. Directedness itself is untouched — hostility still needs no
-reciprocation. Whether rival-vs-rival declarations are equally visible is a BL-068
-(competitor-visibility) question this ruling does not settle. The surface is BL-449 (stance needs
-a surface).
+reciprocation.
+
+**Every declaration is public (Ben, 2026-10-30)** — between rivals as much as against the player.
+So is every war that follows: its parties, goals, score and peace. Each derives from facts the
+world already shows — who holds a province, how a battle ended — so nothing private is disclosed
+(BL-068, competitor visibility). The surface is the Diplomacy ledger (`../ui/ledgers/diplomacy.md`).
 
 ### 2. Reputation — a view of sentiment
 
@@ -379,17 +413,97 @@ cost the player cannot watch is a gotcha, not a trade-off.
 **What it is not.** It is not a per-world aggregate and it has no Ceiling to cross; both retired with
 the test.
 
+---
+
+### 7. War — a declaration with goals, a score and a peace (Ben, 2026-10-30)
+
+**A war is a record that a declaration opens.** Hostility stays the gate every consumer reads (§ 1);
+the war gives it a purpose and an end. There is one war per pair, with a **declarer** and a
+**defender**. The record holds both sides' goals, the war score, each side's exhaustion and the day
+it opened, and it is in the world snapshot. A nation may be party to several wars at once. There are
+no alliances: a friend is never drawn in, though a friend attacked is a justification (below).
+
+**Declaring.** `declare_war(declarer, defender, goals)` writes the declarer's hostility row and opens
+the record in one call. It is refused — mutating nothing — when the pair is already at war, a truce
+stands between them, or a goal is invalid. Friendship dissolves as § 1 says. While a war stands,
+`return_to_neutral` between its parties is refused: **a war ends only in peace.** The right-click
+declare-and-attack (`../military/MILITARY.md` § Marching) opens the same declaration, with the
+attacked tile's province as its first goal.
+
+**Goals are provinces.** The declarer names one to three of the defender's provinces, each bordering
+the declarer's ground or touching the coast. A capital province is never a goal.
+
+**The defender answers, for free.** Its hostility back costs nothing — it is the act of being
+attacked. Answering names its own goals among the declarer's provinces, by the same rule. Until it
+answers it is a victim, not a raider: § 1's interdiction note holds.
+
+**The price of declaring.** A declaration is conduct (§ Who emits each factor):
+`hostility_declared` on the defender's row, and `war_declared` on every other nation's — Trust
+toward the declarer falls and Alarm rises. A nation bordering either party watches twice as hard,
+and each goal past the first raises the price: greed is watched.
+
+**A justification lowers the price.** It is derived, never authored by the declaring player: each is
+a `condition_set` row (`../META_LAYER.md`), so a new one is a table row, never a code branch. The
+opening set:
+
+| Justification | Holds when |
+|---|---|
+| Grievance | the declarer's Trust toward the defender is in the adverse band |
+| Embargo | the defender embargoes the declarer |
+| Lost ground | a goal is a province the declarer ceded to the defender at an earlier peace |
+| A friend attacked | the defender is the declarer in a war against the declarer's friend |
+
+Any one that holds cuts the third-party price by an authored fraction. The declaration shows which
+hold, and the price, before it is confirmed. This reads sentiment to **price** a declaration; it
+never makes one, so the invariant holds.
+
+**War score.** One number from −100 to +100, positive in the declarer's favour, built from two parts:
+
+- **Occupation** — each side's goals it holds (`province_holder`), weighted by the goal's tiles: the
+  declarer's held goals less the defender's, over all goals named in the war.
+- **Battles** — strength destroyed in battles between the pair: the declarer's share less the
+  defender's, over the war.
+
+The weights are authored. The score is public because both parts are.
+
+**Exhaustion.** Each party carries 0–100. It rises with its own strength lost, each day its units
+stand in the field, and each of its provinces the enemy holds. It decays once the nation is at peace.
+It moves the morale of the nation's units (`../military/MILITARY.md` § Land — the unit's stats). Unrest has no
+store yet; when it has one, exhaustion feeds it too.
+
+**Peace.** Either party offers terms; the other accepts or refuses. A pending offer is not a peace,
+and lives in its own table as friendship offers do (§ 1). There is one pending offer per war.
+
+- **White peace** — nothing changes hands.
+- **Cession** — named goals the receiving side holds pass to it. Only goals, and only held ones.
+
+A side whose score stands at 100 in its favour may **impose** its terms without acceptance. At
+peace, both hostility rows clear and the record closes into the nation's history. A **truce** then
+bars either party declaring on the other for an authored span. `peace_concluded` warms both rows;
+`province_ceded` lands hard on the loser's row toward the winner. Each ceded province becomes a
+*lost ground* justification for the loser, so revanchism is a loop with a visible cause.
+
+**Cession moves the territory.** For each ceded province, `tile_to_nation` follows `province_holder`.
+The ground changes nation, and with it everything the ground decides. That covers the buildings on
+it (a nation owns every building on its ground, `NATIONS.md`), its population centre, the
+jurisdiction of law, its roads' network and the fronts, which re-derive. The loser's units on ceded
+ground withdraw by the retreat rule. A white peace hands every occupied goal's holder back to its
+owner, and the occupying units withdraw the same way.
+
+**Who scores a war.** The player declares, answers and makes peace through the Diplomacy ledger. A
+rival declares under the stance grant (§ 1); its answering and peace are NR-1100.
+
 ## Open questions
 
-1. **How many dimensions does sentiment carry?** (NR-522) Two — Access and Trust — at every grain
-   is the ruling; the open half is the admission rule for a third, which must gate something before
+1. **How many dimensions does sentiment carry?** (NR-522) Three — Access, Trust and Alarm — at
+   every grain; the open half is the admission rule for a fourth, which must gate something before
    it is added.
 
 2. **Which reading does passage take** — reach-field contribution (recommended) or placement
    permission? Owned by BL-549 (friendship permits two things).
 
-3. **Are rival-vs-rival declarations visible to the player?** A BL-068 (competitor-visibility)
-   question the signalling ruling leaves open.
+3. **The war's strawman numbers and shapes** (§ 7) — goal count and reach, the score's weights,
+   imposing at 100, truce length, the defender's free answer. Raised as NR-1101.
 
 ---
 
@@ -406,7 +520,8 @@ the test.
 | Standing bands | `src/world/standing.{hpp,cpp}` |
 | Interdiction gate | `src/world/supply_system.cpp` |
 | Battle engagement gate | `src/world/battle_system.cpp` |
-| The Stance column | `src/ui/corporation_panel.cpp` |
+| The war record, peace offers, truces | `src/world/war.{hpp,cpp}` (proposed); the tables on `world.hpp` |
+| The Diplomacy ledger | `../ui/ledgers/diplomacy.md` (slot 9) |
 | Checks | `tools/verify/sentiment_harness.cpp`, `stance_determinism.cpp`, `procurement_harness.cpp` |
 
 **Related authorities.** [`NATIONS.md`](NATIONS.md) (the nation as an actor), `docs/military/MILITARY.md` (what hostility permits militarily),
@@ -418,4 +533,7 @@ the test.
 view. BL-541 (directional tariffs) and BL-391 (reputation floor deadlock) sit on it; BL-540
 (nation→corp stance) is retired. BL-450 (rivals score stance) owns the rival's declaration; BL-449 (stance
 needs a surface) is the UI half; BL-390 (the seam has no read-back) owns making the value visible;
-BL-549 (friendship permits two things) owns passage and immunity.
+BL-549 (friendship permits two things) owns passage and immunity. The war (§ 7) is owned by BL-1459
+(war record and declaration), BL-1428 (war goals and peace) and BL-1460 (cession moves territory);
+BL-1458 (sentiment emitters) owns § Who emits each factor; BL-1432 (Alarm as sentiment) owns § 6;
+BL-1461 (rivals declare war) the rival's war; BL-1462 (diplomacy ledger) the surface.

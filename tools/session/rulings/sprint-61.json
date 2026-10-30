@@ -1,0 +1,45 @@
+[
+ {
+  "ruling": "Every declaration and war is public, between rivals too (Ben, 2026-10-30)",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "Every declaration is public \\(Ben, 2026-10-30\\)",
+  "stale": [
+   "rival-vs-rival declarations are equally visible",
+   "Are rival-vs-rival declarations visible"
+  ],
+  "owner": "BL-1462 (diplomacy ledger)"
+ },
+ {
+  "ruling": "A war has goals, a score, exhaustion and a peace that may cede ground (Ben, 2026-10-30)",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "### 7\\. War",
+  "stale": [
+   "still unowned work"
+  ],
+  "owner": "BL-1428 (war goals and peace)"
+ },
+ {
+  "ruling": "The stance grant covers a rival declaring war (Ben, 2026-10-30)",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "That grant covers a rival declaring\\s+war \\(Ben, 2026-10-30\\)",
+  "stale": [],
+  "owner": "BL-1461 (rivals declare war)"
+ },
+ {
+  "ruling": "Sentiment carries three dimensions, Alarm the third",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "Three dimensions — Access, Trust and Alarm",
+  "stale": [
+   "two floats (Access, Trust)",
+   "Two dimensions — Access and Trust — at every grain"
+  ],
+  "owner": "BL-1432 (Alarm as sentiment)"
+ },
+ {
+  "ruling": "The Diplomacy ledger: Nations and Wars, with five extras (Ben, 2026-10-30)",
+  "doc": "docs/ui/ledgers/diplomacy.md",
+  "anchor": "Extras in the ledger",
+  "stale": [],
+  "owner": "BL-1462 (diplomacy ledger)"
+ }
+]

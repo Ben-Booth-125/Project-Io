@@ -1199,6 +1199,17 @@
     "src/ui/ui_state.hpp"
    ],
    "status": "drafted"
+  },
+  "diplomacy_ledger": {
+   "surface": "Diplomacy ledger (nav rail slot 9): Nations and Wars tabs",
+   "answers": "Who could I fight, who might fight me, and what would it cost?",
+   "because": "A war is now a declared act with a price, goals, a score and a peace (RELATIONS.md § 7), and sentiment informs a declaration without ever making one - so the player must be able to read every input the declaration weighs. Sentiment, Alarm, stance, power, front strength and trade exposure sit on one row per nation, because a declaration is a choice about one nation; the Wars tab lists every war in the world, because every declaration is public (Ben, 2026-10-30). A cost the player cannot watch is a gotcha, not a trade-off (RELATIONS.md § 6). Slot 9 held the corporation stance surface until the corporations retired (Ben, 2026-10-23); this is its subject at the nation grain (docs/ui/ledgers/diplomacy.md).",
+   "backlog_item": "BL-1462",
+   "files": [
+    "src/ui/diplomacy_ledger.cpp",
+    "src/ui/nav_pane.cpp"
+   ],
+   "status": "drafted"
   }
  }
 }

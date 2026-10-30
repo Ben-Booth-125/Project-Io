@@ -737,13 +737,15 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": null,
+   "sprint": 61,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
    "parked": false,
    "blocked_on": null,
    "author": "main session (sprint 58 military design, 2026-10-26)",
-   "requires": [],
+   "requires": [
+    "BL-1459"
+   ],
    "id": "BL-1428",
    "category": "Military",
    "authority_doc": "docs/politics/RELATIONS.md",
@@ -751,11 +753,14 @@
    "priority": "A",
    "difficulty": 4,
    "files": [
-    "src/world/stance.cpp",
-    "src/world/battle_system.cpp"
+    "src/world/war.cpp",
+    "src/world/battle_system.cpp",
+    "src/world/world.hpp",
+    "docs/ai/ACTIONS.json",
+    "tools/verify/war_harness.cpp"
    ],
-   "title": "A war has a declared cost, goals, a score and a peace that cedes ground",
-   "design": "Proposed in research/MILITARY_1960_PRESENT.md § 8, not yet ruled: declaration cost with a justification discount, war goals as provinces, war score and exhaustion, white peace or cession so tile_to_nation follows province_holder. Design first; Ben's rulings go into RELATIONS.md / MILITARY.md."
+   "title": "A war has a score, exhaustion, and a peace: white, ceded, or imposed at 100; then a truce",
+   "design": "RELATIONS.md § 7 (Ben, 2026-10-30: the full war, not declaration only). War score -100..100 from occupation of goals (province_holder, tile-weighted) and battle strength destroyed, weights authored; exhaustion 0-100 per party from strength lost, days in the field and provinces held by the enemy, decaying at peace, moving unit morale (MILITARY.md stats table). Peace offers in their own table, one pending per war: white peace or cession of held goals; impose at 100; both hostility rows clear; the record closes to history; a truce bars re-declaration. Cession's territorial half is BL-1460 (cession moves territory). Declaration and the record are BL-1459."
   },
   {
    "status": "proposed",
@@ -827,7 +832,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": null,
+   "sprint": 61,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
    "parked": false,
@@ -1287,6 +1292,152 @@
    ],
    "title": "building_element.lua aims at hard-coded coordinates that no longer accept an iron extraction site",
    "design": "The script sweeps a 7x7 box around (155,37) for a tile that accepts an iron_ore extraction placement and errors when none does. On main 2652c244's build_rel it fails: 44 tiles refuse invalid_tile and 5 foreign_ground; none for funds. Aim the placement without fixed coordinates - verify.find_deposit_tile(\"iron_ore\") on the player's own ground, or the site finder rows - so generation moves cannot rot it. Script-only; no new verify grant."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-30",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 diplomacy design, 2026-10-30)",
+   "id": "BL-1458",
+   "short_name": "SENTIMENT_EMITTERS",
+   "category": "Politics",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "priority": "A",
+   "difficulty": 3,
+   "requires": [],
+   "files": [
+    "src/world/sentiment.hpp",
+    "src/world/sentiment.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/battle_system.cpp",
+    "src/world/stance.cpp",
+    "scripts/economy.lua",
+    "tools/verify/sentiment_harness.cpp"
+   ],
+   "title": "Conduct writes sentiment: every live factor gets its emitter",
+   "design": "RELATIONS.md § Who emits each factor (Ben, 2026-10-30). Today only historical_grudge writes a row, and it fades in about three campaign years, so every pair reads neutral after that. Wire trade_conducted (trade flow, per tick per pair, magnitude = value landed), hostility_declared and war_declared (declare_war), friendship_accepted, embargo_imposed (the embargo law), force_used (battles, magnitude = strength lost), peace_concluded and province_ceded; append the three new enumerators. Weights in economy.sentiment.factors, calibration in band (delegated). Emitters fold through the canonicalised batch so order is not observable; sentiment.cpp keeps no world& (R1). Check: sentiment_harness rows per emitter, world_determinism, save_roundtrip."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-30",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 diplomacy design, 2026-10-30)",
+   "id": "BL-1459",
+   "short_name": "WAR_RECORD_AND_DECLARATION",
+   "category": "Politics",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "priority": "A",
+   "difficulty": 4,
+   "requires": [
+    "BL-1458"
+   ],
+   "files": [
+    "src/world/war.hpp",
+    "src/world/war.cpp",
+    "src/world/stance.cpp",
+    "src/world/world.hpp",
+    "src/world/serialisation.cpp",
+    "src/world/corp_command.cpp",
+    "docs/ai/ACTIONS.json",
+    "tools/verify/war_harness.cpp"
+   ],
+   "title": "A war is a record: declare_war with goals, a priced declaration, justifications, the free answer",
+   "design": "RELATIONS.md § 7 (Ben, 2026-10-30). The war record per (declarer, defender) on world and in the snapshot (save version bump). declare_war(declarer, defender, goals) writes hostility and the record atomically; refused with nothing mutated on an existing war, a truce or an invalid goal (1-3 of the defender's provinces, bordering the declarer's ground or coastal, never a capital). The defender's answer is free and names its own goals. return_to_neutral refused between war parties. Justifications as condition_set rows (grievance, embargo, lost ground, a friend attacked) cutting the war_declared price; a price preview read for the ledger. The right-click declare-and-attack routes here with the attacked province as first goal. New verbs cross the AI-facing seam as untrusted input; ACTIONS.json entries. Strawman numbers: NR-1101."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-30",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 diplomacy design, 2026-10-30)",
+   "id": "BL-1460",
+   "short_name": "CESSION_MOVES_TERRITORY",
+   "category": "Politics",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "priority": "A",
+   "difficulty": 4,
+   "requires": [
+    "BL-1428"
+   ],
+   "files": [
+    "src/world/war.cpp",
+    "src/world/world.hpp",
+    "src/world/nation_ground.cpp",
+    "src/world/fronts.cpp",
+    "tools/verify/cession_harness.cpp"
+   ],
+   "title": "A peace that cedes moves tile_to_nation; a white peace hands occupied goals back",
+   "design": "RELATIONS.md § 7, Cession moves the territory (Ben, 2026-10-30); MILITARY.md § Battles, the holder paragraph. For each ceded province tile_to_nation follows province_holder: buildings change owner with the ground, the population centre, law jurisdiction, road network membership, and fronts re-derive; the loser's units on ceded ground withdraw by the retreat rule. A white peace resets every occupied goal's holder to its owner and withdraws the occupiers. The heaviest seam in the sprint: check money_conservation, fold_census, save_roundtrip, world_determinism and the front harnesses, plus a cession_harness that cedes on a library seed and walks every consumer of tile_to_nation. File names are a guess; read the code first."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-30",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 diplomacy design, 2026-10-30)",
+   "id": "BL-1461",
+   "short_name": "RIVALS_DECLARE_WAR",
+   "category": "AI",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "priority": "A",
+   "difficulty": 3,
+   "requires": [
+    "BL-1459",
+    "BL-1432"
+   ],
+   "files": [
+    "src/world/corp_ai.cpp",
+    "tools/verify/stance_determinism.cpp"
+   ],
+   "title": "A rival nation scores and declares war, naming goals, under the stance grant",
+   "design": "RELATIONS.md § 1 Who declares and § 7 (Ben, 2026-10-30: the 2026-08-18 stance grant covers a rival declaring war). The scorer reads its own sentiment and Alarm toward a nation, the price and justifications, front strength and trade exposure; it declares via declare_war only, never on a threshold alone, and never as a planner. Pure, seeded, deterministic, replayable. Answering and peace scoring wait on NR-1100. The player's nation is never scored. Check: stance_determinism, spectator_determinism, a war-count band across the 16 library seeds (no world where every nation is at war by tick 40, none where none ever is)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-30",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 diplomacy design, 2026-10-30)",
+   "id": "BL-1462",
+   "short_name": "DIPLOMACY_LEDGER",
+   "category": "UI",
+   "authority_doc": "docs/ui/ledgers/diplomacy.md",
+   "priority": "A",
+   "difficulty": 4,
+   "requires": [
+    "BL-1458",
+    "BL-1459",
+    "BL-1432"
+   ],
+   "files": [
+    "src/ui/diplomacy_ledger.cpp",
+    "src/ui/nav_pane.cpp",
+    "src/ui/ui_state.hpp",
+    "docs/ui/MENU.md",
+    "docs/ui/question_log.json",
+    "docs/ui/ui_elements.json",
+    "docs/ai/ACTIONS.json",
+    "scripts/verify/diplomacy_ledger.lua"
+   ],
+   "title": "Slot 9: the Diplomacy ledger — Nations and Wars, the declaration and peace flows",
+   "design": "docs/ui/ledgers/diplomacy.md (Ben, 2026-10-30). Light slot 9. Nations view: folded rows with stance chips and Access/Trust/Alarm toward the player; expanded rows with the reverse sentiment, power comparison and front strength, trade exposure, friendship offer/withdraw/accept, the embargo toggle (a door onto the law verb) and Declare war. The declaration in place: goal picking on the canvas, justifications, the live price. Wars view: every war (public), score bar, exhaustion, answer, offer/impose peace, accept/refuse, truces. Peace presses land with BL-1428. Live click required."
   }
  ]
 }

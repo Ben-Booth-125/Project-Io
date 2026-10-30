@@ -1,5 +1,29 @@
 # REFINED — active worklist
 
+## Sprint 61 — diplomacy and war (designed 2026-10-30, beside sprint 60)
+
+**Target.** v0.3.0. Opens once sprint 60 closes, or beside it on disjoint files. `sprints.json`
+`next_up` still holds sprint 60's line.
+
+**Design.** `docs/politics/RELATIONS.md` § Who emits each factor, § 6 (Alarm) and § 7 (War);
+`docs/ui/ledgers/diplomacy.md`. Ruling register `tools/session/rulings/sprint-61.json`.
+
+**Gated on Ben.** NR-1101 (war strawman shapes) before BL-1459 and BL-1428 build. NR-1100 (rival
+peace and cession grant) before the peace half of BL-1461.
+
+**Items, in build order.**
+- BL-1458 (sentiment emitters): every live factor gets its one emitter.
+- BL-1432 (Alarm as sentiment): the third dimension, its capability factors, the tree effects.
+- BL-1459 (war record and declaration): `declare_war` with goals, the price, justifications, the free answer. Save bump.
+- BL-1428 (war goals and peace): score, exhaustion, white peace, cession offers, imposing at 100, truce.
+- BL-1460 (cession moves territory): `tile_to_nation` follows the holder at a ceding peace. The heaviest seam.
+- BL-1461 (rivals declare war): the scorer declares under the stance grant; peace waits on NR-1100.
+- BL-1462 (diplomacy ledger): slot 9, Nations and Wars, the declaration and peace flows. Live click.
+
+**Lanes.** BL-1458 and BL-1432 both touch `sentiment.*`, so one world lane. BL-1459 → BL-1428 →
+BL-1460 is a chain on `war.*`. BL-1462 can start on stubs once BL-1459's verbs are fixed. Every lane
+is Delivery Full: the save format and the territory seam move.
+
 ## Sprint 60 (opened 2026-10-28)
 
 - BL-1447 (kit goods priced): hire and refit check goods by price; PNG inflate cap; refit menu wording (cold review of unit designs, 2026-10-28).

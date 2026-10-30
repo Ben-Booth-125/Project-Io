@@ -1196,8 +1196,9 @@ moves the holder only when the beaten side has no unit left anywhere in the prov
 2026-10-27)**: a battle is one tile, so beating one stack takes that tile, and the province changes
 hands when its last defending stack falls. It is deliberately
 narrow — a military fact a contract predicate can read, not a political one: `tile_to_nation` (the
-territorial map) does not follow the holder, so what holding a province does *beyond* that fact is
-still unowned work. Battle state survives a save under BL-536 (world snapshot save).
+territorial map) does not follow the holder in battle. It follows only at a **peace that cedes the
+province** (`../politics/RELATIONS.md` § 7, Ben 2026-10-30), and a held war goal counts toward the
+war score. Battle state survives a save under BL-536 (world snapshot save).
 
 ### Dispatches and the card
 

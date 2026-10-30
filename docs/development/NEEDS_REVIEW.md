@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*15 entries — 13 open, 2 resolved.*
+*17 entries — 15 open, 2 resolved.*
 
 ---
 
@@ -184,6 +184,20 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 (a) The free source is the lowest-id running inland logistics hub on the capital. Seeds 10, 11, 12, 25 and 31 had a railway station or port standing as the capital's source and no hub, so nothing ran free and the opening cut removed their capitals' buildings (dark at the handoff). The seeding's step 0 now stands a hub on EVERY capital, beside any station or port already there. (b) purse_room_of now carries the settle cap for every spend - builds, retools, hires, refits, roads and survey dispatch alike; surveys in the settle were not separately ruled.
 
 **Why it matters.** (a) changes world shape: every capital opens with one more building (the shape probe was not re-run). The alternative is to let a station or port on the capital be the free source instead. (b) a poor nation may send fewer surveys in the settle. Merged at b0a9e9b5, G1t50 full 84.6. Work: BL-1452 (carried supplies).
+
+### NR-1100 — Does the stance grant cover a rival answering, offering and accepting peace, and so ceding ground?
+*question · raised 2026-10-30 · from Sprint 61 design (diplomacy and war), 2026-10-30*
+
+Ben ruled the 2026-08-18 stance grant covers a rival DECLARING war. A whole war also needs the rival to answer a declaration (naming goals), offer peace, accept or refuse one, and impose at 100. Accepting a cession is a rival choosing to give up ground, which is a new subject (territory), not a stance. Recommended: yes, same terms (pure, seeded, deterministic, legal verbs, never a planner), recorded as a dated entry in AI_OPPONENT.md § 11. Alternative: rivals answer and accept white peace only; cession happens only when imposed at 100.
+
+**Why it matters.** Without it, a war against a rival can only end by imposition, and a rival never ends a war it started. Blocks the peace half of BL-1461 (rivals declare war). RELATIONS.md § 1 and § 7 cite this entry.
+
+### NR-1101 — The war strawman: goals, score weights, imposing at 100, truce, the free answer
+*question · raised 2026-10-30 · from Sprint 61 design (diplomacy and war), 2026-10-30*
+
+RELATIONS.md § 7 sets shapes I proposed, not ones you ruled: (a) 1-3 goals, each a defender province bordering the declarer or coastal, never a capital; (b) score = occupation + battles, strawman 60/40; (c) a side at 100 may impose; (d) a truce after peace, strawman 8 ticks (two years); (e) the defender's answer is free and names its own goals; (f) a war ends only in peace (return_to_neutral refused between parties); (g) a justification cuts the third-party price, strawman by half. Numbers inside these shapes are delegated calibration; the shapes are not.
+
+**Why it matters.** Each shape is a rule a player learns. Overturning one after BL-1459 and BL-1428 build is a save-format change. Answer before those lanes start; numbers can follow.
 
 ---
 

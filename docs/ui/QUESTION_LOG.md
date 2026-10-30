@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**75 surfaces** — 4 settled, 71 awaiting Ben's wording.
+**76 surfaces** — 4 settled, 72 awaiting Ben's wording.
 
 ---
 
@@ -131,6 +131,14 @@ alphabetical order.
 **Because:** The scorer has recorded its own rationale since BL-202 - the winning score, the runner-up score and a reason code, into a 256-entry ring and permanently into the history log - and nothing has ever read either store. The reasoning accumulated every tick of every session and was shown to nobody. The margin is what earns the space: a command taken at 0.81 against a runner-up of 0.79 is a coin-flip the tuning could have gone either way on, one taken at 0.90 against 0.10 is a conviction, and nothing else in the game distinguishes them. That difference is most of what 'which strategy is it running' means. It also pays as diagnostics rather than spectacle (AI_OPPONENT.md 10h): the idle/resume oscillation that was the AI's dominant behaviour for an unknown number of sprints was invisible for exactly this reason.
 
 *Demanded by BL-407 · `src/ui/decision_feed.cpp` · id `decision_feed`*
+
+### Diplomacy ledger (nav rail slot 9): Nations and Wars tabs
+
+**Answers:** Who could I fight, who might fight me, and what would it cost?
+
+**Because:** A war is now a declared act with a price, goals, a score and a peace (RELATIONS.md § 7), and sentiment informs a declaration without ever making one - so the player must be able to read every input the declaration weighs. Sentiment, Alarm, stance, power, front strength and trade exposure sit on one row per nation, because a declaration is a choice about one nation; the Wars tab lists every war in the world, because every declaration is public (Ben, 2026-10-30). A cost the player cannot watch is a gotcha, not a trade-off (RELATIONS.md § 6). Slot 9 held the corporation stance surface until the corporations retired (Ben, 2026-10-23); this is its subject at the nation grain (docs/ui/ledgers/diplomacy.md).
+
+*Demanded by BL-1462 · `src/ui/diplomacy_ledger.cpp`, `src/ui/nav_pane.cpp` · id `diplomacy_ledger`*
 
 ### Entity summary
 
