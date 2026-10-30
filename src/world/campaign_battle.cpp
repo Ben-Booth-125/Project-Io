@@ -48,7 +48,7 @@ int64_t side_hardness(const std::vector<land_combatant>& side)
 
 /// Milli-hits a side deals against a target of @p target_hardness: per unit,
 /// men x (soft x (1 - h) + hard x h), scaled by the unit's morale and supply.
-/// Before the swing.
+/// Deterministic: no draw.
 int64_t side_hits(const std::vector<land_combatant>& side, int64_t target_hardness)
 {
     int64_t hits = 0;

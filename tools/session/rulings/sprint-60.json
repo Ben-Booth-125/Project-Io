@@ -1,0 +1,404 @@
+[
+ {
+  "ruling": "Units march by the day at their class speed (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Units march by the day, at their class's speed \\(Ben, 2026-10-28\\)",
+  "stale": [
+   "March points are per-CLASS, authored data",
+   "Spent per tick against the per-tile"
+  ],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "Battles step daily; contact is checked daily (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Pacing is by the day \\(Ben, 2026-10-28\\)",
+  "stale": [
+   "Pacing is several rounds per tick"
+  ],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "Movement takes no Logistic Points (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Movement takes no Logistic Points \\(Ben, 2026-10-28\\)",
+  "stale": [
+   "a march spends its\\s+grant day by day",
+   "a march spends its points against",
+   "A march draws on the nation's pool too"
+  ],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "A unit's supply draws Logistic Points once a quarter, and claims first (Ben, 2026-10-28)",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "A unit's supply draws on the pool, and claims first \\(Ben, 2026-10-28",
+  "stale": [
+   "the march draws Logistic Points\\s+before",
+   "at the tile the unit stands on\\*\\* and served by that tile's routed cover"
+  ],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "Supply is drawn where the unit stands (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Supply is drawn where the unit stands \\(Ben, 2026-10-28\\)",
+  "stale": [
+   "quarter it draws Logistic Points at the tile it stands on"
+  ],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "Readiness and morale recover daily; a killed unit is removed that day (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Out of contact, readiness and morale recover daily \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1445 (move by days)"
+ },
+ {
+  "ruling": "Authored images load through one in-tree PNG decoder (Ben, 2026-10-28)",
+  "doc": "docs/tech/TECH_FOUNDATIONS.md",
+  "anchor": "Authored images load through one in-tree PNG decoder",
+  "stale": [],
+  "owner": "BL-1446 (unit designer)"
+ },
+ {
+  "ruling": "A designer pick drafts; Save commits (Ben, 2026-10-28)",
+  "doc": "docs/ui/ledgers/military.md",
+  "anchor": "A pick drafts; Save commits \\(Ben, 2026-10-28",
+  "stale": [
+   "Saving is the pick"
+  ],
+  "owner": "BL-1448 (designer draft and Save)"
+ },
+ {
+  "ruling": "The airbase is its own building (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "The airbase is its own building \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1449 (air combat core)"
+ },
+ {
+  "ruling": "Six air classes on the one-live-design rule (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Six classes \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1449 (air combat core)"
+ },
+ {
+  "ruling": "A wing is assigned to provinces in range, straight line (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Assignment is to provinces in range, straight line \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1449 (air combat core)"
+ },
+ {
+  "ruling": "Tactical bombing hits enemy units in the province, units in battle first (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Tactical bombing hits enemy units in the province, units in battle first \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1449 (air combat core)"
+ },
+ {
+  "ruling": "Strategic bombing damages a building's condition, which slows its throughput (Ben, 2026-10-28)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Strategic bombing damages a building, and damage slows its throughput \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1449 (air combat core)"
+ },
+ {
+  "ruling": "Recruit and Design group their rows by theatre (Ben, 2026-10-28)",
+  "doc": "docs/ui/ledgers/military.md",
+  "anchor": "### Grouped by theatre \\(Ben, 2026-10-28\\)",
+  "stale": [],
+  "owner": "BL-1450 (air UI)"
+ },
+ {
+  "ruling": "Rival nations fly air wings - granted (Ben, 2026-10-28)",
+  "doc": "docs/ai/AI_OPPONENT.md",
+  "anchor": "Rival nations fly air wings — granted \\(Ben, 2026-10-28",
+  "stale": [],
+  "owner": "BL-1451 (rival air)"
+ },
+ {
+  "ruling": "Units carry food, ammunition and equipment stocks (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "### Carried supplies \\(Ben, 2026-10-29\\)",
+  "stale": [
+   "there is no starvation model here",
+   "hits at half strength, since the land round scales"
+  ],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "Restock scales with cover (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Restock scales with cover\\s+\\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "A unit past its roads is unfed even at home; past its roads is more than 8 tiles (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A unit past its roads is unfed even at home \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "Only the road gap starves; starvation runs from the handoff (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Only the road gap starves \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "A garrison is posted only where its network covers (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A garrison is posted only where its network covers \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "No unit is assigned to a front by default (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "No unit is assigned to a front by default \\(Ben, 2026-10-29\\)",
+  "stale": [
+   "assigns? (its |all |every )?(border )?(garrisons?|units) to (its |a )?fronts? (at generation|in the settle|by default)",
+   "garrisons? (are|is) assigned to (a |its )?fronts? (at generation|in the settle|by default)",
+   "generation assigns .{0,40}fronts?"
+  ],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "Rival fronts narrowed to live play (Ben, 2026-10-29)",
+  "doc": "docs/ai/AI_OPPONENT.md",
+  "anchor": "Narrowed to live play \\(Ben, 2026-10-29",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "An army sent past its roads starves; a front never bends to supply reach (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "An army sent past its roads starves, as ruled \\(Ben,\\s+2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "Logistics serves the armies from generation (Ben, 2026-10-29)",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "Logistics serves the armies from generation \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "The capital's source runs free (Ben, 2026-10-29)",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "The capital's source runs free \\(Ben, 2026-10-29",
+  "stale": [
+   "reported dark — its source stands and the funding gate",
+   "every nation holding network nodes carries a bill"
+  ],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "A poor nation opens with fewer state buildings (Ben, 2026-10-29)",
+  "doc": "docs/generation/NATION_GENERATION.md",
+  "anchor": "A poor nation opens with fewer state buildings \\(Ben, 2026-10-29",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "Military bases are cut like any building (Ben, 2026-10-29)",
+  "doc": "docs/generation/NATION_GENERATION.md",
+  "anchor": "Military bases are cut like any\\s+building \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "The settle builds only from surplus (Ben, 2026-10-29)",
+  "doc": "docs/generation/NATION_GENERATION.md",
+  "anchor": "The settle builds only from surplus \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "The nation build grant narrowed in the settle (Ben, 2026-10-29)",
+  "doc": "docs/ai/AI_OPPONENT.md",
+  "anchor": "Narrowed in the settle \\(Ben, 2026-10-29",
+  "stale": [],
+  "owner": "BL-1452 (carried supplies)"
+ },
+ {
+  "ruling": "Recon is the attacker's: hits scale by min(1, recon / target stealth); the defender always hits in full (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "An attacker damages only what its recon has found \\(Ben, 2026-10-29\\)",
+  "stale": [
+   "counter-recon",
+   "counter recon",
+   "two-sided recon",
+   "symmetric recon",
+   "recon offence",
+   "share of its target its side can see",
+   "each side'?s recon (stock|share)",
+   "both sides'? recon"
+  ],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "Recon builds very quickly in battle; every land class has recon above zero (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Recon builds very quickly in battle \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "Adjacent units count at once; only haste attacks blind (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Only haste attacks blind",
+  "stale": [],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "Stealth is a kit stat; counter-recon is called stealth (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Stealth is a kit stat",
+  "stale": [],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "All air active over a province gives its side's battles recon (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Air also sees for the land\\s+battle \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "Bombing a unit takes the land round's day scale (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Bombing a unit takes the land round's day scale \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "A battle has no maximum duration (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A battle has no maximum duration \\(Ben, 2026-10-29\\)",
+  "stale": [
+   "six-round",
+   "six rounds",
+   "max_rounds",
+   "round cap of",
+   "stalemate after \\d+ rounds",
+   "ends in a stalemate"
+  ],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "A battle is weeks long, not days; breaking a defender takes about 1.5:1 (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A battle is weeks long, not days \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "Like forces entrench, and supply decides the stalemate (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Like forces entrench, and supply decides the stalemate \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "A battle has no randomness: no swing, no fortune (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A battle has no randomness \\(Ben, 2026-10-29",
+  "stale": [
+   "fortune",
+   "swing_permille",
+   "per-round swing of",
+   "draws? (a|its|the) swing",
+   "splitmix.{0,60}battle",
+   "battle.{0,60}splitmix",
+   "rolls? (for|a) (the )?battle"
+  ],
+  "owner": "BL-1453 (land recon)"
+ },
+ {
+  "ruling": "Each land class carries a per-terrain row: move, blocked unless roaded, fight, wear, stealth (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "### Terrain and the classes \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1455 (terrain class modifiers)"
+ },
+ {
+  "ruling": "Infantry carriers dismount on high ground (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Infantry carriers dismount \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1455 (terrain class modifiers)"
+ },
+ {
+  "ruling": "Tanks are blocked in desert too (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Tanks are blocked in desert too \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1455 (terrain class modifiers)"
+ },
+ {
+  "ruling": "The worst terrain row only, never a product (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "The worst row only \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1455 (terrain class modifiers)"
+ },
+ {
+  "ruling": "Terrain moves stealth both ways; open ground exposes everyone (Ben, 2026-10-29)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Terrain moves stealth both ways \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1455 (terrain class modifiers)"
+ },
+ {
+  "ruling": "A unit draws off the road, up to 8 tiles from it, paid per item resupplied (Ben, 2026-10-29)",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "A unit draws off the road, up to 8 tiles from it \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1456 (off-road supply draw)"
+ },
+ {
+  "ruling": "A unit off the road is joined to it by a dashed line on the Logistics lens (Ben, 2026-10-29)",
+  "doc": "docs/ui/LENSES.md",
+  "anchor": "A unit off the road is joined to it by a dashed line \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1456 (off-road supply draw)"
+ },
+ {
+  "ruling": "The off-road dash is coloured by the granted share, linearly (Ben, 2026-10-29)",
+  "doc": "docs/ui/LENSES.md",
+  "anchor": "unit was granted, linearly \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1456 (off-road supply draw)"
+ },
+ {
+  "ruling": "One stat grid on the unit card and in the designer (Ben, 2026-10-29)",
+  "doc": "docs/ui/ledgers/military.md",
+  "anchor": "### The stat grid \\(Ben, 2026-10-29\\)",
+  "stale": [
+   "The summary\\*\\* under the image"
+  ],
+  "owner": "BL-1454 (unit stat grid)"
+ },
+ {
+  "ruling": "A rival's unit shows design stats only once seen (Ben, 2026-10-29)",
+  "doc": "docs/ui/ledgers/military.md",
+  "anchor": "A rival's unit \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1454 (unit stat grid)"
+ },
+ {
+  "ruling": "The stat grid takes the unit card's centre (Ben, 2026-10-29)",
+  "doc": "docs/ui/SELECTION.md",
+  "anchor": "The stat grid takes the centre \\(Ben, 2026-10-29\\)",
+  "stale": [],
+  "owner": "BL-1454 (unit stat grid)"
+ }
+]

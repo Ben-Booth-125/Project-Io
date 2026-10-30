@@ -82,7 +82,8 @@ of its own, and the partition's is stable for the world's lifetime.
 window is a real window rather than a parameter pretending to be one.
 
 `resolve_campaign_battle` is a convenience wrapper over those, taking a **scripted** withdrawal
-plan. It adds no rules of its own, so a scripted run and a stepped one resolve identically.
+plan. It adds no rules of its own, so a scripted run and a stepped one resolve identically; its one
+extra is a ten-year round budget, so a scripted harness run always returns. The live daily pass has no cap.
 
 **Each round.** Every participating unit deals its hits by the soft/hard arithmetic (§ The
 campaign force model), with **no draw and no swing** (Ben, 2026-10-29: battles carry no
@@ -138,7 +139,7 @@ withdrawal honoured at the next day's boundary.
 
 **Like forces entrench, and supply decides the stalemate (Ben, 2026-10-29).** When the two sides'
 raw hits stand near parity — neither side dealing much more than the other — the
-battle **digs in**: its landed damage drops further, and each side **recovers readiness from its
+battle **digs in**: the damage that lands drops further, and each side **recovers readiness from its
 carried supplies** (§ Carried supplies) while it fights — a unit that is fed and holds ammunition
 above its floor recovers; a hungry unit, or one at the ammunition floor, does not. An entrenched
 battle spends ammunition and food every day like any other, so it is **decided by which side's
@@ -519,7 +520,7 @@ there, and superiority adds recon in proportion to its share (§ Recon).
 tactical mission spends its hits on enemy units fighting a battle in the province first, and on any
 other enemy unit there once none is in battle. Its hits use the land arithmetic (soft and hard
 attack against the target's hardness), with no terrain divisor, since an aircraft attacks from
-above. **Bombing a unit takes the land round's day scale (Ben, 2026-10-29):** its landed damage is
+above. **Bombing a unit takes the land round's day scale (Ben, 2026-10-29):** the damage it lands is
 scaled by the same per-day factor a battle's round is (§ Battles, "A battle is weeks long"), so air
 stays one arm of a weeks-long fight rather than outpacing it.
 
@@ -1060,8 +1061,8 @@ speed.
 
 **Movement takes no Logistic Points (Ben, 2026-10-28).** A march is paid in days, never in points, so
 an order given mid-quarter moves at once. What a unit costs the network is its **supply**: once a
-quarter it draws Logistic Points at the tile it stands on (§ Upkeep — supply is drawn where the unit
-stands).
+quarter it draws Logistic Points from where it stands — at its own tile on the network, or at the
+closest road within 8 tiles of it (§ Upkeep — supply is drawn where the unit stands).
 
 **Out of contact, readiness and morale recover daily (Ben, 2026-10-28)**, on the same day step as the
 march and the battle, and **a unit a battle kills is removed that same day** — it does not stand on
@@ -1386,7 +1387,7 @@ garrisons), so it is held to that base like any unit raised there.
 
 **Supply is drawn where the unit stands (Ben, 2026-10-28).** Once a quarter each unit asks the
 Logistic Points its supplies need, **scored on its current tile**: a request on that tile, served by
-the tile's routed cover from the nation's pool exactly as a building's is
+the tile's routed cover — or, off the road, the paying road's (below) — from the nation's pool exactly as a building's is
 ([`LOGISTICS.md`](../economy/LOGISTICS.md) § A unit's supply draws on the pool). The supplies are
 everything that keeps a unit in the field: food upkeep, ammunition resupply, the weaponry it lost to
 attrition, and the recruits and equipment that refill its HP (§ Land — equipment, refit and

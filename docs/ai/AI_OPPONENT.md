@@ -2323,6 +2323,10 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   or on ground no nation owns; no verb that exists only because the actor is now a nation; no read of
   another nation's private state beyond what any nation may observe. Pure, seeded, deterministic,
   replayable, legal verbs only, never a planner.
+  **Narrowed in the settle (Ben, 2026-10-29; `../generation/NATION_GENERATION.md` § Pass 7, "The
+  settle builds only from surplus").** In the pre-game settle a nation's scorer builds only from what
+  its treasury holds above the chest generation sized its state to, so the settle never spends that
+  chest and no nation takes on debt before the game starts.
 
   **Fronts move the player's assigned units — granted (Ben, 2026-10-26; `../military/MILITARY.md`
   § Fronts).** A new subject on the player's own nation: units **the player assigns** to a front are
@@ -2339,6 +2343,9 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   `march_unit`. **Not admitted:** any unit or front of another nation, the player's included;
   declaring the hostility a push needs (that stays the stance scorer's, BL-450); a campaign planned
   beyond the next order. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **Narrowed to live play (Ben, 2026-10-29; `../military/MILITARY.md` § Nation garrisons, "No unit
+  is assigned to a front by default").** Neither generation nor the settle assigns any nation's units
+  to a front; a rival's scorer assigns its own only after the handoff.
   **Rival nations fly air wings — granted (Ben, 2026-10-28; `../military/MILITARY.md` § Air).** A new
   subject: a rival nation's scorer may build airbases on its own ground, hire wings at them, and
   assign each of its OWN wings a mission over provinces in the wing's range — air superiority,

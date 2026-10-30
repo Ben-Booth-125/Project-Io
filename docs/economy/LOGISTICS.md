@@ -881,9 +881,9 @@ an uncovered centre is a market that cannot trade. A source must also be paid fo
 nation's treasury, nodes first (`../generation/NATION_GENERATION.md` § Pass 7, "No capital starts
 dark"). The firms that once topped a short nation's node bill up retire (Ben, 2026-10-23), but
 what they held is now the nation's: every building and balance on its ground is its own, so the
-opening node bill is paid from that whole treasury, and "no capital starts dark" stands. A capital
-that whole treasury still cannot fund is reported dark — its source stands and the funding gate
-idles it. The coverage census (`lp_coverage_census`) checks the three
+opening node bill is paid from that whole treasury, and "no capital starts dark" stands. The
+capital's own source carries no bill and the funding gate never idles it (above, "The capital's
+source runs free"), so no capital is dark however short its treasury. The coverage census (`lp_coverage_census`) checks the three
 rules on every curated seed, reads them through the funding gate, reports dark capitals, and fails
 when a capital holds no source or a consumer is uncovered for a reason the seeding did not count.
 
@@ -1008,8 +1008,9 @@ was tried.
 2026-10-16 march draw).** Movement draws no points: a march is paid in days
 (`../military/MILITARY.md` § Marching). What draws is a unit's **supply** — food, ammunition, the
 weaponry lost to attrition and the recruits and equipment that refill it — requested once a quarter
-**at the tile the unit stands on** and served by that tile's routed cover like any building's
-request. Guns, butter and freight still compete in one currency. **The supply draw claims before the
+**from where the unit stands** and served by the routed cover of the closest road its network
+reaches — its own tile when it stands on the network, otherwise the paying road below — like any
+building's request. Guns, butter and freight still compete in one currency. **The supply draw claims before the
 others** — Ben's 2026-09-24 ruling (NR-917), kept with its original subject: the front is supplied,
 and the trade and the factories behind it wait. A campaign visibly starving its own industry is the
 intended, legible cost of keeping an army in the field.

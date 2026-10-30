@@ -640,7 +640,8 @@ reorder a few realms (Ben, 2026-10-19):** it lifts the endowment alone, so a sma
 trades can pass a larger one that does not; that small reordering is accepted, the one exception to
 "keep the order". **No capital starts dark (Ben, 2026-10-22).** Every capital holds a
 Logistic Point source, a minor's as a major's (`../economy/LOGISTICS.md` § Where generation puts
-the sources), so every nation holding network nodes carries a bill for them from the first tick. The
+the sources), so every nation holding network nodes beyond its capital's free source carries a bill
+for them from the first tick. The
 endowment floor stays at 500 per mille: swept from 500 to the cap, it lifted few of the short realms
 and pushed more seeds' medians out of the band, and no floor reaches a nation the history never held.
 The top-up that made **the firms on a nation's ground fund its opening node bill** (2026-10-22) is
