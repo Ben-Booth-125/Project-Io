@@ -534,9 +534,9 @@ labour at habitability ≥ 0.6, ramping linearly to 0.5× at 0. Effective workfo
 outbid itself and its neighbours, so labour scarcity is priced instead of silently averaged. The
 player never hand-assigns headcount; they express intent and the pool resolves it.
 
-**Soldiers draw from the same pool (Ben, 2026-10-26).** A nation's units are manned out of its
-`(nation, body)` labour pool, so mobilisation empties factories; conscript or professional service
-sets how widely and how cheaply (`../military/MILITARY.md` § The campaign force model). Building counts
+**Soldiers come from the province's people, not the labour pool (Ben, 2026-10-30).** A base makes
+recruits by taking heads from the population centres of its province (`../military/MILITARY.md`
+§ Recruits), so a mobilised province is an emptier one and its labour shrinks with it. Building counts
 lean on available land (§ Land use, the province ceiling), not on the pool alone.
 
 ### Wages

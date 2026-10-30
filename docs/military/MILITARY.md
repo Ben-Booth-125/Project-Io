@@ -386,14 +386,35 @@ attack and draws a drone good, which is how they are used.
 **Six goods, by kind, not by generation (Ben, 2026-10-27):** small arms, armoured vehicles,
 artillery pieces, guided weapons and drones, with the existing electronics; later kit needs more of
 them and adds electronics, so the economy feels each generation without a good for every rung.
-Ordnance stays every unit's per-tick draw. **Refit**: a wounded unit regains HP by drawing equipment and manpower each tick. A unit
-whose kit cannot be bought stays wounded; the economy is the war's ceiling.
+Ordnance stays every unit's per-tick draw. **Refit**: a wounded unit regains HP by drawing equipment off the shelf and men from its nation's
+recruit pool (§ Recruits). A unit whose kit cannot be bought, or whose pool is empty, stays
+wounded; the economy is the war's ceiling.
 
-**Soldiers come from the labour pool** — shown, with the conscript or professional choice, on the
-Military ledger's **Recruit** tab (Ben, 2026-10-27). Every soldier is drawn from the same `(nation, body)`
-labour pool buildings staff from (`../economy/POPULATION.md`), so a mobilised army is an emptied
-factory. A nation chooses **conscript** or **professional** service: conscripts are cheap per head
-and drain labour widely; professionals cost wages and are fewer and better.
+### Recruits (Ben, 2026-10-30)
+
+**Soldiers are recruits, and bases make them.** A `military_base` makes **land recruits** and an
+`airbase` makes **air recruits**, each at a fixed number per quarter authored in `scripts/economy.lua`
+(`economy.military.recruits`). There is no other source: recruits replace the labour-pool draw and the
+conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
+
+- **Recruits come from the province's people.** Each recruit a base makes is one head taken from the
+  population centres in the base's province, the largest centre first (ties to the lowest id). A
+  province whose centres cannot give makes fewer; a mobilised province is an emptier one.
+- **One pool per theatre per nation.** Every land recruit goes to the nation's one land pool and every
+  air recruit to its one air pool, wherever the base stands.
+- **The cap is fifteen quarters of output.** A pool holds at most 15 x the quarterly recruits its
+  theatre's bases make together. A full pool takes no more; its bases make none that quarter.
+- **A hire spends its men.** Raising a unit spends recruits equal to its men from the land pool; a
+  wing spends its crew from the air pool. A hire the pool cannot fill is refused before money moves,
+  in the shelf's words ("Needs 400 recruits; the pool holds 120").
+- **Losses refill from the pool, paid in Logistic Points.** A unit below its full men draws recruits
+  from its pool as it refits. Each recruit drawn costs Logistic Points, paid at the unit's paying road
+  exactly as its supply is (§ Upkeep, "Supply is drawn where the unit stands"); past the 8-tile draw
+  no recruit reaches it.
+- **Bases carry no upkeep.** A military base or airbase has no maintenance and no wage of its own;
+  the cost of a force is its units' upkeep and the people it takes.
+- **Seen on the Recruit tab.** The Military ledger's Recruit tab heads each theatre with its pool:
+  recruits held, the cap, and the quarter's output (`../ui/ledgers/military.md`).
 
 ### Land — on the canvas
 

@@ -63,7 +63,7 @@ and NR-1102 (a ceded capital moves; a last province is never ceded). Nothing gat
 BL-1460 is a chain on `war.*`. BL-1462 can start on stubs once BL-1459's verbs are fixed. Every lane
 is Delivery Full: the save format and the territory seam move.
 
-**Carried from sprint 60 (closed 2026-10-30 at v0.2.4; re-tagged sprint 61 in the backlog).** BL-1442 (post-capacity starvation) leads, G1t50 84.6 against 85. BL-1454 (unit stat grid) waits on Ben's mock pick (2026-10-30). Then BL-1413..BL-1420, BL-1422, BL-1423, BL-1424 (soldiers from labour; the recruit design may replace it), BL-1426, BL-1436, BL-1440, BL-1441, BL-1444 (battle card march stall), BL-1447, BL-1457 (building_element stale aim).
+**Carried from sprint 60 (closed 2026-10-30 at v0.2.4; re-tagged sprint 61 in the backlog).** BL-1442 (post-capacity starvation) leads, G1t50 84.6 against 85. BL-1454 (unit stat grid) waits on Ben's mock pick (2026-10-30). Then BL-1413..BL-1420, BL-1422, BL-1423, BL-1463 (recruits; supersedes BL-1424, designed 2026-10-30 in MILITARY.md § Recruits), BL-1426, BL-1436, BL-1440, BL-1441, BL-1444 (battle card march stall), BL-1447, BL-1457 (building_element stale aim).
 
 ## Sprint 60 — war in time and on the ground (opened 2026-10-28, CLOSED 2026-10-30 at v0.2.4)
 

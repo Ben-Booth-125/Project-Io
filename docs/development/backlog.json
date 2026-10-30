@@ -260,33 +260,6 @@
    "requires": [
     "BL-1421"
    ],
-   "id": "BL-1424",
-   "category": "Military",
-   "authority_doc": "docs/military/MILITARY.md",
-   "short_name": "SOLDIERS_FROM_LABOUR",
-   "priority": "A",
-   "difficulty": 3,
-   "files": [
-    "src/world/workforce.hpp",
-    "src/world/economy_system.cpp",
-    "src/world/corp_command.cpp",
-    "docs/economy/POPULATION.md"
-   ],
-   "title": "Soldiers are drawn from the nation's labour pool, conscript or professional",
-   "design": "MILITARY.md § Land — equipment, refit and manpower; POPULATION.md § The labour pool. A unit's men are labour taken from the (nation, body) pool before buildings staff, so mobilisation empties factories. A national choice between conscript (cheap per head, wide labour drain, lower quality) and professional (wages, fewer, better). Measure the labour effect on market_viability before tuning."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-26",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (sprint 58 military design, 2026-10-26)",
-   "requires": [
-    "BL-1421"
-   ],
    "id": "BL-1426",
    "category": "Military",
    "authority_doc": "docs/military/MILITARY.md",
@@ -735,6 +708,34 @@
    ],
    "title": "Slot 9: the Diplomacy ledger — Nations and Wars, the declaration and peace flows",
    "design": "docs/ui/ledgers/diplomacy.md (Ben, 2026-10-30). Light slot 9. Nations view: folded rows with stance chips and Access/Trust/Alarm toward the player; expanded rows with the reverse sentiment, power comparison and front strength, trade exposure, friendship offer/withdraw/accept, the embargo toggle (a door onto the law verb) and Declare war. The declaration in place: goal picking on the canvas, justifications, the live price. Wars view: every war (public), score bar, exhaustion, answer, offer/impose peace, accept/refuse, truces. Peace presses land with BL-1428. Live click required."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-30",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-10-30)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1463",
+   "short_name": "RECRUITS",
+   "priority": "A",
+   "difficulty": 4,
+   "requires": [],
+   "files": [
+    "src/world/unit_roster.cpp",
+    "src/world/air_combat.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/economy_system.cpp",
+    "src/world/world_save.cpp",
+    "src/ui/military_ledger.cpp",
+    "scripts/economy.lua"
+   ],
+   "title": "Recruits: bases make land and air recruits from their province's people; hires and refills spend them",
+   "design": "Written in MILITARY.md § Recruits (Ben, 2026-10-30). A military base makes land recruits and an airbase air recruits, a fixed number per quarter (economy.military.recruits), each taken from the population centres of the base's province, largest first. One national land pool and one air pool, capped at 15x the theatre's quarterly output. A hire spends its men (a wing its crew) and is refused when the pool cannot fill it; a unit below full men refills from the pool at a Logistic Point cost per recruit paid at its paying road, as supply is. Bases carry no upkeep. The Recruit tab heads each theatre with its pool. Supersedes BL-1424 (soldiers from labour). Save bump (the two pools). Measure the population drain and G1t50 before tuning the rate; rivals hire through the same gate."
   }
  ]
 }

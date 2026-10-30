@@ -12002,6 +12002,53 @@
         "design",
         "delivered"
       ]
+    },
+    "BL-1424": {
+      "status": "cancelled",
+      "glyph": "✕",
+      "sprint": 61,
+      "version_goal": "v0.3.0",
+      "written": "2026-10-26",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (sprint 58 military design, 2026-10-26)",
+      "requires": [
+        "BL-1421"
+      ],
+      "id": "BL-1424",
+      "category": "Military",
+      "authority_doc": "docs/military/MILITARY.md",
+      "short_name": "SOLDIERS_FROM_LABOUR",
+      "priority": "A",
+      "difficulty": 3,
+      "files": [
+        "src/world/workforce.hpp",
+        "src/world/economy_system.cpp",
+        "src/world/corp_command.cpp",
+        "docs/economy/POPULATION.md"
+      ],
+      "title": "Soldiers are drawn from the nation's labour pool, conscript or professional",
+      "design": "MILITARY.md § Land — equipment, refit and manpower; POPULATION.md § The labour pool. A unit's men are labour taken from the (nation, body) pool before buildings staff, so mobilisation empties factories. A national choice between conscript (cheap per head, wide labour drain, lower quality) and professional (wages, fewer, better). Measure the labour effect on market_viability before tuning. CANCELLED 2026-10-30: superseded by BL-1463 (recruits) - soldiers are base recruits taken from the province's people, not the labour pool (Ben, 2026-10-30).",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "category",
+        "authority_doc",
+        "short_name",
+        "priority",
+        "difficulty",
+        "files",
+        "title",
+        "design"
+      ]
     }
   }
 }

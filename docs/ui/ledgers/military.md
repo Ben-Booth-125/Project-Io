@@ -156,7 +156,8 @@ and market combos). **Raise is a press, not a toggle** — it has no active stat
   swappable slots — not templates (B) and not a free designer (C).
 - **Raising takes time**: a muster queue at the base, shown on Recruit like Construction's queue.
 - **Fronts live on the canvas**, not in this ledger.
-- **Manpower shows on Recruit**: the labour pool and the conscript or professional choice.
+- **Manpower shows on Recruit** (Ben, 2026-10-30): each theatre is headed by its recruit pool -
+  recruits held, the cap and the quarter's output (`../../military/MILITARY.md` § Recruits).
 
 ## The questions as they were put
 
@@ -177,5 +178,4 @@ and market combos). **Raise is a press, not a toggle** — it has no active stat
    *Helicopter Lift* and *Proven Readiness* already promise "muster time -10% / -20%") would give
    Recruit a queue like Construction's.
 4. **Where do fronts live** once BL-1427 exists — a third tab here, or the canvas only?
-5. **Manpower.** Once soldiers come from the labour pool (BL-1424), Recruit should show the pool and
-   the conscript/professional choice. Here, or on the Nation overview?
+5. **Manpower.** Answered (Ben, 2026-10-30): Recruit heads each theatre with its recruit pool.
