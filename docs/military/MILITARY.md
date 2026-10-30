@@ -462,7 +462,9 @@ scorer (Ben, 2026-10-27; both grants are `../ai/AI_OPPONENT.md` § 11).
 
 **How a front is named and walked.** A front is named by a **key**: a tile in its span, normally
 its lowest tile id. Keys are unique within a nation. One tile can border two neighbours, so spans
-claim keys smallest first; each takes its lowest tile that no earlier span took. A span runs
+claim keys smallest first; each takes its lowest tile that no earlier span took. A span whose every
+tile is already taken is keyed by the lowest untaken tile of its neighbour's ground across it, so no
+span is ever left without a name. A span runs
 **end to end**: from the tile farthest from its lowest tile, along the shortest path to the tile
 farthest from that end. A span that closes on itself, ringing an enclave, runs on round the other
 side. Tiles off that line sit beside their nearest line tile. Every tie goes to the lower tile id.
@@ -490,7 +492,9 @@ dropped. When two fronts merge, the merged front keeps the first stored order.
 
 **A rival's fronts.** A rival assigns its idle units: its own, unassigned, unordered, out of
 battle and not refitting. The capital province's units stay home. Each goes to the front with the
-fewest assigned units per span tile, taken in ascending id. A rival pushes where it is hostile to
+fewest assigned units per span tile, taken in ascending id, among the fronts it can reach: one
+whose nearest enterable span tile to the span's middle a march would accept. A unit that can reach
+no front stays unassigned. A rival pushes where it is hostile to
 the neighbour and its assigned strength exceeds 3:2 over the push target's defence. Otherwise it
 holds. It never declares the hostility a push needs.
 

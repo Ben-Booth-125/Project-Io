@@ -53,6 +53,7 @@
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <map>
 #include <set>
 #include <sstream>
@@ -642,6 +643,168 @@ int main()
     }
 
     // -----------------------------------------------------------------------
+    // F9 (BL-1441, front edge cases). (1) A one-tile salient T of A's touching both
+    // B and C, and nothing else of A's touching either: T is the whole span toward B
+    // AND the whole span toward C, so only one of the two can be keyed by T. The
+    // other must still be a front ("Every neighbour has fronts"). (2) A rival never
+    // assigns a unit to a front it cannot reach.
+    std::printf("\nF9 - edge cases: a span never unnamed; a rival assigns only reachable fronts\n");
+    {
+        fixture f; build(f);
+        world& w = f.w;
+        const entity_id T = f.at(5, 2);
+        for (int x = 0; x < W; ++x)
+            if (x != 5)
+            {
+                w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::ocean;
+                w.set_tile_nation(f.at(x, 2), null_entity);
+            }
+        // T's row-3 neighbours: the first goes to C, the rest stay B's.
+        const grid_index g9(w);
+        std::vector<entity_id> below;
+        for (const entity_id n : g9.neighbours(w, T))
+            if (w.tiles.at(n).grid_y == 3) below.push_back(n);
+        std::sort(below.begin(), below.end());
+        const entity_id c_tile = below.front();
+        w.set_tile_nation(c_tile, f.C);
+        const std::vector<front> fs = derive_fronts(w, f.A);
+        const front* fb = front_toward(fs, f.B);
+        const front* fc = front_toward(fs, f.C);
+        const bool scenario = fb != nullptr && fc != nullptr && fb->span == std::vector<entity_id>{ T }
+                           && fc->span == std::vector<entity_id>{ T };
+        std::printf("  [info] A has %zu fronts; toward B %s, toward C %s\n", fs.size(),
+                    fb ? "present" : "MISSING", fc ? "present" : "MISSING");
+        check(fs.size() == 2 && scenario,
+              "F9a the salient T is the whole span toward B AND toward C: both are fronts");
+        const bool keys_ok = scenario && fb->key != fc->key
+                          && (fb->key == T || fc->key == T)
+                          && (fb->key == T ? owner(w, fc->key) == f.C : owner(w, fb->key) == f.B);
+        check(keys_ok, "F9b one is keyed by T, the other by a tile of its neighbour's ground across T");
+        if (scenario)
+        {
+            const front* across = fb->key == T ? fc : fb;
+            const entity_id u = add_unit(f, f.A, f.at(5, 0));
+            check(cmd_assign(w, reg, f.A, u, across->key) == corp_command_result::applied
+                      && w.units.at(u).front == across->key,
+                  "F9c assign_front by the across key reaches that front, and stores its key");
+            reanchor_fronts(w);
+            step(w, reg, 6);
+            check(w.units.at(u).front == across->key && w.units.at(u).position == T,
+                  "F9d the unit holds the span's one tile, T; the assignment survives re-anchoring");
+        }
+    }
+    {
+        fixture f; build(f);
+        world& w = f.w;
+        w.player_entity = f.C; // A is a rival
+        // A second body: one tile, A's, holding one A unit. No march leaves a body.
+        const entity_id isle = w.create_entity();
+        body_component bc{};
+        bc.name = "Isle"; bc.type = body_type::planet; bc.grid_width = 1; bc.grid_height = 1;
+        w.bodies[isle] = bc;
+        const entity_id it = w.create_entity();
+        tile_component tc{};
+        tc.body = isle; tc.grid_x = 0; tc.grid_y = 0;
+        tc.substrate = terrain_substrate::rocky; tc.landform = terrain_landform::plains;
+        w.tiles[it] = tc;
+        w.set_tile_nation(it, f.A);
+        const entity_id stranded = add_unit(f, f.A, it);
+        const entity_id home     = add_unit(f, f.A, f.at(5, 0));
+        reanchor_fronts(w);
+        check(!front_reachable(w, reg, stranded, nation_fronts(w, f.A).front())
+                  && front_reachable(w, reg, home, nation_fronts(w, f.A).front()),
+              "F9e front_reachable: the unit on the other body reaches no front; the one at home does");
+        world twin = w;
+        corp_ai_params p; p.cadence_k = 1;
+        economy_report r1, r2;
+        run_corp_strategic_step(w, reg, r1, k_campaign_settle_ticks, p);
+        run_corp_strategic_step(twin, reg, r2, k_campaign_settle_ticks, p);
+        check(w.units.at(stranded).front == null_entity && w.units.at(home).front != null_entity
+                  && w.state_hash(2) == twin.state_hash(2),
+              "F9f the rival assigns its home unit, never the stranded one (no refused march to re-issue); twins agree");
+    }
+
+    // F9g-F9j (BL-1441 fix round): a front NEVER ISSUES A MARCH THE GAME REFUSES, for
+    // any unit (the player's too), at any slot - not just a lone unit's. Each case is a
+    // two-unit front whose SECOND slot is refused; unit 2 carries a standing order
+    // first, so "stands where it is" is observable: fixed, the order is halted and no
+    // march_unit is refused; unfixed, a refused march every day while the old order
+    // walks on.
+    const auto two_unit_case = [&](fixture& f, const char* label, int u2x, int u2dest_x, const std::function<void(fixture&, entity_id)>& block) {
+        world& w = f.w;
+        const entity_id u1 = add_unit(f, f.A, f.at(2, 0));
+        const entity_id u2 = add_unit(f, f.A, f.at(u2x, 0));
+        reanchor_fronts(w);
+        const front* fr = front_toward(nation_fronts(w, f.A), f.B);
+        if (fr == nullptr) { check(false, std::string(label) + ": the front exists"); return; }
+        const front fcopy = *fr;
+        const std::vector<entity_id> slots = expected_slots(fcopy, 2);
+        block(f, slots[1]);
+        // Unit 2's standing order, to a tile in row 0 (never the slot, never blocked).
+        corp_command go; go.corp = f.A; go.as_nation = f.A; go.verb = corp_verb::march_unit;
+        go.subject = u2; go.tile = f.at(u2dest_x, 0);
+        const bool ordered = apply_corp_command(w, reg, go) == corp_command_result::applied;
+        const corp_command_result probe =
+            march_check(w, f.A, u2, slots[1], null_entity, nullptr, &reg.military());
+        (void)cmd_assign(w, reg, f.A, u1, fcopy.key);
+        (void)cmd_assign(w, reg, f.A, u2, fcopy.key);
+        int refused = 0, applied = 0;
+        for (int d = 0; d < 4; ++d)
+        {
+            const front_step fs = advance_fronts(w, reg);
+            refused += fs.marches_refused;
+            applied += fs.marches_applied;
+            (void)run_unit_march(w, reg);
+            reanchor_fronts(w);
+        }
+        const tile_component& st = w.tiles.at(slots[1]);
+        std::printf("  [info] %s: slot 2 at (%d,%d); march_check onto it %d; unit 2 ordered %d; 4 days: %d marches "
+                    "applied, %d refused; unit 2 order %s\n", label, st.grid_x, st.grid_y, static_cast<int>(probe),
+                    ordered ? 1 : 0, applied, refused,
+                    w.units.at(u2).order.dest == null_entity ? "halted" : "standing");
+        check(ordered && probe == corp_command_result::rejected_invalid,
+              std::string(label) + ": the scenario holds - unit 2's slot is refused (rejected_invalid)");
+        check(refused == 0 && w.units.at(u2).order.dest == null_entity,
+              std::string(label) + ": no refused march is issued; unit 2 stands where it is, its order halted");
+        check(w.units.at(u1).order.dest == slots[0] || w.units.at(u1).position == slots[0],
+              std::string(label) + ": unit 1 still takes its own (reachable) slot");
+    };
+    {
+        // SAME BODY, ANOTHER LANDMASS - AN OBSERVATION, NOT A ROW. Columns 0 and 6 become
+        // ocean from pole to pole, splitting the cylinder into two landmasses. A land
+        // unit west of column 6 is asked to march to (9,2), east of it. MEASURED
+        // (fix round, 2026-10-31): `march_check` ACCEPTS it - `march_path` reads
+        // `intra_body_path`, which crosses water as a sea leg, and the march's domain
+        // test reads only the destination - so on one body no landmass split refuses a
+        // march, and there is no refused march here for the fix to suppress. Printed,
+        // not asserted, so this harness does not pin what may be a march-domain defect
+        // (a land unit's path crossing open ocean; MILITARY.md § Domains and traversal).
+        // The refusal the fix stops at is F9h's.
+        fixture f; build(f);
+        for (int y = 0; y < H; ++y)
+            for (const int x : { 0, 6 })
+                f.w.tiles.at(f.at(x, y)).substrate = terrain_substrate::ocean;
+        const entity_id u = add_unit(f, f.A, f.at(4, 0));
+        std::vector<entity_id> path;
+        const corp_command_result r =
+            march_check(f.w, f.A, u, f.at(9, 2), null_entity, &path, &reg.military());
+        std::size_t wet = 0;
+        for (const entity_id t : path) wet += is_water(f.w.tiles.at(t).substrate) ? 1 : 0;
+        std::printf("  [info] F9g other landmass (observation): march (4,0) -> (9,2) across the ocean column: "
+                    "march_check %d, path %zu tiles, %zu of them water\n", static_cast<int>(r), path.size(), wet);
+    }
+    {
+        // SAME LANDMASS, A RINGED SLOT: every neighbour of slot 2 holds a stack of C's
+        // (not hostile to A), and a march path never crosses a foreign-held tile.
+        fixture f; build(f);
+        two_unit_case(f, "F9h ringed slot", 8, 9, [&](fixture& ff, entity_id slot) {
+            const grid_index gi(ff.w);
+            for (const entity_id n : gi.neighbours(ff.w, slot))
+                (void)add_unit(ff, ff.C, n);
+        });
+    }
+
+    // -----------------------------------------------------------------------
     std::printf("\nF7 - the save\n");
     {
         fixture f; build(f);
@@ -745,8 +908,13 @@ int main()
                 if (i > 0 && !(fs[i - 1].neighbour < f.neighbour
                                || (fs[i - 1].neighbour == f.neighbour && fs[i - 1].key < f.key)))
                     order_ok = false;
+                // BL-1441: a key lies in its span, or (a span every tile of which an
+                // earlier span claimed) on the neighbour's ground with a side onto it.
+                bool key_across = false;
+                if (owner(w, f.key) == f.neighbour)
+                    for (const entity_id t : f.span) key_across = key_across || adjacent(w, g, t, f.key);
                 keys_ok = keys_ok && f.nation == n && keys.insert(f.key).second
-                       && std::find(f.span.begin(), f.span.end(), f.key) != f.span.end();
+                       && (std::find(f.span.begin(), f.span.end(), f.key) != f.span.end() || key_across);
                 for (const entity_id t : f.span)
                 {
                     owned_ok = owned_ok && owner(w, t) == n;
@@ -770,10 +938,10 @@ int main()
         check(owned_ok, "F1b every span tile is the nation's own");
         check(borders_ok, "F1c every span tile has a hex side onto the neighbour");
         check(conn_ok, "F1d every span is contiguous, and no two spans toward one neighbour share a tile");
-        check(keys_ok, "F1e keys are unique per nation and each lies in its span");
+        check(keys_ok, "F1e keys are unique per nation and each lies in its span (or across it, BL-1441)");
         check(order_ok, "F1f fronts are ordered by (neighbour, key)");
-        std::printf("  [info] border tiles covered %zu, uncovered %zu (a lone corner tile whose every tile is "
-                    "another front's key)\n", covered, uncovered);
+        std::printf("  [info] border tiles covered %zu, uncovered %zu (a span named across the border still covers its tiles; "
+                    "a gap here is a span with no key)\n", covered, uncovered);
         check(uncovered == 0, "F1g every border tile lies in a front toward each neighbour it touches");
         std::printf("  [info] walk steps between adjacent tiles: %zu / %zu (%.1f%%; a span two tiles thick "
                     "steps sideways)\n", adj_steps, steps, steps ? 100.0 * adj_steps / steps : 100.0);

@@ -30,9 +30,13 @@ class recipe_registry;
 // spans, and could then be the lowest tile of both. So keys are claimed smallest
 // span first (ties by neighbour, then lowest tile), each front taking the lowest
 // tile of its span that no front claimed before it. A front whose every tile is
-// already another front's key — a lone corner tile touching two neighbours — has
-// no name of its own and is not listed (it is covered by the front that holds its
-// tile). Apart from that, every border tile is in exactly one front per neighbour.
+// already another front's key — a lone corner tile touching two neighbours — is
+// keyed instead by the lowest unclaimed tile of its NEIGHBOUR'S ground across it
+// (BL-1441), which no span of this nation holds. One case would still leave a span
+// unnamed and dropped: two spans toward ONE neighbour, each wholly claimed, whose
+// only tile across is the same tile. No border is known to draw it (fronts_harness
+// F1g counts any dropped tile); short of it, every span is a front and every border
+// tile is in exactly one front per neighbour.
 //
 // WALK ORDER. A span is ordered end to end: from one end A (the span tile farthest
 // from its lowest tile, ties to the lower id) along the shortest path to the far
@@ -46,7 +50,7 @@ struct front
 {
     entity_id              nation    = null_entity; ///< The nation the front belongs to.
     entity_id              neighbour = null_entity; ///< The nation across it.
-    entity_id              key       = null_entity; ///< The front's name: a tile in `span` (above).
+    entity_id              key       = null_entity; ///< The front's name: a tile in `span`, else one across it (above).
     std::vector<entity_id> span;                    ///< Border tiles in walk order, end to end.
 };
 
@@ -118,10 +122,27 @@ bool front_may_push(const world& w, const front& f);
 /// this is the front-wide reading a rival's scorer weighs.
 entity_id front_push_target(const world& w, const front& f, int64_t* defence = nullptr);
 
+/// BL-1441 (front edge cases): may @p unit reach front @p f? The test a front's
+/// own hold step would meet for a lone unit: of the span tiles nearest the span's
+/// middle (ties to the lower index), the first the unit's class may enter; reachable
+/// when the unit already stands on it or `march_check` would accept a march onto
+/// it. False for a span with no enterable tile, or one on another landmass. A
+/// rival assigns only to fronts this answers true for, so a march the game refuses
+/// is not re-issued every tick. Read-only but for the march path cache.
+bool front_reachable(world& w, const recipe_registry& reg, entity_id unit, const front& f);
+
 /// The per-tick front step (MILITARY.md § Fronts, "What a front does with its
 /// units"): assigned units take slot tiles spaced evenly along their span and march
 /// onto them; under push each marches onto the neighbour's weakest adjacent tile.
 /// Every move is a legal `march_unit` (or `halt_unit`) applied through
 /// `apply_corp_command` as the unit's own nation; a unit in battle or refitting
 /// is left alone. @p reg is what `apply_corp_command` takes.
-void advance_fronts(world& w, const recipe_registry& reg);
+/// BL-1441: every march is asked of `march_check` first and issued only when it would
+/// apply; a unit whose slot (or push target, and then slot) is refused stands where it
+/// is, its standing order halted, and is asked again next day. Stateless.
+struct front_step
+{
+    int marches_applied = 0; ///< `march_unit` verbs issued and applied this step.
+    int marches_refused = 0; ///< `march_unit` verbs issued and refused (0 by construction).
+};
+front_step advance_fronts(world& w, const recipe_registry& reg);
