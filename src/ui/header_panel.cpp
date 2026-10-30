@@ -1,5 +1,6 @@
 #include "header_panel.hpp"
 
+#include "corporation_dashboard.hpp" // BL-1415: nation_operating_net
 #include "format.hpp"
 #include "presentation.hpp"
 #include "text_fit.hpp"
@@ -23,21 +24,19 @@ float player_treasury(const world& w)
     return p != nullptr ? *p : 0.0f;
 }
 
-/// The last economy tick's net change to the player nation's treasury, read from
-/// the nation's own row of the state ledger (`world::state_ledger`: the treasury
-/// as the funding gate opened the tick, and as the budget settled it). False when
-/// the nation holds no row this tick — no state industry ran — so the caller falls
-/// back to the treasury series.
+/// The last economy tick's OPERATING net for the player nation — BL-1415 (Ben,
+/// 2026-10-26, NR-1002 B): the Balance card's own "Net this quarter", read
+/// through `nation_operating_net`, so the strip and the card agree. Refunds (the
+/// seat's cancelled construction credited back) are not earnings and stay their
+/// own line on the card; the treasury's close-less-open would fold them in. False
+/// when the nation holds no state-ledger row this tick — no state industry ran —
+/// so the caller falls back to the treasury series.
 bool ledger_net(const world& w, float& net)
 {
     const entity_id nation = player_nation(w);
     if (nation == null_entity) // BL-1407: every world is the nations'
         return false;
-    const auto it = w.state_ledger.find(nation);
-    if (it == w.state_ledger.end())
-        return false;
-    net = it->second.treasury_close - it->second.treasury_open;
-    return true;
+    return nation_operating_net(w, nation, net);
 }
 
 } // namespace
@@ -105,7 +104,7 @@ void draw_header_panel(const world& w,
     const float treasury  = player_treasury(w);
     const float valuation = player_cargo_value(w);
 
-    // Last-tick net change: the nation's own state-ledger row (close less open);
+    // Last-tick operating net: the Balance card's net (BL-1415, refunds excluded);
     // with no row this tick, the most recent step of the treasury series.
     float net = 0.0f;
     if (!ledger_net(w, net) && balance_history.size() >= 2)

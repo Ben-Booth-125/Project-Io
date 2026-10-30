@@ -157,6 +157,41 @@ balance_columns build_balance_columns(const corp_budget& b, float refunds, float
     return c;
 }
 
+namespace {
+
+/// The nation branch of `derive_corp_rollups`, shared with
+/// `nation_operating_net` so the header's NET and the card's net are one formula.
+bool fill_nation_rollups(const world& w, entity_id nation, corp_rollups& r)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return false;
+    r.nation  = true;
+    r.balance = nit->second.treasury;
+    if (const auto lit = w.state_ledger.find(nation); lit != w.state_ledger.end())
+    {
+        const world::state_tick_ledger& led = lit->second;
+        r.budget.income      = led.income;
+        r.budget.expenditure = led.expenditure;
+        r.budget.maintenance = led.maintenance;
+        r.budget.wages       = led.wages;
+        r.tax_income         = led.taxes;
+        r.budget_measured    = true;
+    }
+    return true;
+}
+
+} // namespace
+
+bool nation_operating_net(const world& w, entity_id nation, float& net)
+{
+    corp_rollups r;
+    if (!fill_nation_rollups(w, nation, r) || !r.budget_measured)
+        return false;
+    net = r.net();
+    return true;
+}
+
 corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
                                  const economy_report& report, entity_id corp)
 {
@@ -168,22 +203,8 @@ corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
     // folded. Its money is the treasury, and its quarter is its own row of the
     // state ledger (`world::state_ledger`): sales, the inputs and upkeep goods it
     // bought, maintenance, wages, and the tax that returns to the treasury.
-    if (const auto nit = w.nations.find(corp); nit != w.nations.end())
-    {
-        r.nation  = true;
-        r.balance = nit->second.treasury;
-        if (const auto lit = w.state_ledger.find(corp); lit != w.state_ledger.end())
-        {
-            const world::state_tick_ledger& led = lit->second;
-            r.budget.income      = led.income;
-            r.budget.expenditure = led.expenditure;
-            r.budget.maintenance = led.maintenance;
-            r.budget.wages       = led.wages;
-            r.tax_income         = led.taxes;
-            r.budget_measured    = true;
-        }
+    if (fill_nation_rollups(w, corp, r))
         return r;
-    }
 
     // BL-1407: no corporation exists; an actor that is not a nation has no books.
     (void)report;
