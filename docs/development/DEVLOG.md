@@ -10,6 +10,40 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-10-30 — Sprint 60: war in time and on the ground — version 0.2.4
+
+**Runtime:** three days; Design on Ben's rulings, Delivery Full in worktree lanes with a cold review
+each, closed on Ben's live clicks in the release build.
+
+**What was built.**
+- **Time:** BL-1445 (move by days). Class speeds in days per tile; battles and contact step daily.
+- **Air:** BL-1449 (air combat core), BL-1450 (air UI), BL-1451 (rival air). Airbases, six wing classes, daily missions, superiority, air defence. Save v65.
+- **Supply:** BL-1452 (carried supplies), BL-1456 (off-road supply draw).
+  - Food, ammunition and equipment stocks, restocked by the Logistic Point share; only the road gap starves.
+  - A unit draws up to 8 tiles off its roads, paid at the closest road; the Logistics lens dashes the leg by share.
+  - The opening state is sized to the chest, the capital's hub runs free, the settle builds from surplus. Save v66.
+- **Battle:** BL-1453 (land recon). One-sided recon against named stealth; no cap, no fortune, no swing; entrenchment. Parity 51 days, break near 1.5:1. Save v67.
+- **Terrain:** BL-1455 (terrain class modifiers). Armour needs roads in mountains and desert; march, fight, wear and stealth rows, worst row only.
+- **Designer:** BL-1448 (designer draft and save).
+
+**Decisions.** Every ruling is in its owning doc; the register (`tools/session/rulings/sprint-60.json`)
+passes 50 of 50. Supplies and the off-road draw were merged and judged together. NR-1099 logs the
+supplies lane's two delegated calls (a hub on every capital; one purse gate caps surveys).
+
+**Triage.** Sprint 55's twenty carries were listed in its retro but never re-tagged, so four closes
+missed them. One was built (BL-1359 (hub levels at centres)); Ben cancelled the rest with BL-1393 and
+BL-1429. This close re-tags its carries to sprint 61 in the backlog itself.
+
+**Re-bless.** One, at the close, on Ben's go ("Yes, if the probe explains it"). D_search unmoved on all 16; D_land, D_settle and D_seat moved. rebless_shape_probe (v0.2.3 against main) names every mover: the opening state sized to the chest, bases cut like any building, the settle building from surplus, the garrison repost and the seeding toward garrison posts, settle growth on the changed supply. Recheck: --digest-check via par_seeds, 16 of 16 rows PASS, one player each.
+
+**Gates at close.** market_viability full on main d3b0ba23: G1t50 84.6 against 85 (from 79.8). All
+military, logistics and save harnesses pass; the known reds are unchanged.
+
+**Left open.** BL-1442 (post-capacity starvation) and BL-1454 (unit stat grid) lead sprint 61, beside
+the diplomacy-and-war design. Ben's live click could not raise a wing ("Not fieldable now") where the
+verify world can; the headless probe found every air row fieldable, and he passed air on the captures.
+The recruit system and three ledger fixes came out of the live clicks.
+
 ## 2026-10-28 — Sprint 59: unit designs and the designer — version 0.2.3
 
 **Runtime:** one day; Design from Ben's rulings in the morning, then Delivery Full in worktree lanes,

@@ -12,6 +12,66 @@ release.
 
 ## [Unreleased]
 
+## [0.2.4] — 2026-10-30
+
+*War in time and on the ground. Units march by the day at their class speed, and battles run for
+weeks: no cap, no randomness, decided by numbers, supply, recon and terrain. Armies carry their own
+food, ammunition and equipment, drawn off the road up to 8 tiles, and an equal, supplied pair
+entrenches. Air combat arrives: airbases, wings, daily missions, air superiority and air defence,
+which rival nations run too. v0.3.0 waits for the naval system and a playtest with a few wars
+(Ben, 2026-10-30). G1 at tick 50 is 84.6 against 85, up from 79.8.*
+
+### Added
+
+- **Units move by the day** (BL-1445 (move by days)): each class marches at its own speed in
+  days per tile, battles step daily, and contact is checked every day.
+- **Air combat** (BL-1449 (air combat core)): airbases, six wing classes, daily missions, air
+  superiority over a province, tactical and strategic bombing on the land battle's day scale, and
+  air defence. Saved at version 65.
+- **The air UI** (BL-1450 (air UI)): the Military ledger groups forces by theatre, each group
+  folding; a wing card; a right-click on a province assigns a mission. The unit designer opens on
+  air classes too.
+- **Rival air** (BL-1451 (rival air)): rival nations build airbases, hire wings and assign
+  missions by scored utility.
+- **Carried supplies** (BL-1452 (carried supplies)): every unit carries food, ammunition and
+  equipment stocks, restocked by its Logistic Point share. A hungry unit fights and recovers worse;
+  a starving one dies. Only the road gap starves, from the handoff. Saved at version 66.
+- **The off-road draw** (BL-1456 (off-road supply draw)): a unit draws supply up to 8 tiles off
+  its nation's roads, paid at the closest road per item resupplied. The Logistics lens dashes the
+  off-road leg, coloured by share; past 8 tiles the dash is short and red.
+- **Land recon and stealth** (BL-1453 (land recon)): an attacker's hits scale by
+  min(1, its recon / the target's stealth); the defender always strikes in full. The recon stock
+  builds within days from units in battle, adjacent units and air. Attacking the day a unit
+  arrives is haste. Saved at version 67.
+- **Terrain and the classes** (BL-1455 (terrain class modifiers)): per-class terrain rows. Armour
+  cannot enter mountains or desert without a road; terrain slows marches, debuffs fights (a road
+  halves it) and wears equipment; cover raises stealth and open ground lowers it. The worst row
+  applies.
+- **Designer drafts** (BL-1448 (designer draft and save)): designer picks are a draft until
+  Save; Revert drops it.
+
+### Changed
+
+- **Battles have no maximum length and no randomness** (Ben, 2026-10-29): no cap, no fortune,
+  no swing. A parity fight runs about 51 days; the break sits near 1.5:1. A fed, armed defender at
+  parity entrenches and holds; a hungry unit dug in recovers nothing.
+- **Generation's garrisons are not assigned to fronts** (Ben, 2026-10-29): they stand on
+  drawable ground; moving and supplying them is the player's.
+- **A poor nation opens with fewer state buildings**, sized to what its chest runs for sixteen
+  ticks. The capital's logistics hub runs free, so no capital starts dark, and the settle builds
+  only from surplus (Ben, 2026-10-29).
+
+### Removed
+
+- The sprint 55 carries left unbuilt, BL-1393 and BL-1429 are cancelled (Ben, 2026-10-30).
+
+### Known issues
+
+- G1 at tick 50 is 84.6 against 85 (BL-1442 (post-capacity starvation)).
+- `battle_card.lua` finds no battle within 720 days (BL-1444 (battle card march stall)).
+- `building_element.lua` aims at stale coordinates (BL-1457 (building_element stale aim)).
+- `logistic_points_harness` (18 rows) and `state_industry_harness` (S3, S7) are red, as before.
+
 ## [0.2.3] — 2026-10-28
 
 *Unit designs and the designer. Each land class carries its own kit slots, and a nation keeps one
@@ -1759,7 +1819,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.2.0...v0.2.1

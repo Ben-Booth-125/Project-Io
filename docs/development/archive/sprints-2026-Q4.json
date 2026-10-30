@@ -391,6 +391,50 @@
           "Ruling register 6 of 6 pass."
         ]
       }
+    },
+    "60": {
+      "id": "60",
+      "theme": "war in time and on the ground",
+      "state": "landed",
+      "status_line": "CLOSED 2026-10-30 at v0.2.4 (Ben: cut a version; v0.3.0 waits for the naval system and a playtest with a few wars). Units move by the day, battles run for weeks with no cap and no randomness, armies carry supplies drawn up to 8 tiles off the road, recon is one-sided against named stealth, terrain shapes each class, and air combat arrives with rivals flying too. G1t50 84.6 (from 79.8). One re-bless at the close.",
+      "opened_date": "2026-10-28",
+      "author": "Ben (2026-10-28)",
+      "goal": "Units march by the day at class speed and battles step daily; the military gains air, carried supplies, recon and terrain.",
+      "planned": [
+        "BL-1445 (move by days) first, held on a branch for four calls.",
+        "BL-1442 (post-capacity starvation) and the sprint 59 carries.",
+        "Added in sprint: BL-1449 (air combat core), BL-1450 (air UI), BL-1451 (rival air), BL-1452 (carried supplies), BL-1453 (land recon), BL-1455 (terrain class modifiers), BL-1456 (off-road supply draw), BL-1448 (designer draft and save)."
+      ],
+      "risk": "Three save bumps in one sprint (v65 air, v66 supplies, v67 recon), stacked across worktree lanes.",
+      "done_when": "Every lane passes its harnesses and a cold review; G1t50 no worse than main on the full tier; Ben's live clicks pass; one re-bless at the close.",
+      "notes": "Register sprint-60: 50 of 50 pass. Supplies and the off-road draw were judged together (Ben, 2026-10-29).",
+      "closed_date": "2026-10-30",
+      "retro": {
+        "landed": [
+          "MOVE: BL-1445 (move by days): class speeds in days per tile, daily battles and contact.",
+          "AIR: BL-1449 (air combat core), BL-1450 (air UI), BL-1451 (rival air): airbases, six wing classes, daily missions, superiority, air defence; save v65.",
+          "SUPPLY: BL-1452 (carried supplies) and BL-1456 (off-road supply draw): food, ammunition and equipment stocks, restock by Logistic Point share, the 8-tile off-road draw dashed on the Logistics lens; save v66. The opening state sized to the chest; the capital's hub runs free; the settle builds from surplus.",
+          "BATTLE: BL-1453 (land recon): one-sided recon against named stealth, no cap, no fortune, no swing, entrenchment; parity 51 days, break near 1.5:1; save v67.",
+          "TERRAIN: BL-1455 (terrain class modifiers): blocked unless roaded, march, fight, wear and stealth rows, the worst row applies.",
+          "DESIGNER: BL-1448 (designer draft and save).",
+          "TRIAGE: BL-1359 (hub levels at centres) found built and closed; nineteen sprint 55 carries, BL-1393 and BL-1429 cancelled (Ben, 2026-10-30)."
+        ],
+        "carried": [
+          "To sprint 61, re-tagged in the backlog (not only listed here): BL-1413..BL-1420, BL-1422, BL-1423, BL-1424, BL-1426, BL-1436, BL-1440, BL-1441, BL-1442 (G1t50 84.6 against 85), BL-1444 (battle card march stall), BL-1447, BL-1454 (unit stat grid), BL-1457 (building_element stale aim).",
+          "New from the live clicks: refusal reasons and the ledger's descriptions become tooltips; the designer closes with the ledger; a recruit system is in design."
+        ],
+        "feedback": [
+          "Sprint 55's carries were listed in its retro but never re-tagged, so four closes missed them. Carries are now re-tagged at the close.",
+          "Cold review caught a spec violation in recon (hungry units recovering) after the lane's gates passed.",
+          "A live player could not raise a wing ('Not fieldable now') where the verify world could; the headless probe could not reproduce it, and Ben passed air on the captures."
+        ],
+        "gates": [
+          "market_viability full tier on main d3b0ba23: G1 93.1, G1t50 84.6 (FAIL vs 85, carried as BL-1442), G1b 2.7, G2 192.7, G3 100.0.",
+          "All military, logistics and save harnesses pass; logistic_points (18 rows) and state_industry (S3, S7) fail as before; battle_card.lua (BL-1444) and building_element.lua (BL-1457) fail as filed.",
+          "One re-bless at the close; rebless_shape_probe v0.2.3 vs main explains every mover (opening cut, bases cut, settle surplus, garrison repost and seeding, settle growth on the changed supply).",
+          "Ruling register 50 of 50 pass."
+        ]
+      }
     }
   }
 }

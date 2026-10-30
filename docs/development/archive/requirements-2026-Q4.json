@@ -1182,6 +1182,55 @@
         }
       ]
     },
+    "move-by-days": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: move_by_days_harness"
+          ],
+          "requirement": "A march advances every day, not every quarter: a unit crosses a plains tile in its class's authored days (foot infantry 3, motorised 1, mechanised 1, light armour 1, medium armour 1.5, towed artillery 2, air defence 1.5); terrain multiplies, a road divides; partial progress banks across days and saves.",
+          "notes": null,
+          "result_metric": "move_by_days_harness 45/45 on main d3b0ba23 (2026-10-30)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: move_by_days_harness",
+            "headless: battle_engagement_harness",
+            "headless: tile_contact_harness"
+          ],
+          "requirement": "Contact is checked and battles step every day: the day a march meets a hostile stack the battle opens; rounds run daily with damage calibrated so typical battle lengths are stated and measured.",
+          "notes": null,
+          "result_metric": "move_by_days 45/45, battle_engagement 88/88, tile_contact 96/96 on main d3b0ba23. Battle lengths: parity 51 days, 1.5:1 65-90, 2:1 9-12 (MILITARY.md § Battles)."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism",
+            "headless: save_roundtrip",
+            "headless: market_viability"
+          ],
+          "requirement": "Logistic Points are granted once a quarter and spent day by day; a unit whose grant is spent halts until the next grant. Determinism and the save hold; the economy is unmoved apart from what marching draws.",
+          "notes": null,
+          "result_metric": "world_determinism and save_roundtrip pass on main d3b0ba23; market_viability full tier G1t50 84.6 (was 79.8 at v0.2.3)."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "live"
+          ],
+          "requirement": "In the running game a marching unit visibly moves tile by tile between quarter ticks.",
+          "notes": null,
+          "result_metric": "Ben live click 2026-10-30, release build d3b0ba23: a marching unit steps tile by tile between quarter ticks. Pass."
+        }
+      ],
+      "resolution": "All four rows complete at the sprint 60 close (v0.2.4)."
+    },
     "muster-queue": {
       "rows": [
         {

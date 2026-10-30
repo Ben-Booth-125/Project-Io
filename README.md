@@ -111,7 +111,9 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest releases — v0.2.0, v0.2.1, v0.2.2 and v0.2.3
+## Latest releases — v0.2.0 to v0.2.4
+
+**v0.2.4 — war in time and on the ground.** Units march by the day at their class speed, and battles run for weeks with no cap and no randomness, decided by numbers, supply, recon and terrain. Armies carry food, ammunition and equipment, drawing supply up to 8 tiles off the road, and an equal, supplied pair entrenches. Armour needs roads through mountains and desert. Air combat arrives: airbases, wings and daily missions, which rival nations run too. v0.3.0 waits for the naval system and a playtest with a few wars.
 
 **v0.2.3 — unit designs and the designer.** Each land class now has its own equipment slots, and a nation keeps one live design per class: new hires are raised to it, and units already in the field refit to it. A catalogue of 71 kit items fills the slots, with the 1960 base kit open and later kit locked until research names it. A full-canvas designer, opened from a unit type, shows the class with a box per slot, and each pick saves at once. Units marching by the day is designed and carries into the next sprint, as does G1 at tick 50.
 
