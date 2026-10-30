@@ -9,6 +9,7 @@
 #include "battle_system.hpp"   // unit_in_battle (BL-1427: a rival assigns only idle units)
 #include "fronts.hpp"          // BL-1427: a rival uses its fronts
 #include "air_combat.hpp"      // BL-1451: a rival flies air wings
+#include "campaign_settle.hpp" // BL-1452: k_campaign_settle_ticks - the settle assigns no fronts
 #include "stance.hpp"          // is_hostile (BL-1451)
 #include "input_reach.hpp"     // BL-1187: obtainable inputs (the BL-1185 reach)
 #include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
@@ -1825,7 +1826,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // BL-1427 (AI_OPPONENT.md § 11, "Rival nations use fronts", Ben 2026-10-27):
         // a nation's own units onto its own fronts, and each front's order. Past the
         // player guard above, so never the player's nation in a seated session.
-        if (actor.is_nation)
+        // NO UNIT IS ASSIGNED TO A FRONT BY DEFAULT (Ben, 2026-10-29; MILITARY.md
+        // § Nation garrisons): the pre-game settle (econ ticks 0..11, under spectate,
+        // when every nation - the player's too - is evaluated) runs no front scoring at
+        // all, so every garrison opens on its post. This NARROWS the BL-1427 grant to
+        // live play; it widens nothing. Keyed on the econ tick, the same settle/live
+        // boundary the day stamps use (economy_system.cpp `carried_supplies_live`).
+        if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_fronts(w, reg, corp, tick);
 
         // BL-1451 (AI_OPPONENT.md § 11, "Rival nations fly air wings", Ben 2026-10-28):

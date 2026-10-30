@@ -19,6 +19,7 @@
 #include "state_industry.hpp"  // BL-1296: plan_state_funding, the state ledger
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
+#include "campaign_settle.hpp" // BL-1452: k_campaign_settle_ticks - the settle keeps the stocks full
 
 #include <algorithm>
 #include <array>
@@ -2764,8 +2765,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     //
     // BL-1445 (Ben, 2026-10-28; LOGISTICS.md § A unit's supply draws on the pool, and
     // claims first): MOVEMENT TAKES NO LOGISTIC POINTS - a march is paid in days. What
-    // draws is each unit's SUPPLY, once a quarter, AT THE TILE IT STANDS ON: its
-    // requests are gathered here, before the resolve, so they claim ahead of every
+    // draws is each unit's SUPPLY, once a quarter, PAID AT THE CLOSEST ROAD of its
+    // network within 8 tiles (BL-1456; the resolver picks the tile,
+    // `unit_supply_draw_tile`): its requests are gathered here, before the resolve, so they claim ahead of every
     // producer (NR-917 kept), and the share each was granted is what the one decay
     // rule reads (`run_nation_garrison_upkeep`, through `lp_tick::supply_share`). The
     // draw is priced in credits as it is granted (`charge_supply_draws`).
@@ -4196,11 +4198,17 @@ building_upkeep_tick run_building_upkeep(world& w, const recipe_registry& reg,
     std::map<entity_id, entity_id> owner_of; // BL-1407: every owner is a nation
     // BL-1296: a state building draws its basket under its nation's id, billed
     // to the treasury at the clear — unless the gate idled it this tick.
+    // BL-1452 (Ben, 2026-10-29): the capital's source runs free - it draws no basket,
+    // and its supply factor reads full.
     for (const auto& [nid, nc] : w.nations)
         for (const entity_id bid : nc.state_assets)
-            if (const auto bit = w.buildings.find(bid);
-                bit != w.buildings.end() && !bit->second.state_idle)
-                owner_of[bid] = nid;
+            if (const auto bit = w.buildings.find(bid); bit != w.buildings.end())
+            {
+                if (capital_free_source(w, bid))
+                    bit->second.supply_factor_permille = 1000;
+                else if (!bit->second.state_idle)
+                    owner_of[bid] = nid;
+            }
 
     // Ascending building id. The pass writes a SHARED pool (two buildings of one
     // corp on one body draw the same stock), so the visit order decides which one
@@ -4585,7 +4593,8 @@ void charge_supply_draws(world& w, const recipe_registry& reg, const lp_tick& lp
         const entity_id owner = uit->second.owner;
         if (float* purse = purse_of(w, owner); purse != nullptr)
         {
-            const float cost = std::min(rate * s.granted, purse_room_of(w, owner));
+            // A running cost of the supply draw: never capped by the settle's surplus gate.
+            const float cost = std::min(rate * s.granted, purse_room_ungated_of(w, owner));
             if (cost > 0.0f)
                 *purse -= cost;
         }
@@ -4661,7 +4670,7 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
         // MOVEMENT TAKES NO LOGISTIC POINTS (Ben, 2026-10-28; MILITARY.md § Marching): a
         // march is paid in days, never in points, so an order given mid-quarter moves at
         // once and nothing halts it but the ground. What a unit costs the network is its
-        // supply, drawn once a quarter at its tile (`collect_supply_claims`).
+        // supply, drawn once a quarter at the closest road (`collect_supply_claims`).
         float points = u.order.progress + rate; // today's movement, the bank included
         u.order.progress = 0.0f;
 
@@ -4821,10 +4830,23 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
 
 namespace {
 
+/// STARVATION RUNS FROM THE HANDOFF (Ben, 2026-10-29; MILITARY.md § Carried supplies):
+/// is @p day_tick a day of the campaign rather than of the pre-game settle? Keyed on the
+/// ONE day-stamp base (`military_quarter_day_base`): a quarter closed by econ tick T
+/// stamps its days base(T) + 1 .. base(T) + 90, so the settle's twelve (T = 0..11) end
+/// on base(12) itself, and every live day - the app's day loop and the headless catch-up
+/// alike - is stamped strictly above it. A negative stamp reads the world's day tick,
+/// as the march does.
+bool carried_supplies_live(const world& w, int day_tick)
+{
+    const int stamp = day_tick >= 0 ? day_tick : w.current_day_tick;
+    return stamp > military_quarter_day_base(k_campaign_settle_ticks);
+}
+
 /// Is there anything for a military day to do? A unit with an order or a front, or a
 /// live battle. Nothing else issues a march between economy ticks on a headless path
 /// (the scorers are quarterly), so a quarter that goes quiet stays quiet.
-bool military_active(const world& w)
+bool military_active(const world& w, const recipe_registry& reg, int day_tick)
 {
     if (!w.battles.empty())
         return true;
@@ -4834,7 +4856,12 @@ bool military_active(const world& w)
     // BL-1445: out-of-contact recovery is daily, so a day with a unit still
     // recovering is a day with something to do (no battle is live here, so every
     // unit is out of contact).
-    return recovery_pending(w);
+    // BL-1452: so is a day on which some unit's carried stocks still move (an
+    // under-supplied or starving unit, or one refilling).
+    // In the settle the stocks are held full, so they keep no day walking.
+    return recovery_pending(w)
+        || (carried_supplies_live(w, day_tick)
+            && carried_supplies_pending(w, reg.military().supplies, &reg.military()));
 }
 
 } // namespace
@@ -4842,7 +4869,7 @@ bool military_active(const world& w)
 military_day_result run_military_day(world& w, const recipe_registry& reg, int day_tick)
 {
     military_day_result out;
-    if (!military_active(w))
+    if (!military_active(w, reg, day_tick))
         return out;
 
     // THE FRONTS FIRST, after yesterday's musters and before today's battles, so a
@@ -4859,7 +4886,18 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     if (any_front)
         advance_fronts(w, reg);
 
+    // BL-1452: the units in contact at the day's start fight today's rounds, so they
+    // spend ammunition and battle-worn equipment today (read before the battles, which
+    // may end and release them).
+    const std::set<entity_id> fought = units_in_live_battles(w);
     out.battles = run_battles(w, reg, day_tick);
+    // THE CARRIED SUPPLIES' DAY (BL-1452; MILITARY.md § Carried supplies): after the
+    // rounds that read the stocks, drain and refill them at the unit's road share, and
+    // starve a unit with no food - before the disband, so a unit starvation takes to
+    // zero men is removed today as a battle-killed one is. Live days only: the settle
+    // keeps every stock full.
+    if (carried_supplies_live(w, day_tick))
+        out.supplies = run_carried_supplies_day(w, reg.military().supplies, fought, &reg.military());
     // A UNIT A BATTLE KILLS IS REMOVED THE SAME DAY (Ben, 2026-10-28; MILITARY.md
     // § Marching), by the one disband path the upkeep pass also runs, so it never
     // stands on its tile blocking today's march.
@@ -4883,7 +4921,7 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
     // completes on day d is under the march from that day on, on every path alike.
     for (int d = from + 1; d <= to; ++d)
     {
-        if (!military_active(w))
+        if (!military_active(w, reg, quarter_first_day_tick + d))
         {
             // Nothing military left to walk: construction takes the rest in one call,
             // which walks the identical days (advance_construction_to is days-outer).

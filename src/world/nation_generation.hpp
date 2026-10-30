@@ -1,9 +1,14 @@
 #pragma once
 
+#include "logistic_points.hpp" // BL-1452: lp_reach_memo, in unit_draw_memo
+
 #include "tongue.hpp"
 #include "world.hpp"
 
+struct military_capability_params;
+
 #include <cstdint>
+#include <map>
 #include <utility>
 #include <vector>
 
@@ -548,6 +553,51 @@ int seat_capitals_on_centres(world& w, int* unseated = nullptr);
 /// picked as a border province, which it picks by that same adjacency.
 /// Exposed so centre_census C16 asserts the rule against the same function.
 entity_id garrison_border_post(world& w, const province& pr, entity_id guarded);
+
+/// The memo `unit_tile_drawable` keeps across calls in one pass.
+struct unit_draw_memo
+{
+    lp_reach_memo                                     lp;
+    std::map<entity_id, bool>                         cover;    ///< tile -> routed cover > 0
+    std::map<std::pair<entity_id, entity_id>, bool>   drawable; ///< (nation, tile) -> result
+};
+
+/// THE PLACEMENT PREDICATE (BL-1452): can a unit of @p nation standing on @p tile draw
+/// its supply there? `unit_tile_within_draw` (logistic_points.hpp, the one rule the
+/// draw-off-the-road lane replaces) over `lp_coverage_at` > 0, memoised.
+bool unit_tile_drawable(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile);
+
+/// What `repost_garrisons_on_cover` did, for the finish log and the harnesses.
+struct garrison_repost_report
+{
+    int garrisons          = 0; ///< Garrisons the generation record still named, standing.
+    int on_front           = 0; ///< On a front or marching: the front owns where they stand, left.
+    int in_battle          = 0; ///< In a live battle: the fight holds them, left.
+    int already_covered    = 0; ///< Whose rule post the network already covered: unmoved.
+    int moved_in_province  = 0; ///< Re-posted on a covered tile of their own province.
+    int moved_off_province = 0; ///< Province uncovered: re-posted on the nation's nearest covered tile.
+    int uncovered          = 0; ///< No covered tile of the nation's ground at all: left where they stood.
+};
+
+/// A GARRISON IS POSTED ONLY WHERE ITS NETWORK COVERS (Ben, 2026-10-29; MILITARY.md
+/// § Nation garrisons). AT THE HANDOFF — the end of the settle's last tick
+/// (`run_settle_tick`), against the network the handoff receives — each garrison
+/// `seed_nation_garrisons` posted that still stands on its post (not on a front, not
+/// marching) is re-chosen among the tiles
+/// of its province its supply can be drawn to (`unit_tile_drawable`), by the same rule: a border post the covered tile with the
+/// most sides facing the neighbour it guards, ties to the lowest id (or, if no covered
+/// tile faces it, the covered tile nearest the rule's post); a capital post the covered
+/// tile nearest its anchor. A province with no covered tile posts on the covered tile
+/// of the nation's own ground nearest the rule's post, ties to the lowest tile id. A
+/// post already covered is untouched; a re-posted garrison's road share is whole until
+/// the next quarter's draw. Ascending unit id; deterministic. Consumes and clears
+/// `world::gen_garrisons`.
+/// @p mil, when given, applies BL-1455's class walls: a garrison is never posted on a
+/// tile walled for its class (`class_wall`). A garrison in a live battle is left.
+garrison_repost_report repost_garrisons_on_cover(world& w, const military_capability_params* mil = nullptr);
+
+/// One `[garrisons on cover]` line for @p r (stdout, flushed).
+void print_garrison_repost(const garrison_repost_report& r);
 
 /// Summed `unit_strength` (BL-459, unit_roster.hpp) of every nation-owned
 /// unit standing in the province with id @p province_id — the garrison-

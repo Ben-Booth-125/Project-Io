@@ -564,8 +564,20 @@ inline constexpr uint32_t world_save_magic =
 /// kit ids ascending); and every building off full condition, ascending, as (id, i32
 /// condition). v64 is a STRICT PREFIX of v65 and is read too
 /// (`k_world_save_version_pre_air`), as a world with no air and every building whole.
-/// BL-1445 (move by days) claims v65 on another branch too: the second to merge renumbers.
-inline constexpr uint32_t world_save_version = 65;
+///
+/// Bumped to 66 (BL-1452, carried supplies; MILITARY.md § Carried supplies): A
+/// TRAILING SECTION after the air carries,
+/// after a u32 count, every unit whose carried stocks are not all full or whose
+/// starvation carry is not zero, ascending id, as (id, i32 food, i32 ammunition,
+/// i32 equipment, i32 carry, 3 x i32 sub-per-mille remainders, i32 road share) — stocks
+/// and the share in [0, 1000], carry in [0, 180), remainders in [0, 1000000) and zero on
+/// a full stock. v65 is a
+/// STRICT PREFIX of v66 and is read too (`k_world_save_version_pre_supplies`), as is
+/// v64 (`k_world_save_version_pre_air`): a world where every unit's stocks are full.
+inline constexpr uint32_t world_save_version = 66;
+
+/// v65, a strict prefix of v66 (the carried-supplies section is v66's only addition).
+inline constexpr uint32_t k_world_save_version_pre_supplies = 65;
 
 /// v64, a strict prefix of v65 (the air section is v65's only addition).
 inline constexpr uint32_t k_world_save_version_pre_air = 64;
@@ -735,6 +747,9 @@ void write_world_snapshot_pre_designs(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1449): the v64 stream shape, with no air section.
 void write_world_snapshot_pre_air(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1452): @p w as a v65 stream — no carried-supplies section.
+void write_world_snapshot_pre_supplies(const world& w, std::ostream& out);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

@@ -1,5 +1,6 @@
 #include "battle_system.hpp"
 
+#include "carried_supplies.hpp" // BL-1452: the round's supply term and the recovery step
 #include "logistics.hpp" // road_edge_neighbour: the retreat step (BL-1421)
 #include "placement_rules.hpp"
 #include "province.hpp"
@@ -82,7 +83,10 @@ std::vector<land_combatant> build_combatants(const world& w, const std::vector<e
         c.men       = u.count;
         c.readiness = std::clamp(u.readiness_permille, 0, 1000);
         c.morale    = std::clamp(u.morale_permille, 0, 1000);
-        c.supply    = std::clamp(u.supply_factor_permille, 0, 1000);
+        // BL-1452: the round reads the CARRIED stocks, not the supply factor (which
+        // refills them): ammunition x equipment on every stat, hunger on the hits.
+        c.supply    = carried_attack_permille(u);
+        c.carried   = carried_combat_permille(u);
         c.stats     = unit_land_stats(u);
         if (ground_tc != nullptr)
             c.terrain = terrain_fight_permille(terrain_class_effects_for_type(*mil, u.type, *ground_tc));
@@ -261,11 +265,15 @@ void recovery_step(const unit_component& u, const campaign_battle_params& p, int
     if (morale < supply)      morale += std::min(p.morale_recovery_permille, supply - morale);
     else if (morale > supply) morale -= std::min(p.morale_recovery_permille, morale - supply);
 
+    // BL-1452: a hungry unit recovers readiness 15% slower, and a starving one never
+    // above its men over establishment (MILITARY.md § Carried supplies).
+    const int ceiling = std::min(morale, carried_readiness_cap(u));
     ready = std::clamp(u.readiness_permille, 0, 1000);
-    if (ready < morale)
-        ready = std::min(morale, ready + p.readiness_recovery_permille * supply / 1000);
+    if (ready < ceiling)
+        ready = std::min(ceiling, ready + p.readiness_recovery_permille * supply / 1000
+                                              * carried_recovery_permille(u) / 1000);
     else
-        ready = morale;
+        ready = ceiling;
 }
 
 } // namespace

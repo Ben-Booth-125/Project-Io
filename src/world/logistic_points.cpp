@@ -505,12 +505,14 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& su
 
     // 1b. A UNIT'S SUPPLY CLAIMS FIRST (BL-1445; LOGISTICS.md § How a tile's points get
     // to it, "A unit's supply draws on the pool, and claims first", NR-917 kept). The
-    // requests arrive in ascending unit id. Each is ROUTED ON THE TILE THE UNIT STANDS
-    // ON against its own nation's sources, exactly as a building's request is (step 2
+    // requests arrive in ascending unit id. Each is PAID AT THE CLOSEST ROAD (BL-1456):
+    // the unit's own tile when its network reaches it, else the nearest tile it reaches
+    // within 8 steps over crossable land (`unit_supply_draw_tile`), and routed there
+    // against its own nation's sources, exactly as a building's request is (step 2
     // below): its claim is need x cover, served while the pool lasts - so what
     // production claims against below is `pool - supply_granted`, not `pool`. A unit
-    // with no nation, or on a tile its nation's network does not reach, is granted
-    // nothing; a request of zero is fully granted (share 1000).
+    // with no nation, or more than 8 tiles from any tile its network reaches, is
+    // granted nothing; a request of zero is fully granted (share 1000).
     for (const lp_supply_claim& c : supplies)
     {
         lp_supply_row sr;
@@ -531,7 +533,16 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& su
                 lp_nation_row& r = rows[c.nation];
                 r.nation = c.nation;
                 r.supply_claim += c.need;
-                sr.cover = lp_route_to(w, memo, c.nation, tit->second.body, c.tile).cover;
+                // BL-1456 (Ben, 2026-10-29; LOGISTICS.md § A unit draws off the road):
+                // PAID AT THE CLOSEST ROAD. The unit's own tile when its network reaches
+                // it; else the nearest tile it reaches within 8 steps over crossable
+                // land, ties to the lowest id; else nothing - past its roads, unfed. The
+                // request stays the quantity of its supplies, charged at that tile's cover.
+                sr.paid_tile = unit_supply_draw_tile(w, memo, c.nation, c.tile,
+                                                     lp_offroad_draw_steps, &sr.draw_steps);
+                sr.cover = sr.paid_tile == null_entity
+                    ? 0.0f
+                    : lp_route_to(w, memo, c.nation, w.tiles.at(sr.paid_tile).body, sr.paid_tile).cover;
                 const float claim = c.need * std::clamp(sr.cover, 0.0f, 1.0f);
                 // `supply_granted` IS the running total, so what is left is the pool
                 // minus it - no second accumulator to keep in step with it.
@@ -964,6 +975,107 @@ lp_route lp_route_to(world& w, lp_reach_memo& memo, entity_id nation, entity_id 
     out.network  = cands.front().net;
     out.distance = cands.front().dist;
     return out;
+}
+
+entity_id unit_supply_draw_tile(world& w, const std::function<bool(entity_id)>& reached,
+                                entity_id unit_tile, int max_steps, int* steps_out)
+{
+    if (steps_out != nullptr)
+        *steps_out = -1;
+    const auto here = w.tiles.find(unit_tile);
+    if (here == w.tiles.end())
+        return null_entity;
+    const entity_id body = here->second.body;
+    // On the network: the request is the road's own.
+    if (reached(unit_tile))
+    {
+        if (steps_out != nullptr)
+            *steps_out = 0;
+        return unit_tile;
+    }
+    // Breadth-first, ONE LAYER AT A TIME, bounded at @p max_steps. A layer is walked in
+    // the order it was found, each tile's sides in index order; the visited set is a
+    // lookup only, never iterated, so nothing here depends on hash layout. The winner
+    // is the LOWEST id among the first layer holding a reached tile - not the first
+    // found - so the tie rule is the doc's, not the walk's.
+    std::set<entity_id>    seen{unit_tile};
+    std::vector<entity_id> layer{unit_tile}, next;
+    for (int step = 1; step <= max_steps && !layer.empty(); ++step)
+    {
+        next.clear();
+        for (const entity_id cur : layer)
+        {
+            const int row = w.tiles.at(cur).grid_y;
+            for (int side = 0; side < 6; ++side)
+            {
+                if (!road_side_is_crossable(side, row))
+                    continue; // the four sides every cost walk crosses
+                const entity_id nb = road_edge_neighbour(w, cur, side);
+                if (nb == null_entity || seen.count(nb) != 0)
+                    continue;
+                const auto nit = w.tiles.find(nb);
+                if (nit == w.tiles.end() || nit->second.body != body
+                    || is_water(nit->second.substrate))
+                    continue; // crossable LAND only: a water gap is no step
+                seen.insert(nb);
+                next.push_back(nb);
+            }
+        }
+        entity_id best = null_entity;
+        for (const entity_id t : next)
+            if ((best == null_entity || t < best) && reached(t))
+                best = t;
+        if (best != null_entity)
+        {
+            if (steps_out != nullptr)
+                *steps_out = step;
+            return best;
+        }
+        layer.swap(next);
+    }
+    return null_entity; // past its roads
+}
+
+entity_id unit_supply_draw_tile(world& w, lp_reach_memo& memo, entity_id nation,
+                                entity_id unit_tile, int max_steps, int* steps_out)
+{
+    if (steps_out != nullptr)
+        *steps_out = -1;
+    const auto here = w.tiles.find(unit_tile);
+    if (nation == null_entity || here == w.tiles.end())
+        return null_entity;
+    const entity_id body = here->second.body;
+    return unit_supply_draw_tile(
+        w, [&](entity_id t) { return lp_route_to(w, memo, nation, body, t).reached; },
+        unit_tile, max_steps, steps_out);
+}
+
+std::unordered_set<entity_id> lp_reached_tiles(world& w, lp_reach_memo& memo, entity_id nation,
+                                               entity_id body)
+{
+    // `route_cands`' qualifying test, turned inside out: a tile is reached when some
+    // source of the nation has it in its field with reach > 0 AND is connected to the
+    // capital. Sources walked in ascending id (memo_sources); the set is lookup only.
+    std::unordered_set<entity_id> out;
+    if (nation == null_entity)
+        return out;
+    const entity_id centre = chain_anchor(w, nation, body);
+    for (const lp_source_ref& s : memo_sources(w, memo, nation, body))
+    {
+        if (!memo_connected(w, memo, nation, s, body, centre))
+            continue;
+        for (const auto& [tile, d] : memo_field(w, memo, s, body))
+            if (lp_reach(s.network, d) > 0.0f)
+                out.insert(tile);
+    }
+    return out;
+}
+
+entity_id unit_supply_draw_tile(world& w, entity_id nation, entity_id unit_tile, int max_steps,
+                                int* steps_out)
+{
+    lp_reach_memo memo;
+    return unit_supply_draw_tile(w, memo, nation, unit_tile, max_steps, steps_out);
 }
 
 namespace {
@@ -1502,6 +1614,17 @@ std::unordered_map<entity_id, lp_flow> lp_route_flow(world& w, lp_reach_memo& me
 // Generation
 // ---------------------------------------------------------------------------
 
+bool unit_tile_within_draw(world& w, entity_id nation, entity_id tile,
+                           const std::function<bool(entity_id)>& has_cover)
+{
+    // THE CLAIM'S OWN WALK (BL-1456, merged with BL-1452): garrison placement and the
+    // seeding's garrison step ask exactly what a unit's supply claim answers - is a tile
+    // the caller's network reaches within the draw - so the two can never disagree.
+    // @p has_cover is the caller's "reached" (a mid-seeding caller reads its live memo).
+    (void)nation; // the caller's has_cover is already that nation's reach
+    return unit_supply_draw_tile(w, has_cover, tile, lp_offroad_draw_steps) != null_entity;
+}
+
 lp_seed_report seed_logistics_sources(world& w)
 {
     lp_seed_report rep;
@@ -1676,15 +1799,18 @@ lp_seed_report seed_logistics_sources(world& w)
     };
     // The road chain laid outward to one consumer (step 1 below; re-run after a bridge).
     // @p avoid: a tile the chain must not take - the shore tile a bridge's port needs.
+    // @p done: when given, the chain stops as soon as it holds (a garrison post needs
+    // only the draw, BL-1452), instead of at the tile's full cover.
     const auto lay_chain = [&](entity_id nation, entity_id body, entity_id ct, entity_id tile,
-                               entity_id owner, entity_id avoid = null_entity) -> bool {
+                               entity_id owner, entity_id avoid = null_entity,
+                               const std::function<bool()>* done = nullptr) -> bool {
         const auto fc = lp_distance_field(w, body, lp_network::road, {tile});
         const auto steps = own_steps(nation, body, tile);
         int last_gap = std::numeric_limits<int>::max();
         bool covered = false;
         for (int step = 0; step < k_chain_steps && rep.hubs_placed < k_max_hubs; ++step)
         {
-            if (coverage_of(nation, body, tile) >= 1.0f)
+            if (done != nullptr ? (*done)() : coverage_of(nation, body, tile) >= 1.0f)
             {
                 covered = true;
                 break;
@@ -1745,7 +1871,7 @@ lp_seed_report seed_logistics_sources(world& w)
             last_gap = ext_gap;
             place_hub(nation, ext, owner);
         }
-        return covered || coverage_of(nation, body, tile) >= 1.0f;
+        return covered || (done != nullptr ? (*done)() : coverage_of(nation, body, tile) >= 1.0f);
     };
 
     // The nation's dry ground a 4-neighbour walk reaches from @p start (an island).
@@ -1990,14 +2116,17 @@ lp_seed_report seed_logistics_sources(world& w)
             if (cap == null_entity || w.tiles.count(cap) == 0 || owner == null_entity
                 || rep.hubs_placed >= k_max_hubs)
                 continue;
-            // A capital that already holds a running source of any network (a rail
-            // station, a state port on a coastal seat) holds one: none is stacked on it.
+            // BL-1452 (Ben, 2026-10-29; § Every capital holds a source, "the capital's source
+            // runs free"): the free source is the capital's GENERATED type, an inland
+            // logistics hub (state_industry `capital_free_source`). So every capital holds a
+            // running HUB: a rail station or a state port standing there does not count, and
+            // the hub stands beside it - else that capital's only source is billed, and a
+            // poor nation's chest sizing cuts it, and the capital goes dark.
             bool holds = hub_tiles.count(cap) != 0;
             for (const entity_id bid : in.ids)
             {
                 const building_component& b = w.buildings.at(bid);
-                lp_network net;
-                if (b.tile == cap && lp_source_network(b.type, net) && lp_source_running(b))
+                if (b.tile == cap && b.type == building_type::inland_logistics_hub && lp_source_running(b))
                     holds = true;
             }
             if (!holds && placeable(cap, nid))
@@ -2109,6 +2238,66 @@ lp_seed_report seed_logistics_sources(world& w)
             rep.unconnectable_ids.push_back(bid); // in.ids is ascending
             if (region_of(nation, body, ct).count(b.tile) == 0)
                 ++rep.unconnectable_cut_off;
+        }
+    }
+
+    // 1b. THE ARMIES (BL-1452; LOGISTICS.md § Where generation puts the sources, Ben
+    //     2026-10-29: "logistics serves the armies from generation"). Every garrison post -
+    //     the capital's and each border post - is a request beside the producing
+    //     buildings: where no source's cover reaches within the unit's draw
+    //     (`unit_tile_within_draw`), the chain is laid out toward the post, bridged by sea
+    //     where its ground is cut off, exactly as for a consumer, and stops as soon as the
+    //     post is within the draw. Ascending unit id: order-independent.
+    {
+        std::vector<world::generated_garrison> posts = w.gen_garrisons;
+        std::sort(posts.begin(), posts.end(),
+                  [](const world::generated_garrison& a, const world::generated_garrison& b) {
+                      return a.unit < b.unit;
+                  });
+        for (const world::generated_garrison& g : posts)
+        {
+            if (rep.hubs_placed >= k_max_hubs)
+                break;
+            const auto uit = w.units.find(g.unit);
+            if (uit == w.units.end() || uit->second.count <= 0)
+                continue;
+            const entity_id tile   = uit->second.position;
+            const entity_id nation = g.nation;
+            const auto tit = w.tiles.find(tile);
+            if (tit == w.tiles.end() || host_nation(w, tile) != nation)
+                continue;
+            ++rep.garrison_posts;
+            const entity_id body = tit->second.body;
+            const std::function<bool()> drawable = [&]() {
+                return unit_tile_within_draw(w, nation, tile, [&](entity_id t) {
+                    return coverage_of(nation, body, t) > 0.0f;
+                });
+            };
+            if (drawable())
+                continue;
+            ++rep.garrison_posts_served;
+            const entity_id owner = nation;
+            const entity_id ct = chain_anchor(w, nation, body);
+            if (ct == null_entity)
+            {
+                if (placeable(tile, nation))
+                    place_hub(nation, tile, owner);
+            }
+            else if (!lay_chain(nation, body, ct, tile, owner, null_entity, &drawable)
+                     && region_of(nation, body, ct).count(tile) == 0)
+            {
+                const std::set<entity_id> island = flood_own(nation, body, tile);
+                const auto key = std::make_tuple(nation, body, *island.begin());
+                if (bridged.count(key) == 0 && bridge(nation, body, ct, island, tile, owner))
+                {
+                    bridged.insert(key);
+                    bridged_ground[{nation, body}].insert(island.begin(), island.end());
+                }
+                if (!lay_chain(nation, body, ct, tile, owner, null_entity, &drawable))
+                    (void)rejoin_linked(nation, body, ct, tile, owner);
+            }
+            if (!drawable())
+                ++rep.garrison_posts_short;
         }
     }
 
@@ -2391,5 +2580,8 @@ void print_lp_seed_report(const lp_seed_report& r)
     std::printf("[lp] port lanes: %d laid between ports within fifty, %d sea tiles added, "
                 "%d pairs no sea joins\n",
                 r.port_lanes_laid, r.port_lane_tiles, r.port_lanes_unreachable);
+    std::printf("[lp] garrison posts: %d counted, %d the sources were laid toward, %d still past "
+                "the draw\n",
+                r.garrison_posts, r.garrison_posts_served, r.garrison_posts_short);
     std::fflush(stdout);
 }

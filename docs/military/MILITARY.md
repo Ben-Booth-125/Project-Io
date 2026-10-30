@@ -184,7 +184,7 @@ reads is shown on the surface that reads it.
 | **Food** | stored, per unit, ‰ | The carried food stock (§ Carried supplies). Below full, a flat penalty; at zero, the unit starves. |
 | **Ammunition** | stored, per unit, ‰ | The carried ammunition stock. Scales every combat stat, floored at 20%. |
 | **Equipment** | stored, per unit, ‰ | The carried equipment stock — the kit fit to use. Scales every combat stat. |
-| **Supply** | stored, per unit | `supply_factor_permille`: the share of its supplies the network delivers (§ Upkeep). It is what resupplies the three stocks, not a scale on the round of its own. |
+| **Supply** | stored, per unit | Two quantities. The **Logistic Point share** granted at the unit's tile (§ Upkeep, "Supply is drawn where the unit stands") is what resupplies the three stocks. `supply_factor_permille`, moved by the one decay rule (an unpaid wage, an unmet goods draw, the share), moves readiness and morale. Neither scales the round of its own. |
 | **Soft attack** | class × equipment | Hits per round against a target's soft share. |
 | **Hard attack** | class × equipment | Hits per round against its hard share. |
 | **Hardness** | class × equipment, 0..1 | Share of the unit that is armoured. |
@@ -238,9 +238,13 @@ keeps every stock full, and the stocks move only once the campaign begins.
   attack, defence and breakthrough. **Ammunition is floored at 20%**: a unit out of shells still
   fights with small arms at close quarters. Equipment has no floor. The two multiply, with morale.
 
-The three stocks are what the round reads for supply; `supply_factor_permille` is the delivered
-share that feeds them, so the one decay rule (§ Upkeep) now moves the stocks' resupply rather than
-scaling hits directly.
+The daily drain rates are authored in `scripts/economy.lua` § `economy.military.carried_supplies`
+(food per day, ammunition per day fighting, equipment per day and per day fighting, and the restock); the hunger
+step, the ammunition floor and the 180 days are the design's own numbers, not rates.
+
+The three stocks are what the round reads for supply. They are fed by the **Logistic Point share**
+granted at the unit's tile — only the road gap starves — while `supply_factor_permille` and the
+one decay rule (§ Upkeep) move readiness and morale; neither scales hits directly.
 
 ### Recon (Ben, 2026-10-29)
 
@@ -1366,15 +1370,15 @@ everything that keeps a unit in the field: food upkeep, ammunition resupply, the
 attrition, and the recruits and equipment that refill its HP (§ Land — equipment, refit and
 manpower). The request is the quantity of those goods, as a convoy's draw is its cargo. Where the
 tile's cover meets only part of it, the unit is supplied at that share, and the one decay rule above
-moves its supply factor toward it — a third trigger of the same rule, not a second rule. The
-supply factor is the rate at which the unit's carried food, ammunition and equipment are refilled
-(§ Carried supplies). A unit off the road draws at the closest road within 8 tiles, paid per item
+moves its supply factor toward it — a third trigger of the same rule, not a second rule. That
+share, as granted, is the rate at which the unit's carried food, ammunition and equipment are
+refilled (§ Carried supplies); the supply factor moves its readiness and morale. A unit off the road draws at the closest road within 8 tiles, paid per item
 resupplied (`../economy/LOGISTICS.md` § A unit draws off the road); an army deep past its roads is
 an army its network cannot feed.
 
 **Supply is measurably real in the resolver, not merely expensive.** The land round reads each
-unit's carried food, ammunition and equipment (§ Carried supplies), which its supply factor refills,
-so an unsupplied army is weaker where it counts.
+unit's carried food, ammunition and equipment (§ Carried supplies), which its Logistic Point share
+refills, so an army its network cannot reach is weaker where it counts.
 
 ---
 

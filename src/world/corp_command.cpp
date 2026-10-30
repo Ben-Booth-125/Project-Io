@@ -142,6 +142,44 @@ bool hire_goods_affordable(const world& w, entity_id nation, const roster_row* r
     return true;
 }
 
+/// BL-1452 (one purse gate): an UPPER BOUND on what buying @p need off @p nation's
+/// shelves costs - each good at the highest posted price among its markets. A hire
+/// proves its credits AND its goods fit the purse room together, so the settle's cap
+/// (and the never-debt rule) cannot leave a paid hire short of its kit.
+float hire_goods_price_bound(const world& w, entity_id nation, const std::array<float, resource_count>& need)
+{
+    float total = 0.0f;
+    const std::vector<entity_id> mids = corp_markets(w, nation);
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (!(need[r] > 0.0f))
+            continue;
+        float px = 0.0f;
+        for (const entity_id mid : mids)
+            if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+                px = std::max(px, posted_price(mit->second, r));
+        total += need[r] * px;
+    }
+    return total;
+}
+
+/// The goods a hire draws: @p kit plus each of @p row's gated axes at the resource
+/// `hire_axis_resource` would take (none when @p row is null).
+std::array<float, resource_count> hire_goods_need(const world& w, entity_id nation, const roster_row* row,
+                                                  const std::array<float, resource_count>& kit)
+{
+    std::array<float, resource_count> need = kit;
+    if (row != nullptr)
+        for (std::size_t i = 0; i < hire_axis_count; ++i)
+        {
+            const hire_axis axis = static_cast<hire_axis>(i);
+            if (gate_axis_q(row->gate, axis) <= 0 || !corp_can_afford_axis(w, nation, axis))
+                continue;
+            need[static_cast<std::size_t>(hire_axis_resource(w, nation, axis))] += hire_axis_cost;
+        }
+    return need;
+}
+
 /// BL-1434: buy the kit goods @p kit off @p nation's shelves, ascending resource.
 /// Only called once `hire_goods_affordable` has passed.
 void debit_kit_goods(world& w, entity_id nation, const std::array<float, resource_count>& kit)
@@ -880,6 +918,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             const std::array<float, resource_count> kit = kit_goods(lc, design);
             if (!hire_goods_affordable(w, cmd.corp, &row, kit))
                 return corp_command_result::rejected_funds;
+            if (purse_room_of(w, cmd.corp)
+                < hire_cost + hire_goods_price_bound(w, cmd.corp, hire_goods_need(w, cmd.corp, &row, kit)))
+                return corp_command_result::rejected_funds; // BL-1452: the goods' price counts too
 
             if (!debit_hire_cost(w, cmd.corp, row))
                 return corp_command_result::rejected_funds;
@@ -925,6 +966,8 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 goods[g] += cs.hire_goods[g];
             if (!hire_goods_affordable(w, cmd.corp, nullptr, goods))
                 return corp_command_result::rejected_funds;
+            if (purse_room_of(w, cmd.corp) < cs.hire_cost + hire_goods_price_bound(w, cmd.corp, goods))
+                return corp_command_result::rejected_funds; // BL-1452: the goods' price counts too
             debit_kit_goods(w, cmd.corp, goods);
             *purse_of(w, cmd.corp) -= cs.hire_cost;
 

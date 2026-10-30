@@ -1345,6 +1345,35 @@ ImU32 logistics_road_colour(float supplied, float requested)
     return logistics_ramp_colour(logistics_road_t(supplied, requested));
 }
 
+/// BL-1456: THE OFF-ROAD DASH's two RHYTHMS, as fractions of the hex radius (each with a
+/// pixel floor), so the pattern reads alike at every rung of the zoom ladder. A unit
+/// within 8 tiles takes the LONG dash, coloured by its share - so a starved one (share
+/// 0) is red in long dashes; a unit PAST ITS ROADS takes the SHORT, close-set dash in
+/// red - the rhythm, not the colour, is what tells the two apart. The key draws both.
+constexpr float k_dash_long_len  = 0.40f, k_dash_long_gap  = 0.25f; // floors 5 px / 3 px
+constexpr float k_dash_short_len = 0.12f, k_dash_short_gap = 0.14f; // floors 2 px / 3 px
+/// A dashed segment @p a -> @p b: a dark casing 2 px wider under each dash, then the dash.
+void stroke_dashed(ImDrawList* dl, ImVec2 a, ImVec2 b, ImU32 col, float width, float dash,
+                   float gap)
+{
+    const float dx = b.x - a.x, dy = b.y - a.y;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (!(len > 1.0f) || !(dash > 0.0f))
+        return;
+    const float ux = dx / len, uy = dy / len;
+    for (int pass = 0; pass < 2; ++pass) // casing, then colour
+        for (float s = 0.0f; s < len; s += dash + gap)
+        {
+            const float e = std::min(len, s + dash);
+            const ImVec2 p0{a.x + ux * s, a.y + uy * s};
+            const ImVec2 p1{a.x + ux * e, a.y + uy * e};
+            if (pass == 0)
+                dl->AddLine(p0, p1, IM_COL32(12, 16, 24, 190), width + 2.0f);
+            else
+                dl->AddLine(p0, p1, col, width);
+        }
+}
+
 /// REACH, KEPT APART FROM TRAFFIC (Ben, 2026-10-25: "an unused road between them
 /// reads 0,0"; LENSES.md § Logistics lens). A link of the player's chain that no routed
 /// request crosses is CONNECTED, IDLE - a pale steel, neither end of the traffic ramp,
@@ -1393,12 +1422,14 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
 
     const float mark_d = 11.0f; // anchor swatch diameter
     const bool  have   = !state.lp_anchors.empty() && state.lp_anchor_max > 0.0f;
+    const bool  dashes = !state.lp_dashes.empty(); // BL-1456: rows only when a dash is drawn
     // A nation with NO connected source still gets the ramp and its arithmetic
     // (Ben, 2026-10-24: "it is not clear whether logistics works as intended"):
     // "Generated 0" beside what production needs is the answer, not a blank key.
     const float body_h = state.lp_player_known
         ? pad + line_h + 4.0f + bar_h + 2.0f + line_h + 2.0f + line_h + 6.0f // ramp, stops, caption
               + 2.0f * (line_h + 2.0f) + 4.0f // the idle and off-chain swatches
+              + (dashes ? 2.0f * (line_h + 2.0f) + 4.0f : 0.0f) // BL-1456: the two dashes
               + (have ? std::max(line_h, mark_d) : line_h) + 4.0f
               + 4.0f * (line_h + 2.0f) + pad
         : pad + line_h + 6.0f + line_h + 4.0f + line_h + pad;
@@ -1461,6 +1492,25 @@ void draw_throughput_key(ImDrawList* dl, const ui_state& state)
     swatch_row(k_logistics_idle, "connected, idle");
     swatch_row(k_logistics_off, "not tied to the capital");
     y += 4.0f;
+
+    // BL-1456: THE DASH IS NOT THE ROAD RAMP. A dash is coloured by its unit's granted
+    // SHARE, linearly (Ben, 2026-10-29), so a green dash means "fed", never "2x+"; the
+    // key says so, and shows the past-its-roads rhythm beside it, each sample drawn by
+    // the canvas's own stroke at a mid-ladder hex radius of 16 px.
+    if (dashes)
+    {
+        const auto dash_row = [&](ImU32 c, float len, float gap, const char* label) {
+            const float sw = 24.0f, cy = y + line_h * 0.5f;
+            stroke_dashed(dl, {x, cy}, {x + sw, cy}, c, 2.0f, len, gap);
+            dl->AddText({ x + sw + 6.0f, y }, IM_COL32(200, 205, 214, 255), label); // fit-exempt: legend box sized to its measured entries (container 2)
+            y += line_h + 2.0f;
+        };
+        dash_row(k_logistics_road_green, std::max(5.0f, k_dash_long_len * 16.0f),
+                 std::max(3.0f, k_dash_long_gap * 16.0f), "unit off road: share of supply granted");
+        dash_row(k_logistics_road_red, std::max(2.0f, k_dash_short_len * 16.0f),
+                 std::max(3.0f, k_dash_short_gap * 16.0f), "unit past its roads (over 8 tiles)");
+        y += 4.0f;
+    }
 
     // Row 2 - the SOURCE MARK, carrying the points that source makes. BL-1352: these
     // are hubs, stations and ports, never cities; BL-1353: and only your nation's.
@@ -2055,6 +2105,7 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
     state.lp_chain.clear();
     state.lp_track.clear();
     state.lp_legs.clear();
+    state.lp_dashes.clear(); // BL-1456
     state.lp_links.clear();
     state.lp_both_cells = state.lp_both_added = 0;
     state.lp_both_supplied = state.lp_both_requested = 0.0;
@@ -2433,6 +2484,108 @@ void update_body_throughput(world& w, ui_state& state, const recipe_registry& re
             for (const lp_source_row& src : lp.sources)
                 if (src.nation == pn && src.connected) // BL-1356: only those feeding the pool
                     ++state.lp_player_sources;
+
+            // BL-1456 (Ben, 2026-10-29; LENSES.md § Logistics lens, "A unit off the road
+            // is joined to it by a dashed line"). Each of the PLAYER's units on this body
+            // that stands off its network: a dash from the road tile its supply is paid
+            // at (`unit_supply_draw_tile`, the resolver's own search, within 8) to the
+            // unit, coloured by its granted share LINEARLY (Ben, 2026-10-29); past its 8
+            // tiles, a RED dash in the short past-its-roads rhythm to the nearest road its
+            // network reaches, searched to 32 for this display only (none in bound: no
+            // dash). A unit on the network draws none.
+            //
+            // GEOMETRY AND COLOUR FROM ONE MOMENT. The geometry is the unit's position
+            // now; the share is the last resolve's. So the row's share colours the dash
+            // only when the road the unit would be paid at NOW is the road the row was
+            // paid at; otherwise the dash forecasts, coloured by the cover at that road
+            // now. A unit that walked back onto a road draws no dash, whatever its row.
+            //
+            // Held across frames on the body's stamp, the track count (as the flow is)
+            // and the player units' positions. A miss builds the nation's REACHED SET
+            // once (`lp_reached_tiles`, the same per-source fields routing reads), so
+            // each tile the searches visit is one lookup, not a routing.
+            {
+                constexpr int k_dash_display_steps = 32;
+                static body_frame_stamp                             s_dash_stamp;
+                static entity_id                                    s_dash_nation = null_entity;
+                static std::size_t                                  s_dash_track  = ~std::size_t{0};
+                static std::vector<std::pair<entity_id, entity_id>> s_dash_units; // (unit, tile)
+                static std::vector<ui_state::lp_dash_view>          s_dashes;
+                std::vector<std::pair<entity_id, entity_id>> units_here;
+                for (const auto& [uid, u] : w.units)
+                {
+                    if (u.owner != pn || u.count <= 0)
+                        continue;
+                    const auto ut = w.tiles.find(u.position);
+                    if (ut != w.tiles.end() && ut->second.body == state.active_body)
+                        units_here.emplace_back(uid, u.position);
+                }
+                std::sort(units_here.begin(), units_here.end()); // ascending id: w.units is unordered
+                if (fstamp != s_dash_stamp || pn != s_dash_nation || units_here != s_dash_units
+                    || w.rail_track.size() != s_dash_track)
+                {
+                    s_dash_stamp  = fstamp;
+                    s_dash_nation = pn;
+                    s_dash_track  = w.rail_track.size();
+                    s_dash_units  = units_here;
+                    s_dashes.clear();
+                    std::map<entity_id, const lp_supply_row*> rows;
+                    for (const lp_supply_row& sr : lp.supplies)
+                        rows[sr.unit] = &sr;
+                    const auto cell_of = [&](entity_id t) -> int {
+                        const auto tc = w.tiles.find(t);
+                        if (tc == w.tiles.end() || gw <= 0)
+                            return -1;
+                        return tc->second.grid_y * gw + tc->second.grid_x;
+                    };
+                    const std::unordered_set<entity_id> reach =
+                        units_here.empty() ? std::unordered_set<entity_id>{}
+                                           : lp_reached_tiles(w, memo, pn, state.active_body);
+                    const std::function<bool(entity_id)> reached = [&](entity_id t) {
+                        return reach.count(t) != 0;
+                    };
+                    for (const auto& [uid, tile] : units_here)
+                    {
+                        int steps = -1;
+                        entity_id road = unit_supply_draw_tile(w, reached, tile,
+                                                               lp_offroad_draw_steps, &steps);
+                        if (road == tile)
+                            continue; // on the network: its request is the road's own
+                        ui_state::lp_dash_view d;
+                        d.unit = uid;
+                        const auto rit = rows.find(uid);
+                        if (road == null_entity)
+                        {
+                            road = unit_supply_draw_tile(w, reached, tile, k_dash_display_steps, &steps);
+                            if (road == null_entity)
+                                continue; // no road of its network in display bound
+                            d.red = true;
+                            d.t   = 0.0f;
+                        }
+                        else if (rit != rows.end() && rit->second->paid_tile == road)
+                        {
+                            // The road the last resolve paid at: its granted share.
+                            d.t = rit->second->need > 0.0f
+                                ? std::clamp(rit->second->share_permille / 1000.0f, 0.0f, 1.0f)
+                                : 1.0f;
+                        }
+                        else
+                        {
+                            // Moved since that resolve, or none served it yet (the guarded
+                            // fallback carries no supply claims): a FORECAST, the cover at
+                            // the road it would be paid at now.
+                            d.forecast = true;
+                            d.t = std::clamp(lp_route_to(w, memo, pn, state.active_body, road).cover,
+                                             0.0f, 1.0f);
+                        }
+                        d.road_cell = cell_of(road);
+                        d.unit_cell = cell_of(tile);
+                        if (d.road_cell >= 0 && d.unit_cell >= 0)
+                            s_dashes.push_back(d);
+                    }
+                }
+                state.lp_dashes = s_dashes;
+            }
         }
     }
 
@@ -6663,6 +6816,62 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         dl->AddPolyline(seg, ns, cell_col, ImDrawFlags_None, thick);
                 }
                 for (ImVec2& p : pts) p.x -= off;
+            }
+        }
+    }
+
+    // --- BL-1456: THE OFF-ROAD LEG, dashed ------------------------------------
+    //
+    // LENSES.md § Logistics lens, "A unit off the road is joined to it by a dashed line"
+    // (Ben, 2026-10-29): from the centre of the road tile a player unit's supply is
+    // paid at to the centre of the unit's tile, coloured by its granted share linearly -
+    // or, past its 8 tiles, red in the SHORT rhythm to the nearest road its network
+    // reaches. Dashes are cut by hand (ImGui strokes no dashed line, `stroke_dashed`)
+    // and SCALE WITH THE HEX so the rhythm reads the same at every rung of the zoom
+    // ladder: the long dash 0.40 hex radius with a 0.25 gap (floors 5 px / 3 px), the
+    // short dash 0.12 with a 0.14 gap (floors 2 px / 3 px); a width of 0.10 hex radius,
+    // never under 2 px; a dark casing 2 px wider under each dash, as the legs have, so it
+    // holds over any ground. Per frame and not cached: a handful of short lines.
+    state.lp_dashes_drawn = state.lp_dashes_red_drawn = 0;
+    for (ui_state::lp_dash_view& d : state.lp_dashes)
+        d.drawn = 0;
+    if (state.overlay == overlay_mode::throughput && !state.lp_dashes.empty() && raster_ok
+        && state.lp_reaching_gw == gw)
+    {
+        const float width = std::max(2.0f, 0.10f * draw_r);
+        for (ui_state::lp_dash_view& d : state.lp_dashes)
+        {
+            const int rc = d.road_cell % gw, rr = d.road_cell / gw;
+            const int uc = d.unit_cell % gw, ur = d.unit_cell / gw;
+            if (!god_view_lift && !(survey_tile_visible(body.survey, gw, gh, rc, rr)
+                                    && survey_tile_visible(body.survey, gw, gh, uc, ur)))
+                continue; // the survey mask owns unseen ground
+            ImVec2 a = to_screen(hex_local_centre(rc, rr, hex_size));
+            const ImVec2 b = to_screen(hex_local_centre(uc, ur, hex_size));
+            // Unwrap across the cylinder seam so the leg is the short way round.
+            if (period_px > 0.0f)
+            {
+                while (a.x - b.x >  0.5f * period_px) a.x -= period_px;
+                while (b.x - a.x >  0.5f * period_px) a.x += period_px;
+            }
+            const float dash = d.red ? std::max(2.0f, k_dash_short_len * draw_r)
+                                     : std::max(5.0f, k_dash_long_len * draw_r);
+            const float gap  = d.red ? std::max(3.0f, k_dash_short_gap * draw_r)
+                                     : std::max(3.0f, k_dash_long_gap * draw_r);
+            const ImU32 col = d.red ? k_logistics_road_red : logistics_ramp_colour(d.t);
+            const float min_x = std::min(a.x, b.x), max_x = std::max(a.x, b.x);
+            const int k_lo = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - max_x) / period_px)) : 0;
+            const int k_hi = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - min_x) / period_px)) : 0;
+            for (int k = k_lo; k <= k_hi; ++k)
+            {
+                const float off = static_cast<float>(k) * period_px;
+                stroke_dashed(dl, {a.x + off, a.y}, {b.x + off, b.y}, col, width, dash, gap);
+                ++d.drawn;
+                ++state.lp_dashes_drawn;
+                if (d.red)
+                    ++state.lp_dashes_red_drawn;
             }
         }
     }

@@ -2128,6 +2128,12 @@ void app::setup_world(world_params params)
     // body opens hidden until the player dispatches a survey.
     init_survey_states(m_world);
     m_last_survey_day = 0;
+
+    // BL-1452: THE VERIFY WORLD IS A LIVE WORLD. It runs no settle, so its first step
+    // is a live one, as a loaded save resumes (`m_econ_steps = settle + env.econ_tick`)
+    // and as Begin hands over: stamped from k_campaign_settle_ticks, so the settle's
+    // surplus cap, its garrison repost and its held stocks never apply to a script.
+    m_econ_steps = static_cast<uint64_t>(k_campaign_settle_ticks);
 }
 
 void app::setup_presentation(const world_params& params)

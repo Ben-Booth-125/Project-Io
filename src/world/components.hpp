@@ -1945,7 +1945,51 @@ struct unit_component
     /// `refit_unit` (the live design when the refit was ordered, its kit paid for
     /// then) and taken into `kit` when the refit completes. Base when not refitting.
     unit_design refit_kit{};
+
+    // BL-1452 (carried supplies; MILITARY.md § Carried supplies, Ben 2026-10-29): the
+    // three stocks a unit carries, each per-mille of full, and the starvation carry.
+    // Full at hire (these defaults), drained and refilled once a day by
+    // `run_carried_supplies_day` (carried_supplies.hpp), read by the land round
+    // through `carried_attack_permille` / `carried_combat_permille`. Saved
+    // (world_save_version 66, only off full) and hashed only off full.
+
+    /// Carried food, per-mille. Below 1000 the unit is hungry; at 0 it starves.
+    int32_t   food_permille = 1000;
+
+    /// Carried ammunition, per-mille. Scales every combat stat, floored at 20%.
+    int32_t   ammo_permille = 1000;
+
+    /// Carried equipment (the kit fit to use), per-mille. Scales every combat stat.
+    int32_t   equipment_permille = 1000;
+
+    /// The starvation remainder: establishment-days owed toward the next man lost,
+    /// in [0, k_starvation_days). A starving unit loses establishment / 180 men a day
+    /// with this integer carry, so the whole establishment goes in exactly 180 days.
+    int32_t   starvation_carry = 0;
+
+    /// Each stock's sub-per-mille remainder, in [0, k_supply_remainder_unit) millionths
+    /// of full (carried_supplies.hpp): the delivery's fraction carried day to day, so a
+    /// cover at break-even neither drifts up nor down. 0 at full.
+    int32_t   food_remainder = 0;
+    int32_t   ammo_remainder = 0;
+    int32_t   equipment_remainder = 0;
+
+    /// ONLY THE ROAD GAP STARVES (Ben, 2026-10-29; MILITARY.md § Carried supplies): the
+    /// Logistic Point share, per-mille, the unit's supply request was granted at its
+    /// tile this quarter (`lp_tick::supply_share`, written by the quarterly garrison
+    /// upkeep). It — not `supply_factor_permille`, which an unpaid wage or an unmet
+    /// goods draw also lowers — is the share that resupplies the three stocks.
+    int32_t   lp_share_permille = 1000;
 };
+
+/// True when a unit's carried supplies are all full with nothing carried and its road
+/// share is whole — the state the save and the hash leave out (BL-1452).
+inline bool unit_supplies_full(const unit_component& u)
+{
+    return u.food_permille == 1000 && u.ammo_permille == 1000 && u.equipment_permille == 1000
+        && u.starvation_carry == 0 && u.food_remainder == 0 && u.ammo_remainder == 0
+        && u.equipment_remainder == 0 && u.lp_share_permille == 1000;
+}
 
 /// `unit_component::refit_type`'s "not refitting" sentinel. Never a roster index.
 inline constexpr uint16_t k_no_refit = 0xFFFFu;

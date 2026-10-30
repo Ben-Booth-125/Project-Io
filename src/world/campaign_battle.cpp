@@ -84,7 +84,8 @@ int64_t side_hits(const std::vector<land_combatant>& side, int64_t target_hardne
 }
 
 /// Milli-hits a side can absorb: men x defence when it defends, men x
-/// breakthrough when it attacks.
+/// breakthrough when it attacks, scaled by the unit's carried ammunition and
+/// equipment (BL-1452, `land_combatant::carried`).
 int64_t side_absorb(const std::vector<land_combatant>& side, bool defending)
 {
     int64_t absorb = 0;
@@ -92,6 +93,7 @@ int64_t side_absorb(const std::vector<land_combatant>& side, bool defending)
         if (land_combatant_fighting(c))
             absorb += static_cast<int64_t>(c.men)
                     * std::max(0, defending ? c.stats.defence : c.stats.breakthrough)
+                    * clamp_permille(c.carried) / 1000
                     * clamp_permille(c.terrain) / 1000; // BL-1455: the class's ground
     return absorb;
 }

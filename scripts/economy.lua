@@ -945,6 +945,37 @@ economy = {
             siege    = 3.0,
         },
 
+        -- BL-1452 (carried supplies; MILITARY.md § Carried supplies, Ben 2026-10-29): A
+        -- UNIT CARRIES FOOD, AMMUNITION AND EQUIPMENT, each per-mille of full, drained
+        -- once a DAY and refilled at its LOGISTIC POINT SHARE (Ben, 2026-10-29: only the
+        -- road gap starves - an unpaid wage moves morale, never the stocks): share x
+        -- (today's need + the restock below), capped at full. Per-mille of a full stock per day; integers in [0, 1000]
+        -- (the loader rejects anything else, and any unknown key). FIRST CUT, argued:
+        --   food 33: a full stock feeds a cut-off unit ~30 days (1000 / 33), a month of
+        --     carried rations - long enough that a quarter's short grant bites inside
+        --     the quarter, short enough that an army cut off for a season starves;
+        --   ammunition 50 per day fighting: 20 days of fire from full, the day by which
+        --     recon gives full vision (§ Recon), so an unsupplied stack runs dry about
+        --     when a battle matures; the 20% floor keeps it fighting after;
+        --   equipment 1 a day attrition, 10 per day fighting: a quarter in camp
+        --     unsupplied wears a tenth of the kit; a battle wears it ten times faster.
+        -- RESTOCK (Ben, 2026-10-29: "Delivery is share x (daily need + a restock rate);
+        -- half cover then drains more slowly, full cover refills"): restock_permille
+        -- of each stock's full daily rate rides on top of today's need, at the share.
+        -- 500 (half): full cover refills an empty stock at half its rate a day (food
+        -- 16.5/day, ~61 days from empty), and a stock spent at its full rate breaks
+        -- even at 1000 / 1.5 = 667 permille cover; half cover now loses 8.25 food a day
+        -- (a full stock lasts ~121 days) instead of 16.5.
+        -- The hunger step (-15%), the ammunition floor (20%) and starvation's 180 days
+        -- are the design's own numbers (carried_supplies.hpp), not rates.
+        carried_supplies = {
+            food_per_day                = 33,
+            ammo_per_battle_day         = 50,
+            equipment_attrition_per_day = 1,
+            equipment_per_battle_day    = 10,
+            restock_permille            = 500,
+        },
+
         -- BL-1455 (Ben, 2026-10-29; MILITARY.md § Terrain and the classes): GROUND
         -- TREATS THE CLASSES DIFFERENTLY. A row per (land class, terrain). Terrain keys:
         -- mountain, canyon, rift (landforms); marsh, desert (the dunes cover), forest,
