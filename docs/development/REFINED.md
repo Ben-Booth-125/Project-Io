@@ -42,6 +42,23 @@ and NR-1102 (a ceded capital moves; a last province is never ceded). Nothing gat
 - BL-1419 (Industry lens fills): it shows other nations' plants.
 - BL-1420 (lane and port defects and checks): five defects, two missing checks.
 
+### Wave 1 — Delivery Full (requirements: groups `sentiment-emitters`, `alarm-as-sentiment`, `war-record-and-declaration`, `war-goals-and-peace`)
+
+**Lane S — BL-1458 (sentiment emitters) + BL-1432 (Alarm as sentiment).** Save version 68.
+- [ ] **S1** Alarm: third float on `sentiment_value`, factor weight and decay, erase-when-all-neutral, save v68 (old streams load Alarm 0). provides: `sentiment_value::alarm`, `sentiment_factor_weight::alarm`, `alarm_decay_per_tick`. (BL-1432 R1)
+- [ ] **S2** Append `war_declared`, `peace_concluded`, `province_ceded` after `historical_grudge`. provides: those three enumerators.
+- [ ] **S3** Emitters: trade flow, `accept_friendship`, embargo law, battles; Alarm capability factors; tree effects "Alarm toward you"; industrialisation reading [13] renamed. consumes: S1, S2. (BL-1458 R1-R3, BL-1432 R2-R4)
+
+**Lane W — BL-1459 (war record and declaration) → BL-1428 (war goals and peace).** Save version 69.
+- [ ] **W1** `war.{hpp,cpp}`: the war record, truce and peace-offer tables on `world`, snapshot v69. provides: `war_record`, `world::wars`, `world::truces`, `world::peace_offers`.
+- [ ] **W2** `declare_war`, `answer_war`, justifications as condition rows, `declaration_price` preview, refusals; `return_to_neutral` refused in war; right-click path routed. consumes: S2 (appended identically in W's branch). provides: `declare_war`, `answer_war`, `declaration_price`. (BL-1459 R1-R5)
+- [ ] **W3** War score, exhaustion and morale, peace offers (white, cession of held goals, never the last province), impose at 100, 16-tick truce, emit peace factors. The cession's territorial move is a stub call, `cede_provinces`, BL-1460's in wave 2. provides: `war_score`, `offer_peace`, `accept_peace`, `impose_peace`, `cede_provinces` (stub). (BL-1428 R1-R4)
+
+### Wave 2 — after wave 1 merges
+- BL-1460 (cession moves territory): fills `cede_provinces`. consumes: W3.
+- BL-1461 (rivals declare war): consumes W2, W3, S1.
+- BL-1462 (diplomacy ledger): consumes S1, W2, W3 and the stance verbs.
+
 **Lanes.** BL-1458 and BL-1432 both touch `sentiment.*`, so one world lane. BL-1459 → BL-1428 →
 BL-1460 is a chain on `war.*`. BL-1462 can start on stubs once BL-1459's verbs are fixed. Every lane
 is Delivery Full: the save format and the territory seam move.

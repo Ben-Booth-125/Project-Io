@@ -7580,6 +7580,360 @@
    "batch": "sprint-59",
    "resolved": "2026-10-28",
    "archived": "docs/development/archive/requirements-2026-Q4.json"
+  },
+  {
+   "brief": "sentiment-emitters",
+   "title": "BL-1458 - Conduct writes sentiment: every live factor gets its emitter",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1458 - sprint 61 (Ben, 2026-10-30)",
+   "batch": "sprint-61",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: sentiment_harness"
+     ],
+     "requirement": "Each emitter in RELATIONS.md § Who emits each factor writes its factor on the stated observer -> subject rows with the stated sign per dimension: trade_conducted (per tick per pair, magnitude = value landed), friendship_accepted, embargo_imposed, force_used (magnitude = strength the observer lost). The war emitters (hostility_declared, war_declared, peace_concluded, province_ceded) are asserted by war_harness (BL-1459, BL-1428).",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: sentiment_harness"
+     ],
+     "requirement": "sentiment.cpp still takes no world& (R1 holds); emitters gather sentiment_events and fold one canonicalised batch per tick, so gather order is not observable. War_declared, peace_concluded and province_ceded are appended to sentiment_factor_kind after historical_grudge, in that order.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: world_determinism",
+      "headless: save_roundtrip",
+      "headless: market_viability (quick)"
+     ],
+     "requirement": "Determinism and the save hold. Nothing reads the emitted rows yet but the scorer and the ledger, so the economy is unmoved; digest movement is reported, not re-blessed.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "alarm-as-sentiment",
+   "title": "BL-1432 - Alarm is a third sentiment dimension that rivals read and the player can watch",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1432 - sprint 61 (Ben, 2026-10-30)",
+   "batch": "sprint-61",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: sentiment_harness",
+      "headless: save_roundtrip"
+     ],
+     "requirement": "Alarm is a third float beside Access and Trust per (observer, subject): folded by authored factor weights, decayed toward neutral at an authored rate, a row erased only when all three are neutral. Saved (save version bump); a stream from before the bump loads with Alarm 0.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: sentiment_harness"
+     ],
+     "requirement": "Alarm's factors emit (RELATIONS.md § 6): visible capability (a technology whose tell is public, a large single-site facility), standing force on the observer's border, severed trade. Unrest has no store; its factor is authored zero. Live trade between the pair relieves it (trade_conducted, BL-1458).",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: tech_tree_effects or the harness that reads tree effects"
+     ],
+     "requirement": "The Digitisation nodes whose effect reads \"Alarm toward you\" write to the Alarm dimension instead of reading nothing.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: industrialisation_sim_harness"
+     ],
+     "requirement": "Reading [13] prints \"Alarm lean\", not \"Catastrophe lean\" (INDUSTRIALISATION.md acceptance table).",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "war-record-and-declaration",
+   "title": "BL-1459 - A war is a record: declare_war with goals, a priced declaration, justifications, the free answer",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1459 - sprint 61 (Ben, 2026-10-30)",
+   "batch": "sprint-61",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: war_harness"
+     ],
+     "requirement": "declare_war(declarer, defender, goals) writes the declarer's hostility row and opens the war record in one call. It is refused, mutating nothing, on: an existing war between the pair, a standing truce, zero or more than three goals, a goal that is not the defender's province, declarer == defender. Friendship between the pair dissolves. return_to_neutral between war parties is refused.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: war_harness"
+     ],
+     "requirement": "The price: hostility_declared on the defender's row toward the declarer; war_declared on every other nation's row toward the declarer, magnitude doubled for a nation bordering either party and raised per goal past the first; halved when any justification holds. Each of the four justifications (grievance, embargo, lost ground, a friend attacked) is detected by its condition row, and a preview read returns the same price the declaration then charges.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: war_harness"
+     ],
+     "requirement": "The defender's answer costs nothing, writes its hostility row, and names one to three goals among the declarer's provinces; refused, mutating nothing, on an invalid goal or a war that is not its own.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: save_roundtrip",
+      "headless: world_determinism",
+      "headless: agent_seam"
+     ],
+     "requirement": "The war record and its tables are in the world snapshot (save version bump; older streams load with no wars). The verbs cross the AI-facing seam as untrusted input: an out-of-range id or goal list rejects the whole command and mutates nothing. ACTIONS.json carries declare_war and the answer.",
+     "notes": null
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "headless: war_harness"
+     ],
+     "requirement": "The right-click declare-and-attack path declares through declare_war with the attacked tile's province as its first goal.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "war-goals-and-peace",
+   "title": "BL-1428 - A war has a score, exhaustion, and a peace: white, ceded, or imposed at 100; then a truce",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1428 - sprint 61 (Ben, 2026-10-30)",
+   "batch": "sprint-61",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: war_harness"
+     ],
+     "requirement": "War score in [-100, 100], positive for the declarer: half occupation (each side's goals it holds by province_holder, weighted by tiles: declarer's held goals less the defender's, over all goals named) and half battles (strength destroyed between the pair: declarer's share less the defender's).",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: war_harness"
+     ],
+     "requirement": "Exhaustion in [0, 100] per party rises with its own strength lost, each day its units stand in the field, and each of its provinces the enemy holds; it decays once at peace, and it moves the morale of the nation's units.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: war_harness"
+     ],
+     "requirement": "Peace offers live in their own table, one pending per war. White peace changes nothing hands; cession passes only named goals the receiver holds, never the loser's last province. A side at score 100 may impose without acceptance. At peace both hostility rows clear, the record closes, and a 16-tick truce refuses declare_war either way. peace_concluded and province_ceded emit as RELATIONS.md says.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: save_roundtrip",
+      "headless: world_determinism",
+      "headless: agent_seam"
+     ],
+     "requirement": "Offers, truces, score and exhaustion are saved; the peace verbs are seam-validated and in ACTIONS.json.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "cession-moves-territory",
+   "title": "BL-1460 - A peace that cedes moves tile_to_nation; a white peace hands occupied goals back",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1460 - sprint 61 (Ben, 2026-10-30)",
+   "batch": "sprint-61",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: cession_harness"
+     ],
+     "requirement": "On a library seed, a ceded province's tiles move to the receiver in tile_to_nation; every building on them changes owner with the ground; its population centre, law jurisdiction and road network membership follow; fronts re-derive; the loser's units on ceded ground withdraw by the retreat rule.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: cession_harness"
+     ],
+     "requirement": "A ceded capital moves the loser's capital to its remaining province with the largest population centre (ties to the lower id), and the free logistics hub moves with it. A peace that would cede the last province is refused.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: cession_harness"
+     ],
+     "requirement": "A white peace returns every occupied goal's holder to its owner, and the occupying units withdraw by the retreat rule.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: money_conservation",
+      "headless: fold_census",
+      "headless: save_roundtrip",
+      "headless: world_determinism",
+      "headless: the front harnesses"
+     ],
+     "requirement": "Conservation, the fold, the save and determinism hold across a cession; no consumer of tile_to_nation keeps a stale cache.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "rivals-declare-war",
+   "title": "BL-1461 - A rival nation wages war: declares with goals, answers, makes and imposes peace",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1461 - sprint 61 (Ben, 2026-10-30)",
+   "batch": "sprint-61",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "headless: stance_determinism",
+      "headless: spectator_determinism"
+     ],
+     "requirement": "A rival's war choices are pure, seeded and replayable: two runs of one seed declare, answer and make peace identically.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "headless: war_census (par-seeds, 16 seeds)"
+     ],
+     "requirement": "Across the 16 library seeds by tick 40 at least one war is declared somewhere, and no seed has every nation at war. The measured counts are reported as a decision entry (the band is calibration).",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "headless: war_harness"
+     ],
+     "requirement": "A rival answers a declaration against it, offers and accepts or refuses peace, and imposes at 100, only through the legal verbs; the player's nation is never acted for.",
+     "notes": null
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "headless: market_viability (full)",
+      "headless: world_determinism"
+     ],
+     "requirement": "The economy readings and digest movement are reported with their cause; only invariants gate the merge, and the wave's re-bless waits on Ben.",
+     "notes": null
+    }
+   ]
+  },
+  {
+   "brief": "diplomacy-ledger",
+   "title": "BL-1462 - Slot 9: the Diplomacy ledger — Nations and Wars, the declaration and peace flows",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1462 - sprint 61 (Ben, 2026-10-30)",
+   "batch": "sprint-61",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "visual: scripts/verify/diplomacy_ledger.lua"
+     ],
+     "requirement": "Slot 9 opens the ledger. Nations shows one row per nation with stance chips and Access/Trust/Alarm toward the player; an expanded row shows the reverse sentiment, power and front strength, trade exposure, friendship, embargo and Declare war. Wars lists every war with score, exhaustion and goals.",
+     "notes": null
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "live"
+     ],
+     "requirement": "In the running game: open slot 9, expand a row, declare war choosing a goal on the canvas with the price shown, answer and offer peace from Wars, offer friendship, toggle the embargo; each press does what it says and the toggle rule holds.",
+     "notes": null
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "static: question_log.json, ui_elements.json, ACTIONS.json"
+     ],
+     "requirement": "The surface carries its question log entry, a ui_elements entry with its checks, and an ACTIONS.json entry per press.",
+     "notes": null
+    }
+   ]
   }
  ]
 }
