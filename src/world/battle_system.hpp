@@ -44,7 +44,7 @@
 // ---------------------------------------------------------------------------
 
 #include "campaign_battle.hpp"
-#include "land_recon_params.hpp" // BL-1453: the opening's defender x1.5
+#include "land_recon_params.hpp" // BL-1453: the open-time recon parameter (unused today)
 #include "entity.hpp"
 #include "terrain_class.hpp" // BL-1455: terrain_class_effect, the terrain hook's answer
 
@@ -190,29 +190,27 @@ struct battle_tick
 /// stands there. Joined stacks stay where they stood.
 battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
 
-/// BL-1453 (MILITARY.md § Recon): a side's recon points over battle @p b, in
-/// MILLI-points, BEFORE the time term and the defender's 1.5x (both are applied per
-/// target by `visible_share_permille`). The sum of: the kit recon of the side's
-/// FIGHTING units (`land_combatant_fighting`, as built for the round); the recon of
-/// every other unit of the side's nation, with men standing, on a tile adjacent to
-/// the defended tile (joined or not - a unit already in the side's list counts once,
-/// through the first term, or not at all when it is spent); and its air over the
-/// battle's province (`air_land_recon_milli`). A sum over sorted or keyed walks, so
-/// no visit order reaches it.
+/// BL-1453 (MILITARY.md § Recon): what a side's recon stock would GROW by today over
+/// battle @p b, in MILLI-points — the recon of its FIGHTING units, of every other unit
+/// of its nation with men standing on a tile adjacent to the defended tile (counted
+/// at once, nothing stored; a unit in the side's list counts once, through the first
+/// term), and of its air over the province (`air_land_recon_milli`). Only the
+/// attacker's is used (recon is one-sided); a sum over keyed walks, so no visit order
+/// reaches it.
 int64_t battle_side_recon_milli(const world& w, const recipe_registry& reg, const active_battle& b,
                                 bool attacker_side);
 
 /// BL-1453 (MILITARY.md § Battles, "Like forces entrench, and supply decides the
 /// stalemate"): the readiness, per-mille, unit @p unit regains each DAY of an
-/// entrenched fight from its CARRIED STOCKS (BL-1452) — 0 when it is starving or its
-/// ammunition is at its floor, else `p.entrench_recovery_permille` x
-/// `carried_recovery_permille` (850 when hungry, 1000 fed). THE ONE PREDICATE the
+/// entrenched fight from its CARRIED STOCKS (BL-1452) — `p.entrench_recovery_permille`
+/// when it is fed (food full) and its ammunition is above its floor, else 0 (a hungry
+/// unit, or one at the ammunition floor, does not recover). THE ONE PREDICATE the
 /// battle pass reads. 0 for an unknown unit.
 int unit_entrench_recovery_permille(const world& w, entity_id unit,
                                     const campaign_battle_params& p = {});
 
 /// BL-1453: the day of battle @p b the next round is fought on, 1-based - its rounds
-/// fought / `rounds_per_day`, plus one. What the time term reads.
+/// fought / `rounds_per_day`, plus one. What the battle card shows.
 int battle_day(const active_battle& b, const campaign_battle_params& p = {});
 
 /// Out of contact, every unit recovers: readiness toward its morale (scaled by its
@@ -258,6 +256,8 @@ struct tile_attack
 /// attacker starts nothing; spent defenders are still caught and overrun).
 /// ENTITY-ID-AGNOSTIC: the two sides are read only as unit owners. Exposed so a
 /// harness can open a battle without a march.
+/// @p rp is UNUSED today (the opening reads no rate: the stock is the units' recon);
+/// kept so a future opening rate needs no signature change at every caller.
 bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, entity_id defender,
                       const std::vector<entity_id>& attacking_units,
                       const land_recon_params& rp = {});

@@ -1810,6 +1810,21 @@ void write_world_snapshot_pre_air(const world& w, std::ostream& out)
     write_world_snapshot_at(w, out, k_world_save_version_pre_air);
 }
 
+void write_world_snapshot_pre_battle_carry(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1453): the v66 stream shape — no battle-carry section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_battle_carry);
+}
+
+int32_t legacy_battle_recon_milli(const world& w, const active_battle& b)
+{
+    int64_t stealth = 0;
+    for (const entity_id uid : b.defender_units)
+        if (const auto it = w.units.find(uid); it != w.units.end())
+            stealth = std::max<int64_t>(stealth, unit_land_stats(it->second).stealth);
+    return static_cast<int32_t>(std::min<int64_t>(stealth * 2000, 1 << 30));
+}
+
 void write_world_snapshot_pre_supplies(const world& w, std::ostream& out)
 {
     // VERIFICATION ONLY (BL-1452): the v65 stream shape — no carried-supplies section.
@@ -3113,8 +3128,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // >= -1, not all at their defaults; exactly one recon stock per battle, in
     // [0, 2^30]. Refused whole
     // otherwise. A v66 (and older) stream ends before it: every remainder 0, every unit
-    // on its tile since before any stamp, every battle's recon stock 0 (it builds from
-    // the next day).
+    // on its tile since before any stamp, every live battle's recon stock at full sight
+    // (`legacy_battle_recon_milli`).
     if (version >= k_world_save_version_battle_carry)
     {
         uint32_t count = 0;
@@ -3149,6 +3164,13 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 return false;
             b.attacker_recon_milli = v;
         }
+    }
+    else
+    {
+        // A pre-v67 stream carries no recon stock: a battle already in progress loads
+        // SEEN, never blinded by the load (cold review).
+        for (active_battle& b : s.battles)
+            b.attacker_recon_milli = legacy_battle_recon_milli(s, b);
     }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct

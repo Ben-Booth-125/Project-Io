@@ -475,7 +475,8 @@ int main()
         }
         check(to_bytes(back) == to_bytes(c.w), "S7c and starves on identically");
 
-        // THE SAVE STACK (v64 designs, v65 air, v66 supplies): a damaged building is the
+        // THE SAVE STACK (v64 designs, v65 air, v66 supplies, v67 the battle carry, BL-1453):
+        // a damaged building is the
         // air section's witness (its condition is that section's last record).
         const entity_id hub = c.w.create_entity();
         {
@@ -494,31 +495,38 @@ int main()
             writer(c.w, o);
             return from_bytes(o.str(), into);
         };
-        world v66, v65, v64;
-        const bool r66 = from_bytes(to_bytes(c.w), v66);
+        world v67, v66, v65, v64;
+        const bool r67 = from_bytes(to_bytes(c.w), v67);
+        const bool r66 = read_as(&write_world_snapshot_pre_battle_carry, v66);
         const bool r65 = read_as(&write_world_snapshot_pre_supplies, v65);
         const bool r64 = read_as(&write_world_snapshot_pre_air, v64);
         const auto cond = [&](const world& x) {
             return x.buildings.count(hub) != 0 ? x.buildings.at(hub).condition_permille : -1;
         };
-        std::printf("      v66 read %d (stocks off full %d, condition %d) | v65 read %d (%d, %d) | v64 read %d (%d, %d)\n",
-                    r66, r66 && !stocks_full(v66), cond(v66), r65, r65 && !stocks_full(v65), cond(v65),
+        std::printf("      v67 read %d | v66 read %d (stocks off full %d, condition %d) | v65 read %d (%d, %d) | v64 read %d (%d, %d)\n",
+                    r67, r66, r66 && !stocks_full(v66), cond(v66), r65, r65 && !stocks_full(v65), cond(v65),
                     r64, r64 && !stocks_full(v64), cond(v64));
-        check(r66 && !stocks_full(v66) && cond(v66) == 700 && to_bytes(v66) == to_bytes(c.w),
-              "S7d a v66 stream round-trips the air section and then the supplies, byte for byte");
+        check(r67 && !stocks_full(v67) && cond(v67) == 700 && to_bytes(v67) == to_bytes(c.w),
+              "S7d today's (v67) stream round-trips the air, the supplies and the battle carry, byte for byte");
+        check(r66 && !stocks_full(v66) && cond(v66) == 700,
+              "S7d1 a v66 stream (air and supplies, no battle carry) loads its air and the stocks off full");
         check(r65 && stocks_full(v65) && cond(v65) == 700,
               "S7d2 a v65 stream (air, no supplies) loads its air and every unit's stocks full");
         check(r64 && stocks_full(v64) && cond(v64) == 1000,
               "S7d3 a v64 stream (no air, no supplies) loads whole buildings and full stocks");
         c.w.buildings.erase(hub);
 
-        // Corrupt the food of the one record (the section is the stream's tail).
+        // Corrupt the food of the one record. The supplies section is followed by v67's
+        // battle-carry section (BL-1453), so the record ends that far from the tail.
         std::string bad = bytes;
-        const std::size_t food_at = bad.size() - 32; // (id, food, ammo, equip, carry, 3 remainders, share)
+        world as_saved; // the section's size as `bytes` wrote it
+        (void)from_bytes(bytes, as_saved);
+        const std::size_t food_at = bad.size() - world_save_battle_carry_section_bytes(as_saved)
+                                  - 32; // (id, food, ammo, equip, carry, 3 remainders, share)
         bad[food_at] = static_cast<char>(0xE9); bad[food_at + 1] = static_cast<char>(0x03); // 1001
         world untouched;
         const bool refused = !from_bytes(bad, untouched) && untouched.units.empty();
-        check(refused, "S7e a stock past 1000 is refused whole, and the destination is untouched");
+        check(refused, "S7e a FOOD stock past 1000 is refused whole, and the destination is untouched");
     }
 
     // -----------------------------------------------------------------------

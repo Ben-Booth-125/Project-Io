@@ -68,17 +68,13 @@ forces over a tile, fought round by round until a side breaks or withdraws, with
 production caller is `run_battles` (§ Battles); `tools/verify/campaign_battle_harness.cpp`
 asserts it in isolation.
 
-**The randomness is real to the player and absent to the engine.** Every draw comes from a
-splitmix64 stream folded from the battle's own identity, consumed in a fixed order. The same save
-replays the same battle; the player, who cannot see the seed, faces a genuinely uncertain fight.
-
-The **`campaign_battle_identity`** folded into that seed is
-`{attacker, defender, province, tick, world_seed}`. The attacker/defender pair is packed in role
-order, not sorted — swapping the roles is a different battle and must be a different stream. The
-province sits in the fold where a tile index otherwise would (Ben's ruling 1, 2026-08-19: the
-province frames the fight), keeping the stream one field wide. `world_seed` is the province
-partition's seed — `world` carries none of its own, and the partition's is stable for the
-world's lifetime.
+**A battle has no randomness** (Ben, 2026-10-29; § Battles): no draw, no swing, no per-battle
+roll, so the same forces on the same ground with the same supply fight the same battle, and the
+same save replays it. The battle's identity is still folded into a **seed** —
+`campaign_battle_identity`, `{attacker, defender, tile, tick, world_seed}`, the pair packed in role
+order — but nothing in the fight reads it: it only varies the wording of the battle's dispatches
+(§ Dispatches and the card). `world_seed` is the province partition's seed — `world` carries none
+of its own, and the partition's is stable for the world's lifetime.
 
 **The span is modelled explicitly.** `begin_campaign_battle` opens a fight and resolves nothing;
 `step_campaign_battle` fights one round; `withdraw_campaign_battle` breaks off;
@@ -1207,7 +1203,7 @@ still unowned work. Battle state survives a save under BL-536 (world snapshot sa
 
 A battle **reports**. `battle_tick::dispatches` carries one pure-data `battle_dispatch` per battle
 that acted this day — the defended tile and its province, sides, phase, rounds fought and today's, both strengths and
-swings, men lost, and for an ending the `withdrew`, `end` and `field_held_by` fields. It includes
+changes of readiness across the day, men lost, and for an ending the `withdrew`, `end` and `field_held_by` fields. It includes
 battles that **concluded** that day and are already erased from `world::battles`; that is the only
 way the aftermath — who held the field, what it cost — can reach a surface at all.
 

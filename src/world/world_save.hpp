@@ -583,7 +583,7 @@ inline constexpr uint32_t world_save_magic =
 /// attacker's recon stock (`active_battle::attacker_recon_milli`, i32 milli-points).
 /// v66 is a STRICT PREFIX of v67 and is read too (`k_world_save_version_pre_battle_carry`),
 /// as a world with every remainder 0, every unit on its tile since before any stamp and
-/// every recon stock 0.
+/// every live battle's attacker fully seeing its defenders (`legacy_battle_recon_milli`).
 inline constexpr uint32_t world_save_version = 67;
 
 /// v65, a strict prefix of v66 (the carried-supplies section is v66's only addition).
@@ -771,6 +771,15 @@ void write_world_snapshot_pre_air(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1452): @p w as a v65 stream — no carried-supplies section.
 void write_world_snapshot_pre_supplies(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1453): @p w as a v66 stream — no battle-carry section.
+void write_world_snapshot_pre_battle_carry(const world& w, std::ostream& out);
+
+/// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
+/// see every defending unit in full (twice the stealthiest defender's kit stealth, in
+/// milli-points: headroom over any terrain multiplier), so a fight already in progress
+/// is not blinded by the load.
+int32_t legacy_battle_recon_milli(const world& w, const active_battle& b);
 
 /// Read a world snapshot written by `write_world_snapshot` into @p w.
 ///

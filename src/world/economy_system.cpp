@@ -2032,6 +2032,11 @@ void advance_musters(world& w)
             .establishment          = hire_batch_manpower, // BL-1421: the HP bar's full mark
             .kit                    = m.kit, // BL-1434: the design the hire paid for
         };
+        // BL-1453 (MILITARY.md § Recon, "Only haste attacks blind"): raised NOW, at the
+        // close of this quarter. The next quarter's days are stamped from
+        // military_quarter_day_base(T + 1) + 1, so a raised unit counts toward an opening
+        // from the next day on; it has not stood a day before that.
+        w.units[unit].tile_since_day = military_quarter_day_base(w.current_econ_tick + 1);
     }
     w.musters.swap(still);
 }

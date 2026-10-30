@@ -238,6 +238,8 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
         }
         u.order           = movement_order{};
         u.morale_permille = std::clamp(u.morale_permille - p.morale_loss, 0, 1000);
+        u.battle_ready_carry = 0; // BL-1453: out of the battle, no carry
+        u.battle_hp_carry    = 0;
     }
 
     const std::set<entity_id> gone(leaving.begin(), leaving.end());
@@ -801,8 +803,9 @@ shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params*
             const entity_id to = retreat_tile(w, u, 0, foreign, false, mil);
             if (to != null_entity)
             {
-                u.position = to;
-                u.order    = movement_order{};
+                u.position       = to;
+                u.order          = movement_order{};
+                u.tile_since_day = w.current_day_tick; // BL-1453: it came onto this tile now
                 ++out.stepped;
             }
             else
@@ -842,13 +845,12 @@ int unit_entrench_recovery_permille(const world& w, entity_id unit, const campai
         return 0;
     const unit_component& u = it->second;
     // BL-1452 (MILITARY.md § Battles, "Like forces entrench, and supply decides the
-    // stalemate"): FROM THE CARRIED STOCKS. A starving unit, or one at its ammunition
-    // floor, recovers nothing; otherwise the rate x `carried_recovery_permille` (the
-    // flat hunger step: 850 below full food, 1000 fed).
-    if (unit_starving(u) || u.ammo_permille <= k_ammo_floor_permille)
+    // stalemate"): FROM THE CARRIED STOCKS. "A unit that is fed and holds ammunition
+    // above its floor recovers; a hungry unit, or one at the ammunition floor, does
+    // not." Full rate or nothing.
+    if (unit_hungry(u) || u.ammo_permille <= k_ammo_floor_permille)
         return 0;
-    return static_cast<int>(int64_t{std::max(0, p.entrench_recovery_permille)}
-                            * carried_recovery_permille(u) / 1000);
+    return std::max(0, p.entrench_recovery_permille);
 }
 
 int battle_day(const active_battle& b, const campaign_battle_params& p)
@@ -1022,7 +1024,17 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         }
 
         if (b.state.end != campaign_battle_end::in_progress)
+        {
             ++out.concluded;
+            // BL-1453: the battle is over - every unit in it leaves carrying nothing.
+            for (const auto* side : {&b.attacker_units, &b.defender_units})
+                for (const entity_id uid : *side)
+                    if (const auto it = w.units.find(uid); it != w.units.end())
+                    {
+                        it->second.battle_ready_carry = 0;
+                        it->second.battle_hp_carry    = 0;
+                    }
+        }
 
         // BL-1453 (cold review): the phase YESTERDAY, read off the round records the
         // way `read_battle_phase` reads today (wavering, a crisis swing of 150, the

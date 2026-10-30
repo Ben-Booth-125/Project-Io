@@ -20,6 +20,12 @@
 //       others 10, x strength / provinces; superiority x its share).
 //   R6  STEALTH KIT LOWERS HITS TAKEN.
 //   R7  DETERMINISM: two identical worlds fight byte-identical battles.
+//   R8  THE SAVE (v67): a live battle's recon stock, carries and tile days round-trip;
+//       a v66 stream loads under v67 with the battle SEEN (never blinded by the load),
+//       every carry 0 and every tile day -1; a unit whose battle ends carries nothing.
+//   R9  A HUNGRY UNIT RECOVERS NOTHING (MILITARY.md § Battles): fed and armed, 40 a
+//       dug-in day; hungry (not starving) or at the ammunition floor, 0 - so in an
+//       entrenched pair the hungry side erodes and the fed side wins the stalemate.
 //   M1  MEASURED (reported): base-infantry battles at 1:1 .. 3:1, recon vs full
 //       vision; blind and faced days to full.
 //
@@ -36,9 +42,12 @@
 #include "world/unit_designs.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
+#include "world/world_save.hpp"
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -367,6 +376,90 @@ int main()
         open_tile_battle(h.w, 0, h.tile, h.att, h.def, {h.ua});
         for (int d = 1; d <= 20; ++d) { run_battles(g.w, reg, d); run_battles(h.w, reg, d); }
         check(g.w.state_hash(20) == h.w.state_hash(20), "R7a two identical worlds fight identical battles (state hash)");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nR8 - the save\n");
+    {
+        fixture f;
+        build(f);
+        f.w.units.at(f.ua).tile_since_day = 0;
+        open_tile_battle(f.w, 0, f.tile, f.att, f.def, {f.ua});
+        for (int d = 1; d <= 2; ++d) run_battles(f.w, reg, d);
+        const active_battle* b = the_battle(f);
+        check(b != nullptr && b->attacker_recon_milli > 0, "R8 setup: a live battle with a recon stock");
+        const auto to_bytes = [](const world& x, void (*writer)(const world&, std::ostream&)) {
+            std::ostringstream o(std::ios::binary);
+            writer(x, o);
+            return o.str();
+        };
+        const auto from = [](const std::string& bytes, world& into) {
+            std::istringstream in(bytes, std::ios::binary);
+            return read_world_snapshot(into, in);
+        };
+        world back;
+        const std::string v67 = to_bytes(f.w, &write_world_snapshot);
+        const bool ok67 = from(v67, back);
+        const active_battle* bb = nullptr;
+        for (const active_battle& x : back.battles) if (x.tile == f.tile) bb = &x;
+        check(ok67 && bb != nullptr && bb->attacker_recon_milli == b->attacker_recon_milli
+                  && back.units.at(f.ua).tile_since_day == f.w.units.at(f.ua).tile_since_day
+                  && back.units.at(f.ub).battle_ready_carry == f.w.units.at(f.ub).battle_ready_carry
+                  && to_bytes(back, &write_world_snapshot) == v67,
+              "R8a v67 round-trips the recon stock, the carries and the tile days, byte for byte");
+        world legacy;
+        const std::string v66 = to_bytes(f.w, &write_world_snapshot_pre_battle_carry);
+        uint32_t stamped = 0;
+        std::memcpy(&stamped, &v66[4], sizeof stamped);
+        const bool ok66 = from(v66, legacy);
+        const active_battle* lb = nullptr;
+        for (const active_battle& x : legacy.battles) if (x.tile == f.tile) lb = &x;
+        std::printf("        v66 stream: %zu bytes (v67 %zu); its battle loads with stock %d\n", v66.size(),
+                    v67.size(), lb ? lb->attacker_recon_milli : -1);
+        check(ok66 && stamped == k_world_save_version_pre_battle_carry && v66.size() < v67.size(),
+              "R8b a v66 stream (no battle-carry section) is written and loads under v67");
+        check(lb != nullptr && visible_share_permille(lb->attacker_recon_milli, inf.stealth) == 1000,
+              "R8c a battle loaded from v66 is SEEN in full - the load never blinds a fight in progress");
+        check(ok66 && legacy.units.at(f.ua).tile_since_day == -1 && legacy.units.at(f.ub).battle_ready_carry == 0,
+              "R8d ...with every tile day -1 and every carry 0");
+        // A unit whose battle ends carries nothing: starve the attacker so it breaks.
+        f.w.units.at(f.ua).ammo_permille = 200;
+        for (int d = 3; d <= 60 && the_battle(f) != nullptr; ++d) run_battles(f.w, reg, d);
+        bool clear = the_battle(f) == nullptr;
+        for (const entity_id uid : {f.ua, f.ub})
+            if (const auto it = f.w.units.find(uid); it != f.w.units.end())
+                clear = clear && it->second.battle_ready_carry == 0 && it->second.battle_hp_carry == 0;
+        check(clear, "R8e when its battle ends (or it retreats) a unit carries no remainder");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nR9 - a hungry unit recovers nothing\n");
+    {
+        fixture f;
+        build(f);
+        f.w.units.at(f.ua).food_permille = 900; // hungry, not starving; fully armed
+        const int fed    = unit_entrench_recovery_permille(f.w, f.ub);
+        const int hungry = unit_entrench_recovery_permille(f.w, f.ua);
+        f.w.units.at(f.ub).ammo_permille = 200;
+        const int floor_ = unit_entrench_recovery_permille(f.w, f.ub);
+        f.w.units.at(f.ub).ammo_permille = 1000;
+        std::printf("        dug-in recovery a day: fed %d, hungry %d, at the ammunition floor %d\n", fed, hungry, floor_);
+        check(fed == campaign_battle_params{}.entrench_recovery_permille && hungry == 0 && floor_ == 0,
+              "R9a fed and armed: the full rate; hungry (not starving) or at the floor: 0");
+        open_tile_battle(f.w, 0, f.tile, f.att, f.def, {f.ua});
+        f.w.battles.front().attacker_recon_milli = 1 << 20; // seen in full: vision is not this row's subject
+        campaign_battle_end end = campaign_battle_end::in_progress;
+        int day = 0;
+        for (day = 1; day <= 1000 && the_battle(f) != nullptr; ++day)
+        {
+            const battle_tick t = run_battles(f.w, reg, day);
+            for (const battle_dispatch& d : t.dispatches) end = d.end;
+            f.w.units.at(f.ua).food_permille = 900; // the hunger holds (no supply day runs here)
+        }
+        std::printf("        hungry attacker against a fed defender: %s on day %d\n",
+                    end == campaign_battle_end::attacker_broken ? "attacker broken" : "other", day - 1);
+        check(end == campaign_battle_end::attacker_broken,
+              "R9b in an entrenched pair the hungry side erodes and breaks - the fed side wins the stalemate");
     }
 
     // -----------------------------------------------------------------------

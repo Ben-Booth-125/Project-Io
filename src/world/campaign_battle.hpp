@@ -361,8 +361,9 @@ struct campaign_battle_state
     int defender_strength_permille = 1000;
 
     /// UNUSED since 2026-10-29 (battles carry no randomness, so no step draws).
-    /// Still set to `stream_seed` at open, hashed and saved, so an older save loads
-    /// and the save layout (v65) is unchanged. Nothing advances or reads it.
+    /// Still set to `stream_seed` at open, hashed and saved in the battle section, so an
+    /// older save loads and the battle record's layout is unchanged. Nothing advances or
+    /// reads it.
     uint64_t rng_state  = 0;
     /// The folded seed. No longer drives any draw; still read by the dispatch text,
     /// which folds it with the round index to vary wording (battle_dispatch_text.cpp).

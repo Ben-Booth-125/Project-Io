@@ -360,13 +360,15 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_i32(h, u.readiness_permille);
                 fnv1a_i32(h, u.morale_permille);
             }
-            // BL-1453: the battle carry, folded only off zero behind its own marker,
-            // so a world that never fights keeps every hash.
-            if (u.battle_ready_carry != 0 || u.battle_hp_carry != 0)
+            // BL-1453: the battle carry and the day the unit took its tile, folded only
+            // off their defaults behind their own marker, so a world nobody moves keeps
+            // every hash.
+            if (u.battle_ready_carry != 0 || u.battle_hp_carry != 0 || u.tile_since_day != -1)
             {
                 fnv1a_u32(h, 0xCA77B00Eu);
                 fnv1a_i32(h, u.battle_ready_carry);
                 fnv1a_i32(h, u.battle_hp_carry);
+                fnv1a_i32(h, u.tile_since_day); // the day it took its tile (haste)
             }
             // Refit to a newer type (Ben, 2026-10-27): folded only while the unit
             // refits, behind its own marker, so a world nobody refits keeps every hash.

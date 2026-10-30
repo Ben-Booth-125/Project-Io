@@ -128,8 +128,18 @@ int64_t seen_men(const land_combatant& c)
 /// man at a time in vector order — ascending unit id by the combatant contract.
 /// Integer throughout, so the split cannot depend on a rounding mode. @return removed.
 int64_t remove_men(std::vector<land_combatant>& side, const std::vector<std::size_t>& targets,
-                   int64_t to_remove)
+                   int64_t to_remove, bool by_seen = true)
 {
+    // BL-1453 (cold review): a WITHDRAWAL's price is split by plain men, never by what
+    // the enemy sees — a side that leaves unseen still pays.
+    if (!by_seen)
+    {
+        std::vector<land_combatant> plain = side;
+        for (land_combatant& c : plain) c.visible = 1000;
+        const int64_t removed = remove_men(plain, targets, to_remove, true);
+        for (std::size_t k = 0; k < side.size(); ++k) side[k].men = plain[k].men;
+        return removed;
+    }
     int64_t total = 0, weight = 0;
     for (const std::size_t k : targets)
     {
@@ -462,7 +472,7 @@ int withdraw_campaign_battle(campaign_battle_state&        st,
             standing.push_back(k);
             men += leaving[k].men;
         }
-    const int removed = static_cast<int>(remove_men(leaving, standing, men * parting / 1000));
+    const int removed = static_cast<int>(remove_men(leaving, standing, men * parting / 1000, false));
 
     const bool attacker_leaving = (side == withdrawing_side::attacker);
     if (attacker_leaving) st.attacker_strength_permille = side_readiness(leaving);
