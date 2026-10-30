@@ -5,6 +5,8 @@
 #include "tongue.hpp"
 #include "world.hpp"
 
+struct military_capability_params;
+
 #include <cstdint>
 #include <map>
 #include <utility>
@@ -570,6 +572,7 @@ struct garrison_repost_report
 {
     int garrisons          = 0; ///< Garrisons the generation record still named, standing.
     int on_front           = 0; ///< On a front or marching: the front owns where they stand, left.
+    int in_battle          = 0; ///< In a live battle: the fight holds them, left.
     int already_covered    = 0; ///< Whose rule post the network already covered: unmoved.
     int moved_in_province  = 0; ///< Re-posted on a covered tile of their own province.
     int moved_off_province = 0; ///< Province uncovered: re-posted on the nation's nearest covered tile.
@@ -589,7 +592,9 @@ struct garrison_repost_report
 /// post already covered is untouched; a re-posted garrison's road share is whole until
 /// the next quarter's draw. Ascending unit id; deterministic. Consumes and clears
 /// `world::gen_garrisons`.
-garrison_repost_report repost_garrisons_on_cover(world& w);
+/// @p mil, when given, applies BL-1455's class walls: a garrison is never posted on a
+/// tile walled for its class (`class_wall`). A garrison in a live battle is left.
+garrison_repost_report repost_garrisons_on_cover(world& w, const military_capability_params* mil = nullptr);
 
 /// One `[garrisons on cover]` line for @p r (stdout, flushed).
 void print_garrison_repost(const garrison_repost_report& r);

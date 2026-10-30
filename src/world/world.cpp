@@ -808,10 +808,8 @@ const float* purse_of(const world& w, entity_id owner)
     return nullptr;
 }
 
-float purse_room_of(const world& w, entity_id owner)
+float purse_room_ungated_of(const world& w, entity_id owner)
 {
-    // A nation's uncommitted treasury - state_uncommitted_treasury's rule
-    // (state_industry.cpp), restated so this file needs no economy header.
     if (const auto nit = w.nations.find(owner); nit != w.nations.end())
     {
         float committed = 0.0f;
@@ -820,6 +818,27 @@ float purse_room_of(const world& w, entity_id owner)
         return std::max(0.0f, nit->second.treasury - committed);
     }
     return 0.0f;
+}
+
+float purse_room_of(const world& w, entity_id owner)
+{
+    // A nation's uncommitted treasury - state_uncommitted_treasury's rule
+    // (state_industry.cpp), restated so this file needs no economy header, the
+    // settle's surplus cap included (BL-1452: ONE purse gate - a hire, its goods, a
+    // wing, a refit, a road and a survey are capped exactly as a build is).
+    const auto nit = w.nations.find(owner);
+    if (nit == w.nations.end())
+        return 0.0f;
+    float committed = 0.0f;
+    if (const auto lit = w.state_ledger.find(owner); lit != w.state_ledger.end())
+        committed = lit->second.committed;
+    if (!w.settle_build_gate)
+        return std::max(0.0f, nit->second.treasury - committed);
+    const auto cit = w.settle_chest.find(owner);
+    const float chest = cit != w.settle_chest.end() ? cit->second : nit->second.treasury;
+    const auto wit = w.settle_wage.find(owner);
+    const float wage = wit != w.settle_wage.end() ? wit->second : 0.0f;
+    return std::max(0.0f, nit->second.treasury - committed - wage - chest);
 }
 
 bool owner_holds(const world& w, entity_id owner, entity_id building)

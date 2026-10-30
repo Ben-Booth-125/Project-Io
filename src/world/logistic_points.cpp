@@ -2027,14 +2027,17 @@ lp_seed_report seed_logistics_sources(world& w)
             if (cap == null_entity || w.tiles.count(cap) == 0 || owner == null_entity
                 || rep.hubs_placed >= k_max_hubs)
                 continue;
-            // A capital that already holds a running source of any network (a rail
-            // station, a state port on a coastal seat) holds one: none is stacked on it.
+            // BL-1452 (Ben, 2026-10-29; § Every capital holds a source, "the capital's source
+            // runs free"): the free source is the capital's GENERATED type, an inland
+            // logistics hub (state_industry `capital_free_source`). So every capital holds a
+            // running HUB: a rail station or a state port standing there does not count, and
+            // the hub stands beside it - else that capital's only source is billed, and a
+            // poor nation's chest sizing cuts it, and the capital goes dark.
             bool holds = hub_tiles.count(cap) != 0;
             for (const entity_id bid : in.ids)
             {
                 const building_component& b = w.buildings.at(bid);
-                lp_network net;
-                if (b.tile == cap && lp_source_network(b.type, net) && lp_source_running(b))
+                if (b.tile == cap && b.type == building_type::inland_logistics_hub && lp_source_running(b))
                     holds = true;
             }
             if (!holds && placeable(cap, nid))

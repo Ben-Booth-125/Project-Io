@@ -3,6 +3,8 @@
 #include "hard_coded_world.hpp" // generation_progress — the BL-305 carve tap
 #include "hex_neighbors.hpp"    // BL-571: garrison border-tile adjacency
 #include "logistic_points.hpp"  // BL-1452: lp_coverage_at - a garrison is posted where its network covers
+#include "battle_system.hpp"    // BL-1452: class_wall, unit_in_battle - the repost respects walls and fights
+#include "recipe_registry.hpp"  // military_capability_params
 #include "logistics.hpp"        // BL-571: body_tile_grid, for the same
 #include "nation_ai.hpp"        // BL-571: nation_grudge, the highest-grudge pick
 #include "province.hpp"         // BL-571: province_holder_for, province lookup
@@ -2332,7 +2334,7 @@ bool unit_tile_drawable(world& w, unit_draw_memo& memo, entity_id nation, entity
     return found;
 }
 
-garrison_repost_report repost_garrisons_on_cover(world& w)
+garrison_repost_report repost_garrisons_on_cover(world& w, const military_capability_params* mil)
 {
     garrison_repost_report rep;
     std::vector<world::generated_garrison> posts = std::move(w.gen_garrisons);
@@ -2355,12 +2357,13 @@ garrison_repost_report repost_garrisons_on_cover(world& w)
         return unit_tile_drawable(w, memo, nation, t);
     };
     // The covered tile of @p tiles (ascending) nearest @p from, ties to the lowest id.
-    const auto nearest = [&](entity_id nation, const std::vector<entity_id>& tiles, entity_id from) {
+    const auto nearest = [&](entity_id nation, const std::vector<entity_id>& tiles, entity_id from,
+                             const std::function<bool(entity_id, entity_id)>& ok) {
         entity_id best = null_entity;
         int best_d = std::numeric_limits<int>::max();
         for (const entity_id t : tiles)
         {
-            if (!covered(nation, t))
+            if (!ok(nation, t))
                 continue;
             const int d = garrison_hex_distance(w, from, t);
             if (d < best_d || (d == best_d && t < best))
@@ -2386,6 +2389,23 @@ garrison_repost_report repost_garrisons_on_cover(world& w)
             ++rep.on_front;
             continue;
         }
+        if (unit_in_battle(w, g.unit))
+        {
+            ++rep.in_battle;
+            continue;
+        }
+        // BL-1455: never onto a tile walled for this unit's class.
+        std::function<bool(const tile_component&)> walled;
+        if (mil != nullptr)
+            walled = class_wall(*mil, u.type);
+        const auto postable = [&](entity_id nation, entity_id t) {
+            if (!covered(nation, t))
+                return false;
+            if (walled)
+                if (const auto tt = w.tiles.find(t); tt != w.tiles.end() && walled(tt->second))
+                    return false;
+            return true;
+        };
         const entity_id rule_post = u.position;
         if (covered(g.nation, rule_post))
         {
@@ -2403,7 +2423,7 @@ garrison_repost_report repost_garrisons_on_cover(world& w)
                 int best_sides = 0;
                 for (const entity_id t : pr->tiles)
                 {
-                    if (!covered(g.nation, t))
+                    if (!postable(g.nation, t))
                         continue;
                     int sides = 0;
                     for (int side = 0; side < 6; ++side)
@@ -2425,7 +2445,7 @@ garrison_repost_report repost_garrisons_on_cover(world& w)
             // The capital rule's choice is its anchor: the covered tile nearest it. And
             // a border province whose covered tiles face no one falls back the same way.
             if (to == null_entity)
-                to = nearest(g.nation, pr->tiles, rule_post);
+                to = nearest(g.nation, pr->tiles, rule_post, postable);
         }
         if (to != null_entity)
         {
@@ -2435,7 +2455,7 @@ garrison_repost_report repost_garrisons_on_cover(world& w)
         {
             std::vector<entity_id> own = nit->second.tiles;
             std::sort(own.begin(), own.end());
-            to = nearest(g.nation, own, rule_post);
+            to = nearest(g.nation, own, rule_post, postable);
             if (to != null_entity)
                 ++rep.moved_off_province;
         }
@@ -2455,10 +2475,10 @@ garrison_repost_report repost_garrisons_on_cover(world& w)
 
 void print_garrison_repost(const garrison_repost_report& g)
 {
-    std::printf("[garrisons on cover] %d garrison(s): %d on a front (left), %d already covered, "
-                "%d re-posted in province, %d on the nation's nearest covered tile, %d with no "
-                "covered ground (left)\n",
-                g.garrisons, g.on_front, g.already_covered, g.moved_in_province,
+    std::printf("[garrisons on cover] %d garrison(s): %d on a front (left), %d in a battle (left), "
+                "%d already covered, %d re-posted in province, %d on the nation's nearest covered "
+                "tile, %d with no covered ground (left)\n",
+                g.garrisons, g.on_front, g.in_battle, g.already_covered, g.moved_in_province,
                 g.moved_off_province, g.uncovered);
     std::fflush(stdout);
 }

@@ -41,6 +41,14 @@
 
 namespace {
 
+int g_checks_failed = 0;
+
+void check(bool ok, unsigned seed, const char* what)
+{
+    std::printf("  %s  seed %u: %s\n", ok ? "PASS" : "FAIL", seed, what);
+    if (!ok) ++g_checks_failed;
+}
+
 bool at_home(const world& w, const unit_component& u)
 {
     const auto it = w.tile_to_nation.find(u.position);
@@ -152,6 +160,8 @@ std::map<entity_id, nation_sources> sources_by_nation(const world& w)
 struct lap_tap
 {
     std::vector<std::array<std::map<entity_id, float>, k_campaign_settle_lap_count + 1>> ticks;
+    /// Per lap, per nation: its state buildings and its queued musters (what a spend makes).
+    std::vector<std::array<std::map<entity_id, std::pair<std::size_t, int>>, k_campaign_settle_lap_count + 1>> made;
     /// The national budget pass's per-line spend, summed over the settle, per nation.
     std::map<entity_id, std::array<float, priority_count>> budget_lines;
 };
@@ -162,6 +172,12 @@ void tap_after_lap(const world& w, int lap, void* ctx)
     if (t->ticks.empty()) return;
     auto& row = t->ticks.back()[static_cast<std::size_t>(lap) + 1];
     for (const auto& [nid, nc] : w.nations) row[nid] = nc.treasury;
+    if (!t->made.empty())
+    {
+        auto& m = t->made.back()[static_cast<std::size_t>(lap) + 1];
+        for (const auto& [nid, nc] : w.nations) m[nid] = {nc.state_assets.size(), 0};
+        for (const muster_order& mo : w.musters) ++m[mo.owner].second;
+    }
 }
 
 /// Zero-food and starved-to-death tracking over one phase.
@@ -233,6 +249,42 @@ int main(int argc, char** argv)
     build_app_start_world(lua, p, *start);
     world& w = start->w;
     census(w, "start");
+
+    // ---- THE OPENING WORLD'S ROWS (BL-1452, cold-review round) ----------------------
+    {
+        const opening_state_cut_report& cut = start->land.cut;
+        std::printf("  CUT: %d short, %d cut, %d unbuilt, refunded %.1f, minted %d, still short %d\n",
+                    cut.nations_short, cut.nations_cut, cut.unbuilt, static_cast<double>(cut.refunded),
+                    cut.minted, cut.still_short);
+        check(cut.minted == 0, seed, "C1 the opening-state cut mints nothing (a treasury rises by no more than its refunds)");
+        check(cut.still_short == 0, seed, "C2 the 16-tick sizing holds: every nation's kept state runs 16 ticks on its chest");
+        world again = w;
+        const opening_state_cut_report second = size_opening_state_to_chest(again, start->reg);
+        check(second.unbuilt == 0, seed, "C3 a second pass cuts nothing - the sizing already holds");
+        bool bases_ok = true, musters_ok = true;
+        for (const auto& [uid, u] : w.units)
+            if (u.muster_base != null_entity && w.buildings.count(u.muster_base) == 0) bases_ok = false;
+        for (const muster_order& m : w.musters)
+            if (w.buildings.count(m.base) == 0) musters_ok = false;
+        check(bases_ok, seed, "C4 no unit's muster_base names a cut base (cleared, never orphaned)");
+        check(musters_ok, seed, "C5 no queued muster names a cut base (dropped)");
+        const lp_seed_report& lp = start->land.lp;
+        std::printf("  SEEDING step 1b: %d garrison posts counted, %d laid toward, %d still past the draw\n",
+                    lp.garrison_posts, lp.garrison_posts_served, lp.garrison_posts_short);
+        check(lp.garrison_posts > 0 && lp.garrison_posts_short <= lp.garrison_posts_served, seed,
+              "C6 the seeding counts the garrison posts as requests, and lays toward every one it can");
+        int free_capitals = 0, no_hub_capital = 0;
+        for (const auto& [nid, nc] : w.nations)
+        {
+            bool has = false;
+            for (const entity_id bid : nc.state_assets)
+                has = has || capital_free_source(w, bid);
+            free_capitals += has ? 1 : 0;
+            no_hub_capital += has ? 0 : 1;
+        }
+        std::printf("  FREE capital sources: %d nations hold one, %d hold none (no running hub on the capital)\n",
+                    free_capitals, no_hub_capital);
+    }
     std::map<entity_id, entity_id> posted; // unit -> the tile it opened on
     for (const auto& [uid, u] : w.units) posted[uid] = u.position;
     const auto moved_report = [&](const char* when) {
@@ -290,16 +342,46 @@ int main(int argc, char** argv)
         std::printf("\n");
     }
     lap_tap tap;
+    std::map<entity_id, float> chest_at_settle; // the settle's recorded chests, copied after step 0
+    int build_dips = 0, bill_dips = 0;
+    int dips_by_lap[k_campaign_settle_lap_count] = {};
     for (int step = 0; step < k_app_validation_ticks; ++step)
     {
         tap.ticks.emplace_back();
+        tap.made.emplace_back();
         for (const auto& [nid, nc] : w.nations) tap.ticks.back()[0][nid] = nc.treasury;
+        for (const auto& [nid, nc] : w.nations) tap.made.back()[0][nid] = {nc.state_assets.size(), 0};
+        for (const muster_order& mo : w.musters) ++tap.made.back()[0][mo.owner].second;
         settle_tick_hooks hooks;
         hooks.after_lap = tap_after_lap;
         hooks.ctx       = &tap;
         const settle_tick_result res = run_settle_tick(w, start->reg, step, /*day_tick=*/0,
                                                        /*spectating=*/true, &hooks);
         settle.observe(w);
+        if (step == 0)
+            chest_at_settle = w.settle_chest;
+        // S-SURPLUS: a SPEND - a lap in which the nation placed a building or queued a
+        // muster - never takes it below its chest, or further below it. Dips in a lap that
+        // made nothing are running costs (the bills, inputs, the active-LP charge, trade):
+        // counted and reported, not failed.
+        for (const auto& [nid, chest] : chest_at_settle)
+            for (int lap = 0; lap < k_campaign_settle_lap_count; ++lap)
+            {
+                const auto& a = tap.ticks.back()[static_cast<std::size_t>(lap)];
+                const auto& b = tap.ticks.back()[static_cast<std::size_t>(lap) + 1];
+                if (!a.count(nid) || !b.count(nid)) continue;
+                const float before = a.at(nid), after = b.at(nid);
+                if (after < chest - 0.01f && after < before - 0.01f)
+                {
+                    const auto& ma = tap.made.back()[static_cast<std::size_t>(lap)];
+                    const auto& mb = tap.made.back()[static_cast<std::size_t>(lap) + 1];
+                    const auto pa = ma.count(nid) ? ma.at(nid) : std::pair<std::size_t, int>{0, 0};
+                    const auto pb = mb.count(nid) ? mb.at(nid) : std::pair<std::size_t, int>{0, 0};
+                    const bool spent = pb.first > pa.first || pb.second > pa.second;
+                    ++(spent ? build_dips : bill_dips);
+                    ++dips_by_lap[lap];
+                }
+            }
         src_ticks.push_back(sources_by_nation(w));
         for (const nation_budget_result& nr : res.report.national_budget.nations)
             for (std::size_t i = 0; i < priority_count; ++i)
@@ -311,6 +393,28 @@ int main(int argc, char** argv)
     clear_research_at_handover(w);
     census(w, "handoff");
     moved_report("handoff");
+    std::printf("  SURPLUS: across the 12 settle steps, %d lap(s) took a nation below its chest by a "
+                "spend (a build or a muster that lap), %d by running costs alone; dips by lap: L0 %d L1 %d L2 %d L3 %d L4 %d L5 %d\n", build_dips, bill_dips,
+                dips_by_lap[0], dips_by_lap[1], dips_by_lap[2], dips_by_lap[3], dips_by_lap[4], dips_by_lap[5]);
+    check(build_dips == 0, seed, "S1 the settle builds only from surplus: no spend takes a nation below its chest");
+    {
+        // R1: every garrison still on its post (no front, no march, not fighting) stands on
+        // ground its supply can be drawn to.
+        unit_draw_memo dm;
+        int on_post = 0, undrawable = 0;
+        for (const auto& [uid, u] : w.units)
+        {
+            if (u.count <= 0 || w.nations.count(u.owner) == 0 || u.front != null_entity
+                || u.order.dest != null_entity || unit_in_battle(w, uid))
+                continue;
+            ++on_post;
+            if (!unit_tile_drawable(w, dm, u.owner, u.position)) ++undrawable;
+        }
+        std::printf("  REPOST: %d units on their posts at the handoff, %d on ground the draw cannot reach\n",
+                    on_post, undrawable);
+        check(undrawable == 0, seed, "R1 every garrison on its post at the handoff stands on drawable ground");
+    }
+    int dark_at_handoff = 0;
     {
         // THE DARK NATIONS: a nation with garrisons none of whose ground draws at the
         // handoff. Its sources' states per settle tick (t0 = as generation left them).
@@ -325,6 +429,7 @@ int main(int argc, char** argv)
             for (const entity_id t : nc.tiles)
                 if (unit_tile_drawable(w, dm, nid, t)) { any = true; break; }
             if (any) continue;
+            ++dark_at_handoff;
             int units = 0;
             for (const auto& [uid, u] : w.units) units += (u.owner == nid && u.count > 0) ? 1 : 0;
             std::printf("  DARK seed %u nation %u (%zu tiles, %d units, capital tile %u):", seed,
@@ -393,6 +498,8 @@ int main(int argc, char** argv)
         }
     }
 
+    check(dark_at_handoff == 0, seed, "D1 no nation is dark at the handoff (the capital's source runs free)");
+
     // The live window, a tick at a time, exactly as run_app_live_window steps it. The
     // watch carries over: a unit starving at the handoff that dies in the window
     // counts in the window.
@@ -416,5 +523,7 @@ int main(int argc, char** argv)
     }
     settle.print(seed, "settle");
     live.print(seed, "t1-t50");
-    return 0;
+    std::printf("  CENSUS seed %u: %s (%d check(s) failed)\n", seed,
+                g_checks_failed == 0 ? "ALL PASS" : "FAILURES", g_checks_failed);
+    return g_checks_failed == 0 ? 0 : 1;
 }
