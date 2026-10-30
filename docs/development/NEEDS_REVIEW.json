@@ -346,7 +346,7 @@
   },
   {
    "raised": "2026-10-30",
-   "status": "open",
+   "status": "resolved",
    "id": "NR-1102",
    "kind": "question",
    "title": "A ceded capital, and a nation ceded away",
@@ -358,7 +358,8 @@
     "B: the capital moves as written; a nation's last province can never be ceded",
     "C: a capital can never be ceded (a goal, but not cedable)"
    ],
-   "recommendation": "B. Elimination is a whole subject. The floor keeps every nation on the map until it is designed on purpose."
+   "recommendation": "B. Elimination is a whole subject. The floor keeps every nation on the map until it is designed on purpose.",
+   "resolution": "Ben, 2026-10-30: B - the capital moves to the largest remaining population centre (with its free hub); a nation's last province can never be ceded, so no nation leaves the map by war. Written into RELATIONS.md § 7 and ledgers/diplomacy.md."
   }
  ]
 }

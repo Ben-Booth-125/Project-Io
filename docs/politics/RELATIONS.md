@@ -435,10 +435,11 @@ attacked tile's province as its first goal.
 **Goals are provinces (Ben, 2026-10-30, NR-1101).** The declarer names one to three of the
 defender's provinces — **any** of them, with no reach rule, and the capital included.
 
-**Ceding a capital moves it.** A nation whose capital province is ceded takes as its new capital
-the remaining province with the largest population centre, ties to the lower province id. A nation
-that cedes its last province leaves the map: its wars close, and its sentiment rows are erased as
-neutral rows are. Both are strawman rules (NR-1102).
+**Ceding a capital moves it (Ben, 2026-10-30, NR-1102).** A nation whose capital province is ceded
+takes as its new capital the remaining province with the largest population centre, ties to the
+lower province id; the capital's free logistics hub moves with it. **A nation's last province can
+never be ceded:** a peace that would cede it is refused, and no nation leaves the map by war.
+Removing a nation is a subject of its own, not a side effect of a peace.
 
 **The defender answers, for free.** Its hostility back costs nothing — it is the act of being
 attacked. Answering names its own goals among the declarer's provinces, by the same rule. Until it
@@ -509,8 +510,7 @@ rival declares, answers and makes peace under the stance grant (§ 1), on its st
 2. **Which reading does passage take** — reach-field contribution (recommended) or placement
    permission? Owned by BL-549 (friendship permits two things).
 
-3. **Where a ceded capital goes, and whether a nation can be ceded away** (§ 7). Raised as
-   NR-1102.
+3. **Can a nation ever leave the map?** Not by war (§ 7, NR-1102); elimination is undesigned.
 
 ---
 

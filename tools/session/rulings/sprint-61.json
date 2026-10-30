@@ -88,5 +88,15 @@
    "by an authored fraction"
   ],
   "owner": "BL-1459 (war record and declaration)"
+ },
+ {
+  "ruling": "A ceded capital moves; a nation's last province can never be ceded (Ben, 2026-10-30, NR-1102)",
+  "doc": "docs/politics/RELATIONS.md",
+  "anchor": "never be ceded",
+  "stale": [
+   "leaves the map: its wars close",
+   "whether a nation can be ceded away"
+  ],
+  "owner": "BL-1460 (cession moves territory)"
  }
 ]

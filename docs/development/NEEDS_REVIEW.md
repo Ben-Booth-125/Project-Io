@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*18 entries — 14 open, 4 resolved.*
+*18 entries — 13 open, 5 resolved.*
 
 ---
 
@@ -185,19 +185,6 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 
 **Why it matters.** (a) changes world shape: every capital opens with one more building (the shape probe was not re-run). The alternative is to let a station or port on the capital be the free source instead. (b) a poor nation may send fewer surveys in the settle. Merged at b0a9e9b5, G1t50 full 84.6. Work: BL-1452 (carried supplies).
 
-### NR-1102 — A ceded capital, and a nation ceded away
-*question · raised 2026-10-30 · from NR-1101 ruling (capitals may be goals), 2026-10-30*
-
-With capitals open as goals, two cases now exist that nothing owned. (a) A nation that cedes its capital province takes as its new capital the remaining province with the largest population centre, ties to the lower id. The capital is where the treasury sits and where the free logistics hub stands (NR-1099), so the hub must move too. (b) Three goals can take every province of a small nation. Strawman: it leaves the map, its wars close, and its sentiment rows are erased. The alternative is a floor: the last province can never be a goal or ceded.
-
-**Why it matters.** (b) is elimination, and nothing else in the campaign removes a nation, so every consumer of the nation list meets it for the first time (fronts, markets, the scorer, saves, spectating). Both rules are strawman in RELATIONS.md § 7. Work: BL-1460 (cession moves territory).
-
-- A: both strawman rules as written
-- B: the capital moves as written; a nation's last province can never be ceded
-- C: a capital can never be ceded (a goal, but not cedable)
-
-> **Recommendation:** B. Elimination is a whole subject. The floor keeps every nation on the map until it is designed on purpose.
-
 ---
 
 ## Resolved
@@ -257,4 +244,19 @@ RELATIONS.md § 7 sets shapes I proposed, not ones you ruled: (a) 1-3 goals, eac
 **Why it matters.** Each shape is a rule a player learns. Overturning one after BL-1459 and BL-1428 build is a save-format change. Answer before those lanes start; numbers can follow.
 
 > **RESOLVED.** Ben, 2026-10-30: (a) any of the defender's provinces may be a goal, capitals included, no reach rule; (b) occupation and battles carry half each; (c) a side at 100 imposes; (d) truce sixteen ticks (four years); (e) the answer is free and names its own goals; (f) only peace ends a war; (g) a justification halves the price. The goal count was not addressed; one to three stands. Written into RELATIONS.md § 7 and ledgers/diplomacy.md. Allowing capitals raised NR-1102.
+
+### NR-1102 — A ceded capital, and a nation ceded away
+*question · raised 2026-10-30 · from NR-1101 ruling (capitals may be goals), 2026-10-30*
+
+With capitals open as goals, two cases now exist that nothing owned. (a) A nation that cedes its capital province takes as its new capital the remaining province with the largest population centre, ties to the lower id. The capital is where the treasury sits and where the free logistics hub stands (NR-1099), so the hub must move too. (b) Three goals can take every province of a small nation. Strawman: it leaves the map, its wars close, and its sentiment rows are erased. The alternative is a floor: the last province can never be a goal or ceded.
+
+**Why it matters.** (b) is elimination, and nothing else in the campaign removes a nation, so every consumer of the nation list meets it for the first time (fronts, markets, the scorer, saves, spectating). Both rules are strawman in RELATIONS.md § 7. Work: BL-1460 (cession moves territory).
+
+- A: both strawman rules as written
+- B: the capital moves as written; a nation's last province can never be ceded
+- C: a capital can never be ceded (a goal, but not cedable)
+
+> **Recommendation:** B. Elimination is a whole subject. The floor keeps every nation on the map until it is designed on purpose.
+
+> **RESOLVED.** Ben, 2026-10-30: B - the capital moves to the largest remaining population centre (with its free hub); a nation's last province can never be ceded, so no nation leaves the map by war. Written into RELATIONS.md § 7 and ledgers/diplomacy.md.
 

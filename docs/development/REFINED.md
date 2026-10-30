@@ -8,9 +8,8 @@
 **Design.** `docs/politics/RELATIONS.md` § Who emits each factor, § 6 (Alarm) and § 7 (War);
 `docs/ui/ledgers/diplomacy.md`. Ruling register `tools/session/rulings/sprint-61.json`.
 
-**Ruled 2026-10-30.** NR-1100 (rivals make peace and may cede, granted) and NR-1101 (the war
-rules). **Gated on Ben:** NR-1102 (a ceded capital; whether a nation can be ceded away) before
-BL-1460 builds.
+**Ruled 2026-10-30.** NR-1100 (rivals make peace and may cede, granted), NR-1101 (the war rules)
+and NR-1102 (a ceded capital moves; a last province is never ceded). Nothing gates the build.
 
 **Items, in build order.**
 - BL-1458 (sentiment emitters): every live factor gets its one emitter.
