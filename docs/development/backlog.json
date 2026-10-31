@@ -465,51 +465,6 @@
    "parked": false,
    "blocked_on": null,
    "author": "main session (sprint 61 delivery, from lane reports, 2026-10-31)",
-   "priority": "B",
-   "requires": [],
-   "id": "BL-1465",
-   "short_name": "LP_POOL_L7_TAIL",
-   "category": "Logistics",
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "difficulty": 1,
-   "files": [
-    "tools/verify/lp_pool_harness.cpp"
-   ],
-   "title": "lp_pool_harness L7 measures a stale save-stream tail",
-   "design": "Found by Lane W, sprint 61 (2026-10-31), failing on main: row L7 does byte arithmetic on a v49 stream and has not subtracted any section added since v56. Correct the arithmetic as save_roundtrip does (subtract each later section), never loosen the assertion. Check: lp_pool_harness all rows."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-31",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (sprint 61 delivery, from lane reports, 2026-10-31)",
-   "requires": [],
-   "id": "BL-1466",
-   "short_name": "MARCH_PATH_DOMAIN",
-   "category": "Military",
-   "authority_doc": "docs/military/MILITARY.md",
-   "priority": "A",
-   "difficulty": 2,
-   "files": [
-    "src/world/corp_command.cpp",
-    "tools/verify/fronts_harness.cpp"
-   ],
-   "title": "A land unit's march path crosses open ocean",
-   "design": "Found by Lane F, sprint 61 (2026-10-31), fronts_harness F9g: on a cylinder split by ocean columns, march_check ACCEPTS a land unit's march from (4,0) to (9,2), an 8-tile path with one water tile, because the domain check reads only the destination tile. MILITARY.md § Domains and traversal: land classes cross coastal water only where owned and never open ocean. Every tile of the path must pass the class's domain test (the path search should refuse illegal tiles, not only the endpoint). Turn F9g from a printed observation into an assertion. Check: fronts_harness F9g, campaign_battle_harness, move_by_days_harness, world_determinism (digests may move; report, do not re-bless)."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-31",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (sprint 61 delivery, from lane reports, 2026-10-31)",
    "requires": [],
    "id": "BL-1467",
    "short_name": "BUILDING_ELEMENT_PRODUCING",
@@ -522,29 +477,6 @@
    ],
    "title": "building_element.lua's producing capture shows a construction site",
    "design": "Found by Lane F, sprint 61 (2026-10-31): aimed at the site finder's top Iron Mine row, the placed site at (1,93) is still under construction after 40 economy steps, so building_element_player captures a site, not a producing building. Pick the first row whose local market can supply the build materials (the BL-095 reason the old tile was chosen), or step until complete, and assert completion before the capture."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-31",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (sprint 61 delivery, from Lane G, 2026-10-31)",
-   "requires": [],
-   "id": "BL-1468",
-   "short_name": "TOP_ROW_UNCONNECTABLE",
-   "category": "Logistics",
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "priority": "B",
-   "difficulty": 2,
-   "files": [
-    "src/world/logistics.cpp",
-    "tools/verify/lp_coverage_census.cpp"
-   ],
-   "title": "Seed 32 opens a consumer on the map's top row that no Logistic Point can connect",
-   "design": "Found by Lane G, sprint 61 (2026-10-31): lp_coverage_census's new UC rule (no unconnectable consumers, BL-1420) fails on seed 32 only - building 82511 of Thuzi Thuthal at (141,0), the top row, counted unconnectable; present already at fe811118. Either Logistic Point source placement cannot reach the top row (a fix) or a top-row consumer is placed where nothing can serve it (fix the placement). Do not exempt the row. Check: lp_coverage_census on all 16 library seeds."
   },
   {
    "status": "proposed",

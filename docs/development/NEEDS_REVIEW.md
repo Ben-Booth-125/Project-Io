@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*38 entries — 32 open, 6 resolved.*
+*39 entries — 33 open, 6 resolved.*
 
 ---
 
@@ -429,6 +429,17 @@ capital_military_base fails because size_opening_state_to_chest (finish_campaign
 > **Recommendation:** B. Recruits now come from bases, so a baseless opening nation cannot raise or refill an army; the capital base is infrastructure the state needs, like the free hub.
 
 *Files: `src/world/state_industry.cpp`, `docs/military/MILITARY.md`, `docs/generation/NATION_GENERATION.md`*
+
+### NR-1123 — A land unit may cross a bridge over another nation's water
+*decision taken on your behalf · raised 2026-10-31 · from Lane D, sprint 61 (BL-1466 march path domain), 2026-10-31*
+
+MILITARY.md § Domains and traversal lets land classes onto coastal water only where owned. A roaded water tile (a bridge) now counts as land for a land class, as a road already lifts the class terrain wall - so a land unit may cross a bridge over another nation's strait. Naval rows still see the water under it.
+
+**Why it matters.** A bridge over a rival's strait becomes an invasion route; without the rule a bridge would be a road nobody may walk.
+
+> **Recommendation:** Accept; a bridge is ground. Write it into § Domains and traversal.
+
+*Files: `src/world/battle_system.cpp`, `docs/military/MILITARY.md`*
 
 ---
 

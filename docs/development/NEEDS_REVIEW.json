@@ -731,6 +731,22 @@
     "docs/generation/NATION_GENERATION.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1123",
+   "title": "A land unit may cross a bridge over another nation's water",
+   "raised": "2026-10-31",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Lane D, sprint 61 (BL-1466 march path domain), 2026-10-31",
+   "what": "MILITARY.md § Domains and traversal lets land classes onto coastal water only where owned. A roaded water tile (a bridge) now counts as land for a land class, as a road already lifts the class terrain wall - so a land unit may cross a bridge over another nation's strait. Naval rows still see the water under it.",
+   "why_it_matters": "A bridge over a rival's strait becomes an invasion route; without the rule a bridge would be a road nobody may walk.",
+   "recommendation": "Accept; a bridge is ground. Write it into § Domains and traversal.",
+   "files": [
+    "src/world/battle_system.cpp",
+    "docs/military/MILITARY.md"
+   ],
+   "resolution": null
   }
  ]
 }
