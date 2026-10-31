@@ -174,8 +174,8 @@ int main()
     // R0b — A PICKED SEAT OPENS UNARMED (the BL-1154 review). The pick path
     //       (`corp_verb::take_seat`) and the draw share `move_seat_force`:
     //       the corporation picked loses its opening force, and the seat it
-    //       left is armed. On a LEGACY world (no budget) and a BUDGET world
-    //       (the shipped arc, the charter web spent on the seed candidate).
+    //       left is armed. On a LEGACY world (no budget). The BUDGET world rows
+    //       are retired (BL-1440, below): capital_military_base C5 holds them.
     // -------------------------------------------------------------------
     {
         const auto pick_row = [&](world& w, const char* label) {
@@ -224,13 +224,39 @@ int main()
             pick_row(w, "legacy world");
         }
         {
-            world_params p{};                // the shipped arc: the budget's own world
+            // BL-1440 (R0b budget world): THE THREE "BUDGET WORLD" ROWS ARE RETIRED,
+            // because their premise is. They built the shipped arc Lua-free
+            // (`make_hard_coded_world(world_params{})`), spent its charter budget on
+            // the seed candidate, then moved the seat. Today that world has no works
+            // table, so the Industrialisation span earns no industry points and the
+            // stockpile budget is EMPTY; since BL-1404 an empty budget lays no legacy
+            // roster either. So it charters nothing, seats nobody, and - majors being
+            // the nations that hold a specialist charter (BL-1404,
+            // `mark_majors_from_champions`) - has NO MAJOR NATION, and `take_seat`
+            // refuses a minor. No seat can move there, so no Lua-free fixture holds
+            // the rows' subject without forging majors or a budget.
+            //
+            // THE SUBJECT LIVES ON: the seat-move rule on the charter-budget world
+            // (the app's, with works) is capital_military_base's C5, on the shipped
+            // start - a picked NATION loses the force raised at its base, keeps its
+            // one capital base (BL-1439), and the nation it left is armed at its own.
+            // (On the shipped start C5 expects the pick to KEEP one base, its capital
+            // base, where the legacy row above still expects 0: on the legacy world the
+            // pick's one base is the opening force's, which no garrison records, so
+            // the disarm removes it - and that legacy row passes.)
+            //
+            // What stays here is the premise itself, so a change that makes this
+            // world a budget world again fails loudly and the rows come back.
+            world_params p{};                // the shipped arc, Lua-free
             world w = make_hard_coded_world(p);
-            const recipe_registry reg;      // Lua-free: the web charters its specialists
-            const seed_candidate_spend scs =
-                spend_stockpile_on_seed_candidate(w, reg, p.seed, world_gen_config{}.corporation_count);
-            check(scs.spent, "R0b budget world: the charter budget was spent (a budget world)");
-            pick_row(w, "budget world");
+            std::size_t majors = 0;
+            for (const auto& [nid, nc] : w.nations)
+                majors += is_major_nation(w, nid) ? 1 : 0;
+            std::printf("  budget world (Lua-free shipped arc): %zu charters, %zu majors, seat %u\n",
+                        w.gen_charters.size(), majors, static_cast<unsigned>(w.player_entity));
+            check(w.gen_charters.empty() && majors == 0 && w.player_entity == null_entity,
+                  "R0b budget world RETIRED (BL-1440): the Lua-free shipped arc charters nothing, has no major and "
+                  "seats nobody, so no seat can move; the rows' subject is capital_military_base C5");
         }
     }
 
