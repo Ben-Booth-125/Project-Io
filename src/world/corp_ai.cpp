@@ -11,6 +11,8 @@
 #include "air_combat.hpp"      // BL-1451: a rival flies air wings
 #include "campaign_settle.hpp" // BL-1452: k_campaign_settle_ticks - the settle assigns no fronts
 #include "stance.hpp"          // is_hostile (BL-1451)
+#include "war.hpp"             // BL-1461: declaration_price, war_score, the war verbs' reads
+#include "sentiment_emitters.hpp" // BL-1461: sentiment_conduct_live (no war in the settle)
 #include "input_reach.hpp"     // BL-1187: obtainable inputs (the BL-1185 reach)
 #include "logistics.hpp"       // body_reach_field (BL-379: warm before the reach-checked muster scan)
 #include "market_clearing.hpp" // market_for_tile
@@ -1719,6 +1721,429 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
     }
 }
 
+// ---------------------------------------------------------------------------
+// BL-1461 — a rival nation wages war (AI_OPPONENT.md § 11: the stance grant,
+// BL-450, covers a rival DECLARING war, goals included (Ben, 2026-10-30); "Rival
+// nations wage war whole" grants answering, offering, accepting, refusing and
+// imposing peace on the same terms (NR-1100); RELATIONS.md § 1 Who declares, § 7).
+// The grant and nothing wider:
+//
+//   * Only the nation's OWN wars and offers, through the legal verbs the player's
+//     Diplomacy ledger issues (declare_war, answer_war, offer_peace, accept_peace,
+//     refuse_peace, impose_peace) via apply_corp_command. Never declare_hostile:
+//     a bare hostility is not a rival war path.
+//   * Never FOR the player's nation (refused outright, as score_nation_air does),
+//     and never an IMPOSE on the player's nation: "whose wars only the player
+//     answers and ends" - the player ends its wars by its own accept or offer.
+//   * Never a planner: every choice is the next verb, scored on the world as it
+//     stands. Nothing models the other side's reply.
+//   * Reads only what the nation may read: ITS OWN sentiment row toward a target
+//     (Trust, Alarm), the declaration's public price and justifications
+//     (`declaration_price`, the preview the player sees), standing force on the
+//     shared front's provinces (visible on the map; the reading Alarm's
+//     standing-force factor and front_push_target take), the pair's trade streaks
+//     (cargo landing in its markets, and its own cargo landing in theirs), its own
+//     exhaustion, and the public war score.
+//   * NEVER ON ONE THRESHOLD: a declaration needs a MOTIVE (an adverse Trust, an
+//     Alarm, or a justification that holds), an EDGE on the shared front, and a
+//     summed utility over every term - grievance, alarm, warmth, edge, goals, the
+//     price, trade exposure, exhaustion, the wars it already fights - above a bar.
+//     Sentiment informs; no sentiment value alone makes a declaration (RELATIONS.md
+//     § The invariant).
+//   * No war in the settle: run_corp_strategic_step calls this only on a live
+//     tick (econ tick >= k_campaign_settle_ticks), and it also refuses while
+//     `sentiment_conduct_live` is false (the settle's build gate is up).
+// Pure arithmetic on sorted ids; one declaration at most per evaluation, and at
+// most one verb per open war.
+// ---------------------------------------------------------------------------
+
+std::vector<war_ai_trace_row>*& war_ai_trace_sink()
+{
+    static std::vector<war_ai_trace_row>* sink = nullptr;
+    return sink;
+}
+
+namespace {
+
+// Calibration (BL-1461, delegated in band: across the 16 library seeds by econ
+// tick 40 at least one war, and no seed with every nation at war).
+constexpr float k_war_ai_w_grievance  = 4.0f;  ///< x max(0, -Trust) / limit
+constexpr float k_war_ai_w_alarm      = 4.0f;  ///< x max(0, Alarm) / limit
+constexpr float k_war_ai_w_warmth     = 6.0f;  ///< x max(0, Trust) / limit (warmth deters)
+constexpr float k_war_ai_w_edge       = 0.3f;  ///< x the front edge in [-1, 1]
+constexpr float k_war_ai_w_goal       = 0.05f; ///< x goals named (what is to be won)
+constexpr float k_war_ai_w_price      = 0.10f; ///< x the price relative to one unjustified goal
+constexpr float k_war_ai_w_trade      = 0.20f; ///< x trade exposure in [0, 1]
+constexpr float k_war_ai_w_exhaustion = 1.0f;  ///< x own exhaustion / 100
+constexpr float k_war_ai_w_open_wars  = 0.40f; ///< x wars it already fights
+constexpr float k_war_ai_declare_bar  = 0.32f; ///< the summed utility a declaration must clear
+constexpr float k_war_ai_min_edge     = 0.33f; ///< the front edge a declaration needs (2:1)
+/// The motive a declaration needs - (adverse Trust + Alarm) / limit - unless a
+/// justification holds: sentiment's ordinary drift is not a grievance.
+constexpr float k_war_ai_min_motive   = 0.025f;
+
+/// Peace: a war younger than this is neither offered nor accepted (a declaration
+/// is not withdrawn the quarter it is made).
+constexpr int   k_war_ai_min_peace_ticks    = 4;
+constexpr float k_war_ai_peace_w_exhaustion = 0.8f; ///< x own exhaustion / 100
+constexpr float k_war_ai_peace_w_losing     = 0.6f; ///< x max(0, -score) / 100
+constexpr float k_war_ai_peace_w_duration   = 0.4f; ///< x min(1, ticks at war / truce length)
+constexpr float k_war_ai_peace_w_stake      = 0.5f; ///< x provinces gained less lost by the terms
+constexpr float k_war_ai_peace_w_winning    = 0.4f; ///< x max(0, score) / 100
+constexpr float k_war_ai_peace_bar          = 0.3f; ///< accept / offer when the sum clears it
+constexpr int   k_war_ai_demand_score       = 25;   ///< an offer asks for held goals from this score
+
+/// One shared border, read from the nation's side.
+struct war_pair_front
+{
+    int64_t mine = 0, theirs = 0;      ///< standing strength on the front's provinces
+    std::vector<uint32_t> their_provs; ///< the target's provinces on the front, ranked as goals
+};
+
+/// The land provinces on the spans of @p fronts toward @p neighbour, politically
+/// owned by @p owner: ascending id.
+std::vector<uint32_t> span_provinces(const world& w, const std::vector<front>& fronts,
+                                     entity_id neighbour, entity_id owner)
+{
+    std::set<uint32_t> s;
+    for (const front& f : fronts)
+        if (f.neighbour == neighbour)
+            for (const entity_id t : f.span)
+                if (const uint32_t p = w.provinces.province_of(t); p != 0)
+                    s.insert(p);
+    std::vector<uint32_t> out;
+    for (const uint32_t p : s)
+        if (province_kind_of(w, p) == province_kind::land && province_owner(w, p) == owner)
+            out.push_back(p);
+    return out;
+}
+
+/// Rank provinces as goals: the most tiles first, ties to the lower id.
+void rank_goal_provinces(const world& w, std::vector<uint32_t>& provs)
+{
+    std::sort(provs.begin(), provs.end(), [&w](uint32_t a, uint32_t b) {
+        const province* pa = w.provinces.find(a);
+        const province* pb = w.provinces.find(b);
+        const std::size_t na = pa ? pa->tiles.size() : 0, nb = pb ? pb->tiles.size() : 0;
+        return na != nb ? na > nb : a < b;
+    });
+}
+
+/// Every shared border of @p nation, keyed by neighbour (ascending).
+std::map<entity_id, war_pair_front> war_pair_fronts(world& w, entity_id nation)
+{
+    std::map<entity_id, war_pair_front> out;
+    const std::vector<front> mine = nation_fronts(w, nation); // a copy: the next call may re-anchor
+    for (const front& f : mine)
+        out[f.neighbour];
+    std::map<entity_id, std::set<uint32_t>> zone; // neighbour -> both sides' front provinces
+    for (auto& [nb, pf] : out)
+    {
+        const std::vector<front> theirs = nation_fronts(w, nb);
+        pf.their_provs = span_provinces(w, theirs, nation, nb);
+        rank_goal_provinces(w, pf.their_provs);
+        std::set<uint32_t>& z = zone[nb];
+        for (const uint32_t p : pf.their_provs) z.insert(p);
+        for (const uint32_t p : span_provinces(w, mine, nb, nation)) z.insert(p);
+    }
+    if (out.empty())
+        return out;
+    // Standing strength per (province, owner): integer sums, so the unordered
+    // unit walk cannot reach the result.
+    std::map<std::pair<uint32_t, entity_id>, int64_t> force;
+    for (const auto& [uid, u] : w.units)
+        if (u.count > 0 && u.position != null_entity)
+            if (const uint32_t p = w.provinces.province_of(u.position); p != 0)
+                force[{ p, u.owner }] += unit_strength(w, u);
+    for (auto& [nb, pf] : out)
+        for (const uint32_t p : zone[nb])
+        {
+            if (const auto it = force.find({ p, nation }); it != force.end()) pf.mine += it->second;
+            if (const auto it = force.find({ p, nb }); it != force.end()) pf.theirs += it->second;
+        }
+    return out;
+}
+
+/// The front edge in [-1, 1]: (mine - theirs) / (mine + theirs); 0 when neither stands there.
+float front_edge(const war_pair_front& pf)
+{
+    const int64_t sum = pf.mine + pf.theirs;
+    return sum > 0 ? static_cast<float>(static_cast<double>(pf.mine - pf.theirs) / static_cast<double>(sum))
+                   : 0.0f;
+}
+
+/// Trade exposure in [0, 1]: half for live trade landing in each direction.
+float trade_exposure(const world& w, entity_id nation, entity_id other)
+{
+    const auto live = [&w](entity_id shipper, entity_id receiver) {
+        const auto it = w.sentiment_trade_streaks.find({ shipper, receiver });
+        return it != w.sentiment_trade_streaks.end() && (it->second.traded > 0 || it->second.armed);
+    };
+    return 0.5f * (live(other, nation) ? 1.0f : 0.0f) + 0.5f * (live(nation, other) ? 1.0f : 0.0f);
+}
+
+/// A nation's land provinces (ascending), for an answer with no shared front.
+std::vector<uint32_t> owned_land_provinces(const world& w, entity_id nation)
+{
+    std::vector<uint32_t> out;
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return out;
+    std::set<uint32_t> touched;
+    for (const entity_id t : nit->second.tiles)
+        if (const uint32_t p = w.provinces.province_of(t); p != 0)
+            touched.insert(p);
+    for (const uint32_t p : touched)
+        if (province_kind_of(w, p) == province_kind::land && province_owner(w, p) == nation)
+            out.push_back(p);
+    return out;
+}
+
+corp_command war_cmd(entity_id nation, int tick, corp_verb v, entity_id other,
+                     const std::vector<uint32_t>& provs, uint32_t order = 0)
+{
+    corp_command cmd;
+    cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+    cmd.verb = v; cmd.counterparty = other; cmd.order = order;
+    for (std::size_t i = 0; i < provs.size() && i < k_war_goals_max; ++i)
+        cmd.air_provinces[i] = provs[i];
+    return cmd;
+}
+
+void war_trace(int tick, entity_id nation, entity_id target, war_ai_choice c, float u,
+               float g, float a, float s, float p, float x, int goals, bool applied)
+{
+    if (std::vector<war_ai_trace_row>* sink = war_ai_trace_sink())
+        sink->push_back(war_ai_trace_row{ tick, nation, target, c, u, g, a, s, p, x, goals, applied });
+}
+
+/// The goals @p gainer holds that are still the loser's - a cession's candidates,
+/// ascending - trimmed from the back until the terms are legal. Empty when none is.
+std::vector<uint32_t> legal_cession(const world& w, const war_record& war, entity_id gainer)
+{
+    const entity_id loser = gainer == war.declarer ? war.defender : war.declarer;
+    const std::vector<uint32_t>& goals = gainer == war.declarer ? war.declarer_goals : war.defender_goals;
+    std::vector<uint32_t> held;
+    for (const uint32_t g : goals) // ascending
+        if (province_holder_for(w, g) == gainer && province_owner(w, g) == loser)
+            held.push_back(g);
+    while (!held.empty())
+    {
+        peace_terms t;
+        t.kind = peace_kind::cession; t.gainer = gainer; t.provinces = held;
+        if (check_peace_terms(w, war, t) == war_result::applied)
+            return held;
+        held.pop_back();
+    }
+    return held;
+}
+
+} // namespace
+
+void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick)
+{
+    // Never the player's nation (AI_OPPONENT.md § 11: "Not admitted: ... acting for
+    // the player's nation"), never an unknown one, never in the settle.
+    const entity_id player = player_nation(w);
+    if (nation == null_entity || nation == player || w.nations.find(nation) == w.nations.end())
+        return;
+    if (!sentiment_conduct_live(w))
+        return;
+    const sentiment_params& sp = reg.sentiment();
+    const float limit = sp.limit > 0.0f ? sp.limit : 100.0f;
+
+    std::map<entity_id, war_pair_front> fronts; // built on first use
+    bool fronts_built = false;
+    const auto pair_fronts = [&]() -> const std::map<entity_id, war_pair_front>& {
+        if (!fronts_built) { fronts = war_pair_fronts(w, nation); fronts_built = true; }
+        return fronts;
+    };
+    const float exhaustion = nation_war_exhaustion(w, nation) / 100.0f;
+
+    // ---- 1. ITS OWN OPEN WARS: answer, impose, accept or refuse, offer ---------
+    std::vector<std::pair<entity_id, entity_id>> keys;
+    for (const auto& [key, war] : w.wars) // ascending
+        if (war.declarer == nation || war.defender == nation)
+            keys.push_back(key);
+    for (const auto& key : keys)
+    {
+        const auto wit = w.wars.find(key);
+        if (wit == w.wars.end())
+            continue;
+        const war_record war = wit->second; // a copy: the verbs below may close it
+        const bool is_declarer = war.declarer == nation;
+        const entity_id other = is_declarer ? war.defender : war.declarer;
+
+        // ANSWER: free, and it names goals, so a defender always answers.
+        if (!is_declarer && !war.answered)
+        {
+            std::vector<uint32_t> goals;
+            float s = 0.0f;
+            const auto& pf = pair_fronts();
+            if (const auto it = pf.find(other); it != pf.end() && !it->second.their_provs.empty())
+            {
+                s = front_edge(it->second);
+                goals = it->second.their_provs;
+                const std::size_t k = 1 + (s > 0.0f ? 1 : 0) + (s > 0.5f ? 1 : 0);
+                if (goals.size() > k) goals.resize(k);
+            }
+            else
+            {
+                // No shared front: the declarer's capital province, else its first.
+                const auto dn = w.nations.find(other);
+                const uint32_t cp = dn != w.nations.end() && dn->second.capital_tile != null_entity
+                                        ? w.provinces.province_of(dn->second.capital_tile) : 0u;
+                if (cp != 0 && province_kind_of(w, cp) == province_kind::land && province_owner(w, cp) == other)
+                    goals.push_back(cp);
+                else if (const std::vector<uint32_t> own = owned_land_provinces(w, other); !own.empty())
+                    goals.push_back(own.front());
+            }
+            if (goals.empty())
+                continue;
+            const corp_command cmd = war_cmd(nation, tick, corp_verb::answer_war, other, goals);
+            const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+            war_trace(tick, nation, other, war_ai_choice::answer, 0.0f, 0, 0, s, 0, 0,
+                      static_cast<int>(goals.size()), ok);
+            continue; // one verb per war
+        }
+
+        const int score = war_score(w, war);
+        const int mine  = is_declarer ? score : -score; // in this nation's favour
+        const int dur   = tick - war.opened_tick;
+        const float losing  = static_cast<float>(std::max(0, -mine)) / 100.0f;
+        const float winning = static_cast<float>(std::max(0, mine)) / 100.0f;
+        const float lasted  = std::min(1.0f, static_cast<float>(std::max(0, dur))
+                                              / static_cast<float>(k_war_truce_ticks));
+
+        // IMPOSE at 100 - never on the player's nation, whose wars only it ends.
+        if (mine >= 100 && other != player)
+        {
+            const std::vector<uint32_t> held = legal_cession(w, war, nation);
+            const corp_command cmd = war_cmd(nation, tick, corp_verb::impose_peace, other, held,
+                                             held.empty() ? 0u : 1u);
+            const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+            war_trace(tick, nation, other, war_ai_choice::impose, static_cast<float>(mine), 0, 0, 0, 0, 0,
+                      static_cast<int>(held.size()), ok);
+            continue;
+        }
+
+        // A PENDING OFFER from the other side: accept or refuse.
+        const auto oit = w.peace_offers.find(key);
+        if (oit != w.peace_offers.end() && oit->second.offerer == other)
+        {
+            const peace_terms t = oit->second.terms;
+            float stake = 0.0f;
+            if (t.kind == peace_kind::cession)
+                stake = (t.gainer == nation ? 1.0f : -1.0f) * static_cast<float>(t.provinces.size());
+            const float a = dur < k_war_ai_min_peace_ticks ? -1.0f
+                : k_war_ai_peace_w_exhaustion * exhaustion + k_war_ai_peace_w_losing * losing
+                + k_war_ai_peace_w_duration * lasted + k_war_ai_peace_w_stake * stake
+                - k_war_ai_peace_w_winning * winning;
+            const bool accept = a > k_war_ai_peace_bar;
+            const corp_command cmd = war_cmd(nation, tick,
+                                             accept ? corp_verb::accept_peace : corp_verb::refuse_peace,
+                                             other, {});
+            const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+            war_trace(tick, nation, other, accept ? war_ai_choice::accept : war_ai_choice::refuse, a,
+                      stake, 0, 0, 0, 0, static_cast<int>(t.provinces.size()), ok);
+            continue;
+        }
+        if (oit != w.peace_offers.end())
+            continue; // its own offer stands; the other side answers it
+
+        // OFFER: weariness, a war going badly, or one going well enough to cash in.
+        if (dur < k_war_ai_min_peace_ticks)
+            continue;
+        std::vector<uint32_t> provs;
+        uint32_t order = 0; // white
+        if (mine >= k_war_ai_demand_score)
+        {
+            provs = legal_cession(w, war, nation);
+            if (!provs.empty()) order = 1; // ceded to the actor
+        }
+        else if (mine <= -2 * k_war_ai_demand_score)
+        {
+            provs = legal_cession(w, war, other);
+            if (!provs.empty()) order = 2; // ceded to the counterparty: its own ground
+        }
+        const float d = k_war_ai_peace_w_exhaustion * exhaustion + k_war_ai_peace_w_losing * losing
+                      + k_war_ai_peace_w_duration * lasted
+                      + (order == 1 ? k_war_ai_peace_w_winning * winning : 0.0f);
+        if (d <= k_war_ai_peace_bar)
+            continue;
+        const corp_command cmd = war_cmd(nation, tick, corp_verb::offer_peace, other, provs, order);
+        const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+        war_trace(tick, nation, other, war_ai_choice::offer, d, 0, 0, 0, 0, 0,
+                  static_cast<int>(provs.size()), ok);
+    }
+
+    // ---- 2. A DECLARATION: at most one, toward a neighbour across a front ------
+    int open_wars = 0;
+    for (const auto& [key, war] : w.wars)
+        if (war.declarer == nation || war.defender == nation)
+            ++open_wars;
+    // The third parties a declaration prices: every nation but the pair.
+    const std::size_t others = w.nations.size() >= 2 ? w.nations.size() - 2 : 0;
+    const float base_trust = sp.factors[static_cast<std::size_t>(sentiment_factor_kind::war_declared)].trust;
+
+    struct pick
+    {
+        float u = 0.0f;
+        entity_id t = null_entity;
+        std::vector<uint32_t> goals;
+        float g = 0, a = 0, s = 0, p = 0, x = 0;
+    };
+    pick best;
+    bool have = false;
+    for (const auto& [target, pf] : pair_fronts()) // ascending neighbour
+    {
+        if (target == nation || w.nations.find(target) == w.nations.end() || pf.their_provs.empty())
+            continue;
+        if (at_war(w, nation, target) || truce_between(w, nation, target))
+            continue;
+        const sentiment_value sv = sentiment_toward(w.sentiment, nation, target); // its OWN row
+        const float g    = std::max(0.0f, -sv.trust) / limit;
+        const float a    = std::max(0.0f, sv.alarm) / limit;
+        const float warm = std::max(0.0f, sv.trust) / limit;
+        const float s    = front_edge(pf);
+        if (s < k_war_ai_min_edge)
+            continue; // no edge on the shared front
+        const float x = trade_exposure(w, nation, target);
+        const std::size_t kmax = std::min<std::size_t>(k_war_goals_max, pf.their_provs.size());
+        for (std::size_t k = 1; k <= kmax; ++k)
+        {
+            const std::vector<uint32_t> goals(pf.their_provs.begin(),
+                                              pf.their_provs.begin() + static_cast<std::ptrdiff_t>(k));
+            const war_price price = declaration_price(w, sp, nation, target, goals);
+            if (!price.valid)
+                continue;
+            if (g + a < k_war_ai_min_motive && !price.justified)
+                break; // no motive: nothing to weigh
+            const float p = (base_trust < 0.0f && others > 0)
+                                ? price.sum_trust / (base_trust * static_cast<float>(others)) : 0.0f;
+            const float u = k_war_ai_w_grievance * g + k_war_ai_w_alarm * a - k_war_ai_w_warmth * warm
+                          + k_war_ai_w_edge * s + k_war_ai_w_goal * static_cast<float>(k)
+                          - k_war_ai_w_price * p - k_war_ai_w_trade * x
+                          - k_war_ai_w_exhaustion * exhaustion
+                          - k_war_ai_w_open_wars * static_cast<float>(open_wars);
+            war_trace(tick, nation, target, war_ai_choice::candidate, u, g, a, s, p, x,
+                      static_cast<int>(k), false);
+            if (!have || u > best.u) // strict: ties keep the lower target, then fewer goals
+            {
+                have = true;
+                best = pick{ u, target, goals, g, a, s, p, x };
+            }
+        }
+    }
+    if (have && best.u > k_war_ai_declare_bar)
+    {
+        const corp_command cmd = war_cmd(nation, tick, corp_verb::declare_war, best.t, best.goals);
+        const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+        war_trace(tick, nation, best.t, war_ai_choice::declare, best.u, best.g, best.a, best.s, best.p,
+                  best.x, static_cast<int>(best.goals.size()), ok);
+    }
+}
+
 bool corp_strategic_eval_due(const world& w, entity_id corp, int tick, const corp_ai_params& p)
 {
     // The player-corp skip, and the ONE condition that removes it (BL-409).
@@ -1863,6 +2288,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // all, so every garrison opens on its post. This NARROWS the BL-1427 grant to
         // live play; it widens nothing. Keyed on the econ tick, the same settle/live
         // boundary the day stamps use (economy_system.cpp `carried_supplies_live`).
+        // BL-1461 (AI_OPPONENT.md § 11: the stance grant and "Rival nations wage war
+        // whole"): its own wars - answer, peace, at most one declaration - on the same
+        // live-only gate as the fronts (no war begins in the settle), and BEFORE the
+        // fronts, so a front reads the hostility as it stands after this evaluation's
+        // verbs. score_nation_war refuses the player's nation itself as well.
+        if (actor.is_nation && tick >= k_campaign_settle_ticks)
+            score_nation_war(w, reg, corp, tick);
+
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_fronts(w, reg, corp, tick);
 

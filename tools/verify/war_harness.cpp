@@ -3,7 +3,8 @@
 // peace; no SDL / Lua / ImGui) — docs/politics/RELATIONS.md § 7.
 // ---------------------------------------------------------------------------
 // Requirement groups `war-record-and-declaration` (R1-R5) and `war-goals-and-peace`
-// (R1-R4). Every refusal is checked by a WHOLE-WORLD snapshot compare (the save
+// (R1-R4), and `rivals-declare-war` R1/R3 (BL-1461: the RW rows, a rival's war pass
+// through the verbs, never for the player, replayable). Every refusal is checked by a WHOLE-WORLD snapshot compare (the save
 // bytes, which carry sentiment, stance and every war table, plus `state_hash`),
 // never by the return code alone — the untrusted-boundary rule.
 //
@@ -16,8 +17,10 @@
 
 #include "world/battle_system.hpp"
 #include "world/components.hpp"
+#include "world/corp_ai.hpp"      // BL-1461: score_nation_war, war_ai_trace_sink
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
+#include "world/fronts.hpp"       // BL-1461: derive_fronts (where the RW rows stand a unit)
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/sentiment.hpp"
@@ -1023,6 +1026,230 @@ int main()
               "F5b an answered war with no defender->declarer row is refused whole on load");
         world back3;
         check(from_bytes(to_bytes(w), back3), "F5c the intact stream loads");
+    }
+
+    // =====================================================================
+    // BL-1461 (rivals declare war; requirement group `rivals-declare-war` R3): the
+    // rival war pass acts only through the legal verbs, and never for the player.
+    std::printf("\nRW - a rival wages war through the verbs (BL-1461)\n");
+    {
+        // The rows read what the pass DID through the trace it writes and the tables
+        // the verbs write; nothing here calls a war verb on the rival's behalf.
+        std::vector<war_ai_trace_row> trace;
+        war_ai_trace_sink() = &trace;
+        const auto did = [&trace](war_ai_choice c, entity_id actor, entity_id target) {
+            for (const war_ai_trace_row& t : trace)
+                if (t.choice == c && t.nation == actor && t.target == target && t.applied) return true;
+            return false;
+        };
+        const auto front_tile = [](const world& w, entity_id owner, entity_id toward) {
+            for (const front& fr : derive_fronts(w, owner))
+                if (fr.neighbour == toward && !fr.span.empty()) return fr.span.front();
+            return null_entity;
+        };
+        const auto add_unit = [](world& w, entity_id owner, entity_id tile, int men) {
+            const entity_id u = w.create_entity();
+            unit_component uc{}; uc.position = tile; uc.owner = owner; uc.count = men; uc.establishment = men;
+            w.units[u] = uc;
+        };
+        const auto grudge = [&sp](world& w, entity_id observer, entity_id subject, float magnitude) {
+            apply_sentiment_events(w.sentiment, sp,
+                                   { sentiment_event{ observer, subject, sentiment_factor_kind::hostility_declared,
+                                                      magnitude } });
+        };
+
+        // RW1 - the defender answers, naming goals among the declarer's provinces.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 20;
+            (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+            trace.clear();
+            score_nation_war(w, reg, f.B, 20);
+            const war_record* rec = war_between(w, f.A, f.B);
+            bool goals_ok = rec != nullptr && !rec->defender_goals.empty() && rec->defender_goals.size() <= 3;
+            if (rec != nullptr)
+                for (const uint32_t g : rec->defender_goals) goals_ok = goals_ok && province_owner(w, g) == f.A;
+            check(rec != nullptr && rec->answered && is_hostile(w, f.B, f.A) && goals_ok
+                      && did(war_ai_choice::answer, f.B, f.A),
+                  "RW1 a rival defender answers through answer_war: its hostility row, 1..3 goals among the declarer's provinces");
+        }
+        // RW2 - the player's nation is never acted for: not answered, not offered, not declared.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 20;
+            (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+            w.player_entity = f.B;
+            grudge(w, f.B, f.C, 2.0f);
+            add_unit(w, f.B, front_tile(w, f.B, f.C), 2000);
+            trace.clear();
+            const snap s = take(w);
+            score_nation_war(w, reg, f.B, 20);
+            check(same(s, w) && trace.empty(),
+                  "RW2 the player's nation is never acted for: no answer, no declaration, nothing mutated");
+        }
+        // RW3 - impose at 100 through impose_peace, its held goals ceded to it.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 20;
+            const std::vector<uint32_t> dg = { f.provs[f.B][0], f.provs[f.B][1] };
+            (void)declare_war(w, sp, f.A, f.B, dg);
+            for (const uint32_t p : dg) w.province_holder[holder_index(w, p)] = f.A;
+            w.wars.at({ f.A, f.B }).defender_men_lost = 50;
+            check(war_score(w, *war_between(w, f.A, f.B)) == 100, "RW3 (setup) the declarer's score stands at 100");
+            trace.clear();
+            score_nation_war(w, reg, f.A, 20);
+            check(!at_war(w, f.A, f.B) && !w.war_history.empty()
+                      && w.war_history.back().end == war_end::imposed_cession && w.war_history.back().gainer == f.A
+                      && w.war_history.back().ceded == dg && did(war_ai_choice::impose, f.A, f.B),
+                  "RW3 at 100 a rival imposes through impose_peace: its held goals are ceded to it");
+        }
+        // RW3b - never an impose on the player's nation: at 100 it offers instead.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 10;
+            const std::vector<uint32_t> dg = { f.provs[f.B][0], f.provs[f.B][1] };
+            (void)declare_war(w, sp, f.A, f.B, dg);
+            for (const uint32_t p : dg) w.province_holder[holder_index(w, p)] = f.A;
+            w.wars.at({ f.A, f.B }).defender_men_lost = 50;
+            w.player_entity = f.B;
+            w.current_econ_tick = 20;
+            trace.clear();
+            score_nation_war(w, reg, f.A, 20);
+            const auto oit = w.peace_offers.find({ f.A, f.B });
+            check(at_war(w, f.A, f.B) && w.war_history.empty() && oit != w.peace_offers.end()
+                      && oit->second.offerer == f.A && oit->second.terms.kind == peace_kind::cession
+                      && !did(war_ai_choice::impose, f.A, f.B) && did(war_ai_choice::offer, f.A, f.B),
+                  "RW3b at 100 against the player's nation a rival does not impose: it offers, and the player ends it");
+        }
+        // RW4 - accept: a weary rival accepts the other side's offer through accept_peace.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 10;
+            (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+            (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+            w.current_econ_tick = 20;
+            w.wars.at({ f.A, f.B }).declarer_exhaustion = 80.0f;
+            (void)offer_peace(w, f.B, f.A, peace_terms{});
+            trace.clear();
+            score_nation_war(w, reg, f.A, 20);
+            check(!at_war(w, f.A, f.B) && !w.war_history.empty() && w.war_history.back().end == war_end::white_peace
+                      && did(war_ai_choice::accept, f.A, f.B),
+                  "RW4 a weary rival (exhaustion 80) accepts the white peace offered it, through accept_peace");
+        }
+        // RW5 - refuse: a fresh rival refuses through refuse_peace; the war goes on.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 16;
+            (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+            (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+            w.current_econ_tick = 20;
+            (void)offer_peace(w, f.B, f.A, peace_terms{});
+            trace.clear();
+            score_nation_war(w, reg, f.A, 20);
+            check(at_war(w, f.A, f.B) && w.peace_offers.empty() && did(war_ai_choice::refuse, f.A, f.B),
+                  "RW5 a fresh rival (no exhaustion, level score, four ticks in) refuses through refuse_peace; the war goes on");
+        }
+        // RW6 - offer: a weary rival offers peace through offer_peace.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 10;
+            (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+            (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+            w.current_econ_tick = 18;
+            w.wars.at({ f.A, f.B }).defender_exhaustion = 60.0f;
+            trace.clear();
+            score_nation_war(w, reg, f.B, 18);
+            const auto oit = w.peace_offers.find({ f.A, f.B });
+            check(at_war(w, f.A, f.B) && oit != w.peace_offers.end() && oit->second.offerer == f.B
+                      && oit->second.terms.kind == peace_kind::white && did(war_ai_choice::offer, f.B, f.A),
+                  "RW6 a weary rival (exhaustion 60, eight ticks in) offers a white peace through offer_peace");
+        }
+        // RW7 - a declaration: a motive, an edge on the front, through declare_war only.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 20;
+            grudge(w, f.A, f.B, 2.0f);
+            add_unit(w, f.A, front_tile(w, f.A, f.B), 2000);
+            {
+                world no_edge = w;
+                for (auto& [uid, u] : no_edge.units) u.count = 0; // no force: no edge on the front
+                trace.clear();
+                const snap s = take(no_edge);
+                score_nation_war(no_edge, reg, f.A, 20);
+                check(same(s, no_edge), "RW7a with the motive but no edge on the front, no declaration");
+            }
+            {
+                world no_motive = w;
+                no_motive.sentiment = sentiment_table{};
+                trace.clear();
+                const snap s = take(no_motive);
+                score_nation_war(no_motive, reg, f.A, 20);
+                check(same(s, no_motive), "RW7b with the edge but no motive, no declaration (never on one threshold)");
+            }
+            trace.clear();
+            score_nation_war(w, reg, f.A, 20);
+            const war_record* rec = war_between(w, f.A, f.B);
+            bool goals_ok = rec != nullptr && rec->declarer == f.A && !rec->declarer_goals.empty()
+                         && rec->declarer_goals.size() <= 3;
+            if (rec != nullptr)
+                for (const uint32_t g : rec->declarer_goals) goals_ok = goals_ok && province_owner(w, g) == f.B;
+            check(goals_ok && is_hostile(w, f.A, f.B) && !is_hostile(w, f.B, f.A)
+                      && did(war_ai_choice::declare, f.A, f.B) && w.wars.size() == 1,
+                  "RW7 with a motive and an edge a rival declares through declare_war: 1..3 goals among the target's provinces");
+            trace.clear();
+            const snap s = take(w);
+            score_nation_war(w, reg, f.A, 21);
+            check(same(s, w) && !did(war_ai_choice::declare, f.A, f.B),
+                  "RW7c a second evaluation does not declare again (one war per pair; the open war weighs)");
+        }
+        // RW8 - the settle gate: no war verb while the settle's build gate is up.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 5;
+            grudge(w, f.A, f.B, 2.0f);
+            add_unit(w, f.A, front_tile(w, f.A, f.B), 2000);
+            w.settle_build_gate = true;
+            trace.clear();
+            const snap s = take(w);
+            score_nation_war(w, reg, f.A, 5);
+            check(same(s, w) && trace.empty(), "RW8 under the settle gate the pass does nothing (no war begins in the settle)");
+        }
+        // RW9 - replay: the same pass on two built worlds gives byte-identical worlds and traces.
+        {
+            std::vector<std::string> bytes;
+            std::vector<std::size_t> rows;
+            for (int run = 0; run < 2; ++run)
+            {
+                fixture f; build(f);
+                world& w = f.w;
+                w.current_econ_tick = 20;
+                grudge(w, f.A, f.B, 2.0f);
+                grudge(w, f.C, f.D, 1.0f);
+                add_unit(w, f.A, front_tile(w, f.A, f.B), 2000);
+                add_unit(w, f.C, front_tile(w, f.C, f.D), 1500);
+                trace.clear();
+                for (int t = 20; t < 40; ++t)
+                {
+                    w.current_econ_tick = t;
+                    for (const entity_id n : { f.A, f.B, f.C, f.D, f.E, f.F })
+                        score_nation_war(w, reg, n, t);
+                }
+                bytes.push_back(to_bytes(w));
+                rows.push_back(trace.size());
+            }
+            check(bytes[0] == bytes[1] && rows[0] == rows[1] && rows[0] > 0,
+                  "RW9 the pass replays: two built worlds, twenty ticks of every nation's pass, byte-identical");
+        }
+        war_ai_trace_sink() = nullptr;
     }
 
     // =====================================================================

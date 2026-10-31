@@ -512,6 +512,52 @@ bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
 /// run_corp_strategic_step for each due nation; exported for the harness.
 void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, int tick);
 
+/// BL-1461 (AI_OPPONENT.md § 11: the stance grant covers a rival declaring war; "Rival
+/// nations wage war whole" covers the rest; RELATIONS.md § 7): a rival nation's war
+/// pass over its OWN wars - answer a declaration against it, impose at a score of 100
+/// (never on the player's nation), accept or refuse an offer made to it, or offer
+/// peace - then at most one declaration toward a neighbour it shares a front with,
+/// scored from its own Trust and Alarm toward it, the front edge, the declaration's
+/// price and justifications, trade exposure, its own exhaustion and the wars it already
+/// fights. Legal verbs only (apply_corp_command), never a planner. Does nothing for the
+/// player's nation, an unknown one, or while the settle gate is up. Called by
+/// run_corp_strategic_step for each due nation on a live tick; exported for harnesses.
+void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick);
+
+/// What the war pass chose (`war_ai_trace_row::choice`).
+enum class war_ai_choice : uint8_t
+{
+    candidate = 0, ///< A declaration weighed (one target, one goal count).
+    declare,
+    answer,
+    offer,
+    accept,
+    refuse,
+    impose,
+};
+
+/// One row of the war pass's diagnostic trace. Written only while a harness holds
+/// the sink; nothing in the world reads it.
+struct war_ai_trace_row
+{
+    int           tick = 0;
+    entity_id     nation = null_entity;
+    entity_id     target = null_entity;
+    war_ai_choice choice = war_ai_choice::candidate;
+    float         utility = 0.0f;  ///< declaration: the sum; peace: the accept/offer sum; impose: the score
+    float         grievance = 0.0f; ///< declaration terms (accept/refuse: g carries the stake)
+    float         alarm = 0.0f;
+    float         edge = 0.0f;
+    float         price = 0.0f;
+    float         trade = 0.0f;
+    int           goals = 0;
+    bool          applied = false;
+};
+
+/// Opt-in diagnostic sink for the war pass (the corp_extraction_trace_sink pattern):
+/// null by default; a harness points it at a vector it owns.
+std::vector<war_ai_trace_row>*& war_ai_trace_sink();
+
 void run_corp_strategic_step(world& w, const recipe_registry& reg,
                              economy_report& report, int tick,
                              const corp_ai_params& p = {});
