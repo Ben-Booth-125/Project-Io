@@ -904,7 +904,10 @@ outlying consumer by laying hubs outward: where one tile both carries the consum
 strength and touches the chain, one hub there; otherwise a hub on the chain's edge nearest the
 consumer, joining the chain and carrying it closer, until the consumer is covered. The chain is
 steered by the walk over the nation's own dry ground, not by straight-line distance, so it never
-heads for ground it could not reach.
+heads for ground it could not reach. Ground near on the grid can be far by road, and points travel
+only along roads: where that walk leads the chain onto a road that does not lead on to the
+consumer, the chain is steered by the road walk from the consumer instead, and it stops only where
+no tile it touches is any closer along the road either.
 
 **Ground cut off by water is bridged by sea (Ben, 2026-10-21).** Where a consumer's ground is
 cut off from the capital by water, generation lands a **port** on that ground's coast where the

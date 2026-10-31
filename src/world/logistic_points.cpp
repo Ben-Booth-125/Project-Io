@@ -281,63 +281,20 @@ std::unordered_map<entity_id, float> lp_lane_walk(world& w, entity_id body,
     return dist;
 }
 
-std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body, lp_network n,
-                                                       const std::vector<entity_id>& seeds)
+namespace {
+
+/// The road walk lp_distance_field and lp_road_steps share (BL-1468): 4-cardinal steps
+/// over roaded edges at `step_cost`, columns wrapping, bounded at @p bound.
+std::unordered_map<entity_id, float> cardinal_walk(world& w, entity_id body, lp_network n,
+                                                   const std::vector<entity_id>& seeds,
+                                                   float bound)
 {
     std::unordered_map<entity_id, float> dist;
     const auto bit = w.bodies.find(body);
     if (bit == w.bodies.end() || seeds.empty())
         return dist;
-
-    // BL-1360: RAIL IS POINT TO POINT (Ben, 2026-10-16: "Railways can reach 20 tiles,
-    // but they only supply the exact tile they connect to"; LOGISTICS.md § One pool).
-    // A station's points land on its own tile and on every OTHER STATION's tile the
-    // line joins it to within reach - never on the country the track passes through,
-    // which is the rule goods already obey (they board and leave only at stations,
-    // § 4c). The distance is the line's own track steps, read off the one rail
-    // network the router uses, so cut and idle track and unfunded stations carry
-    // nothing here exactly as they carry no cargo.
-    if (n == lp_network::rail)
-    {
-        const float rail_bound = lp_full_reach[static_cast<std::size_t>(n)]
-                               + lp_fade_length[static_cast<std::size_t>(n)];
-        const world::rail_network& net = body_rail_network(w, body);
-        std::vector<entity_id> sorted = seeds;
-        std::sort(sorted.begin(), sorted.end());
-        for (const entity_id s : sorted)
-        {
-            const auto tit = w.tiles.find(s);
-            if (tit == w.tiles.end() || tit->second.body != body)
-                continue;
-            dist[s] = 0.0f;
-            // `stations` is sorted ascending (body_rail_network), so a binary search.
-            const auto sit = std::lower_bound(net.stations.begin(), net.stations.end(), s);
-            if (sit == net.stations.end() || *sit != s)
-                continue; // a station joined to no line delivers to its own tile only
-            const std::size_t i = static_cast<std::size_t>(sit - net.stations.begin());
-            for (std::size_t j = 0; j < net.stations.size(); ++j)
-            {
-                const int steps = (i < net.steps.size() && j < net.steps[i].size())
-                                  ? net.steps[i][j] : -1;
-                if (j == i || steps < 0 || static_cast<float>(steps) > rail_bound)
-                    continue;
-                const auto [it, fresh] = dist.emplace(net.stations[j], static_cast<float>(steps));
-                if (!fresh && static_cast<float>(steps) < it->second)
-                    it->second = static_cast<float>(steps);
-            }
-        }
-        return dist;
-    }
-
     const int gw = bit->second.grid_width, gh = bit->second.grid_height;
     const std::vector<entity_id>& grid = body_tile_grid(w, body);
-    const float bound = lp_full_reach[static_cast<std::size_t>(n)]
-                      + lp_fade_length[static_cast<std::size_t>(n)];
-    // Sea has its own walk, taken before this loop: along the lanes (Ben, 2026-10-25;
-    // lp_lane_walk), which replaced BL-1396's any-water walk as a port's field.
-    if (n == lp_network::sea)
-        return lp_lane_walk(w, body, seeds);
-
     using item = std::pair<float, entity_id>;
     std::priority_queue<item, std::vector<item>, std::greater<item>> pq;
     std::vector<entity_id> sorted_seeds = seeds;
@@ -392,6 +349,72 @@ std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body,
         }
     }
     return dist;
+}
+
+} // namespace
+
+std::unordered_map<entity_id, float> lp_distance_field(world& w, entity_id body, lp_network n,
+                                                       const std::vector<entity_id>& seeds)
+{
+    std::unordered_map<entity_id, float> dist;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end() || seeds.empty())
+        return dist;
+
+    // BL-1360: RAIL IS POINT TO POINT (Ben, 2026-10-16: "Railways can reach 20 tiles,
+    // but they only supply the exact tile they connect to"; LOGISTICS.md § One pool).
+    // A station's points land on its own tile and on every OTHER STATION's tile the
+    // line joins it to within reach - never on the country the track passes through,
+    // which is the rule goods already obey (they board and leave only at stations,
+    // § 4c). The distance is the line's own track steps, read off the one rail
+    // network the router uses, so cut and idle track and unfunded stations carry
+    // nothing here exactly as they carry no cargo.
+    if (n == lp_network::rail)
+    {
+        const float rail_bound = lp_full_reach[static_cast<std::size_t>(n)]
+                               + lp_fade_length[static_cast<std::size_t>(n)];
+        const world::rail_network& net = body_rail_network(w, body);
+        std::vector<entity_id> sorted = seeds;
+        std::sort(sorted.begin(), sorted.end());
+        for (const entity_id s : sorted)
+        {
+            const auto tit = w.tiles.find(s);
+            if (tit == w.tiles.end() || tit->second.body != body)
+                continue;
+            dist[s] = 0.0f;
+            // `stations` is sorted ascending (body_rail_network), so a binary search.
+            const auto sit = std::lower_bound(net.stations.begin(), net.stations.end(), s);
+            if (sit == net.stations.end() || *sit != s)
+                continue; // a station joined to no line delivers to its own tile only
+            const std::size_t i = static_cast<std::size_t>(sit - net.stations.begin());
+            for (std::size_t j = 0; j < net.stations.size(); ++j)
+            {
+                const int steps = (i < net.steps.size() && j < net.steps[i].size())
+                                  ? net.steps[i][j] : -1;
+                if (j == i || steps < 0 || static_cast<float>(steps) > rail_bound)
+                    continue;
+                const auto [it, fresh] = dist.emplace(net.stations[j], static_cast<float>(steps));
+                if (!fresh && static_cast<float>(steps) < it->second)
+                    it->second = static_cast<float>(steps);
+            }
+        }
+        return dist;
+    }
+
+    // Sea has its own walk, taken before this loop: along the lanes (Ben, 2026-10-25;
+    // lp_lane_walk), which replaced BL-1396's any-water walk as a port's field.
+    if (n == lp_network::sea)
+        return lp_lane_walk(w, body, seeds);
+    return cardinal_walk(w, body, n, seeds,
+                         lp_full_reach[static_cast<std::size_t>(n)]
+                             + lp_fade_length[static_cast<std::size_t>(n)]);
+}
+
+std::unordered_map<entity_id, float> lp_road_steps(world& w, entity_id body,
+                                                   const std::vector<entity_id>& seeds)
+{
+    return cardinal_walk(w, body, lp_network::road, seeds,
+                         std::numeric_limits<float>::infinity());
 }
 
 bool lp_share_rule_valid(const std::array<float, lp_class_count>& share)
@@ -1807,6 +1830,10 @@ lp_seed_report seed_logistics_sources(world& w)
         const auto fc = lp_distance_field(w, body, lp_network::road, {tile});
         const auto steps = own_steps(nation, body, tile);
         int last_gap = std::numeric_limits<int>::max();
+        // BL-1468: the ROAD steer, taken once the own-ground steer stalls (below).
+        bool by_road = false;
+        std::unordered_map<entity_id, float> road_steps;
+        float last_road = std::numeric_limits<float>::infinity();
         bool covered = false;
         for (int step = 0; step < k_chain_steps && rep.hubs_placed < k_max_hubs; ++step)
         {
@@ -1865,6 +1892,46 @@ lp_seed_report seed_logistics_sources(world& w)
                     ext_gap = gap;
                     ext_z   = dz;
                 }
+            }
+            // BL-1468: THE OWN-GROUND STEER CAN STALL ON A ROAD THAT LEADS NOWHERE. Points
+            // travel only along roads, and the grid walk measures ground, not road: a chain
+            // drawn to the frontier tile nearest the consumer on the grid can stand on a
+            // spur the consumer's road never joins, and then no tile it touches is any
+            // closer (seed 32: a top-row consumer at the head of a road that runs south and
+            // west, the chain led onto a dead-end spur beside it). Where that happens the
+            // chain is steered by the ROAD WALK from the consumer instead - the frontier
+            // tile nearest it along the road (further out first on a tie, then the lower
+            // tile id) - and it stops only when no tile it touches is closer by road either.
+            // A consumer the own-ground steer reaches is laid exactly as before.
+            if (!by_road && (ext == null_entity || ext_gap >= last_gap))
+            {
+                by_road    = true;
+                road_steps = lp_road_steps(w, body, {tile});
+            }
+            if (by_road)
+            {
+                entity_id rext = null_entity;
+                float rgap = 0.0f, rz = 0.0f;
+                for (const auto& [t2, dz] : fz)
+                {
+                    if (!(lp_reach(lp_network::road, dz) > 0.0f) || !placeable(t2, nation) || t2 == avoid)
+                        continue;
+                    const auto rt = road_steps.find(t2);
+                    if (rt == road_steps.end())
+                        continue; // not on the consumer's road: no step closer along it
+                    if (rext == null_entity || rt->second < rgap || (rt->second == rgap && dz > rz)
+                        || (rt->second == rgap && dz == rz && t2 < rext))
+                    {
+                        rext = t2;
+                        rgap = rt->second;
+                        rz   = dz;
+                    }
+                }
+                if (rext == null_entity || !(rgap < last_road))
+                    break; // the chain cannot get closer along the road either: stop here
+                last_road = rgap;
+                place_hub(nation, rext, owner);
+                continue;
             }
             if (ext == null_entity || ext_gap >= last_gap)
                 break; // the chain cannot get closer (sea, a frontier): stop here

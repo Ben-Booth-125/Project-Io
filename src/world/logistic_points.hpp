@@ -326,6 +326,13 @@ std::unordered_map<entity_id, float> lp_sea_walk(world& w, entity_id body,
 std::unordered_map<entity_id, float> lp_lane_walk(world& w, entity_id body,
                                                   const std::vector<entity_id>& seeds);
 
+/// BL-1468: the ROAD walk lp_distance_field takes, UNBOUNDED - every tile a road walk
+/// from @p seeds reaches, at its road distance. What the generation chain is steered by
+/// when the walk over own ground has led it onto a road that does not lead on to its
+/// consumer (seed_logistics_sources).
+std::unordered_map<entity_id, float> lp_road_steps(world& w, entity_id body,
+                                                   const std::vector<entity_id>& seeds);
+
 /// Network distance field from @p seeds on @p body for network @p n, bounded at
 /// that network's full + fade: tile -> distance, only tiles within the bound.
 /// Road: every tile the walk reaches. Sea: the lanes and the port tiles they land on
