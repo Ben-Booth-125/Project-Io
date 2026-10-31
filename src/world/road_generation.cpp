@@ -3285,9 +3285,57 @@ colonial_port_report place_colonial_ports(world& w)
         }
     };
 
-    for (const auto& [key, members] : groups)
-    {
-        (void)key;
+    // THE SEA WITHIN TWO HEX STEPS of a set of sea tiles (BL-1420): breadth-first over the
+    // sea, six hex sides, the harbour grouping's own measure. A harbour SERVES an end that
+    // lies within two steps of one of its port's mouths - the spur the rule allows.
+    std::array<entity_id, 6> sb{};
+    const auto sea_within_two = [&](const std::vector<entity_id>& from) {
+        std::set<entity_id> seen;
+        std::vector<std::pair<entity_id, int>> q;
+        for (const entity_id f : from)
+            if (f != null_entity && is_sea(w.tiles.at(f).substrate) && seen.insert(f).second)
+                q.push_back({f, 0});
+        for (std::size_t head = 0; head < q.size(); ++head)
+        {
+            const auto [t, d] = q[head];
+            if (d >= k_harbour_share_steps)
+                continue;
+            sides(t, sb);
+            for (const entity_id n : sb)
+                if (n != null_entity && is_sea(w.tiles.at(n).substrate) && seen.insert(n).second)
+                    q.push_back({n, d + 1});
+        }
+        return seen;
+    };
+    // The sea mouths of a land tile: its six hex sides that are sea.
+    const auto sea_mouths = [&](entity_id land_tile) {
+        std::vector<entity_id> out;
+        sides(land_tile, sb);
+        for (const entity_id m : sb)
+            if (m != null_entity && is_sea(w.tiles.at(m).substrate))
+                out.push_back(m);
+        return out;
+    };
+    // The members a port on (or already at) @p port_tile leaves beyond two steps of its mouths.
+    const auto unserved_by = [&](entity_id port_tile, const std::vector<entity_id>& members) {
+        const std::set<entity_id> reach = sea_within_two(sea_mouths(port_tile));
+        std::vector<entity_id> out;
+        for (const entity_id e : members)
+            if (reach.count(e) == 0)
+                out.push_back(e);
+        return out;
+    };
+
+    // EVERY END WITHIN TWO STEPS OF ITS PORT (BL-1420). Harbours chain (A beside B, B beside
+    // C), so a chain can carry an end farther than two steps from any land beside another
+    // end - and a port stood beside the nearest-seat end left that far end a dead spur on a
+    // portless coast. The harbour's land is therefore chosen among the tiles whose mouths
+    // lie within two steps of EVERY member end: first the land beside a member (the nearest
+    // seats, as before), then the land beside the sea within two steps of a member. Where no
+    // such land has room, the nearest-seat land beside a member stands the port as before,
+    // and the members it leaves beyond two steps are served as a harbour of their own.
+    std::function<bool(const std::vector<entity_id>&)> serve_group;
+    serve_group = [&](const std::vector<entity_id>& members) {
         // A group already served: the lowest-id port one of its ends is a mouth of.
         entity_id serving = null_entity;
         for (const entity_id e : members)
@@ -3297,66 +3345,108 @@ colonial_port_report place_colonial_ports(world& w)
         if (serving != null_entity)
         {
             ++rep.at_port;
-            extend_to(members, serving);
-            continue;
+            const std::vector<entity_id> rest = unserved_by(w.buildings.at(serving).tile, members);
+            const std::set<entity_id> rest_set(rest.begin(), rest.end());
+            std::vector<entity_id> near;
+            for (const entity_id e : members)
+                if (rest_set.count(e) == 0)
+                    near.push_back(e);
+            extend_to(near, serving);
+            if (!rest.empty() && !serve_group(rest))
+                extend_to(rest, serving); // none of their own: walked on to this port as before
+            return true;
         }
-        // THE HARBOUR: the land beside any member end nearest the group's seats (the least
-        // Chebyshev distance to any of them, columns wrapping; ties to the lower tile id).
+        // THE HARBOUR: the land nearest the group's seats (the least Chebyshev distance to
+        // any of them, columns wrapping; ties to the lower tile id).
         const int gw = w.bodies.at(w.tiles.at(members.front()).body).grid_width;
         std::vector<entity_id> seats;
         for (const entity_id e : members)
             if (const entity_id st = seat_of.at(e); st != null_entity && w.tiles.count(st) != 0)
                 seats.push_back(st);
-        std::vector<std::pair<int, entity_id>> land;
-        for (const entity_id e : members)
-        {
-            sides(e, nb);
-            for (const entity_id t : nb)
+        const auto seat_distance = [&](entity_id t) {
+            const tile_component& tc = w.tiles.at(t);
+            int d = seats.empty() ? 0 : std::numeric_limits<int>::max();
+            for (const entity_id st : seats)
             {
-                if (t == null_entity || is_water(w.tiles.at(t).substrate))
-                    continue;
-                const tile_component& tc = w.tiles.at(t);
-                int d = seats.empty() ? 0 : std::numeric_limits<int>::max();
-                for (const entity_id st : seats)
-                {
-                    const tile_component& sc = w.tiles.at(st);
-                    int dc = std::abs(tc.grid_x - sc.grid_x);
-                    if (gw > 0 && dc > gw / 2) dc = gw - dc;
-                    const int dr = std::abs(tc.grid_y - sc.grid_y);
-                    d = std::min(d, std::max(dc, dr));
-                }
-                land.push_back({d, t});
+                const tile_component& sc = w.tiles.at(st);
+                int dc = std::abs(tc.grid_x - sc.grid_x);
+                if (gw > 0 && dc > gw / 2) dc = gw - dc;
+                const int dr = std::abs(tc.grid_y - sc.grid_y);
+                d = std::min(d, std::max(dc, dr));
             }
-        }
+            return d;
+        };
+        const auto land_beside = [&](const std::vector<entity_id>& sea_tiles) {
+            std::vector<std::pair<int, entity_id>> out;
+            for (const entity_id s : sea_tiles)
+            {
+                sides(s, nb);
+                for (const entity_id t : nb)
+                    if (t != null_entity && !is_water(w.tiles.at(t).substrate))
+                        out.push_back({seat_distance(t), t});
+            }
+            std::sort(out.begin(), out.end());
+            out.erase(std::unique(out.begin(), out.end()), out.end());
+            return out;
+        };
+        const auto has_room = [&](entity_id t) {
+            const tile_component& tc = w.tiles.at(t);
+            return source_tiles.count(t) == 0
+                && placement_rules::non_extraction_buildings_on_tile(w, t)
+                       < placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover);
+        };
+        const std::vector<std::pair<int, entity_id>> land = land_beside(members);
         if (land.empty())
         {
             ++rep.open;
-            continue;
+            return false;
         }
-        std::sort(land.begin(), land.end());
-        land.erase(std::unique(land.begin(), land.end()), land.end());
         entity_id harbour = null_entity;
+        // 1. The land beside a member that serves every member.
         for (const auto& [d, t] : land)
         {
             (void)d;
-            const tile_component& tc = w.tiles.at(t);
-            if (source_tiles.count(t) != 0
-                || placement_rules::non_extraction_buildings_on_tile(w, t)
-                       >= placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover))
-                continue;
-            harbour = t;
-            break;
+            if (has_room(t) && unserved_by(t, members).empty())
+            {
+                harbour = t;
+                break;
+            }
         }
+        // 2. The land beside the sea within two steps of a member that serves every member.
+        if (harbour == null_entity)
+        {
+            const std::set<entity_id> ring = sea_within_two(members);
+            for (const auto& [d, t] : land_beside(std::vector<entity_id>(ring.begin(), ring.end())))
+            {
+                (void)d;
+                if (has_room(t) && unserved_by(t, members).empty())
+                {
+                    harbour = t;
+                    break;
+                }
+            }
+        }
+        // 3. As before: the nearest-seat land beside a member with room.
+        if (harbour == null_entity)
+            for (const auto& [d, t] : land)
+            {
+                (void)d;
+                if (has_room(t))
+                {
+                    harbour = t;
+                    break;
+                }
+            }
         if (harbour == null_entity)
         {
             ++rep.no_room;
-            continue;
+            return false;
         }
         const auto tn = w.tile_to_nation.find(harbour);
         if (tn == w.tile_to_nation.end() || w.nations.count(tn->second) == 0)
         {
             ++rep.unheld;
-            continue;
+            return false;
         }
         const entity_id bid = w.create_entity();
         building_component bc;
@@ -3372,7 +3462,28 @@ colonial_port_report place_colonial_ports(world& w)
         add_mouths(harbour, bid);
         ++rep.placed;
         changed = true;
-        extend_to(members, bid);
+        const std::vector<entity_id> rest = unserved_by(harbour, members);
+        if (rest.empty())
+        {
+            extend_to(members, bid);
+            return true;
+        }
+        const std::set<entity_id> rest_set(rest.begin(), rest.end());
+        std::vector<entity_id> near;
+        for (const entity_id e : members)
+            if (rest_set.count(e) == 0)
+                near.push_back(e);
+        extend_to(near, bid);
+        // The members beyond two steps: a harbour of their own. Where none can stand, their
+        // lanes are walked on to this port as before, so every lane still reaches a port.
+        if (!serve_group(rest))
+            extend_to(rest, bid);
+        return true;
+    };
+    for (const auto& [key, members] : groups)
+    {
+        (void)key;
+        serve_group(members);
     }
     if (changed)
         invalidate_logistics_caches(w);

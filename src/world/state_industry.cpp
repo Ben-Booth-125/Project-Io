@@ -11,6 +11,7 @@
 #include "logistics.hpp"       // BL-1255: tile_touches_track, invalidate_logistics_caches
 #include "logistic_points.hpp" // BL-1398: lp_source_network (a network node)
 #include "unit_roster.hpp"     // BL-1452: resolve_unit_upkeep - the garrison wage in the running bill
+#include "hex_neighbors.hpp"   // BL-1420: the open-sea test reads the six hex sides
 #include <set>
 #include <unordered_set>
 #include <functional>
@@ -87,6 +88,121 @@ bool state_runs(const recipe_registry& reg, building_type type, std::uint16_t re
     return type == building_type::processing_facility
         && strategic_sector_of(reg, type, recipe) != strategic_sector::none;
 }
+
+namespace {
+
+/// BL-1420: the sea tiles of one body a lane can leave from, raster order, 1 = OPEN SEA.
+/// A convoy sails water to water on the four cardinal steps and a lane is walked on them
+/// (logistics.cpp, ocean_currents.cpp), while a port's reach is measured across all six
+/// hex sides - so a pocket of sea joined to the rest only across a hex diagonal is "within
+/// reach" of ports no lane or convoy can get to. Open sea is the largest four-way piece of
+/// each six-way piece of sea (ties all open); a smaller piece is a pocket.
+std::vector<std::uint8_t> open_sea_mask(world& w, entity_id body)
+{
+    std::vector<std::uint8_t> open;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return open;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    const int n = gw * gh;
+    if (gw <= 0 || gh <= 0 || static_cast<int>(grid.size()) < n)
+        return open;
+    std::vector<std::uint8_t> sea(static_cast<std::size_t>(n), 0);
+    for (int i = 0; i < n; ++i)
+        if (const auto it = w.tiles.find(grid[static_cast<std::size_t>(i)]); it != w.tiles.end())
+            sea[static_cast<std::size_t>(i)] = is_sea(it->second.substrate) ? 1 : 0;
+    // Label pieces by flood, raster order: four-way, then six-way.
+    const auto label = [&](bool hex, std::vector<int>& lab) {
+        lab.assign(static_cast<std::size_t>(n), -1);
+        int next = 0;
+        std::vector<int> stack;
+        for (int s = 0; s < n; ++s)
+        {
+            if (!sea[static_cast<std::size_t>(s)] || lab[static_cast<std::size_t>(s)] >= 0)
+                continue;
+            lab[static_cast<std::size_t>(s)] = next;
+            stack.assign(1, s);
+            while (!stack.empty())
+            {
+                const int u = stack.back();
+                stack.pop_back();
+                const int ux = u % gw, uy = u / gw;
+                const int k = hex ? 6 : 4;
+                for (int side = 0; side < k; ++side)
+                {
+                    int vx = 0, vy = 0;
+                    if (hex)
+                    {
+                        const hex_neighbors::coord c = hex_neighbors::neighbour(ux, uy, side);
+                        vx = c.gx;
+                        vy = c.gy;
+                    }
+                    else
+                    {
+                        constexpr int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
+                        vx = ux + dx[side];
+                        vy = uy + dy[side];
+                    }
+                    if (vy < 0 || vy >= gh)
+                        continue;
+                    const int v = vy * gw + ((vx % gw) + gw) % gw;
+                    if (sea[static_cast<std::size_t>(v)] && lab[static_cast<std::size_t>(v)] < 0)
+                    {
+                        lab[static_cast<std::size_t>(v)] = next;
+                        stack.push_back(v);
+                    }
+                }
+            }
+            ++next;
+        }
+        return next;
+    };
+    std::vector<int> l4, l6;
+    const int n4 = label(false, l4);
+    const int n6 = label(true, l6);
+    std::vector<int> size4(static_cast<std::size_t>(n4), 0), best(static_cast<std::size_t>(n6), 0);
+    for (int i = 0; i < n; ++i)
+        if (sea[static_cast<std::size_t>(i)])
+            ++size4[static_cast<std::size_t>(l4[static_cast<std::size_t>(i)])];
+    for (int i = 0; i < n; ++i)
+        if (sea[static_cast<std::size_t>(i)])
+        {
+            int& b = best[static_cast<std::size_t>(l6[static_cast<std::size_t>(i)])];
+            b = std::max(b, size4[static_cast<std::size_t>(l4[static_cast<std::size_t>(i)])]);
+        }
+    open.assign(static_cast<std::size_t>(n), 0);
+    for (int i = 0; i < n; ++i)
+        if (sea[static_cast<std::size_t>(i)]
+            && size4[static_cast<std::size_t>(l4[static_cast<std::size_t>(i)])]
+                   == best[static_cast<std::size_t>(l6[static_cast<std::size_t>(i)])])
+            open[static_cast<std::size_t>(i)] = 1;
+    return open;
+}
+
+/// Whether land @p tile has an OPEN SEA tile (`open_sea_mask`) on one of its six hex sides.
+bool opens_on_open_sea(world& w, entity_id tile, const std::vector<std::uint8_t>& open)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end() || open.empty())
+        return false;
+    const auto bit = w.bodies.find(tit->second.body);
+    if (bit == w.bodies.end())
+        return false;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    for (int side = 0; side < 6; ++side)
+    {
+        const hex_neighbors::coord c = hex_neighbors::neighbour(tit->second.grid_x, tit->second.grid_y, side);
+        if (c.gy < 0 || c.gy >= gh)
+            continue;
+        const int v = c.gy * gw + ((c.gx % gw) + gw) % gw;
+        if (static_cast<std::size_t>(v) < open.size() && open[static_cast<std::size_t>(v)])
+            return true;
+    }
+    return false;
+}
+
+} // namespace
 
 state_handover_report hand_over_state_industry(world& w, const recipe_registry& reg)
 {
@@ -332,6 +448,8 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
     std::unordered_set<entity_id> chartered_ports; // BL-1407: a charter's port is not the state's
     for (const auto& [cid, cc] : w.gen_charters)
         chartered_ports.insert(cc.assets.begin(), cc.assets.end());
+    std::map<entity_id, std::vector<std::uint8_t>> open_sea; // body -> open_sea_mask (BL-1420)
+    constexpr int k_pocket_rank = 1 << 20; // ranks every pocket site after every open one
     for (const entity_id nid : nation_ids)
     {
         nation_component& nc = w.nations.at(nid);
@@ -358,6 +476,15 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                                    std::abs(tit->second.grid_y - cap->second.grid_y));
             sites.emplace_back(d, tile);
         }
+        // BL-1420: a site opening on the OPEN SEA first - a port in a pocket only a hex
+        // diagonal joins to the sea counts its neighbours within reach and can lay no lane
+        // to them. A pocket site is taken only where the nation has no other coast.
+        auto oit = open_sea.find(cap->second.body);
+        if (oit == open_sea.end())
+            oit = open_sea.emplace(cap->second.body, open_sea_mask(w, cap->second.body)).first;
+        for (auto& [d, tile] : sites)
+            if (!opens_on_open_sea(w, tile, oit->second))
+                d += k_pocket_rank;
         std::stable_sort(sites.begin(), sites.end(),
                          [](const auto& a, const auto& b) { return a.first < b.first; });
         entity_id built = null_entity;

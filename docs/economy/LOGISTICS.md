@@ -586,6 +586,14 @@ land at one end, the lower seat tile is its seat.
   already holds a network source, or whose stack is full, is passed over for the next nearest. A
   harbour one of whose ends is already the mouth of a standing port (any of its six hex sides) is
   served by that port and gets none.
+- **Every end within two steps of its port** (BL-1420, lane and port defects: a delegated reading of the two-tile ruling
+  under chaining). A chain can carry an end farther than two hex steps over the sea from the land
+  beside another end, which would leave it a dead spur on a portless coast. So the port's land is
+  taken first among the tiles whose mouths lie **within two hex steps over the sea of every end** —
+  the land beside an end, nearest the seats, then the land beside the sea within two steps of an
+  end, nearest the seats. Only where no such land has room does the nearest land beside an end
+  stand the port, and the ends it leaves beyond two steps are served as a harbour of their own, by
+  these same rules; where that harbour can stand no port, their lanes are walked on to the first.
 - **Every lane reaches its port.** An end of the harbour that is not the port's own mouth is walked
   on over the sea, by the lane walk above, to the nearest of the port's mouths, so the lane runs into
   the harbour on the map. Where the lane already passes the port's mouth, the end is a spur of at

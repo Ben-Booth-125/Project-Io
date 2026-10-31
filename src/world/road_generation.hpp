@@ -774,6 +774,12 @@ port_lane_stats lay_all_port_lanes(world& w, port_lane_trace* trace = nullptr);
 //     mouth is walked on over the sea to the nearest of the port's sea mouths by the lane
 //     walk (cardinal steps, the current, reuse) and stamped, so the map shows the lane
 //     running into the harbour.
+//   - EVERY END WITHIN TWO STEPS OF ITS PORT (BL-1420): the harbour's land is taken first
+//     among the tiles whose sea mouths lie within two hex steps over the sea of EVERY
+//     member (beside a member, then beside the sea within two steps of one; nearest seats
+//     each). Only where none has room does the nearest land beside a member stand it; the
+//     members it (or a serving port) leaves beyond two steps are served as a group of
+//     their own, recursively, and walked on to the first port where theirs cannot stand.
 // Deterministic: sorted record, ascending tiles, no RNG. Clears the record.
 struct colonial_port_report
 {

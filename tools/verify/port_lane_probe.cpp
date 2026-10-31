@@ -19,7 +19,8 @@
 // carries its grid distance to the nearest port. A colonial COAST end within two hex steps
 // over water of a port's mouth is a HARBOUR end (CH): ends within two tiles share one
 // harbour port (Ben, 2026-10-26, NR-1081), so its lane is served there; a colonial coast
-// end beyond that is listed CC, a landing with no port. Ends present PRE are colonial; ends new
+// end beyond that is listed CC, a landing with no port, and counted a DEFECT (BL-1420), with
+// its harbour group (CCg) and the land beside it. Ends present PRE are colonial; ends new
 // POST are the port lanes', and every one of those must be a PORT end.
 //
 // Build:  bash tools/verify/build_lua_harness.sh port_lane_probe
@@ -122,7 +123,7 @@ reading read(world& w, entity_id body)
         {
             const entity_id cur = q[head];
             const int d = harbour_steps[cur];
-            if (d >= 2) continue;
+            if (d >= 12) continue; // walked past two so a CC end reports how far it lies
             const tile_component& tc = w.tiles.at(cur);
             for (int side = 0; side < 6; ++side)
             {
@@ -210,14 +211,28 @@ int main(int argc, char** argv)
         std::map<entity_id, reading> pre;
         for (const entity_id b : bodies) pre[b] = read(w, b);
 
+        std::set<entity_id> ports_before_state; // standing before the state handover
+        for (const auto& [pbid, pbc] : w.buildings)
+            if (pbc.type == building_type::port) ports_before_state.insert(pbid);
         hand_over_state_industry(w, start->reg);
         hand_over_rail(w);
+        // The colonial record's lane ends, kept before the fold consumes it, so a CC end can
+        // be read as a recorded landing (a harbour the fold should have placed) or a lane end
+        // the record never named.
+        const std::set<entity_id> recorded_ends = [&] {
+            std::set<entity_id> s;
+            for (const auto& [end, seat] : w.gen_sea_lane_landings) { (void)seat; s.insert(end); }
+            return s;
+        }();
         const colonial_port_report cp = place_colonial_ports(w); // ports in history (fold order)
         std::printf("CP seed=%u ends=%d groups=%d placed=%d at_port=%d open=%d unheld=%d no_room=%d "
                     "ext=%d ext_tiles=%d ext_failed=%d\n", seed, cp.ends, cp.groups, cp.placed,
                     cp.at_port, cp.open, cp.unheld, cp.no_room, cp.extensions, cp.extension_tiles,
                     cp.extensions_failed);
         defects += cp.extensions_failed; // a member lane that cannot reach its port
+        std::set<entity_id> ports_after_history; // standing after the colonial ports
+        for (const auto& [pbid, pbc] : w.buildings)
+            if (pbc.type == building_type::port) ports_after_history.insert(pbid);
         lay_site_roads_every_body(w);
         const lp_seed_report rep = seed_logistics_sources(w);
 
@@ -238,7 +253,7 @@ int main(int argc, char** argv)
                 {
                     const auto hs = post.harbour_steps.find(t);
                     const tile_component& tc = w.tiles.at(t);
-                    if (hs != post.harbour_steps.end())
+                    if (hs != post.harbour_steps.end() && hs->second <= 2)
                     {
                         --c_coast;
                         ++c_harbour; // a spur past its harbour's mouth: served (NR-1081)
@@ -246,8 +261,79 @@ int main(int argc, char** argv)
                                     static_cast<unsigned>(b), tc.grid_x, tc.grid_y, hs->second);
                     }
                     else
-                        std::printf("CC seed=%u body=%u col=%d row=%d (a colonial end on a portless coast)\n",
-                                    seed, static_cast<unsigned>(b), tc.grid_x, tc.grid_y);
+                    {
+                        // Why there is no port: the land beside the end, its holder, and
+                        // whether it already holds a source or a full stack.
+                        std::string land;
+                        for (int side = 0; side < 6; ++side)
+                        {
+                            const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+                            const auto bit2 = w.bodies.find(b);
+                            if (nb.gy < 0 || nb.gy >= bit2->second.grid_height) continue;
+                            const int gw2 = bit2->second.grid_width;
+                            const entity_id lt = body_tile_grid(w, b)[static_cast<std::size_t>(
+                                nb.gy * gw2 + ((nb.gx % gw2) + gw2) % gw2)];
+                            const tile_component& lc = w.tiles.at(lt);
+                            if (is_water(lc.substrate)) continue;
+                            const auto tn = w.tile_to_nation.find(lt);
+                            int src = 0;
+                            for (const auto& [bid2, b2] : w.buildings)
+                            {
+                                lp_network net;
+                                if (b2.tile == lt && lp_source_network(b2.type, net)) ++src;
+                            }
+                            char buf[96];
+                            std::snprintf(buf, sizeof buf, " (%d,%d nation=%u src=%d)", lc.grid_x, lc.grid_y,
+                                          tn == w.tile_to_nation.end() ? 0u : static_cast<unsigned>(tn->second), src);
+                            land += buf;
+                        }
+                        std::printf("CC seed=%u body=%u col=%d row=%d recorded=%d mouth_steps=%d land:%s "
+                                    "(a colonial end on a portless coast - a DEFECT)\n",
+                                    seed, static_cast<unsigned>(b), tc.grid_x, tc.grid_y,
+                                    recorded_ends.count(t) != 0 ? 1 : 0,
+                                    hs == post.harbour_steps.end() ? -1 : hs->second, land.c_str());
+                        // Its harbour group, as the fold grouped it (NR-1081): recorded ends
+                        // within two hex steps over the sea, chained. Each member listed with
+                        // its hex steps to the nearest port mouth, so a chain that carries an
+                        // end beyond two steps of its port is visible.
+                        const auto bit3 = w.bodies.find(b);
+                        const int gw3 = bit3->second.grid_width, gh3 = bit3->second.grid_height;
+                        std::set<entity_id> group{t};
+                        std::vector<entity_id> work{t};
+                        for (std::size_t wi = 0; wi < work.size(); ++wi)
+                        {
+                            std::vector<std::pair<entity_id, int>> q{{work[wi], 0}};
+                            std::set<entity_id> seen{work[wi]};
+                            for (std::size_t h = 0; h < q.size(); ++h)
+                            {
+                                const auto [qt, qd] = q[h];
+                                if (qd > 0 && recorded_ends.count(qt) != 0 && group.insert(qt).second)
+                                    work.push_back(qt);
+                                if (qd >= 2) continue;
+                                const tile_component& qc = w.tiles.at(qt);
+                                for (int side = 0; side < 6; ++side)
+                                {
+                                    const hex_neighbors::coord nb = hex_neighbors::neighbour(qc.grid_x, qc.grid_y, side);
+                                    if (nb.gy < 0 || nb.gy >= gh3) continue;
+                                    const entity_id nt = body_tile_grid(w, b)[static_cast<std::size_t>(
+                                        nb.gy * gw3 + ((nb.gx % gw3) + gw3) % gw3)];
+                                    if (seen.insert(nt).second && is_sea(w.tiles.at(nt).substrate))
+                                        q.push_back({nt, qd + 1});
+                                }
+                            }
+                        }
+                        std::string mem;
+                        for (const entity_id g : group)
+                        {
+                            const tile_component& gc = w.tiles.at(g);
+                            const auto gs = post.harbour_steps.find(g);
+                            char buf[48];
+                            std::snprintf(buf, sizeof buf, " (%d,%d s=%d)", gc.grid_x, gc.grid_y,
+                                          gs == post.harbour_steps.end() ? -1 : gs->second);
+                            mem += buf;
+                        }
+                        std::printf("CCg seed=%u members=%zu:%s\n", seed, group.size(), mem.c_str());
+                    }
                 }
                 // A colonial end within three tiles of a port stops SHORT of it: listed.
                 if (colonial && e.kind != 0 && e.port_dist >= 0 && e.port_dist <= 3)
@@ -269,11 +355,61 @@ int main(int argc, char** argv)
             for (const entity_id pb : post.untouched_ports)
             {
                 const tile_component& tc = w.tiles.at(w.buildings.at(pb).tile);
-                std::printf("PU seed=%u body=%u port=%u col=%d row=%d substrate=%d\n", seed,
+                std::printf("PU seed=%u body=%u port=%u col=%d row=%d substrate=%d origin=%s\n", seed,
                             static_cast<unsigned>(b), static_cast<unsigned>(pb), tc.grid_x, tc.grid_y,
-                            static_cast<int>(tc.substrate));
+                            static_cast<int>(tc.substrate),
+                            ports_after_history.count(pb) == 0 ? "seeding"
+                            : ports_before_state.count(pb) != 0 ? "landscape" : "state-or-history");
+                // Why: its mouths (substrate, laned) and the partners within the limit.
+                const auto bit2 = w.bodies.find(b);
+                const int gw2 = bit2->second.grid_width, gh2 = bit2->second.grid_height;
+                for (int side = 0; side < 6; ++side)
+                {
+                    const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+                    if (nb.gy < 0 || nb.gy >= gh2) continue;
+                    const entity_id m = body_tile_grid(w, b)[static_cast<std::size_t>(
+                        nb.gy * gw2 + ((nb.gx % gw2) + gw2) % gw2)];
+                    const tile_component& mc = w.tiles.at(m);
+                    if (!is_water(mc.substrate)) continue;
+                    std::printf("PUm seed=%u side=%d col=%d row=%d substrate=%d lane=%d\n", seed, side,
+                                mc.grid_x, mc.grid_y, static_cast<int>(mc.substrate), mc.lane_level);
+                }
+                // The neighbourhood, rows top-down: '#' land, 'P' the port, '.' sea, '~' lake,
+                // '=' laned water.
+                for (int dy = -5; dy <= 5; ++dy)
+                {
+                    const int yy = tc.grid_y + dy;
+                    if (yy < 0 || yy >= gh2) continue;
+                    std::string row;
+                    for (int dx = -8; dx <= 8; ++dx)
+                    {
+                        const int xx = ((tc.grid_x + dx) % gw2 + gw2) % gw2;
+                        const tile_component& mc = w.tiles.at(body_tile_grid(w, b)[static_cast<std::size_t>(yy * gw2 + xx)]);
+                        char ch = '#';
+                        if (dx == 0 && dy == 0) ch = 'P';
+                        else if (is_water(mc.substrate))
+                            ch = mc.lane_level > 0 ? '=' : (mc.substrate == terrain_substrate::lake ? '~' : '.');
+                        row += ch;
+                    }
+                    std::printf("PUg seed=%u row=%3d %s\n", seed, yy, row.c_str());
+                }
+                const auto f = lp_sea_walk(w, b, {w.buildings.at(pb).tile}, port_lane_limit());
+                for (const auto& [ob, obc] : w.buildings)
+                {
+                    if (ob == pb || obc.type != building_type::port || obc.ticks_remaining > 0 || obc.decommissioned)
+                        continue;
+                    const auto it = f.find(obc.tile);
+                    if (it == f.end() || it->second <= 0.0f || it->second > port_lane_limit() + lp_full_eps)
+                        continue;
+                    const tile_component& oc = w.tiles.at(obc.tile);
+                    std::printf("PUp seed=%u partner=%u col=%d row=%d dist=%.0f\n", seed,
+                                static_cast<unsigned>(ob), oc.grid_x, oc.grid_y, static_cast<double>(it->second));
+                }
             }
-            defects += post.partner_untouched + n_coast + n_open;
+            // BL-1420 (b): a colonial end on a coast no port serves - a landing the history
+            // made with no harbour, or a lane stopping on a shore it never reaches - is a
+            // DEFECT, as a port lane's non-port end is. A harbour end (CH) is served.
+            defects += post.partner_untouched + n_coast + n_open + c_coast;
             std::printf("B seed=%u body=%u PRE ports=%d ends=%d | POST ports=%d with_partner=%d lonely=%d "
                         "touched=%d partner_untouched=%d | colonial_ends port=%d harbour=%d coast=%d open=%d | "
                         "new_ends port=%d coast=%d open=%d | colonial_near_port=%d | lanes_laid=%d unreachable=%d\n",
