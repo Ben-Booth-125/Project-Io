@@ -216,6 +216,18 @@ enum class corp_verb : uint8_t
     hire_wing,            ///< Raise a wing of air roster row `unit_type` (air_roster_table) at the actor's own completed airbase on `tile` (a military base hosts no wings). Pays the class's hire credits and its hire goods plus its live air design's kit goods off the shelves, both legs checked first; the wing is created at once with the class's muster days to run before it flies, and returned through `out_building`. rejected_invalid (unknown row, a row the nation's shelves cannot field, unknown tile) / rejected_placement (no such airbase) / rejected_funds — see `hire_wing_check`.
     assign_air_mission,   ///< Assign wing `subject` mission `order` (0 none, 1 superiority, 2 tactical, 3 strategic, 4 recon) over the provinces in `air_provinces` (unused slots `no_province`; any order). rejected_invalid (no such wing, a mission its class does not fly, none with provinces or a mission with none, an unknown or repeated province) / rejected_not_owner / rejected_placement (a province out of straight-line range of its airbase) / rejected_state (a bombing mission over a province not held by a nation the actor is hostile to; no change) — see `air_mission_check`.
     set_air_design,       ///< The seat's nation fits air kit item `unit_type` (an air kit id, unit_designs.hpp) into slot `recipe` (0 airframe, 1 armament, 2 avionics) of its live design for air class `order`. The seat's alone: no grant lets a rival design. See `air_design_check`.
+    // --- BL-1459 / BL-1428: war and peace (RELATIONS.md § 7, Ben 2026-10-30) ---
+    // Appended after set_air_design, same append-only rule. war.hpp owns the verbs.
+    // Every nation acting for itself; a rival issues them under the stance grant
+    // (AI_OPPONENT.md § 11, NR-1100). The goals / ceded provinces ride
+    // `air_provinces`: a contiguous prefix of 1..3 ids, every later slot
+    // `no_province` — anything else is refused whole (`war_province_list`).
+    declare_war,          ///< `corp` declares war on `counterparty` with goals `air_provinces` (1..3 of its provinces). Writes `corp`'s hostility row, opens the war, charges `declaration_price`. rejected_invalid (bad goals, unknown or same nation) / rejected_state (a war already stands either way, a truce).
+    answer_war,           ///< `corp`, the defender, answers the war `counterparty` declared on it, naming goals `air_provinces` (1..3 of the declarer's provinces). Free. rejected_invalid (bad goals) / rejected_state (no unanswered war).
+    offer_peace,          ///< `corp` offers peace to `counterparty` on terms `order` (0 white; 1 cession of `air_provinces` to `corp`; 2 cession to `counterparty`). One pending offer per war. rejected_invalid (bad terms shape) / rejected_state (no war, an offer pending, terms not legal now).
+    accept_peace,         ///< `corp` accepts the pending peace offer `counterparty` made; the peace concludes on its terms. rejected_state (no such offer, or its terms no longer hold).
+    refuse_peace,         ///< `corp` refuses the pending peace offer `counterparty` made; the offer is erased. rejected_state (no such offer).
+    impose_peace,         ///< `corp` concludes peace with `counterparty` on terms `order` (as offer_peace) without acceptance — only at war score 100 in its favour. rejected_invalid (bad terms shape) / rejected_state (no war, score short of 100, terms not legal).
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -225,7 +237,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::set_air_design) + 1;
+    static_cast<uint8_t>(corp_verb::impose_peace) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

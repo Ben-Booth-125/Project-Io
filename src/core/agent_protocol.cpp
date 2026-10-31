@@ -180,6 +180,12 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::hire_wing:          // BL-1449: the actor's own airbase
         case corp_verb::assign_air_mission: // BL-1449: the actor's own wing
         case corp_verb::set_air_design:     // BL-1449: the seat's nation; the seam refuses any other
+        case corp_verb::declare_war:        // BL-1459: the actor's own war; goals ride `provinces=`
+        case corp_verb::answer_war:         // BL-1459
+        case corp_verb::offer_peace:        // BL-1428: terms ride `order=` + `provinces=`
+        case corp_verb::accept_peace:       // BL-1428
+        case corp_verb::refuse_peace:       // BL-1428
+        case corp_verb::impose_peace:       // BL-1428
         // BL-1407: every player verb is sent as the nation, these included.
         case corp_verb::survey:
         case corp_verb::hold_convoy:

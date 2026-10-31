@@ -41,3 +41,4 @@
 {"version":54,"kind":"world","owner":"BL-1337 return net crosses zero","ts":"2026-10-16T21:59:34.754Z","branch":"worktree-agent-a940568c7a9946e1d"}
 {"version":67,"kind":"world","owner":"BL-1453 land recon (the battle carry, tile_since_day, the attacker recon stock)","ts":"2026-10-30T00:00:00.000Z","branch":"worktree-agent-a4d96b447ea9af82c"}
 {"version":68,"kind":"world","owner":"BL-1432 Alarm as sentiment + BL-1458 sentiment emitters (Alarm rows, the pending conduct queue, the trade accumulator)","ts":"2026-10-30T00:00:00.000Z","branch":"worktree-agent-ab1fa82763cf86e39"}
+{"version":69,"kind":"world","owner":"BL-1459 war record and declaration / BL-1428 war goals and peace (world::wars, truces, peace_offers, war_history, province_cessions, war_exhaustion_residual); the war section rides after BL-1432/BL-1458's v68 Alarm section","ts":"2026-10-30T12:00:00.000Z","branch":"worktree-agent-a5f2ddfe20ee60c53"}

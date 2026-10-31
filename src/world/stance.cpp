@@ -1,6 +1,8 @@
 #include "stance.hpp"
 #include "sentiment_emitters.hpp" // BL-1458: friendship_accepted
 
+#include "war.hpp" // BL-1459: at_war (return_to_neutral is refused between war parties)
+
 #include <algorithm>
 
 std::pair<entity_id, entity_id> canonical_pair(entity_id a, entity_id b)
@@ -51,13 +53,18 @@ stance_result declare_hostile(world& w, entity_id from, entity_id to)
     // whole thing is atomic from a caller's point of view (invariant 2 — a
     // corp is never left reading as both hostile and friendly toward the
     // same target).
+    write_hostility(w, from, to);
+    return stance_result::applied;
+}
+
+void write_hostility(world& w, entity_id from, entity_id to)
+{
     w.corp_hostile_pairs.insert({from, to});
     w.corp_friend_pairs.erase(canonical_pair(from, to));
     // A pending offer in either direction is stale the moment either party
     // turns hostile — withdraw it rather than leave it live under a war.
     w.corp_friend_offers.erase({from, to});
     w.corp_friend_offers.erase({to, from});
-    return stance_result::applied;
 }
 
 stance_result offer_friendship(world& w, entity_id offerer, entity_id target)
@@ -96,6 +103,10 @@ stance_result return_to_neutral(world& w, entity_id corp, entity_id counterparty
 {
     if (!valid_pair(w, corp, counterparty))
         return stance_result::rejected_invalid;
+    // BL-1459 (RELATIONS.md § 7): a war ends only in peace — while one stands
+    // between the pair, neither party may return to neutral toward the other.
+    if (at_war(w, corp, counterparty))
+        return stance_result::rejected_state;
 
     // Unilateral: `corp` clears its OWN directed hostility toward
     // `counterparty` (not the reverse direction — that is the other party's

@@ -523,6 +523,7 @@ int main()
         (void)from_bytes(bytes, as_saved);
         const std::size_t food_at = bad.size() - world_save_battle_carry_section_bytes(as_saved)
                                   - world_save_alarm_section_bytes(as_saved) // BL-1432 (v68), last
+                                  - world_save_war_section_bytes(as_saved) // BL-1459 (v69)
                                   - 32; // (id, food, ammo, equip, carry, 3 remainders, share)
         bad[food_at] = static_cast<char>(0xE9); bad[food_at + 1] = static_cast<char>(0x03); // 1001
         world untouched;

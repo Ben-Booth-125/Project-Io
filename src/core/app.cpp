@@ -55,6 +55,8 @@
 #include "world/nation_step.hpp"
 #include "world/construction.hpp"
 #include "world/corp_ai.hpp"
+#include "world/stance.hpp" // BL-1459: is_hostile, for the declare-and-attack
+#include "world/war.hpp" // BL-1459: the declare-and-attack opens a war
 #include "world/corporation_generation.hpp"
 #include "world/history_log.hpp"
 #include "world/placement_rules.hpp"
@@ -3296,16 +3298,31 @@ void app::render()
         }
         if (go && m_ui.pending_unit_order_declare != null_entity)
         {
+            // BL-1459 (RELATIONS.md § 7): the declare-and-attack opens a WAR, with the
+            // attacked tile's province as its first goal (`attack_goal_province`; the
+            // defender's capital province when the stack stands off its own ground).
+            // A player already declared on, and not yet answering, answers instead.
+            const entity_id target = m_ui.pending_unit_order_declare;
+            const war_record* existing = war_between(m_world, m_world.player_entity, target);
+            const bool answering = existing != nullptr && existing->defender == m_world.player_entity
+                                && !existing->answered;
             corp_command cmd;
             cmd.tick         = tick;
             cmd.corp         = m_world.player_entity;
-            cmd.verb         = corp_verb::declare_hostile;
-            cmd.counterparty = m_ui.pending_unit_order_declare;
-            const corp_command_result r = player_command(cmd);
-            // rejected_state = already hostile: the attack still stands.
-            go = (r == corp_command_result::applied || r == corp_command_result::rejected_state);
+            cmd.verb         = answering ? corp_verb::answer_war : corp_verb::declare_war;
+            cmd.counterparty = target;
+            cmd.air_provinces = no_air_provinces();
+            cmd.air_provinces[0] = attack_goal_province(m_world, target, m_ui.pending_unit_order_tile);
+            const corp_command_result r = cmd.air_provinces[0] == 0
+                ? corp_command_result::rejected_invalid
+                : player_command(cmd);
+            // Already hostile (the declare raced another): the attack still stands.
+            go = r == corp_command_result::applied
+              || is_hostile(m_world, m_world.player_entity, target);
             if (!go)
-                m_ui.construction.last_message = "Couldn't declare hostility.";
+                m_ui.construction.last_message = r == corp_command_result::rejected_state
+                    ? "Couldn't declare war — a truce stands, or a war is already open."
+                    : "Couldn't declare war.";
         }
         if (go)
         {

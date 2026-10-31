@@ -450,6 +450,12 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::hire_wing:       return "hire wing";      // BL-1449
         case corp_verb::assign_air_mission: return "air mission"; // BL-1449
         case corp_verb::set_air_design:  return "air design";     // BL-1449: never issued by a rival
+        case corp_verb::declare_war:     return "war declaration"; // BL-1459
+        case corp_verb::answer_war:      return "war answer";      // BL-1459
+        case corp_verb::offer_peace:     return "peace offer";     // BL-1428
+        case corp_verb::accept_peace:    return "peace acceptance"; // BL-1428
+        case corp_verb::refuse_peace:    return "peace refusal";   // BL-1428
+        case corp_verb::impose_peace:    return "imposed peace";   // BL-1428
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";

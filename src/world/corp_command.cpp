@@ -19,6 +19,7 @@
 #include "province.hpp"       // BL-511: march_unit's destination is a province
 #include "recipe_registry.hpp"
 #include "state_industry.hpp" // BL-1296: state_runs (the state build/retool doors)
+#include "war.hpp"    // BL-1459/BL-1428: declare_war, answer_war, the peace verbs
 #include "stance.hpp" // BL-448: corp stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral)
 #include "supply_system.hpp"
 #include "trade.hpp" // BL-1266: trade_is_valid (set_trade)
@@ -222,6 +223,64 @@ corp_command_result map_construction(construction_result r)
     return corp_command_result::rejected_invalid;
 }
 
+/// BL-1459: war_result -> the seam's vocabulary.
+corp_command_result map_war(war_result r)
+{
+    switch (r)
+    {
+        case war_result::applied:          return corp_command_result::applied;
+        case war_result::rejected_invalid: return corp_command_result::rejected_invalid;
+        case war_result::rejected_state:   return corp_command_result::rejected_state;
+    }
+    return corp_command_result::rejected_invalid;
+}
+
+/// BL-1459: the province list a war verb carries in `air_provinces` — a contiguous
+/// prefix of real ids (never 0) of at most `k_war_goals_max`, every later slot
+/// `no_province`. False (refuse whole) on a gap, a 0, or a fourth id. Whether each
+/// names a real province of the right nation is war.cpp's own check.
+bool war_province_list(const corp_command& cmd, std::vector<uint32_t>& out)
+{
+    out.clear();
+    bool ended = false;
+    for (const uint32_t p : cmd.air_provinces)
+    {
+        if (p == no_province)
+        {
+            ended = true;
+            continue;
+        }
+        if (ended || p == 0 || out.size() >= k_war_goals_max)
+            return false;
+        out.push_back(p);
+    }
+    return true;
+}
+
+/// BL-1428: the terms `offer_peace` / `impose_peace` carry — `order` 0 white (no
+/// provinces), 1 a cession of `air_provinces` to the actor, 2 to the counterparty
+/// (1..3 provinces). False (refuse whole) on any other shape.
+bool war_terms_of(const corp_command& cmd, peace_terms& terms)
+{
+    std::vector<uint32_t> provs;
+    if (!war_province_list(cmd, provs) || cmd.order > 2)
+        return false;
+    if (cmd.order == 0)
+    {
+        if (!provs.empty())
+            return false;
+        terms = peace_terms{};
+        return true;
+    }
+    if (provs.empty())
+        return false;
+    terms.kind      = peace_kind::cession;
+    terms.gainer    = cmd.order == 1 ? cmd.corp : cmd.counterparty;
+    std::sort(provs.begin(), provs.end());
+    terms.provinces = std::move(provs);
+    return true;
+}
+
 /// BL-1402 (NATIONS.md § What a nation owns): the verbs a NATION ACTING AS
 /// ITSELF (`cmd.corp == cmd.as_nation`, the nation's own id) takes through the
 /// SHARED verb bodies of `apply_corp_command` rather than the state-industry
@@ -265,6 +324,13 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::offer_friendship:
         case corp_verb::accept_friendship:
         case corp_verb::return_to_neutral:
+        // BL-1459 / BL-1428 (RELATIONS.md § 7): war and peace act for a nation.
+        case corp_verb::declare_war:
+        case corp_verb::answer_war:
+        case corp_verb::offer_peace:
+        case corp_verb::accept_peace:
+        case corp_verb::refuse_peace:
+        case corp_verb::impose_peace:
             return true;
         default:
             return false;
@@ -1148,6 +1214,11 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
         case corp_verb::declare_hostile:
         {
+            // BL-1459: between a war's parties hostility is written by the war's
+            // own verbs — the declarer's by declare_war, the defender's by
+            // answer_war, which names its goals. A bare declare is refused there.
+            if (at_war(w, cmd.corp, cmd.counterparty))
+                return corp_command_result::rejected_state;
             const stance_result r = declare_hostile(w, cmd.corp, cmd.counterparty);
             return (r == stance_result::applied) ? corp_command_result::applied
                  : (r == stance_result::rejected_invalid) ? corp_command_result::rejected_invalid
@@ -1181,6 +1252,41 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                  : (r == stance_result::rejected_invalid) ? corp_command_result::rejected_invalid
                                                             : corp_command_result::rejected_state;
         }
+
+        // --- BL-1459 / BL-1428: war and peace (war.hpp) -----------------------
+        // The untrusted-boundary translation: the province list and the terms
+        // byte are validated as the values that land (`war_province_list`,
+        // `war_terms_of`) and the whole command is refused on violation; war.cpp's
+        // verbs validate everything else before they mutate anything.
+        case corp_verb::declare_war:
+        case corp_verb::answer_war:
+        {
+            std::vector<uint32_t> goals;
+            if (!war_province_list(cmd, goals) || goals.empty())
+                return corp_command_result::rejected_invalid;
+            const war_result r = cmd.verb == corp_verb::declare_war
+                ? declare_war(w, reg.sentiment(), cmd.corp, cmd.counterparty, goals)
+                : answer_war(w, cmd.corp, cmd.counterparty, goals);
+            return map_war(r);
+        }
+
+        case corp_verb::offer_peace:
+        case corp_verb::impose_peace:
+        {
+            peace_terms terms;
+            if (!war_terms_of(cmd, terms))
+                return corp_command_result::rejected_invalid;
+            const war_result r = cmd.verb == corp_verb::offer_peace
+                ? offer_peace(w, cmd.corp, cmd.counterparty, terms)
+                : impose_peace(w, reg.sentiment(), cmd.corp, cmd.counterparty, terms);
+            return map_war(r);
+        }
+
+        case corp_verb::accept_peace:
+            return map_war(accept_peace(w, reg.sentiment(), cmd.corp, cmd.counterparty));
+
+        case corp_verb::refuse_peace:
+            return map_war(refuse_peace(w, cmd.corp, cmd.counterparty));
 
         // --- BL-470: the unit march seam -------------------------------------
         // Extends THIS seam (BL-470's ruling 2) — no parallel unit_command

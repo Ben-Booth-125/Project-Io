@@ -686,12 +686,13 @@ int main()
               "T13c a v62 stream reads: its battle keyed by its ground tile, with no attacking stack");
         check(v62.size() == bytes.size() - (4 + 4 + 4) - 12 - 24 - 4 // BL-1434: v64's empty designs section; BL-1449: v65's empty air section; BL-1452: v66's empty supplies section
                                - world_save_battle_carry_section_bytes(f.w) // BL-1453: v67's battle carry
-                               - world_save_alarm_section_bytes(f.w),       // BL-1432: v68's Alarm
+                               - world_save_alarm_section_bytes(f.w)       // BL-1432: v68's Alarm
+                               - world_save_war_section_bytes(f.w),         // BL-1459: v69's wars
               "T13d ...and the v62 stream is today's less exactly the stack section (one battle of one unit) and the empty designs section");
         // An attacking stack naming a unit not on the attacker's side is refused.
         std::string bad = bytes;
         const entity_id ghost = 0x7FFFFFF0u;
-        std::memcpy(&bad[bytes.size() - 4], &ghost, sizeof ghost);
+        std::memcpy(&bad[bytes.size() - world_save_war_section_bytes(f.w) - 4], &ghost, sizeof ghost); // BL-1459: before v69's wars
         world s1;
         check(!from_bytes(bad, s1) && s1.battles.empty() && s1.units.empty(),
               "T13e a stack naming a unit outside the battle's attacker side is REFUSED, destination untouched");

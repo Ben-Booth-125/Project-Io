@@ -10,6 +10,7 @@
 #include "unit_designs.hpp" // BL-1434: the designs section's range checks
 #include "air_combat.hpp"   // BL-1449: air_roster_table — the air section's range checks
 #include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
+#include "war.hpp"         // BL-1459: the war section
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <algorithm>
@@ -1860,6 +1861,99 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_u8(out, st.armed ? 1u : 0u);
         }
     }
+
+    // world_save_version 69 (BL-1459, BL-1428): THE WARS, the last section. Every
+    // table is an ordered map or an append-ordered vector, so the stream is in a
+    // fixed order without a sort here.
+    if (version >= k_world_save_version_war)
+    {
+        const auto w_provs = [&out](const std::vector<uint32_t>& v) {
+            w_u32(out, static_cast<uint32_t>(v.size()));
+            for (const uint32_t p : v)
+                w_u32(out, p);
+        };
+        w_u32(out, static_cast<uint32_t>(w.wars.size()));
+        for (const auto& [key, r] : w.wars)
+        {
+            w_id(out, r.declarer);
+            w_id(out, r.defender);
+            w_u8(out, r.answered ? 1u : 0u);
+            w_i32(out, r.opened_tick);
+            w_i32(out, r.opened_day);
+            w_i64(out, r.declarer_men_lost);
+            w_i64(out, r.defender_men_lost);
+            w_f32(out, r.declarer_exhaustion);
+            w_f32(out, r.defender_exhaustion);
+            w_provs(r.declarer_goals);
+            w_provs(r.defender_goals);
+        }
+        w_u32(out, static_cast<uint32_t>(w.truces.size()));
+        for (const auto& [pair, expiry] : w.truces)
+        {
+            w_id(out, pair.first);
+            w_id(out, pair.second);
+            w_i32(out, expiry);
+        }
+        w_u32(out, static_cast<uint32_t>(w.peace_offers.size()));
+        for (const auto& [key, o] : w.peace_offers)
+        {
+            w_id(out, key.first);
+            w_id(out, key.second);
+            w_id(out, o.offerer);
+            w_i32(out, o.offered_tick);
+            w_u8(out, static_cast<uint8_t>(o.terms.kind));
+            w_id(out, o.terms.gainer);
+            w_provs(o.terms.provinces);
+        }
+        w_u32(out, static_cast<uint32_t>(w.war_history.size()));
+        for (const war_history_entry& h : w.war_history)
+        {
+            w_id(out, h.declarer);
+            w_id(out, h.defender);
+            w_i32(out, h.opened_tick);
+            w_i32(out, h.closed_tick);
+            w_u8(out, static_cast<uint8_t>(h.end));
+            w_id(out, h.gainer);
+            w_i32(out, h.final_score);
+            w_provs(h.ceded);
+        }
+        w_u32(out, static_cast<uint32_t>(w.province_cessions.size()));
+        for (const province_cession& c : w.province_cessions)
+        {
+            w_id(out, c.from);
+            w_id(out, c.to);
+            w_u32(out, c.province);
+            w_i32(out, c.tick);
+        }
+        w_u32(out, static_cast<uint32_t>(w.war_exhaustion_residual.size()));
+        for (const auto& [nation, v] : w.war_exhaustion_residual)
+        {
+            w_id(out, nation);
+            w_f32(out, v);
+        }
+    }
+}
+
+void write_world_snapshot_pre_war(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1459): the v67 stream shape — no war section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_war);
+}
+
+std::size_t world_save_war_section_bytes(const world& w)
+{
+    std::size_t n = 6 * 4;
+    for (const auto& [key, r] : w.wars)
+        n += 4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 * r.declarer_goals.size() + 4
+           + 4 * r.defender_goals.size();
+    n += 12 * w.truces.size();
+    for (const auto& [key, o] : w.peace_offers)
+        n += 4 + 4 + 4 + 4 + 1 + 4 + 4 + 4 * o.terms.provinces.size();
+    for (const war_history_entry& h : w.war_history)
+        n += 4 + 4 + 4 + 4 + 1 + 4 + 4 + 4 + 4 * h.ceded.size();
+    n += 16 * w.province_cessions.size();
+    n += 8 * w.war_exhaustion_residual.size();
+    return n;
 }
 
 void write_world_snapshot_pre_air(const world& w, std::ostream& out)
@@ -2058,7 +2152,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_air        // BL-1449: v64, no air
             && version != k_world_save_version_pre_supplies     // BL-1452: v65, every unit's stocks full
             && version != k_world_save_version_pre_battle_carry // BL-1453: v66, no battle carry
-            && version != k_world_save_version_pre_alarm))      // BL-1432: v67, every Alarm 0
+            && version != k_world_save_version_pre_alarm      // BL-1432: v67, every Alarm 0
+            && version != k_world_save_version_pre_war))       // BL-1459: v68, no wars
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -3336,6 +3431,160 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 return false;
             prev = key;
             s.sentiment_trade_streaks.emplace(key, sentiment_trade_streak{ traded, idle, armed != 0 });
+        }
+    }
+
+    // v69 (BL-1459, BL-1428): THE WARS. Untrusted: every party a nation in the
+    // stream and the two distinct; war keys strictly ascending (one war per pair,
+    // never both directions); goals 1..3 (the defender's 0..3, non-empty exactly
+    // when answered), strictly ascending, never 0 or no_province (a goal may name a
+    // province an in-play merge has since removed, so existence is not required);
+    // losses >= 0; exhaustion finite in [0, 100]; truces keyed canonically and
+    // ascending; one offer per open war, from one of its parties, with legal-shaped
+    // terms; history ends in range; residual finite in (0, 100], nations ascending.
+    // Refused whole otherwise. A v67 stream ends before it: a world with no wars.
+    if (version >= k_world_save_version_war)
+    {
+        const auto nation_ok = [&s](entity_id n) {
+            return n != null_entity && s.nations.find(n) != s.nations.end();
+        };
+        const auto r_provs = [&in](std::vector<uint32_t>& v, std::size_t lo, std::size_t hi) {
+            uint32_t n = 0;
+            if (!r_u32(in, n) || n < lo || n > hi)
+                return false;
+            v.clear();
+            for (uint32_t k = 0; k < n; ++k)
+            {
+                uint32_t p = 0;
+                if (!r_u32(in, p) || p == 0 || p == no_province || (k > 0 && p <= v.back()))
+                    return false;
+                v.push_back(p);
+            }
+            return true;
+        };
+        const auto exh_ok = [](float v) { return std::isfinite(v) && v >= 0.0f && v <= 100.0f; };
+        const std::size_t pairs_max = s.nations.size() * s.nations.size();
+
+        uint32_t nw = 0;
+        if (!r_u32(in, nw) || nw > pairs_max)
+            return false;
+        for (uint32_t k = 0; k < nw; ++k)
+        {
+            war_record r;
+            uint8_t answered = 0;
+            if (!r_id(in, r.declarer) || !r_id(in, r.defender) || !r_u8(in, answered)
+                || !r_i32(in, r.opened_tick) || !r_i32(in, r.opened_day)
+                || !r_i64(in, r.declarer_men_lost) || !r_i64(in, r.defender_men_lost)
+                || !r_f32(in, r.declarer_exhaustion) || !r_f32(in, r.defender_exhaustion)
+                || !r_provs(r.declarer_goals, 1, k_war_goals_max)
+                || !r_provs(r.defender_goals, 0, k_war_goals_max))
+                return false;
+            if (answered > 1 || !nation_ok(r.declarer) || !nation_ok(r.defender)
+                || r.declarer == r.defender || r.declarer_men_lost < 0 || r.defender_men_lost < 0
+                || !exh_ok(r.declarer_exhaustion) || !exh_ok(r.defender_exhaustion)
+                || (answered == 1) != !r.defender_goals.empty())
+                return false;
+            r.answered = answered == 1;
+            const std::pair<entity_id, entity_id> key{r.declarer, r.defender};
+            if (!s.wars.empty() && !(s.wars.rbegin()->first < key))
+                return false;
+            s.wars.emplace(key, std::move(r));
+        }
+        // One war per pair: never both directions (a reversed twin may arrive on
+        // either side of it in ascending order, so this is checked once all are in).
+        for (const auto& [key, r] : s.wars)
+            if (s.wars.count({key.second, key.first}) != 0)
+                return false;
+
+        uint32_t nt = 0;
+        if (!r_u32(in, nt) || nt > pairs_max)
+            return false;
+        for (uint32_t k = 0; k < nt; ++k)
+        {
+            entity_id a = null_entity, b = null_entity;
+            int32_t expiry = 0;
+            if (!r_id(in, a) || !r_id(in, b) || !r_i32(in, expiry))
+                return false;
+            if (!nation_ok(a) || !nation_ok(b) || !(a < b))
+                return false;
+            const std::pair<entity_id, entity_id> key{a, b};
+            if (!s.truces.empty() && !(s.truces.rbegin()->first < key))
+                return false;
+            s.truces.emplace(key, expiry);
+        }
+
+        uint32_t no = 0;
+        if (!r_u32(in, no) || no > s.wars.size())
+            return false;
+        for (uint32_t k = 0; k < no; ++k)
+        {
+            entity_id dec = null_entity, def = null_entity;
+            peace_offer o;
+            uint8_t kind = 0;
+            if (!r_id(in, dec) || !r_id(in, def) || !r_id(in, o.offerer)
+                || !r_i32(in, o.offered_tick) || !r_u8(in, kind) || !r_id(in, o.terms.gainer)
+                || !r_provs(o.terms.provinces, 0, k_war_goals_max))
+                return false;
+            const std::pair<entity_id, entity_id> key{dec, def};
+            if (kind > peace_kind_max || s.wars.count(key) == 0
+                || (o.offerer != dec && o.offerer != def)
+                || (!s.peace_offers.empty() && !(s.peace_offers.rbegin()->first < key)))
+                return false;
+            o.terms.kind = static_cast<peace_kind>(kind);
+            const bool shape_ok = o.terms.kind == peace_kind::white
+                ? (o.terms.gainer == null_entity && o.terms.provinces.empty())
+                : ((o.terms.gainer == dec || o.terms.gainer == def) && !o.terms.provinces.empty());
+            if (!shape_ok)
+                return false;
+            s.peace_offers.emplace(key, std::move(o));
+        }
+
+        uint32_t nh = 0;
+        if (!r_u32(in, nh) || nh > (1u << 20))
+            return false;
+        for (uint32_t k = 0; k < nh; ++k)
+        {
+            war_history_entry h;
+            uint8_t end = 0;
+            if (!r_id(in, h.declarer) || !r_id(in, h.defender) || !r_i32(in, h.opened_tick)
+                || !r_i32(in, h.closed_tick) || !r_u8(in, end) || !r_id(in, h.gainer)
+                || !r_i32(in, h.final_score) || !r_provs(h.ceded, 0, k_war_goals_max))
+                return false;
+            if (end > war_end_max || !nation_ok(h.declarer) || !nation_ok(h.defender)
+                || h.declarer == h.defender || h.final_score < -100 || h.final_score > 100)
+                return false;
+            h.end = static_cast<war_end>(end);
+            s.war_history.push_back(std::move(h));
+        }
+
+        uint32_t nc = 0;
+        if (!r_u32(in, nc) || nc > (1u << 20))
+            return false;
+        for (uint32_t k = 0; k < nc; ++k)
+        {
+            province_cession c;
+            if (!r_id(in, c.from) || !r_id(in, c.to) || !r_u32(in, c.province) || !r_i32(in, c.tick))
+                return false;
+            if (!nation_ok(c.from) || !nation_ok(c.to) || c.from == c.to || c.province == 0
+                || c.province == no_province)
+                return false;
+            s.province_cessions.push_back(c);
+        }
+
+        uint32_t nr = 0;
+        if (!r_u32(in, nr) || nr > s.nations.size())
+            return false;
+        for (uint32_t k = 0; k < nr; ++k)
+        {
+            entity_id n = null_entity;
+            float v = 0.0f;
+            if (!r_id(in, n) || !r_f32(in, v))
+                return false;
+            if (!nation_ok(n) || !std::isfinite(v) || v <= 0.0f || v > 100.0f
+                || (!s.war_exhaustion_residual.empty()
+                    && !(s.war_exhaustion_residual.rbegin()->first < n)))
+                return false;
+            s.war_exhaustion_residual.emplace(n, v);
         }
     }
 
