@@ -1362,14 +1362,19 @@ economy = {
             embargo_imposed     = { access = -5.0, trust = -3.0 },
             -- Magnitude: men the observer lost. 1000 men lost is -2 Trust, +2 Alarm.
             force_used          = { trust = -0.002, alarm = 0.002 },
-            -- Alarm's capability factors (§ 6), emitted every tick, so each weight
-            -- is the decay rate times the Alarm it settles at per unit of magnitude:
-            --   a technology's tell settles at the tell itself (+10 is +10);
-            technology_visible  = { alarm = 0.074125 },
+            -- Alarm's capability factors (§ 6) are emitted EVERY TICK, so each is
+            -- authored as the Alarm it SETTLES AT per unit of magnitude
+            -- (alarm_settles_at); the loader derives the per-tick weight as that
+            -- level x alarm_decay_per_tick, so retuning the decay keeps the level.
+            -- A subject's "Alarm toward you" nodes then scale the level (x0.99 for
+            -- -1%), and its "decays N% faster" nodes divide it (x1.10 settles at
+            -- 1/1.10 of it) — both by design.
+            --   a technology's tell: per tell point (+10 settles at +10);
+            technology_visible  = { alarm_settles_at = 1.0 },
             --   each large facility settles at +2 (the Nuclear Plant's "by 2");
-            facility_visible    = { alarm = 0.14825 },
-            --   each 1000 men on a shared front settles at +1.
-            border_force        = { alarm = 0.000074125 },
+            facility_visible    = { alarm_settles_at = 2.0 },
+            --   each 1000 men on a shared front or inside the observer's ground: +1.
+            border_force        = { alarm_settles_at = 1.0 },
             -- One-off, the tick a shipper stops landing cargo with the observer.
             trade_severed       = { alarm = 2.0 },
             -- Unrest has no store, so nothing emits this.

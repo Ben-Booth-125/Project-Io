@@ -172,9 +172,27 @@ neutral. A factor's direction on each dimension is fixed below; its size is an a
 | `peace_concluded` | a peace, any terms | each party → the other | | + | − |
 | `province_ceded` | a peace that cedes; magnitude is the provinces ceded | loser → winner | − | − | + |
 
-**Alarm's capability factors** — visible technology, a large single-site facility, standing force on
-the observer's border, severed trade, unrest — are § 6's, and arrive with it. A factor whose emitter
-retired, or has none yet, is authored at zero.
+**Alarm's capability factors** are § 6's, emitted the same way — one call site each, and every one
+but severed trade emitted every tick from the subject's standing state:
+
+| Factor | Emitted by | Observer → subject | Alarm | Magnitude |
+|---|---|---|---|---|
+| `technology_visible` | each tick, from the subject's held nodes' public tell (`alarm_tell`) | **every other nation** → the holder | + | the summed tell, in Alarm points |
+| `facility_visible` | each tick, from the subject's built large single-site facilities | every other nation → the owner | + | how many it owns |
+| `border_force` | each tick, from where the subject's men stand | the observer → the nation standing men on their shared front **or anywhere inside the observer's ground** | + | thousands of men |
+| `trade_severed` | the fold, through a **persistence window**: a pair that landed cargo at two consecutive folds (established), then landed nothing at two consecutive folds, severs — once, and not again until the trade is re-established for two folds. A convoy that misses a tick severs nothing | the **receiver → the shipper** (the one left short observes the one that stopped) | + | 1 |
+| `unrest_visible` | nothing: unrest has no store | — | + | authored zero |
+
+A factor emitted every tick is authored as the Alarm it **settles at** per unit of magnitude
+(`alarm_settles_at`); its per-tick weight is that level times `alarm_decay_per_tick`, since
+decay-then-fold settles where the two balance. A retuned decay therefore keeps the authored level.
+The subject's "Alarm toward you" nodes scale the level, and its "decays N% faster" nodes divide it.
+A factor whose emitter retired, or has none yet, is authored at zero.
+
+**The settle is not conduct.** Through the settle's ticks (the validation run that closes generation,
+`../generation/GENERATION_STRATEGY.md`) no emitter gathers and nothing folds: nobody is seated and nothing done there
+was chosen by a nation, so the opening world carries generation's grudges (§ Where a grudge lands)
+and no other sentiment. Conduct starts at the handoff.
 
 ### Where a grudge lands
 
@@ -403,7 +421,17 @@ of an Era): the test is gone, the quantity stays, and its consequence is how oth
 
 **What moves it** — the subject's **visible** capability (a technology whose tell is public, a large
 single-site facility, standing force on the observer's border, a strategic nuclear arsenal), trade
-ties the subject severed, its military posture, and its domestic unrest. Technology effects that read
+ties the subject severed, its military posture, and its domestic unrest. Where each is measured:
+
+- **A public technology** — the subject's held nodes, through their `alarm_tell` modifier; seen by
+  every other nation, since a tell is public by definition.
+- **A large single-site facility** — the subject's built, standing state buildings whose authored
+  build cost reaches `alarm_large_facility_cost`; seen by every other nation.
+- **Standing force** — the subject's men on the tiles of a front it shares with the observer, and
+  on any tile of the observer's own ground; seen by that observer.
+- **Severed trade** — cargo the subject's convoys land in the observer's markets, fold by fold,
+  through the persistence window (§ Who emits each factor).
+- **Unrest** — nowhere yet: it has no store, so it moves nothing. Technology effects that read
 *"Alarm toward you"* write to this dimension (`../economy/tech/DIGITISATION_TREE.md`). **What
 relieves it** — decay toward neutral like every sentiment dimension, live trade between the pair, and
 the nodes that cut it.

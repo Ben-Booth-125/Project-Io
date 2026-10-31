@@ -1606,11 +1606,24 @@ int main()
         // an Alarm-ONLY row (Access and Trust both zero), which v67 had no form for.
         f.sentiment.pairs[{ c1, c2 }].alarm = 4.125f;
         f.sentiment.pairs[{ c1, c3 }] = sentiment_value{ 0.0f, 0.0f, -1.75f };
-        // BL-1458 (v68): the emitters' gathered conduct, pending its fold.
-        f.sentiment_pending.push_back(sentiment_event{ c2, c3, sentiment_factor_kind::force_used, 250.0f, 0.99f });
-        f.sentiment_pending.push_back(sentiment_event{ c3, c2, sentiment_factor_kind::friendship_accepted, 1.0f, 1.0f });
+        // BL-1458 (v68): the emitters' gathered conduct, pending its fold. A
+        // pending event names two NATIONS of the stream (the loader refuses any
+        // other), so the queue is built from the world's own two lowest nations.
+        std::vector<entity_id> pend_n;
+        for (const auto& kv : f.nations) pend_n.push_back(kv.first);
+        std::sort(pend_n.begin(), pend_n.end());
+        const entity_id pn1 = pend_n.size() > 1 ? pend_n[0] : null_entity;
+        const entity_id pn2 = pend_n.size() > 1 ? pend_n[1] : null_entity;
+        if (pn1 != null_entity)
+        {
+            // The alarm scale is set off 1 on purpose: it is not saved (the fold
+            // restamps it), so it must read back as 1.
+            f.sentiment_pending.push_back(sentiment_event{ pn2, pn1, sentiment_factor_kind::force_used, 250.0f, 0.99f });
+            f.sentiment_pending.push_back(sentiment_event{ pn1, pn2, sentiment_factor_kind::friendship_accepted, 1.0f, 1.0f });
+        }
         f.sentiment_trade_landed[{ c1, c3 }] = 37.5f;
-        f.sentiment_trade_last.insert({ c2, c1 });
+        f.sentiment_trade_streaks[{ c2, c1 }] = sentiment_trade_streak{ 0, 1, true };
+        f.sentiment_trade_streaks[{ c3, c1 }] = sentiment_trade_streak{ 1, 0, false };
 
         // Sprint N3 T2: two nations' weight vectors. Every weight is DISTINCT
         // and one (0.3f) is non-dyadic on purpose -- a reader that widened or
@@ -1744,18 +1757,28 @@ int main()
                       && back.sentiment.pairs.at({ c1, c3 }) == sentiment_value{ 0.0f, 0.0f, -1.75f },
                   "P8 BL-1432: Alarm round-trips distinct from Access and Trust, an "
                   "Alarm-only row included (save v68)");
-            check(back.sentiment_pending.size() == 2
-                      && back.sentiment_pending[0].observer == c2
+            check(pn1 != null_entity && back.sentiment_pending.size() == 2
+                      && back.sentiment_pending[0].observer == pn2
+                      && back.sentiment_pending[0].subject == pn1
                       && back.sentiment_pending[0].kind == sentiment_factor_kind::force_used
                       && back.sentiment_pending[0].magnitude == 250.0f
-                      && back.sentiment_pending[0].alarm_scale == 0.99f
+                      && back.sentiment_pending[0].alarm_scale == 1.0f
                       && back.sentiment_pending[1].kind == sentiment_factor_kind::friendship_accepted
                       && back.sentiment_trade_landed.size() == 1
                       && back.sentiment_trade_landed.at({ c1, c3 }) == 37.5f
-                      && back.sentiment_trade_last.size() == 1
-                      && back.sentiment_trade_last.count({ c2, c1 }) == 1,
-                  "P8 BL-1458: the pending conduct queue, the trade accumulator and "
-                  "last fold's trading pairs round-trip in order (save v68)");
+                      && back.sentiment_trade_streaks.size() == 2
+                      && back.sentiment_trade_streaks.at({ c2, c1 }) == sentiment_trade_streak{ 0, 1, true }
+                      && back.sentiment_trade_streaks.at({ c3, c1 }) == sentiment_trade_streak{ 1, 0, false },
+                  "P8 BL-1458: the pending conduct queue (alarm scale unsaved, read back 1), the "
+                  "trade accumulator and the trade streaks round-trip in order (save v68)");
+            // A pending event naming something that is not a nation is refused whole.
+            {
+                world g = f;
+                g.sentiment_pending.push_back(sentiment_event{ c1, c2, sentiment_factor_kind::force_used, 1.0f });
+                world sentinel;
+                check(!from_bytes(to_bytes(g), sentinel) && sentinel.nations.empty(),
+                      "P8 BL-1458: a pending event between non-nations is REFUSED, destination untouched");
+            }
             // v67, the strict prefix: no Alarm section. It loads with every Alarm 0,
             // nothing pending, and the Alarm-only row (which has no v67 form) absent.
             {
@@ -1774,7 +1797,7 @@ int main()
                           && w67.sentiment.pairs.at({ c1, c2 }) == sentiment_value{ 2.25f, -0.75f, 0.0f }
                           && w67.sentiment.pairs.count({ c1, c3 }) == 0
                           && w67.sentiment_pending.empty() && w67.sentiment_trade_landed.empty()
-                          && w67.sentiment_trade_last.empty(),
+                          && w67.sentiment_trade_streaks.empty(),
                       "P8 BL-1432: a v67 stream loads with Alarm 0 and nothing pending");
             }
 

@@ -258,11 +258,13 @@ enum class sentiment_factor_kind : uint8_t
     /// authored build cost reaches `alarm_large_facility_cost`). Magnitude:
     /// how many it owns.
     facility_visible = 16,
-    /// The subject stands force on a front it shares with the observer.
-    /// Magnitude: the men it has on that front.
+    /// The subject stands force where the observer sees a threat: on a front
+    /// the two share, or anywhere inside the observer's own ground. Magnitude:
+    /// thousands of men.
     border_force = 17,
-    /// The subject stopped shipping to the observer: it landed cargo in the
-    /// observer's markets last tick and none this tick. Magnitude 1.
+    /// The subject stopped shipping to the observer: an ESTABLISHED trade (cargo
+    /// landed at `sentiment_trade_window` consecutive folds) then landed nothing
+    /// for as many. Once per severing. Magnitude 1.
     trade_severed = 18,
     /// The subject's domestic unrest. Unrest has no store in the campaign, so
     /// nothing emits this and its weight is authored zero.
@@ -419,6 +421,28 @@ struct sentiment_event
     /// Part of the canonical order, so it cannot leak a gather order either.
     float                 alarm_scale = 1.0f;
 };
+
+/// BL-1432: one (shipper, receiver) pair's trade streak, for `trade_severed`'s
+/// PERSISTENCE WINDOW. Trade is ESTABLISHED once the pair has landed cargo at
+/// `sentiment_trade_window` consecutive folds (`armed`), and SEVERED once an
+/// established pair then lands nothing at `sentiment_trade_window` consecutive
+/// folds — which fires once and disarms, so the next severing needs the trade
+/// re-established first. A convoy that misses one tick is neither. Plain data:
+/// the emitter (sentiment_emitters.cpp) owns the rule; this file only names it.
+struct sentiment_trade_streak
+{
+    uint8_t traded = 0;     ///< Consecutive folds with cargo landed, capped at the window.
+    uint8_t idle   = 0;     ///< Consecutive folds with none, capped at the window.
+    bool    armed  = false; ///< Established trade: a severing can fire.
+};
+
+/// The window, in folds (ticks), on both sides of a severing.
+inline constexpr uint8_t sentiment_trade_window = 2;
+
+inline bool operator==(const sentiment_trade_streak& a, const sentiment_trade_streak& b)
+{
+    return a.traded == b.traded && a.idle == b.idle && a.armed == b.armed;
+}
 
 /// THE TABLE. Sparse and directed: keyed (observer, subject), and an ABSENT ROW
 /// IS NEUTRAL. A `std::map` so every walk is a sorted walk over ids (BL-158),

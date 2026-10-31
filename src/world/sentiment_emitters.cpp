@@ -7,6 +7,7 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <cmath>
 #include <cstdint>
 #include <set>
@@ -49,14 +50,27 @@ entity_id market_nation(const world& w, entity_id market)
 
 } // namespace
 
+bool sentiment_conduct_live(const world& w)
+{
+    // The settle (campaign_settle.cpp) runs the economy step for its ticks with
+    // `settle_build_gate` up. Nobody is seated and nothing the settle does is
+    // conduct a nation chose, so it writes no sentiment: the opening world holds
+    // generation's grudges and nothing else.
+    return !w.settle_build_gate;
+}
+
 void queue_conduct(world& w, entity_id observer, entity_id subject,
                    sentiment_factor_kind kind, float magnitude)
 {
+    if (!sentiment_conduct_live(w))
+        return;
     w.sentiment_pending.push_back(sentiment_event{ observer, subject, kind, magnitude });
 }
 
 void note_trade_landed(world& w, entity_id owner, entity_id dest_market, float value)
 {
+    if (!sentiment_conduct_live(w))
+        return;
     if (!std::isfinite(value) || !(value > 0.0f))
         return;
     const entity_id shipper  = owner_home_nation(w, owner);
@@ -82,6 +96,8 @@ void note_battle_losses(world& w, entity_id attacker, entity_id defender,
 
 void emit_alarm_capability(world& w, const recipe_registry& reg)
 {
+    if (!sentiment_conduct_live(w))
+        return;
     const sentiment_params& sp = reg.sentiment();
     const std::vector<entity_id> nations = nation_ids(w);
     if (nations.size() < 2)
@@ -129,9 +145,11 @@ void emit_alarm_capability(world& w, const recipe_registry& reg)
     }
 
     // --- Standing force on the observer's border -----------------------------
-    // The men the SUBJECT stands on the border tiles of each front it shares
-    // with the OBSERVER (RELATIONS.md § 6: "standing force on the observer's
-    // border"). The front cache is current: the caller re-anchored it.
+    // RELATIONS.md section 6: the men the SUBJECT stands where the OBSERVER can
+    // see them as a threat - on the border tiles of a front the subject shares
+    // with the observer, AND on any tile of the observer's own ground (an army
+    // that has crossed is more alarming, not less). Magnitude: thousands of men.
+    // The front cache is current: the caller re-anchored it.
     if (bord_on && !w.units.empty())
     {
         // (tile, owner) -> men. An integer sum, so the unordered walk's order
@@ -140,25 +158,38 @@ void emit_alarm_capability(world& w, const recipe_registry& reg)
         for (const auto& [uid, u] : w.units)
             if (u.count > 0 && u.position != null_entity && is_nation(w, u.owner))
                 men_at[{ u.position, u.owner }] += u.count;
-        if (!men_at.empty())
-            for (const auto& [subject, fronts] : w.fronts_cache.by_nation) // std::map: ascending
+        // (observer, subject) -> men, ascending.
+        std::map<std::pair<entity_id, entity_id>, int64_t> facing;
+        // Inside the observer's ground: the tile's nation is the observer.
+        for (const auto& [key, men] : men_at)
+        {
+            const auto n = w.tile_to_nation.find(key.first);
+            if (n == w.tile_to_nation.end() || n->second == key.second || !is_nation(w, n->second))
+                continue;
+            facing[{ n->second, key.second }] += men;
+        }
+        // On the subject's own border span toward the observer (std::map: ascending).
+        // A span tile is the subject's own, so it is never counted twice above.
+        for (const auto& [subject, fronts] : w.fronts_cache.by_nation)
+            for (const front& f : fronts)
             {
-                std::map<entity_id, int64_t> facing; // observer -> men, ascending
-                for (const front& f : fronts)
+                if (!is_nation(w, f.neighbour) || f.neighbour == subject)
+                    continue;
+                int64_t men = 0;
+                for (const entity_id tile : f.span)
                 {
-                    if (!is_nation(w, f.neighbour) || f.neighbour == subject)
-                        continue;
-                    int64_t men = 0;
-                    for (const entity_id tile : f.span)
-                        if (const auto it = men_at.find({ tile, subject }); it != men_at.end())
-                            men += it->second;
-                    if (men > 0)
-                        facing[f.neighbour] += men;
+                    const auto t = w.tile_to_nation.find(tile);
+                    if (t != w.tile_to_nation.end() && t->second == f.neighbour)
+                        continue; // the observer's own tile: counted above
+                    if (const auto it = men_at.find({ tile, subject }); it != men_at.end())
+                        men += it->second;
                 }
-                for (const auto& [observer, men] : facing)
-                    queue_conduct(w, observer, subject, sentiment_factor_kind::border_force,
-                                  static_cast<float>(men));
+                if (men > 0)
+                    facing[{ f.neighbour, subject }] += men;
             }
+        for (const auto& [pair, men] : facing)
+            queue_conduct(w, pair.first, pair.second, sentiment_factor_kind::border_force,
+                          static_cast<float>(men) / 1000.0f);
     }
 }
 
@@ -176,6 +207,13 @@ std::map<entity_id, float> alarm_decay_scales(const world& w)
 
 std::size_t fold_pending_sentiment(world& w, const recipe_registry& reg)
 {
+    if (!sentiment_conduct_live(w))
+    {
+        // Nothing is gathered under the settle, but say so structurally too.
+        w.sentiment_pending.clear();
+        w.sentiment_trade_landed.clear();
+        return 0;
+    }
     std::vector<sentiment_event> batch = std::move(w.sentiment_pending);
     w.sentiment_pending.clear();
 
@@ -192,12 +230,40 @@ std::size_t fold_pending_sentiment(world& w, const recipe_registry& reg)
     }
     w.sentiment_trade_landed.clear();
 
-    // Severed trade: a shipper that landed cargo with the receiver at the last
-    // fold and none this time. The receiver is the one left short; it observes.
-    for (const auto& pair : w.sentiment_trade_last)
-        if (trading.count(pair) == 0 && is_nation(w, pair.first) && is_nation(w, pair.second))
-            batch.push_back(sentiment_event{ pair.second, pair.first, sentiment_factor_kind::trade_severed, 1.0f });
-    w.sentiment_trade_last = std::move(trading);
+    // Severed trade, through its PERSISTENCE WINDOW (sentiment_trade_streak):
+    // a pair is ESTABLISHED after `sentiment_trade_window` consecutive folds with
+    // cargo landed, and SEVERED after as many consecutive folds with none - so a
+    // convoy that misses a tick severs nothing. It fires once and disarms. The
+    // receiver is the one left short; it observes the shipper.
+    for (const auto& pair : trading)
+        w.sentiment_trade_streaks.emplace(pair, sentiment_trade_streak{});
+    for (auto it = w.sentiment_trade_streaks.begin(); it != w.sentiment_trade_streaks.end();)
+    {
+        sentiment_trade_streak& st = it->second;
+        if (trading.count(it->first) != 0)
+        {
+            st.idle = 0;
+            if (st.traded < sentiment_trade_window)
+                ++st.traded;
+            if (st.traded >= sentiment_trade_window)
+                st.armed = true;
+        }
+        else
+        {
+            st.traded = 0;
+            if (st.idle < sentiment_trade_window)
+                ++st.idle;
+            if (st.armed && st.idle >= sentiment_trade_window)
+            {
+                st.armed = false;
+                if (is_nation(w, it->first.first) && is_nation(w, it->first.second))
+                    batch.push_back(sentiment_event{ it->first.second, it->first.first,
+                                                     sentiment_factor_kind::trade_severed, 1.0f });
+            }
+        }
+        // Nothing to remember: not established and not trading now.
+        it = (!st.armed && st.traded == 0) ? w.sentiment_trade_streaks.erase(it) : std::next(it);
+    }
 
     if (batch.empty())
         return 0;

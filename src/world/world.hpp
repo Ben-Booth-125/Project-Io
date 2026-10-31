@@ -1137,10 +1137,11 @@ struct world
     /// per party per pair at the fold, then cleared. Saved (v68).
     std::map<std::pair<entity_id, entity_id>, float> sentiment_trade_landed;
 
-    /// BL-1432: the (shipper, receiver) pairs that landed cargo at the LAST
-    /// fold, so the next can see a pair whose trade stopped (`trade_severed`).
-    /// Saved (v68).
-    std::set<std::pair<entity_id, entity_id>> sentiment_trade_last;
+    /// BL-1432: each (shipper, receiver) pair's trade streak across folds, so a
+    /// pair whose trade STOPPED can be told from one whose convoys merely missed
+    /// a tick (`trade_severed`'s window, `sentiment_trade_streak`). Only pairs
+    /// with something to remember are held. Saved (v68).
+    std::map<std::pair<entity_id, entity_id>, sentiment_trade_streak> sentiment_trade_streaks;
 
     /// BL-350's Q3 counterparty reputation, as a VIEW rather than a store
     /// (BL-546). Reputation IS sentiment's Trust dimension from the BUYER

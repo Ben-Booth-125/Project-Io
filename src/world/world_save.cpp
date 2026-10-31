@@ -1841,8 +1841,7 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_id(out, e.observer);
             w_id(out, e.subject);
             w_u8(out, static_cast<uint8_t>(e.kind));
-            w_f32(out, e.magnitude);
-            w_f32(out, e.alarm_scale);
+            w_f32(out, e.magnitude); // the alarm scale is not saved: the fold restamps it
         }
         w_u32(out, static_cast<uint32_t>(w.sentiment_trade_landed.size()));
         for (const auto& [k, v] : w.sentiment_trade_landed)
@@ -1851,11 +1850,14 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_id(out, k.second);
             w_f32(out, v);
         }
-        w_u32(out, static_cast<uint32_t>(w.sentiment_trade_last.size()));
-        for (const auto& k : w.sentiment_trade_last)
+        w_u32(out, static_cast<uint32_t>(w.sentiment_trade_streaks.size()));
+        for (const auto& [k, st] : w.sentiment_trade_streaks)
         {
             w_id(out, k.first);
             w_id(out, k.second);
+            w_u8(out, st.traded);
+            w_u8(out, st.idle);
+            w_u8(out, st.armed ? 1u : 0u);
         }
     }
 }
@@ -1958,8 +1960,8 @@ std::size_t world_save_alarm_section_bytes(const world& w)
     for (const auto& [k, v] : w.sentiment.pairs)
         if (v.alarm != 0.0f)
             n += 12;
-    n += 17 * w.sentiment_pending.size() + 12 * w.sentiment_trade_landed.size()
-       + 8 * w.sentiment_trade_last.size();
+    n += 13 * w.sentiment_pending.size() + 12 * w.sentiment_trade_landed.size()
+       + 11 * w.sentiment_trade_streaks.size();
     return n;
 }
 
@@ -3254,9 +3256,10 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
 
     // v68 (BL-1432 / BL-1458): Alarm and the emitters' gathered conduct. Untrusted:
     // Alarm rows strictly ascending, each a row the sentiment map holds, finite and
-    // non-zero; then no row may be wholly neutral. Pending events with an in-range
-    // kind and finite numbers, at most `sentiment_max_records`; trade pairs strictly
-    // ascending, non-null and distinct, landed values finite and positive. Refused
+    // non-zero; then no row may be wholly neutral. Pending events between two
+    // distinct nations of the stream, with an in-range kind and a finite magnitude,
+    // at most `sentiment_max_records`; trade pairs strictly ascending, non-null and
+    // distinct, landed values finite and positive, streak counts within the window. Refused
     // whole otherwise. A v67 (and older) stream ends before it: every Alarm 0, nothing
     // pending.
     if (alarm_section)
@@ -3291,10 +3294,11 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             sentiment_event e;
             uint8_t kind = 0;
             if (!r_id(in, e.observer) || !r_id(in, e.subject) || !r_u8(in, kind)
-                || !r_f32(in, e.magnitude) || !r_f32(in, e.alarm_scale)
+                || !r_f32(in, e.magnitude)
                 || kind >= sentiment_factor_count || !std::isfinite(e.magnitude)
-                || !std::isfinite(e.alarm_scale))
-                return false;
+                || e.observer == e.subject
+                || s.nations.count(e.observer) == 0 || s.nations.count(e.subject) == 0)
+                return false; // only nations are queued (sentiment_emitters.cpp)
             e.kind = static_cast<sentiment_factor_kind>(kind);
             s.sentiment_pending.push_back(e);
         }
@@ -3315,19 +3319,23 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             s.sentiment_trade_landed.emplace(key, v);
         }
 
-        uint32_t last = 0;
-        if (!r_u32(in, last) || last > sentiment_max_records)
+        uint32_t streaks = 0;
+        if (!r_u32(in, streaks) || streaks > sentiment_max_records)
             return false;
         prev = { null_entity, null_entity };
-        for (uint32_t k = 0; k < last; ++k)
+        for (uint32_t k = 0; k < streaks; ++k)
         {
             std::pair<entity_id, entity_id> key{ null_entity, null_entity };
+            uint8_t traded = 0, idle = 0, armed = 0;
             if (!r_id(in, key.first) || !r_id(in, key.second)
+                || !r_u8(in, traded) || !r_u8(in, idle) || !r_u8(in, armed)
                 || key.first == null_entity || key.second == null_entity || key.first == key.second
-                || (k > 0 && !(prev < key)))
+                || (k > 0 && !(prev < key)) || traded > sentiment_trade_window
+                || idle > sentiment_trade_window || armed > 1
+                || (armed == 0 && traded == 0)) // the fold erases such a pair
                 return false;
             prev = key;
-            s.sentiment_trade_last.insert(key);
+            s.sentiment_trade_streaks.emplace(key, sentiment_trade_streak{ traded, idle, armed != 0 });
         }
     }
 

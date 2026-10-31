@@ -66,6 +66,8 @@
 //                            [--base X] [--lin Y] [--sqrt Z] [--unit U]
 //                            [--growth G] [--econ E] [--age Y] [--age-only]
 //   --seeds 0   fixture rows (R1-R3, T1, T2) plus T2-live's one generated world — the ctest invocation.
+//   --fixture-only  with --seeds 0: the fixture rows ALONE, skipping T2-live and R5-live
+//               (their generated seed-28 settle and leg search run for over half an hour).
 //   default     all 16 library seeds, 32 live quarters, each seed built twice,
 //               on the registry's research dials (scripts/economy.lua) unless
 //               --base/--lin/--sqrt/--unit override them for a measurement.
@@ -2168,10 +2170,12 @@ int main(int argc, char** argv)
     ai_dials ad;
     int ai_years = 0; // BL-1275: --ai Y runs R7 over Y years
     std::vector<std::uint32_t> seeds;
+    bool fixture_only = false; // --fixture-only: R1-R3, R5, T1-T3, R6 and nothing generated
     for (int i = 1; i < argc; ++i)
     {
         const bool more = i + 1 < argc;
         if (!std::strcmp(argv[i], "--seeds") && more) seed_count = std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--fixture-only")) fixture_only = true; // BL-1432 review
         else if (!std::strcmp(argv[i], "--seed-list") && more) seeds = parse_list(argv[++i]);
         else if (!std::strcmp(argv[i], "--quarters") && more) quarters = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--once")) twice = false;
@@ -2216,7 +2220,29 @@ int main(int argc, char** argv)
         rows_t1(reg);
         rows_t2(reg);
         rows_r6(reg);
+        // BL-1432 review: Alarm's capability factors are authored as the level
+        // they SETTLE AT, and the loader derives the per-tick weight as level x
+        // alarm_decay_per_tick, so a decay retune keeps the authored level.
+        {
+            const sentiment_params& sp = reg.sentiment();
+            const auto w_of = [&sp](sentiment_factor_kind k) {
+                return sp.factors[static_cast<std::size_t>(k)].alarm;
+            };
+            const float r = sp.alarm_decay_per_tick;
+            std::printf("\nT3 the Alarm capability weights (economy.sentiment): decay %.6f; "
+                        "tell %.9f, facility %.9f, border %.9f per tick\n", r,
+                        w_of(sentiment_factor_kind::technology_visible),
+                        w_of(sentiment_factor_kind::facility_visible),
+                        w_of(sentiment_factor_kind::border_force));
+            check(r > 0.0f
+                      && w_of(sentiment_factor_kind::technology_visible) == static_cast<float>(1.0 * r)
+                      && w_of(sentiment_factor_kind::facility_visible) == static_cast<float>(2.0 * static_cast<double>(r))
+                      && w_of(sentiment_factor_kind::border_force) == static_cast<float>(1.0 * r),
+                  "T3a each capability factor's per-tick weight is its authored settled level "
+                  "(tell 1/point, facility 2, border 1/1000 men) x alarm_decay_per_tick");
+        }
     }
+    if (!fixture_only)
     {
         // Curated seeds for the rows a hand fixture cannot route: the overland
         // rows on the first (28, the fastest build), then seeds in turn until
@@ -2232,7 +2258,7 @@ int main(int argc, char** argv)
         }
         check(ported, "T2s a ported leg was priced on a curated seed, found or planted (the handling split was measured)");
     }
-    if (seed_count > 0 || !seeds.empty())
+    if (!fixture_only && (seed_count > 0 || !seeds.empty()))
         rows_r5_live(28); // BL-1324 review: fresh-settle and just-loaded projection rows
     } // !age_only
 

@@ -800,20 +800,55 @@ int main()
                       && ba == sentiment_value{ 4.0f, 4.0f, -4.0f },
                   "E1b trade_conducted folds once a tick per party, magnitude the value "
                   "landed: each -> the other, Access +, Trust +, Alarm -");
-            check(w.sentiment_trade_landed.empty() && w.sentiment_trade_last.count({ A, B }) == 1,
-                  "E1c the fold clears the accumulator and remembers the pair as trading");
+            check(w.sentiment_trade_landed.empty() && w.sentiment_trade_streaks.count({ A, B }) == 1,
+                  "E1c the fold clears the accumulator and starts the pair's trade streak");
+        }
 
-            // E5 trade_severed: the next fold with no landing from A to B — the
-            // receiver, left short, is alarmed by the shipper.
-            fold_pending_sentiment(w, reg);
-            check(sentiment_toward(w.sentiment, B, A).alarm == -4.0f + 2.0f
-                      && sentiment_toward(w.sentiment, A, B).alarm == -4.0f
-                      && w.sentiment_trade_last.empty(),
-                  "E5 severed trade: a pair that traded at the last fold and lands "
-                  "nothing now raises the receiver's Alarm toward the shipper, once");
-            fold_pending_sentiment(w, reg);
-            check(sentiment_toward(w.sentiment, B, A).alarm == -2.0f,
-                  "E5b ...and only once: a pair that stays stopped emits nothing more");
+        // E5 trade_severed, through its persistence window: only an ESTABLISHED
+        // trade (2 consecutive folds landing) that then lands nothing for 2
+        // consecutive folds severs, once; a pair whose convoys alternate ticks
+        // severs nothing. Measured on severed alone (no decay, no trade weight),
+        // so B's Alarm toward A is 2 x the severings.
+        {
+            sentiment_params sp;
+            sp.factors[static_cast<std::size_t>(sentiment_factor_kind::trade_severed)] =
+                sentiment_factor{ 0.0f, 0.0f, 2.0f };
+            recipe_registry sreg;
+            sreg.set_sentiment(sp);
+            world w;
+            const entity_id A = add_nation(w, "Shipper");
+            const entity_id B = add_nation(w, "Receiver");
+            const entity_id tile_b = w.create_entity();
+            w.tile_to_nation[tile_b] = B;
+            const entity_id mb = w.create_entity();
+            market_component mkb{};
+            mkb.centre_tile = tile_b;
+            w.markets[mb] = mkb;
+            const auto run = [&](const char* pattern) { // 'L' lands, '.' does not
+                for (const char* c = pattern; *c != '\0'; ++c)
+                {
+                    if (*c == 'L')
+                        note_trade_landed(w, A, mb, 1.0f);
+                    fold_pending_sentiment(w, sreg);
+                }
+                return sentiment_toward(w.sentiment, B, A).alarm;
+            };
+            const float alternating = run("L.L.L.L.L.L.L.L.");
+            check(alternating == 0.0f && w.sentiment.pairs.empty(),
+                  "E5a convoys landing on alternate ticks for 16 folds raise NO severed event "
+                  "(a missed tick is not a severing)");
+            const float one_stop = run("LLL....");
+            check(one_stop == 2.0f,
+                  "E5b an established trade (3 folds landing) then stopped (4 folds idle) "
+                  "severs exactly once: the receiver's Alarm toward the shipper +2");
+            const float no_rearm = run("L..L..");
+            check(no_rearm == 2.0f,
+                  "E5c ...and not again until the trade is re-established for 2 folds");
+            const float rearmed = run("LL..");
+            check(rearmed == 4.0f && sentiment_toward(w.sentiment, A, B).alarm == 0.0f
+                      && w.sentiment_trade_streaks.empty(),
+                  "E5d re-established then stopped again severs once more; the shipper "
+                  "forms nothing, and a severed pair leaves no streak behind");
         }
 
         // E2 friendship_accepted: both parties observe, each in its own row.
@@ -1092,9 +1127,27 @@ int main()
         check(w.sentiment_pending.size() == 1 && w.sentiment_pending[0].observer == O
                   && w.sentiment_pending[0].subject == S
                   && w.sentiment_pending[0].kind == sentiment_factor_kind::border_force
-                  && w.sentiment_pending[0].magnitude == 1000.0f,
-              "C3 border force: the observer is alarmed by the men the subject stands on "
-              "their shared front (1000), not by men inland or its own");
+                  && w.sentiment_pending[0].magnitude == 1.0f,
+              "C3a border force: the observer is alarmed by the men the subject stands on "
+              "their shared front (1000, magnitude in thousands), not by men inland or its own");
+        w.sentiment_pending.clear();
+
+        // C3b an army that has CROSSED: 2000 of S's men three tiles inside O's
+        // ground (a tile O holds, on no front span) counts with the 1000 on the
+        // front - force inside the observer's territory alarms it too.
+        {
+            const entity_id deep = w.create_entity();
+            w.tile_to_nation[deep] = O;
+            unit_component u{};
+            u.owner = S; u.position = deep; u.count = 2000;
+            w.units[w.create_entity()] = u;
+        }
+        emit_alarm_capability(w, reg);
+        check(w.sentiment_pending.size() == 1 && w.sentiment_pending[0].observer == O
+                  && w.sentiment_pending[0].subject == S
+                  && w.sentiment_pending[0].magnitude == 3.0f,
+              "C3b ...and by the men it stands INSIDE the observer's ground (2000 three "
+              "tiles in + 1000 on the front = 3 thousand)");
         w.sentiment_pending.clear();
 
         // C4 unrest has no store: its factor emits nothing and is authored zero.
@@ -1139,6 +1192,58 @@ int main()
         check(wired >= 13 && every_alarm_effect_read,
               "C5c every Alarm modifier row in the store classifies as READ (nation_tech's "
               "declaration)");
+    }
+
+    // --- G: THE SETTLE WRITES NO CONDUCT (BL-1458 review) ----------------------
+    // The settle runs the economy step for its ticks with `settle_build_gate`
+    // up. Nothing it does is conduct a nation chose, so every emitter gathers
+    // nothing and the fold folds nothing: the opening world carries generation's
+    // grudges and no other sentiment.
+    std::printf("\n-- G  the settle writes no conduct --\n");
+    {
+        sentiment_params p;
+        for (std::size_t i = 0; i < sentiment_factor_count; ++i)
+            p.factors[i] = sentiment_factor{ 1.0f, 1.0f, 1.0f };
+        recipe_registry reg;
+        reg.set_sentiment(p);
+        world w;
+        const entity_id A = add_nation(w, "A");
+        const entity_id B = add_nation(w, "B");
+        const entity_id tile_b = w.create_entity();
+        w.tile_to_nation[tile_b] = B;
+        const entity_id mb = w.create_entity();
+        market_component mkb{};
+        mkb.centre_tile = tile_b;
+        w.markets[mb] = mkb;
+        // A grudge generation seeded: the one thing the opening world holds.
+        apply_sentiment_events(w.sentiment, p, { ev(A, B, sentiment_factor_kind::historical_grudge) });
+        const sentiment_table seeded = w.sentiment;
+        unit_component u{};
+        u.owner = A; u.position = tile_b; u.count = 5000; // A's army inside B
+        w.units[w.create_entity()] = u;
+        for (int i = 0; i < io::dg::node_count; ++i)
+            if (std::string_view(io::dg::nodes[static_cast<std::size_t>(i)].id) == "DG-ST-AC-Ba")
+                w.nation_tech[A].held.set(static_cast<std::size_t>(i)); // a public tell
+
+        w.settle_build_gate = true; // as run_settle_tick raises it on steps 0..11
+        for (int step = 0; step < 12; ++step)
+        {
+            note_trade_landed(w, A, mb, 50.0f);
+            note_battle_losses(w, A, B, 10, 10);
+            queue_conduct(w, A, B, sentiment_factor_kind::friendship_accepted);
+            emit_alarm_capability(w, reg);
+            fold_pending_sentiment(w, reg);
+        }
+        check(tables_identical(w.sentiment, seeded) && w.sentiment_pending.empty()
+                  && w.sentiment_trade_landed.empty() && w.sentiment_trade_streaks.empty(),
+              "G1 a settled world holds no conduct rows: twelve settle ticks of trade, "
+              "battle, friendship, a tell and an army across the border leave only the "
+              "seeded grudge, and nothing pending");
+        w.settle_build_gate = false; // the handoff
+        emit_alarm_capability(w, reg);
+        fold_pending_sentiment(w, reg);
+        check(sentiment_toward(w.sentiment, B, A).alarm > 0.0f,
+              "G2 ...and from the handoff the same world emits (B is alarmed by A)");
     }
 
     // --- N: the authoring roster --------------------------------------------

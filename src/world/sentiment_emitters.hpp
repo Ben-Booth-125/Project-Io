@@ -35,12 +35,18 @@ class recipe_registry;
 //   technology_visible   } emit_alarm_capability, once a tick from
 //   facility_visible     } run_economy_step, after the end-of-tick
 //   border_force         } re-anchor of the fronts
-//   trade_severed        fold_pending_sentiment (last fold's pairs vs this one's)
+//   trade_severed        fold_pending_sentiment, through the trade streak's
+//                        persistence window (sentiment_trade_streak)
 //   embargo_imposed      NO EMITTER: the campaign has no embargo law and no
 //                        enactment event for one (RELATIONS.md § 3). Authored
 //                        at its directions so an emitter is one call when it lands.
 //   unrest_visible       NO EMITTER: unrest has no store. Authored zero.
 // ---------------------------------------------------------------------------
+
+/// True outside the settle. Under it (`world::settle_build_gate`) every emitter
+/// below gathers nothing and the fold folds nothing: the settle is not conduct,
+/// so the opening world carries generation's grudges and no other sentiment.
+bool sentiment_conduct_live(const world& w);
 
 /// Queue ONE occurrence of @p kind from @p observer toward @p subject for the
 /// next fold. Ill-formed events (null ids, a self pair, a non-finite magnitude)
@@ -64,8 +70,9 @@ void note_battle_losses(world& w, entity_id attacker, entity_id defender,
 
 /// Alarm's capability factors (RELATIONS.md § 6), once a tick: every nation's
 /// public technology tell, its large single-site facilities, and the force it
-/// stands on each front it shares with a neighbour. Reads the front cache, so
-/// call it after `reanchor_fronts`.
+/// stands where a neighbour sees it - on the front they share and anywhere
+/// inside the neighbour's ground (magnitude in thousands of men). Reads the
+/// front cache, so call it after `reanchor_fronts`.
 void emit_alarm_capability(world& w, const recipe_registry& reg);
 
 /// Each nation's held `alarm_decay` multiplier, keyed by nation, for
@@ -74,9 +81,9 @@ void emit_alarm_capability(world& w, const recipe_registry& reg);
 std::map<entity_id, float> alarm_decay_scales(const world& w);
 
 /// THE FOLD, once a tick: the trade accumulator becomes `trade_conducted`
-/// events (each party toward the other, magnitude the value landed), last
-/// fold's trading pairs that landed nothing this time become `trade_severed`
-/// (the receiver toward the shipper), every event is stamped with its subject's
+/// events (each party toward the other, magnitude the value landed), an
+/// established pair that has now landed nothing for the window becomes one
+/// `trade_severed` (the receiver toward the shipper), every event is stamped with its subject's
 /// `alarm_toward` scale, and the whole batch goes through
 /// `apply_sentiment_events` once. The pending queue and accumulator are then
 /// cleared. Returns the number of events folded (before the substrate's own

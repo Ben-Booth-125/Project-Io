@@ -591,9 +591,9 @@ inline constexpr uint32_t world_save_magic =
 /// zero, ascending (observer, subject), as (observer, subject, f32 alarm) — each a row
 /// the sentiment map earlier in the stream holds; then the emitters' gathered conduct:
 /// a u32 count and each pending event in queue order as (observer, subject, u8 kind,
-/// f32 magnitude, f32 alarm scale); a u32 count and each (shipper, receiver, f32 value)
+/// f32 magnitude) - both nations; a u32 count and each (shipper, receiver, f32 value)
 /// of the trade landed since the last fold, ascending; and a u32 count and each
-/// (shipper, receiver) that traded at the last fold, ascending. From v68 the sentiment
+/// (shipper, receiver, u8 traded, u8 idle, u8 armed) trade streak, ascending. From v68 the sentiment
 /// map may hold a row whose Access and Trust are both zero (its Alarm is not).
 /// v67 is a STRICT PREFIX of v68 and is read too (`k_world_save_version_pre_alarm`), as
 /// a world where every Alarm is 0 and nothing is pending.
@@ -717,8 +717,8 @@ std::size_t world_save_books_section_bytes(const world& w);
 std::size_t world_save_battle_carry_section_bytes(const world& w);
 
 /// BL-1432 (v68): the bytes the Alarm / emitter section takes for @p w, the stream's
-/// LAST section - four counts, then 12 an Alarm row, 17 a pending event, 12 a landed
-/// pair and 8 a last-traded pair. For harnesses that address a section from the tail.
+/// LAST section - four counts, then 12 an Alarm row, 13 a pending event, 12 a landed
+/// pair and 11 a trade streak. For harnesses that address a section from the tail.
 std::size_t world_save_alarm_section_bytes(const world& w);
 
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the

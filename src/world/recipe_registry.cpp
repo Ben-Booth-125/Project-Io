@@ -1228,6 +1228,28 @@ void recipe_registry::load_from_lua(lua_state& lua)
                 sp.factors[i].access = row->get_or("access", sp.factors[i].access);
                 sp.factors[i].trust  = row->get_or("trust",  sp.factors[i].trust);
                 sp.factors[i].alarm  = row->get_or("alarm",  sp.factors[i].alarm); // BL-1432
+                // BL-1432: a factor emitted EVERY TICK (Alarm's capability factors)
+                // is authored as the Alarm it SETTLES AT per unit of magnitude, and
+                // its per-tick weight derived here as level x alarm_decay_per_tick:
+                // decay-then-fold has v = v(1 - r) + r L as its fixed point v = L, so
+                // retuning the decay keeps the authored level true. Rejected unless
+                // finite; authoring both keys on one row is refused as ambiguous.
+                const sol::object settles = (*row)["alarm_settles_at"];
+                if (settles.valid() && settles.get_type() != sol::type::lua_nil)
+                {
+                    const std::string at = std::string("economy.sentiment.factors.")
+                                         + sentiment_factor_names[i] + ".alarm_settles_at";
+                    if (settles.get_type() != sol::type::number)
+                        throw std::runtime_error(at + " is not a number");
+                    const double level = settles.as<double>();
+                    if (!std::isfinite(level) || std::fabs(level) > 1.0e6)
+                        throw std::runtime_error(at + " = " + std::to_string(level)
+                                                 + " is not a finite Alarm level");
+                    const sol::object direct = (*row)["alarm"];
+                    if (direct.valid() && direct.get_type() != sol::type::lua_nil)
+                        throw std::runtime_error(at + " and .alarm are both authored");
+                    sp.factors[i].alarm = static_cast<float>(level * sp.alarm_decay_per_tick);
+                }
             }
         }
 
