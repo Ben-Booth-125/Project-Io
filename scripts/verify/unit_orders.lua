@@ -5,7 +5,8 @@
 -- MOVE (green outline, "Right-click: move"); hovering another nation's stack
 -- previews an ATTACK (red, the battle glyph) or, toward a nation the player is
 -- not hostile to, DECLARE AND ATTACK (orange) — and a right-click there opens the
--- declare confirm instead of sending anything. A right-click on a plain tile
+-- Diplomacy ledger's declaration (ledgers/diplomacy.md § The declaration), the
+-- attacked province chosen, instead of sending anything. A right-click on a plain tile
 -- sends the march, and the unit then holds a movement order.
 --
 -- Aiming uses only UI state: the preview's own word (pointer_target().unit_order)
@@ -96,14 +97,17 @@ if theirs ~= nil then
         verify.click(p.x, p.y, "right")
         verify.frames(3)
         local cp = verify.pointer_target()
-        print("unit_orders: after right-click on a non-hostile stack confirm=" .. tostring(cp.order_confirm))
-        assert(cp.order_confirm, "the declare confirm did not open")
+        print("unit_orders: after right-click on a non-hostile stack declaration=" .. tostring(cp.order_confirm))
+        assert(cp.order_confirm, "the declaration did not open with the attack attached")
+        local dl = verify.diplomacy_ledger()
+        print("unit_orders: declaration open on " .. dl.declaring .. " with " .. dl.goals .. " goal(s) chosen")
+        assert(dl.goals >= 1, "the attacked province was not chosen as a goal")
         verify.capture("unit_orders_declare_confirm")
-        -- A left press elsewhere on the canvas closes it and sends nothing.
-        verify.click(p.x - 220, p.y - 160) -- up-left of the stack: the confirm sits down-right
+        -- Escape cancels it and sends nothing.
+        verify.press_escape()
         verify.frames(2)
-        assert(not verify.pointer_target().order_confirm, "a canvas press did not close the confirm")
-        print("unit_orders: confirm closed by a canvas press; nothing sent")
+        assert(not verify.pointer_target().order_confirm, "Escape did not close the declaration")
+        print("unit_orders: declaration cancelled by Escape; nothing sent")
     end
 else
     print("unit_orders: no foreign unit on the surface; the attack preview was not taken")
@@ -137,10 +141,8 @@ verify.mouse(-1, -1)
 verify.frames(2)
 verify.capture("unit_orders_marching")
 
--- 5. Declare and attack, through the confirm's own button. The button stands at
---    a fixed offset from the right-click point (the confirm opens 12 px down-right
---    of the cursor; its first button is one text line below the window's top) —
---    measured from unit_orders_declare_confirm.png at this font.
+-- 5. Declare and attack, through the declaration's own Declare press, at the
+--    point the Diplomacy ledger published.
 if theirs ~= nil then
     assert(verify.select_unit(mine.id), "select_unit refused")
     verify.center_tile(theirs.col, theirs.row, 10.0)
@@ -149,10 +151,24 @@ if theirs ~= nil then
     local kind = verify.pointer_target().unit_order
     verify.click(p.x, p.y, "right")
     verify.frames(3)
+    print("unit_orders: step 5 preview was '" .. kind .. "', declaration open="
+          .. tostring(verify.pointer_target().order_confirm))
     if kind == "declare" and verify.pointer_target().order_confirm then
-        verify.hover(p.x + 89, p.y + 51, 2)
-        verify.click(p.x + 89, p.y + 51)
-        verify.frames(3)
+        for _, pr in ipairs(verify.diplomacy_ledger().presses) do
+            if (pr.kind == "declare" or pr.kind == "answer") then
+                print("unit_orders: the declaration's " .. pr.kind .. " press at " .. pr.x .. "," .. pr.y
+                      .. " enabled=" .. tostring(pr.enabled) .. (pr.enabled and "" or (" (" .. pr.reason .. ")")))
+                if pr.enabled then
+                    verify.hover(pr.x, pr.y, 2)
+                    verify.click(pr.x, pr.y)
+                    verify.mouse(-1, -1)
+                    verify.frames(3)
+                end
+                break
+            end
+        end
+        print("unit_orders: after Declare, wars=" .. verify.diplomacy_ledger().wars
+              .. " message='" .. verify.diplomacy_ledger().message .. "'")
     end
     local hov = (function() verify.hover(p.x, p.y, 2); return verify.pointer_target().unit_order end)()
     local u = unit_by_id(mine.id)

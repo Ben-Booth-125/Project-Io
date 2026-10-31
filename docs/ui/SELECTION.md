@@ -510,7 +510,7 @@ every unit of the group, one command each in ascending id.
 |---|---|
 | Land, empty or holding the player's own units | **Move** — `march_unit` to the tile. |
 | Another nation's stack, toward which the player is hostile | **Attack** — the same march onto that tile; contact opens the battle (MILITARY.md § Battles). There is no attack verb. |
-| Another nation's stack, toward which the player is not hostile | **Declare and attack** — a confirm opens: *Declare hostility toward ‹nation› and attack?* with **Declare and attack** / **Cancel**. Confirming sends `declare_hostile`, then the march. |
+| Another nation's stack, toward which the player is not hostile | **Declare and attack** — the Diplomacy ledger's **declaration** opens (`ledgers/diplomacy.md` § The declaration) against that nation, with the attacked province already chosen as a goal. **Declare** there sends `declare_war` with the chosen goals (or `answer_war`, when that nation declared on the player and the player has not answered), then the march. |
 | Water, or the tile the units already stand on | Nothing. |
 
 **A unit assigned to a front is unassigned and obeys**: `assign_front` with a null tile goes first,
@@ -526,9 +526,10 @@ the battle glyph for an attack, orange for a declare — and a line at the curso
 **One status line reports the stack**: *3 marching*, *2 marching, 1 refused*, *2 attacking*. A
 refusal is the verb's own (`march_unit`'s preconditions) and mutates nothing for that unit.
 
-The confirm closes on **Cancel**, **Escape**, or any other press on the canvas, and sends nothing.
-It earns the second press because hostility is a stance every other surface reads, not just a
-position — the withdraw confirm's precedent (§ The battle element).
+The declaration closes on **Cancel** or **Escape** and sends nothing; while it is open a click on
+one of the target's provinces toggles it as a goal. It earns the second press because a war is a
+stance every other surface reads and carries a price with every other nation, not just a position —
+the player sees the goals, the justifications and the price before anything is sent.
 
 The unit card's **March** cell remains the two-step route: the press arms the pick, the next
 left-click on a land tile names the destination, with the same green outline.

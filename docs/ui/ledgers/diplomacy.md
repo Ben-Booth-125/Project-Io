@@ -1,7 +1,7 @@
 # Diplomacy — design Q&A
 
 > **Working design doc** for the ledger-mockup pass. Settled where marked; strawman elsewhere.
-> Menu slot: **rail slot 9**, under the Diplomacy glyph (`../MENU.md`) · Source: none yet ·
+> Menu slot: **rail slot 8**, under the Diplomacy glyph (`../MENU.md`) · Source: `src/ui/diplomacy_ledger.cpp` ·
 > Mock table(s): none yet.
 > Host: shell fold-out column, ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
@@ -15,7 +15,7 @@ Alarm (§ 6) and war (§ 7).
 **"Who could I fight, who might fight me, and what would it cost?"**
 
 It earns a rail slot under `../MENU.md` § Menus are broad ledgers: every nation is a row, and every
-war in the world is listed. Slot 9 held the corporation stance surface until the corporations retired
+war in the world is listed. This slot held the corporation stance surface until the corporations retired
 (Ben, 2026-10-23); this is its subject at the nation grain.
 
 **What it is NOT.** It does not answer "where are my units": the canvas and the unit cards do. It

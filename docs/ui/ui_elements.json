@@ -973,7 +973,7 @@
     "docs/ui/LAYOUT.md § Navigation pane",
     "src/ui/nav_pane.cpp"
    ],
-   "summary": "A fixed 56px-wide, full-height icon rail of twelve square slots (ten live, two reserved-dimmed: Corp. Strategy 7, Diplomacy 8), each toggling a fold-out ledger open/closed, accordion-style. The retired Acquisitions slot left the rail and every later slot moved up one (Ben, 2026-10-24).",
+   "summary": "A fixed 56px-wide, full-height icon rail of twelve square slots, each toggling a fold-out ledger open/closed, accordion-style: nine curated player slots (Nation overview, Budget, Construction, Research, Market, Convoys, Military 7, Diplomacy 8, History) and the three-slot developer tail. The retired Acquisitions slot left the rail and every later slot moved up one (Ben, 2026-10-24).",
    "interesting_question": "The doc states a standalone buildings-overview ledger was dropped as a rail slot because it 'proved more good-to-know than goal-driving' — what is the actual test the doc applies to decide any future slot?",
    "resolution": "Stated as an explicit test: MENU.md § Menus are broad ledgers gives it directly — 'is this a broad overview, or a targeted action? Broad → a ledger with a slot. Targeted → the Selection element / a popup, no slot.'",
    "checks": [
@@ -2000,7 +2000,7 @@
     "src/ui/body_surface_canvas.cpp",
     "src/core/app.cpp"
    ],
-   "summary": "With the player's own unit or group selected, the hovered land tile previews the order (green move, red attack, orange declare hostility and attack, with a line at the cursor) and a right-click sends it: a march for every unit, the attack on another nation's stack, or a confirm before declaring hostility. A front-assigned unit is unassigned first.",
+   "summary": "With the player's own unit or group selected, the hovered land tile previews the order (green move, red attack, orange declare and attack, with a line at the cursor) and a right-click sends it: a march for every unit, the attack on another nation's stack, or - toward a nation the player is not hostile to - the Diplomacy ledger's declaration with the attacked province chosen as a goal, whose Declare files the war and then the attack. A front-assigned unit is unassigned first.",
    "interesting_question": "One press, three meanings. Does the preview make the difference legible before the press, and does a stack report one honest line for many commands?",
    "resolution": "The preview is the hover's job and the press's meaning never differs from it (both read one resolver, resolve_unit_order). The stack's commands run in ascending id and report 'N marching' or 'N marching, M refused'.",
    "checks": [
@@ -2025,6 +2025,26 @@
    "resolution": "Yes, because a locked item stays fully readable - its stat change, its goods and the node that opens it - so the designer is where a player learns what military research would buy. Only the pick is refused, with the seam's own reason.",
    "checks": [
     "unit_designer"
+   ]
+  },
+  {
+   "id": "UI-133",
+   "name": "Diplomacy Ledger",
+   "kind": "ledger",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/diplomacy.md",
+    "docs/ui/MENU.md (slot 8)",
+    "docs/politics/RELATIONS.md § 7",
+    "src/ui/diplomacy_ledger.cpp",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "summary": "Rail slot 8, two tabs. Nations (default): one folded row per nation - stance chips you -> them and them -> you, and its Access / Trust / Alarm toward the player as signed bars with a four-tick trend arrow; expanding a row in place adds the player's bars toward it, reach / market share / GDP beside the player's, front strength, trade exposure, Offer / Withdraw / Accept friendship, the Embargo press and Declare war. Declare war turns the row into the declaration: the canvas outlines the target's provinces, a click toggles up to three goals, the justifications show holding or not and the price (Trust and Alarm, summed and per neighbour) follows the goals; Declare files declare_war, Cancel or Escape leaves no trace. Wars: every war, the player's first, with goals and holders, a centred score bar, exhaustion and days open; Answer, the peace composer (white or cession, Impose at 100), Accept / Refuse; then truces.",
+   "interesting_question": "Trend arrows and trade exposure both need a four-tick window, and the world keeps no history of either. Where does the window come from, and what does it show on the first tick a session watches?",
+   "resolution": "From a UI-side ring buffer, never saved: once per econ tick the ledger samples each pair's sentiment and notes which convoys landed between nations (a convoy seen in flight and gone at the next sample). Until two samples exist the bars carry no arrow and trade exposure reads 'No ticks watched yet', which is the honest answer rather than a zero.",
+   "checks": [
+    "diplomacy_ledger",
+    "unit_orders"
    ]
   }
  ]

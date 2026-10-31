@@ -123,6 +123,18 @@ inline constexpr ImU32 order_declare = IM_COL32(240, 150,  60, 240); ///< An att
 inline constexpr ImU32 air_assigned = IM_COL32(140, 150, 255, 235); ///< A province the selected wing flies over; its right-click assign preview.
 inline constexpr ImU32 air_refused  = IM_COL32(232,  84,  72, 240); ///< A right-click the seam would refuse (order_attack's red).
 
+// --- the declaration's goal picking (docs/ui/ledgers/diplomacy.md § The declaration) ---
+// A possible goal reads as the declare-and-attack's orange; a chosen one as the
+// attack's red, thicker, so "may be a goal" and "is a goal" never share a stroke.
+inline constexpr ImU32 war_goal_candidate = IM_COL32(240, 150,  60, 200); ///< One of the target's provinces: a possible goal.
+inline constexpr ImU32 war_goal_chosen    = IM_COL32(232,  84,  72, 255); ///< A goal the declaration names.
+
+// --- the Diplomacy ledger's sentiment bars (ledgers/diplomacy.md § Nations) ---
+// Access and Trust are good when positive (`positive` / `negative`); Alarm is bad
+// when positive, so it carries its own amber rather than borrowing green for a threat.
+inline constexpr ImU32 sentiment_alarm = IM_COL32(240, 160,  60, 255); ///< Alarm above zero.
+inline constexpr ImU32 sentiment_track = IM_COL32( 60,  64,  74, 255); ///< A bar's empty track and centre tick.
+
 // --- the placement lens (Ben, 2026-10-25; LENSES.md § The placement lens) ---
 // A site the chosen building may take, a site with no Logistic Points operating
 // (amber: it will build, but it will not run until a source reaches it), and the

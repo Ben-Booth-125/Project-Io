@@ -4,6 +4,7 @@
 #include "world/components.hpp"   // building_type / resource_type
 #include "world/corp_command.hpp" // corp_command — the seam the ledger presses queue onto
 #include "world/entity.hpp"
+#include "world/sentiment.hpp"    // sentiment_value — the Diplomacy ledger's trend samples
 
 #include <imgui.h>
 #include <array>
@@ -403,6 +404,111 @@ struct military_ledger_state
     struct drawn_wing { entity_id id = null_entity; float x = -1.0f, y = -1.0f; };
     std::vector<drawn_wing> wing_rows;     ///< Recruit's "Your wings" rows: each press selects the wing.
     std::vector<drawn_class> air_class_rows; ///< Design's Air rows (cls = air_class): each opens the designer.
+};
+
+/// The Diplomacy ledger's view state (rail slot 8; docs/ui/ledgers/diplomacy.md):
+/// the tab, the expanded row, the declaration flow, the peace composer, the queued
+/// presses app::render sends through `player_command`, two UI-side ring buffers,
+/// and where its controls landed this frame so a verify script presses the REAL
+/// control. VIEW state, never serialised.
+struct diplomacy_ledger_state
+{
+    /// 0 = Nations (default), 1 = Wars.
+    int       view = 0;
+    /// The nation whose row is expanded in place, or null. A toggle per row.
+    entity_id expanded = null_entity;
+    /// One-shot scroll requests: bring a just-expanded row's head, or a just-opened
+    /// declaration's head, to the top of the column so its content is not below
+    /// the fold. Consumed when drawn.
+    bool      scroll_to_row  = false;
+    bool      scroll_to_decl = false;
+
+    // ── THE DECLARATION (diplomacy.md § The declaration) ─────────────────────
+    /// Non-null while the declaration is open against this nation. The canvas
+    /// marks `goal_candidates` and toggles `goals` on a left-click while it is.
+    entity_id declare_target = null_entity;
+    /// True when the flow names goals for the player's ANSWER to a war declared on
+    /// it (the same picker over the declarer's provinces; Answer is free).
+    bool      declare_answer = false;
+    /// The target's provinces, ascending (every one a possible goal, its capital
+    /// included). Refreshed when the territory moves.
+    std::vector<uint32_t> goal_candidates;
+    std::uint64_t         candidates_generation = ~std::uint64_t{0};
+    /// The chosen goals, in pick order, at most `k_war_goals_max`.
+    std::vector<uint32_t> goals;
+    /// A right-click declare-and-attack opened this flow: the units and tile whose
+    /// attack Declare files after the declaration (app's unit-order block).
+    std::vector<entity_id> attack_units;
+    entity_id              attack_tile = null_entity;
+
+    // ── THE PEACE COMPOSER (Wars tab) ────────────────────────────────────────
+    /// The nation the composer is open against (a war the player is party to), or null.
+    entity_id             peace_with = null_entity;
+    /// Provinces the composer would have ceded: to the player (`peace_gain`) or
+    /// by the player (`peace_give`), ascending. One side at a time.
+    std::vector<uint32_t> peace_gain;
+    std::vector<uint32_t> peace_give;
+
+    /// Presses queued for app::render, which sends each through `player_command`
+    /// (declare_war, answer_war, the peace verbs, offer/accept friendship,
+    /// return_to_neutral) and words the result in `message`.
+    std::vector<corp_command> pending;
+    std::string               message;
+
+    // ── UI-SIDE HISTORY (not saved; the world keeps none) ─────────────────────
+    /// The econ tick last sampled; -1 = never.
+    int       sampled_tick = -1;
+    /// Sentiment per directed (observer, subject) pair, one sample per econ tick,
+    /// oldest first, at most 5 (now and four ticks back) — the trend arrows.
+    std::map<std::pair<entity_id, entity_id>, std::vector<sentiment_value>> trend;
+    /// Convoys seen in flight at the last sample: id -> (shipper nation, receiving
+    /// nation, value at the destination's price). One that is gone at the next
+    /// sample has landed (or was cut), and is counted into `landed`.
+    struct convoy_seen { entity_id from = null_entity, to = null_entity; float value = 0.0f; };
+    std::map<std::uint32_t, convoy_seen> convoys_seen;
+    /// Cargo value landed per directed (shipper, receiver) nation pair, one map per
+    /// econ tick, oldest first, at most 4 — the trade-exposure window.
+    std::vector<std::map<std::pair<entity_id, entity_id>, float>> landed;
+
+    /// Derived caches keyed on the world's territory generation (never saved).
+    std::uint64_t                   owners_generation = ~std::uint64_t{0};
+    std::map<uint32_t, entity_id>   province_owners;  ///< province -> political owner.
+    std::map<entity_id, int>        provinces_owned;  ///< nation -> provinces it owns.
+    /// GDP per nation per year, recomputed once per econ tick.
+    int                             gdp_tick = -1;
+    std::map<entity_id, double>     gdp_year;
+
+    // ── Published each frame the ledger draws (x < 0 = absent) ───────────────
+    float tab_x[2] = {-1.0f, -1.0f}, tab_y[2] = {-1.0f, -1.0f};
+    struct drawn_row
+    {
+        entity_id nation = null_entity;
+        float x = -1.0f, y = -1.0f;   ///< The row's expander.
+        bool  expanded = false;
+        bool  hostile_out = false, hostile_in = false, friends = false, at_war = false, truce = false;
+        float access = 0.0f, trust = 0.0f, alarm = 0.0f; ///< Their sentiment toward the player.
+    };
+    std::vector<drawn_row> rows;
+    /// One press drawn this frame: its kind ("declare_open", "declare", "cancel",
+    /// "offer_friendship", "withdraw", "accept_friendship", "embargo", "answer_open",
+    /// "answer", "peace_open", "offer_white", "offer_cession", "impose_white",
+    /// "impose_cession", "accept_peace", "refuse_peace"), the nation it acts on,
+    /// whether it is live, and why not.
+    struct drawn_press
+    {
+        std::string kind;
+        entity_id   nation = null_entity;
+        float       x = -1.0f, y = -1.0f;
+        bool        enabled = false;
+        std::string reason;
+    };
+    std::vector<drawn_press> presses;
+    /// The declaration as drawn: goals chosen, candidates marked, the summed price.
+    int   decl_goals = 0, decl_candidates = 0;
+    bool  decl_valid = false, decl_justified = false;
+    float decl_trust = 0.0f, decl_alarm = 0.0f;
+    int   decl_observers = 0;
+    int   war_rows = 0, truce_rows = 0;  ///< Wars tab rows drawn.
 };
 
 /// BL-1450: the wing card (SELECTION.md; military.md § Grouped by theatre) and the
@@ -966,6 +1072,10 @@ struct ui_state
     /// where the reserved Corp. Strategy stood. Recruit and Design tabs.
     bool show_military_ledger = false;
 
+    /// Whether the Diplomacy ledger is open — nav-rail slot 8 (Ben, 2026-10-30;
+    /// docs/ui/ledgers/diplomacy.md). Nations and Wars tabs.
+    bool show_diplomacy_ledger = false;
+
     // BL-1406: the Company ledger, its firm payload and the corporations table's
     // aimed row retired with the company and the corporation (Ben, 2026-10-23).
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
@@ -986,6 +1096,7 @@ struct ui_state
     /// The Military ledger (rail slot 7, Ben 2026-10-27; docs/ui/ledgers/military.md).
     /// See `military_ledger_state`.
     military_ledger_state military;
+    diplomacy_ledger_state diplomacy; ///< The Diplomacy ledger (rail slot 8; ledgers/diplomacy.md).
     unit_designer_state   designer; ///< The full-canvas unit designer (military.md § The designer).
     wing_ui_state         wing;         ///< BL-1450: the wing card and the canvas right-click assignment.
 
@@ -1326,13 +1437,14 @@ struct ui_state
     /// True when the order is an attack (another nation's stack on the tile):
     /// only the status line's wording reads it.
     bool      pending_unit_order_attack   = false;
+    /// The war goals a declare-and-attack names (diplomacy.md § The declaration:
+    /// the right-click opens the declaration with the attacked province chosen,
+    /// and Declare files these). Empty = the attacked tile's province alone.
+    std::vector<uint32_t> pending_unit_order_goals;
 
-    /// The declare-hostility confirm, open while `unit_order_confirm_nation` is
-    /// set: the order it would send, and where it stands on screen.
-    entity_id              unit_order_confirm_nation = null_entity;
-    entity_id              unit_order_confirm_tile   = null_entity;
-    std::vector<entity_id> unit_order_confirm_units;
-    ImVec2                 unit_order_confirm_pos{};
+    // The declare-hostility confirm RETIRED: a right-click attack on a nation the
+    // player is not hostile to opens the Diplomacy ledger's declaration instead
+    // (`diplomacy_ledger_state::attack_units` / `attack_tile` carry the attack).
 
     /// What a right-click on the hovered tile would do this frame — written by the
     /// canvas every frame, read by the verify API. 0 none, 1 move, 2 attack,

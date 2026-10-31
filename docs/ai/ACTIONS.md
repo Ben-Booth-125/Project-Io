@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*197 entries — 53 gameplay · 35 canvas · 16 lens · 60 ledger · 33 chrome.*
+*212 entries — 53 gameplay · 36 canvas · 16 lens · 74 ledger · 33 chrome.*
 
 ---
 
@@ -488,38 +488,53 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Never. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
 
-### `gameplay.offer_friendship` — RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
+### `gameplay.offer_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Offer friendship' press (ledger.diplomacy_offer_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
 
-**Press.** None. Over the command seam (--serve COMMAND, the MCP server, the live seam) the verb is REFUSED (rejected_invalid) before the seam, mutating nothing. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
+**Press.** Expand a nation's row in the Diplomacy ledger and press 'Offer friendship'.
 
-**Valid when:**
-- None can be met: every wire call is rejected (rejected_invalid) and mutates nothing.
-
-**Expected output.** rejected_invalid, always. BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired).
-
-**Reason to select.** Never. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
-
-### `gameplay.accept_friendship` — RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
-
-**Press.** None. Over the command seam (--serve COMMAND, the MCP server, the live seam) the verb is REFUSED (rejected_invalid) before the seam, mutating nothing. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id (nation)` | The nation offered friendship. |
 
 **Valid when:**
-- None can be met: every wire call is rejected (rejected_invalid) and mutates nothing.
+- The actor is the player nation.
+- The pair are not already friends, the actor is not hostile toward the counterparty, no identical offer is pending (rejected_state otherwise).
+- No war stands between the pair (the ledger disables the press: 'At war: only peace ends a war.').
 
-**Expected output.** rejected_invalid, always. BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired).
+**Expected output.** A PENDING offer is recorded (world::corp_friend_offers); it is not a friendship until the counterparty accepts. The row's you-chip reads 'Offer sent'; the ledger head reads 'Friendship offered to <nation>.'.
 
-**Reason to select.** Never. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
+**Reason to select.** Court a nation: an accepted friendship raises Access and Trust each way (friendship_accepted) and lowers Alarm.
 
-### `gameplay.return_to_neutral` — RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
+### `gameplay.accept_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Accept friendship' press, shown when that nation has offered (ledger.diplomacy_accept_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
 
-**Press.** None. Over the command seam (--serve COMMAND, the MCP server, the live seam) the verb is REFUSED (rejected_invalid) before the seam, mutating nothing. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
+**Press.** Expand the row of a nation whose them-chip reads 'Offer pending' and press 'Accept friendship'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id (nation)` | The nation whose offer is accepted. |
 
 **Valid when:**
-- None can be met: every wire call is rejected (rejected_invalid) and mutates nothing.
+- The counterparty has a pending friendship offer to the actor (rejected_state otherwise).
 
-**Expected output.** rejected_invalid, always. BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired).
+**Expected output.** The pair are friends (world::corp_friend_pairs) and the pending offer is cleared; friendship_accepted is conduct each way. Both chips read 'Friend'.
 
-**Reason to select.** Never. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
+**Reason to select.** Take a friendship offered: Access and Trust rise each way and Alarm falls.
+
+### `gameplay.return_to_neutral` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Withdraw' press, shown while a friendship or the player's own offer stands (ledger.diplomacy_withdraw). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
+
+**Press.** Expand the row of a nation you are friends with, or have offered friendship to, and press 'Withdraw'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id (nation)` | The nation. |
+
+**Valid when:**
+- Something stands to clear: the actor's hostility toward the counterparty, a friendship, or a pending offer either way (rejected_state otherwise).
+- No war stands between the pair (rejected_state; the ledger disables the press).
+
+**Expected output.** Clears the actor's own hostility toward the counterparty, the friendship between them and any pending offer either way, in one mutation. The ledger head reads 'Withdrawn.'.
+
+**Reason to select.** End a friendship or take back an offer.
 
 ### `gameplay.march_unit` — The unit card's March press in the Selection element (BL-575, unit marker + march UI, landed 2026-08-23 — BL-471 was the placeholder item name; this batch folded it in). Select a unit (its own on-canvas marker, BL-575, or the repeat-click cycle), press March. Also a corp_verb, so an agent issues it against the corp-command seam (ProjectIo --serve, COMMAND opcode) without going through the card.
 
@@ -862,9 +877,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Field better aircraft as research opens new airframes, weapons and avionics.
 
-### `gameplay.declare_war` — The right-click declare-and-attack (ledger.unit_order_declare_confirm) opens a war with the attacked tile's province as its first goal; the Diplomacy ledger's declaration (BL-1462) is its full surface. Also a corp_verb (corp_verb::declare_war, 47) on the command seam.
+### `gameplay.declare_war` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md): the declaration's 'Declare' press (ledger.diplomacy_declare), opened by the row's 'Declare war' (ledger.diplomacy_declare_open) or by a right-click attack on a nation the player is not hostile to (canvas.unit_right_click_attack), with the goals picked on the canvas (canvas.diplomacy_goal_pick). Also a corp_verb (corp_verb::declare_war, 47) on the command seam.
 
-**Press.** UI: confirm a right-click attack on a nation the player is not hostile to. Over the seam: COMMAND corp=<nation> nation=<nation> verb=47 counterparty=<nation> provinces=<id>[,<id>[,<id>]].
+**Press.** UI: open the declaration, click 1 to 3 of the target's provinces on the canvas, press 'Declare'. Over the seam: COMMAND corp=<nation> nation=<nation> verb=47 counterparty=<nation> provinces=<id>[,<id>[,<id>]].
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -882,7 +897,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Go to war for named ground: the goals are what the war score counts and what a peace can cede.
 
-### `gameplay.answer_war` — The right-click declare-and-attack by a nation already declared on and not yet answering sends this instead of declare_war; the Diplomacy ledger (BL-1462) is its full surface. Also a corp_verb (corp_verb::answer_war, 48) on the command seam.
+### `gameplay.answer_war` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md): the Wars tab's 'Answer' press on a war declared on the player (ledger.diplomacy_answer), or a right-click attack on the declarer, which opens the same goal picker. Also a corp_verb (corp_verb::answer_war, 48) on the command seam.
 
 **Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=48 counterparty=<declarer> provinces=<id>[,<id>[,<id>]].
 
@@ -900,7 +915,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Fight back for ground of your own once war is declared on you; until you answer you cannot attack.
 
-### `gameplay.offer_peace` — The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::offer_peace, 49) on the command seam.
+### `gameplay.offer_peace` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_offer_peace). A corp_verb (corp_verb::offer_peace, 49) on the command seam.
 
 **Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=49 counterparty=<nation> order=<0|1|2> [provinces=<id>,...].
 
@@ -921,7 +936,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** End a war on terms: white peace to stop the bleeding, or a cession of goals you hold.
 
-### `gameplay.accept_peace` — The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::accept_peace, 50) on the command seam.
+### `gameplay.accept_peace` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_accept_peace). A corp_verb (corp_verb::accept_peace, 50) on the command seam.
 
 **Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=50 counterparty=<offerer>.
 
@@ -938,7 +953,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Take the terms on the table.
 
-### `gameplay.refuse_peace` — The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::refuse_peace, 51) on the command seam.
+### `gameplay.refuse_peace` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_refuse_peace). A corp_verb (corp_verb::refuse_peace, 51) on the command seam.
 
 **Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=51 counterparty=<offerer>.
 
@@ -954,7 +969,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** The terms are not good enough.
 
-### `gameplay.impose_peace` — The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::impose_peace, 52) on the command seam.
+### `gameplay.impose_peace` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_impose_peace). A corp_verb (corp_verb::impose_peace, 52) on the command seam.
 
 **Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=52 counterparty=<nation> order=<0|1|2> [provinces=<id>,...].
 
@@ -1417,7 +1432,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `canvas.unit_right_click_attack` — The Planetary canvas, with the player's own unit or unit group selected, hovering another nation's stack (BL-1443; SELECTION.md § Right-click orders).
 
-**Press.** Hover a tile another nation's units stand on. Toward a nation the player is hostile to, it outlines red with the battle glyph and the cursor line reads 'Right-click: attack <nation>'; right-click it to march every unit of the selection onto that tile — the attack (the world opens the battle on contact; there is no attack verb). Toward a nation the player is not hostile to it outlines orange and reads 'Right-click: declare hostility and attack <nation>'; the right-click opens ledger.unit_order_declare_confirm instead of sending anything.
+**Press.** Hover a tile another nation's units stand on. Toward a nation the player is hostile to, it outlines red with the battle glyph and the cursor line reads 'Right-click: attack <nation>'; right-click it to march every unit of the selection onto that tile — the attack (the world opens the battle on contact; there is no attack verb). Toward a nation the player is not hostile to it outlines orange and reads 'Right-click: declare hostility and attack <nation>'; the right-click opens the Diplomacy ledger's declaration against that nation (ledger.diplomacy_declare_open), with the attacked tile's province already chosen as a goal (its capital province when the stack stands off its own ground) and the attack attached, instead of sending anything.
 
 **Valid when:**
 - The player's own unit is selected (its card), or the group of the player's units on one tile (the unit group element). A rival's unit or group, or no unit, orders nothing.
@@ -1425,7 +1440,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The March cell is not armed; placement mode and an armed road are off.
 - The march preconditions apply per unit (gameplay.march_unit).
 
-**Expected output.** Hostile target: each unit marches onto the tile (a front-assigned unit is unassigned once its march is accepted). Status line: 'N attacking', 'N attacking, M refused', or 'Can't attack there.'. Not hostile: the declare confirm opens.
+**Expected output.** Hostile target: each unit marches onto the tile (a front-assigned unit is unassigned once its march is accepted). Status line: 'N attacking', 'N attacking, M refused', or 'Can't attack there.'. Not hostile: the declaration opens with the attack attached; its 'Declare' (ledger.diplomacy_declare) first checks every unit's march read-only (march_check, reading the nation as hostile already) and declares nothing if none would be accepted, then sends declare_war with the chosen goals (answer_war when that nation declared on the player and the player has not answered), then the marches, in one frame. Cancel or Escape sends nothing.
 
 **Reason to select.** Attack an enemy stack directly from the map.
 
@@ -1494,6 +1509,22 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Issues gameplay.assign_air_mission {subject = wing, order = mission, provinces = the wing's list plus this one} at the frame's end through the player's seat. The wing card's list grows and the province is outlined; the card shows 'Mission assigned.', or the seam's refusal: 'Out of range.', 'Strategic bombing only over a nation you are hostile to.', 'Nothing to change.' or 'The wing can't fly that.'.
 
 **Reason to select.** Send a wing where it is needed: over a front for superiority, over an enemy's units or industry to bomb, over ground you want spotted.
+
+### `canvas.diplomacy_goal_pick` — The Planetary canvas while the Diplomacy ledger's declaration (or answer) is open: the target's provinces outlined orange, chosen goals red and thicker. A mode of the declaration, not a lens.
+
+**Press.** Hover one of the outlined provinces (the cursor line reads 'Click: make this province a goal', 'Click: remove this goal', or 'Three goals already: remove one first') and left-click it.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `province` | `the clicked province` | A province the target owns, its capital included. |
+
+**Valid when:**
+- The declaration or the answer picker is open.
+- The clicked province is one of the target's (any other click falls through to ordinary selection and leaves the declaration open).
+
+**Expected output.** Toggles the province as a goal, at most three; the click is consumed (no selection). The declaration's goal list, justifications and price update on the next frame. Nothing is sent.
+
+**Reason to select.** Name the ground the war is for: the goals are what the war score counts and what a peace can cede.
 
 ---
 
@@ -2428,19 +2459,6 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** A front does nothing without units on it: assigned units spread along the span, fill gaps and push when ordered.
 
-### `ledger.unit_order_declare_confirm` — The small confirm a right-click attack on a nation the player is not hostile to opens beside the cursor (BL-1443; SELECTION.md § Right-click orders).
-
-**Press.** It reads 'Declare hostility toward <nation> and attack?'. 'Declare and attack' first CHECKS every unit's march read-only (march_check, reading the nation as hostile already); if no unit's march would be accepted it declares nothing and the status reads 'Can't attack there.'. Otherwise it sends gameplay.declare_war toward the nation with the attacked tile's province as its one goal (the nation's capital province when the attacked stack stands off the nation's own ground) — or gameplay.answer_war when that nation has declared war on the player and the player has not answered — then the march of every unit of the selection onto the tile (as canvas.unit_right_click_attack), in that order in one frame. 'Cancel', Escape, or any other press on the canvas closes it and sends nothing.
-
-**Valid when:**
-- Opened by canvas.unit_right_click_attack on a nation the player is not hostile to.
-- At least one unit's march would be accepted (gameplay.march_unit's preconditions, the nation read as hostile); else nothing is sent.
-- declare_war's (or answer_war's) own preconditions apply — a truce, for one, refuses it; if it is refused and the player is not hostile, no march is sent.
-
-**Expected output.** A war is open (or answered) and the player is hostile toward the nation (every stance surface reads it), and the units march onto the tile. Status line as canvas.unit_right_click_attack, or "Couldn't declare war — a truce stands, or a war is already open." / "Couldn't declare war.".
-
-**Reason to select.** Start a war with a nation by attacking its stack — with a deliberate second press, since a declaration is priced and public.
-
 ### `ledger.military_theatre_header` — Military ledger (nav rail slot 7), Recruit and Design tabs: the collapsible theatre headers 'Land (N)' and 'Air (N)' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes).
 
 **Press.** Click a header to fold its rows; click it again to unfold them (the toggle rule). Each tab keeps its own folds; both open by default.
@@ -2545,6 +2563,232 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Issues gameplay.assign_air_mission with the rest of the list on the same mission; removing the last one stands the wing down, the mission staying held on the card for the next right-click.
 
 **Reason to select.** Pull a wing back off a province, or make room under the eight-province cap.
+
+### `ledger.nav_diplomacy` — Nav rail, slot 8 (the Diplomacy glyph), after Military.
+
+**Press.** Click the Diplomacy glyph on the left icon rail.
+
+**Valid when:**
+- In-game
+
+**Expected output.** Toggles the Diplomacy ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Nations (default) and Wars; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change (ledger.diplomacy_tab). NATIONS: one folded row per nation holding ground, hostile first then by Alarm toward you - its colour swatch and name, an 'At war' or 'Truce' chip, the stance chips you -> them (Hostile, Friend, Offer sent, Neutral) and them -> you (Hostile, Friend, Offer pending, Neutral), and its Access, Trust and Alarm toward you as signed bars over [-100, 100] with the figure and a trend arrow over the last four ticks (green when the move is good for you; Alarm's bar is amber above zero). Hovering a bar shows the value, its band (adverse, wary, neutral, favourable, trusted), the four-tick change and the war that links the pair, if any (the open war, else the last one). A row's expander opens it in place (ledger.diplomacy_expand_row). Closing the ledger by any path closes an open declaration without effect. Explanation is a tooltip: a disabled press says why on hover.
+
+**Reason to select.** Answers 'who could I fight, who might fight me, and what would it cost?'. Read it before declaring war, and to see who is alarmed by you.
+
+### `ledger.diplomacy_tab` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the 'Nations' / 'Wars' tab strip.
+
+**Press.** Click 'Nations' or 'Wars'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tab` | `enum (nations|wars)` | The view. |
+
+**Valid when:**
+- The Diplomacy ledger is open.
+
+**Expected output.** Switches the view; re-clicking the active tab closes the ledger. WARS: every open war in the world, the player's first - 'declarer vs defender', days since it opened, the war score as a centred bar from the declarer's side (half occupation of its goals, half battles), each side's goals with who holds each, 'not yet answered' for an unanswered defender, and each side's exhaustion. On the player's wars: Answer (ledger.diplomacy_answer), the peace presses (ledger.diplomacy_offer_peace / ledger.diplomacy_impose_peace), or a pending offer's terms with Accept / Refuse. Then every standing truce with its ticks left.
+
+**Reason to select.** Wars answers 'who is fighting whom, and how is each war going?'; Nations is the default.
+
+### `ledger.diplomacy_expand_row` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, a row's expander at its right edge (a down caret, an up caret while open).
+
+**Press.** Click a nation row's expander.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The row. |
+
+**Valid when:**
+- The Diplomacy ledger is open on Nations.
+
+**Expected output.** Toggles the row open in place (one row at a time; re-press folds it, and folding a row closes its declaration without effect). Expanded: your Access / Trust / Alarm toward them (the same bars); Power - their reach (bodies with a building), market share and GDP a year beside yours (public figures; a rival's treasury is never shown); front strength - the summed unit strength each side stands on the fronts you share, or 'no border'; trade exposure - the share of your imports landed from them and of your exports landed to them over the last four ticks this session watched ('No ticks watched yet' before two samples); the friendship press (ledger.diplomacy_offer_friendship, ledger.diplomacy_withdraw or ledger.diplomacy_accept_friendship); the Embargo press (ledger.diplomacy_embargo); and Declare war (ledger.diplomacy_declare_open) - or, at war, the war score from your side with 'Offer peace', which opens the Wars tab's composer for that war.
+
+**Reason to select.** Weigh a nation before acting on it: how it feels about you and you about it, what you would face, and what a war would cut.
+
+### `ledger.diplomacy_declare_open` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Declare war' press. The canvas right-click attack on a nation the player is not hostile to opens the same declaration (canvas.unit_right_click_attack).
+
+**Press.** Expand a nation's row and press 'Declare war'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The target. |
+
+**Valid when:**
+- No war stands between you (the row shows the score and Offer peace instead).
+- No truce stands (the press is disabled: 'A truce stands for N more ticks.').
+
+**Expected output.** The row turns into THE DECLARATION in place: 'Declare war on <nation>'; Goals (n of 3) with each chosen province named by the population centre it holds and an x to remove it; Justifications - Grievance, Embargo, Lost ground, Friend attacked - each marked holding (+, green) or not (-); the Price - the Trust every other nation loses toward you and the Alarm it gains, summed ('Justified: the price is halved.' when one holds); then the Declare and Cancel presses (ledger.diplomacy_declare, ledger.diplomacy_cancel), placed under the sum so they stay on screen at the 1280x720 floor; then a table of Trust and Alarm per nation - the target first ('(target)'), then neighbours ('*', twice the weight) and the largest, six shown and 'and N more'. The price is war.hpp's declaration_price, exactly what declare_war charges, recomputed as goals change. While it is open the canvas outlines every province of the target in orange and the chosen ones in red, thicker (canvas.diplomacy_goal_pick); the column scrolls the declaration's head to its top. Sends nothing.
+
+**Reason to select.** See what a war would cost before it is declared.
+
+### `ledger.diplomacy_declare` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the declaration's 'Declare' press.
+
+**Press.** With 1 to 3 goals chosen, press 'Declare'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The target. |
+| `goals` | `1 to 3 province ids` | The goals chosen on the canvas. |
+
+**Valid when:**
+- At least one goal (disabled otherwise: 'Choose at least one goal on the map.').
+- The declaration would be accepted - declaration_price is valid (disabled otherwise: 'A truce stands.', 'A war already stands between you.' or 'The declaration would be refused.').
+
+**Expected output.** Issues gameplay.declare_war with the chosen goals and closes the declaration. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head. Landed: 'War declared on <nation>.', the row reads At war with the score, and the Wars tab lists the war. Opened by a right-click attack, it instead files the unit-order request: every march is checked first, then declare_war (or answer_war) with these goals, then the marches (canvas.unit_right_click_attack).
+
+**Reason to select.** Go to war for named ground, having seen the price.
+
+### `ledger.diplomacy_cancel` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the declaration's 'Cancel' press; Escape does the same.
+
+**Press.** Press 'Cancel', or Escape.
+
+**Valid when:**
+- The declaration or the answer picker is open.
+
+**Expected output.** Closes it with no effect: no goal kept, no attack filed, nothing sent; the canvas outlines go. Escape takes this rung before the system menu.
+
+**Reason to select.** Back out of a declaration.
+
+### `ledger.diplomacy_offer_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Offer friendship' press (neither friends nor an offer either way).
+
+**Press.** Press 'Offer friendship'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The row. |
+
+**Valid when:**
+- Not at war ('At war: only peace ends a war.') and not hostile toward them ('You are hostile toward them.') - the press is disabled with that reason.
+
+**Expected output.** Issues gameplay.offer_friendship. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head.
+
+**Reason to select.** Court a nation.
+
+### `ledger.diplomacy_withdraw` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Withdraw' press (you are friends, or your offer is pending).
+
+**Press.** Press 'Withdraw'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The row. |
+
+**Valid when:**
+- Not at war (disabled: 'At war: only peace ends a war.').
+
+**Expected output.** Issues gameplay.return_to_neutral, ending the friendship or taking back the offer. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head.
+
+**Reason to select.** End a friendship or take back an offer.
+
+### `ledger.diplomacy_accept_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Accept friendship' press (they have offered).
+
+**Press.** Press 'Accept friendship'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The row. |
+
+**Valid when:**
+- Their offer is pending.
+
+**Expected output.** Issues gameplay.accept_friendship. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head.
+
+**Reason to select.** Take a friendship offered.
+
+### `ledger.diplomacy_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Embargo' press - a door onto the embargo law (RELATIONS.md § 3).
+
+**Press.** Press 'Embargo'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The row. |
+
+**Valid when:**
+- None can be met: the embargo law has no verb, so the press is always disabled; its tooltip reads 'Embargo law not yet available'.
+
+**Expected output.** Nothing. When the law verb exists the press enacts or repeals the embargo law against this nation, and is a toggle (Embargo / Lift).
+
+**Reason to select.** Never, for now.
+
+### `ledger.diplomacy_answer` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Answer' on a war declared on the player that it has not answered.
+
+**Press.** Press 'Answer', click 1 to 3 of the declarer's provinces on the canvas (canvas.diplomacy_goal_pick), then press the picker's 'Answer'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The declarer. |
+| `goals` | `1 to 3 province ids` | The declarer's provinces you name as goals. |
+
+**Valid when:**
+- The war is unanswered.
+- At least one goal (the picker's Answer is disabled otherwise).
+
+**Expected output.** The first press opens the goal picker in place ('Answer <nation>', 'Answering is free.'); the second issues gameplay.answer_war with the goals. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head. Landed: 'You answered <nation>.'. Cancel or Escape closes the picker without effect.
+
+**Reason to select.** Fight back for ground of your own: until you answer you have no goals and no hostility toward the declarer.
+
+### `ledger.diplomacy_offer_peace` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to with no offer pending: 'Offer peace' opens the composer; 'Offer white peace' and 'Offer cession' send.
+
+**Press.** Press 'Offer peace'. Then either press 'Offer white peace', or tick provinces under 'They cede to you' (your goals you hold that are still theirs) or 'You cede to them' (their goals they hold that are still yours) - one side at a time, at most three - and press 'Offer cession'. 'Close' shuts the composer.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The other party. |
+| `terms` | `white | cession(provinces, to you or to them)` | The terms. |
+
+**Valid when:**
+- A province that would be the loser's last is disabled ('It would be the loser's last province: a last province is never ceded.').
+- Offer cession is disabled until the ticked terms are legal (check_peace_terms; 'Tick the provinces to be ceded.' / 'Those terms are not legal now.').
+
+**Expected output.** Issues gameplay.offer_peace (order 0 white, 1 cession to you, 2 cession to them). The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head. The war then shows 'Your offer stands: <terms>.'.
+
+**Reason to select.** End a war: only peace ends one.
+
+### `ledger.diplomacy_impose_peace` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war whose score stands at 100 in the player's favour: 'Impose peace' replaces 'Offer peace'; 'Impose white peace' and 'Impose cession' send.
+
+**Press.** As ledger.diplomacy_offer_peace, with Impose in place of Offer.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The other party. |
+| `terms` | `white | cession` | The terms. |
+
+**Valid when:**
+- The war score stands at 100 from your side.
+- As ledger.diplomacy_offer_peace.
+
+**Expected output.** Issues gameplay.impose_peace: the peace concludes on your terms without acceptance. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head.
+
+**Reason to select.** Take what the war has won.
+
+### `ledger.diplomacy_accept_peace` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Accept' under a peace offer the other party made ('<nation> offers <terms>.').
+
+**Press.** Press 'Accept'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The offerer. |
+
+**Valid when:**
+- Their offer is pending.
+
+**Expected output.** Issues gameplay.accept_peace; the war closes on its terms (refused if they no longer hold). The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head.
+
+**Reason to select.** Take the peace offered.
+
+### `ledger.diplomacy_refuse_peace` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Refuse' under a peace offer the other party made.
+
+**Press.** Press 'Refuse'.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `nation` | `entity_id (nation)` | The offerer. |
+
+**Valid when:**
+- Their offer is pending.
+
+**Expected output.** Issues gameplay.refuse_peace; the offer is erased and the war goes on. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head.
+
+**Reason to select.** Fight on for better terms.
 
 ---
 

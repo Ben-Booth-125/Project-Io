@@ -132,13 +132,13 @@ alphabetical order.
 
 *Demanded by BL-407 · `src/ui/decision_feed.cpp` · id `decision_feed`*
 
-### Diplomacy ledger (nav rail slot 9): Nations and Wars tabs
+### Diplomacy ledger (nav rail slot 8): Nations and Wars tabs, and the declaration in place with its goal picking on the canvas
 
 **Answers:** Who could I fight, who might fight me, and what would it cost?
 
-**Because:** A war is now a declared act with a price, goals, a score and a peace (RELATIONS.md § 7), and sentiment informs a declaration without ever making one - so the player must be able to read every input the declaration weighs. Sentiment, Alarm, stance, power, front strength and trade exposure sit on one row per nation, because a declaration is a choice about one nation; the Wars tab lists every war in the world, because every declaration is public (Ben, 2026-10-30). A cost the player cannot watch is a gotcha, not a trade-off (RELATIONS.md § 6). Slot 9 held the corporation stance surface until the corporations retired (Ben, 2026-10-23); this is its subject at the nation grain (docs/ui/ledgers/diplomacy.md).
+**Because:** A war is now a declared act with a price, goals, a score and a peace (RELATIONS.md § 7), and sentiment informs a declaration without ever making one - so the player must be able to read every input the declaration weighs. Sentiment, Alarm, stance, power, front strength and trade exposure sit on one row per nation, because a declaration is a choice about one nation; the Wars tab lists every war in the world, because every declaration is public (Ben, 2026-10-30). A cost the player cannot watch is a gotcha, not a trade-off (RELATIONS.md § 6). The folded row is the verdict - stance chips both ways and the three bars toward the player with a four-tick trend arrow - and expanding it in place adds the reverse bars, the public power figures (reach, market share, GDP; never a treasury), front strength, trade exposure and the presses, so a dozen nations scan in one column. The declaration opens in place rather than as a dialog because its goals are picked on the map: the canvas marks the target's provinces while it is open, and the price and justifications follow the goals before anything is sent; the right-click declare-and-attack opens the same declaration with the attacked province chosen, so there is one way to start a war, never a blind one. This rail slot held the corporation stance surface until the corporations retired (Ben, 2026-10-23); this is its subject at the nation grain (docs/ui/ledgers/diplomacy.md).
 
-*Demanded by BL-1462 · `src/ui/diplomacy_ledger.cpp`, `src/ui/nav_pane.cpp` · id `diplomacy_ledger`*
+*Demanded by BL-1462 · `src/ui/diplomacy_ledger.cpp`, `src/ui/nav_pane.cpp`, `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp` · id `diplomacy_ledger`*
 
 ### Entity summary
 

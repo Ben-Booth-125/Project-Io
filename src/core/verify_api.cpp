@@ -1790,7 +1790,11 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             static const char* k_order[] = { "none", "move", "attack", "declare" };
             const int ok = m_ui.unit_order_hover;
             out["unit_order"]     = std::string((ok >= 0 && ok <= 3) ? k_order[ok] : "none");
-            out["order_confirm"]  = (m_ui.unit_order_confirm_nation != null_entity);
+            // The declare-and-attack opens the Diplomacy ledger's declaration with
+            // the attack attached (ledgers/diplomacy.md § The declaration); the old
+            // one-line confirm retired, and this key names its successor.
+            out["order_confirm"]  = (m_ui.diplomacy.declare_target != null_entity
+                                     && !m_ui.diplomacy.attack_units.empty());
             out["status_message"] = m_ui.construction.last_message;
         }
         // THE TWO NON-ENTITY STRUCTURE CHANNELS (BL-664). `selection_kind` above
@@ -1860,6 +1864,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // (NR-716 is exactly this blindness one level up).
             else if (m_ui.show_convoys_ledger)      panel = "convoys";
             else if (m_ui.show_military_ledger)     panel = "military"; // slot 7
+            else if (m_ui.show_diplomacy_ledger)    panel = "diplomacy"; // slot 8
             else if (m_ui.show_generation_ledger)   panel = "generation_ledger";
             else if (m_ui.show_decision_feed)       panel = "decisions";
             else if (m_ui.show_strategy_readout)    panel = "strategy";
@@ -3015,6 +3020,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // the pairing asserts it through the rail press instead.
         else if (name == "convoys")      m_ui.show_convoys_ledger = open;
         else if (name == "military")     m_ui.show_military_ledger = open; // slot 7
+        else if (name == "diplomacy")    m_ui.show_diplomacy_ledger = open; // slot 8
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         // "build" is the tile-selection BUILD BAR, which is a section of the
@@ -3066,6 +3072,65 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // live, the price and the reason it is not), the muster rows drawn, and the
     // hire seam's last answer. Everything here is on screen already; a script
     // presses the REAL control at the published point.
+    // The Diplomacy ledger (slot 8; ledgers/diplomacy.md) reporting what it drew:
+    // its tabs, each nation row (its expander's point, the stance flags its chips
+    // show and the three sentiment figures its bars show), every press drawn (its
+    // kind, nation, point, whether it is live and the tooltip reason when not),
+    // the declaration as drawn (goals chosen, provinces marked, the price's sums)
+    // and the Wars tab's row counts. Everything here is on screen already; a
+    // script presses the REAL control at the published point.
+    v.set_function("diplomacy_ledger", [this]() {
+        sol::state& st = m_lua.state();
+        const auto& d = m_ui.diplomacy;
+        sol::table out = st.create_table();
+        out["open"]           = m_ui.show_diplomacy_ledger;
+        out["view"]           = d.view;
+        out["tab_nations_x"]  = d.tab_x[0];
+        out["tab_nations_y"]  = d.tab_y[0];
+        out["tab_wars_x"]     = d.tab_x[1];
+        out["tab_wars_y"]     = d.tab_y[1];
+        out["expanded"]       = static_cast<unsigned>(d.expanded);
+        out["declaring"]      = static_cast<unsigned>(d.declare_target);
+        out["answering"]      = d.declare_answer;
+        out["attack_attached"] = !d.attack_units.empty();
+        out["goals"]          = d.decl_goals;
+        out["candidates"]     = d.decl_candidates;
+        out["price_valid"]    = d.decl_valid;
+        out["justified"]      = d.decl_justified;
+        out["price_trust"]    = d.decl_trust;
+        out["price_alarm"]    = d.decl_alarm;
+        out["observers"]      = d.decl_observers;
+        out["war_rows"]       = d.war_rows;
+        out["truce_rows"]     = d.truce_rows;
+        out["wars"]           = static_cast<int>(m_world.wars.size());
+        out["message"]        = d.message;
+        out["peace_with"]     = static_cast<unsigned>(d.peace_with);
+        sol::table rows = st.create_table();
+        int k = 0;
+        for (const auto& r : d.rows)
+        {
+            sol::table e = st.create_table();
+            e["nation"] = static_cast<unsigned>(r.nation);
+            e["x"] = r.x; e["y"] = r.y; e["expanded"] = r.expanded;
+            e["hostile_out"] = r.hostile_out; e["hostile_in"] = r.hostile_in;
+            e["friends"] = r.friends; e["at_war"] = r.at_war; e["truce"] = r.truce;
+            e["access"] = r.access; e["trust"] = r.trust; e["alarm"] = r.alarm;
+            rows[++k] = e;
+        }
+        out["rows"] = rows;
+        sol::table presses = st.create_table();
+        k = 0;
+        for (const auto& p : d.presses)
+        {
+            sol::table e = st.create_table();
+            e["kind"] = p.kind; e["nation"] = static_cast<unsigned>(p.nation);
+            e["x"] = p.x; e["y"] = p.y; e["enabled"] = p.enabled; e["reason"] = p.reason;
+            presses[++k] = e;
+        }
+        out["presses"] = presses;
+        return out;
+    });
+
     v.set_function("military_ledger", [this]() {
         sol::state& st = m_lua.state();
         const auto& m = m_ui.military;
@@ -3490,6 +3555,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (name == "market")        m_ui.market_ledger_view = view;
         else if (name == "tech_tree")     m_ui.tech_tree_view = view;   // 0 = Inspect, 1 = Plan (BL-1276)
         else if (name == "military")      m_ui.military.view = view;    // 0 = Recruit, 1 = Design
+        else if (name == "diplomacy")     m_ui.diplomacy.view = view;   // 0 = Nations, 1 = Wars
     });
 
     // The research panel (BL-1276). `tech_tree_node(id)` answers the screen
@@ -3609,6 +3675,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         // above made the names worth checking against the actual call sites.
         else if (name == "construction")         target = "Construction";
         else if (name == "military")             target = "Military"; // slot 7: foldout_begin("Military")
+        else if (name == "diplomacy")            target = "##diplomacy_body"; // slot 8: its body scrolls in this child
         // The tile's building list scrolls in its own child (BL-1255: the rail
         // rows sit at the road ladder's foot and inside Infrastructure).
         else if (name == "build_list")           target = "##build_list";

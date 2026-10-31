@@ -8,9 +8,9 @@
 
 ## Headline
 
-**114 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**115 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**53 of 114 elements can be changed without any check going red.**
+**54 of 115 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
@@ -19,7 +19,7 @@ and so is the safety net.
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
 | **ASSERTED** | 58 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 12 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 33 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **CAPTURE-ONLY** | 34 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -110,7 +110,7 @@ and so is the safety net.
 | `UI-116` History Ledger (Story/Chain/Ages/Tectonics) > Ages view | view | `ages_replay` | 0 | 1 | 0 |
 | `UI-115` History Ledger (Story/Chain/Ages/Tectonics) > Tectonics view | view | `ledger_pass` | 0 | 1 | 0 |
 
-## CAPTURE-ONLY (33)
+## CAPTURE-ONLY (34)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -147,6 +147,7 @@ and so is the safety net.
 | `UI-129` Planetary Canvas > Front line | sub-element | `fronts` | 0 | 0 | 1 |
 | `UI-130` Selection band > Front card | sub-element | `fronts` | 0 | 0 | 1 |
 | `UI-131` Planetary Canvas > Right-click unit orders | control | `unit_orders` | 0 | 0 | 6 |
+| `UI-133` Diplomacy Ledger | ledger | `diplomacy_ledger`, `unit_orders` | 0 | 0 | 9 |
 
 ## NONE (8)
 

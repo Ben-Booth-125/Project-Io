@@ -61,6 +61,7 @@ void close_all_panels(ui_state& state)
     state.show_market_ledger     = false;
     state.show_convoys_ledger    = false; // Convoys ledger (BL-689), slot 6
     state.show_military_ledger   = false; // Military ledger, slot 7 (Ben, 2026-10-27)
+    state.show_diplomacy_ledger  = false; // Diplomacy ledger, slot 8 (Ben, 2026-10-30)
     state.show_construction_panel = false;
     state.show_tile_ledger       = false;
     state.show_generation_ledger = false;
@@ -79,7 +80,7 @@ bool any_panel_open(const ui_state& state)
     return state.show_corporation_panel ||
            state.show_balance_ledger    ||
            state.show_market_ledger     || state.show_convoys_ledger ||
-           state.show_military_ledger   ||
+           state.show_military_ledger   || state.show_diplomacy_ledger ||
            state.show_construction_panel ||
            state.show_tile_ledger       ||
            state.show_generation_ledger || state.show_tech_tree ||
@@ -124,12 +125,10 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // NINE curated slots from MENU.md § Menu set and ordering, then a
     // three-slot developer/observability tail (10-12). The tail is the foot of
     // the rail; nothing is appended below it.
-    // Live slots toggle their panel. Diplomacy is the one still-disabled
-    // slot, and it carries its OWN glyph so the rail teaches the shape of the
-    // game rather than showing a row of identical blanks (BL-174). Research and
-    // Diplomacy are unbuilt subjects whose slots provisionally host a homeless
-    // surface — the tech-tree mock (BL-310) and the corporations table (NR-012)
-    // — keeping their real subject's name and glyph.
+    // Live slots toggle their panel, and every slot carries its OWN glyph so the
+    // rail teaches the shape of the game rather than showing a row of identical
+    // blanks (BL-174). Research provisionally hosts a homeless surface — the
+    // tech-tree mock (BL-310) — keeping its real subject's name and glyph.
     //
     // BL-174 dropped a disabled placeholder that had no glyph and no tooltip, so
     // it was pure noise a new player could not interpret.
@@ -345,12 +344,16 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // ledger's profitability fold-out, which is why this could stop being a
         // balance table at all.
         // BL-1406: the corporation stance table retired with the corporation
-        // (ledgers/corporation.md § Slot 8, retired); Diplomacy is reserved again.
+        // (ledgers/corporation.md § Slot 8, retired). The slot is live again under
+        // the nation-grain Diplomacy ledger (Ben, 2026-10-30; ledgers/diplomacy.md):
+        // Nations and Wars. No lens on open (§ 3).
         case 8:
-            ImGui::BeginDisabled();
-            ImGui::Selectable(id, false, 0, {slot_size, slot_size});
-            ImGui::EndDisabled();
-            slot_tooltip("Diplomacy", "Where your nation stands with the others.", true);
+            if (ImGui::Selectable(id, state.show_diplomacy_ledger, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_diplomacy_ledger;
+                close_all_panels(state);
+                state.show_diplomacy_ledger = !was_open;
+            }
+            slot_tooltip("Diplomacy", "Who you could fight, who might fight you, and what it would cost.", false);
             break;
         case 9: // History (Tile Ledger lives here per MENU.md renaming)
             if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size})) {
@@ -427,7 +430,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // the building it raises force at share a silhouette (MENU.md § The tail).
         case 7: icons::building(dl, centre, r, building_type::military_base, resource_type::iron_ore,
                                 lit(state.show_military_ledger));                break;  // Military
-        case 8: icons::diplomacy(dl, centre, r, dim); break;  // Diplomacy (reserved, BL-1406)
+        case 8: icons::diplomacy(dl, centre, r, lit(state.show_diplomacy_ledger)); break;  // Diplomacy
         case 9: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
         // The plate glyph: this ledger's subject is the generated ground itself,
         // and the Continent lens already teaches that shape as "how the surface

@@ -535,15 +535,15 @@
   ],
   [
    "gameplay.offer_friendship",
-   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Offer friendship' press (ledger.diplomacy_offer_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing."
   ],
   [
    "gameplay.accept_friendship",
-   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Accept friendship' press, shown when that nation has offered (ledger.diplomacy_accept_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing."
   ],
   [
    "gameplay.return_to_neutral",
-   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Withdraw' press, shown while a friendship or the player's own offer stands (ledger.diplomacy_withdraw). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing."
   ],
   [
    "gameplay.march_unit",
@@ -702,10 +702,6 @@
    "The Planetary canvas, with the player's own unit or unit group selected, hovering another nation's stack (BL-1443; SELECTION.md § Right-click orders)."
   ],
   [
-   "ledger.unit_order_declare_confirm",
-   "The small confirm a right-click attack on a nation the player is not hostile to opens beside the cursor (BL-1443; SELECTION.md § Right-click orders)."
-  ],
-  [
    "gameplay.hire_wing",
    "The Military ledger's air rows (nav rail slot 7, Recruit tab, under the Air header; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too."
   ],
@@ -719,27 +715,27 @@
   ],
   [
    "gameplay.declare_war",
-   "The right-click declare-and-attack (ledger.unit_order_declare_confirm) opens a war with the attacked tile's province as its first goal; the Diplomacy ledger's declaration (BL-1462) is its full surface. Also a corp_verb (corp_verb::declare_war, 47) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md): the declaration's 'Declare' press (ledger.diplomacy_declare), opened by the row's 'Declare war' (ledger.diplomacy_declare_open) or by a right-click attack on a nation the player is not hostile to (canvas.unit_right_click_attack), with the goals picked on the canvas (canvas.diplomacy_goal_pick). Also a corp_verb (corp_verb::declare_war, 47) on the command seam."
   ],
   [
    "gameplay.answer_war",
-   "The right-click declare-and-attack by a nation already declared on and not yet answering sends this instead of declare_war; the Diplomacy ledger (BL-1462) is its full surface. Also a corp_verb (corp_verb::answer_war, 48) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md): the Wars tab's 'Answer' press on a war declared on the player (ledger.diplomacy_answer), or a right-click attack on the declarer, which opens the same goal picker. Also a corp_verb (corp_verb::answer_war, 48) on the command seam."
   ],
   [
    "gameplay.offer_peace",
-   "The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::offer_peace, 49) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_offer_peace). A corp_verb (corp_verb::offer_peace, 49) on the command seam."
   ],
   [
    "gameplay.accept_peace",
-   "The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::accept_peace, 50) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_accept_peace). A corp_verb (corp_verb::accept_peace, 50) on the command seam."
   ],
   [
    "gameplay.refuse_peace",
-   "The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::refuse_peace, 51) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_refuse_peace). A corp_verb (corp_verb::refuse_peace, 51) on the command seam."
   ],
   [
    "gameplay.impose_peace",
-   "The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::impose_peace, 52) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to (ledger.diplomacy_impose_peace). A corp_verb (corp_verb::impose_peace, 52) on the command seam."
   ],
   [
    "gameplay.set_embargo",
@@ -788,6 +784,70 @@
   [
    "ledger.selection_wing_remove_province",
    "Selection band, the wing card's 'Provinces' column: one row per assigned province (its population centre's name, or 'Province N', and who holds it) with an 'x' press."
+  ],
+  [
+   "ledger.nav_diplomacy",
+   "Nav rail, slot 8 (the Diplomacy glyph), after Military."
+  ],
+  [
+   "ledger.diplomacy_tab",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the 'Nations' / 'Wars' tab strip."
+  ],
+  [
+   "ledger.diplomacy_expand_row",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, a row's expander at its right edge (a down caret, an up caret while open)."
+  ],
+  [
+   "ledger.diplomacy_declare_open",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Declare war' press. The canvas right-click attack on a nation the player is not hostile to opens the same declaration (canvas.unit_right_click_attack)."
+  ],
+  [
+   "canvas.diplomacy_goal_pick",
+   "The Planetary canvas while the Diplomacy ledger's declaration (or answer) is open: the target's provinces outlined orange, chosen goals red and thicker. A mode of the declaration, not a lens."
+  ],
+  [
+   "ledger.diplomacy_declare",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the declaration's 'Declare' press."
+  ],
+  [
+   "ledger.diplomacy_cancel",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the declaration's 'Cancel' press; Escape does the same."
+  ],
+  [
+   "ledger.diplomacy_offer_friendship",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Offer friendship' press (neither friends nor an offer either way)."
+  ],
+  [
+   "ledger.diplomacy_withdraw",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Withdraw' press (you are friends, or your offer is pending)."
+  ],
+  [
+   "ledger.diplomacy_accept_friendship",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Accept friendship' press (they have offered)."
+  ],
+  [
+   "ledger.diplomacy_embargo",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Embargo' press - a door onto the embargo law (RELATIONS.md § 3)."
+  ],
+  [
+   "ledger.diplomacy_answer",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Answer' on a war declared on the player that it has not answered."
+  ],
+  [
+   "ledger.diplomacy_offer_peace",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war the player is party to with no offer pending: 'Offer peace' opens the composer; 'Offer white peace' and 'Offer cession' send."
+  ],
+  [
+   "ledger.diplomacy_impose_peace",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, on a war whose score stands at 100 in the player's favour: 'Impose peace' replaces 'Offer peace'; 'Impose white peace' and 'Impose cession' send."
+  ],
+  [
+   "ledger.diplomacy_accept_peace",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Accept' under a peace offer the other party made ('<nation> offers <terms>.')."
+  ],
+  [
+   "ledger.diplomacy_refuse_peace",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Refuse' under a peace offer the other party made."
   ]
  ]
 }

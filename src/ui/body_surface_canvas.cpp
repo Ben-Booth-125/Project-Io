@@ -1,4 +1,5 @@
 #include "body_surface_canvas.hpp"
+#include "diplomacy_ledger.hpp" // open_declaration — the right-click declare-and-attack
 #include "text_fit.hpp"
 
 #include "construction_panel.hpp" // the build-progress circle and its site card (Ben, 2026-10-26)
@@ -3159,6 +3160,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (const auto sw = w.wings.find(state.selected_entity);
         sw != w.wings.end() && is_player_side(w, sw->second.owner))
         wing_assigned = sw->second.provinces;
+    // THE DECLARATION'S GOAL PICKING (ledgers/diplomacy.md § The declaration; § 3:
+    // a mode of the declaration flow, not an overlay_mode). While it is open every
+    // province of the target is outlined as a possible goal, and the chosen ones in
+    // the attack's red, thicker. Both lists ascending for the per-tile search.
+    const bool declaring = state.diplomacy.declare_target != null_entity;
+    std::vector<uint32_t> goal_chosen = state.diplomacy.goals;
+    std::sort(goal_chosen.begin(), goal_chosen.end());
+    const std::vector<uint32_t>& goal_cands = state.diplomacy.goal_candidates;
 
     // Spatial index (BL-268): the per-body raster logistics already caches on
     // world.body_tile_index (grid_y*gw + grid_x -> tile entity, null_entity for an
@@ -6400,11 +6409,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                     palette::air_assigned, 2.5f);
                     }
             }
+            // While declaring, a possible goal's own outline is its highlight: the
+            // province hover/selection edge below would paint over it.
+            bool goal_cand_tile = false;
+            if (revealed && declaring && !goal_cands.empty())
+            {
+                const uint32_t gp = prov_id_of();
+                if (gp != 0 && std::binary_search(goal_cands.begin(), goal_cands.end(), gp))
+                {
+                    goal_cand_tile = true;
+                    const bool  chosen = std::binary_search(goal_chosen.begin(), goal_chosen.end(), gp);
+                    const ImU32 gc     = chosen ? palette::war_goal_chosen : palette::war_goal_candidate;
+                    const float gw_px  = chosen ? 3.0f : 1.5f;
+                    for (int s = 0; s < 6; ++s)
+                    {
+                        const auto nc   = hex_neighbors::neighbour(t_col, t_row, s);
+                        const int  ncol = ((nc.gx % gw) + gw) % gw;
+                        const entity_id nid = tile_at_rc(ncol, nc.gy);
+                        if (nid != null_entity && w.provinces.province_of(nid) == gp)
+                            continue;
+                        dl->AddLine(verts[k_side_verts[s][0]], verts[k_side_verts[s][1]], gc, gw_px);
+                    }
+                }
+            }
             const bool in_sel_prov = sel_prov
                 && std::binary_search(sel_prov->tiles.begin(), sel_prov->tiles.end(), id);
             const bool in_hov_prov = !in_sel_prov && hov_prov
                 && std::binary_search(hov_prov->tiles.begin(), hov_prov->tiles.end(), id);
-            if (revealed && (in_sel_prov || in_hov_prov))
+            if (revealed && (in_sel_prov || in_hov_prov) && !goal_cand_tile)
             {
                 const uint32_t prov_id = in_sel_prov ? state.selected_province
                                                      : state.hovered_province;
@@ -7523,9 +7555,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             order_target = resolve_unit_order(w, order_units, hovered_tile);
         }
     }
-    // While the declare confirm is up it owns the order: no second preview.
-    if (state.unit_order_confirm_nation != null_entity)
+    // While the declaration is open it owns the canvas's clicks: no order preview.
+    if (state.diplomacy.declare_target != null_entity)
         order_target = unit_order_target{};
+    // The goal pick's hover: a possible goal says what a click does.
+    uint32_t goal_hover = 0;
+    if (state.diplomacy.declare_target != null_entity && have_hover && hovered_tile != null_entity)
+    {
+        const uint32_t gp = w.provinces.province_of(hovered_tile);
+        const auto& cands = state.diplomacy.goal_candidates;
+        if (gp != 0 && std::binary_search(cands.begin(), cands.end(), gp))
+        {
+            goal_hover = gp;
+            const auto& goals = state.diplomacy.goals;
+            const bool on   = std::find(goals.begin(), goals.end(), gp) != goals.end();
+            const bool full = !on && goals.size() >= k_war_goals_max;
+            const char* line = on ? "Click: remove this goal"
+                             : full ? "Three goals already: remove one first"
+                                    : "Click: make this province a goal";
+            const ImU32 oc = on ? palette::war_goal_chosen : palette::war_goal_candidate;
+            ImDrawList* fdl = ImGui::GetForegroundDrawList();
+            const ImVec2 ts  = ImGui::CalcTextSize(line);
+            const float  pad = 4.0f;
+            const ImVec2 tl { mouse.x + 16.0f, mouse.y + 16.0f };
+            const ImVec2 br { tl.x + ts.x + pad * 2.0f, tl.y + ts.y + pad * 2.0f };
+            fdl->AddRectFilled(tl, br, IM_COL32(18, 18, 24, 235), 3.0f);
+            fdl->AddRect(tl, br, oc, 3.0f, 0, 1.5f);
+            fdl->AddText({ tl.x + pad, tl.y + pad }, IM_COL32(230, 230, 235, 255), line); // fit-exempt: the card is sized to its measured text
+        }
+    }
     state.unit_order_hover = order_target.kind;
     if (order_target.kind != 0)
     {
@@ -7704,48 +7762,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             static_cast<int>(tf_markers.size()));
     v_key_end = dl->VtxBuffer.Size;
 
-    // THE DECLARE CONFIRM (BL-1443): a right-click on the stack of a nation the
-    // player is not hostile to asks before it declares — hostility is a stance
-    // change every other surface reads, not a thing to do by mis-click (the
-    // withdraw confirm's precedent). Drawn before the input gate so it stays up
-    // while the pointer is over it. Escape, Cancel, or another press on the
-    // canvas closes it.
-    if (state.unit_order_confirm_nation != null_entity)
-    {
-        const auto close_confirm = [&state]() {
-            state.unit_order_confirm_nation = null_entity;
-            state.unit_order_confirm_tile   = null_entity;
-            state.unit_order_confirm_units.clear();
-        };
-        const char* who = owner_display_name(w, state.unit_order_confirm_nation);
-        if (who == nullptr) who = "this nation";
-        ImGui::SetNextWindowPos(state.unit_order_confirm_pos, ImGuiCond_Always);
-        const ImGuiWindowFlags cf = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize
-                                  | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove;
-        bool send = false, cancel = ImGui::IsKeyPressed(ImGuiKey_Escape);
-        if (ImGui::Begin("##unit_order_confirm", nullptr, cf))
-        {
-            ImGui::Text("Declare hostility toward %s and attack?", who);
-            if (ImGui::Button("Declare and attack"))
-                send = true;
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel"))
-                cancel = true;
-        }
-        ImGui::End();
-        if (send)
-        {
-            state.pending_unit_order_units    = state.unit_order_confirm_units;
-            state.pending_unit_order_tile     = state.unit_order_confirm_tile;
-            state.pending_unit_order_declare  = state.unit_order_confirm_nation;
-            state.pending_unit_order_attack   = true;
-            close_confirm();
-        }
-        else if (cancel)
-        {
-            close_confirm();
-        }
-    }
+    // THE DECLARE CONFIRM RETIRED (ledgers/diplomacy.md § The declaration): a
+    // right-click attack on a nation the player is not hostile to now opens the
+    // Diplomacy ledger's declaration with the attacked province chosen - goals,
+    // justifications and the price before anything is sent - rather than a
+    // one-line confirm that declared blind. See the right-click block below.
 
     if (!input_enabled)
     {
@@ -8043,7 +8064,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // place_road and charges it once); a press anywhere else disarms, which is
         // the cancel. Either way the click is consumed, so a stray press cannot
         // retarget the Selection element and leave the player armed.
-        if (state.construction.road_arm_tile != null_entity)
+        if (goal_hover != 0)
+        {
+            // THE DECLARATION'S PICK (ledgers/diplomacy.md § The declaration): a
+            // click on one of the target's provinces toggles it as a goal, at most
+            // three. The click is consumed; a press anywhere else falls through to
+            // the ordinary rules below and leaves the declaration open.
+            auto& goals = state.diplomacy.goals;
+            const auto it = std::find(goals.begin(), goals.end(), goal_hover);
+            if (it != goals.end())
+                goals.erase(it);
+            else if (goals.size() < k_war_goals_max)
+                goals.push_back(goal_hover);
+        }
+        else if (state.construction.road_arm_tile != null_entity)
         {
             int chosen = -1;
             for (const road_target& rt : road_arm_targets)
@@ -8556,22 +8590,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // confirm when the player is not hostile to it. Anything else — nothing of
     // the player's selected, water, the units' own tile — is ignored. A canvas
     // press while the confirm is up closes it.
-    if ((ImGui::IsMouseClicked(ImGuiMouseButton_Left) || ImGui::IsMouseClicked(ImGuiMouseButton_Right))
-        && state.unit_order_confirm_nation != null_entity)
-    {
-        state.unit_order_confirm_nation = null_entity;
-        state.unit_order_confirm_tile   = null_entity;
-        state.unit_order_confirm_units.clear();
-    }
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right) && state.pending_march_unit == null_entity
         && order_target.kind != 0 && !order_units.empty())
     {
         if (order_target.kind == 3)
         {
-            state.unit_order_confirm_nation = order_target.nation;
-            state.unit_order_confirm_tile   = hovered_tile;
-            state.unit_order_confirm_units  = order_units;
-            state.unit_order_confirm_pos    = { mouse.x + 12.0f, mouse.y + 12.0f };
+            // The declare-and-attack opens the declaration (diplomacy.md § The
+            // declaration), the attacked province chosen; Declare there files the
+            // war and then this selection's attack, through app's unit-order block.
+            open_declaration(w, state, order_target.nation, hovered_tile, order_units);
         }
         else
         {

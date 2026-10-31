@@ -22,6 +22,7 @@
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
 #include "ui/convoys_ledger.hpp"
 #include "ui/military_ledger.hpp"
+#include "ui/diplomacy_ledger.hpp"
 #include "ui/unit_art.hpp"        // the unit designer's class art, loaded once
 #include "ui/unit_designer.hpp"   // the full-canvas unit designer
 #include "ui/wing_card.hpp"       // BL-1450: reset_wing_ui beside reset_unit_designer
@@ -2303,6 +2304,8 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
         // The band is always open (BL-266) and has no hide rung.
         if (m_ui.confirm_exit_pending)
             m_ui.confirm_exit_pending = false;
+        else if (m_ui.diplomacy.declare_target != null_entity)
+            ui::close_declaration(m_ui);                      // ledgers/diplomacy.md § 5: Escape cancels the declaration
         else if (m_ui.show_system_menu)
             m_ui.show_system_menu = false;
         else if (m_ui.corp_rollup_drill >= 0)
@@ -2855,6 +2858,13 @@ void app::render()
     // Raise press queues the same pending hire the tile card's Hire does, which
     // the hire block below executes through `hire_unit`.
     ui::draw_military_ledger(m_world, m_registry, m_ui, m_ui.show_military_ledger);
+    // Diplomacy ledger — nav slot 8 (Ben, 2026-10-30; ledgers/diplomacy.md). Its
+    // presses queue on m_ui.diplomacy.pending (sent below through player_command);
+    // a declare-and-attack fills the unit-order request instead. Called every
+    // frame: it samples its UI-side history (trend arrows, trade exposure) even
+    // while closed.
+    ui::draw_diplomacy_ledger(m_world, m_registry, m_last_econ_report, m_last_corp_standings, m_ui,
+                              m_ui.show_diplomacy_ledger);
     // The unit designer (military.md § The designer): a full-canvas takeover the
     // Design tab's class rows and the unit card's type name open. Its picks draft;
     // Save queues `designer.pending`, sent below as `set_unit_design` — or, for an
@@ -3312,7 +3322,14 @@ void app::render()
             cmd.verb         = answering ? corp_verb::answer_war : corp_verb::declare_war;
             cmd.counterparty = target;
             cmd.air_provinces = no_air_provinces();
-            cmd.air_provinces[0] = attack_goal_province(m_world, target, m_ui.pending_unit_order_tile);
+            // The declaration's goals (diplomacy.md § The declaration: the right-click
+            // opens it with the attacked province chosen, and the player may change
+            // them); none named = the attacked tile's province alone.
+            if (m_ui.pending_unit_order_goals.empty())
+                cmd.air_provinces[0] = attack_goal_province(m_world, target, m_ui.pending_unit_order_tile);
+            else
+                for (std::size_t g = 0; g < m_ui.pending_unit_order_goals.size() && g < cmd.air_provinces.size(); ++g)
+                    cmd.air_provinces[g] = m_ui.pending_unit_order_goals[g];
             const corp_command_result r = cmd.air_provinces[0] == 0
                 ? corp_command_result::rejected_invalid
                 : player_command(cmd);
@@ -3373,6 +3390,7 @@ void app::render()
         m_ui.pending_unit_order_tile     = null_entity;
         m_ui.pending_unit_order_declare  = null_entity;
         m_ui.pending_unit_order_attack   = false;
+        m_ui.pending_unit_order_goals.clear();
     }
 
     if (m_ui.pending_halt_unit != null_entity)
@@ -3653,6 +3671,55 @@ void app::render()
             m_ui.research_message = "The research queue refused that press.";
     }
     m_ui.pending_research_commands.clear(); // consume the requests
+
+    // Diplomacy presses (ledgers/diplomacy.md) — declare_war, answer_war, the peace
+    // verbs, offer/accept friendship and return_to_neutral, each through the same
+    // seam an agent's command takes. The ledger pre-checks what it can (goals, the
+    // price's validity, a truce, the last province); a refusal here is a race or a
+    // state the ledger could not see, and the line says which verb it was.
+    for (corp_command& cmd : m_ui.diplomacy.pending)
+    {
+        cmd.tick = static_cast<int>(m_sim_loop.day_tick());
+        const corp_command_result r = player_command(cmd);
+        const bool ok = r == corp_command_result::applied;
+        const char* who = actor_name(m_world, cmd.counterparty);
+        const std::string them = (who != nullptr && who[0] != '\0') ? who : "them";
+        switch (cmd.verb)
+        {
+            case corp_verb::declare_war:
+                m_ui.diplomacy.message = ok ? "War declared on " + them + "."
+                    : r == corp_command_result::rejected_state ? "Couldn't declare war: a truce stands, or a war is already open."
+                                                               : "Couldn't declare war.";
+                break;
+            case corp_verb::answer_war:
+                m_ui.diplomacy.message = ok ? "You answered " + them + "." : "Couldn't answer that war.";
+                break;
+            case corp_verb::offer_peace:
+                m_ui.diplomacy.message = ok ? "Peace offered to " + them + "." : "Those peace terms were refused.";
+                break;
+            case corp_verb::impose_peace:
+                m_ui.diplomacy.message = ok ? "Peace imposed on " + them + "." : "Couldn't impose peace.";
+                break;
+            case corp_verb::accept_peace:
+                m_ui.diplomacy.message = ok ? "Peace with " + them + "." : "That offer no longer holds.";
+                break;
+            case corp_verb::refuse_peace:
+                m_ui.diplomacy.message = ok ? "You refused " + them + "'s offer." : "That offer is already gone.";
+                break;
+            case corp_verb::offer_friendship:
+                m_ui.diplomacy.message = ok ? "Friendship offered to " + them + "." : "Couldn't offer friendship.";
+                break;
+            case corp_verb::accept_friendship:
+                m_ui.diplomacy.message = ok ? "Friends with " + them + "." : "That offer is already gone.";
+                break;
+            case corp_verb::return_to_neutral:
+                m_ui.diplomacy.message = ok ? "Withdrawn." : "Nothing to withdraw.";
+                break;
+            default:
+                break;
+        }
+    }
+    m_ui.diplomacy.pending.clear(); // consume the requests
 
     // F1 key-binding cheat-sheet — generated from s_bindings so it never drifts.
     if (m_show_help)
