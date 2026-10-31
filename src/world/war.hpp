@@ -342,6 +342,9 @@ war_result offer_peace(world& w, entity_id offerer, entity_id other, const peace
 
 /// @p receiver accepts the pending offer @p offerer made: the peace is concluded
 /// on its terms (re-validated now; refused, mutating nothing, if they no longer hold).
+/// At ANY peace, every goal of the war that one party holds against the other and
+/// that was not ceded returns to its owner, and the occupier's units on that ground
+/// withdraw by the retreat rule; a third nation's hold is never touched.
 war_result accept_peace(world& w, const sentiment_params& p, entity_id receiver, entity_id offerer);
 
 /// @p receiver refuses the pending offer @p offerer made; the offer is erased.
@@ -359,7 +362,11 @@ war_result impose_peace(world& w, const sentiment_params& p, entity_id imposer,
 /// in `tile_to_nation` (through `set_tile_nation`, so the catchment and front stamps
 /// move) and in both nations' tile lists and deposit profiles; every building of
 /// @p from's on that ground joins @p to's `state_assets`, in its stored order; its
-/// track follows; a muster @p from was raising at a base that passed is dropped. A
+/// track follows; a muster @p from was raising at a base that passed is dropped, and
+/// a wing of @p from's based there rebases to @p from's nearest own airbase (hex
+/// distance, ties to the lower id) or, with none left, is disbanded. Fronts are
+/// re-anchored FIRST, against the map before it moves, so a cession right after a
+/// load remaps front keys exactly as an unbroken run does. A
 /// ceded capital moves to @p from's remaining province with the largest population
 /// centre (ties to the lower province id) and its free logistics hub moves with it
 /// (NR-1102). The logistics caches drop; @p from's units on the ceded ground

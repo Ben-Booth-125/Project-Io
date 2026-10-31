@@ -40,6 +40,7 @@
 
 #include "harness_params.hpp"
 #include "scripting/lua_state.hpp"
+#include "world/air_combat.hpp"
 #include "world/battle_system.hpp"
 #include "world/fronts.hpp"
 #include "world/hex_neighbors.hpp"
@@ -615,6 +616,114 @@ void run_seed(lua_state& lua, std::uint32_t seed)
                         "withdrew by the retreat rule (%d stayed); nothing changed hands — the territorial map, both "
                         "nations' buildings and the cession record are unchanged (%s)", returned ? "yes" : "NO",
                         g_occ.size(), l_occ.size(), stayed, unchanged ? "yes" : "NO"));
+    }
+
+    // ---- C6: a cession right after a load = the same cession in an unbroken run -----
+    {
+        // Its own war: the goal is the L province holding the key of an L front toward
+        // G (its key on L's own ground), so the assignment is keyed in the ceded province.
+        world v = pre;
+        entity_id key = null_entity;
+        for (const front& f : derive_fronts(v, L))
+            if (f.neighbour == G && owner(v, f.key) == L
+                && province_kind_of(v, v.provinces.province_of(f.key)) == province_kind::land)
+            {
+                key = f.key;
+                break;
+            }
+        const std::vector<uint32_t> g6 = { key != null_entity ? v.provinces.province_of(key) : 0u };
+        bool ok = key != null_entity && land_provinces(v, L).size() > 1
+               && declare_war(v, sp, G, L, g6) == war_result::applied;
+        if (ok) v.province_holder[holder_index(v, g6[0])] = G;
+        peace_terms c; c.kind = peace_kind::cession; c.gainer = G; c.provinces = g6;
+        ok = ok && offer_peace(v, G, L, c) == war_result::applied;
+        const std::vector<entity_id> lu = units_of(v, L);
+        entity_id assigned = null_entity;
+        if (ok && !lu.empty())
+        {
+            assigned = lu.front();
+            v.units.at(assigned).front = key;
+        }
+        reanchor_fronts(v); // the unbroken run's cache: built and current before the peace
+        world a = v;
+        world b;
+        const bool loaded = from_bytes(to_bytes(v), b); // a save and load of the same tick
+        const bool ra = ok && accept_peace(a, sp, L, G) == war_result::applied;
+        const bool rb = ok && loaded && accept_peace(b, sp, L, G) == war_result::applied;
+        const entity_id now_a = assigned != null_entity && a.units.count(assigned) ? a.units.at(assigned).front : null_entity;
+        const bool equal = ra && rb && to_bytes(a) == to_bytes(b) && a.state_hash(0) == b.state_hash(0);
+        check(equal && assigned != null_entity && now_a != null_entity && now_a != key, "C6",
+              fmt("the same peace on an unbroken run and on a save+load of the same tick gives byte-identical worlds "
+                  "(%s): unit %llu, assigned to the front keyed %llu in the ceded province %u, is remapped to front "
+                  "%llu on both paths, not dropped on the loaded one", equal ? "equal" : "DIFFER", (ull)assigned,
+                  (ull)key, (unsigned)g6[0], (ull)now_a));
+    }
+
+    // ---- C7: air wings at a lost airbase ----------------------------------------------
+    {
+        const auto add_airbase = [](world& ww, entity_id n, entity_id tile) {
+            const entity_id bid = ww.create_entity();
+            building_component bc{};
+            bc.tile = tile; bc.type = building_type::airbase; bc.ticks_remaining = 0;
+            ww.buildings[bid] = bc;
+            ww.stockpiles[bid] = stockpile_component{};
+            ww.nations.at(n).state_assets.push_back(bid);
+            return bid;
+        };
+        const auto add_wing = [](world& ww, entity_id n, entity_id base, uint32_t prov) {
+            const entity_id wid = ww.create_entity();
+            air_wing wg{};
+            wg.owner = n; wg.airbase = base; wg.mission = air_mission::recon; wg.provinces = { prov };
+            ww.wings[wid] = wg;
+            return wid;
+        };
+        // A land tile of L's in a goal (the lost base), and L's remaining land tiles.
+        entity_id lost_tile = null_entity;
+        std::vector<entity_id> home;
+        for (const auto& [t, o] : pre.tile_to_nation)
+            if (o == L && !is_water(pre.tiles.at(t).substrate))
+            {
+                if (on_goals(pre, t)) { if (lost_tile == null_entity || t < lost_tile) lost_tile = t; }
+                else home.push_back(t);
+            }
+        std::sort(home.begin(), home.end());
+        std::sort(home.begin(), home.end(), [&](entity_id x, entity_id y) {
+            const int dx = air_tile_distance(pre, lost_tile, x), dy = air_tile_distance(pre, lost_tile, y);
+            return dx != dy ? dx < dy : x < y;
+        });
+        if (lost_tile != null_entity && home.size() >= 2)
+        {
+            // Rebase: two remaining airbases, the FAR one created first (lower id), so the
+            // nearest wins on distance, not id.
+            world v = pre;
+            const entity_id far_b  = add_airbase(v, L, home.back());
+            const entity_id near_b = add_airbase(v, L, home.front());
+            const entity_id lost_b = add_airbase(v, L, lost_tile);
+            const entity_id wid = add_wing(v, L, lost_b, goals.front());
+            const bool flew = air_wing_flies(v, v.wings.at(wid));
+            const bool ran2 = run_cession(v, sp, pk);
+            const bool rebased = v.wings.count(wid) && v.wings.at(wid).airbase == near_b;
+            const bool flies = rebased && air_wing_flies(v, v.wings.at(wid));
+            air_wing stale = v.wings.count(wid) ? v.wings.at(wid) : air_wing{};
+            stale.airbase = lost_b; // the lost base, now the gainer's
+            const bool grounded = owner_nation_of(v, lost_b) == G && !air_wing_flies(v, stale);
+            check(ran2 && flew && rebased && flies, "C7a",
+                  fmt("a loser wing whose airbase passed rebases to the loser's NEAREST own airbase (%llu at %d hex, "
+                      "not %llu at %d) and flies from it", (ull)near_b, air_tile_distance(v, lost_tile, home.front()),
+                      (ull)far_b, air_tile_distance(v, lost_tile, home.back())));
+            check(grounded, "C7b", "a wing based at an airbase another nation owns does not fly (wing_flies checks "
+                                   "the base is its owner's)");
+            // Disband: the lost base is the loser's only airbase.
+            world u = pre;
+            const entity_id only_b = add_airbase(u, L, lost_tile);
+            const entity_id wid2 = add_wing(u, L, only_b, goals.front());
+            const bool ran3 = run_cession(u, sp, pk);
+            check(ran3 && u.wings.count(wid2) == 0, "C7c",
+                  "a loser wing whose airbase passed, with no airbase of the loser's left, is disbanded (the upkeep "
+                  "orphan rule)");
+        }
+        else
+            check(false, "C7", "no tile to stage the airbases on");
     }
 
     // ---- C5: conservation, save, determinism ---------------------------------------

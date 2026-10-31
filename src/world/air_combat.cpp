@@ -416,8 +416,11 @@ bool wing_flies(const world& w, const air_wing& wg)
         || wg.provinces.empty() || w.nations.find(wg.owner) == w.nations.end())
         return false;
     const auto bit = w.buildings.find(wg.airbase);
+    // "of its owner's" (BL-1460 fix round): an airbase another nation owns — ground
+    // that passed at a peace — flies nothing for this wing.
     return bit != w.buildings.end() && bit->second.type == building_type::airbase
-        && bit->second.ticks_remaining <= 0 && !bit->second.decommissioned;
+        && bit->second.ticks_remaining <= 0 && !bit->second.decommissioned
+        && owner_nation_of(w, wg.airbase) == wg.owner;
 }
 
 /// A unit's strength, per-mille: men over establishment x its carried supplies' attack
@@ -433,6 +436,11 @@ int64_t unit_strength_permille(const unit_component& u)
 }
 
 } // namespace
+
+bool air_wing_flies(const world& w, const air_wing& wg)
+{
+    return wing_flies(w, wg);
+}
 
 air_day_tick run_air_day(world& w, const recipe_registry& reg, economy_report& report)
 {

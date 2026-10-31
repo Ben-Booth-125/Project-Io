@@ -15,6 +15,8 @@
 
 #include <algorithm>
 #include <cmath> // std::lround: terrain stealth (BL-1453)
+#include <functional>
+#include <limits>
 #include <map>
 #include <set>
 #include <vector>
@@ -174,7 +176,8 @@ void move_morale(world& w, const std::vector<entity_id>& units, int delta)
 /// cannot enter - blocked unless roaded, with no road - is never the step.
 entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
                        const std::set<entity_id>& foreign_tiles, bool province_term = true,
-                       const military_capability_params* mil = nullptr)
+                       const military_capability_params* mil = nullptr,
+                       const std::function<int(entity_id)>* tie = nullptr)
 {
     const auto here = w.tiles.find(u.position);
     if (here == w.tiles.end())
@@ -183,6 +186,7 @@ entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
 
     entity_id best      = null_entity;
     int       best_rank = -1;
+    int       best_tie  = 0;
     for (int side = 0; side < 6; ++side)
     {
         if (!road_side_is_crossable(side, row))
@@ -198,10 +202,14 @@ entity_id retreat_tile(world& w, const unit_component& u, uint32_t province,
         const auto nat  = w.tile_to_nation.find(n);
         const int  rank = (province_term && w.provinces.province_of(n) != province ? 2 : 0)
                         + (nat != w.tile_to_nation.end() && nat->second == u.owner ? 1 : 0);
-        if (rank > best_rank || (rank == best_rank && n < best))
+        // @p tie (the withdrawal's walk home, BL-1460): among equal ranks, the lower
+        // value first, then the lower tile id. Without it, the lower tile id alone.
+        const int tv = tie != nullptr ? (*tie)(n) : 0;
+        if (rank > best_rank || (rank == best_rank && (tv < best_tie || (tv == best_tie && n < best))))
         {
             best      = n;
             best_rank = rank;
+            best_tie  = tv;
         }
     }
     return best;
@@ -872,8 +880,10 @@ shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params*
 }
 
 int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vector<uint32_t>& leave,
-                   const military_capability_params* mil)
+                   int day, const military_capability_params* mil, int* stuck)
 {
+    if (stuck != nullptr)
+        *stuck = 0;
     if (units.empty() || leave.empty())
         return 0;
     std::vector<entity_id> ids = units;
@@ -891,6 +901,29 @@ int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vec
         if (uit == w.units.end() || uit->second.count <= 0 || uit->second.position == null_entity)
             continue;
         unit_component& u = uit->second;
+        // THE WALK HOME: equal-rank steps break toward the neighbour nearest (in hex
+        // steps) to any tile of the unit's own nation's ground on its body.
+        std::vector<entity_id> home;
+        if (const auto nit = w.nations.find(u.owner); nit != w.nations.end())
+        {
+            const auto here = w.tiles.find(u.position);
+            for (const entity_id t : nit->second.tiles)
+                if (const auto tt = w.tiles.find(t);
+                    tt != w.tiles.end() && here != w.tiles.end() && tt->second.body == here->second.body)
+                    if (const auto own = w.tile_to_nation.find(t);
+                        own != w.tile_to_nation.end() && own->second == u.owner)
+                        home.push_back(t);
+        }
+        const std::function<int(entity_id)> homeward = [&](entity_id n) {
+            int best = std::numeric_limits<int>::max();
+            for (const entity_id t : home)
+            {
+                const int d = air_tile_distance(w, n, t);
+                if (d >= 0 && d < best)
+                    best = d;
+            }
+            return best;
+        };
         std::set<entity_id> visited;
         bool stepped = false;
         for (int step = 0; step < k_withdraw_max_steps && in_leave(u.position); ++step)
@@ -900,17 +933,19 @@ int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vec
             std::set<entity_id> barred = foreign_held_tiles(w, u.owner);
             barred.insert(visited.begin(), visited.end());
             const entity_id to =
-                retreat_tile(w, u, w.provinces.province_of(u.position), barred, true, mil);
+                retreat_tile(w, u, w.provinces.province_of(u.position), barred, true, mil, &homeward);
             if (to == null_entity)
                 break;
             visited.insert(u.position);
             u.position = to;
             stepped    = true;
         }
+        if (stuck != nullptr && in_leave(u.position))
+            ++*stuck;
         if (!stepped)
             continue;
         u.order              = movement_order{};
-        u.tile_since_day     = w.current_day_tick; // it came onto this tile now
+        u.tile_since_day     = day; // BL-1453: it came onto this tile on the peace's day
         u.battle_ready_carry = 0;
         u.battle_hp_carry    = 0;
         moved.insert(uid);

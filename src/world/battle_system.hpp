@@ -367,14 +367,17 @@ inline constexpr int k_withdraw_max_steps = 32;
 /// (`retreat_tile`, with the province term read against the province it stands in):
 /// one crossable land neighbour no other nation's units hold as the world stands at
 /// that step, preferring ground outside its current province, then its own nation's
-/// ground, ties to the lowest tile id — repeated, never back onto a tile this walk
+/// ground, then (the walk home) the fewest hex steps to any tile of its own nation's
+/// ground on its body, then the lowest tile id — repeated, never back onto a tile this walk
 /// already left, until it stands outside @p leave or @p k_withdraw_max_steps are
 /// taken. A unit with no step stays where it is (the retreat rule's own answer). A
 /// unit that moved loses its order and its battle carries, and leaves every
-/// battle's lists, as a retreat does. No morale is charged: a withdrawal at peace
-/// is not a rout. @return units moved.
+/// battle's lists, as a retreat does; @p day is the stamp written on its
+/// `tile_since_day`. No morale is charged: a withdrawal at peace is not a rout.
+/// @p stuck, if given, receives how many units still stand in @p leave after their
+/// walk. @return units moved.
 int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vector<uint32_t>& leave,
-                   const military_capability_params* mil = nullptr);
+                   int day, const military_capability_params* mil = nullptr, int* stuck = nullptr);
 
 /// The march path @p from -> @p dest on @p body for a unit of @p owner, in TRAVEL
 /// order (path[0] == @p from), solved around every tile in @p blocked save @p dest

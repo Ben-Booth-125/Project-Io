@@ -108,6 +108,11 @@ int air_province_distance(const world& w, entity_id from, uint32_t province);
 /// The tile @p wing flies from: its airbase's tile, or null when the base is gone.
 entity_id wing_base_tile(const world& w, const air_wing& wg);
 
+/// May @p wg fly today? Raised, alive, assigned, with a standing, completed, working
+/// airbase its OWNER owns (an airbase that passed to another nation at a peace flies
+/// nothing for it). The daily air pass's own test.
+bool air_wing_flies(const world& w, const air_wing& wg);
+
 /// Is @p province within @p wing's range (MILITARY.md: the straight-line tile
 /// distance from the airbase to the province's nearest tile is within its range)?
 bool air_province_in_range(const world& w, const recipe_registry& reg, const air_wing& wg,

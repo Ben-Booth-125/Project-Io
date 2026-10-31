@@ -758,6 +758,61 @@ int main()
               "P3r a white peace changes no hands: every occupied goal's holder returns to its owner");
     }
     {
+        // BL-1460 fix round. A unit of @p owner standing on @p tile.
+        const auto put = [](world& w, entity_id owner, entity_id tile) {
+            const entity_id id = w.create_entity();
+            unit_component uc{}; uc.position = tile; uc.owner = owner; uc.count = 500; uc.establishment = 500;
+            w.units[id] = uc;
+            return id;
+        };
+        const auto in_prov = [](const world& w, entity_id unit, uint32_t p) {
+            return w.provinces.province_of(w.units.at(unit).position) == p;
+        };
+        {
+            // A PARTIAL CESSION RETURNS THE OTHER GOALS: A holds two of B's provinces
+            // and B one of A's; the peace cedes one. The other two go back to their
+            // owners and the occupiers' units there withdraw.
+            fixture f; build(f);
+            world& w = f.w;
+            const uint32_t b0 = f.provs[f.B][0], b1 = f.provs[f.B][1], a0 = f.provs[f.A][0];
+            (void)declare_war(w, sp, f.A, f.B, { b0, b1 });
+            (void)answer_war(w, f.B, f.A, { a0 });
+            w.province_holder[holder_index(w, b0)] = f.A;
+            w.province_holder[holder_index(w, b1)] = f.A;
+            w.province_holder[holder_index(w, a0)] = f.B;
+            const entity_id ua = put(w, f.A, w.provinces.find(b1)->tiles[w.provinces.find(b1)->tiles.size() / 2]);
+            const entity_id ub = put(w, f.B, w.provinces.find(a0)->tiles[w.provinces.find(a0)->tiles.size() / 2]);
+            peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.A; cede.provinces = { b0 };
+            check(offer_peace(w, f.A, f.B, cede) == war_result::applied && accept_peace(w, sp, f.B, f.A) == war_result::applied
+                      && province_owner(w, b0) == f.A && province_holder_for(w, b0) == f.A
+                      && province_holder_for(w, b1) == f.B && province_holder_for(w, a0) == f.A
+                      && !in_prov(w, ua, b1) && !in_prov(w, ub, a0),
+                  "P3r2 a partial cession: the ceded goal passes, every other goal held against its owner by a "
+                  "party returns, and the occupiers' units there withdraw (fix round)");
+        }
+        {
+            // A WHITE PEACE LEAVES A THIRD NATION ALONE: C holds b1 from its own war
+            // with B. A and B make white peace over b0 and b1; C's hold and its unit stand.
+            fixture f; build(f);
+            world& w = f.w;
+            const uint32_t b0 = f.provs[f.B][0], b1 = f.provs[f.B][1];
+            (void)declare_war(w, sp, f.A, f.B, { b0, b1 });
+            (void)declare_war(w, sp, f.C, f.B, { b1 });
+            w.province_holder[holder_index(w, b0)] = f.A;
+            w.province_holder[holder_index(w, b1)] = f.C;
+            const entity_id ua = put(w, f.A, w.provinces.find(b0)->tiles[w.provinces.find(b0)->tiles.size() / 2]);
+            const entity_id uc = put(w, f.C, w.provinces.find(b1)->tiles[w.provinces.find(b1)->tiles.size() / 2]);
+            const entity_id uc_at = w.units.at(uc).position;
+            check(offer_peace(w, f.B, f.A, peace_terms{}) == war_result::applied
+                      && accept_peace(w, sp, f.A, f.B) == war_result::applied
+                      && province_holder_for(w, b0) == f.B && !in_prov(w, ua, b0)
+                      && province_holder_for(w, b1) == f.C && w.units.at(uc).position == uc_at
+                      && at_war(w, f.C, f.B),
+                  "P3r3 a white peace returns only what THIS war's other party holds: a third nation's occupation "
+                  "from its own war, and its unit, are untouched (fix round)");
+        }
+    }
+    {
         // Impose at 100, and only at 100.
         fixture f; build(f);
         world& w = f.w;

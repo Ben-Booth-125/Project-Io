@@ -13,6 +13,10 @@
 #include "logistics.hpp"      // invalidate_logistics_caches (BL-1460)
 #include "state_industry.hpp" // capital_free_source (BL-1460)
 #include "fronts.hpp"         // reanchor_fronts (BL-1460)
+#include "economy_system.hpp" // military_quarter_day_base (BL-1460 fix round)
+#include "air_combat.hpp"     // air_tile_distance: a wing's rebase (BL-1460 fix round)
+
+#include <limits>
 #include "world.hpp"
 
 #include <algorithm>
@@ -166,6 +170,17 @@ bool compare(float v, condition_comparator c, float operand)
         case condition_comparator::less_than:    return v <  operand;
     }
     return false;
+}
+
+/// The day stamp a peace's withdrawal writes on the units it moves (`tile_since_day`,
+/// BL-1453): the stamp the day being walked carries — the quarter base of the economy
+/// step that will CLOSE this quarter (`military_quarter_day_base(current_econ_tick +
+/// 1)`: a peace is concluded between steps, where `current_econ_tick` is the step last
+/// run) plus the days of the quarter already walked. The same scheme the day loop
+/// stamps battles and advances with, so it never depends on the UI's day clock.
+int peace_day_stamp(const world& w)
+{
+    return military_quarter_day_base(w.current_econ_tick + 1) + w.construction_quarter_day;
 }
 
 war_record* find_war_mut(world& w, entity_id a, entity_id b)
@@ -729,10 +744,17 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
                                           static_cast<float>(terms.provinces.size()) });
     }
     else
+        h.end = imposed ? war_end::imposed_white : war_end::white_peace;
+
+    // AT ANY PEACE (BL-1460 fix round): every goal of THIS war that one party holds
+    // against the other and that was not ceded goes back to its owner, and the
+    // occupier's units on that province's ground the owner holds withdraw by the
+    // retreat rule — so at peace no province stays held against its owner by a former
+    // party to the war. Only where owner and holder are this war's two parties: a third
+    // nation's occupation, from its own war, is untouched. A ceded goal is its holder's
+    // now (owner == holder) and so is skipped by the same test.
     {
-        // White peace: every occupied goal's holder goes back to its owner, and the
-        // occupying units withdraw by the retreat rule (BL-1460): the occupier's
-        // units standing on that province's ground the owner holds.
+        const auto party = [&](entity_id n) { return n == war.declarer || n == war.defender; };
         std::vector<uint32_t> returned;
         std::map<uint32_t, std::pair<entity_id, entity_id>> occupied; // goal -> (owner, occupier)
         for (const std::vector<uint32_t>* goals : { &war.declarer_goals, &war.defender_goals })
@@ -740,7 +762,7 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
             {
                 const entity_id owner  = province_owner(w, g);
                 const entity_id holder = province_holder_for(w, g);
-                if (owner != null_entity && holder != owner)
+                if (owner != holder && party(owner) && party(holder))
                 {
                     set_holder(w, g, owner);
                     returned.push_back(g);
@@ -750,6 +772,7 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
         if (!returned.empty())
         {
             std::sort(returned.begin(), returned.end());
+            returned.erase(std::unique(returned.begin(), returned.end()), returned.end());
             std::vector<entity_id> leaving;
             for (const auto& [uid, u] : w.units) // collected; withdraw_units walks ascending
             {
@@ -762,9 +785,8 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
                 if (tn != w.tile_to_nation.end() && tn->second == oit->second.first)
                     leaving.push_back(uid);
             }
-            (void)withdraw_units(w, leaving, returned);
+            (void)withdraw_units(w, leaving, returned, peace_day_stamp(w));
         }
-        h.end = imposed ? war_end::imposed_white : war_end::white_peace;
     }
 
     // Every battle still being fought between the pair ENDS with the peace, closed
@@ -993,6 +1015,14 @@ void cede_provinces(world& w, entity_id from, entity_id to, const std::vector<ui
     nation_component& loser  = fit->second;
     nation_component& gainer = tit_n->second;
 
+    // THE OLD MAP FIRST (fix round, cold review): `reanchor_fronts` remaps a front key
+    // only against the fronts cached before the territory moved. A load drops that
+    // cache, so without this a cession right after a load would drop the assignments
+    // and orders an unbroken run remaps — the saved, hashed state would diverge. Built
+    // here from the map as it stands, before any tile moves, the old fronts exist on
+    // both paths (a no-op when the cache is already current).
+    reanchor_fronts(w);
+
     // The loser's free logistics hub, read while its capital is still its own: the
     // one `capital_free_source` names.
     entity_id free_hub = null_entity;
@@ -1105,6 +1135,45 @@ void cede_provinces(world& w, entity_id from, entity_id to, const std::vector<ui
         if (u.owner == from && u.muster_base != null_entity && w.buildings.count(u.muster_base) != 0
             && owner_nation_of(w, u.muster_base) == to)
             u.muster_base = null_entity;
+    // An air wing of the loser based at an airbase that passed REBASES to the loser's
+    // nearest own airbase (hex distance from the lost base, ties to the lower building
+    // id; an airbase on another body counts as farther than any on this one). With no
+    // airbase left it is DISBANDED, as the upkeep pass disbands a wing whose base is
+    // gone (MILITARY.md § Upkeep, the orphan rule). Wings walk ascending id.
+    {
+        std::vector<entity_id> own_bases; // ascending
+        for (const entity_id bid : loser.state_assets)
+            if (const auto bit = w.buildings.find(bid);
+                bit != w.buildings.end() && bit->second.type == building_type::airbase)
+                own_bases.push_back(bid);
+        std::sort(own_bases.begin(), own_bases.end());
+        std::vector<entity_id> disband;
+        for (auto& [wid, wg] : w.wings)
+        {
+            if (wg.owner != from || w.buildings.count(wg.airbase) == 0
+                || owner_nation_of(w, wg.airbase) != to)
+                continue;
+            const entity_id lost_tile = w.buildings.at(wg.airbase).tile;
+            entity_id best = null_entity;
+            int best_d = std::numeric_limits<int>::max();
+            for (const entity_id bid : own_bases) // ascending: a tie keeps the lower id
+            {
+                const int d0 = air_tile_distance(w, lost_tile, w.buildings.at(bid).tile);
+                const int d  = d0 < 0 ? std::numeric_limits<int>::max() - 1 : d0;
+                if (d < best_d)
+                {
+                    best_d = d;
+                    best   = bid;
+                }
+            }
+            if (best != null_entity)
+                wg.airbase = best;
+            else
+                disband.push_back(wid);
+        }
+        for (const entity_id wid : disband)
+            w.wings.erase(wid);
+    }
 
     // 7. Every derived answer that read the old map: the logistics caches (reach,
     //    anchors, the power grid, LP fields) drop here; the market catchment and the
@@ -1116,7 +1185,7 @@ void cede_provinces(world& w, entity_id from, entity_id to, const std::vector<ui
     for (const auto& [uid, u] : w.units) // collected, then walked ascending by withdraw_units
         if (u.owner == from && u.count > 0 && was_ceded(u.position))
             leaving.push_back(uid);
-    (void)withdraw_units(w, leaving, provinces);
+    (void)withdraw_units(w, leaving, provinces, peace_day_stamp(w));
 
     // 9. Fronts re-anchor onto the new border now, so a save taken before the next
     //    tick holds no assignment keyed on ground its unit's nation no longer holds.
