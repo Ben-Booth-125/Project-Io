@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*34 entries — 28 open, 6 resolved.*
+*35 entries — 29 open, 6 resolved.*
 
 ---
 
@@ -372,6 +372,20 @@ set_embargo exists and the player can press it; no scorer issues it, so rivals n
 > **Recommendation:** Accept all five; (4) is the ground passing with what stands on it.
 
 *Files: `src/world/war.cpp`, `src/world/market_clearing.cpp`*
+
+### NR-1119 — May a rival impose peace on the player at 100?
+*question · raised 2026-10-31 · from Lane R report, sprint 61 (BL-1461 rivals declare war), 2026-10-31*
+
+The war grant's Not-admitted clause says the player's wars "only the player answers and ends". The lane read that as forbidding a rival to IMPOSE on the player at 100: at 100 against the player a rival offers instead, and may accept or refuse the player's offers. Imposing on a rival works as designed. Also taken: rivals declare only across a shared front; front strength counts visible standing units on the front's provinces only; answering is always taken; the war pass runs just before the fronts pass.
+
+**Why it matters.** If imposing is the player's alone to suffer too, the player can never lose ground to a rival by force - only by accepting. That makes war against the player toothless at 100.
+
+- A: a rival may impose on the player at 100 ("answers and ends" means the rival never answers or offers FOR the player, not that the player is immune)
+- B: as built - the player can only lose ground by accepting
+
+> **Recommendation:** A. Imposing at 100 is the war's one forcing outcome; immunity removes the threat the ledger exists to read.
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
 
 ---
 
