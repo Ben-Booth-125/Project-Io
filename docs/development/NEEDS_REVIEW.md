@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*35 entries — 29 open, 6 resolved.*
+*36 entries — 30 open, 6 resolved.*
 
 ---
 
@@ -386,6 +386,21 @@ The war grant's Not-admitted clause says the player's wars "only the player answ
 > **Recommendation:** A. Imposing at 100 is the war's one forcing outcome; immunity removes the threat the ledger exists to read.
 
 *Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1120 — Three war loose ends: spectate, offer churn, the public record
+*question · raised 2026-10-31 · from Cold review of Lane R, sprint 61 (BL-1461 rivals declare war), 2026-10-31*
+
+(1) In spectate mode the player's nation has no one in its seat and the war pass never scores it, so a rival's war against it is never answered, its offers never answered, and it never ends; other strategic tiers score the player's nation while spectating (BL-409). (2) A rival that offers white peace and is refused re-offers on its next evaluation with no cooldown - endless offer and refuse, one verb a war per evaluation. (3) No war verb writes to the history log or the AI decision ring; only a harness-only trace records why a rival declared, though every declaration is public.
+
+**Why it matters.** (1) leaves permanent wars in every spectated run; (3) means the player learns of a war on them only from the ledger, never from a dispatch or the log.
+
+- (1) A: while spectating, the war pass scores the player's nation like any rival (BL-409's rule) / B: leave it
+- (2) A: a refused offer may not be repeated for 4 ticks (needs a saved refusal tick) / B: accept the churn
+- (3) A: declarations and peaces write a history entry and raise a chat dispatch to the player when it is party / B: the ledger is enough
+
+> **Recommendation:** 1A, 2A, 3A. (3) answers diplomacy.md open question 2 as well.
+
+*Files: `src/world/corp_ai.cpp`, `src/world/war.cpp`*
 
 ---
 
