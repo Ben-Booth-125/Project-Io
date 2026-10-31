@@ -1145,8 +1145,22 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // shape — a pair key, then its value — so the only layout change is the
     // second float, and world_save_version 2 is what refuses to read a v1
     // snapshot's single-float records as this.
-    w_map(out, w.sentiment.pairs, w_id_pair,
-          [](std::ostream& s, const sentiment_value& v) { w_f32(s, v.access); w_f32(s, v.trust); });
+    // BL-1432 (v68): Alarm rides a trailing section, so this record keeps its shape.
+    // A v67-or-older stream has no form for an Alarm-only row (Access and Trust both
+    // zero would read as a stored neutral row), so an old-version write leaves those
+    // rows out; from v68 every row is written here and its Alarm follows at the end.
+    if (version >= k_world_save_version_alarm)
+        w_map(out, w.sentiment.pairs, w_id_pair,
+              [](std::ostream& s, const sentiment_value& v) { w_f32(s, v.access); w_f32(s, v.trust); });
+    else
+    {
+        std::map<std::pair<entity_id, entity_id>, sentiment_value> old_rows;
+        for (const auto& [k, v] : w.sentiment.pairs)
+            if (v.access != 0.0f || v.trust != 0.0f)
+                old_rows.emplace(k, v);
+        w_map(out, old_rows, w_id_pair,
+              [](std::ostream& s, const sentiment_value& v) { w_f32(s, v.access); w_f32(s, v.trust); });
+    }
 
     // --- logistics ----------------------------------------------------------
     w_vec(out, w.convoys, w_convoy);
@@ -1802,12 +1816,60 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         for (const active_battle& b : w.battles)
             w_i32(out, b.attacker_recon_milli);
     }
+
+    // world_save_version 68 (BL-1432 / BL-1458): ALARM AND THE EMITTERS' GATHERED
+    // CONDUCT, the last section, after the battle carry. Alarm only where it is not
+    // zero, in the sentiment map's own (sorted) order; then the pending queue in queue
+    // order, the trade landed since the last fold and the last fold's trading pairs.
+    if (version >= k_world_save_version_alarm)
+    {
+        uint32_t alarmed = 0;
+        for (const auto& [k, v] : w.sentiment.pairs)
+            if (v.alarm != 0.0f)
+                ++alarmed;
+        w_u32(out, alarmed);
+        for (const auto& [k, v] : w.sentiment.pairs)
+            if (v.alarm != 0.0f)
+            {
+                w_id(out, k.first);
+                w_id(out, k.second);
+                w_f32(out, v.alarm);
+            }
+        w_u32(out, static_cast<uint32_t>(w.sentiment_pending.size()));
+        for (const sentiment_event& e : w.sentiment_pending)
+        {
+            w_id(out, e.observer);
+            w_id(out, e.subject);
+            w_u8(out, static_cast<uint8_t>(e.kind));
+            w_f32(out, e.magnitude);
+            w_f32(out, e.alarm_scale);
+        }
+        w_u32(out, static_cast<uint32_t>(w.sentiment_trade_landed.size()));
+        for (const auto& [k, v] : w.sentiment_trade_landed)
+        {
+            w_id(out, k.first);
+            w_id(out, k.second);
+            w_f32(out, v);
+        }
+        w_u32(out, static_cast<uint32_t>(w.sentiment_trade_last.size()));
+        for (const auto& k : w.sentiment_trade_last)
+        {
+            w_id(out, k.first);
+            w_id(out, k.second);
+        }
+    }
 }
 
 void write_world_snapshot_pre_air(const world& w, std::ostream& out)
 {
     // VERIFICATION ONLY (BL-1449): the v64 stream shape — no air section.
     write_world_snapshot_at(w, out, k_world_save_version_pre_air);
+}
+
+void write_world_snapshot_pre_alarm(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1432): the v67 stream shape - no Alarm section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_alarm);
 }
 
 void write_world_snapshot_pre_battle_carry(const world& w, std::ostream& out)
@@ -1887,6 +1949,17 @@ std::size_t world_save_battle_carry_section_bytes(const world& w)
     for (const auto& [uid, u] : w.units)
         if (u.battle_ready_carry != 0 || u.battle_hp_carry != 0 || u.tile_since_day != -1)
             n += 16;
+    return n;
+}
+
+std::size_t world_save_alarm_section_bytes(const world& w)
+{
+    std::size_t n = 4 * 4;
+    for (const auto& [k, v] : w.sentiment.pairs)
+        if (v.alarm != 0.0f)
+            n += 12;
+    n += 17 * w.sentiment_pending.size() + 12 * w.sentiment_trade_landed.size()
+       + 8 * w.sentiment_trade_last.size();
     return n;
 }
 
@@ -1982,7 +2055,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_designs    // BL-1434: v63, every design base kit
             && version != k_world_save_version_pre_air        // BL-1449: v64, no air
             && version != k_world_save_version_pre_supplies     // BL-1452: v65, every unit's stocks full
-            && version != k_world_save_version_pre_battle_carry)) // BL-1453: v66, no battle carry
+            && version != k_world_save_version_pre_battle_carry // BL-1453: v66, no battle carry
+            && version != k_world_save_version_pre_alarm))      // BL-1432: v67, every Alarm 0
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2087,14 +2161,19 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // written by the writer above, so the stream is corrupt rather than odd.
     // (`r_map` parses into a local and commits on success, so a rejection here
     // leaves the destination world untouched.)
+    // BL-1432: from v68 a row here may carry Access and Trust both zero (its Alarm,
+    // which follows in the trailing section, is not); the stored-neutral rejection
+    // then runs once the Alarm is in. Before v68 a (0, 0) row is still corruption.
+    const bool alarm_section = version >= k_world_save_version_alarm;
     if (!r_map(in, s.sentiment.pairs,
                [](std::istream& st, std::pair<entity_id, entity_id>& k) {
                    return r_id_pair(st, k) && k.first != null_entity &&
                           k.second != null_entity && k.first != k.second;
                },
-               [](std::istream& st, sentiment_value& v) {
+               [alarm_section](std::istream& st, sentiment_value& v) {
                    return r_f32(st, v.access) && r_f32(st, v.trust) &&
-                          std::isfinite(v.access) && std::isfinite(v.trust) && !v.neutral();
+                          std::isfinite(v.access) && std::isfinite(v.trust) &&
+                          (alarm_section || !v.neutral());
                }))
         return false;
 
@@ -3171,6 +3250,85 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         // SEEN, never blinded by the load (cold review).
         for (active_battle& b : s.battles)
             b.attacker_recon_milli = legacy_battle_recon_milli(s, b);
+    }
+
+    // v68 (BL-1432 / BL-1458): Alarm and the emitters' gathered conduct. Untrusted:
+    // Alarm rows strictly ascending, each a row the sentiment map holds, finite and
+    // non-zero; then no row may be wholly neutral. Pending events with an in-range
+    // kind and finite numbers, at most `sentiment_max_records`; trade pairs strictly
+    // ascending, non-null and distinct, landed values finite and positive. Refused
+    // whole otherwise. A v67 (and older) stream ends before it: every Alarm 0, nothing
+    // pending.
+    if (alarm_section)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.sentiment.pairs.size())
+            return false;
+        std::pair<entity_id, entity_id> prev{ null_entity, null_entity };
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            std::pair<entity_id, entity_id> key{ null_entity, null_entity };
+            float a = 0.0f;
+            if (!r_id(in, key.first) || !r_id(in, key.second) || !r_f32(in, a)
+                || (k > 0 && !(prev < key)) || !std::isfinite(a) || a == 0.0f)
+                return false;
+            prev = key;
+            const auto it = s.sentiment.pairs.find(key);
+            if (it == s.sentiment.pairs.end())
+                return false;
+            it->second.alarm = a;
+        }
+        for (const auto& [key, v] : s.sentiment.pairs)
+            if (v.neutral())
+                return false; // a stored neutral row cannot have been written
+
+        uint32_t pending = 0;
+        if (!r_u32(in, pending) || pending > sentiment_max_records)
+            return false;
+        s.sentiment_pending.reserve(pending);
+        for (uint32_t k = 0; k < pending; ++k)
+        {
+            sentiment_event e;
+            uint8_t kind = 0;
+            if (!r_id(in, e.observer) || !r_id(in, e.subject) || !r_u8(in, kind)
+                || !r_f32(in, e.magnitude) || !r_f32(in, e.alarm_scale)
+                || kind >= sentiment_factor_count || !std::isfinite(e.magnitude)
+                || !std::isfinite(e.alarm_scale))
+                return false;
+            e.kind = static_cast<sentiment_factor_kind>(kind);
+            s.sentiment_pending.push_back(e);
+        }
+
+        uint32_t landed = 0;
+        if (!r_u32(in, landed) || landed > sentiment_max_records)
+            return false;
+        prev = { null_entity, null_entity };
+        for (uint32_t k = 0; k < landed; ++k)
+        {
+            std::pair<entity_id, entity_id> key{ null_entity, null_entity };
+            float v = 0.0f;
+            if (!r_id(in, key.first) || !r_id(in, key.second) || !r_f32(in, v)
+                || key.first == null_entity || key.second == null_entity || key.first == key.second
+                || (k > 0 && !(prev < key)) || !std::isfinite(v) || !(v > 0.0f))
+                return false;
+            prev = key;
+            s.sentiment_trade_landed.emplace(key, v);
+        }
+
+        uint32_t last = 0;
+        if (!r_u32(in, last) || last > sentiment_max_records)
+            return false;
+        prev = { null_entity, null_entity };
+        for (uint32_t k = 0; k < last; ++k)
+        {
+            std::pair<entity_id, entity_id> key{ null_entity, null_entity };
+            if (!r_id(in, key.first) || !r_id(in, key.second)
+                || key.first == null_entity || key.second == null_entity || key.first == key.second
+                || (k > 0 && !(prev < key)))
+                return false;
+            prev = key;
+            s.sentiment_trade_last.insert(key);
+        }
     }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct

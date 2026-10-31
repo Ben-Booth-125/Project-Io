@@ -331,7 +331,9 @@ int main()
         // BL-1449 (v65): then the air section, six empty counts (24 bytes).
         // BL-1452 (v66): then the carried-supplies section, one empty count (4 bytes).
         // BL-1453 (v67): then the battle-carry section.
-        const std::size_t fronts_tail = 8 + 4 + 12 + 24 + 4 + world_save_battle_carry_section_bytes(f.w);
+        // BL-1432 (v68): then the Alarm / emitter section, last.
+        const std::size_t fronts_tail = 8 + 4 + 12 + 24 + 4 + world_save_battle_carry_section_bytes(f.w)
+                                      + world_save_alarm_section_bytes(f.w);
         check(ok60 && v60.size() == bytes.size() - (4 + 10) - fronts_tail && !unit_refitting(old.units.at(b))
                   && old.units.at(b).type == levy,
               "R5b a v60 stream (14 bytes shorter) reads as no refit");

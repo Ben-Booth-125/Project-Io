@@ -3431,9 +3431,11 @@
    "advantage": "-1% Alarm toward you",
    "effects": [
     {
-     "kind": "unread",
-     "what": "-1% Alarm toward you",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
     }
    ],
    "cost_units": 1
@@ -3453,9 +3455,11 @@
    "advantage": "-1% Alarm toward you",
    "effects": [
     {
-     "kind": "unread",
-     "what": "-1% Alarm toward you",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
     }
    ],
    "cost_units": 1
@@ -3537,9 +3541,11 @@
      "value": 1.1
     },
     {
-     "kind": "unread",
-     "what": "rivals’ Alarm +5",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_tell",
+     "scope": "all",
+     "op": "add",
+     "value": 5
     },
     {
      "kind": "unread",
@@ -3566,9 +3572,11 @@
    "advantage": "-1% Alarm toward you",
    "effects": [
     {
-     "kind": "unread",
-     "what": "-1% Alarm toward you",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
     }
    ],
    "cost_units": 2
@@ -3588,9 +3596,11 @@
    "advantage": "-1% Alarm toward you",
    "effects": [
     {
-     "kind": "unread",
-     "what": "-1% Alarm toward you",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
     }
    ],
    "cost_units": 3
@@ -3611,9 +3621,11 @@
    "advantage": "-1% Alarm toward you",
    "effects": [
     {
-     "kind": "unread",
-     "what": "-1% Alarm toward you",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
     }
    ],
    "cost_units": 2
@@ -3633,9 +3645,11 @@
    "advantage": "-1% Alarm toward you",
    "effects": [
     {
-     "kind": "unread",
-     "what": "-1% Alarm toward you",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
     }
    ],
    "cost_units": 3
@@ -3682,9 +3696,11 @@
      "waits_on": "battle resolution"
     },
     {
-     "kind": "unread",
-     "what": "every rival’s Alarm toward you +10",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_tell",
+     "scope": "all",
+     "op": "add",
+     "value": 10
     }
    ],
    "cost_units": 24,
@@ -3755,9 +3771,11 @@
    "advantage": "Alarm toward you -5%",
    "effects": [
     {
-     "kind": "unread",
-     "what": "Alarm toward you -5%",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.95
     }
    ],
    "cost_units": 6
@@ -3780,9 +3798,11 @@
    "advantage": "every nation’s Alarm toward you -25%; every nation’s Alarm toward every other decays 10% faster",
    "effects": [
     {
-     "kind": "unread",
-     "what": "every nation’s Alarm toward you -25%",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.75
     },
     {
      "kind": "unread",
@@ -3812,9 +3832,11 @@
    "advantage": "-3% Alarm toward you",
    "effects": [
     {
-     "kind": "unread",
-     "what": "-3% Alarm toward you",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.97
     }
    ],
    "cost_units": 4
@@ -3840,9 +3862,11 @@
    "advantage": "Alarm toward you decays 10% faster",
    "effects": [
     {
-     "kind": "unread",
-     "what": "Alarm toward you decays 10% faster",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_decay",
+     "scope": "all",
+     "op": "multiply",
+     "value": 1.1
     }
    ],
    "keys_next_branch": "Planetary Accords",
@@ -4041,9 +4065,11 @@
      "waits_on": "unrest"
     },
     {
-     "kind": "unread",
-     "what": "-1% Alarm toward you",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
     }
    ],
    "cost_units": 3
@@ -4074,9 +4100,11 @@
      "value": 1.01
     },
     {
-     "kind": "unread",
-     "what": "-1% Alarm toward you",
-     "waits_on": "Alarm"
+     "kind": "modifier",
+     "subject": "alarm_toward",
+     "scope": "all",
+     "op": "multiply",
+     "value": 0.99
     }
    ],
    "cost_units": 3

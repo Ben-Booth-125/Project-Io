@@ -225,8 +225,10 @@ nine ticks, and
 
     rate = 1 − 2^(−1 / 9) = 0.074125
 
-is `trust_decay_per_tick`. `access_decay_per_tick` is the same value — there is no separate ruling
-for Access. The loader (`recipe_registry.cpp`) rejects either rate unless it is a finite number in
+is `trust_decay_per_tick`. `access_decay_per_tick` and `alarm_decay_per_tick` are the same value —
+there is no separate ruling for Access or Alarm. What counts as a *large* single-site facility for
+§ 6 is authored beside them, as `alarm_large_facility_cost`: a building whose authored build cost
+reaches it. The loader (`recipe_registry.cpp`) rejects either rate unless it is a finite number in
 [0, 1]; an authored rate is never clamped silently.
 
 The factor weights for `contract_completed` and `contract_cancelled` are **seeded from the

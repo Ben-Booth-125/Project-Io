@@ -6,6 +6,7 @@
 #include "nation_tech.hpp"     // nation_scalar: logistics_cost (BL-1274)
 #include "orbital_system.hpp"
 #include "stance.hpp"
+#include "sentiment_emitters.hpp" // BL-1458: trade_conducted at landing
 
 #include <algorithm>
 #include <cmath>
@@ -245,6 +246,10 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
                                                   static_cast<std::size_t>(convoy.cargo_resource));
             if (std::isfinite(v) && v > 0.0f)
                 mit->second.traded_in_accum += v;
+            // BL-1458 (RELATIONS.md § Who emits): the trade flow's emitter. The
+            // same value landed, accumulated per (shipper, receiver) nation pair
+            // and folded once a tick as trade_conducted.
+            note_trade_landed(w, convoy.corp, convoy.dest_market, v);
         }
 
         // THE IMPORT TARIFF (MARKETS.md § Tariffs, Ben 2026-09-15): a convoy

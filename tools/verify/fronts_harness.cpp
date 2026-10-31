@@ -841,13 +841,15 @@ int main()
         // BL-1452 (v66): and then the carried-supplies section, one empty count (4 bytes).
         // BL-1453 (v67): and then the battle-carry section.
         check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9) - 4 - 12 - 24 - 4
-                                     - world_save_battle_carry_section_bytes(f.w),
+                                     - world_save_battle_carry_section_bytes(f.w)
+                                     - world_save_alarm_section_bytes(f.w), // BL-1432 (v68)
               "F7c a v61 stream (the section's 33 bytes, v63's 4-byte stack count and v64's 12-byte designs section shorter) reads as no fronts");
 
         // A row naming nothing: the first assignment's key -> a ghost tile.
         std::string bad = bytes;
         const std::size_t tail = 4 + 12 + 24 + 4 // v63's attacking-stack section (a zero battle count), v64's empty designs section, v65's empty air section, v66's empty supplies section
-                               + world_save_battle_carry_section_bytes(f.w); // BL-1453: v67's battle carry
+                               + world_save_battle_carry_section_bytes(f.w) // BL-1453: v67's battle carry
+                               + world_save_alarm_section_bytes(f.w);       // BL-1432: v68's Alarm, last
         const std::size_t key0 = bytes.size() - tail - (4 + 9) - 2 * 8 + 4;
         const entity_id ghost = 0x7FFFFFF0u;
         std::memcpy(&bad[key0], &ghost, sizeof ghost);

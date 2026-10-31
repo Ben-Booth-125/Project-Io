@@ -6,6 +6,7 @@
 #include "placement_rules.hpp"
 #include "province.hpp"
 #include "recipe_registry.hpp"
+#include "sentiment_emitters.hpp" // BL-1458: force_used
 #include "stance.hpp"
 #include "terrain_combat.hpp"
 #include "unit_roster.hpp"
@@ -1005,6 +1006,10 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         const int lost_a = write_back(w, atk);
         const int lost_d = write_back(w, def);
         out.losses += lost_a + lost_d;
+        // BL-1458 (RELATIONS.md § Who emits): force_used, the side that lost
+        // men toward the other, magnitude the men lost. Queued, folded at the
+        // next tick's fold.
+        note_battle_losses(w, b.attacker, b.defender, lost_a, lost_d);
 
         // A spent unit leaves the fight one tile away from its enemies; a side that
         // withdrew leaves whole.

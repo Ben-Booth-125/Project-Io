@@ -1122,6 +1122,26 @@ struct world
     /// is a sorted walk over ids (BL-158).
     sentiment_table sentiment;
 
+    /// BL-1458 (RELATIONS.md § Who emits each factor): conduct observed since
+    /// the last fold, gathered by every emitter (`sentiment_emitters.hpp`) and
+    /// folded ONCE a tick, as one canonicalised batch, at the end of
+    /// `run_economy_step`. Conduct between ticks (a battle day, an accepted
+    /// friendship) waits here for that fold, so the queue crosses the save seam
+    /// (world_save_version 68). Gather order is never observable: the fold
+    /// sorts the batch before it folds it.
+    std::vector<sentiment_event> sentiment_pending;
+
+    /// BL-1458: the value of cargo landed this tick per (shipper nation,
+    /// receiving nation) — a convoy's owner nation and its destination
+    /// market's nation, foreign pairs only. Turned into one `trade_conducted`
+    /// per party per pair at the fold, then cleared. Saved (v68).
+    std::map<std::pair<entity_id, entity_id>, float> sentiment_trade_landed;
+
+    /// BL-1432: the (shipper, receiver) pairs that landed cargo at the LAST
+    /// fold, so the next can see a pair whose trade stopped (`trade_severed`).
+    /// Saved (v68).
+    std::set<std::pair<entity_id, entity_id>> sentiment_trade_last;
+
     /// BL-350's Q3 counterparty reputation, as a VIEW rather than a store
     /// (BL-546). Reputation IS sentiment's Trust dimension from the BUYER
     /// toward the SUPPLIER — directed, keyed exactly as `corp_reputation` was,

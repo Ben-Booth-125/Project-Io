@@ -837,6 +837,9 @@ void rows_t2(const recipe_registry& reg)
                 subj = s == "processing_yield" ? modifier_subject::processing_yield
                      : s == "logistics_cost" ? modifier_subject::logistics_cost
                      : s == "national_research" ? modifier_subject::national_research
+                     : s == "alarm_toward" ? modifier_subject::alarm_toward // BL-1432
+                     : s == "alarm_tell" ? modifier_subject::alarm_tell
+                     : s == "alarm_decay" ? modifier_subject::alarm_decay
                      : modifier_subject::extraction_rate;
             }
             fixture f = make_fixture();

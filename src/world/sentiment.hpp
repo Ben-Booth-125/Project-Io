@@ -138,16 +138,23 @@ struct sentiment_value
     /// this one (BL-546).
     float trust = 0.0f;
 
-    /// True iff both dimensions are exactly neutral. The predicate the "never
-    /// store a neutral row" rule is written in terms of.
-    bool neutral() const { return access == 0.0f && trust == 0.0f; }
+    /// How THREATENED the observer feels by the subject (RELATIONS.md § 6, Ben
+    /// 2026-10-26; BL-1432). Positive is alarmed; it decays toward neutral like
+    /// the other two and is relieved by live trade. It informs a declaration and
+    /// never makes one: no Alarm threshold writes a stance table (THE INVARIANT).
+    float alarm = 0.0f;
+
+    /// True iff all three dimensions are exactly neutral. The predicate the
+    /// "never store a neutral row" rule is written in terms of — a row is erased
+    /// only when Access, Trust AND Alarm are all home.
+    bool neutral() const { return access == 0.0f && trust == 0.0f && alarm == 0.0f; }
 };
 
 /// Bit-exact equality, deliberately not an epsilon compare: this is the
 /// predicate the determinism and inertness checks are stated in.
 inline bool operator==(const sentiment_value& a, const sentiment_value& b)
 {
-    return a.access == b.access && a.trust == b.trust;
+    return a.access == b.access && a.trust == b.trust && a.alarm == b.alarm;
 }
 inline bool operator!=(const sentiment_value& a, const sentiment_value& b) { return !(a == b); }
 
@@ -236,11 +243,35 @@ enum class sentiment_factor_kind : uint8_t
     /// `economy.sentiment.factors` is correct: there is nothing at runtime for
     /// it to weigh.
     historical_grudge = 11,
+    war_declared = 12,
+    peace_concluded = 13,
+    province_ceded = 14,
+
+    // --- Alarm's capability factors (RELATIONS.md § 6; BL-1432) -------------
+    // Each is emitted once a tick by `sentiment_emitters.cpp` from a visible
+    // fact about the SUBJECT; the observer is every nation that can see it.
+
+    /// The subject holds a technology whose tell is public (a held node's
+    /// `alarm_tell` modifier, nation_tech.hpp). Magnitude: the summed tell.
+    technology_visible = 15,
+    /// The subject owns a large single-site facility (a building whose
+    /// authored build cost reaches `alarm_large_facility_cost`). Magnitude:
+    /// how many it owns.
+    facility_visible = 16,
+    /// The subject stands force on a front it shares with the observer.
+    /// Magnitude: the men it has on that front.
+    border_force = 17,
+    /// The subject stopped shipping to the observer: it landed cargo in the
+    /// observer's markets last tick and none this tick. Magnitude 1.
+    trade_severed = 18,
+    /// The subject's domestic unrest. Unrest has no store in the campaign, so
+    /// nothing emits this and its weight is authored zero.
+    unrest_visible = 19,
 };
 
 /// Number of rows in `sentiment_factor_kind`. Grows when a value is appended;
 /// it is the array bound the fold indexes with, so the two cannot drift apart.
-inline constexpr std::size_t sentiment_factor_count = 12;
+inline constexpr std::size_t sentiment_factor_count = 20;
 
 /// The AUTHORING NAME of each kind, INDEXED BY the kind — the key
 /// `scripts/economy.lua`'s `sentiment.factors` table uses for that row.
@@ -263,6 +294,14 @@ inline constexpr const char* sentiment_factor_names[sentiment_factor_count] = {
     "force_used",
     "contract_failed",
     "historical_grudge",
+    "war_declared",
+    "peace_concluded",
+    "province_ceded",
+    "technology_visible",
+    "facility_visible",
+    "border_force",
+    "trade_severed",
+    "unrest_visible",
 };
 
 /// The AUTHORED weight of one kind of conduct: how far a single occurrence moves
@@ -273,6 +312,7 @@ struct sentiment_factor
 {
     float access = 0.0f; ///< Delta applied to `sentiment_value::access` per occurrence.
     float trust  = 0.0f; ///< Delta applied to `sentiment_value::trust` per occurrence.
+    float alarm  = 0.0f; ///< Delta applied to `sentiment_value::alarm` per occurrence (BL-1432).
 };
 
 /// Every tunable the substrate has, authored in scripts/economy.lua under the
@@ -307,6 +347,7 @@ struct sentiment_params
     /// at load, naming the key, so an authored value never reaches the clamp.
     float access_decay_per_tick = 0.0f;
     float trust_decay_per_tick  = 0.0f;
+    float alarm_decay_per_tick  = 0.0f; ///< BL-1432: Alarm's rate, same rules.
 
     /// Magnitude below which a DECAYING dimension snaps to exactly neutral.
     /// THIS IS NOT A FLOOR — it is the opposite of one (see the header comment):
@@ -327,12 +368,21 @@ struct sentiment_params
     float band_edge_near = 0.10f; ///< |v| below this reads neutral.
     float band_edge_far  = 0.50f; ///< |v| at or above this reads adverse/trusted.
 
+    /// BL-1432, EMITTER policy rather than substrate arithmetic (sentiment.cpp
+    /// never reads it; `sentiment_emitters.cpp` does): the authored build cost
+    /// at or above which a building counts as a LARGE SINGLE-SITE FACILITY for
+    /// the `facility_visible` Alarm factor. Zero = no building is large, so the
+    /// factor emits nothing. Authored beside the weights it feeds so the whole
+    /// of Alarm's tuning is one Lua table.
+    float alarm_large_facility_cost = 0.0f;
+
     /// True iff nothing here can move anything: every factor weight zero and
     /// neither dimension decaying. The loud statement of the inertness rule —
     /// when this holds, `run_sentiment_step` does literally nothing.
     bool inert() const
     {
-        if (access_decay_per_tick > 0.0f || trust_decay_per_tick > 0.0f)
+        if (access_decay_per_tick > 0.0f || trust_decay_per_tick > 0.0f
+            || alarm_decay_per_tick > 0.0f)
             return false;
         return factors_inert();
     }
@@ -342,7 +392,7 @@ struct sentiment_params
     bool factors_inert() const
     {
         for (const sentiment_factor& f : factors)
-            if (f.access != 0.0f || f.trust != 0.0f)
+            if (f.access != 0.0f || f.trust != 0.0f || f.alarm != 0.0f)
                 return false;
         return true;
     }
@@ -361,6 +411,13 @@ struct sentiment_event
     entity_id             subject   = null_entity; ///< Who it is about.
     sentiment_factor_kind kind      = sentiment_factor_kind::contract_completed;
     float                 magnitude = 1.0f;
+
+    /// BL-1432: a multiplier on the ALARM this occurrence RAISES (a positive
+    /// Alarm delta only; Access, Trust and a relieving Alarm delta ignore it).
+    /// The emitter fills it from the subject's held "Alarm toward you" nodes
+    /// (`alarm_toward`, nation_tech.hpp); 1.0 leaves the authored weight as is.
+    /// Part of the canonical order, so it cannot leak a gather order either.
+    float                 alarm_scale = 1.0f;
 };
 
 /// THE TABLE. Sparse and directed: keyed (observer, subject), and an ABSENT ROW
@@ -397,6 +454,14 @@ sentiment_value sentiment_toward(const sentiment_table& t, entity_id observer, e
 /// @param t The table, mutated in place.
 /// @param p Authored decay rates and epsilon.
 void decay_sentiment(sentiment_table& t, const sentiment_params& p);
+
+/// BL-1432: the same decay, with Alarm's rate multiplied PER SUBJECT by
+/// @p alarm_decay_scale (a subject absent from the map decays at the authored
+/// rate). The scale is how a held "Alarm toward you decays N% faster" node
+/// reaches the substrate without the substrate ever seeing a world: the caller
+/// resolves it and hands over a plain map. Null or empty = `decay_sentiment`.
+void decay_sentiment(sentiment_table& t, const sentiment_params& p,
+                     const std::map<entity_id, float>* alarm_decay_scale);
 
 /// Fold a batch of events into the table.
 ///
@@ -479,14 +544,18 @@ inline constexpr uint32_t sentiment_magic =
 /// Format version. Bump on any layout change to the record below — including an
 /// appended `sentiment_factor_kind`, IF a kind is ever stored (it is not today:
 /// the table stores the derived value, not the history that produced it).
-inline constexpr uint32_t sentiment_version = 1;
+inline constexpr uint32_t sentiment_version = 2;
+
+/// BL-1432: version 1 records carry (access, trust) only; still read, with
+/// Alarm 0. Version 2 adds the Alarm float to each record.
+inline constexpr uint32_t sentiment_version_pre_alarm = 1;
 
 /// Sanity ceiling on the declared row count, same reasoning as
 /// `procurement_max_records`.
 inline constexpr uint32_t sentiment_max_records = 1u << 20;
 
 /// Write @p t as magic + version, then the row count, then one record per row
-/// (observer, subject, access, trust) in sorted key order. Binary, native byte
+/// (observer, subject, access, trust, alarm) in sorted key order. Binary, native byte
 /// order — the project's settled flat-binary convention.
 void write_sentiment(const sentiment_table& t, std::ostream& out);
 

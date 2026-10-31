@@ -105,6 +105,20 @@ enum class modifier_subject : uint8_t
                          ///  cost terms. Nothing raises it yet: BL-1350 is the
                          ///  provisional pull technologies and BL-1349 the building
                          ///  standing on the centre. Appended, never inserted.
+    alarm_toward,        ///< BL-1432 (RELATIONS.md § 6): a multiplier on the Alarm
+                         ///  OTHER nations gain toward the holder — a held "-1% Alarm
+                         ///  toward you" is x0.99. WIRED: `sentiment_emitters.cpp`
+                         ///  stamps it on each event as `sentiment_event::alarm_scale`,
+                         ///  which scales only a RAISING Alarm delta. Scope "all".
+    alarm_tell,          ///< BL-1432: the PUBLIC TELL of a held technology — the
+                         ///  Alarm (op add, in Alarm points) every rival settles at
+                         ///  toward the holder while it holds the node ("every rival's
+                         ///  Alarm toward you +10"). WIRED: summed per nation and
+                         ///  emitted each tick as `technology_visible`. Scope "all".
+    alarm_decay,         ///< BL-1432: a multiplier on how fast Alarm TOWARD the holder
+                         ///  decays ("Alarm toward you decays 10% faster" is x1.10).
+                         ///  WIRED: handed to `decay_sentiment` as the per-subject
+                         ///  scale at the head of `run_economy_step`. Scope "all".
 };
 
 /// How a modifier combines with the value it moves. The three ops the BL-479

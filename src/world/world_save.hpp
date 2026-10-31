@@ -584,7 +584,26 @@ inline constexpr uint32_t world_save_magic =
 /// v66 is a STRICT PREFIX of v67 and is read too (`k_world_save_version_pre_battle_carry`),
 /// as a world with every remainder 0, every unit on its tile since before any stamp and
 /// every live battle's attacker fully seeing its defenders (`legacy_battle_recon_milli`).
-inline constexpr uint32_t world_save_version = 67;
+///
+/// Bumped to 68 (BL-1432 Alarm as sentiment, BL-1458 sentiment emitters;
+/// RELATIONS.md § The substrate, § Who emits each factor): A TRAILING SECTION after
+/// the battle carry carries, after a u32 count, every sentiment row whose Alarm is not
+/// zero, ascending (observer, subject), as (observer, subject, f32 alarm) — each a row
+/// the sentiment map earlier in the stream holds; then the emitters' gathered conduct:
+/// a u32 count and each pending event in queue order as (observer, subject, u8 kind,
+/// f32 magnitude, f32 alarm scale); a u32 count and each (shipper, receiver, f32 value)
+/// of the trade landed since the last fold, ascending; and a u32 count and each
+/// (shipper, receiver) that traded at the last fold, ascending. From v68 the sentiment
+/// map may hold a row whose Access and Trust are both zero (its Alarm is not).
+/// v67 is a STRICT PREFIX of v68 and is read too (`k_world_save_version_pre_alarm`), as
+/// a world where every Alarm is 0 and nothing is pending.
+inline constexpr uint32_t world_save_version = 68;
+
+/// BL-1432: the first version carrying the Alarm / emitter section (see above).
+inline constexpr uint32_t k_world_save_version_alarm = 68;
+
+/// BL-1432: v67, a strict prefix of v68 (the Alarm section is v68's only addition).
+inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 
 /// v65, a strict prefix of v66 (the carried-supplies section is v66's only addition).
 inline constexpr uint32_t k_world_save_version_pre_supplies = 65;
@@ -697,6 +716,11 @@ std::size_t world_save_books_section_bytes(const world& w);
 /// that measure an older stream as today's less its later sections.
 std::size_t world_save_battle_carry_section_bytes(const world& w);
 
+/// BL-1432 (v68): the bytes the Alarm / emitter section takes for @p w, the stream's
+/// LAST section - four counts, then 12 an Alarm row, 17 a pending event, 12 a landed
+/// pair and 8 a last-traded pair. For harnesses that address a section from the tail.
+std::size_t world_save_alarm_section_bytes(const world& w);
+
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and
 /// folds them away (`fold_legacy_firms`); the verification writer below writes
@@ -774,6 +798,10 @@ void write_world_snapshot_pre_supplies(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1453): @p w as a v66 stream — no battle-carry section.
 void write_world_snapshot_pre_battle_carry(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1432): the v67 stream shape - no Alarm section, and only the
+/// sentiment rows whose Access or Trust is not zero (an Alarm-only row has no v67 form).
+void write_world_snapshot_pre_alarm(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

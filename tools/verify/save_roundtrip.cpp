@@ -599,7 +599,8 @@ int main()
                                        + designs_section_bytes(wd)   // BL-1434 (v64)
                                        + air_section_bytes(wd)       // BL-1449 (v65)
                                        + supplies_section_bytes(wd)  // BL-1452 (v66)
-                                       + world_save_battle_carry_section_bytes(wd); // BL-1453 (v67), last
+                                       + world_save_battle_carry_section_bytes(wd) // BL-1453 (v67)
+                                       + world_save_alarm_section_bytes(wd);       // BL-1432 (v68), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -668,7 +669,8 @@ int main()
                                          + designs_section_bytes(wu)   // BL-1434 (v64)
                                          + air_section_bytes(wu)       // BL-1449 (v65)
                                          + supplies_section_bytes(wu)  // BL-1452 (v66)
-                                         + world_save_battle_carry_section_bytes(wu); // BL-1453 (v67), last
+                                         + world_save_battle_carry_section_bytes(wu) // BL-1453 (v67)
+                                         + world_save_alarm_section_bytes(wu);       // BL-1432 (v68), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
@@ -1600,6 +1602,15 @@ int main()
         // catch.
         f.sentiment.pairs[{ c1, c2 }] = sentiment_value{ 2.25f, -0.75f };
         f.sentiment.pairs[{ c2, c1 }] = sentiment_value{ -6.5f, 3.5f };
+        // BL-1432 (v68): Alarm, the third float, DISTINCT from the other two; and
+        // an Alarm-ONLY row (Access and Trust both zero), which v67 had no form for.
+        f.sentiment.pairs[{ c1, c2 }].alarm = 4.125f;
+        f.sentiment.pairs[{ c1, c3 }] = sentiment_value{ 0.0f, 0.0f, -1.75f };
+        // BL-1458 (v68): the emitters' gathered conduct, pending its fold.
+        f.sentiment_pending.push_back(sentiment_event{ c2, c3, sentiment_factor_kind::force_used, 250.0f, 0.99f });
+        f.sentiment_pending.push_back(sentiment_event{ c3, c2, sentiment_factor_kind::friendship_accepted, 1.0f, 1.0f });
+        f.sentiment_trade_landed[{ c1, c3 }] = 37.5f;
+        f.sentiment_trade_last.insert({ c2, c1 });
 
         // Sprint N3 T2: two nations' weight vectors. Every weight is DISTINCT
         // and one (0.3f) is non-dyadic on purpose -- a reader that widened or
@@ -1726,6 +1737,46 @@ int main()
                       && back.sentiment.pairs.at({ c1, c2 }).access == 2.25f,
                   "P8 the pair-keyed float tables keep key orientation, and "
                   "sentiment keeps Access and Trust distinct (BL-546)");
+            check(back.sentiment.pairs.at({ c1, c2 }).alarm == 4.125f
+                      && back.sentiment.pairs.at({ c1, c2 }).access == 2.25f
+                      && back.sentiment.pairs.at({ c2, c1 }).alarm == 0.0f
+                      && back.sentiment.pairs.count({ c1, c3 }) == 1
+                      && back.sentiment.pairs.at({ c1, c3 }) == sentiment_value{ 0.0f, 0.0f, -1.75f },
+                  "P8 BL-1432: Alarm round-trips distinct from Access and Trust, an "
+                  "Alarm-only row included (save v68)");
+            check(back.sentiment_pending.size() == 2
+                      && back.sentiment_pending[0].observer == c2
+                      && back.sentiment_pending[0].kind == sentiment_factor_kind::force_used
+                      && back.sentiment_pending[0].magnitude == 250.0f
+                      && back.sentiment_pending[0].alarm_scale == 0.99f
+                      && back.sentiment_pending[1].kind == sentiment_factor_kind::friendship_accepted
+                      && back.sentiment_trade_landed.size() == 1
+                      && back.sentiment_trade_landed.at({ c1, c3 }) == 37.5f
+                      && back.sentiment_trade_last.size() == 1
+                      && back.sentiment_trade_last.count({ c2, c1 }) == 1,
+                  "P8 BL-1458: the pending conduct queue, the trade accumulator and "
+                  "last fold's trading pairs round-trip in order (save v68)");
+            // v67, the strict prefix: no Alarm section. It loads with every Alarm 0,
+            // nothing pending, and the Alarm-only row (which has no v67 form) absent.
+            {
+                std::ostringstream o67(std::ios::binary);
+                write_world_snapshot_pre_alarm(f, o67);
+                const std::string b67 = o67.str();
+                std::istringstream i67(b67, std::ios::binary);
+                world w67;
+                const bool ok67 = read_world_snapshot(w67, i67);
+                uint32_t stamped = 0;
+                if (b67.size() >= 8)
+                    std::memcpy(&stamped, b67.data() + 4, sizeof stamped);
+                check(ok67 && stamped == k_world_save_version_pre_alarm
+                          && b67.size() < to_bytes(f).size()
+                          && w67.sentiment.pairs.size() == 2
+                          && w67.sentiment.pairs.at({ c1, c2 }) == sentiment_value{ 2.25f, -0.75f, 0.0f }
+                          && w67.sentiment.pairs.count({ c1, c3 }) == 0
+                          && w67.sentiment_pending.empty() && w67.sentiment_trade_landed.empty()
+                          && w67.sentiment_trade_last.empty(),
+                      "P8 BL-1432: a v67 stream loads with Alarm 0 and nothing pending");
+            }
 
             // Sprint N3 T2: the weight map, slot by slot. Exact float equality
             // is the point -- the scorer's output must survive a save unchanged

@@ -253,6 +253,10 @@ uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
         fold_u32(h, pair.second);
         fold_f32(h, v.access);
         fold_f32(h, v.trust);
+        // BL-1432: Alarm only where it is not zero, so a world with no Alarm
+        // (every generated world: generation seeds none) digests as before.
+        if (v.alarm != 0.0f)
+            fold_f32(h, v.alarm);
     }
 
     // Road EDGES per tile, SPARSE (BL-1340: a road is an edge between two tiles):

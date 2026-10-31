@@ -1,4 +1,5 @@
 #include "stance.hpp"
+#include "sentiment_emitters.hpp" // BL-1458: friendship_accepted
 
 #include <algorithm>
 
@@ -83,6 +84,11 @@ stance_result accept_friendship(world& w, entity_id offerer, entity_id target)
 
     w.corp_friend_offers.erase({offerer, target});
     w.corp_friend_pairs.insert(canonical_pair(offerer, target));
+    // BL-1458 (RELATIONS.md § Who emits): both parties observe the accepted
+    // friendship, each in its own row, folded at the next tick's fold. The
+    // declaration moves sentiment; nothing here lets sentiment move a stance.
+    queue_conduct(w, target, offerer, sentiment_factor_kind::friendship_accepted);
+    queue_conduct(w, offerer, target, sentiment_factor_kind::friendship_accepted);
     return stance_result::applied;
 }
 

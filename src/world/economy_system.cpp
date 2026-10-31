@@ -14,6 +14,7 @@
 #include "road_generation.hpp"  // lay_port_lanes: a port lays its lanes on completion (Ben, 2026-10-25)
 #include "river_generation.hpp" // BL-1340: hex_side_for_offset — a march pays the edge's road tier
 #include "population_generation.hpp" // k_population_for_scale (BL-616 promotion/decline rungs)
+#include "sentiment_emitters.hpp" // BL-1458/BL-1432: the emitters and the once-a-tick fold
 #include "stance.hpp"          // is_hostile (BL-470's NR-344 march queue; BL-617 migration gate)
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
 #include "state_industry.hpp"  // BL-1296: plan_state_funding, the state ledger
@@ -2093,7 +2094,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // to live. It is a no-op until `economy.sentiment` authors a decay rate
     // (decay_sentiment returns without visiting a row), which is what keeps an
     // unauthored build byte-identical to the pre-migration one.
-    decay_sentiment(w.sentiment, reg.sentiment());
+    //
+    // BL-1432: Alarm decays here too, and a nation holding an "Alarm toward you
+    // decays N% faster" node has the Alarm held TOWARD it shed faster
+    // (`alarm_decay_scales` resolves the held nodes into a plain map, so the
+    // substrate still never sees the world).
+    {
+        const std::map<entity_id, float> alarm_scale = alarm_decay_scales(w);
+        decay_sentiment(w.sentiment, reg.sentiment(), &alarm_scale);
+    }
 
     // Build-time pacing (playtest 2026-07-06 → BL-095): advance every building's
     // construction before anything else runs, so a building finishing this tick is
@@ -3509,6 +3518,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // that can move a border or kill a unit, so a save taken between ticks holds
     // keys that name live fronts and the cache (which a load drops) is current.
     reanchor_fronts(w);
+
+    // BL-1458 / BL-1432 (RELATIONS.md § Who emits, § 6): Alarm's capability
+    // factors read this tick's end state (after the re-anchor, so the fronts
+    // are current), then ONE fold of everything gathered since the last one -
+    // this tick's landings, the quarter's battle days, any accepted friendship -
+    // as one canonicalised batch. After decay (at the top), so conduct is worth
+    // what it was authored to be worth.
+    emit_alarm_capability(w, reg);
+    fold_pending_sentiment(w, reg);
 
     return report;
 }

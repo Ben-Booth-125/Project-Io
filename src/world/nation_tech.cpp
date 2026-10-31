@@ -411,6 +411,11 @@ namespace {
 constexpr modifier_subject k_read_subjects[] = {
     modifier_subject::extraction_rate, modifier_subject::processing_yield,
     modifier_subject::logistics_cost, modifier_subject::national_research,
+    // BL-1432 (RELATIONS.md section 6): the three Alarm subjects, read by
+    // sentiment_emitters.cpp (alarm_toward, alarm_tell) and by the economy
+    // step's sentiment decay (alarm_decay).
+    modifier_subject::alarm_toward, modifier_subject::alarm_tell,
+    modifier_subject::alarm_decay,
 };
 
 /// Mechanic keys with a reader. `space_dispatch` (Rocketry, Ben 2026-10-10):
@@ -423,7 +428,8 @@ constexpr std::string_view k_sites[] = { "farm", "fishing_wharf", "well" };
 /// The systems an unread effect or deed may wait on. Each is a lever the
 /// campaign does not carry (or carries without a nation to read it by).
 constexpr std::string_view k_unread_systems[] = {
-    "Alarm", "Ceiling", "Container Port", "Marketplace trade capacity", "Nuclear Plant",
+    // "Ceiling" retired with the Era catastrophe (RELATIONS.md § 6); nothing waits on it.
+    "Alarm", "Container Port", "Marketplace trade capacity", "Nuclear Plant",
     "Port throughput", "activity fog", "assimilation", "battle resolution",
     "building fuel draw", "building maintenance by nation", "coastal water placement",
     "construction cost by nation", "convoy cargo capacity", "deed history", "espionage",
@@ -446,6 +452,9 @@ bool parse_subject(std::string_view s, modifier_subject& out)
         { "wage_floor", modifier_subject::wage_floor },
         { "collapse_strain", modifier_subject::collapse_strain },
         { "national_research", modifier_subject::national_research },
+        { "alarm_toward", modifier_subject::alarm_toward }, // BL-1432
+        { "alarm_tell", modifier_subject::alarm_tell },     // BL-1432
+        { "alarm_decay", modifier_subject::alarm_decay },   // BL-1432
     };
     for (const auto& [name, v] : table)
         if (name == s)
@@ -556,7 +565,7 @@ void parse_scope(std::string_view s, resolved_modifier& r)
 struct effect_tables
 {
     // Read modifiers, per subject, in node-index order (the effects table's own order).
-    std::vector<resolved_modifier> by_subject[static_cast<std::size_t>(modifier_subject::national_research) + 1];
+    std::vector<resolved_modifier> by_subject[static_cast<std::size_t>(modifier_subject::alarm_decay) + 1];
     std::vector<resolved_unlock>   recipe_unlocks;
     std::vector<resolved_unlock>   structure_unlocks;
     std::vector<resolved_mechanic> mechanics;
