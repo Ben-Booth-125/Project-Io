@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*37 entries — 31 open, 6 resolved.*
+*38 entries — 32 open, 6 resolved.*
 
 ---
 
@@ -415,6 +415,20 @@ War census, 16 library seeds to tick 40: 34 wars on 9 seeds (seed 25 has 13, wit
 > **Recommendation:** A. A war that costs nothing would be the defect; damping rivals to protect a gate is a forced outcome.
 
 *Files: `src/world/corp_ai.cpp`, `tools/verify/war_census.cpp`*
+
+### NR-1122 — Two rulings collide: every capital has a base, and bases are cut like any building
+*question · raised 2026-10-31 · from Lane D report, sprint 61 (BL-1464 capital base missing), 2026-10-31*
+
+capital_military_base fails because size_opening_state_to_chest (finish_campaign_world, after the capital bases are laid) demolishes military bases on purpose: seed 46 cuts 15 (all 15 baseless nations are in the cut list), seed 28 cuts 9, seed 11 cuts 26. MILITARY.md § Nation garrisons (Ben, 2026-10-27) says every capital is generated with a military base; NATION_GENERATION.md (Ben, 2026-10-29) says military bases are cut like any building and a cut garrison stands with no recorded base.
+
+**Why it matters.** A third to two-thirds of nations open with no base, so they cannot recruit or refill (the recruit design of 2026-10-30 hires at bases) until they rebuild one.
+
+- A: the newer ruling stands - a chest can cut the capital base; the harness accepts and names it; MILITARY.md states the exception
+- B: the capital base is exempt from the cut, as the capital's free Logistic Point source is
+
+> **Recommendation:** B. Recruits now come from bases, so a baseless opening nation cannot raise or refill an army; the capital base is infrastructure the state needs, like the free hub.
+
+*Files: `src/world/state_industry.cpp`, `docs/military/MILITARY.md`, `docs/generation/NATION_GENERATION.md`*
 
 ---
 

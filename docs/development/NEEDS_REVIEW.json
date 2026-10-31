@@ -710,6 +710,27 @@
     "tools/verify/war_census.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1122",
+   "title": "Two rulings collide: every capital has a base, and bases are cut like any building",
+   "raised": "2026-10-31",
+   "kind": "question",
+   "status": "open",
+   "source": "Lane D report, sprint 61 (BL-1464 capital base missing), 2026-10-31",
+   "what": "capital_military_base fails because size_opening_state_to_chest (finish_campaign_world, after the capital bases are laid) demolishes military bases on purpose: seed 46 cuts 15 (all 15 baseless nations are in the cut list), seed 28 cuts 9, seed 11 cuts 26. MILITARY.md § Nation garrisons (Ben, 2026-10-27) says every capital is generated with a military base; NATION_GENERATION.md (Ben, 2026-10-29) says military bases are cut like any building and a cut garrison stands with no recorded base.",
+   "why_it_matters": "A third to two-thirds of nations open with no base, so they cannot recruit or refill (the recruit design of 2026-10-30 hires at bases) until they rebuild one.",
+   "options": [
+    "A: the newer ruling stands - a chest can cut the capital base; the harness accepts and names it; MILITARY.md states the exception",
+    "B: the capital base is exempt from the cut, as the capital's free Logistic Point source is"
+   ],
+   "recommendation": "B. Recruits now come from bases, so a baseless opening nation cannot raise or refill an army; the capital base is infrastructure the state needs, like the free hub.",
+   "files": [
+    "src/world/state_industry.cpp",
+    "docs/military/MILITARY.md",
+    "docs/generation/NATION_GENERATION.md"
+   ],
+   "resolution": null
   }
  ]
 }
