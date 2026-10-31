@@ -7854,7 +7854,7 @@
   },
   {
    "brief": "diplomacy-ledger",
-   "title": "BL-1462 - Slot 9: the Diplomacy ledger — Nations and Wars, the declaration and peace flows",
+   "title": "BL-1462 - Slot 8: the Diplomacy ledger — Nations and Wars, the declaration and peace flows",
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
@@ -7870,7 +7870,7 @@
      "verification": [
       "visual: scripts/verify/diplomacy_ledger.lua"
      ],
-     "requirement": "Slot 9 opens the ledger. Nations shows one row per nation with stance chips and Access/Trust/Alarm toward the player; an expanded row shows the reverse sentiment, power and front strength, trade exposure, friendship, embargo and Declare war. Wars lists every war with score, exhaustion and goals.",
+     "requirement": "Slot 8 (MENU.md's slot; diplomacy.md said 9 in error) opens the ledger. Nations shows one row per nation with stance chips and Access/Trust/Alarm toward the player; an expanded row shows the reverse sentiment, power and front strength, trade exposure, friendship, embargo and Declare war. Wars lists every war with score, exhaustion and goals.",
      "notes": null
     },
     {
