@@ -7545,20 +7545,20 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1458 - sprint 61 (Ben, 2026-10-30)",
    "batch": "sprint-61",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-31",
+   "resolution": "All three rows complete on main ae736e46.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: sentiment_harness"
      ],
      "requirement": "Each emitter in RELATIONS.md § Who emits each factor writes its factor on the stated observer -> subject rows with the stated sign per dimension: trade_conducted (per tick per pair, magnitude = value landed), friendship_accepted, embargo_imposed, force_used (magnitude = strength the observer lost). The war emitters (hostility_declared, war_declared, peace_concluded, province_ceded) are asserted by war_harness (BL-1459, BL-1428).",
-     "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 covers trade_conducted, friendship_accepted, force_used; embargo_imposed has no emitter because no embargo law exists - it lands with BL-1418 (embargo bars goods)."
+     "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 covers trade_conducted, friendship_accepted, force_used; embargo_imposed has no emitter because no embargo law exists - it lands with BL-1418 (embargo bars goods). Then main ae736e46: embargo_imposed emits on set_embargo enactment through queue_conduct (sentiment_harness 81/0, E4a-d; embargo_harness 54/0)."
     },
     {
      "id": "R2",
