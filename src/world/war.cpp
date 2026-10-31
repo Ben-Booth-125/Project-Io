@@ -423,27 +423,25 @@ war_result answer_war(world& w, entity_id defender, entity_id declarer,
 
 int war_score(const world& w, const war_record& war)
 {
-    // Occupation: tile-weighted goals held, the declarer's less the defender's, over
-    // every goal named. A goal an in-play merge has removed weighs nothing.
-    int64_t total = 0, dec_held = 0, def_held = 0;
-    for (const uint32_t g : war.declarer_goals)
-        if (const province* pr = w.provinces.find(g))
-        {
-            const int64_t n = static_cast<int64_t>(pr->tiles.size());
-            total += n;
-            if (province_holder_for(w, g) == war.declarer)
-                dec_held += n;
-        }
-    for (const uint32_t g : war.defender_goals)
-        if (const province* pr = w.provinces.find(g))
-        {
-            const int64_t n = static_cast<int64_t>(pr->tiles.size());
-            total += n;
-            if (province_holder_for(w, g) == war.defender)
-                def_held += n;
-        }
-    const double occupation =
-        total > 0 ? static_cast<double>(dec_held - def_held) / static_cast<double>(total) : 0.0;
+    // Occupation (Ben, 2026-10-31, NR-1103): each side normalised by ITS OWN goals —
+    // the tile-weighted share of the declarer's goals the declarer holds, less the
+    // tile-weighted share of the defender's (answered) goals the defender holds. An
+    // unanswered war's second term is 0. A goal an in-play merge has removed weighs
+    // nothing.
+    const auto held_share = [&w](const std::vector<uint32_t>& goals, entity_id side) {
+        int64_t total = 0, held = 0;
+        for (const uint32_t g : goals)
+            if (const province* pr = w.provinces.find(g))
+            {
+                const int64_t n = static_cast<int64_t>(pr->tiles.size());
+                total += n;
+                if (province_holder_for(w, g) == side)
+                    held += n;
+            }
+        return total > 0 ? static_cast<double>(held) / static_cast<double>(total) : 0.0;
+    };
+    const double occupation = held_share(war.declarer_goals, war.declarer)
+                            - held_share(war.defender_goals, war.defender);
     // Battles: the strength each side destroyed — the other side's men lost.
     const int64_t lost = war.declarer_men_lost + war.defender_men_lost;
     const double battles =

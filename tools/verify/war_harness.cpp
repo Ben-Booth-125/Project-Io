@@ -530,36 +530,31 @@ int main()
         const auto score = [&] { return war_score(w, *war_between(w, f.A, f.B)); };
         const auto tiles = [&](uint32_t p) { return static_cast<double>(w.provinces.find(p)->tiles.size()); };
         check(score() == 0, "P1a a fresh war scores 0 (no goal held, no battle)");
+        // NR-1103 (Ben, 2026-10-31): each side's occupation is normalised by ITS OWN goals.
         w.province_holder[holder_index(w, dg[0])] = f.A;
-        const double total = tiles(dg[0]) + tiles(dg[1]) + tiles(fg[0]);
-        const int want1 = static_cast<int>(std::llround(50.0 * tiles(dg[0]) / total));
-        check(score() == want1, "P1b the declarer holding one goal scores 50 x its tiles over all goals' tiles ("
+        const double dtot = tiles(dg[0]) + tiles(dg[1]);
+        const int want1 = static_cast<int>(std::llround(50.0 * tiles(dg[0]) / dtot));
+        check(score() == want1, "P1b the declarer holding one goal scores 50 x its tiles over ITS goals' tiles ("
                                     + std::to_string(want1) + ")");
         w.province_holder[holder_index(w, fg[0])] = f.B;
-        const int want2 = static_cast<int>(std::llround(50.0 * (tiles(dg[0]) - tiles(fg[0])) / total));
-        check(score() == want2, "P1c the defender holding its goal subtracts its tiles (" + std::to_string(want2) + ")");
+        const int want2 = static_cast<int>(std::llround(50.0 * (tiles(dg[0]) / dtot - 1.0)));
+        check(score() == want2, "P1c the defender holding all of its goals subtracts its full share, 50 ("
+                                    + std::to_string(want2) + ")");
         war_record& rec = w.wars.at({ f.A, f.B });
         rec.declarer_men_lost = 100; rec.defender_men_lost = 300;
-        const int want3 = static_cast<int>(std::llround(50.0 * (tiles(dg[0]) - tiles(fg[0])) / total + 50.0 * 200.0 / 400.0));
+        const int want3 = static_cast<int>(std::llround(50.0 * (tiles(dg[0]) / dtot - 1.0) + 50.0 * 200.0 / 400.0));
         check(score() == want3, "P1d battles: the declarer's share of strength destroyed less the defender's, half the score ("
                                     + std::to_string(want3) + ")");
-        // THE FORMULA AS WRITTEN (RELATIONS.md § 7): the denominator is EVERY goal named,
-        // so once the defender has answered, holding all of one's own goals is not the
-        // whole occupation half — neither side can reach +-100 in an answered war. Raised
-        // in the BL-1428 report as a design question; asserted here as the formula reads.
         w.province_holder[holder_index(w, dg[1])] = f.A;
-        w.province_holder[holder_index(w, fg[0])] = f.A; // A also keeps its own province
+        w.province_holder[holder_index(w, fg[0])] = f.A; // the defender holds none of its goals
         rec.declarer_men_lost = 0;
-        const int want5 = static_cast<int>(std::llround(50.0 * (tiles(dg[0]) + tiles(dg[1])) / total + 50.0));
-        check(score() == want5 && want5 < 100,
-              "P1e answered war: every declarer goal held, only defender losses scores 50 x its goals' share + 50 ("
-                  + std::to_string(want5) + "), short of 100");
+        check(score() == 100,
+              "P1e answered war: the declarer's full occupation reaches the whole occupation half (+50), +100 with only defender losses");
         w.province_holder[holder_index(w, dg[0])] = f.B; w.province_holder[holder_index(w, dg[1])] = f.B;
         w.province_holder[holder_index(w, fg[0])] = f.B;
         rec.declarer_men_lost = 500; rec.defender_men_lost = 0;
-        const int want6 = static_cast<int>(std::llround(-50.0 * tiles(fg[0]) / total - 50.0));
-        check(score() == want6 && want6 > -100,
-              "P1f the mirror: the defender holding its goal, only declarer losses (" + std::to_string(want6) + ")");
+        check(score() == -100,
+              "P1f the mirror: the defender's full occupation reaches the whole half (-50), -100 with only declarer losses");
         {
             // An unanswered war: the declarer's goals are every goal named, so +100 is reachable.
             fixture g; build(g);
@@ -774,14 +769,38 @@ int main()
                   && impose_peace(w, sp, f.A, f.B, peace_terms{}) == war_result::rejected_state && same(s, w),
               "P3s below 100 the declarer cannot impose, mutating nothing");
         w.province_holder[holder_index(w, dg[1])] = f.A;
-        s = take(w);
-        check(war_score(w, *war_between(w, f.A, f.B)) == 100
-                  && impose_peace(w, sp, f.B, f.A, peace_terms{}) == war_result::rejected_state && same(s, w),
-              "P3t at +100 the DEFENDER cannot impose, mutating nothing");
         check(impose_peace(w, sp, f.A, f.B, cede) == war_result::applied && !at_war(w, f.A, f.B)
                   && w.war_history.back().end == war_end::imposed_cession && w.war_history.back().final_score == 100
                   && w.province_cessions.size() == 2,
               "P3u at +100 the declarer imposes its cession without acceptance");
+    }
+    {
+        // The DEFENDER imposes at -100 (NR-1103 made it reachable), and only there.
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> dg = { f.provs[f.B][0] };
+        const std::vector<uint32_t> fg = { f.provs[f.A][0], f.provs[f.A][1] };
+        (void)declare_war(w, sp, f.A, f.B, dg);
+        (void)answer_war(w, f.B, f.A, fg);
+        for (const uint32_t p : fg) w.province_holder[holder_index(w, p)] = f.B; // full occupation
+        war_record& rec = w.wars.at({ f.A, f.B });
+        rec.declarer_men_lost = 400; rec.defender_men_lost = 100; // battles favour B, not wholly
+        peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.B; cede.provinces = fg;
+        snap s = take(w);
+        const int below = war_score(w, rec);
+        check(below > -100 && below < 0
+                  && impose_peace(w, sp, f.B, f.A, cede) == war_result::rejected_state && same(s, w),
+              "P3t below 100 in its favour (" + std::to_string(below) + ") the DEFENDER cannot impose, mutating nothing");
+        rec.defender_men_lost = 0; // no defender losses: the battles half is wholly B's
+        s = take(w);
+        check(war_score(w, rec) == -100
+                  && impose_peace(w, sp, f.A, f.B, peace_terms{}) == war_result::rejected_state && same(s, w),
+              "P3w at -100 the DECLARER cannot impose, mutating nothing");
+        check(impose_peace(w, sp, f.B, f.A, cede) == war_result::applied && !at_war(w, f.A, f.B)
+                  && w.war_history.back().end == war_end::imposed_cession && w.war_history.back().final_score == -100
+                  && w.war_history.back().gainer == f.B && w.province_cessions.size() == 2
+                  && w.province_cessions[0].from == f.A && w.province_cessions[0].to == f.B,
+              "P3x at -100 the defender imposes its cession of the declarer's provinces without acceptance");
     }
     {
         // Never the loser's last province.

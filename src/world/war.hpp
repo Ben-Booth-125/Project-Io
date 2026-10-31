@@ -300,7 +300,8 @@ war_price declaration_price(const world& w, const sentiment_params& p, entity_id
                             entity_id defender, const std::vector<uint32_t>& goals);
 
 /// The declarer's war score in [-100, 100] (RELATIONS.md § 7): 50 x occupation
-/// (tile-weighted held goals, declarer's less the defender's, over all goals named)
+/// (the tile-weighted share of its own goals the declarer holds, less the share of
+/// its own answered goals the defender holds; NR-1103)
 /// + 50 x battles (men lost by the defender less by the declarer, over both),
 /// rounded to the nearest integer. 0 for an unknown war.
 int war_score(const world& w, const war_record& war);
