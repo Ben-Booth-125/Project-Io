@@ -124,8 +124,8 @@ corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
 /// of @p nation's last economy tick — exactly the Balance card's "Net this
 /// quarter" (`derive_corp_rollups(...).net()`), so the header strip and the card
 /// cannot disagree. Refunds and flat construction are not operating flows and are
-/// excluded; a refund stays its own line on the card. False when the nation holds
-/// no state-ledger row this tick.
+/// excluded — the nation's card carries neither (its refunds line is a firm's, and
+/// no firm exists). False when the nation holds no state-ledger row this tick.
 bool nation_operating_net(const world& w, entity_id nation, float& net);
 
 /// Draw the Corporation ledger into the shell fold-out column, plus the
