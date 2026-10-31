@@ -653,7 +653,10 @@ for sixteen ticks — the garrison wage and the state bill together — standing
 first and the rest in the order the funding gate pays them, and leaving unbuilt whatever the chest
 cannot carry. Nothing is minted; the nation is smaller, not richer. **Military bases are cut like any
 building (Ben, 2026-10-29)**, in the gate's order; a garrison whose base is cut keeps its men and
-stands with no recorded base. The capital's source costs nothing to run (`../economy/LOGISTICS.md`
+stands with no recorded base. **A base is priced at its old upkeep in this sizing (Ben, 2026-11-01).**
+Bases carry no upkeep in play (`../military/MILITARY.md` § Recruits), so their running bill is
+nothing; the opening sizing alone prices each military base and airbase at the maintenance and wage
+it carried before that ruling, so a chest that cannot carry its bases still opens with fewer. The capital's source costs nothing to run (`../economy/LOGISTICS.md`
 § Every capital holds a source), so even a nation with an empty chest opens with its capital lit.
 **The settle builds only from surplus (Ben, 2026-10-29):** a nation's scorer in the settle may build
 only from income above its running bill, so it never spends the chest the cut sized. No nation, the player's or a

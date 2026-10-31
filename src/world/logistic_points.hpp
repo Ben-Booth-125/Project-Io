@@ -217,6 +217,13 @@ struct lp_supply_claim
     entity_id nation = null_entity; ///< the unit's own nation, whose pool serves it; null = no pool
     entity_id tile   = null_entity; ///< the tile it stands on; the request is PAID at `unit_supply_draw_tile` of it (BL-1456)
     float     need   = 0.0f;        ///< the quantity of its supplies this quarter
+    /// BL-1463 (MILITARY.md § Recruits): the recruits the unit plans to refill this
+    /// quarter, and what each costs. `need` INCLUDES recruits x lp_per_recruit. The
+    /// refill is granted in WHOLE recruits: the unit receives floor(recruits x share /
+    /// 1000), and the grant is trimmed so the pool pays only for those
+    /// (`lp_supply_row::recruits_delivered`).
+    int       recruits       = 0;
+    float     lp_per_recruit = 0.0f;
 };
 
 /// One unit's answer.
@@ -239,6 +246,10 @@ struct lp_supply_row
     /// granted / need in integer per-mille (truncated); 1000 for a request of zero.
     /// The share `run_nation_garrison_upkeep` folds into the one decay rule.
     int       share_permille = 1000;
+    /// BL-1463: the whole recruits this request's refill delivers - floor(recruits x
+    /// share_permille / 1000). `granted` holds only what they and the supplies' share cost:
+    /// the fraction of a recruit the share would have paid for is never drawn.
+    int       recruits_delivered = 0;
 };
 
 struct lp_tick

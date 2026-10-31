@@ -35,6 +35,9 @@ struct air_class_stats
     int ad_vulnerability_permille = 1000; ///< Scales the air-defence fire it takes.
     bool has_morale = true; ///< A drone has no pilot, so no morale.
     int muster_days = 90; ///< Days to raise it.
+    /// BL-1463 (MILITARY.md § Recruits): the air recruits a hire of this class spends
+    /// from its nation's air pool — a wing's crew, aircrew and ground crew together.
+    int crew = 20;
     float hire_cost = 0.0f; ///< Credits, from the treasury's uncommitted part.
     std::array<float, resource_count> hire_goods{}; ///< Bought off the shelf at hire.
     uint8_t missions = 0; ///< Bit (1 << air_mission) per mission it may fly.
@@ -84,41 +87,41 @@ inline air_params default_air_params()
     const uint8_t rec = air_mission_bit(air_mission::recon);
 
     air_class_stats& f = p.cls[static_cast<std::size_t>(air_class::fighter)];
-    f.hp = 100; f.air = 2000; f.superiority_permille = 1000; f.range = 15;
+    f.crew = 20; f.hp = 100; f.air = 2000; f.superiority_permille = 1000; f.range = 15;
     f.ad_vulnerability_permille = 700; f.muster_days = 135; f.hire_cost = 900.0f;
     g(f.hire_goods, rt::alloys, 4.0f); g(f.hire_goods, rt::electronics, 3.0f);
     g(f.hire_goods, rt::machinery, 2.0f); g(f.hire_goods, rt::refined_fuel, 2.0f);
     f.missions = sup;
 
     air_class_stats& m = p.cls[static_cast<std::size_t>(air_class::multirole)];
-    m.hp = 100; m.air = 1500; m.superiority_permille = 600; m.soft = 80; m.hard = 60;
+    m.crew = 24; m.hp = 100; m.air = 1500; m.superiority_permille = 600; m.soft = 80; m.hard = 60;
     m.range = 12; m.ad_vulnerability_permille = 1000; m.muster_days = 135; m.hire_cost = 1100.0f;
     g(m.hire_goods, rt::alloys, 4.0f); g(m.hire_goods, rt::electronics, 3.0f);
     g(m.hire_goods, rt::machinery, 2.0f); g(m.hire_goods, rt::ordnance, 2.0f);
     m.missions = static_cast<uint8_t>(tac | sup);
 
     air_class_stats& b = p.cls[static_cast<std::size_t>(air_class::bomber)];
-    b.hp = 140; b.strategic = 12; b.superiority_permille = 0; b.range = 40;
+    b.crew = 40; b.hp = 140; b.strategic = 12; b.superiority_permille = 0; b.range = 40;
     b.ad_vulnerability_permille = 1600; b.muster_days = 180; b.hire_cost = 1600.0f;
     g(b.hire_goods, rt::alloys, 6.0f); g(b.hire_goods, rt::electronics, 3.0f);
     g(b.hire_goods, rt::machinery, 3.0f); g(b.hire_goods, rt::ordnance, 3.0f);
     b.missions = str;
 
     air_class_stats& h = p.cls[static_cast<std::size_t>(air_class::helicopter)];
-    h.hp = 60; h.soft = 50; h.hard = 120; h.superiority_permille = 0; h.range = 6;
+    h.crew = 12; h.hp = 60; h.soft = 50; h.hard = 120; h.superiority_permille = 0; h.range = 6;
     h.ad_vulnerability_permille = 1300; h.muster_days = 90; h.hire_cost = 500.0f;
     g(h.hire_goods, rt::alloys, 2.0f); g(h.hire_goods, rt::machinery, 2.0f);
     g(h.hire_goods, rt::electronics, 1.0f);
     h.missions = tac;
 
     air_class_stats& d = p.cls[static_cast<std::size_t>(air_class::drone)];
-    d.hp = 40; d.soft = 40; d.hard = 40; d.recon = 150; d.superiority_permille = 0; d.range = 10;
+    d.crew = 6; d.hp = 40; d.soft = 40; d.hard = 40; d.recon = 150; d.superiority_permille = 0; d.range = 10;
     d.ad_vulnerability_permille = 1200; d.has_morale = false; d.muster_days = 90; d.hire_cost = 400.0f;
     g(d.hire_goods, rt::electronics, 2.0f); g(d.hire_goods, rt::alloys, 1.0f);
     d.missions = static_cast<uint8_t>(tac | rec);
 
     air_class_stats& r = p.cls[static_cast<std::size_t>(air_class::recon)];
-    r.hp = 80; r.recon = 300; r.superiority_permille = 0; r.range = 20;
+    r.crew = 30; r.hp = 80; r.recon = 300; r.superiority_permille = 0; r.range = 20;
     r.ad_vulnerability_permille = 800; r.muster_days = 135; r.hire_cost = 800.0f;
     g(r.hire_goods, rt::alloys, 3.0f); g(r.hire_goods, rt::electronics, 4.0f);
     r.missions = rec;

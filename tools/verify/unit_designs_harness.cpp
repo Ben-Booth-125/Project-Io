@@ -123,6 +123,7 @@ void build(fixture& f, float shelf = 100.0f)
     f.nation = w.create_entity();
     nation_component nc{};
     nc.name = "Hosts"; nc.treasury = 100000.0f;
+    nc.land_recruits = 100000; // BL-1463: a full land pool - this harness tests designs, not recruits
     f.base = w.create_entity();
     building_component b{};
     b.tile = f.home; b.type = building_type::military_base; b.ticks_remaining = 0;
