@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*18 entries — 13 open, 5 resolved.*
+*23 entries — 18 open, 5 resolved.*
 
 ---
 
@@ -184,6 +184,72 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 (a) The free source is the lowest-id running inland logistics hub on the capital. Seeds 10, 11, 12, 25 and 31 had a railway station or port standing as the capital's source and no hub, so nothing ran free and the opening cut removed their capitals' buildings (dark at the handoff). The seeding's step 0 now stands a hub on EVERY capital, beside any station or port already there. (b) purse_room_of now carries the settle cap for every spend - builds, retools, hires, refits, roads and survey dispatch alike; surveys in the settle were not separately ruled.
 
 **Why it matters.** (a) changes world shape: every capital opens with one more building (the shape probe was not re-run). The alternative is to let a station or port on the capital be the free source instead. (b) a poor nation may send fewer surveys in the settle. Merged at b0a9e9b5, G1t50 full 84.6. Work: BL-1452 (carried supplies).
+
+### NR-1103 — An answered war can never reach a score of 100
+*question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
+
+The occupation half divides held goals by ALL goals named. Once the defender answers with its own goals, neither side can reach +-100: holding every enemy goal while losing none reads 83 in the harness (P1e), and the defender tops out lower still (P1f: -67). So the defender can never impose, and the declarer can impose only while the war is unanswered.
+
+**Why it matters.** Impose at 100 (NR-1101 C) silently becomes declarer-only, and answering a war makes it unwinnable by force. Work: BL-1428 (war goals and peace).
+
+- A: normalise each side by its own goals: (my held share of your goals) less (your held share of mine), so holding all of theirs and losing none is 100
+- B: keep as built; imposing is only for an unanswered war
+- C: keep the formula, lower the impose threshold
+
+> **Recommendation:** A. It keeps half-occupation, half-battles and makes 100 reachable for either side.
+
+*Files: `src/world/war.cpp`, `docs/politics/RELATIONS.md`*
+
+### NR-1104 — Grievance can almost never hold
+*question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
+
+The grievance justification reads the adverse band, Trust <= -50 toward the target. With the nine-tick decay and the authored weights, conduct between two nations rarely pushes Trust that far, so grievance will almost never halve a price. The other three (embargo, lost ground, a friend attacked) hold as designed.
+
+**Why it matters.** A justification that never holds is a rule nobody meets. The threshold is RELATIONS § 7 design, not calibration inside a ruled range.
+
+- A: grievance holds at the hostile-leaning band (Trust <= -25)
+- B: keep -50 and let war price grievance only after long conduct
+- C: grievance counts the seeded grudge too, so an inherited war justifies the next one
+
+> **Recommendation:** A, measured once rivals declare (BL-1461 rivals declare war) so the census shows how often it holds.
+
+*Files: `src/world/war.cpp`*
+
+### NR-1105 — Is hostility without a war retired?
+*question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
+
+declare_war now writes the hostility row, and a bare declare_hostile between war parties is refused, so the defender must answer instead. Between nations NOT at war, declare_hostile still writes a hostility row with no war record: no goals, no score, no peace, and return_to_neutral ends it.
+
+**Why it matters.** Two ways to be hostile with different exits is the opposite of legible. RELATIONS § 1 predates § 7 here.
+
+- A: retire bare hostility; declare_hostile becomes declare_war (the right-click path already is)
+- B: keep both; hostility is a cold stance, war is the hot one
+
+> **Recommendation:** A. Every hostility then has goals, a score and a peace.
+
+*Files: `src/world/stance.cpp`, `docs/politics/RELATIONS.md`*
+
+### NR-1106 — Four war calls the lane took
+*decision taken on your behalf · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
+
+(1) A province belongs, for goal validity and cession, to the plurality of tile_to_nation over its tiles, ties to the lower id; province_holder is only the military holder. (2) A right-click attack on a stack standing off the defender's ground takes the defender's capital province as the first goal. (3) Justifications are pair-measure rows in war.cpp in the condition grammar (measure, comparator, operand), not condition_subject entries, which measure one actor; promoting them with a counterparty qualifier would change the save layout. (4) Exhaustion's field days are counted once a quarter from where units stand then.
+
+**Why it matters.** (2) means a declaration can name a capital the player never pointed at; (3) leaves a second predicate grammar beside META_LAYER.md.
+
+> **Recommendation:** Accept all four; promote (3) into META_LAYER only if another pair rule needs it.
+
+*Files: `src/world/war.cpp`, `src/core/app.cpp`*
+
+### NR-1107 — A front key may now sit across the border
+*novel-work · raised 2026-10-31 · from Lane F report, sprint 61 (BL-1441 front edge cases), 2026-10-31*
+
+A span whose every tile an earlier span already claimed used to be dropped, leaving a front unnamed. It is now keyed by the lowest unclaimed tile on the neighbour's side. The lane wrote the rule into MILITARY.md § Fronts. Rival front assignment also now skips a front no march can reach (front_reachable); a player-assigned unit with a refused march is still re-issued each tick.
+
+**Why it matters.** An authority-doc rule changed inside a defect fix. Digests did not move.
+
+> **Recommendation:** Accept; the key is an identity, not a place.
+
+*Files: `docs/military/MILITARY.md`, `src/world/fronts.cpp`*
 
 ---
 

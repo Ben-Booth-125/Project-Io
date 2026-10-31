@@ -360,6 +360,99 @@
    ],
    "recommendation": "B. Elimination is a whole subject. The floor keeps every nation on the map until it is designed on purpose.",
    "resolution": "Ben, 2026-10-30: B - the capital moves to the largest remaining population centre (with its free hub); a nation's last province can never be ceded, so no nation leaves the map by war. Written into RELATIONS.md § 7 and ledgers/diplomacy.md."
+  },
+  {
+   "id": "NR-1103",
+   "title": "An answered war can never reach a score of 100",
+   "raised": "2026-10-31",
+   "kind": "question",
+   "status": "open",
+   "source": "Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31",
+   "what": "The occupation half divides held goals by ALL goals named. Once the defender answers with its own goals, neither side can reach +-100: holding every enemy goal while losing none reads 83 in the harness (P1e), and the defender tops out lower still (P1f: -67). So the defender can never impose, and the declarer can impose only while the war is unanswered.",
+   "why_it_matters": "Impose at 100 (NR-1101 C) silently becomes declarer-only, and answering a war makes it unwinnable by force. Work: BL-1428 (war goals and peace).",
+   "options": [
+    "A: normalise each side by its own goals: (my held share of your goals) less (your held share of mine), so holding all of theirs and losing none is 100",
+    "B: keep as built; imposing is only for an unanswered war",
+    "C: keep the formula, lower the impose threshold"
+   ],
+   "recommendation": "A. It keeps half-occupation, half-battles and makes 100 reachable for either side.",
+   "files": [
+    "src/world/war.cpp",
+    "docs/politics/RELATIONS.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1104",
+   "title": "Grievance can almost never hold",
+   "raised": "2026-10-31",
+   "kind": "question",
+   "status": "open",
+   "source": "Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31",
+   "what": "The grievance justification reads the adverse band, Trust <= -50 toward the target. With the nine-tick decay and the authored weights, conduct between two nations rarely pushes Trust that far, so grievance will almost never halve a price. The other three (embargo, lost ground, a friend attacked) hold as designed.",
+   "why_it_matters": "A justification that never holds is a rule nobody meets. The threshold is RELATIONS § 7 design, not calibration inside a ruled range.",
+   "options": [
+    "A: grievance holds at the hostile-leaning band (Trust <= -25)",
+    "B: keep -50 and let war price grievance only after long conduct",
+    "C: grievance counts the seeded grudge too, so an inherited war justifies the next one"
+   ],
+   "recommendation": "A, measured once rivals declare (BL-1461 rivals declare war) so the census shows how often it holds.",
+   "files": [
+    "src/world/war.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1105",
+   "title": "Is hostility without a war retired?",
+   "raised": "2026-10-31",
+   "kind": "question",
+   "status": "open",
+   "source": "Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31",
+   "what": "declare_war now writes the hostility row, and a bare declare_hostile between war parties is refused, so the defender must answer instead. Between nations NOT at war, declare_hostile still writes a hostility row with no war record: no goals, no score, no peace, and return_to_neutral ends it.",
+   "why_it_matters": "Two ways to be hostile with different exits is the opposite of legible. RELATIONS § 1 predates § 7 here.",
+   "options": [
+    "A: retire bare hostility; declare_hostile becomes declare_war (the right-click path already is)",
+    "B: keep both; hostility is a cold stance, war is the hot one"
+   ],
+   "recommendation": "A. Every hostility then has goals, a score and a peace.",
+   "files": [
+    "src/world/stance.cpp",
+    "docs/politics/RELATIONS.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1106",
+   "title": "Four war calls the lane took",
+   "raised": "2026-10-31",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31",
+   "what": "(1) A province belongs, for goal validity and cession, to the plurality of tile_to_nation over its tiles, ties to the lower id; province_holder is only the military holder. (2) A right-click attack on a stack standing off the defender's ground takes the defender's capital province as the first goal. (3) Justifications are pair-measure rows in war.cpp in the condition grammar (measure, comparator, operand), not condition_subject entries, which measure one actor; promoting them with a counterparty qualifier would change the save layout. (4) Exhaustion's field days are counted once a quarter from where units stand then.",
+   "why_it_matters": "(2) means a declaration can name a capital the player never pointed at; (3) leaves a second predicate grammar beside META_LAYER.md.",
+   "recommendation": "Accept all four; promote (3) into META_LAYER only if another pair rule needs it.",
+   "files": [
+    "src/world/war.cpp",
+    "src/core/app.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1107",
+   "title": "A front key may now sit across the border",
+   "raised": "2026-10-31",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "Lane F report, sprint 61 (BL-1441 front edge cases), 2026-10-31",
+   "what": "A span whose every tile an earlier span already claimed used to be dropped, leaving a front unnamed. It is now keyed by the lowest unclaimed tile on the neighbour's side. The lane wrote the rule into MILITARY.md § Fronts. Rival front assignment also now skips a front no march can reach (front_reachable); a player-assigned unit with a refused march is still re-issued each tick.",
+   "why_it_matters": "An authority-doc rule changed inside a defect fix. Digests did not move.",
+   "recommendation": "Accept; the key is an identity, not a place.",
+   "files": [
+    "docs/military/MILITARY.md",
+    "src/world/fronts.cpp"
+   ],
+   "resolution": null
   }
  ]
 }
