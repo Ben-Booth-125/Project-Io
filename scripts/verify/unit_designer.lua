@@ -177,7 +177,7 @@ if mine == nil then
     print("unit_designer: the player has no unit; the card entry is not checked")
 else
     verify.select_unit(mine.id)
-    verify.unit_card_page(1) -- a no-op since BL-1454: the type name heads the stat grid
+    verify.unit_card_page(1) -- the roster page carries the type name
     settle()
     d = verify.unit_designer()
     if d.card_type_x < 0 then

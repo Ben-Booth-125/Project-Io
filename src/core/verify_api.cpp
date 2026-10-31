@@ -48,7 +48,6 @@
 #include "ui/selection.hpp"
 #include "ui/tech_tree_panel.hpp" // BL-1276: research_player_nation, the queue readout
 #include "ui/text_fit.hpp"
-#include "ui/unit_stat_grid.hpp" // BL-1454: verify.unit_stat_grid
 #include "world/era_timelapse.hpp" // BL-829: round 4's replay, for the history_* readouts
 #include "ui/view_nav.hpp"
 #include "world/construction.hpp"
@@ -3385,38 +3384,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             items[++k] = e;
         }
         out["items"] = items;
-        // BL-1454: the stat grid the designer drew — label, value, signed delta
-        // against the live design (0 when not editing). What the screen shows.
-        sol::table grid = st.create_table();
-        k = 0;
-        for (const auto& c : d.grid_cells)
-        {
-            sol::table e = st.create_table();
-            e["label"] = c.label; e["value"] = c.value; e["delta"] = c.delta;
-            grid[++k] = e;
-        }
-        out["grid"] = grid;
         return out;
-    });
-
-    // BL-1454 (ledgers/military.md § The stat grid): the unit card's stat grid for
-    // unit @p id, cell by cell (label, value, whether it carries a bar), from the
-    // same builder the card draws — a rival's hidden cells read "—" here too. Nil
-    // for an unknown unit. What the screen shows, nothing more.
-    v.set_function("unit_stat_grid", [this](unsigned id) -> sol::object {
-        sol::state& st = m_lua.state();
-        const auto it = m_world.units.find(static_cast<entity_id>(id));
-        if (it == m_world.units.end())
-            return sol::make_object(st, sol::lua_nil);
-        sol::table out = st.create_table();
-        int k = 0;
-        for (const ui::stat_cell& c : ui::unit_card_cells(m_world, m_registry, it->second, it->first))
-        {
-            sol::table e = st.create_table();
-            e["label"] = c.label; e["value"] = c.value; e["bar"] = c.bar >= 0.0f;
-            out[++k] = e;
-        }
-        return sol::make_object(st, out);
     });
 
     // STAGING: waive the kit research lock (unit_designs.hpp), so a check can draft
@@ -3434,8 +3402,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
 
     // Turn the unit card's accordion to page @p n (0 = strength, 1 = roster), as
-    // its own arrows did. BL-1454 folded both pages into the stat grid, so the card
-    // draws no pager now; kept so older scripts still run. UI state only.
+    // its own arrows do. UI state only.
     v.set_function("unit_card_page", [this](int n) { m_ui.selection_unit_page = n; });
 
     v.set_function("spectate", [this](bool on) { m_ui.spectating = on; });

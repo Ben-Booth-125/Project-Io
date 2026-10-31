@@ -514,10 +514,6 @@ struct unit_designer_state
 
     /// The unit card's type-name press (opens the designer for the unit's class).
     float card_type_x = -1.0f, card_type_y = -1.0f;
-    /// BL-1454: the stat grid the designer drew this frame (label, value, signed
-    /// delta against the live design; 0 when not editing) — for the verify seam.
-    struct grid_cell { std::string label; std::string value; int delta = 0; };
-    std::vector<grid_cell> grid_cells;
 };
 
 /// Where the Construction ledger's own controls landed on screen this frame, so a
