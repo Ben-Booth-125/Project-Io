@@ -1605,4 +1605,187 @@ void rail_line(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     }
 }
 
+// BL-1454: the stat glyphs (icons.hpp `stat_glyph`). Line glyphs, one stroke width
+// scaled from r so they hold at a cell's 6-8 px radius and at a tooltip's larger one.
+void stat(ImDrawList* dl, ImVec2 c, float r, stat_glyph which, ImU32 col)
+{
+    const float t = std::max(1.2f, r * 0.17f);
+    auto P = [&](float x, float y) { return ImVec2{c.x + x * r, c.y + y * r}; };
+    switch (which)
+    {
+        case stat_glyph::hp:
+        {
+            // An outlined Greek cross: twelve corners, arms a third of the box wide.
+            const float a = 0.32f, b = 0.90f;
+            const ImVec2 v[12] = {P(-a, -b), P(a, -b), P(a, -a), P(b, -a), P(b, a), P(a, a),
+                                  P(a, b),   P(-a, b), P(-a, a), P(-b, a), P(-b, -a), P(-a, -a)};
+            dl->AddPolyline(v, 12, col, ImDrawFlags_Closed, t);
+            break;
+        }
+        case stat_glyph::readiness:
+        {
+            // A gauge: the upper half-dial, a baseline, and the needle near full.
+            const ImVec2 o = P(0.0f, 0.45f);
+            dl->PathArcTo(o, r * 0.90f, 3.14159f, 6.28318f, 16);
+            dl->PathStroke(col, ImDrawFlags_None, t);
+            dl->AddLine(P(-0.90f, 0.45f), P(0.90f, 0.45f), col, t);
+            dl->AddLine(o, P(0.45f, -0.25f), col, t);
+            dl->AddCircleFilled(o, std::max(1.0f, r * 0.14f), col);
+            break;
+        }
+        case stat_glyph::morale:
+        {
+            // An outlined heart: two lobes meeting at a point below.
+            dl->PathLineTo(P(0.0f, 0.85f));
+            dl->PathBezierCubicCurveTo(P(-0.55f, 0.40f), P(-1.05f, -0.10f), P(-0.62f, -0.62f));
+            dl->PathBezierCubicCurveTo(P(-0.32f, -0.95f), P(-0.02f, -0.70f), P(0.0f, -0.38f));
+            dl->PathBezierCubicCurveTo(P(0.02f, -0.70f), P(0.32f, -0.95f), P(0.62f, -0.62f));
+            dl->PathBezierCubicCurveTo(P(1.05f, -0.10f), P(0.55f, 0.40f), P(0.0f, 0.85f));
+            dl->PathStroke(col, ImDrawFlags_None, t);
+            break;
+        }
+        case stat_glyph::food:
+        {
+            // A wheat ear: a stem, three pairs of grains angled up, a tip grain.
+            dl->AddLine(P(0.0f, 0.95f), P(0.0f, -0.55f), col, t);
+            for (int i = 0; i < 3; ++i)
+            {
+                const float y = 0.35f - static_cast<float>(i) * 0.38f;
+                dl->AddLine(P(0.0f, y), P(-0.48f, y - 0.30f), col, t);
+                dl->AddLine(P(0.0f, y), P(0.48f, y - 0.30f), col, t);
+            }
+            dl->AddLine(P(0.0f, -0.55f), P(0.0f, -0.95f), col, t * 1.4f);
+            break;
+        }
+        case stat_glyph::ammunition:
+        {
+            // Two shells: a case under a pointed ogive, side by side, each banded.
+            for (int s = -1; s <= 1; s += 2)
+            {
+                const float x = 0.40f * static_cast<float>(s), hw = 0.24f;
+                const ImVec2 v[5] = {P(x - hw, 0.90f), P(x - hw, -0.25f), P(x, -0.90f),
+                                     P(x + hw, -0.25f), P(x + hw, 0.90f)};
+                dl->AddPolyline(v, 5, col, ImDrawFlags_Closed, t);
+                dl->AddLine(P(x - hw, 0.55f), P(x + hw, 0.55f), col, t);
+            }
+            break;
+        }
+        case stat_glyph::equipment:
+        {
+            // A helmet: a dome over a brim that runs past it either side, a chin strap.
+            dl->PathArcTo(P(0.0f, 0.25f), r * 0.68f, 3.14159f, 6.28318f, 16);
+            dl->PathStroke(col, ImDrawFlags_None, t);
+            dl->AddLine(P(-0.95f, 0.25f), P(0.95f, 0.25f), col, t);
+            dl->AddLine(P(-0.40f, 0.25f), P(-0.40f, 0.65f), col, t);
+            dl->AddLine(P(0.40f, 0.25f), P(0.40f, 0.65f), col, t);
+            dl->AddLine(P(-0.40f, 0.65f), P(0.40f, 0.65f), col, t);
+            break;
+        }
+        case stat_glyph::soft_attack:
+        {
+            dl->AddCircle(c, r * 0.62f, col, 20, t);
+            dl->AddLine(P(0.0f, -0.98f), P(0.0f, -0.32f), col, t);
+            dl->AddLine(P(0.0f, 0.32f),  P(0.0f, 0.98f),  col, t);
+            dl->AddLine(P(-0.98f, 0.0f), P(-0.32f, 0.0f), col, t);
+            dl->AddLine(P(0.32f, 0.0f),  P(0.98f, 0.0f),  col, t);
+            break;
+        }
+        case stat_glyph::hard_attack:
+        {
+            // An arrow from the left striking a thick plate at the right.
+            dl->AddLine(P(0.62f, -0.90f), P(0.62f, 0.90f), col, t * 2.2f);
+            dl->AddLine(P(-0.95f, 0.0f), P(0.35f, 0.0f), col, t);
+            dl->AddLine(P(0.35f, 0.0f), P(0.0f, -0.35f), col, t);
+            dl->AddLine(P(0.35f, 0.0f), P(0.0f, 0.35f), col, t);
+            break;
+        }
+        case stat_glyph::defence:
+        {
+            const ImVec2 v[6] = {P(0.0f, -0.92f), P(0.80f, -0.62f), P(0.72f, 0.15f),
+                                 P(0.0f, 0.95f),  P(-0.72f, 0.15f), P(-0.80f, -0.62f)};
+            dl->AddPolyline(v, 6, col, ImDrawFlags_Closed, t);
+            break;
+        }
+        case stat_glyph::breakthrough:
+        {
+            // A wall in two pieces with a gap, an arrow running through the gap.
+            dl->AddLine(P(0.15f, -0.95f), P(0.15f, -0.32f), col, t * 2.0f);
+            dl->AddLine(P(0.15f, 0.32f),  P(0.15f, 0.95f),  col, t * 2.0f);
+            dl->AddLine(P(-0.95f, 0.0f), P(0.92f, 0.0f), col, t);
+            dl->AddLine(P(0.92f, 0.0f), P(0.58f, -0.32f), col, t);
+            dl->AddLine(P(0.92f, 0.0f), P(0.58f, 0.32f), col, t);
+            break;
+        }
+        case stat_glyph::hardness:
+        {
+            // A hexagonal plate, an inner plate filled.
+            ImVec2 o[6], in[6];
+            for (int i = 0; i < 6; ++i)
+            {
+                const float a = 0.5236f + static_cast<float>(i) * 1.0472f;
+                o[i]  = P(0.92f * std::cos(a), 0.92f * std::sin(a));
+                in[i] = P(0.42f * std::cos(a), 0.42f * std::sin(a));
+            }
+            dl->AddPolyline(o, 6, col, ImDrawFlags_Closed, t);
+            dl->AddConvexPolyFilled(in, 6, col);
+            break;
+        }
+        case stat_glyph::recon:
+        case stat_glyph::stealth:
+        {
+            // An eye: two arcs meeting at the corners, a filled pupil; stealth strikes it.
+            dl->PathLineTo(P(-0.95f, 0.0f));
+            dl->PathBezierQuadraticCurveTo(P(0.0f, -0.95f), P(0.95f, 0.0f));
+            dl->PathBezierQuadraticCurveTo(P(0.0f, 0.95f), P(-0.95f, 0.0f));
+            dl->PathStroke(col, ImDrawFlags_None, t);
+            dl->AddCircleFilled(c, r * 0.24f, col);
+            if (which == stat_glyph::stealth)
+                dl->AddLine(P(-0.80f, 0.80f), P(0.80f, -0.80f), col, t * 1.3f);
+            break;
+        }
+        case stat_glyph::speed:
+        {
+            for (int k = 0; k < 2; ++k)
+            {
+                const float x = -0.55f + static_cast<float>(k) * 0.70f;
+                dl->AddLine(P(x, -0.75f), P(x + 0.45f, 0.0f), col, t);
+                dl->AddLine(P(x + 0.45f, 0.0f), P(x, 0.75f), col, t);
+            }
+            break;
+        }
+        case stat_glyph::air_attack:
+        {
+            dl->AddCircle(c, r * 0.90f, col, 20, t);
+            dl->AddLine(P(-0.48f, 0.30f), P(0.0f, -0.40f), col, t);
+            dl->AddLine(P(0.0f, -0.40f), P(0.48f, 0.30f), col, t);
+            break;
+        }
+        case stat_glyph::strategic:
+        {
+            // A bomb, nose down, finned, over a ground line.
+            dl->AddEllipse(P(0.0f, -0.05f), {r * 0.30f, r * 0.50f}, col, 0.0f, 16, t);
+            dl->AddLine(P(0.0f, -0.55f), P(-0.30f, -0.92f), col, t);
+            dl->AddLine(P(0.0f, -0.55f), P(0.30f, -0.92f), col, t);
+            dl->AddLine(P(-0.30f, -0.92f), P(0.30f, -0.92f), col, t);
+            dl->AddLine(P(-0.95f, 0.85f), P(0.95f, 0.85f), col, t);
+            break;
+        }
+        case stat_glyph::range:
+        {
+            // A point at the lower left, three quarter-rings out from it.
+            const ImVec2 o = P(-0.80f, 0.80f);
+            dl->AddCircleFilled(o, std::max(1.0f, r * 0.16f), col);
+            for (int k = 1; k <= 3; ++k)
+            {
+                dl->PathArcTo(o, r * 0.55f * static_cast<float>(k), -1.5708f, 0.0f, 10);
+                dl->PathStroke(col, ImDrawFlags_None, t);
+            }
+            break;
+        }
+        case stat_glyph::supply:
+            supply(dl, c, r * 0.85f, col);
+            break;
+    }
+}
+
 } // namespace ui::icons

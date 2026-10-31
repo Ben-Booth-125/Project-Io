@@ -1060,7 +1060,8 @@ struct ui_state
     entity_id strategy_readout_corp = null_entity;
 
 
-    /// Unit Selection card accordion page index — Strength / Roster, whichever apply.
+    /// Retired pager index: the unit card is one page since its stat grid (BL-1454). Kept
+    /// only so `verify.unit_card_page` and the resets that zero it stay harmless.
     int selection_unit_page = 0;
 
     /// Show the selected unit's GROUP — every unit of its owner on its tile — rather

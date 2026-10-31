@@ -438,34 +438,21 @@ A selected **Unit** (`selection_kind::unit`) takes the **same 3-column band shap
 building/tile elements (`draw_unit_selection_body`, `src/ui/selection_panel.cpp`) — the
 card's shape is built ahead of units carrying much in the live economy (Ben's direction).
 
-1. **Left quarter — a generic humanoid placeholder glyph** (`glyph_soldier`): a filled circle
-   head over a triangle body. There is no unit-type-keyed glyph vocabulary (unlike buildings'
-   `ui::icons::building`), so this is an honest placeholder rather than a faked per-type icon.
-2. **Centre half — a paged accordion** (`unit_pages()` / `draw_unit_page()`, the same
-   list+dispatch-pair precedent as `tile_metrics` and `building_pages`), reading real
-   `unit_component` fields only:
-   - **Strength** — `strength` and `count`. `unit_component::strength` is documented in
-     `components.hpp` as a fixed-point combat strength scalar, but every writer
-     (`corp_command.cpp`'s `hire_unit`, `corporation_generation.cpp`, `hard_coded_world.cpp`)
-     sets it equal to the raw manpower count with no scale factor, and the hover-card reader
-     (`entity_summary.cpp::draw_unit_summary`) prints it raw — so this page prints the raw
-     value too, rather than guess a divisor that would disagree with the other surface.
-   - **Roster** — `type` resolved through `unit_roster_table()` (`hire_unit` sets
-     `unit_component::type` from that table's own index; an out-of-range index falls back to
-  `"Type %u"`) and `owner` resolved via the same owner-name lookup the building card's rival
-     summary uses.
+1. **Left quarter — the class's portrait**: the designer's authored image of the land class the
+   unit fights as (`assets/units/<class>.png`, `unit_art.hpp`), scaled with its aspect kept; the
+   humanoid placeholder glyph (`glyph_soldier`) where a class has no image.
+2. **Centre half — the unit's type and owner over its stat grid** (`ledgers/military.md` § The
+   stat grid; `stat_grid.hpp`, the one grid the designer also draws): the roster type's name
+   (`unit_roster_display_name`; on the player's own unit, the designer's door), the land class it
+   fights as and the owner; then the four bands of numbers; then a line each for what the grid
+   does not hold — an older design, a refit in progress, the front it holds, a supply shortfall.
 3. **Right quarter — a 2×3 action grid**: **Go to** (`focus_on_entity`), **March**, **Halt**,
    **Disband**, **Refit** and **Assign to front** (§ The front element), matching the
    tile/building cards' pattern.
 
-`ui_state::selection_unit_page` is the pager index, mirroring `selection_building_page`.
-
-**The stat grid takes the centre (Ben, 2026-10-29).** Beside the portrait — the class's authored
-image (`assets/units/<class>.png`, the designer's) in the left quarter — the centre column is the
-unit's **stat grid** (`ledgers/military.md` § The stat grid): every stat the unit fights with, in
-one grid, headed by its type and owner. The Strength and Roster pages fold into it; what is left
-(the front it holds, a refit in progress) is a line under the grid. A rival's unit shows design
-stats only once seen, internals never.
+**The stat grid takes the centre (Ben, 2026-10-29).** Every stat the unit fights with is in one
+grid, so the card has no pages: the Strength and Roster pages that held them fold into it. A
+rival's unit shows design stats only once seen, internals never.
 
 A unit standing with others of its owner on its tile carries a **`< Group (N)`** press in the
 card's header, left of 'go to', which returns the band to that group (§ The unit group element).
@@ -487,8 +474,11 @@ unit rung); any selection made elsewhere clears it.
 1. **Header** — the owner, `N units`, and the tile's grid position; 'go to' on the right. A group
    of the player's own units carries **Assign to front** left of 'go to', assigning every unit of
    the group in one press (§ The front element).
-2. **Left quarter** — the counter itself, drawn large: band, count, and the summed bars.
-3. **The rest — one row per unit**: roster type, the land class it fights as, men over
+2. **A narrow left column** — the counter itself, drawn large: band, count, and the summed bars.
+3. **The group's stat grid** (`ledgers/military.md` § The stat grid) — the unit card's grid, each
+   cell the group's mean with its lowest-to-highest range in smaller type beneath (Ben,
+   2026-10-30).
+4. **The rest — one row per unit**: roster type, the land class it fights as, men over
    establishment, an HP bar and a readiness bar in the counter's colours, and morale.
    **A row is the door to that unit's card** (DRILL_THROUGH.md), whose `< Group (N)` press
    comes back.

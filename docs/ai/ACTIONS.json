@@ -2923,14 +2923,27 @@
   {
    "id": "ledger.selection_unit_type_designer",
    "family": "ledger",
-   "surface": "Selection band, the unit card's Roster page (the card's second page): the unit type's name under 'Type', for the player's own unit.",
+   "surface": "Selection band, the unit card's centre column: the unit type's name at its head, above the stat grid, for the player's own unit (BL-1454: the card is one page; its Roster page retired).",
    "press": "Click the type name. Clicking it again while the designer is open on that unit's class closes it (the toggle rule) - unless a slot's draft is unsaved, when the designer stays open and asks Save or Discard (canvas.designer_save).",
    "args": [],
    "preconditions": [
-    "A unit of your own nation is selected and its card is on the Roster page. A rival's unit shows its type as plain text: the designer edits your own designs."
+    "A unit of your own nation is selected (its own card, not its group). A rival's unit shows its type as plain text: the designer edits your own designs."
    ],
-   "expected_output": "Opens the unit designer on the full canvas for the land class the unit fights as (as ledger.military_open_designer). When the unit's recorded design differs from the class's live design, the page also says it is on an older design and the Refit menu offers its own type as '(live design)'. Nothing in the world changes.",
+   "expected_output": "Opens the unit designer on the full canvas for the land class the unit fights as (as ledger.military_open_designer). When the unit's recorded design differs from the class's live design, the line under the stat grid says it is on an older design and the Refit menu offers its own type as '(live design)'. Nothing in the world changes.",
    "reason_to_select": "To see or change what this kind of unit carries, straight from a unit in front of you."
+  },
+  {
+   "id": "chrome.stat_grid_cell_hover",
+   "family": "chrome",
+   "surface": "The stat grid (BL-1454; ledgers/military.md § The stat grid): on the unit card and the unit group card in the Selection band, on the wing card, and at the bottom right of the land and air designers. Labelled bands - Condition, Supply, Combat, Field for a land unit; Condition, Combat, Field for a wing - of cells, each a stat glyph with its value right-aligned and no text label.",
+   "press": "Hover a cell. A read, not a command: nothing is pressed.",
+   "args": [],
+   "preconditions": [
+    "A unit, a unit group or a wing is selected, or the designer is open.",
+    "A rival unit's internals (HP, readiness, morale, food, ammunition, equipment) read a dash; its design stats read a dash unless it stands in a live battle opposite one of your units. A rival wing's every cell reads a dash."
+   ],
+   "expected_output": "A tooltip names the stat and says in one line what it does, with a dim line beneath where one applies (a unit's men over establishment; a group's 'Mean of N units'; why a cell reads a dash). On a group's card each cell is the mean, its lowest-to-highest range beneath. In the designer each design stat carries a signed delta against the live design - for the draft, or for the kit item hovered in an open slot list, previewed fitted. Nothing in the world changes.",
+   "reason_to_select": "To learn what a number on a unit or design means, or to compare a stack's spread before sending it."
   },
   {
    "id": "ledger.military_show_obsolete",

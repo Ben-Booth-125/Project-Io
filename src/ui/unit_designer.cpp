@@ -3,6 +3,7 @@
 #include "detail_level.hpp"
 #include "icons.hpp"
 #include "presentation.hpp"
+#include "stat_grid.hpp" // BL-1454: the design's stat grid, bottom right
 #include "unit_art.hpp"
 #include "wing_card.hpp" // air_class_label
 
@@ -117,6 +118,9 @@ public:
     virtual corp_command_result          check(int sl, uint16_t item) const = 0;
     virtual std::string                  item_delta(uint16_t item) const = 0; ///< Its own change, for the box.
     virtual std::vector<stat>            stats(const unit_design& d) const = 0;
+    /// The stat grid's bands for @p shown, each stat's delta against @p live (BL-1454).
+    virtual stat_bands                   bands(const recipe_registry& reg, const unit_design& shown,
+                                               const unit_design& live) const = 0;
     virtual std::string                  design_goods(const unit_design& d) const = 0;
     virtual const char*                  class_label() const = 0;
     virtual const char*                  per() const = 0;             ///< "unit" / "wing".
@@ -174,6 +178,10 @@ public:
         return stat_delta_text(zero, to_stats(d));
     }
     std::vector<stat> stats(const unit_design& d) const override { return to_stats(kit_stats(c_, d)); }
+    stat_bands bands(const recipe_registry& reg, const unit_design& shown, const unit_design& live) const override
+    {
+        return land_design_stat_bands(reg, c_, kit_stats(c_, shown), kit_stats(c_, live));
+    }
     std::string design_goods(const unit_design& d) const override { return goods_text(kit_goods(c_, d)); }
     const char* class_label() const override { return land_label(c_); }
     const char* per() const override { return "unit"; }
@@ -259,14 +267,10 @@ public:
     {
         return stat_delta_text(to_stats({}), to_stats(air_kit_catalogue()[it].delta));
     }
-    std::vector<stat> stats(const unit_design& d) const override
+    std::vector<stat> stats(const unit_design& d) const override { return to_stats(totals(d)); }
+    stat_bands bands(const recipe_registry&, const unit_design& shown, const unit_design& live) const override
     {
-        const air_class_stats& cs = reg_.military().air.cls[static_cast<std::size_t>(c_)];
-        const air_combat_stats k  = air_kit_delta(c_, d);
-        air_combat_stats t;
-        t.hp = cs.hp + k.hp;  t.air = cs.air + k.air;  t.soft = cs.soft + k.soft;  t.hard = cs.hard + k.hard;
-        t.strategic = cs.strategic + k.strategic;  t.recon = cs.recon + k.recon;  t.range = cs.range + k.range;
-        return to_stats(t);
+        return air_design_stat_bands(totals(shown), totals(live));
     }
     std::string design_goods(const unit_design& d) const override { return goods_text(air_kit_goods(c_, d)); }
     const char* class_label() const override { return air_class_label(c_); }
@@ -303,6 +307,16 @@ public:
     float anchor_y(int sl) const override { static constexpr float y[3] = {0.58f, 0.66f, 0.20f}; return y[sl]; }
 
 private:
+    /// The class's numbers plus design @p d's kit.
+    air_combat_stats totals(const unit_design& d) const
+    {
+        const air_class_stats& cs = reg_.military().air.cls[static_cast<std::size_t>(c_)];
+        const air_combat_stats k  = air_kit_delta(c_, d);
+        air_combat_stats t;
+        t.hp = cs.hp + k.hp;  t.air = cs.air + k.air;  t.soft = cs.soft + k.soft;  t.hard = cs.hard + k.hard;
+        t.strategic = cs.strategic + k.strategic;  t.recon = cs.recon + k.recon;  t.range = cs.range + k.range;
+        return t;
+    }
     static std::vector<stat> to_stats(const air_combat_stats& s)
     {
         return {{"HP", "HP", s.hp, false},
@@ -652,11 +666,16 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     d.stale_units = t.stale();
 
     // ── Layout: image in the middle, slot boxes in columns either side, the
-    //    summary strip underneath. ─────────────────────────────────────────────
+    //    summary strip underneath: the goods, the save model and Save / Revert at
+    //    its left, the stat grid at its right (BL-1454). ───────────────────────
     const ImVec2 o     = ImGui::GetCursorScreenPos();
     const ImVec2 avail = ImGui::GetContentRegionAvail();
-    // Three summary lines and the Save / Revert row under them.
-    const float  summary_h = 3.0f * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetFrameHeightWithSpacing() + 10.0f;
+    const unit_design live_d = t.live_design();
+    const float  grid_w = std::clamp(avail.x * 0.40f, 340.0f, 560.0f);
+    // The grid's height, or two summary lines and the Save / Revert row, whichever is taller.
+    const float  grid_h = stat_grid_height(t.bands(reg, design, live_d));
+    const float  summary_h = std::max(grid_h, 2.0f * ImGui::GetTextLineHeightWithSpacing()
+                                                 + ImGui::GetFrameHeightWithSpacing()) + 14.0f;
     const float  main_h    = std::max(120.0f, avail.y - summary_h);
     const float  box_w     = std::clamp(avail.x * 0.24f, 180.0f, 300.0f);
     const float  box_h     = 3.0f * line + 2.0f * pad + 4.0f;
@@ -916,24 +935,15 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
                               && t.variant_of(preview) != design.fit[static_cast<std::size_t>(d.slot_open)];
         if (has_preview)
             next.fit[static_cast<std::size_t>(d.slot_open)] = t.variant_of(preview);
-        const std::vector<stat> then = t.stats(next);
 
-        const int   n     = static_cast<int>(now_stats.size());
-        const float col_w = avail.x / static_cast<float>(std::max(1, n));
-        const float x0    = ImGui::GetCursorPosX();
-        for (int i = 0; i < n; ++i)
-        {
-            if (i) ImGui::SameLine(x0 + col_w * static_cast<float>(i));
-            const stat& c  = now_stats[static_cast<std::size_t>(i)];
-            const int   cb = then[static_cast<std::size_t>(i)].value;
-            const int   a  = c.pct ? (c.value + 5) / 10 : c.value;
-            const int   b  = c.pct ? (cb + 5) / 10 : cb;
-            if (has_preview && c.value != cb)
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(cb > c.value ? palette::positive : palette::negative),
-                                   "%s %d%s \xe2\x86\x92 %d%s", c.label, a, c.pct ? "%" : "", b, c.pct ? "%" : "");
-            else
-                ImGui::Text("%s %d%s", c.label, a, c.pct ? "%" : "");
-        }
+        // The stat grid at the right: the draft's numbers, or the hovered pick
+        // previewed fitted, each with its signed delta against the LIVE design.
+        const ImVec2 strip = ImGui::GetCursorScreenPos();
+        ImGui::SetCursorScreenPos({o.x + avail.x - grid_w, strip.y});
+        draw_stat_grid(is_air(surface) ? "air_designer" : "unit_designer", t.bands(reg, next, live_d), grid_w);
+        ImGui::SetCursorScreenPos(strip);
+        const float text_w = std::max(120.0f, avail.x - grid_w - 16.0f);
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + text_w);
         const std::string goods_now = t.design_goods(design);
         if (has_preview)
             ImGui::TextDisabled("Kit goods per %s: %s  \xe2\x86\x92  %s", t.per(), goods_now.c_str(),
@@ -985,6 +995,7 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", d.last_message.c_str());
         else
             ImGui::TextDisabled("No changes.");
+        ImGui::PopTextWrapPos();
     }
 
     // ── The close prompt: a close was asked for with an unsaved draft ─────────

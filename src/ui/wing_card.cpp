@@ -3,6 +3,7 @@
 #include "icons.hpp"
 #include "player_side.hpp" // is_player_side
 #include "presentation.hpp"
+#include "stat_grid.hpp" // BL-1454: the wing's stat grid
 
 #include "world/air_combat.hpp"
 #include "world/province.hpp" // province_holder_for
@@ -223,7 +224,6 @@ bool draw_wing_selection(const world& w, const recipe_registry& reg, ui_state& s
         return false;
     const air_wing&       wg   = it->second;
     const air_class       cls  = wing_class(wg);
-    const air_wing_stats  st   = wing_stats(reg, wg);
     const bool            mine = is_player_side(w, wg.owner);
     const ImGuiStyle&     style = ImGui::GetStyle();
     ImDrawList*           dl    = ImGui::GetWindowDrawList();
@@ -249,7 +249,10 @@ bool draw_wing_selection(const world& w, const recipe_registry& reg, ui_state& s
     ImGui::Separator();
 
     const float total_w = ImGui::GetContentRegionAvail().x;
-    const float col_w   = (total_w - 2.0f * style.ItemSpacing.x) / 3.0f;
+    // BL-1454: the left column carries the stat grid, which needs the width; the
+    // mission and provinces columns share the rest.
+    const float grid_col_w = (total_w - 2.0f * style.ItemSpacing.x) * 0.44f;
+    const float col_w      = (total_w - 2.0f * style.ItemSpacing.x - grid_col_w) * 0.5f;
     const ImGuiWindowFlags cf = ImGuiWindowFlags_NoSavedSettings;
 
     // A RIVAL's wing (BL-068): what it is and whose, nothing of its condition, its
@@ -258,30 +261,21 @@ bool draw_wing_selection(const world& w, const recipe_registry& reg, ui_state& s
     {
         const char* who = owner_display_name(w, wg.owner);
         ImGui::TextDisabled("Owner: %s", who != nullptr ? who : "a rival");
+        // BL-1454: the same stat grid, every cell unseen (stat_grid.hpp).
+        draw_stat_grid("wing_card", wing_stat_bands(w, reg, id), std::min(total_w, 420.0f));
         return true;
     }
 
     // ── Left: its condition ──
-    ImGui::BeginChild("##wing_state", {col_w, 0.0f}, false, cf);
+    ImGui::BeginChild("##wing_state", {grid_col_w, 0.0f}, false, cf);
     ImGui::PushTextWrapPos(0.0f);
     {
-        const float hp = static_cast<float>(wg.hp_ppm) / static_cast<float>(k_wing_hp_full);
-        char ov[32];
-        std::snprintf(ov, sizeof ov, "HP %d%%", static_cast<int>(hp * 100.0f + 0.5f));
-        ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImGui::ColorConvertU32ToFloat4(palette::unit_hp));
-        ImGui::ProgressBar(std::clamp(hp, 0.0f, 1.0f), {-1.0f, 0.0f}, ov);
-        ImGui::PopStyleColor();
-        if (st.has_morale)
-            ImGui::TextDisabled("Morale %d%%   Supply %d%%", (wg.morale_permille + 5) / 10,
-                                (wg.supply_factor_permille + 5) / 10);
-        else
-            ImGui::TextDisabled("No pilot, no morale   Supply %d%%", (wg.supply_factor_permille + 5) / 10);
+        // BL-1454: the wing's stat grid (military.md § The stat grid) - Condition,
+        // Combat, Field - the one grid the unit card and the designers share.
+        draw_stat_grid("wing_card", wing_stat_bands(w, reg, id), ImGui::GetContentRegionAvail().x);
         if (wg.muster_days > 0)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::unit_readiness),
                                "Mustering: %d days before it flies", wg.muster_days);
-        ImGui::TextDisabled("Range %d tiles", st.range);
-        ImGui::TextDisabled("Air %d  soft %d  hard %d  strategic %d  recon %d",
-                            st.air, st.soft, st.hard, st.strategic, st.recon);
     }
     ImGui::PopTextWrapPos();
     ImGui::EndChild();

@@ -30,6 +30,7 @@
 #include "ui/construction_panel.hpp"
 #include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
 #include "ui/selection_panel.hpp"
+#include "ui/stat_grid.hpp"      // BL-1454: verify.stat_grids, the grids on screen
 #include "ui/corporation_dashboard.hpp"
 // BL-1406: ui/corporation_panel.hpp retired with the corporation stance table.
 #include "ui/detail_level.hpp"
@@ -3387,6 +3388,34 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1454 (military.md § The stat grid): every stat grid drawn on the LAST frame -
+    // the unit card's, the unit group's, the wing card's, the designers' - by id, each
+    // cell's band, stat name, value as drawn, a group's range, a designer's delta,
+    // whether it carries a bar, and its centre (a hover there shows its tooltip).
+    // Only what the screen draws. UI state only.
+    v.set_function("stat_grids", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        const int frame = ImGui::GetFrameCount();
+        for (const auto& grid : ui::stat_grids_drawn())
+        {
+            if (grid.frame != frame)
+                continue;
+            sol::table cells = st.create_table();
+            int k = 0;
+            for (const auto& c : grid.cells)
+            {
+                sol::table e = st.create_table();
+                e["band"] = c.band; e["stat"] = c.stat; e["value"] = c.value;
+                e["range"] = c.range; e["delta"] = c.delta; e["bar"] = c.bar;
+                e["x"] = c.x; e["y"] = c.y;
+                cells[++k] = e;
+            }
+            out[grid.id] = cells;
+        }
+        return out;
+    });
+
     // STAGING: waive the kit research lock (unit_designs.hpp), so a check can draft
     // and save a non-base pick before the age tree holds any kit node (BL-1436).
     // Process-global, never saved; the script turns it back off. Verify-only.
@@ -3401,8 +3430,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         handle_key_down(k);
     });
 
-    // Turn the unit card's accordion to page @p n (0 = strength, 1 = roster), as
-    // its own arrows do. UI state only.
+    // Retired with the unit card's pager (BL-1454: the card is one page, its stat
+    // grid); kept a harmless no-op so older scripts still run. UI state only.
     v.set_function("unit_card_page", [this](int n) { m_ui.selection_unit_page = n; });
 
     v.set_function("spectate", [this](bool on) { m_ui.spectating = on; });

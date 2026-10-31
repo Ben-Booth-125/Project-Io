@@ -143,6 +143,30 @@ and is the one grid the unit card and the designer share, so the two cannot disa
 - **A rival's unit (Ben, 2026-10-29)** shows its **design stats only once seen** — in a battle with
   one of the player's units, or revealed by recon. Its internals (HP, readiness, morale and the
   three stocks) stay hidden (BL-068); unseen, the cells read "—".
+- **What the cells read (reading, BL-1454).** HP is the unit's men, its bar men over establishment;
+  readiness, morale and the three stocks are percentages of full, each barred. Combat and recon
+  and stealth are the unit's own numbers (`unit_land_stats`: its class plus the kit it recorded,
+  attacks and absorbs scaled by its type's quality), so a card can read above the designer's
+  unscaled numbers for the same class. Hardness is a percentage. Speed is the class's **days to
+  cross one plains tile** (`march_days_per_tile`), so fewer is faster; it carries no delta. The
+  stored stats' bars use the counter's colours for HP and readiness, the card's blue for morale,
+  and one colour per stock (`palette::unit_food`, `unit_ammo`, `unit_equipment`).
+- **Seen, as read today (reading, BL-1454).** "Seen" is derived, not remembered: a rival's unit is
+  seen while it stands in a live battle opposite one of the player's units (the attacker's recon
+  is spent inside that same battle). Once the battle closes it reads unseen again. A remembered
+  sighting — and recon outside a battle — would need a per-nation record in the world (open
+  question 6).
+- **On the unit group card** the grid sits between the counter and the unit rows, the group's
+  means with the range beneath. A rival group's internals read "—"; its design stats are the
+  means of the units seen.
+- **Air wings (reading, BL-1454)** use the same grid with the wing's own numbers, in three bands:
+  **Condition** (HP, morale, supply — a wing carries no stocks, so its upkeep share stands in
+  Condition, and a drone's morale reads "—"), **Combat** (air attack, soft attack, hard attack,
+  strategic — four cells, so it wraps) and **Field** (recon, range). HP is the wing's points now,
+  barred against full; strategic is a percentage of a building's condition a day. The wing card
+  carries it in its left column. A rival's wing shows the grid with every cell "—". **The air
+  designer** shows HP at full under Condition (the airframe changes it), then Combat and Field,
+  each with its delta.
 
 ## 3. Lens on open
 
@@ -201,3 +225,7 @@ and market combos). **Raise is a press, not a toggle** — it has no active stat
    Recruit a queue like Construction's.
 4. **Where do fronts live** once BL-1427 exists — a third tab here, or the canvas only?
 5. **Manpower.** Answered (Ben, 2026-10-30): Recruit heads each theatre with its recruit pool.
+6. **Does a sighting last?** (BL-1454.) The stat grid reads a rival's design stats while its unit
+   fights one of the player's in a live battle, and "—" again once the battle ends. Should a
+   sighting be remembered — per nation, per unit or per design — and should recon outside a battle
+   (an air recon mission over the province) reveal it? Either needs a saved per-nation record.
