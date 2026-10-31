@@ -4,6 +4,9 @@
 
 #include "battle_system.hpp" // battle_tick, battle_dispatch (the daily hook)
 #include "hex_neighbors.hpp"
+#include "modifier_set.hpp"      // modifier_subject::alarm_toward, effect_target
+#include "nation_tech.hpp"       // nation_scalar: the alarm scale the fold stamps
+#include "sentiment_emitters.hpp" // queue_conduct, sentiment_conduct_live (BL-1458)
 #include "province.hpp"
 #include "stance.hpp" // write_hostility, are_friends, canonical_pair
 #include "world.hpp"
@@ -291,16 +294,29 @@ war_result declare_check(const world& w, entity_id declarer, entity_id defender,
     return war_result::applied;
 }
 
+/// The alarm scale `fold_pending_sentiment` stamps on an event about @p subject:
+/// its "Alarm toward you" scalar (the same read, the same fallback).
+float alarm_scale_of(const world& w, entity_id subject)
+{
+    float s = nation_scalar(w, subject, modifier_subject::alarm_toward, effect_target{}, 1.0f);
+    if (!std::isfinite(s) || s < 0.0f)
+        s = 1.0f;
+    return s;
+}
+
 war_price_row priced(const sentiment_params& p, entity_id observer, sentiment_factor_kind kind,
-                     float magnitude, bool borders)
+                     float magnitude, bool borders, float alarm_scale, bool live)
 {
     war_price_row r;
     r.observer  = observer;
     r.kind      = kind;
     r.magnitude = magnitude;
     const sentiment_factor& f = p.factors[static_cast<std::size_t>(kind)];
-    r.access    = f.access * magnitude;
-    r.trust     = f.trust * magnitude;
+    // The fold's own arithmetic per dimension (sentiment.cpp: weight x magnitude,
+    // Alarm also x the event's alarm scale); nothing when the gate drops it.
+    r.access    = live ? f.access * magnitude : 0.0f;
+    r.trust     = live ? f.trust * magnitude : 0.0f;
+    r.alarm     = live ? f.alarm * magnitude * alarm_scale : 0.0f;
     r.borders   = borders;
     return r;
 }
@@ -317,8 +333,11 @@ war_price declaration_price(const world& w, const sentiment_params& p, entity_id
     out.justified      = std::any_of(out.justifications.begin(), out.justifications.end(),
                                      [](bool b) { return b; });
 
+    out.charged = sentiment_conduct_live(w);
+    const float scale = alarm_scale_of(w, declarer); // every row's subject is the declarer
     // hostility_declared: the defender toward the declarer, once.
-    out.rows.push_back(priced(p, defender, sentiment_factor_kind::hostility_declared, 1.0f, false));
+    out.rows.push_back(priced(p, defender, sentiment_factor_kind::hostility_declared, 1.0f, false,
+                              scale, out.charged));
 
     // war_declared: every other nation toward the declarer.
     const std::set<entity_id> border = nations_bordering(w, declarer, defender);
@@ -336,12 +355,13 @@ war_price declaration_price(const world& w, const sentiment_params& p, entity_id
         float m = goal_factor * (b ? k_war_border_multiplier : 1.0f);
         if (out.justified)
             m *= k_war_justified_multiplier;
-        out.rows.push_back(priced(p, o, sentiment_factor_kind::war_declared, m, b));
+        out.rows.push_back(priced(p, o, sentiment_factor_kind::war_declared, m, b, scale, out.charged));
     }
     for (const war_price_row& r : out.rows)
     {
         out.sum_access += r.access;
         out.sum_trust  += r.trust;
+        out.sum_alarm  += r.alarm;
     }
     return out;
 }
@@ -372,11 +392,9 @@ war_result declare_war(world& w, const sentiment_params& p, entity_id declarer,
     write_hostility(w, declarer, defender);
     w.wars[{declarer, defender}] = std::move(rec);
 
-    std::vector<sentiment_event> events;
-    events.reserve(price.rows.size());
+    // Gathered, not written: the tick's one fold canonicalises it with the rest.
     for (const war_price_row& r : price.rows)
-        events.push_back(sentiment_event{ r.observer, declarer, r.kind, r.magnitude });
-    apply_sentiment_events(w.sentiment, p, events);
+        queue_conduct(w, r.observer, declarer, r.kind, r.magnitude);
     return war_result::applied;
 }
 
@@ -700,7 +718,7 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
     h.closed_tick = w.current_econ_tick;
     h.final_score = war_score(w, war);
 
-    std::vector<sentiment_event> events;
+    std::vector<sentiment_event> events; // gathered below (queue_conduct), folded with the tick
     events.push_back(sentiment_event{ war.declarer, war.defender, sentiment_factor_kind::peace_concluded, 1.0f });
     events.push_back(sentiment_event{ war.defender, war.declarer, sentiment_factor_kind::peace_concluded, 1.0f });
 
@@ -755,7 +773,9 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
     w.peace_offers.erase(key);
     w.wars.erase(key);
     w.truces[canonical_pair(war.declarer, war.defender)] = w.current_econ_tick + k_war_truce_ticks;
-    apply_sentiment_events(w.sentiment, p, events);
+    for (const sentiment_event& e : events)
+        queue_conduct(w, e.observer, e.subject, e.kind, e.magnitude);
+    (void)p; // the weights are the fold's, read when the queue folds
 }
 
 war_result pair_check(const world& w, entity_id a, entity_id b)

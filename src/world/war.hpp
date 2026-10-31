@@ -250,8 +250,7 @@ struct war_price_row
     float                 magnitude = 0.0f;
     float                 access    = 0.0f; ///< weight.access x magnitude
     float                 trust     = 0.0f; ///< weight.trust x magnitude
-    // TODO(Lane S, BL-1458): Alarm is not a sentiment dimension on this branch.
-    // When it lands, add `alarm` here (weight.alarm x magnitude) and sum it below.
+    float                 alarm     = 0.0f; ///< weight.alarm x magnitude x the declarer's alarm_toward scale
     bool                  borders   = false; ///< war_declared: the observer borders a party.
 };
 
@@ -263,6 +262,10 @@ struct war_price
     std::vector<war_price_row> rows; ///< Ascending observer; hostility_declared first.
     float sum_access = 0.0f;
     float sum_trust  = 0.0f;
+    float sum_alarm  = 0.0f;
+    /// False under the settle (`sentiment_conduct_live`): the conduct would be
+    /// dropped, so every delta above reads 0 — the preview is the charge.
+    bool  charged    = true;
 };
 
 // ---------------------------------------------------------------------------
@@ -315,7 +318,9 @@ int war_morale_ceiling(const world& w, entity_id nation);
 
 /// Opens a war: writes the declarer's hostility row (stance's internals —
 /// friendship and offers dissolve) and the record, and charges exactly
-/// `declaration_price`. Refused on: declarer == defender or an unknown nation,
+/// `declaration_price`. The charge is GATHERED (`queue_conduct`, BL-1458) and lands
+/// at the tick's one sentiment fold (`fold_pending_sentiment`), with every other
+/// conduct of the tick. Refused on: declarer == defender or an unknown nation,
 /// 0 or > 3 goals, a repeated goal, a goal not the defender's province
 /// (rejected_invalid); a war already standing between the pair either way, or a
 /// standing truce (rejected_state). `goals` may arrive in any order.

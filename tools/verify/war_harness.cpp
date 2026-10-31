@@ -21,6 +21,7 @@
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/sentiment.hpp"
+#include "world/sentiment_emitters.hpp"
 #include "world/stance.hpp"
 #include "world/war.hpp"
 #include "world/world.hpp"
@@ -75,14 +76,17 @@ constexpr int GW = 60, GH = 20;
 sentiment_params war_params()
 {
     sentiment_params p;
-    auto set = [&p](sentiment_factor_kind k, float a, float t) {
+    // scripts/economy.lua's rows (BL-1458's calibration), all three dimensions. Every
+    // row below reads the weight back from this table, never a literal.
+    auto set = [&p](sentiment_factor_kind k, float a, float t, float al) {
         p.factors[static_cast<std::size_t>(k)].access = a;
         p.factors[static_cast<std::size_t>(k)].trust  = t;
+        p.factors[static_cast<std::size_t>(k)].alarm  = al;
     };
-    set(sentiment_factor_kind::hostility_declared, -10.0f, -10.0f);
-    set(sentiment_factor_kind::war_declared,         0.0f,  -3.0f);
-    set(sentiment_factor_kind::peace_concluded,      0.0f,   4.0f);
-    set(sentiment_factor_kind::province_ceded,      -6.0f,  -6.0f);
+    set(sentiment_factor_kind::hostility_declared, -5.0f, -5.0f,  5.0f);
+    set(sentiment_factor_kind::war_declared,        0.0f, -2.0f,  3.0f);
+    set(sentiment_factor_kind::peace_concluded,     0.0f,  3.0f, -3.0f);
+    set(sentiment_factor_kind::province_ceded,     -3.0f, -3.0f,  3.0f);
     return p;
 }
 
@@ -168,6 +172,11 @@ corp_command war_cmd(corp_verb v, entity_id actor, entity_id other, std::vector<
 
 float trust_of(const world& w, entity_id o, entity_id s) { return sentiment_toward(w.sentiment, o, s).trust; }
 float access_of(const world& w, entity_id o, entity_id s) { return sentiment_toward(w.sentiment, o, s).access; }
+float alarm_of(const world& w, entity_id o, entity_id s) { return sentiment_toward(w.sentiment, o, s).alarm; }
+const sentiment_factor& weight(const sentiment_params& p, sentiment_factor_kind k)
+{
+    return p.factors[static_cast<std::size_t>(k)];
+}
 
 } // namespace
 
@@ -283,10 +292,13 @@ int main()
             by[r.observer * 2 + (r.kind == sentiment_factor_kind::hostility_declared ? 1 : 0)] = r;
         const war_price_row h = by[f.C * 2 + 1];
         check(h.kind == sentiment_factor_kind::hostility_declared && h.magnitude == 1.0f
-                  && h.access == -10.0f && h.trust == -10.0f,
+                  && h.access == weight(sp, sentiment_factor_kind::hostility_declared).access
+                  && h.trust == weight(sp, sentiment_factor_kind::hostility_declared).trust
+                  && h.alarm == weight(sp, sentiment_factor_kind::hostility_declared).alarm,
               "R2b hostility_declared lands on the defender's row toward the declarer, once");
         const float gf = 1.0f + k_war_per_extra_goal; // two goals
-        check(by[f.F * 2].magnitude == gf && by[f.F * 2].trust == -3.0f * gf && !by[f.F * 2].borders,
+        check(by[f.F * 2].magnitude == gf && by[f.F * 2].trust == weight(sp, sentiment_factor_kind::war_declared).trust * gf
+                  && by[f.F * 2].alarm == weight(sp, sentiment_factor_kind::war_declared).alarm * gf && !by[f.F * 2].borders,
               "R2c war_declared on a non-bordering nation: base x the goal factor (two goals: x1.5)");
         check(by[f.B * 2].borders && by[f.D * 2].borders && by[f.E * 2].borders
                   && by[f.B * 2].magnitude == gf * k_war_border_multiplier
@@ -304,19 +316,28 @@ int main()
         // Preview == charge.
         std::map<entity_id, sentiment_value> before;
         for (const auto& [nid, nc] : w.nations) before[nid] = sentiment_toward(w.sentiment, nid, f.A);
+        const std::size_t queued_before = w.sentiment_pending.size();
         check(declare_war(w, sp, f.A, f.C, goals) == war_result::applied, "R2g the declaration applies");
+        bool untouched = true;
+        for (const auto& [nid, nc] : w.nations)
+            untouched = untouched && sentiment_toward(w.sentiment, nid, f.A) == before[nid];
+        check(untouched && w.sentiment_pending.size() == queued_before + pr.rows.size(),
+              "R2g' the charge is GATHERED (queue_conduct): no row moves until the tick's fold");
+        (void)fold_pending_sentiment(w, reg);
         bool eq = true;
-        float sa = 0, st = 0;
+        float sa = 0, st = 0, sal = 0;
         for (const war_price_row& r : pr.rows)
         {
             const sentiment_value now = sentiment_toward(w.sentiment, r.observer, f.A);
             eq = eq && now.access - before[r.observer].access == r.access
-                    && now.trust - before[r.observer].trust == r.trust;
+                    && now.trust - before[r.observer].trust == r.trust
+                    && now.alarm - before[r.observer].alarm == r.alarm;
             sa += now.access - before[r.observer].access;
             st += now.trust - before[r.observer].trust;
+            sal += now.alarm - before[r.observer].alarm;
         }
-        check(eq && sa == pr.sum_access && st == pr.sum_trust,
-              "R2h declare_war charged exactly the preview, per nation and summed");
+        check(eq && sa == pr.sum_access && st == pr.sum_trust && sal == pr.sum_alarm && pr.sum_alarm > 0.0f,
+              "R2h after the fold, declare_war charged exactly the preview, per nation and summed, Alarm included");
         check(trust_of(w, f.A, f.C) == 0.0f && trust_of(w, f.C, f.C) == 0.0f,
               "R2i the declarer's own rows are not charged");
 
@@ -387,13 +408,15 @@ int main()
         check(answer_war(w, f.A, f.B, { f.provs[f.B][1] }) == war_result::rejected_state && same(s, w),
               "R3d the declarer cannot 'answer' its own war, mutating nothing");
         const sentiment_table before = w.sentiment;
+        const std::size_t queued = w.sentiment_pending.size();
         check(answer_war(w, f.B, f.A, { f.provs[f.A][3], f.provs[f.A][1] }) == war_result::applied,
               "R3e the defender's answer applies");
         const war_record* rec = war_between(w, f.A, f.B);
         check(rec && rec->answered && is_hostile(w, f.B, f.A)
                   && rec->defender_goals == std::vector<uint32_t>({ f.provs[f.A][1], f.provs[f.A][3] }),
               "R3f it writes the defender's hostility row and names its goals (ascending)");
-        check(before.pairs == w.sentiment.pairs, "R3g it costs nothing: no sentiment row moves");
+        check(before.pairs == w.sentiment.pairs && w.sentiment_pending.size() == queued,
+              "R3g it costs nothing: no sentiment row moves and nothing is queued");
         s = take(w);
         check(answer_war(w, f.B, f.A, { f.provs[f.A][2] }) == war_result::rejected_state && same(s, w),
               "R3h a second answer is refused, mutating nothing");
@@ -458,7 +481,7 @@ int main()
         check(from_bytes(b67, old) && old.wars.empty() && old.truces.empty() && old.peace_offers.empty()
                   && old.war_history.empty() && old.province_cessions.empty()
                   && b67.size() == b.size() - world_save_war_section_bytes(w),
-              "R4l a v67 stream (today's less the war section) loads with no wars");
+              "R4l a v68 stream (today's less the war section) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;
         const std::size_t war0 = b.size() - world_save_war_section_bytes(w) + 4; // past the war count
@@ -684,8 +707,10 @@ int main()
               "P3h refusing erases the offer; the war goes on");
         // Cession accepted.
         check(offer_peace(w, f.A, f.B, cede) == war_result::applied, "P3i (re-offer the cession)");
+        (void)fold_pending_sentiment(w, reg); // the declaration's own conduct, folded first
         const float trust_ab = trust_of(w, f.A, f.B), trust_ba = trust_of(w, f.B, f.A);
         const float acc_ba = access_of(w, f.B, f.A);
+        const float al_ab = alarm_of(w, f.A, f.B), al_ba = alarm_of(w, f.B, f.A);
         w.current_econ_tick = 20;
         check(accept_peace(w, sp, f.B, f.A) == war_result::applied, "P3j the receiver accepts the cession");
         check(!at_war(w, f.A, f.B) && !is_hostile(w, f.A, f.B) && !is_hostile(w, f.B, f.A)
@@ -697,9 +722,14 @@ int main()
                   && w.province_cessions[0].province == dg[0]
                   && province_holder_for(w, dg[0]) == f.A && province_owner(w, dg[0]) == f.B,
               "P3l the cession stub records the ceded province and keeps its holder; tile_to_nation is BL-1460's (still B's)");
-        check(trust_of(w, f.A, f.B) - trust_ab == 4.0f
-                  && trust_of(w, f.B, f.A) - trust_ba == 4.0f - 6.0f
-                  && access_of(w, f.B, f.A) - acc_ba == -6.0f,
+        (void)fold_pending_sentiment(w, reg);
+        const sentiment_factor& pc = weight(sp, sentiment_factor_kind::peace_concluded);
+        const sentiment_factor& ce = weight(sp, sentiment_factor_kind::province_ceded);
+        check(trust_of(w, f.A, f.B) - trust_ab == pc.trust
+                  && std::fabs(trust_of(w, f.B, f.A) - trust_ba - (pc.trust + ce.trust)) < 1e-5f
+                  && access_of(w, f.B, f.A) - acc_ba == ce.access
+                  && std::fabs(alarm_of(w, f.A, f.B) - al_ab - pc.alarm) < 1e-5f
+                  && std::fabs(alarm_of(w, f.B, f.A) - al_ba - (pc.alarm + ce.alarm)) < 1e-5f,
               "P3m peace_concluded warms both rows; province_ceded lands on the loser's row toward the winner (x provinces ceded)");
         check(truce_between(w, f.A, f.B) && w.truces.at(canonical_pair(f.A, f.B)) == 20 + k_war_truce_ticks,
               "P3n a truce of 16 ticks stands");

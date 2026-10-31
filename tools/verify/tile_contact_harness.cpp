@@ -692,7 +692,7 @@ int main()
         // An attacking stack naming a unit not on the attacker's side is refused.
         std::string bad = bytes;
         const entity_id ghost = 0x7FFFFFF0u;
-        std::memcpy(&bad[bytes.size() - world_save_war_section_bytes(f.w) - 4], &ghost, sizeof ghost); // BL-1459: before v69's wars
+        std::memcpy(&bad[bytes.size() - world_save_war_section_bytes(f.w) - world_save_alarm_section_bytes(f.w) - 4], &ghost, sizeof ghost); // BL-1459/BL-1432: before v68 Alarm and v69 wars
         world s1;
         check(!from_bytes(bad, s1) && s1.battles.empty() && s1.units.empty(),
               "T13e a stack naming a unit outside the battle's attacker side is REFUSED, destination untouched");
