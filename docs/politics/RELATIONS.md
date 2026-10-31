@@ -497,8 +497,11 @@ never makes one, so the invariant holds.
 
 **War score.** One number from −100 to +100, positive in the declarer's favour, built from two parts:
 
-- **Occupation** — each side's goals it holds (`province_holder`), weighted by the goal's tiles: the
-  declarer's held goals less the defender's, over all goals named in the war.
+- **Occupation** — each side normalised by its own goals (Ben, 2026-10-31): the share of the
+  declarer's goals (the defender's ground, weighted by tiles) that the declarer holds by
+  `province_holder`, less the share of the defender's answered goals that the defender holds. An
+  unanswered war has no defender goals, so that term is 0. Holding every goal you named while losing
+  none of your own is the full occupation half, for either side.
 - **Battles** — strength destroyed in battles between the pair: the declarer's share less the
   defender's, over the war.
 
