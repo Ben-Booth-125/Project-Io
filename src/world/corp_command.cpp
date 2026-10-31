@@ -88,9 +88,26 @@ bool corp_can_afford_axis(const world& w, entity_id corp, hire_axis axis)
 /// broken gate, not a refusal the player should ever see as a free kit.
 void debit_from_corp(world& w, entity_id corp, resource_type res, float amount)
 {
-    const float bought = buy_from_corp_shelves(w, corp, static_cast<std::size_t>(res), amount, 0.0f);
-    assert(bought >= amount - 1e-3f * std::max(1.0f, amount)
+    const std::size_t r = static_cast<std::size_t>(res);
+#ifndef NDEBUG
+    // Compared in MONEY, not units: the shelf buy caps each take at purse_room / px,
+    // so with room exactly equal to the proven cost a float rounding of that room
+    // (an ulp of a large treasury) can leave a sliver unbought. The sliver's price
+    // is what matters, and the tolerance scales with the purse it was rounded in.
+    const float* purse_p      = purse_of(w, corp);
+    const float  purse_before = purse_p != nullptr ? *purse_p : 0.0f;
+    float px_bound = 0.0f; // the highest posted price the buy could have paid
+    for (const entity_id mid : corp_markets(w, corp))
+        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
+            px_bound = std::max(px_bound, posted_price(mit->second, r));
+#endif
+    const float bought = buy_from_corp_shelves(w, corp, r, amount, 0.0f);
+#ifndef NDEBUG
+    const float short_money = std::max(0.0f, amount - bought) * px_bound;
+    const float tolerance   = 1e-3f + 1e-5f * std::max(1.0f, std::fabs(purse_before));
+    assert(short_money <= tolerance
            && "debit_from_corp: the gate proved this buy, the shelves or the purse refused it");
+#endif
     (void)bought;
 }
 
