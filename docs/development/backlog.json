@@ -174,29 +174,6 @@
    "status": "proposed",
    "glyph": "○",
    "sprint": 61,
-   "written": "2026-10-26",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (BL-1408 re-bless, 2026-10-26)",
-   "requires": [],
-   "id": "BL-1420",
-   "short_name": "LANE_PORT_DEFECTS_AND_CHECKS",
-   "category": "Generation",
-   "priority": "A",
-   "difficulty": 2,
-   "authority_doc": "docs/economy/LOGISTICS.md",
-   "files": [
-    "src/world/road_generation.cpp",
-    "tools/verify/port_lane_probe.cpp",
-    "tools/verify/lp_coverage_census.cpp"
-   ],
-   "title": "Five lane and port defects on library seeds, and two claims with no check",
-   "design": "Found by the sprint 57 re-bless across all 16 library seeds (Ben carried them to sprint 58, 2026-10-26). DEFECTS: (1) seeds 40 and 12 each have a port with a partner within 50 and no laned water beside it; (2) seeds 13 and 10 have 3 colonial lane ends on a coast with no port. MISSING CHECKS: (a) nothing asserts zero unconnectable consumers - lp_coverage_census rule 3 excuses them; (b) port_lane_probe lists colonial portless coast ends but does not count them as defects. THE WORK: make both claims committed checks first, then fix the defects so they pass on all 16 seeds."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
    "parked": false,
@@ -735,6 +712,29 @@
    ],
    "title": "building_element.lua's producing capture shows a construction site",
    "design": "Found by Lane F, sprint 61 (2026-10-31): aimed at the site finder's top Iron Mine row, the placed site at (1,93) is still under construction after 40 economy steps, so building_element_player captures a site, not a producing building. Pick the first row whose local market can supply the build materials (the BL-095 reason the old tile was chosen), or step until complete, and assert completion before the capture."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-31",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 delivery, from Lane G, 2026-10-31)",
+   "requires": [],
+   "id": "BL-1468",
+   "short_name": "TOP_ROW_UNCONNECTABLE",
+   "category": "Logistics",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "priority": "B",
+   "difficulty": 2,
+   "files": [
+    "src/world/logistics.cpp",
+    "tools/verify/lp_coverage_census.cpp"
+   ],
+   "title": "Seed 32 opens a consumer on the map's top row that no Logistic Point can connect",
+   "design": "Found by Lane G, sprint 61 (2026-10-31): lp_coverage_census's new UC rule (no unconnectable consumers, BL-1420) fails on seed 32 only - building 82511 of Thuzi Thuthal at (141,0), the top row, counted unconnectable; present already at fe811118. Either Logistic Point source placement cannot reach the top row (a fix) or a top-row consumer is placed where nothing can serve it (fix the placement). Do not exempt the row. Check: lp_coverage_census on all 16 library seeds."
   }
  ]
 }

@@ -12226,6 +12226,50 @@
         "design",
         "completion"
       ]
+    },
+    "BL-1420": {
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 61,
+      "written": "2026-10-26",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (BL-1408 re-bless, 2026-10-26)",
+      "requires": [],
+      "id": "BL-1420",
+      "short_name": "LANE_PORT_DEFECTS_AND_CHECKS",
+      "category": "Generation",
+      "priority": "A",
+      "difficulty": 2,
+      "authority_doc": "docs/economy/LOGISTICS.md",
+      "files": [
+        "src/world/road_generation.cpp",
+        "tools/verify/port_lane_probe.cpp",
+        "tools/verify/lp_coverage_census.cpp"
+      ],
+      "title": "Five lane and port defects on library seeds, and two claims with no check",
+      "design": "Found by the sprint 57 re-bless across all 16 library seeds (Ben carried them to sprint 58, 2026-10-26). DEFECTS: (1) seeds 40 and 12 each have a port with a partner within 50 and no laned water beside it; (2) seeds 13 and 10 have 3 colonial lane ends on a coast with no port. MISSING CHECKS: (a) nothing asserts zero unconnectable consumers - lp_coverage_census rule 3 excuses them; (b) port_lane_probe lists colonial portless coast ends but does not count them as defects. THE WORK: make both claims committed checks first, then fix the defects so they pass on all 16 seeds.",
+      "completion": "Delivered 2026-10-31 (fdaea470 + review fix 7bb9b2e7): state ports prefer open sea; harbour land serves every group member within two steps over the same four-way sea piece, held candidates only, far ends split to their own harbour; port_lane_probe counts portless colonial ends and its counters sum. port_lane_probe 16/16 PASS; lp_coverage_census UC 15/16 - seed 32 is a pre-existing defect, BL-1468. D_land moves on seeds 40, 12, 13, 10 (more ports and lanes); world_determinism unmoved. Re-bless joins the wave.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "short_name",
+        "category",
+        "priority",
+        "difficulty",
+        "authority_doc",
+        "files",
+        "title",
+        "design",
+        "completion"
+      ]
     }
   }
 }
