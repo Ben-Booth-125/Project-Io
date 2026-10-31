@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*33 entries — 27 open, 6 resolved.*
+*34 entries — 28 open, 6 resolved.*
 
 ---
 
@@ -361,6 +361,17 @@ set_embargo exists and the player can press it; no scorer issues it, so rivals n
 > **Recommendation:** A, as a dated grant in AI_OPPONENT § 11, built with BL-1461 (rivals declare war) since it shares the scorer.
 
 *Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1118 — Five cession calls RELATIONS § 7 does not settle
+*decision taken on your behalf · raised 2026-10-31 · from Lane C and its cold review, sprint 61 (BL-1460 cession moves territory), 2026-10-31*
+
+(1) Any peace returns every occupied, uncedeed goal of that war to its owner and withdraws the occupier, so no province stays held at peace by a former enemy. (2) A loser's air wing whose airbase passed rebases to its nearest own airbase, or disbands if it has none (the existing gone-base rule). (3) Units withdraw from ceded ground by the retreat rule, aimed at their own nation's nearest ground; a unit with no legal step stays. (4) A ceded site under construction keeps what the loser paid; if the gainer cancels it, the refund goes to the gainer. (5) A moved capital must not re-roll national cravings: the preference hash will read a saved generation-time capital (save v71).
+
+**Why it matters.** (1) and (2) change what a peace does on the map; (4) moves money between nations.
+
+> **Recommendation:** Accept all five; (4) is the ground passing with what stands on it.
+
+*Files: `src/world/war.cpp`, `src/world/market_clearing.cpp`*
 
 ---
 

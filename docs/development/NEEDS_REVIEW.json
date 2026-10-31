@@ -633,6 +633,22 @@
     "docs/ai/AI_OPPONENT.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1118",
+   "title": "Five cession calls RELATIONS § 7 does not settle",
+   "raised": "2026-10-31",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Lane C and its cold review, sprint 61 (BL-1460 cession moves territory), 2026-10-31",
+   "what": "(1) Any peace returns every occupied, uncedeed goal of that war to its owner and withdraws the occupier, so no province stays held at peace by a former enemy. (2) A loser's air wing whose airbase passed rebases to its nearest own airbase, or disbands if it has none (the existing gone-base rule). (3) Units withdraw from ceded ground by the retreat rule, aimed at their own nation's nearest ground; a unit with no legal step stays. (4) A ceded site under construction keeps what the loser paid; if the gainer cancels it, the refund goes to the gainer. (5) A moved capital must not re-roll national cravings: the preference hash will read a saved generation-time capital (save v71).",
+   "why_it_matters": "(1) and (2) change what a peace does on the map; (4) moves money between nations.",
+   "recommendation": "Accept all five; (4) is the ground passing with what stands on it.",
+   "files": [
+    "src/world/war.cpp",
+    "src/world/market_clearing.cpp"
+   ],
+   "resolution": null
   }
  ]
 }
