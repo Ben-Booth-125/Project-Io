@@ -3149,14 +3149,17 @@ void app::render()
                 // BL-1435: the hire is queued at the base, not raised yet — the
                 // Military ledger's Recruit tab shows it mustering.
                 m_ui.construction.last_message = "Unit mustering.";
+                m_ui.military.raise_refused = false;
                 (void)hired;
                 break;
             case corp_command_result::rejected_funds:
                 // Either leg: the BL-394 credit cost or the gated-axis
                 // resource draw — the seam refuses both through one result.
-                m_ui.construction.last_message = "Can't afford or supply it."; break;
+                m_ui.construction.last_message = "Can't afford or supply it.";
+                m_ui.military.raise_refused = true; break;
             default:
-                m_ui.construction.last_message = "Hiring failed."; break;
+                m_ui.construction.last_message = "Hiring failed.";
+                m_ui.military.raise_refused = true; break;
         }
         m_ui.construction.pending_hire_tile = null_entity; // consume the request
     }
@@ -3446,7 +3449,9 @@ void app::render()
         cmd.tile      = m_ui.military.pending_wing_tile;
         cmd.unit_type = m_ui.military.pending_wing_row;
         entity_id wing = null_entity;
-        switch (player_command(cmd, &wing))
+        const corp_command_result wr = player_command(cmd, &wing);
+        m_ui.military.air_raise_refused = wr != corp_command_result::applied;
+        switch (wr)
         {
             case corp_command_result::applied:
                 m_ui.military.air_message = "Wing mustering."; break;

@@ -1697,7 +1697,7 @@
    "preconditions": [
     "In-game"
    ],
-   "expected_output": "Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed with the goods or port it lacks; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base'. DESIGN: one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its live design's numbers; pressing a class opens the unit designer on the full canvas (ledger.military_open_designer). Below, every unit type with its obsolete toggle (gameplay.set_unit_obsolete).",
+   "expected_output": "Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed, the goods or port it lacks on its Raise press's tooltip; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base' (why is the tooltip of both). Explanation is never ledger text: every refusal reason and intro sentence is the hover tooltip of the control it explains (Ben, 2026-10-30). DESIGN: one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its live design's numbers; pressing a class opens the unit designer on the full canvas (ledger.military_open_designer). Below, every unit type with its obsolete toggle (gameplay.set_unit_obsolete). Closing the ledger by any path (this icon, the active tab's re-press, another ledger opening) also closes an open unit designer, through its close catch: an unsaved draft asks Save or Discard first.",
    "reason_to_select": "Answers 'what force can I raise, where, at what cost - and what is it raised with?'. It is the broad door to every hire: every base and every unit type on one surface, where the tile card's Hire list shows one base's rows only."
   },
   {
@@ -1718,11 +1718,11 @@
     }
    ],
    "preconditions": [
-    "A completed military base of yours is chosen in the picker (Raise is muted with 'No military base to raise it at.' otherwise)",
-    "Your nation can field the row (dimmed with the goods or port it lacks otherwise)",
-    "The row's credit price is within your treasury room (muted with 'The treasury cannot cover it.' otherwise)"
+    "A completed military base of yours is chosen in the picker (Raise is disabled otherwise; its tooltip reads 'No military base to raise it at.')",
+    "Your nation can field the row (dimmed otherwise; the Raise tooltip names the goods or port it lacks)",
+    "The row's credit price is within your treasury room (Raise disabled otherwise; its tooltip reads 'The treasury cannot cover it.'). A disabled Raise shows its reason only on hover, never as ledger text."
    ],
-   "expected_output": "Issues gameplay.hire_unit with {tile, unit_type} - the same pending request the tile card's Hire press makes, executed at the frame's end through the corp-command seam with its full live re-validation. Not a second hire path. The seam's answer is shown above the roster: 'Unit raised.', 'Can't afford or supply it.' (either payment leg) or 'Hiring failed.'.",
+   "expected_output": "Issues gameplay.hire_unit with {tile, unit_type} - the same pending request the tile card's Hire press makes, executed at the frame's end through the corp-command seam with its full live re-validation. Not a second hire path. A landed press shows its result above the roster: 'Unit mustering.'. A refusal - 'Can't afford or supply it.' (either payment leg) or 'Hiring failed.' - is not ledger text: it is the pressed row's Raise tooltip (Ben, 2026-10-30).",
    "reason_to_select": "You want a unit and know where it should stand: Raise from the ledger rather than hunting for the base on the canvas. See gameplay.hire_unit for the verb's gates and the honest caveats about what a unit does today."
   },
   {
@@ -2873,7 +2873,7 @@
    "preconditions": [
     "The Military ledger is open on Design."
    ],
-   "expected_output": "The unit designer takes the canvas region (the full-canvas rung; the ledger column, header, Selection band and minimap stay). The class's image fills the middle; one box per kit slot (infantry 2, every other class 3) sits beside it with a leader line to the slot's point on the image; each box shows the slot, the fitted item and its stat change. Under the image: the design's soft attack, hard attack, defence, breakthrough and hardness, its kit goods per unit, and how many of your units in the field are on an older design. It closes on the same press, its top-left return control, or Esc - unless a slot's draft is unsaved, when it stays open and asks Save or Discard (canvas.designer_save). Nothing in the world changes.",
+   "expected_output": "The unit designer takes the canvas region (the full-canvas rung; the ledger column, header, Selection band and minimap stay). The class's image fills the middle; one box per kit slot (infantry 2, every other class 3) sits beside it with a leader line to the slot's point on the image; each box shows the slot, the fitted item and its stat change. Under the image: the design's soft attack, hard attack, defence, breakthrough and hardness, its kit goods per unit, and how many of your units in the field are on an older design. It closes on the same press, its top-left return control, Esc, or the Military ledger closing - unless a slot's draft is unsaved, when it stays open and asks Save or Discard (canvas.designer_save). Nothing in the world changes.",
    "reason_to_select": "Answers 'what is this kind of unit carrying, and what can it carry instead?'. Open it to see what each slot holds, what research would open, and to change the class's live design."
   },
   {
@@ -3166,9 +3166,9 @@
    ],
    "preconditions": [
     "The Military ledger is open (nav rail slot 7).",
-    "Raise is DISABLED, with the reason under the row and on hover, when: the nation's shelves cannot field the row ('Needs steel or iron ore and coal or fuel on the shelf.' - available_air_rows), there is no airbase ('No airbase to raise it at.'), hire_wing_check refuses the airbase, or the treasury's uncommitted part is below the class's hire credits. The goods leg is the seam's answer on the press. A military base hosts no wings: only airbases are listed."
+    "Raise is DISABLED, its reason the press's hover tooltip (never ledger text), when: the nation's shelves cannot field the row ('Needs steel or iron ore and coal or fuel on the shelf.' - available_air_rows), there is no airbase ('No airbase to raise it at.'), hire_wing_check refuses the airbase, or the treasury's uncommitted part is below the class's hire credits. The goods leg is the seam's answer on the press. A military base hosts no wings: only airbases are listed."
    ],
-   "expected_output": "Issues gameplay.hire_wing {tile = the airbase's tile, unit_type = row} at the frame's end through the player's seat. The ledger shows the seam's answer: 'Wing mustering.', 'Can't afford or supply it.', 'No airbase of yours there.' or 'Raising the wing failed.'. A raised wing appears under 'Your wings' with its muster days left.",
+   "expected_output": "Issues gameplay.hire_wing {tile = the airbase's tile, unit_type = row} at the frame's end through the player's seat. A landed press shows its result above the theatres: 'Wing mustering.'. A refusal - 'Can't afford or supply it.', 'No airbase of yours there.' or 'Raising the wing failed.' - is the pressed row's Raise tooltip instead (Ben, 2026-10-30). A raised wing appears under 'Your wings' with its muster days left.",
    "reason_to_select": "Raise air power at an airbase: fighters to hold the air, strike wings and helicopters to hit units, bombers for industry, drones and early warning to spot."
   },
   {
@@ -3216,7 +3216,7 @@
    "preconditions": [
     "The Military ledger is open on Design, the Air header unfolded."
    ],
-   "expected_output": "The unit designer takes the canvas region on the air class: the aircraft in the middle (a placeholder image until air art lands), one box per slot - Airframe, Armament, Avionics - beside it with a leader line, each showing the slot, the drafted item and its change; under it the design's HP, air attack, soft and hard attack, strategic, recon and range, its kit goods per wing, how many of your wings fly an older design, and the Save design / Revert row. Closes on the same press, its return control, or Esc - asking first when a draft is unsaved. No world change.",
+   "expected_output": "The unit designer takes the canvas region on the air class: the aircraft in the middle (a placeholder image until air art lands), one box per slot - Airframe, Armament, Avionics - beside it with a leader line, each showing the slot, the drafted item and its change; under it the design's HP, air attack, soft and hard attack, strategic, recon and range, its kit goods per wing, how many of your wings fly an older design, and the Save design / Revert row. Closes on the same press, its return control, Esc, or the Military ledger closing - asking first when a draft is unsaved. No world change.",
    "reason_to_select": "See what each air slot holds, what research would open, and change the class's live design."
   },
   {

@@ -337,6 +337,14 @@ struct military_ledger_state
     /// Set by a Raise press: the Recruit tab then shows the hire seam's answer
     /// (`construction.last_message`, written by app). Cleared on close.
     bool      raise_pressed = false;
+    /// The roster row the last land Raise pressed (-1 = none), and whether the seam
+    /// REFUSED it (app writes it). A refusal is not printed in the ledger (Ben,
+    /// 2026-10-30): it is the pressed row's Raise tooltip; only a result line shows.
+    int       raise_row     = -1;
+    bool      raise_refused = false;
+    /// The ledger's open state last frame: the open -> closed edge closes the unit
+    /// designer (military.md § Toggle / close semantics; Ben, 2026-10-30).
+    bool      was_open      = false;
 
     /// BL-1437: Recruit hides obsolete unit types unless this is on (a view filter,
     /// per session). The Design tab's per-type toggle queues one change here, which
@@ -376,6 +384,8 @@ struct military_ledger_state
     entity_id     pending_wing_tile = null_entity;
     std::uint16_t pending_wing_row  = 0;
     std::string   air_message;          ///< The hire seam's answer to the last air Raise (app writes it).
+    int           air_raise_row     = -1;    ///< The air row the last air Raise pressed (-1 = none).
+    bool          air_raise_refused = false; ///< The seam refused it: its answer is that row's tooltip.
 
     // Published each frame (x < 0 = absent).
     struct drawn_header { int tab = 0, theatre = 0; float x = -1.0f, y = -1.0f; bool open = false; int count = 0; };

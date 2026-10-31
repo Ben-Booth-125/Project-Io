@@ -7,7 +7,9 @@
 --    each row's price and Raise press, and the muster queue's empty state.
 -- 4. A Raise press through the real control: the hire seam's answer is shown.
 -- 5. The Design tab: one row per land class.
--- 6. The toggle rule: re-pressing the active tab closes the ledger.
+-- 6. The toggle rule: re-pressing the active tab closes the ledger, and an
+--    open unit designer with it.
+-- 7. The rail icon's close also closes the designer.
 --
 -- Staging: a base comes from lib.lua's raise_player_force (the real
 -- construct_building and hire_unit paths). The Raise press is made with a loan
@@ -141,9 +143,54 @@ led = verify.military_ledger()
 if led.view == 1 then ok("the Design tab opens") else fail("Design tab press did not switch view") end
 verify.capture("military_ledger_design")
 
--- 6. Re-pressing the active tab closes the ledger.
+-- 5b. A class row opens the designer, so step 6 can check the ledger's close
+--     takes it too (military.md § The designer, Ben 2026-10-30).
+local designer_opened = false
+if led.classes and #led.classes > 0 then
+    local c = led.classes[1]
+    verify.click(c.x, c.y)
+    verify.mouse(-1, -1)
+    verify.frames(3)
+    designer_opened = verify.unit_designer().open
+    if designer_opened then ok("a Design class row opens the designer") else
+        fail("the Design class row did not open the designer") end
+    led = verify.military_ledger()
+else
+    fail("the Design tab drew no class rows")
+end
+
+-- 6. Re-pressing the active tab closes the ledger - and the designer with it.
 verify.click(led.tab_design_x, led.tab_design_y)
 verify.mouse(-1, -1)
 verify.frames(3)
 if not verify.military_ledger().open then ok("re-pressing the active tab closes the ledger") else
     fail("the active tab re-press left the ledger open") end
+if designer_opened then
+    if not verify.unit_designer().open then ok("closing the ledger by its tab closes the designer") else
+        fail("the designer stayed open after the ledger closed") end
+end
+
+-- 7. The rail icon's close takes the designer too: reopen, open a class, press
+--    slot 7 again.
+verify.click(sx, sy)
+verify.mouse(-1, -1)
+verify.frames(3)
+led = verify.military_ledger()
+if led.open and led.view == 1 and led.classes and #led.classes > 0 then
+    local c = led.classes[1]
+    verify.click(c.x, c.y)
+    verify.mouse(-1, -1)
+    verify.frames(3)
+    if verify.unit_designer().open then
+        verify.click(sx, sy)
+        verify.mouse(-1, -1)
+        verify.frames(3)
+        if not verify.military_ledger().open and not verify.unit_designer().open then
+            ok("closing the ledger by its rail icon closes the designer") else
+            fail("the rail close left the ledger or the designer open") end
+    else
+        fail("the class row did not reopen the designer")
+    end
+else
+    fail("the rail press did not reopen the ledger on Design")
+end
