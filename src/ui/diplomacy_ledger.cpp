@@ -79,9 +79,11 @@ std::map<uint32_t, std::string> g_province_names;
 
 void refresh_owners(const world& w, diplomacy_ledger_state& d)
 {
-    if (d.owners_generation == w.territory_generation && !d.province_owners.empty())
+    if (d.owners_generation == w.territory_generation && d.owners_catchment == w.catchment_generation
+        && !d.province_owners.empty())
         return;
     d.owners_generation = w.territory_generation;
+    d.owners_catchment  = w.catchment_generation;
     d.province_owners.clear();
     d.provinces_owned.clear();
     g_province_names.clear();
@@ -163,6 +165,7 @@ void sample_history(const world& w, diplomacy_ledger_state& d)
         d.landed.clear();
     }
     const bool had_sample = d.sampled_tick >= 0 && tick > d.sampled_tick;
+    const int  prev_tick  = d.sampled_tick;
     d.sampled_tick = tick;
 
     const entity_id me = me_of(w);
@@ -179,8 +182,13 @@ void sample_history(const world& w, diplomacy_ledger_state& d)
         }
     }
 
-    // Landings: a convoy seen in flight last sample and gone now has landed (or
-    // was cut — rare, and only between hostile pairs).
+    // Landings: a convoy seen in flight last sample and gone now has landed — or
+    // was cut. The live tick surfaces no cut record to the UI, so a vanished
+    // convoy counts as landed only if it was DUE (its progress would reach the end
+    // within the ticks since the sample: a cut mid-route was not) and its
+    // destination market still stands on the nation recorded (a border that moved
+    // mid-flight makes it some other pair's trade, or none).
+    const int elapsed = std::max(1, tick - prev_tick);
     std::map<std::uint32_t, diplomacy_ledger_state::convoy_seen> now;
     for (const convoy_component& c : w.convoys)
     {
@@ -193,14 +201,23 @@ void sample_history(const world& w, diplomacy_ledger_state& d)
             ? 0.0f : dispatch_market_price(m->second, static_cast<std::size_t>(c.cargo_resource));
         const float v = c.cargo_qty * price;
         if (std::isfinite(v) && v > 0.0f)
-            now[c.id] = {from, to, v};
+            now[c.id] = {from, to, c.dest_market, v, c.progress + c.speed >= 1.0f - 1e-4f};
     }
     if (had_sample)
     {
         std::map<std::pair<entity_id, entity_id>, float> landed;
         for (const auto& [id, seen] : d.convoys_seen)
-            if (now.find(id) == now.end())
-                landed[{seen.from, seen.to}] += seen.value;
+        {
+            if (now.find(id) != now.end())
+                continue;
+            // `due` is judged one tick ahead; over a longer gap (ticks run faster
+            // than frames) any convoy may have arrived, so it is not judged.
+            if (!seen.due && elapsed <= 1)
+                continue; // gone before it could arrive: cut, not landed
+            if (market_nation_of(w, seen.dest) != seen.to)
+                continue; // the destination changed nation in flight
+            landed[{seen.from, seen.to}] += seen.value;
+        }
         d.landed.push_back(std::move(landed));
         if (d.landed.size() > k_trade_window)
             d.landed.erase(d.landed.begin());
@@ -336,10 +353,13 @@ void sentiment_block(const world& w, const diplomacy_ledger_state& d, const sent
     const sentiment_value v = sentiment_toward(w.sentiment, obs, subj);
     sentiment_value dt;
     const bool has = trend_of(d, obs, subj, dt);
-    ImGui::PushID(static_cast<int>(obs) * 7919 + static_cast<int>(subj));
+    // Two pushes, not one product: an id product overflows a signed int.
+    ImGui::PushID(static_cast<int>(obs));
+    ImGui::PushID(static_cast<int>(subj));
     sentiment_bar("Access", v.access, has, dt.access, false, p, context);
     sentiment_bar("Trust",  v.trust,  has, dt.trust,  false, p, context);
     sentiment_bar("Alarm",  v.alarm,  has, dt.alarm,  true,  p, context);
+    ImGui::PopID();
     ImGui::PopID();
 }
 
@@ -427,6 +447,66 @@ std::string goals_line(const world& w, const std::vector<uint32_t>& goals, entit
             s += std::string(" (") + (h == me ? "you" : name_of(w, h)) + ")";
     }
     return s;
+}
+
+// ── The declaration's preview cache ─────────────────────────────────────────
+
+/// `declaration_price` and `war_justifications` walk every tile (the border test,
+/// `nations_bordering`), so they run once per change, not every frame. The key is
+/// everything they read that can move under an open declaration: the pair and
+/// goals, the econ tick (sentiment folds once per tick), the territory and
+/// catchment counters, and the sizes of the embargo, war, history and cession
+/// tables (a press mid-tick moves those). Never saved; cleared by
+/// `reset_diplomacy_ui`.
+struct declaration_preview
+{
+    bool                  set = false;
+    entity_id             me = null_entity, target = null_entity;
+    std::vector<uint32_t> goals;
+    int                   tick = 0;
+    std::uint64_t         territory = 0, catchment = 0;
+    std::size_t           embargoes = 0, wars = 0, history = 0, cessions = 0;
+    war_price             price;
+    std::array<bool, k_war_justification_count> just{};
+};
+declaration_preview g_preview;
+
+/// The expanded row's front strengths, recomputed once a day (draw_expanded).
+/// Cleared by `reset_diplomacy_ui`: its key can repeat across worlds.
+struct front_read
+{
+    entity_id me = null_entity, them = null_entity;
+    int tick = -1, day = -1;
+    std::uint64_t territory = 0;
+    std::size_t units = 0;
+    bool border_me = false, border_them = false;
+    int64_t f_me = 0, f_them = 0;
+};
+front_read g_fronts;
+
+const declaration_preview& cached_preview(const world& w, const sentiment_params& sp, entity_id me,
+                                          entity_id target, const std::vector<uint32_t>& goals)
+{
+    declaration_preview& c = g_preview;
+    if (c.set && c.me == me && c.target == target && c.goals == goals && c.tick == w.current_econ_tick
+        && c.territory == w.territory_generation && c.catchment == w.catchment_generation
+        && c.embargoes == w.nation_embargoes.size() && c.wars == w.wars.size()
+        && c.history == w.war_history.size() && c.cessions == w.province_cessions.size())
+        return c;
+    c.set       = true;
+    c.me        = me;
+    c.target    = target;
+    c.goals     = goals;
+    c.tick      = w.current_econ_tick;
+    c.territory = w.territory_generation;
+    c.catchment = w.catchment_generation;
+    c.embargoes = w.nation_embargoes.size();
+    c.wars      = w.wars.size();
+    c.history   = w.war_history.size();
+    c.cessions  = w.province_cessions.size();
+    c.price     = declaration_price(w, sp, me, target, goals);
+    c.just      = war_justifications(w, sp, me, target, goals);
+    return c;
 }
 
 // ── The declaration ────────────────────────────────────────────────────────
@@ -538,7 +618,8 @@ void draw_declaration(const world& w, const recipe_registry& reg, ui_state& s, e
     if (!answer)
     {
         // Justifications — every opening row, marked holding or not.
-        const auto just = war_justifications(w, sp, me, target, goals);
+        const declaration_preview& pv = cached_preview(w, sp, me, target, goals);
+        const auto& just = pv.just;
         ImGui::Text("Justifications");
         for (std::size_t i = 0; i < k_war_justification_count; ++i)
         {
@@ -551,7 +632,7 @@ void draw_declaration(const world& w, const recipe_registry& reg, ui_state& s, e
         }
 
         // The price — what declare_war will charge, summed and per neighbour.
-        const war_price price = declaration_price(w, sp, me, target, goals);
+        const war_price& price = pv.price;
         d.decl_valid     = price.valid;
         d.decl_justified = price.justified;
         d.decl_trust     = price.sum_trust;
@@ -687,9 +768,20 @@ void draw_expanded(const world& w, const recipe_registry& reg, const std::vector
     ImGui::Text("  GDP %s / %s a year",
                 g_them == d.gdp_year.end() ? "-" : fmt::credits(g_them->second).c_str(),
                 g_me == d.gdp_year.end() ? "-" : fmt::credits(g_me->second).c_str());
-    int64_t f_me = 0, f_them = 0;
-    const bool border_me   = front_strength(w, me, them, f_me);
-    const bool border_them = front_strength(w, them, me, f_them);
+    // Fronts and unit positions move at most once a day: recompute per day, per
+    // row, not per frame (`current_fronts` re-derives when its cache is stale).
+    front_read& fr = g_fronts;
+    if (fr.me != me || fr.them != them || fr.tick != w.current_econ_tick
+        || fr.day != w.construction_quarter_day || fr.territory != w.territory_generation
+        || fr.units != w.units.size())
+    {
+        fr.me = me; fr.them = them; fr.tick = w.current_econ_tick; fr.day = w.construction_quarter_day;
+        fr.territory = w.territory_generation; fr.units = w.units.size();
+        fr.border_me   = front_strength(w, me, them, fr.f_me);
+        fr.border_them = front_strength(w, them, me, fr.f_them);
+    }
+    const int64_t f_me = fr.f_me, f_them = fr.f_them;
+    const bool border_me = fr.border_me, border_them = fr.border_them;
     if (border_me || border_them)
         ImGui::Text("  Front strength %lld / %lld", static_cast<long long>(f_them), static_cast<long long>(f_me));
     else
@@ -966,6 +1058,14 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
     };
     const auto pick_list = [&](const char* head, const std::vector<uint32_t>& goals, entity_id gainer,
                                entity_id loser, std::vector<uint32_t>& chosen, std::vector<uint32_t>& other_side) {
+        // A ticked province that no longer qualifies (retaken, or no longer the
+        // loser's) drops out, so the offer is never stuck disabled on a box the
+        // list no longer draws.
+        chosen.erase(std::remove_if(chosen.begin(), chosen.end(), [&](uint32_t pid) {
+                         return std::find(goals.begin(), goals.end(), pid) == goals.end()
+                             || province_holder_for(w, pid) != gainer || province_owner(w, pid) != loser;
+                     }),
+                     chosen.end());
         bool any = false;
         for (const uint32_t pid : goals)
         {
@@ -1054,7 +1154,8 @@ void draw_wars(const world& w, const recipe_registry& reg, ui_state& s, entity_i
 
     for (const war_record* war : wars)
     {
-        ImGui::PushID(static_cast<int>(war->declarer) * 7919 + static_cast<int>(war->defender));
+        ImGui::PushID(static_cast<int>(war->declarer)); // two pushes: no signed-overflow product
+        ImGui::PushID(static_cast<int>(war->defender));
         ++d.war_rows;
         const bool mine = war->declarer == me || war->defender == me;
         ImGui::TextColored(col4(mine ? palette::selection : palette::text_secondary), "%s  vs  %s",
@@ -1088,6 +1189,7 @@ void draw_wars(const world& w, const recipe_registry& reg, ui_state& s, entity_i
         }
         ImGui::Separator();
         ImGui::PopID();
+        ImGui::PopID();
     }
 
     // Truces, with their time left.
@@ -1103,7 +1205,38 @@ void draw_wars(const world& w, const recipe_registry& reg, ui_state& s, entity_i
     }
 }
 
+/// A declaration the player can no longer SEE must not keep the canvas: while
+/// `declare_target` is set the canvas suppresses right-click orders and turns
+/// left-clicks into goal toggles. So it closes the moment its host goes — the
+/// tab it lives on is left (a tab press, Offer peace's jump to Wars), another row
+/// is expanded, or the war an answer was for is answered or gone.
+void drop_orphan_declaration(const world& w, ui_state& s)
+{
+    diplomacy_ledger_state& d = s.diplomacy;
+    if (d.declare_target == null_entity)
+        return;
+    bool orphan = d.view != (d.declare_answer ? 1 : 0);
+    if (!d.declare_answer)
+        orphan = orphan || d.expanded != d.declare_target;
+    else
+    {
+        const war_record* war = war_between(w, me_of(w), d.declare_target);
+        orphan = orphan || war == nullptr || war->answered || war->declarer != d.declare_target;
+    }
+    if (orphan)
+        close_declaration(s);
+}
+
 } // namespace
+
+void reset_diplomacy_ui(ui_state& s)
+{
+    s.diplomacy = diplomacy_ledger_state{};
+    s.pending_unit_order_goals.clear();
+    g_preview = declaration_preview{};
+    g_fronts  = front_read{};
+    g_province_names.clear();
+}
 
 void close_declaration(ui_state& s)
 {
@@ -1168,6 +1301,7 @@ void draw_diplomacy_ledger(const world& w, const recipe_registry& reg, const eco
         return;
     }
 
+    drop_orphan_declaration(w, s);
     refresh_owners(w, d);
     refresh_candidates(d);
 
@@ -1215,6 +1349,7 @@ void draw_diplomacy_ledger(const world& w, const recipe_registry& reg, const eco
                 draw_wars(w, reg, s, me);
         }
         ImGui::EndChild();
+        drop_orphan_declaration(w, s); // a tab or row press this frame left it unseen
     }
     if (!open)
     {

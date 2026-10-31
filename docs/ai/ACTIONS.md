@@ -2641,7 +2641,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - At least one goal (disabled otherwise: 'Choose at least one goal on the map.').
 - The declaration would be accepted - declaration_price is valid (disabled otherwise: 'A truce stands.', 'A war already stands between you.' or 'The declaration would be refused.').
 
-**Expected output.** Issues gameplay.declare_war with the chosen goals and closes the declaration. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head. Landed: 'War declared on <nation>.', the row reads At war with the score, and the Wars tab lists the war. Opened by a right-click attack, it instead files the unit-order request: every march is checked first, then declare_war (or answer_war) with these goals, then the marches (canvas.unit_right_click_attack).
+**Expected output.** Issues gameplay.declare_war with the chosen goals and closes the declaration. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head. Landed: 'War declared on <nation>.', the row reads At war with the score, and the Wars tab lists the war. Opened by a right-click attack, it instead files the unit-order request: every march is checked first, then declare_war (or answer_war) with these goals, then the marches (canvas.unit_right_click_attack); that outcome, a refusal included ('Can't attack there.', 'Couldn't declare war...'), is also the ledger's result line.
 
 **Reason to select.** Go to war for named ground, having seen the price.
 
@@ -2652,7 +2652,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - The declaration or the answer picker is open.
 
-**Expected output.** Closes it with no effect: no goal kept, no attack filed, nothing sent; the canvas outlines go. Escape takes this rung before the system menu.
+**Expected output.** Closes it with no effect: no goal kept, no attack filed, nothing sent; the canvas outlines go. On Escape's ladder it comes after the exit confirm and an open system menu (Escape closes those first), and before the menu's own opening. The declaration also closes by itself, with no effect, the moment it can no longer be seen: switching tab (including Offer peace's jump to Wars), expanding another row, folding its row, or closing the ledger.
 
 **Reason to select.** Back out of a declaration.
 

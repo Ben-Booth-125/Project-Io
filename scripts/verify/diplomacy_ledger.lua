@@ -133,6 +133,43 @@ assert(led().declaring == 0 and led().goals == 0, "Escape did not close the decl
 local wars0 = led().wars
 ok("Escape closes the declaration, nothing sent (wars " .. wars0 .. ")")
 
+-- Leaving the declaration's tab closes it: an unseen declaration must not keep
+-- the canvas (it suppresses right-click orders and eats left-clicks as goals).
+-- Open it, press Wars, then the canvas's right-click order works again.
+click(press_of("declare_open", target).x, press_of("declare_open", target).y)
+assert(led().declaring == target, "Declare war did not reopen the declaration")
+click(led().tab_wars_x, led().tab_wars_y)
+assert(led().view == 1, "the Wars tab did not open")
+assert(led().declaring == 0, "switching to Wars left the declaration open, unseen")
+ok("a tab change closes the declaration")
+local mine = nil
+for _, u in ipairs(verify.units()) do
+    if u.col ~= nil and u.player and u.count > 0 then mine = u break end
+end
+if mine ~= nil and theirs ~= nil then
+    assert(verify.select_unit(mine.id), "select_unit refused")
+    verify.center_tile(theirs.col, theirs.row, 8.0)
+    verify.frames(2)
+    local p = verify.tile_screen(theirs.col, theirs.row)
+    verify.hover(p.x, p.y, 2)
+    local order = verify.pointer_target().unit_order
+    print("diplomacy_ledger: after the tab change the stack previews '" .. order .. "'")
+    assert(order == "declare", "the canvas's unit-order preview did not come back")
+    verify.click(p.x, p.y, "right")
+    verify.frames(3)
+    assert(verify.pointer_target().order_confirm, "the right-click order did not work after the tab change")
+    ok("the right-click order works again (it opens the declaration)")
+    verify.press_escape()
+    verify.frames(2)
+    assert(led().declaring == 0, "Escape did not close the right-click's declaration")
+    verify.clear_selection()
+    verify.mouse(-1, -1)
+    verify.frames(2)
+end
+local d0 = led()
+if d0.view ~= 0 then click(d0.tab_nations_x, d0.tab_nations_y) end
+if led().expanded ~= target then click(row_of(target).x, row_of(target).y) end
+
 -- Reopen and choose a goal on the canvas: the rival stack's province.
 click(press_of("declare_open", target).x, press_of("declare_open", target).y)
 if theirs ~= nil then

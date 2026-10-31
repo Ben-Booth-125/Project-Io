@@ -1875,6 +1875,7 @@ void app::finish_new_game()
     open_play_log(std::string());
     ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
     ui::reset_wing_ui(m_ui);       // BL-1450: so do a wing card's held missions and queued order
+    ui::reset_diplomacy_ui(m_ui);  // BL-1462: and the Diplomacy ledger's declaration, history and caches
     m_screen = app_screen::in_game;
 }
 
@@ -2304,10 +2305,10 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
         // The band is always open (BL-266) and has no hide rung.
         if (m_ui.confirm_exit_pending)
             m_ui.confirm_exit_pending = false;
-        else if (m_ui.diplomacy.declare_target != null_entity)
-            ui::close_declaration(m_ui);                      // ledgers/diplomacy.md § 5: Escape cancels the declaration
         else if (m_ui.show_system_menu)
             m_ui.show_system_menu = false;
+        else if (m_ui.diplomacy.declare_target != null_entity)
+            ui::close_declaration(m_ui);                      // ledgers/diplomacy.md § 5: Escape cancels the declaration
         else if (m_ui.corp_rollup_drill >= 0)
             m_ui.corp_rollup_drill = -1;                      // back to the roll-up (BL-248)
         else if (ui::any_expanded(m_ui))
@@ -2531,6 +2532,7 @@ bool app::load_game_from(const std::string& path)
     m_ui.clear_front_selection();
     ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
     ui::reset_wing_ui(m_ui);       // BL-1450: so do a wing card's held missions and queued order
+    ui::reset_diplomacy_ui(m_ui);  // BL-1462: and the Diplomacy ledger's declaration, history and caches
 
     m_screen = app_screen::in_game;
     open_play_log(path);
@@ -3287,6 +3289,11 @@ void app::render()
     {
         const int tick = static_cast<int>(m_sim_loop.day_tick());
         bool go = true;
+        // A declare-and-attack is filed by the Diplomacy ledger's declaration: its
+        // outcome, a refusal above all, is also the ledger's result line, since the
+        // declaration has closed and the player is looking at the ledger.
+        const bool        from_declaration = m_ui.pending_unit_order_declare != null_entity;
+        std::string       declared_line;
         if (m_ui.pending_unit_order_declare != null_entity)
         {
             bool any = false, walled = false;
@@ -3336,6 +3343,12 @@ void app::render()
             // Already hostile (the declare raced another): the attack still stands.
             go = r == corp_command_result::applied
               || is_hostile(m_world, m_world.player_entity, target);
+            if (r == corp_command_result::applied)
+            {
+                const char* nm = actor_name(m_world, target);
+                const std::string them = (nm != nullptr && nm[0] != '\0') ? nm : "them";
+                declared_line = answering ? "You answered " + them + ". " : "War declared on " + them + ". ";
+            }
             if (!go)
                 m_ui.construction.last_message = r == corp_command_result::rejected_state
                     ? "Couldn't declare war — a truce stands, or a war is already open."
@@ -3388,6 +3401,8 @@ void app::render()
         }
         m_ui.pending_unit_order_units.clear(); // consume the request
         m_ui.pending_unit_order_tile     = null_entity;
+        if (from_declaration)
+            m_ui.diplomacy.message = declared_line + m_ui.construction.last_message;
         m_ui.pending_unit_order_declare  = null_entity;
         m_ui.pending_unit_order_attack   = false;
         m_ui.pending_unit_order_goals.clear();

@@ -464,7 +464,15 @@ struct diplomacy_ledger_state
     /// Convoys seen in flight at the last sample: id -> (shipper nation, receiving
     /// nation, value at the destination's price). One that is gone at the next
     /// sample has landed (or was cut), and is counted into `landed`.
-    struct convoy_seen { entity_id from = null_entity, to = null_entity; float value = 0.0f; };
+    /// `dest` and `due` let a vanished convoy be told from a cut one: only a convoy
+    /// that was due to arrive by the next sample (progress + speed >= 1) and whose
+    /// destination market still stands on `to`'s ground counts as landed.
+    struct convoy_seen
+    {
+        entity_id from = null_entity, to = null_entity, dest = null_entity;
+        float     value = 0.0f;
+        bool      due   = false;
+    };
     std::map<std::uint32_t, convoy_seen> convoys_seen;
     /// Cargo value landed per directed (shipper, receiver) nation pair, one map per
     /// econ tick, oldest first, at most 4 — the trade-exposure window.
@@ -472,6 +480,9 @@ struct diplomacy_ledger_state
 
     /// Derived caches keyed on the world's territory generation (never saved).
     std::uint64_t                   owners_generation = ~std::uint64_t{0};
+    /// Also keyed on `world::catchment_generation` (process-wide, never repeated
+    /// across worlds): `territory_generation` restarts at 0 on every load.
+    std::uint64_t                   owners_catchment  = ~std::uint64_t{0};
     std::map<uint32_t, entity_id>   province_owners;  ///< province -> political owner.
     std::map<entity_id, int>        provinces_owned;  ///< nation -> provinces it owns.
     /// GDP per nation per year, recomputed once per econ tick.

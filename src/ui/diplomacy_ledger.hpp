@@ -51,4 +51,10 @@ void open_declaration(const world& w, ui_state& s, entity_id target, entity_id a
 /// Closes the declaration without effect (Cancel, Escape): no goal, no attack, nothing queued.
 void close_declaration(ui_state& s);
 
+/// Clears every piece of the ledger's view state and UI-side history — the
+/// declaration, its attack and goals, the peace composer, the trend and trade
+/// ring buffers, the derived caches — for a load or a new campaign, whose world
+/// shares none of it. Called beside `reset_wing_ui`.
+void reset_diplomacy_ui(ui_state& s);
+
 } // namespace ui
