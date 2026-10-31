@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*26 entries — 21 open, 5 resolved.*
+*28 entries — 23 open, 5 resolved.*
 
 ---
 
@@ -290,6 +290,28 @@ The 2026-10-26 ruling says "keep the always-on player outline". Since the 2026-1
 > **Recommendation:** Accept; ask for a saved "seen once" record only if (3) feels wrong on the live click.
 
 *Files: `src/ui/unit_stat_grid.cpp`, `src/ui/profile_panel.cpp`*
+
+### NR-1111 — A harbour group's far ends get their own harbour
+*decision taken on your behalf · raised 2026-10-31 · from Lane G report, sprint 61 (BL-1420 lane and port defects), 2026-10-31*
+
+The ruling that colonial ends within two tiles share one harbour port and LOGISTICS.md § 4b's chaining of harbour groups could not both hold: a chain carried an end three or four steps from its port (seed 13). The lane kept the two-tile reach: harbour land is now chosen so its sea mouths lie within two steps of every end in the group, and ends still beyond two steps get a harbour of their own. Written into § 4b as a delegated reading.
+
+**Why it matters.** More, smaller harbours on chained coasts (seed 10 gained two ports). The alternative accepts longer dead spurs and loosens the check.
+
+> **Recommendation:** Accept.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-1112 — State port siting has no doc home
+*novel-work · raised 2026-10-31 · from Lane G report, sprint 61 (BL-1420 lane and port defects), 2026-10-31*
+
+A coastal capital's state port sits on the coastal tile nearest the capital, a rule stated only in a code comment. On seed 40 that tile lay in a sea pocket joined to open water only across a hex diagonal, which the four-step lane walk cannot cross, so no lane left it. The lane added a preference for open sea (the largest four-connected piece of the six-connected sea) in code only.
+
+**Why it matters.** A generation rule with no authority doc. It moves D_land on every seed with such a pocket.
+
+> **Recommendation:** Write the siting rule, open sea included, into LOGISTICS.md § 4b beside the harbour rules.
+
+*Files: `src/world/state_industry.cpp`*
 
 ---
 
