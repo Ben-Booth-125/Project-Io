@@ -6,6 +6,7 @@
 #include "player_side.hpp"  // owner_display_name
 #include "presentation.hpp"
 
+#include "world/embargo.hpp"         // embargoes — the Embargo / Lift toggle
 #include "world/building_profit.hpp" // estimate_building_profit — the GDP read (seat_screen's)
 #include "world/fronts.hpp"          // current_fronts — front strength
 #include "world/province.hpp"        // province_holder_for
@@ -739,8 +740,25 @@ void draw_expanded(const world& w, const recipe_registry& reg, const std::vector
             d.pending.push_back(command_for(w, corp_verb::offer_friendship, them));
     }
     ImGui::SameLine();
-    // Embargo — a door onto the embargo law, which has no verb yet. Disabled.
-    press(d, "Embargo", "embargo", them, false, "Embargo law not yet available");
+    // Embargo / Lift — a TOGGLE (diplomacy.md § 5): its state is visible (the
+    // press reads "Lift" in the active colour while the embargo stands), and
+    // pressing it while active repeals. Both go through `set_embargo`.
+    {
+        const bool on = embargoes(w, me, them);
+        if (on)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        const bool hit = press(d, on ? "Lift" : "Embargo", on ? "lift" : "embargo", them, true, {},
+                               on ? "Your embargo stands: none of their cargo lands in your markets. Press to lift it."
+                                  : "Embargo them: none of their cargo lands in your markets.");
+        if (on)
+            ImGui::PopStyleColor();
+        if (hit)
+        {
+            corp_command c = command_for(w, corp_verb::set_embargo, them);
+            c.order = on ? 0u : 1u;
+            d.pending.push_back(c);
+        }
+    }
 
     // Declare war / the war's score and Offer peace.
     if (r.at_war)

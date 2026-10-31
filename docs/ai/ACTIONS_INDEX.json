@@ -531,7 +531,7 @@
   ],
   [
    "gameplay.declare_hostile",
-   "RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering)."
+   "No control issues it: between nations a war's hostility is written by gameplay.declare_war (the declarer's row) and gameplay.answer_war (the defender's), and the right-click attack opens the Diplomacy ledger's declaration instead. In-process callers only: the verb is not in the wire allow-list, so over the command seam (--serve COMMAND, the MCP server) it is refused (rejected_invalid) before the seam, mutating nothing."
   ],
   [
    "gameplay.offer_friendship",
@@ -739,7 +739,7 @@
   ],
   [
    "gameplay.set_embargo",
-   "No control yet: the command seam only (BL-1418). A corp_verb (corp_verb::set_embargo, 53)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam."
   ],
   [
    "ledger.military_theatre_header",
@@ -827,7 +827,7 @@
   ],
   [
    "ledger.diplomacy_embargo",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Embargo' press - a door onto the embargo law (RELATIONS.md § 3)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift press - a toggle (diplomacy.md § 5): it reads 'Embargo' while none stands, and 'Lift' in the active button colour while your embargo of that nation stands."
   ],
   [
    "ledger.diplomacy_answer",

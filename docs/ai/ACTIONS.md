@@ -477,16 +477,23 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Stop a delivery that has stopped being the right one — the destination market's price collapsed, the stock turns out to be wanted at the source, a better destination appeared — without losing the cargo. The honest limit, and the thing to weigh before dispatching rather than after: holding does NOT bring the goods back. The stock is out of the pool either way; hold only stops it arriving somewhere you no longer want it, and buys time to decide. Release when the reason passes.
 
-### `gameplay.declare_hostile` — RETIRED (BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired)). No surface issues it. The corp_verb slot survives only because the verb enum is append-only (stored commands and wire callers agree on its numbering).
+### `gameplay.declare_hostile` — No control issues it: between nations a war's hostility is written by gameplay.declare_war (the declarer's row) and gameplay.answer_war (the defender's), and the right-click attack opens the Diplomacy ledger's declaration instead. In-process callers only: the verb is not in the wire allow-list, so over the command seam (--serve COMMAND, the MCP server) it is refused (rejected_invalid) before the seam, mutating nothing.
 
-**Press.** None. Over the command seam (--serve COMMAND, the MCP server, the live seam) the verb is REFUSED (rejected_invalid) before the seam, mutating nothing. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
+**Press.** None in the UI. In-process (apply_corp_command): corp=<nation> verb=declare_hostile counterparty=<nation>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id (nation)` | The nation the actor declares hostility toward. |
 
 **Valid when:**
-- None can be met: every wire call is rejected (rejected_invalid) and mutates nothing.
+- The actor and counterparty are distinct, known nations (rejected_invalid otherwise).
+- The actor is not already hostile toward the counterparty (rejected_state).
+- No war stands between the pair in either direction (rejected_state): between a war's parties hostility is the war verbs' to write (BL-1459).
+- No truce stands between the pair (rejected_state; BL-1428, RELATIONS.md § 7): a bare hostility may not walk around a truce. A refusal mutates nothing.
 
-**Expected output.** rejected_invalid, always. BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): a corp-to-corp stance has no subject with no corporations, and the corporation stance ledger (rail slot 9, Diplomacy) that hosted it retired; Diplomacy is a reserved slot again (docs/ui/ledgers/corporation.md § Slot 8, retired).
+**Expected output.** The actor's directed hostility row toward the counterparty is written (world::corp_hostile_pairs); any friendship between them dissolves and pending offers either way are withdrawn, in the same mutation. It opens no war, names no goals and charges no declaration price; every hostility consumer (interception of hostile cargo, the march queue, the battle trigger) reads it.
 
-**Reason to select.** Never. Nation-grain relations have no player verb yet (docs/politics/RELATIONS.md).
+**Reason to select.** Rarely: a bare hostility with no war and no goals. To fight for ground, declare war instead (gameplay.declare_war), which carries goals, a score and a peace.
 
 ### `gameplay.offer_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Offer friendship' press (ledger.diplomacy_offer_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
 
@@ -990,9 +997,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** The war is won outright: dictate the terms.
 
-### `gameplay.set_embargo` — No control yet: the command seam only (BL-1418). A corp_verb (corp_verb::set_embargo, 53).
+### `gameplay.set_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam.
 
-**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=53 counterparty=<nation> order=<0|1>.
+**Press.** UI: expand a nation's row and press 'Embargo' (or 'Lift' while one stands). Over the seam: COMMAND corp=<nation> nation=<nation> verb=53 counterparty=<nation> order=<0|1>.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -2694,20 +2701,20 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Take a friendship offered.
 
-### `ledger.diplomacy_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Embargo' press - a door onto the embargo law (RELATIONS.md § 3).
+### `ledger.diplomacy_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift press - a toggle (diplomacy.md § 5): it reads 'Embargo' while none stands, and 'Lift' in the active button colour while your embargo of that nation stands.
 
-**Press.** Press 'Embargo'.
+**Press.** Press 'Embargo' to enact; press 'Lift' (the same control, active) to repeal.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `nation` | `entity_id (nation)` | The row. |
+| `nation` | `entity_id (nation)` | The row: the nation embargoed. |
 
 **Valid when:**
-- None can be met: the embargo law has no verb, so the press is always disabled; its tooltip reads 'Embargo law not yet available'.
+- Always live. The verb's own refusals (an embargo already standing, none to lift, not a nation) come back as the ledger's result line.
 
-**Expected output.** Nothing. When the law verb exists the press enacts or repeals the embargo law against this nation, and is a toggle (Embargo / Lift).
+**Expected output.** Issues gameplay.set_embargo with order 1 (Embargo) or 0 (Lift). The press queues a corp_command that app::render sends at the frame's end through player_command. Landed: 'Embargo on <nation> in force.' and the press reads Lift; or 'Embargo on <nation> lifted.' and it reads Embargo again. Refused: 'Refused: an embargo on <nation> already stands.', 'Refused: no embargo on <nation> stands.' or 'Refused: <nation> is not a nation you can embargo.'.
 
-**Reason to select.** Never, for now.
+**Reason to select.** Shut a nation's goods out of your markets (see gameplay.set_embargo), or lift it to let them back in.
 
 ### `ledger.diplomacy_answer` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Answer' on a war declared on the player that it has not answered.
 

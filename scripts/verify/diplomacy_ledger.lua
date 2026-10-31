@@ -3,7 +3,7 @@
 -- 1. Slot 8 is Diplomacy: pressing it opens the ledger on Nations, every nation
 --    a folded row with stance chips and Access / Trust / Alarm toward the player.
 -- 2. Expanding a row in place: the reverse sentiment, power and front strength,
---    trade exposure, friendship, the embargo press (disabled with its reason)
+--    trade exposure, friendship, the Embargo / Lift toggle (enact, then lift)
 --    and Declare war.
 -- 3. The declaration: Declare war turns the row into it, the canvas marks the
 --    target's provinces, a click on one chooses it as a goal, and the
@@ -81,8 +81,7 @@ click(r.x, r.y)
 assert(led().expanded == target, "the expander did not expand the row")
 ok("the row expands in place")
 local emb = press_of("embargo", target)
-assert(emb ~= nil and not emb.enabled and emb.reason == "Embargo law not yet available",
-       "the embargo press is not drawn disabled with its reason")
+assert(emb ~= nil and emb.enabled, "the Embargo press is not drawn live")
 local friend = press_of("offer_friendship", target) or press_of("withdraw", target)
                or press_of("accept_friendship", target)
 assert(friend ~= nil, "no friendship press drawn")
@@ -99,6 +98,22 @@ click(r.x, r.y)
 assert(led().expanded == 0, "re-pressing the expander did not fold the row")
 click(row_of(target).x, row_of(target).y)
 ok("the expander is a toggle")
+
+-- Embargo / Lift is a toggle: Embargo enacts and the press reads Lift; Lift
+-- repeals and it reads Embargo again. Both through set_embargo.
+emb = press_of("embargo", target)
+click(emb.x, emb.y)
+verify.frames(2)
+local lift = press_of("lift", target)
+print("diplomacy_ledger: after Embargo message='" .. led().message .. "' lift drawn=" .. tostring(lift ~= nil))
+assert(lift ~= nil, "after Embargo the press does not read Lift")
+verify.capture("diplomacy_embargo_in_force")
+click(lift.x, lift.y)
+verify.frames(2)
+print("diplomacy_ledger: after Lift message='" .. led().message .. "'")
+assert(press_of("embargo", target) ~= nil and press_of("lift", target) == nil,
+       "Lift did not restore the Embargo press")
+ok("Embargo / Lift toggles through set_embargo")
 
 -- 3. The declaration.
 decl = press_of("declare_open", target)

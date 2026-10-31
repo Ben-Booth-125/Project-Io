@@ -3715,6 +3715,14 @@ void app::render()
             case corp_verb::return_to_neutral:
                 m_ui.diplomacy.message = ok ? "Withdrawn." : "Nothing to withdraw.";
                 break;
+            case corp_verb::set_embargo: // order 1 enacts, 0 repeals (embargo.hpp)
+                m_ui.diplomacy.message = ok
+                    ? (cmd.order == 1 ? "Embargo on " + them + " in force." : "Embargo on " + them + " lifted.")
+                    : r == corp_command_result::rejected_state
+                        ? (cmd.order == 1 ? "Refused: an embargo on " + them + " already stands."
+                                          : "Refused: no embargo on " + them + " stands.")
+                        : "Refused: " + them + " is not a nation you can embargo.";
+                break;
             default:
                 break;
         }
