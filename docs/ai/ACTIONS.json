@@ -2923,13 +2923,13 @@
   {
    "id": "ledger.selection_unit_type_designer",
    "family": "ledger",
-   "surface": "Selection band, the unit card's Roster page (the card's second page): the unit type's name under 'Type', for the player's own unit.",
+   "surface": "Selection band, the unit card's header above its stat grid (BL-1454; the Strength and Roster pages folded into the grid): the unit type's name, for the player's own unit.",
    "press": "Click the type name. Clicking it again while the designer is open on that unit's class closes it (the toggle rule) - unless a slot's draft is unsaved, when the designer stays open and asks Save or Discard (canvas.designer_save).",
    "args": [],
    "preconditions": [
-    "A unit of your own nation is selected and its card is on the Roster page. A rival's unit shows its type as plain text: the designer edits your own designs."
+    "A unit of your own nation is selected. A rival's unit shows its type as plain text: the designer edits your own designs."
    ],
-   "expected_output": "Opens the unit designer on the full canvas for the land class the unit fights as (as ledger.military_open_designer). When the unit's recorded design differs from the class's live design, the page also says it is on an older design and the Refit menu offers its own type as '(live design)'. Nothing in the world changes.",
+   "expected_output": "Opens the unit designer on the full canvas for the land class the unit fights as (as ledger.military_open_designer). When the unit's recorded design differs from the class's live design, the card also says (under the grid) it is on an older design and the Refit menu offers its own type as '(live design)'. Nothing in the world changes.",
    "reason_to_select": "To see or change what this kind of unit carries, straight from a unit in front of you."
   },
   {

@@ -39,6 +39,8 @@
 #include "world/corp_command.hpp" // refit_check / refit_credit_cost: the unit card's Refit menu (2026-10-27)
 #include "unit_designer.hpp"     // the unit card's type name opens the designer
 #include "world/unit_designs.hpp" // unit_land_class, unit_design_stale
+#include "unit_art.hpp"       // BL-1454: the class image beside the stat grid
+#include "unit_stat_grid.hpp" // BL-1454: the shared stat grid
 #include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324); also the Soldier card's Roster page name lookup
 
 #include "rail_tool.hpp" // BL-1255: the Track / Railway Station rows
@@ -1584,66 +1586,88 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
     const float         right_w = avail * 0.25f;
     const float       center_w  = std::max(80.0f, avail - left_w - right_w - 2.0f * spacing);
 
-    // ── Left quarter: placeholder soldier glyph ──
+    // ── Left quarter: the class's authored image (BL-1454; SELECTION.md § The unit
+    //    element's layout) — the designer's `assets/units/<class>.png`, aspect kept;
+    //    the soldier glyph stands in when the class has no image. ──
+    const unit_component& u0 = uit->second;
     {
         const ImVec2 p  = ImGui::GetCursorScreenPos();
         const ImVec2 mx = {p.x + left_w, p.y + total_h};
         dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
-        const ImVec2 gc = {(p.x + mx.x) * 0.5f, (p.y + mx.y) * 0.5f};
-        const float  gr = std::min(left_w, total_h) * 0.5f - 10.0f;
-        glyph_soldier(dl, gc, std::max(4.0f, gr), IM_COL32(190, 200, 210, 255));
+        const unit_art& art = unit_art_for(unit_land_class(u0));
+        if (art.tex != nullptr && art.width > 0 && art.height > 0)
+        {
+            const float room_w = left_w - 8.0f, room_h = total_h - 8.0f;
+            const float sc = std::min(room_w / art.width, room_h / art.height);
+            const float iw = art.width * sc, ih = art.height * sc;
+            const ImVec2 i0 = {p.x + (left_w - iw) * 0.5f, p.y + (total_h - ih) * 0.5f};
+            dl->AddImage(reinterpret_cast<ImTextureID>(art.tex), i0, {i0.x + iw, i0.y + ih});
+        }
+        else
+        {
+            const ImVec2 gc = {(p.x + mx.x) * 0.5f, (p.y + mx.y) * 0.5f};
+            const float  gr = std::min(left_w, total_h) * 0.5f - 10.0f;
+            glyph_soldier(dl, gc, std::max(4.0f, gr), IM_COL32(190, 200, 210, 255));
+        }
         dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
         ImGui::Dummy({left_w, total_h});
     }
     ImGui::SameLine();
 
-    // ── Centre half: paged accordion over unit_pages() ──
+    // ── Centre half: the STAT GRID (BL-1454; ledgers/military.md § The stat grid),
+    //    headed by the unit's type and owner. The Strength and Roster pages fold into
+    //    it; what is left — a stale design, a refit in progress, the front it holds,
+    //    a supply shortfall — is a line under the grid. ──
     {
-        const std::vector<unit_page> pages = unit_pages(w, sel);
+        ImGui::BeginChild("##unit_accordion", {center_w, total_h}, true, ImGuiWindowFlags_NoSavedSettings);
+        const unit_component& u   = u0;
+        const bool            own = is_player_side(w, u.owner);
 
-        ImGui::BeginChild("##unit_accordion", {center_w, total_h}, true,
-                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-
-        int&      page = ui.selection_unit_page;
-        const int n    = static_cast<int>(pages.size());
-        page = std::clamp(page, 0, std::max(0, n - 1));
-
-        if (n == 0)
+        // Header: the type name (the designer's second door on the player's own
+        // unit — military.md § The designer; lit while open, a toggle), then owner.
+        const std::string nm = unit_roster_display_name(u.type);
+        if (own && kit_slot_count(unit_land_class(u)) > 0)
         {
-            ImGui::TextDisabled("\xe2\x80\x94");
+            const land_class lc = unit_land_class(u);
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::selection));
+            if (ImGui::Selectable((nm + "##unit_type_designer").c_str(), unit_designer_open_on(ui, lc), 0,
+                                  {ImGui::CalcTextSize(nm.c_str()).x, 0.0f}))
+                toggle_unit_designer(ui, lc);
+            ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Open the designer for this class");
+            ui.designer.card_type_x = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
+            ui.designer.card_type_y = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
         }
         else
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", nm.c_str());
+        ImGui::SameLine();
+        const char* owner_name = owner_display_name(w, u.owner);
+        ImGui::TextDisabled("%s \xc2\xb7 %s", land_class_display_name(unit_land_class(u)),
+                            owner_name != nullptr ? owner_name : "\xe2\x80\x94");
+
+        draw_stat_grid("##unit_stat_grid", unit_card_cells(w, reg, u, sel), ImGui::GetContentRegionAvail().x);
+
+        if (own)
         {
-            const unit_page& up = pages[static_cast<std::size_t>(page)];
-
-            const float frame_h = ImGui::GetFrameHeight();
-            const float aw      = ImGui::GetContentRegionAvail().x;
-            const float right   = ImGui::GetCursorPosX() + aw;
-            ImGui::BeginDisabled(page == 0);
-            if (ImGui::ArrowButton("##unit_prev", ImGuiDir_Left)) --page;
-            ImGui::EndDisabled();
-            if (ImGui::IsItemHovered() && page > 0)
-                ImGui::SetTooltip("Previous");
-
-            char hdr[64];
-            std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", up.label.c_str(), page + 1, n);
-            const float name_w = ui::fit_width(hdr);
-            ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
-
-            ImGui::SameLine(right - 2.0f * frame_h - style.ItemSpacing.x);
-            ImGui::BeginDisabled(page == n - 1);
-            if (ImGui::ArrowButton("##unit_next", ImGuiDir_Right)) ++page;
-            ImGui::EndDisabled();
-            if (ImGui::IsItemHovered() && page < n - 1)
-                ImGui::SetTooltip("Next");
-
-            ImGui::Spacing();
-            ImGui::BeginChild("##unit_page_body", {0.0f, 0.0f}, false,
-                              ImGuiWindowFlags_NoSavedSettings);
-            draw_unit_page(w, reg, sel, up.kind, &ui);
-            ImGui::EndChild();
+            if (unit_design_stale(w, u))
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::research_warning),
+                                   "On an older design \xe2\x80\x94 refit to take the live one");
+            if (unit_refitting(u))
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                                   "Refitting to %s \xe2\x80\x94 %d d left",
+                                   unit_roster_display_name(u.refit_type).c_str(), u.refit_days);
+            if (const front_view* fv = front_by_key(w, u.owner, u.front))
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(
+                                       front_stance_colour(stance_toward(w, u.owner, fv->f.neighbour))),
+                                   "Front: %s", fv->label.c_str());
+            if (u.supply_factor_permille < 1000)
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                                   "Supply %.0f%% \xe2\x80\x94 unsupplied, weakening",
+                                   u.supply_factor_permille / 10.0f);
         }
+        else if (!rival_unit_seen(w, sel))
+            ImGui::TextDisabled("Not yet seen \xe2\x80\x94 fight it or reveal it by recon");
 
         ImGui::EndChild();
     }

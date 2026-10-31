@@ -106,6 +106,11 @@ inline constexpr ImU32 negative = IM_COL32(216, 100,  96, 255); ///< Loss, defic
 inline constexpr ImU32 unit_hp        = IM_COL32(110, 200, 120, 255); ///< Men fit to fight — `positive`'s green.
 inline constexpr ImU32 unit_readiness = IM_COL32(240, 140,  40, 255); ///< Cohesion in contact — orange (Ben, 2026-10-27), distinct from HP.
 inline constexpr ImU32 unit_morale    = IM_COL32(120, 160, 230, 255); ///< Will to fight — blue, the card only.
+/// BL-1454 (the stat grid; MILITARY.md § Carried supplies): the three carried stocks'
+/// bars, the card and the designer only — grain, brass and steel.
+inline constexpr ImU32 unit_food      = IM_COL32(214, 182,  96, 255);
+inline constexpr ImU32 unit_ammo      = IM_COL32(200, 150,  70, 255);
+inline constexpr ImU32 unit_equipment = IM_COL32(150, 166, 186, 255);
 inline constexpr ImU32 neutral  = IM_COL32(170, 175, 185, 255); ///< No change / not applicable.
 
 // --- a front's line, by the stance toward its neighbour (BL-1427; MILITARY.md § Fronts) ---

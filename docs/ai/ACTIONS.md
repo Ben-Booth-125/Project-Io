@@ -2360,14 +2360,14 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Answers 'what is this kind of unit carrying, and what can it carry instead?'. Open it to see what each slot holds, what research would open, and to change the class's live design.
 
-### `ledger.selection_unit_type_designer` — Selection band, the unit card's Roster page (the card's second page): the unit type's name under 'Type', for the player's own unit.
+### `ledger.selection_unit_type_designer` — Selection band, the unit card's header above its stat grid (BL-1454; the Strength and Roster pages folded into the grid): the unit type's name, for the player's own unit.
 
 **Press.** Click the type name. Clicking it again while the designer is open on that unit's class closes it (the toggle rule) - unless a slot's draft is unsaved, when the designer stays open and asks Save or Discard (canvas.designer_save).
 
 **Valid when:**
-- A unit of your own nation is selected and its card is on the Roster page. A rival's unit shows its type as plain text: the designer edits your own designs.
+- A unit of your own nation is selected. A rival's unit shows its type as plain text: the designer edits your own designs.
 
-**Expected output.** Opens the unit designer on the full canvas for the land class the unit fights as (as ledger.military_open_designer). When the unit's recorded design differs from the class's live design, the page also says it is on an older design and the Refit menu offers its own type as '(live design)'. Nothing in the world changes.
+**Expected output.** Opens the unit designer on the full canvas for the land class the unit fights as (as ledger.military_open_designer). When the unit's recorded design differs from the class's live design, the card also says (under the grid) it is on an older design and the Refit menu offers its own type as '(live design)'. Nothing in the world changes.
 
 **Reason to select.** To see or change what this kind of unit carries, straight from a unit in front of you.
 

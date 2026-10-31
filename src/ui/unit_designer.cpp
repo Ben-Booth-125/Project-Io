@@ -4,6 +4,7 @@
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "unit_art.hpp"
+#include "unit_stat_grid.hpp" // BL-1454: the grid the unit card shares
 #include "wing_card.hpp" // air_class_label
 
 #include "world/air_combat.hpp"             // wing_class — an air class's stale wings
@@ -117,6 +118,9 @@ public:
     virtual corp_command_result          check(int sl, uint16_t item) const = 0;
     virtual std::string                  item_delta(uint16_t item) const = 0; ///< Its own change, for the box.
     virtual std::vector<stat>            stats(const unit_design& d) const = 0;
+    /// BL-1454: the stat grid's cells for design @p d, each with its signed delta
+    /// against @p from when given (the live design, while editing).
+    virtual std::vector<stat_cell>       grid(const unit_design& d, const unit_design* from) const = 0;
     virtual std::string                  design_goods(const unit_design& d) const = 0;
     virtual const char*                  class_label() const = 0;
     virtual const char*                  per() const = 0;             ///< "unit" / "wing".
@@ -149,7 +153,8 @@ const char* land_label(land_class c)
 class land_theatre final : public theatre
 {
 public:
-    land_theatre(const world& w, entity_id nation, land_class c) : w_(w), nation_(nation), c_(c) {}
+    land_theatre(const world& w, entity_id nation, land_class c, const recipe_registry* reg = nullptr)
+        : w_(w), reg_(reg), nation_(nation), c_(c) {}
     int slots() const override { return kit_slot_count(c_); }
     const char* slot_name(int sl) const override { return kit_slot_name(c_, sl); }
     const std::vector<uint16_t>& items(int sl) const override { return kit_items_for(c_, sl); }
@@ -174,6 +179,17 @@ public:
         return stat_delta_text(zero, to_stats(d));
     }
     std::vector<stat> stats(const unit_design& d) const override { return to_stats(kit_stats(c_, d)); }
+    std::vector<stat_cell> grid(const unit_design& d, const unit_design* from) const override
+    {
+        // The unit card's own design cells (`land_design_cells`), so the two grids
+        // cannot disagree. Speed is the class's alone (Ben, 2026-10-28): no delta.
+        const float days = reg_ != nullptr
+            ? reg_->military().march_days_per_land_class[static_cast<std::size_t>(c_)] : 0.0f;
+        if (from == nullptr)
+            return land_design_cells(kit_stats(c_, d), days);
+        const land_combat_stats base = kit_stats(c_, *from);
+        return land_design_cells(kit_stats(c_, d), days, &base);
+    }
     std::string design_goods(const unit_design& d) const override { return goods_text(kit_goods(c_, d)); }
     const char* class_label() const override { return land_label(c_); }
     const char* per() const override { return "unit"; }
@@ -225,9 +241,10 @@ private:
                 {"Recon", "recon", s.recon, false},       // BL-1453 (MILITARY.md § Recon)
                 {"Stealth", "stealth", s.stealth, false}};
     }
-    const world& w_;
-    entity_id    nation_;
-    land_class   c_;
+    const world&           w_;
+    const recipe_registry* reg_;
+    entity_id              nation_;
+    land_class             c_;
 };
 
 /// The air classes (`air_kit_catalogue`; MILITARY.md § Air). No air art yet: the
@@ -267,6 +284,27 @@ public:
         t.hp = cs.hp + k.hp;  t.air = cs.air + k.air;  t.soft = cs.soft + k.soft;  t.hard = cs.hard + k.hard;
         t.strategic = cs.strategic + k.strategic;  t.recon = cs.recon + k.recon;  t.range = cs.range + k.range;
         return to_stats(t);
+    }
+    std::vector<stat_cell> grid(const unit_design& d, const unit_design* from) const override
+    {
+        const std::vector<stat> a = stats(d);
+        const std::vector<stat> b = from != nullptr ? stats(*from) : a;
+        std::vector<stat_cell> out;
+        for (std::size_t i = 0; i < a.size(); ++i)
+        {
+            stat_cell c;
+            c.label = a[i].label;
+            char v[24];
+            std::snprintf(v, sizeof v, "%d", a[i].value);
+            c.value = v;
+            if (from != nullptr)
+            {
+                c.has_delta = true;
+                c.delta     = a[i].value - b[i].value;
+            }
+            out.push_back(c);
+        }
+        return out;
     }
     std::string design_goods(const unit_design& d) const override { return goods_text(air_kit_goods(c_, d)); }
     const char* class_label() const override { return air_class_label(c_); }
@@ -342,7 +380,7 @@ std::unique_ptr<theatre> make_theatre(const world& w, const recipe_registry* reg
             return nullptr;
         return std::make_unique<air_theatre>(w, *reg, nation, static_cast<air_class>(key));
     }
-    return std::make_unique<land_theatre>(w, nation, static_cast<land_class>(key));
+    return std::make_unique<land_theatre>(w, nation, static_cast<land_class>(key), reg);
 }
 
 /// The draft's picks laid over @p t's live design.
@@ -531,6 +569,7 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     d.stale_units = 0;
     d.drawn_cls   = -1;
     d.drawn_air   = false;
+    d.grid_cells.clear();
 
     const entity_id nation = player_nation(w);
 
@@ -655,8 +694,17 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     //    summary strip underneath. ─────────────────────────────────────────────
     const ImVec2 o     = ImGui::GetCursorScreenPos();
     const ImVec2 avail = ImGui::GetContentRegionAvail();
-    // Three summary lines and the Save / Revert row under them.
-    const float  summary_h = 3.0f * ImGui::GetTextLineHeightWithSpacing() + ImGui::GetFrameHeightWithSpacing() + 10.0f;
+    // Three summary lines and the Save / Revert row under them on the left, and the
+    // stat grid (BL-1454) at the bottom right: two rows of label-over-value cells.
+    // The grid's columns follow its width as `draw_stat_grid` fits them (2..4), so
+    // its rows — and the strip's height — follow from the cell count.
+    const float  grid_w    = std::clamp(avail.x * 0.46f, 300.0f, 560.0f);
+    const int    grid_cols = std::clamp(static_cast<int>(grid_w / 118.0f), 2, 4);
+    const int    grid_rows = (static_cast<int>(t.grid(t.live_design(), nullptr).size()) + grid_cols - 1) / grid_cols;
+    const float  grid_h    = grid_rows * (2.0f * ImGui::GetTextLineHeightWithSpacing() + 4.0f) + 14.0f;
+    const float  summary_h = std::max(3.0f * ImGui::GetTextLineHeightWithSpacing()
+                                          + ImGui::GetFrameHeightWithSpacing() + 10.0f,
+                                      grid_h);
     const float  main_h    = std::max(120.0f, avail.y - summary_h);
     const float  box_w     = std::clamp(avail.x * 0.24f, 180.0f, 300.0f);
     const float  box_h     = 3.0f * line + 2.0f * pad + 4.0f;
@@ -916,24 +964,25 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
                               && t.variant_of(preview) != design.fit[static_cast<std::size_t>(d.slot_open)];
         if (has_preview)
             next.fit[static_cast<std::size_t>(d.slot_open)] = t.variant_of(preview);
-        const std::vector<stat> then = t.stats(next);
-
-        const int   n     = static_cast<int>(now_stats.size());
-        const float col_w = avail.x / static_cast<float>(std::max(1, n));
-        const float x0    = ImGui::GetCursorPosX();
-        for (int i = 0; i < n; ++i)
-        {
-            if (i) ImGui::SameLine(x0 + col_w * static_cast<float>(i));
-            const stat& c  = now_stats[static_cast<std::size_t>(i)];
-            const int   cb = then[static_cast<std::size_t>(i)].value;
-            const int   a  = c.pct ? (c.value + 5) / 10 : c.value;
-            const int   b  = c.pct ? (cb + 5) / 10 : cb;
-            if (has_preview && c.value != cb)
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(cb > c.value ? palette::positive : palette::negative),
-                                   "%s %d%s \xe2\x86\x92 %d%s", c.label, a, c.pct ? "%" : "", b, c.pct ? "%" : "");
-            else
-                ImGui::Text("%s %d%s", c.label, a, c.pct ? "%" : "");
-        }
+        // THE STAT GRID at the bottom right (BL-1454; military.md § The designer):
+        // the shown design — the draft, with the hovered item previewed fitted — and,
+        // while it differs from the live design, each stat's signed delta against it.
+        const unit_design live_d  = t.live_design();
+        const bool        editing = next != live_d;
+        const ImVec2      sum0    = ImGui::GetCursorScreenPos();
+        ImGui::SetCursorScreenPos({o.x + avail.x - grid_w, sum0.y});
+        ImGui::BeginChild("##designer_stat_grid", {grid_w, summary_h - 6.0f}, ImGuiChildFlags_None,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        const std::vector<stat_cell> cells = t.grid(next, editing ? &live_d : nullptr);
+        draw_stat_grid("##designer_grid", cells, grid_w);
+        // Published for the verify seam: what the grid drew, cell by cell.
+        d.grid_cells.clear();
+        for (const stat_cell& c : cells)
+            d.grid_cells.push_back({c.label, c.value, c.has_delta ? c.delta : 0});
+        ImGui::EndChild();
+        ImGui::SetCursorScreenPos(sum0);
+        ImGui::BeginChild("##designer_summary_left", {avail.x - grid_w - 12.0f, summary_h - 6.0f},
+                          ImGuiChildFlags_None, ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
         const std::string goods_now = t.design_goods(design);
         if (has_preview)
             ImGui::TextDisabled("Kit goods per %s: %s  \xe2\x86\x92  %s", t.per(), goods_now.c_str(),
@@ -985,6 +1034,7 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", d.last_message.c_str());
         else
             ImGui::TextDisabled("No changes.");
+        ImGui::EndChild(); // ##designer_summary_left
     }
 
     // ── The close prompt: a close was asked for with an unsaved draft ─────────
