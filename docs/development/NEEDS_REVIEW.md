@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*23 entries — 18 open, 5 resolved.*
+*26 entries — 21 open, 5 resolved.*
 
 ---
 
@@ -250,6 +250,46 @@ A span whose every tile an earlier span already claimed used to be dropped, leav
 > **Recommendation:** Accept; the key is an identity, not a place.
 
 *Files: `docs/military/MILITARY.md`, `src/world/fronts.cpp`*
+
+### NR-1108 — Trade-flow room: nothing computes "no room" today
+*question · raised 2026-10-31 · from Lane U report, sprint 61 (UI carries), 2026-10-31, BL-1414 (trade-flow room)*
+
+BL-1414 asks the Trade-flow lens to compute a lane's room without rivals' cargo, so a no-room marker never reveals a rival's shipments. But the dispatcher (src/world/trade.cpp) only ever records trade_refusal::sent, so the lens never draws a refusal marker and there is no room figure to change. The item was skipped.
+
+**Why it matters.** Building a room figure is new lens-side economics, not polish. The brief and the row also disagreed on which way rivals' cargo counts.
+
+- A: bring the refusal classes back in the dispatcher, room computed without rivals' cargo (private stays private)
+- B: cancel BL-1414; the lens shows flows only
+- C: park it until trade capacity is next touched
+
+> **Recommendation:** B unless a refusal marker answers a question the player is asking now; the lens question is "where do my goods go".
+
+*Files: `src/world/trade.cpp`, `docs/economy/TRADE.md`*
+
+### NR-1109 — The "always-on player outline" draws only under a lens
+*question · raised 2026-10-31 · from Lane U report, sprint 61 (UI carries), 2026-10-31, BL-1416 (identity wash)*
+
+The 2026-10-26 ruling says "keep the always-on player outline". Since the 2026-10-24 ruling the outline draws only under a lens, and PLANETARY.md and LENSES.md both say the plain canvas has no outline. The lane removed the stale wash wording and did not bring the outline back.
+
+**Why it matters.** Two dated rulings disagree; the code and two docs follow the earlier one.
+
+- A: the plain canvas has no outline (as built and documented)
+- B: the player outline is always on, plain canvas included
+
+> **Recommendation:** A: read "always-on" as "under every lens", and amend the 10-26 wording.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/canvases/PLANETARY.md`*
+
+### NR-1110 — Five UI calls the lane took
+*decision taken on your behalf · raised 2026-10-31 · from Lane U report, sprint 61 (UI carries), 2026-10-31*
+
+(1) BL-1417: with the emblem gone, the profile card marks the nation by a thin rule in its colour beside the name. (2) BL-1454: new colours palette::unit_food, unit_ammo, unit_equipment. (3) A rival unit's design stats count as "seen" only while it is in a battle against the player or air-revealed to the player; nothing remembers a past sighting, since that needs a save field. (4) New verify reads verify.unit_stat_grid(id) and verify.unit_designer().grid return only the cells the screen draws (unit stats, no tile data). (5) The unit card's Strength/Roster pager is gone; verify.unit_card_page is kept as a no-op.
+
+**Why it matters.** (3) means a rival's stats blank again the day a battle ends, which may read as forgetting. The rest are look-and-feel; each is in the live click list.
+
+> **Recommendation:** Accept; ask for a saved "seen once" record only if (3) feels wrong on the live click.
+
+*Files: `src/ui/unit_stat_grid.cpp`, `src/ui/profile_panel.cpp`*
 
 ---
 
