@@ -24,7 +24,7 @@
 // POST are the port lanes', and every one of those must be a PORT end.
 //
 // Build:  bash tools/verify/build_lua_harness.sh port_lane_probe
-// Run:    build_gen/verify/port_lane_probe.exe [--seeds 0,1,28,46]
+// Run:    build_gen/verify/port_lane_probe.exe [--seeds 0,1,28,46,40,12,13,10]
 
 #include "scripting/lua_state.hpp"
 #include "harness_params.hpp"
@@ -57,10 +57,65 @@ struct reading
     std::set<entity_id> ends;
     std::map<entity_id, lane_end> end_info;
     std::vector<entity_id> untouched_ports;
-    std::map<entity_id, int> harbour_steps; ///< sea tile -> hex steps over water from a port's mouth (<= 2)
+    std::map<entity_id, int> harbour_steps; ///< sea tile -> hex steps over the sea from a harbour port's mouth
+    std::set<entity_id> harbour_mouths;     ///< the sea mouths of the ports that could serve a harbour
 };
 
-reading read(world& w, entity_id body)
+/// BL-1420 review: whether colonial end @p e's lane REACHES a harbour port - a laned path on
+/// the four cardinal steps (the lane walk's own grid) from @p e to a harbour mouth within two
+/// hex steps over the sea of it. Within two steps alone is not enough: a hex diagonal no
+/// lane crosses would pass it.
+bool lane_reaches_harbour(world& w, entity_id body, entity_id e, const reading& r)
+{
+    const auto bit = w.bodies.find(body);
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    const auto at = [&](int x, int y) -> entity_id {
+        if (y < 0 || y >= gh) return null_entity;
+        return grid[static_cast<std::size_t>(y * gw + ((x % gw) + gw) % gw)];
+    };
+    // The harbour mouths within two hex steps over the sea of e.
+    std::set<entity_id> targets;
+    {
+        std::vector<std::pair<entity_id, int>> q{{e, 0}};
+        std::set<entity_id> seen{e};
+        for (std::size_t h = 0; h < q.size(); ++h)
+        {
+            const auto [t, d] = q[h];
+            if (r.harbour_mouths.count(t) != 0) targets.insert(t);
+            if (d >= 2) continue;
+            const tile_component& tc = w.tiles.at(t);
+            for (int side = 0; side < 6; ++side)
+            {
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+                const entity_id n = at(nb.gx, nb.gy);
+                if (n != null_entity && is_sea(w.tiles.at(n).substrate) && seen.insert(n).second)
+                    q.push_back({n, d + 1});
+            }
+        }
+    }
+    if (targets.empty()) return false;
+    // A laned four-way flood from e, bounded: a harbour spur is a few tiles.
+    std::vector<entity_id> q{e};
+    std::set<entity_id> seen{e};
+    for (std::size_t h = 0; h < q.size() && q.size() < 4096; ++h)
+    {
+        const entity_id t = q[h];
+        if (targets.count(t) != 0) return true;
+        const tile_component& tc = w.tiles.at(t);
+        const int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
+        for (int k = 0; k < 4; ++k)
+        {
+            const entity_id n = at(tc.grid_x + dx[k], tc.grid_y + dy[k]);
+            if (n == null_entity || !seen.insert(n).second) continue;
+            const tile_component& nc = w.tiles.at(n);
+            if (is_sea(nc.substrate) && nc.lane_level > 0) q.push_back(n);
+        }
+    }
+    return false;
+}
+
+reading read(world& w, entity_id body, const std::set<entity_id>& harbour_ports = {})
 {
     reading r;
     const auto bit = w.bodies.find(body);
@@ -115,9 +170,26 @@ reading read(world& w, entity_id body)
     // within two tiles share one harbour): a colonial end here is IN A HARBOUR - its lane
     // runs past the port's mouth and stops short of the next one, a spur, not a portless
     // landing. Steps are hex steps over water, the grouping's own measure.
+    // BL-1420 review: the measure is the RULE's - SEA mouths (is_sea, as the harbour rule
+    // reads them) of the ports that could serve a colonial harbour: those standing once the
+    // fold's colonial ports are placed (@p harbour_ports), not the ports the Logistic Point
+    // seeding lands afterwards. The walk is over the sea only.
     std::map<entity_id, int> harbour_steps;
     {
-        std::vector<entity_id> q(mouths.begin(), mouths.end());
+        std::vector<entity_id> q;
+        for (const auto& [bid, pt] : ports)
+        {
+            if (harbour_ports.count(bid) == 0) continue;
+            const tile_component& tc = w.tiles.at(pt);
+            for (int side = 0; side < 6; ++side)
+            {
+                const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+                const entity_id m = at(nb.gx, nb.gy);
+                if (m != null_entity && is_sea(w.tiles.at(m).substrate) && harbour_steps.count(m) == 0)
+                    q.push_back(m);
+                if (m != null_entity && is_sea(w.tiles.at(m).substrate)) harbour_steps[m] = 0;
+            }
+        }
         for (const entity_id m : q) harbour_steps[m] = 0;
         for (std::size_t head = 0; head < q.size(); ++head)
         {
@@ -129,7 +201,7 @@ reading read(world& w, entity_id body)
             {
                 const hex_neighbors::coord nb = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
                 const entity_id n = at(nb.gx, nb.gy);
-                if (n == null_entity || !is_water(w.tiles.at(n).substrate) || harbour_steps.count(n) != 0)
+                if (n == null_entity || !is_sea(w.tiles.at(n).substrate) || harbour_steps.count(n) != 0)
                     continue;
                 harbour_steps[n] = d + 1;
                 q.push_back(n);
@@ -137,6 +209,9 @@ reading read(world& w, entity_id body)
         }
     }
     r.harbour_steps = harbour_steps;
+    r.harbour_mouths.clear();
+    for (const auto& [t, d] : harbour_steps)
+        if (d == 0) r.harbour_mouths.insert(t);
     // Lane ends.
     for (int y = 0; y < gh; ++y)
         for (int x = 0; x < gw; ++x)
@@ -180,7 +255,8 @@ reading read(world& w, entity_id body)
 
 int main(int argc, char** argv)
 {
-    std::vector<std::uint32_t> seeds{0, 1, 28, 46};
+    // The defaults carry the BL-1420 defect seeds (40, 12, 13, 10) beside the original four.
+    std::vector<std::uint32_t> seeds{0, 1, 28, 46, 40, 12, 13, 10};
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc)
@@ -225,11 +301,14 @@ int main(int argc, char** argv)
             return s;
         }();
         const colonial_port_report cp = place_colonial_ports(w); // ports in history (fold order)
-        std::printf("CP seed=%u ends=%d groups=%d placed=%d at_port=%d open=%d unheld=%d no_room=%d "
-                    "ext=%d ext_tiles=%d ext_failed=%d\n", seed, cp.ends, cp.groups, cp.placed,
+        // Every harbour group (and every sub-group split off one) resolves exactly once.
+        const bool cp_sums = cp.groups + cp.split == cp.at_port + cp.open + cp.unheld + cp.no_room + cp.placed;
+        std::printf("CP seed=%u ends=%d groups=%d split=%d placed=%d at_port=%d open=%d unheld=%d no_room=%d "
+                    "ext=%d ext_tiles=%d ext_failed=%d sums=%s\n", seed, cp.ends, cp.groups, cp.split, cp.placed,
                     cp.at_port, cp.open, cp.unheld, cp.no_room, cp.extensions, cp.extension_tiles,
-                    cp.extensions_failed);
+                    cp.extensions_failed, cp_sums ? "yes" : "NO");
         defects += cp.extensions_failed; // a member lane that cannot reach its port
+        if (!cp_sums) ++defects;         // the report's counters lost or double-counted a group
         std::set<entity_id> ports_after_history; // standing after the colonial ports
         for (const auto& [pbid, pbc] : w.buildings)
             if (pbc.type == building_type::port) ports_after_history.insert(pbid);
@@ -238,7 +317,7 @@ int main(int argc, char** argv)
 
         for (const entity_id b : bodies)
         {
-            const reading post = read(w, b);
+            const reading post = read(w, b, ports_after_history);
             const reading& pr = pre[b];
             if (post.ports == 0 && post.ends.empty()) continue;
             int c_port = 0, c_coast = 0, c_open = 0, n_port = 0, n_coast = 0, n_open = 0, near_port = 0;
@@ -253,7 +332,7 @@ int main(int argc, char** argv)
                 {
                     const auto hs = post.harbour_steps.find(t);
                     const tile_component& tc = w.tiles.at(t);
-                    if (hs != post.harbour_steps.end() && hs->second <= 2)
+                    if (hs != post.harbour_steps.end() && hs->second <= 2 && lane_reaches_harbour(w, b, t, post))
                     {
                         --c_coast;
                         ++c_harbour; // a spur past its harbour's mouth: served (NR-1081)
@@ -394,8 +473,12 @@ int main(int argc, char** argv)
                     std::printf("PUg seed=%u row=%3d %s\n", seed, yy, row.c_str());
                 }
                 const auto f = lp_sea_walk(w, b, {w.buildings.at(pb).tile}, port_lane_limit());
-                for (const auto& [ob, obc] : w.buildings)
+                std::vector<entity_id> others; // ascending id: deterministic output
+                for (const auto& [ob, obc] : w.buildings) { (void)obc; others.push_back(ob); }
+                std::sort(others.begin(), others.end());
+                for (const entity_id ob : others)
                 {
+                    const building_component& obc = w.buildings.at(ob);
                     if (ob == pb || obc.type != building_type::port || obc.ticks_remaining > 0 || obc.decommissioned)
                         continue;
                     const auto it = f.find(obc.tile);

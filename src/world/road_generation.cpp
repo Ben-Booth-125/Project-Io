@@ -3142,7 +3142,9 @@ colonial_port_report place_colonial_ports(world& w)
         sides(port_tile, nb);
         for (const entity_id m : nb)
         {
-            if (m == null_entity || !is_water(w.tiles.at(m).substrate))
+            // SEA mouths only (BL-1420 review): the one water predicate the harbour's
+            // service test reads, so a group served here is served by the same measure.
+            if (m == null_entity || !is_sea(w.tiles.at(m).substrate))
                 continue;
             auto it = mouth_port.find(m);
             if (it == mouth_port.end())
@@ -3316,13 +3318,78 @@ colonial_port_report place_colonial_ports(world& w)
                 out.push_back(m);
         return out;
     };
-    // The members a port on (or already at) @p port_tile leaves beyond two steps of its mouths.
+    // THE FOUR-WAY PIECE of each sea tile, per body (BL-1420 review): a lane is walked on
+    // the four cardinal steps (`sea_walk_laned_between`), so two sea tiles a hex diagonal
+    // alone joins are two pieces, and no lane runs from one to the other. Labelled by flood
+    // over the lane walk's own sea mask, raster order; -1 off the sea.
+    std::map<entity_id, std::vector<int>> pieces;
+    const auto piece_of = [&](entity_id sea_tile) -> int {
+        const tile_component& tc = w.tiles.at(sea_tile);
+        auto it = pieces.find(tc.body);
+        if (it == pieces.end())
+        {
+            const port_lane_body& pb = body_of(tc.body);
+            std::vector<int> lab;
+            if (pb.ok)
+            {
+                const int n = pb.gw * pb.gh;
+                lab.assign(static_cast<std::size_t>(n), -1);
+                int next = 0;
+                std::vector<int> stack;
+                for (int s = 0; s < n; ++s)
+                {
+                    if (!pb.sea[static_cast<std::size_t>(s)] || lab[static_cast<std::size_t>(s)] >= 0)
+                        continue;
+                    lab[static_cast<std::size_t>(s)] = next;
+                    stack.assign(1, s);
+                    while (!stack.empty())
+                    {
+                        const int u = stack.back();
+                        stack.pop_back();
+                        constexpr int dc[4] = {0, 0, -1, 1}, dr[4] = {-1, 1, 0, 0};
+                        for (int k = 0; k < 4; ++k)
+                        {
+                            const int vr = u / pb.gw + dr[k];
+                            if (vr < 0 || vr >= pb.gh)
+                                continue; // rows do not wrap
+                            const int v = vr * pb.gw + ((u % pb.gw + dc[k]) % pb.gw + pb.gw) % pb.gw;
+                            if (pb.sea[static_cast<std::size_t>(v)] && lab[static_cast<std::size_t>(v)] < 0)
+                            {
+                                lab[static_cast<std::size_t>(v)] = next;
+                                stack.push_back(v);
+                            }
+                        }
+                    }
+                    ++next;
+                }
+            }
+            it = pieces.emplace(tc.body, std::move(lab)).first;
+        }
+        const std::size_t i = static_cast<std::size_t>(tc.grid_y) * static_cast<std::size_t>(
+                                  body_of(tc.body).gw) + static_cast<std::size_t>(tc.grid_x);
+        return i < it->second.size() ? it->second[i] : -1;
+    };
+    // The members a port on (or already at) @p port_tile leaves unserved: a member is served
+    // by a sea mouth within two hex steps over the sea of it AND in its four-way piece, so a
+    // lane can be walked from the member into the harbour.
     const auto unserved_by = [&](entity_id port_tile, const std::vector<entity_id>& members) {
-        const std::set<entity_id> reach = sea_within_two(sea_mouths(port_tile));
+        std::vector<std::pair<int, std::set<entity_id>>> reach; // (piece, sea within two)
+        for (const entity_id m : sea_mouths(port_tile))
+            reach.push_back({piece_of(m), sea_within_two({m})});
         std::vector<entity_id> out;
         for (const entity_id e : members)
-            if (reach.count(e) == 0)
+        {
+            const int pe = is_sea(w.tiles.at(e).substrate) ? piece_of(e) : -1;
+            bool served = false;
+            for (const auto& [pm, near] : reach)
+                if (pe >= 0 && pm == pe && near.count(e) != 0)
+                {
+                    served = true;
+                    break;
+                }
+            if (!served)
                 out.push_back(e);
+        }
         return out;
     };
 
@@ -3352,7 +3419,15 @@ colonial_port_report place_colonial_ports(world& w)
                 if (rest_set.count(e) == 0)
                     near.push_back(e);
             extend_to(near, serving);
-            if (!rest.empty() && !serve_group(rest))
+            if (rest.empty())
+                return true;
+            if (rest.size() == members.size())
+            {
+                extend_to(rest, serving); // no progress: never recurse on an unchanged group
+                return true;
+            }
+            ++rep.split;
+            if (!serve_group(rest))
                 extend_to(rest, serving); // none of their own: walked on to this port as before
             return true;
         }
@@ -3389,11 +3464,24 @@ colonial_port_report place_colonial_ports(world& w)
             out.erase(std::unique(out.begin(), out.end()), out.end());
             return out;
         };
+        // A candidate stands the port only with room AND a holder (BL-1420 review): held
+        // ground is tested per candidate, so an unheld tile falls through to the next one
+        // rather than failing the whole harbour. `saw_unheld` keeps the report's split
+        // between a harbour with no room and one whose only room is ground nobody holds.
+        bool saw_unheld = false;
         const auto has_room = [&](entity_id t) {
             const tile_component& tc = w.tiles.at(t);
-            return source_tiles.count(t) == 0
-                && placement_rules::non_extraction_buildings_on_tile(w, t)
-                       < placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover);
+            if (source_tiles.count(t) != 0
+                || placement_rules::non_extraction_buildings_on_tile(w, t)
+                       >= placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover))
+                return false;
+            const auto tn = w.tile_to_nation.find(t);
+            if (tn == w.tile_to_nation.end() || w.nations.count(tn->second) == 0)
+            {
+                saw_unheld = true;
+                return false;
+            }
+            return true;
         };
         const std::vector<std::pair<int, entity_id>> land = land_beside(members);
         if (land.empty())
@@ -3439,15 +3527,13 @@ colonial_port_report place_colonial_ports(world& w)
             }
         if (harbour == null_entity)
         {
-            ++rep.no_room;
+            if (saw_unheld)
+                ++rep.unheld; // room only on ground no nation holds
+            else
+                ++rep.no_room;
             return false;
         }
-        const auto tn = w.tile_to_nation.find(harbour);
-        if (tn == w.tile_to_nation.end() || w.nations.count(tn->second) == 0)
-        {
-            ++rep.unheld;
-            return false;
-        }
+        const auto tn = w.tile_to_nation.find(harbour); // held: has_room tested it
         const entity_id bid = w.create_entity();
         building_component bc;
         bc.tile               = harbour;
@@ -3474,8 +3560,14 @@ colonial_port_report place_colonial_ports(world& w)
             if (rest_set.count(e) == 0)
                 near.push_back(e);
         extend_to(near, bid);
+        if (rest.size() == members.size())
+        {
+            extend_to(rest, bid); // no progress: never recurse on an unchanged group
+            return true;
+        }
         // The members beyond two steps: a harbour of their own. Where none can stand, their
         // lanes are walked on to this port as before, so every lane still reaches a port.
+        ++rep.split;
         if (!serve_group(rest))
             extend_to(rest, bid);
         return true;
@@ -3492,10 +3584,10 @@ colonial_port_report place_colonial_ports(world& w)
 
 void print_colonial_ports(const colonial_port_report& r)
 {
-    std::printf("[colonial ports] %d lane end(s) in %d harbour group(s): %d ports stood in "
+    std::printf("[colonial ports] %d lane end(s) in %d harbour group(s) (+%d split off): %d ports stood in "
                 "history, %d groups already at a port, %d open sea, %d on unheld ground, %d with "
                 "no room; %d lanes walked on to their port (%d sea tiles, %d failed)\n",
-                r.ends, r.groups, r.placed, r.at_port, r.open, r.unheld, r.no_room, r.extensions,
+                r.ends, r.groups, r.split, r.placed, r.at_port, r.open, r.unheld, r.no_room, r.extensions,
                 r.extension_tiles, r.extensions_failed);
     std::fflush(stdout);
 }

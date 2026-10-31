@@ -777,7 +777,10 @@ port_lane_stats lay_all_port_lanes(world& w, port_lane_trace* trace = nullptr);
 //   - EVERY END WITHIN TWO STEPS OF ITS PORT (BL-1420): the harbour's land is taken first
 //     among the tiles whose sea mouths lie within two hex steps over the sea of EVERY
 //     member (beside a member, then beside the sea within two steps of one; nearest seats
-//     each). Only where none has room does the nearest land beside a member stand it; the
+//     each), a mouth serving a member only on its FOUR-WAY piece of sea (the lane walk's
+//     grid). Room includes a holder: unheld land falls through to the next candidate, and
+//     a group is counted unheld only when its sole room is unheld. Only where none has
+//     room does the nearest land beside a member stand it; the
 //     members it (or a serving port) leaves beyond two steps are served as a group of
 //     their own, recursively, and walked on to the first port where theirs cannot stand.
 // Deterministic: sorted record, ascending tiles, no RNG. Clears the record.
@@ -790,6 +793,9 @@ struct colonial_port_report
     int unheld      = 0; ///< groups whose harbour is ground no nation holds
     int no_room     = 0; ///< groups whose every land tile holds a network source or a full stack
     int placed      = 0; ///< ports stood
+    /// BL-1420: sub-groups split off a harbour whose port leaves them beyond two steps, each
+    /// resolved by the same rules - so groups + split == at_port + open + unheld + no_room + placed.
+    int split       = 0;
     int extensions  = 0; ///< member lanes walked on to their port's mouth
     int extension_tiles   = 0; ///< sea tiles those walks newly laned
     int extensions_failed = 0; ///< member ends no sea walk joins to their port (a defect)
