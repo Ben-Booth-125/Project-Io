@@ -1907,6 +1907,12 @@ lp_seed_report seed_logistics_sources(world& w)
             {
                 by_road    = true;
                 road_steps = lp_road_steps(w, body, {tile});
+                // The bar a road step must beat: the chain's own nearest point along the
+                // road (its anchor or a connected source), so the first hub is laid only
+                // where it stands closer than anything the chain already holds.
+                for (const entity_id at : anchors)
+                    if (const auto rt = road_steps.find(at); rt != road_steps.end())
+                        last_road = std::min(last_road, rt->second);
             }
             if (by_road)
             {
