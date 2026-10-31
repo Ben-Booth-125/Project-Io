@@ -7558,27 +7558,27 @@
       "headless: sentiment_harness"
      ],
      "requirement": "Each emitter in RELATIONS.md § Who emits each factor writes its factor on the stated observer -> subject rows with the stated sign per dimension: trade_conducted (per tick per pair, magnitude = value landed), friendship_accepted, embargo_imposed, force_used (magnitude = strength the observer lost). The war emitters (hostility_declared, war_declared, peace_concluded, province_ceded) are asserted by war_harness (BL-1459, BL-1428).",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 covers trade_conducted, friendship_accepted, force_used; embargo_imposed has no emitter because no embargo law exists - it lands with BL-1418 (embargo bars goods)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: sentiment_harness"
      ],
      "requirement": "sentiment.cpp still takes no world& (R1 holds); emitters gather sentiment_events and fold one canonicalised batch per tick, so gather order is not observable. War_declared, peace_concluded and province_ceded are appended to sentiment_factor_kind after historical_grudge, in that order.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness E6 (one canonicalised batch a tick, gather order unobservable); sentiment.cpp takes no world&; enumerators 12-14."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: world_determinism",
       "headless: save_roundtrip",
       "headless: market_viability (quick)"
      ],
      "requirement": "Determinism and the save hold. Nothing reads the emitted rows yet but the scorer and the ledger, so the economy is unmoved; digest movement is reported, not re-blessed.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: world_determinism ALL PASS, digests unmoved; save_roundtrip OK; market_viability FULL (16 seeds) pooled G1 93.2 G1t50 85.1 G1b 2.5 G2 193.4 G3 100."
     }
    ]
   },
@@ -7588,48 +7588,48 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1432 - sprint 61 (Ben, 2026-10-30)",
    "batch": "sprint-61",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-31",
+   "resolution": "All four rows complete on integrated main 3f2c068a.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: sentiment_harness",
       "headless: save_roundtrip"
      ],
      "requirement": "Alarm is a third float beside Access and Trust per (observer, subject): folded by authored factor weights, decayed toward neutral at an authored rate, a row erased only when all three are neutral. Saved (save version bump); a stream from before the bump loads with Alarm 0.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 (A1-A7, C1-C5, E5a-d, G1-G2); save_roundtrip P8 (v68, v67 loads with Alarm 0); nation_tech_harness --fixture-only T1e/T2/T3; industrialisation_sim_harness [13] Alarm lean."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: sentiment_harness"
      ],
      "requirement": "Alarm's factors emit (RELATIONS.md § 6): visible capability (a technology whose tell is public, a large single-site facility), standing force on the observer's border, severed trade. Unrest has no store; its factor is authored zero. Live trade between the pair relieves it (trade_conducted, BL-1458).",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 (A1-A7, C1-C5, E5a-d, G1-G2); save_roundtrip P8 (v68, v67 loads with Alarm 0); nation_tech_harness --fixture-only T1e/T2/T3; industrialisation_sim_harness [13] Alarm lean."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: tech_tree_effects or the harness that reads tree effects"
      ],
      "requirement": "The Digitisation nodes whose effect reads \"Alarm toward you\" write to the Alarm dimension instead of reading nothing.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 (A1-A7, C1-C5, E5a-d, G1-G2); save_roundtrip P8 (v68, v67 loads with Alarm 0); nation_tech_harness --fixture-only T1e/T2/T3; industrialisation_sim_harness [13] Alarm lean."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: industrialisation_sim_harness"
      ],
      "requirement": "Reading [13] prints \"Alarm lean\", not \"Catastrophe lean\" (INDUSTRIALISATION.md acceptance table).",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 (A1-A7, C1-C5, E5a-d, G1-G2); save_roundtrip P8 (v68, v67 loads with Alarm 0); nation_tech_harness --fixture-only T1e/T2/T3; industrialisation_sim_harness [13] Alarm lean."
     }
    ]
   },
@@ -7647,12 +7647,12 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: war_harness"
      ],
      "requirement": "declare_war(declarer, defender, goals) writes the declarer's hostility row and opens the war record in one call. It is refused, mutating nothing, on: an existing war between the pair, a standing truce, zero or more than three goals, a goal that is not the defender's province, declarer == defender. Friendship between the pair dissolves. return_to_neutral between war parties is refused.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0; save_roundtrip OK (v69 over v68); agent_seam_harness 23/0; ACTIONS.json carries the six war verbs. R5 is the harness path; the app right-click is in the live-click batch."
     },
     {
      "id": "R2",
@@ -7661,36 +7661,36 @@
       "headless: war_harness"
      ],
      "requirement": "The price: hostility_declared on the defender's row toward the declarer; war_declared on every other nation's row toward the declarer, magnitude doubled for a nation bordering either party and raised per goal past the first; halved when any justification holds. Each of the four justifications (grievance, embargo, lost ground, a friend attacked) is detected by its condition row, and a preview read returns the same price the declaration then charges.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness R2a-R2m pass, but the lost-ground justification cannot hold through the real flow while cession moves only province_holder (cold review); completes with BL-1460 (cession moves territory)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: war_harness"
      ],
      "requirement": "The defender's answer costs nothing, writes its hostility row, and names one to three goals among the declarer's provinces; refused, mutating nothing, on an invalid goal or a war that is not its own.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0; save_roundtrip OK (v69 over v68); agent_seam_harness 23/0; ACTIONS.json carries the six war verbs. R5 is the harness path; the app right-click is in the live-click batch."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: save_roundtrip",
       "headless: world_determinism",
       "headless: agent_seam"
      ],
      "requirement": "The war record and its tables are in the world snapshot (save version bump; older streams load with no wars). The verbs cross the AI-facing seam as untrusted input: an out-of-range id or goal list rejects the whole command and mutates nothing. ACTIONS.json carries declare_war and the answer.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0; save_roundtrip OK (v69 over v68); agent_seam_harness 23/0; ACTIONS.json carries the six war verbs. R5 is the harness path; the app right-click is in the live-click batch."
     },
     {
      "id": "R5",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: war_harness"
      ],
      "requirement": "The right-click declare-and-attack path declares through declare_war with the attacked tile's province as its first goal.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0; save_roundtrip OK (v69 over v68); agent_seam_harness 23/0; ACTIONS.json carries the six war verbs. R5 is the harness path; the app right-click is in the live-click batch."
     }
    ]
   },
@@ -7708,21 +7708,21 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: war_harness"
      ],
      "requirement": "War score in [-100, 100], positive for the declarer: half occupation and half battles. Occupation normalises each side by its own goals (Ben, 2026-10-31, NR-1103): the tile-weighted share of the declarer's goals the declarer holds by province_holder, less the share of the defender's answered goals the defender holds; holding every goal named and losing none of one's own is the full half for either side, so either side can reach +-100 in an answered war. Battles: strength destroyed between the pair, declarer's share less the defender's.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0 (P1 per-side occupation per NR-1103, P2 daily field days, F1 peace ends battles, F2 truce refuses hostility); save_roundtrip OK; agent_seam 23/0."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: war_harness"
      ],
      "requirement": "Exhaustion in [0, 100] per party rises with its own strength lost, each day its units stand in the field, and each of its provinces the enemy holds; it decays once at peace, and it moves the morale of the nation's units.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0 (P1 per-side occupation per NR-1103, P2 daily field days, F1 peace ends battles, F2 truce refuses hostility); save_roundtrip OK; agent_seam 23/0."
     },
     {
      "id": "R3",
@@ -7731,18 +7731,18 @@
       "headless: war_harness"
      ],
      "requirement": "Peace offers live in their own table, one pending per war. White peace changes nothing hands; cession passes only named goals the receiver holds, never the loser's last province. A side at score 100 may impose without acceptance. At peace both hostility rows clear, the record closes, and a 16-tick truce refuses declare_war either way. peace_concluded and province_ceded emit as RELATIONS.md says.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness P3 passes incl. defender impose (P3x), but the last-province guard does not count across wars and cessions are not final while tile_to_nation stays with the loser; completes with BL-1460."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: save_roundtrip",
       "headless: world_determinism",
       "headless: agent_seam"
      ],
      "requirement": "Offers, truces, score and exhaustion are saved; the peace verbs are seam-validated and in ACTIONS.json.",
-     "notes": null
+     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0 (P1 per-side occupation per NR-1103, P2 daily field days, F1 peace ends battles, F2 truce refuses hostility); save_roundtrip OK; agent_seam 23/0."
     }
    ]
   },
