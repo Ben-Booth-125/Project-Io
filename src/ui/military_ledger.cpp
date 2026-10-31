@@ -1,6 +1,7 @@
 #include "military_ledger.hpp"
 
 #include "construction_sites.hpp" // site_options — the no-base door onto the site finder
+#include "detail_level.hpp"       // fold — closing the ledger closes the designer
 #include "foldout_column.hpp"
 #include "format.hpp"             // fmt::credits
 #include "nav_pane.hpp"           // close_all_panels — the no-base door takes the column
@@ -167,12 +168,13 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
     const entity_id actor = player_actor(w);
     const auto mine = [&](entity_id owner) { return owner == actor || owner == w.player_entity; };
 
-    // The hire seam's answer to the last Raise press (app writes it), above both
-    // theatres: the press that asked may sit in either.
-    if (m.raise_pressed && !s.construction.last_message.empty())
+    // The hire seam's RESULT for the last Raise press (app writes it), above both
+    // theatres: the press that asked may sit in either. A REFUSAL is not printed
+    // here (Ben, 2026-10-30): it is the pressed row's Raise tooltip.
+    if (m.raise_pressed && !m.raise_refused && !s.construction.last_message.empty())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
                            s.construction.last_message.c_str());
-    if (m.raise_pressed && !m.air_message.empty())
+    if (m.raise_pressed && !m.air_raise_refused && !m.air_message.empty())
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", m.air_message.c_str());
     const float room = purse_room_of(w, actor);
     ImGui::TextDisabled("Treasury room %s", fmt::credits(room).c_str());
@@ -211,15 +213,20 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
     if (bases.empty())
     {
         m.base = null_entity;
+        // The explanation is the heading's and the press's tooltip, not ledger text
+        // (Ben, 2026-10-30): the ledger shows controls and data only.
+        static const char* const k_no_base_why =
+            "Every unit is raised at a base. Build one on your own ground first.";
         ImGui::TextUnformatted("No military base");
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("Every unit is raised at a base. Build one on your own ground first.");
-        ImGui::PopTextWrapPos();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", k_no_base_why);
         ImGui::Spacing();
         if (ImGui::Button("Find a site for a base"))
             // The Construction ledger's site finder, pre-set to the military base
             // (military.md § The empty states).
             open_site_finder_for(w, reg, s, building_type::military_base);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", k_no_base_why);
         m.no_base_x = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
         m.no_base_y = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
         ImGui::Separator();
@@ -322,10 +329,21 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
             s.construction.pending_hire_unit_type = idx;
             s.construction.last_message.clear();
             m.raise_pressed = true;
+            m.raise_row     = static_cast<int>(idx);
+            m.raise_refused = false;
+            m.air_raise_row = -1;
         }
         ImGui::EndDisabled();
-        if (!enabled && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("%s", reason.c_str());
+        // Why Raise is off, or why the seam refused this row's last press, is the
+        // button's tooltip - never ledger text (Ben, 2026-10-30).
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            if (!enabled)
+                ImGui::SetTooltip("%s", reason.c_str());
+            else if (m.raise_pressed && m.raise_refused && m.raise_row == static_cast<int>(idx)
+                     && !s.construction.last_message.empty())
+                ImGui::SetTooltip("%s", s.construction.last_message.c_str());
+        }
         m.raises.push_back({idx, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                             (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f,
                             fieldable, enabled, price, reason});
@@ -339,13 +357,6 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
         // and at its narrowest width the numbers do not fit one line.
         ImGui::PushTextWrapPos(0.0f);
         ImGui::TextDisabled("%s   %s", land_class_label(land_class_for(row)), stats);
-
-        // Line 3: why it is dimmed, or why Raise is off. Not repeated per row when
-        // there is no base at all: the empty state above already says so once.
-        if (!enabled && base_tile != null_entity)
-            ImGui::TextDisabled("%s", reason.c_str());
-        else if (!fieldable)
-            ImGui::TextDisabled("%s", reason.c_str());
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
         ImGui::PopID();
@@ -413,12 +424,15 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
     if (bases.empty())
     {
         m.air_base = null_entity;
+        static const char* const k_no_airbase_why =
+            "Every wing is raised at an airbase. A military base hosts none.";
         ImGui::TextUnformatted("No airbase");
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("Every wing is raised at an airbase. A military base hosts none.");
-        ImGui::PopTextWrapPos();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", k_no_airbase_why);
         if (ImGui::Button("Find a site for an airbase"))
             open_site_finder_for(w, reg, s, building_type::airbase);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", k_no_airbase_why);
         ImGui::Separator();
     }
     else
@@ -505,11 +519,21 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
             m.pending_wing_row  = idx;
             m.air_message.clear();
             s.construction.last_message.clear();
-            m.raise_pressed = true;
+            m.raise_pressed     = true;
+            m.air_raise_row     = static_cast<int>(idx);
+            m.air_raise_refused = false;
+            m.raise_row         = -1;
         }
         ImGui::EndDisabled();
-        if (!enabled && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-            ImGui::SetTooltip("%s", reason.c_str());
+        // As the land rows: a refusal is the Raise tooltip, never ledger text.
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            if (!enabled)
+                ImGui::SetTooltip("%s", reason.c_str());
+            else if (m.raise_pressed && m.air_raise_refused && m.air_raise_row == static_cast<int>(idx)
+                     && !m.air_message.empty())
+                ImGui::SetTooltip("%s", m.air_message.c_str());
+        }
         m.air_raises.push_back({idx, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                 (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f,
                                 fieldable, enabled, price, reason});
@@ -522,8 +546,6 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
                                 missions_of(reg, row.cls).c_str(), stats);
         else
             ImGui::TextDisabled("%s - %s   %s", air_class_label(row.cls), missions_of(reg, row.cls).c_str(), stats);
-        if (!enabled && (base_tile != null_entity || !fieldable))
-            ImGui::TextDisabled("%s", reason.c_str());
         ImGui::PopTextWrapPos();
         ImGui::Spacing();
         ImGui::PopID();
@@ -573,10 +595,8 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
 
 void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
 {
-    ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("Press a class to open its designer. Kit choices open as military research lands.");
-    ImGui::PopTextWrapPos();
-    ImGui::Separator();
+    // The tab's intro copy is the class rows' tooltip and the Design tab's
+    // (Ben, 2026-10-30): the ledger shows controls and data only.
     const entity_id nation = player_nation(w);
     military_ledger_state& m = s.military;
     if (theatre_header(m, 1, 0, "Land", land_class_count - 1)) // every class but `none`
@@ -596,7 +616,8 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
             if (ImGui::Selectable(land_class_label(lc), unit_designer_open_on(s, lc)))
                 toggle_unit_designer(s, lc);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Open the designer for %s", land_class_label(lc));
+                ImGui::SetTooltip("Open the designer for %s. Kit choices open as military research lands.",
+                                  land_class_label(lc));
             s.military.class_rows.push_back({c, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                              (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
             ImGui::PopID();
@@ -610,10 +631,11 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
         // obsolete and hidden from Recruit; the defaults mark every type below the
         // modern band. The press queues `set_unit_obsolete`, which app executes.
         ImGui::Separator();
+        static const char* const k_obsolete_why =
+            "Tick a type to mark it obsolete: Recruit hides it and it is no longer raised.";
         ImGui::TextUnformatted("Unit types");
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("Tick a type to mark it obsolete: Recruit hides it and it is no longer raised.");
-        ImGui::PopTextWrapPos();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", k_obsolete_why);
         const entity_id actor = player_actor(w);
         const std::vector<roster_row>& table = unit_roster_table();
         const roster_band band = campaign_roster_band_for(reg.era());
@@ -635,6 +657,8 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
                 m.pending_obsolete_row   = static_cast<int>(idx);
                 m.pending_obsolete_value = obsolete;
             }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", k_obsolete_why);
             ImGui::SameLine();
             ImGui::TextDisabled("%s", land_class_label(land_class_for(table[idx])));
             ImGui::PopID();
@@ -656,7 +680,8 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
             if (ImGui::Selectable(air_class_label(ac), air_designer_open_on(s, ac)))
                 toggle_air_designer(s, ac);
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Open the designer for %s", air_class_label(ac));
+                ImGui::SetTooltip("Open the designer for %s. Kit choices open as military research lands.",
+                                  air_class_label(ac));
             m.air_class_rows.push_back({c, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                         (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
             ImGui::PopID();
@@ -667,6 +692,21 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
         }
         ImGui::Unindent(4.0f);
     }
+}
+
+/// The ledger's close closes the unit designer (Ben, 2026-10-30): on the open ->
+/// closed edge, whatever path closed it (the rail toggle, the active tab's re-press,
+/// another ledger opening), a designer that is the open takeover is folded. The fold
+/// goes through the designer's close catch, so an unsaved draft still asks first.
+/// Edge, not level: a designer opened from a unit card with the ledger shut stays.
+void close_designer_on_ledger_close(ui_state& s, bool open)
+{
+    military_ledger_state& m = s.military;
+    if (m.was_open && !open
+        && (s.expanded.surface == detail_surface::unit_designer
+            || s.expanded.surface == detail_surface::air_designer))
+        fold(s);
+    m.was_open = open;
 }
 
 } // namespace
@@ -689,12 +729,14 @@ void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& 
     if (!open)
     {
         m.raise_pressed = false;
+        close_designer_on_ledger_close(s, open);
         return;
     }
 
     if (!ui::foldout_begin("Military"))
     {
         ui::foldout_end();
+        close_designer_on_ledger_close(s, open);
         return;
     }
 
@@ -705,6 +747,9 @@ void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& 
     m.tab_y[0] = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
     ImGui::SameLine();
     ui::nav_button("Design", 1, m.view, &open);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Each class's design. Press a class to open its designer; kit choices open as "
+                          "military research lands.");
     m.tab_x[1] = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
     m.tab_y[1] = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
     if (m.view < 0 || m.view > 1)
@@ -721,6 +766,7 @@ void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& 
         m.raise_pressed = false;
 
     ui::foldout_end();
+    close_designer_on_ledger_close(s, open);
 }
 
 } // namespace ui

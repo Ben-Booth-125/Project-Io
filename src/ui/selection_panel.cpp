@@ -5380,6 +5380,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                 {
                     ui.construction.pending_hire_tile      = tile_id;
                     ui.construction.pending_hire_unit_type = idx;
+                    ui.military.raise_row = -1; // the answer is this card's, not a ledger row's
                 }
                 ImGui::PopID();
             }

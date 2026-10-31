@@ -29,11 +29,28 @@ Two views behind a `nav_button` strip, inside `foldout_begin("Military")`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Recruit** *(default)* | "What can I raise, where, and what will it cost?" | A **base picker** — the nation's completed military bases, each with its province and the units standing there. Below it, the **roster**: one row per unit type the nation may field (`available_rows`), each carrying its land class, its numbers (soft, hard, hardness, defence), its hire price in credits and the kit it buys off the shelf, and a **Raise** press that hires at the chosen base. A type the nation cannot field yet is listed dimmed with **why** (the missing good, or the technology it waits on), so the roster shows the ladder, not only the rungs in reach. |
+| **Recruit** *(default)* | "What can I raise, where, and what will it cost?" | A **base picker** — the nation's completed military bases, each with its province and the units standing there. Below it, the **roster**: one row per unit type the nation may field (`available_rows`), each carrying its land class, its numbers (soft, hard, hardness, defence), its hire price in credits and the kit it buys off the shelf, and a **Raise** press that hires at the chosen base. A type the nation cannot field yet is listed dimmed, its Raise disabled, and **why** (the missing good, or the technology it waits on) is the Raise press's tooltip, so the roster shows the ladder, not only the rungs in reach. |
 | **Design** | "What is each kind of unit raised with?" | **Designs, one per land class to start** (Ben, 2026-10-27): each class's **kit slots** with the researched choice in each — infantry's rifles or anti-tank launchers, artillery's guns with drones or anti-armour alongside — what the kit costs per unit, and what the design gives (its soft, hard and hardness). A slot offers only researched kit; a class with nothing researched for a slot fields its base kit. Saving a design makes it the one Recruit raises; units in the field refit to it as kit arrives (BL-1423). Kit opens by military research. |
 
 **Why Recruit is the default.** It is the act the ledger exists for; Design is set once and
 revisited when a technology lands.
+
+### Explanation is a tooltip (Ben, 2026-10-30)
+
+**The ledger shows controls and data only.** Every sentence that explains — why a Raise is off,
+what a heading means, what a tab is for — is the hover tooltip of the control or heading it
+explains, never wrapped text in the column.
+
+- **A refusal is the Raise press's tooltip.** Why a Raise is disabled ("Needs steel or iron ore on
+  the shelf.", "No military base to raise it at.", "The treasury cannot cover it.") shows on hover
+  over the disabled press. When the seam refuses a live press ("Can't afford or supply it."), the
+  answer is that row's Raise tooltip too.
+- **A result stays a line.** The seam's answer to a press that landed ("Unit mustering.",
+  "Wing mustering.") is shown above the theatres, where it was.
+- **The empty states' explanation** is the tooltip of their heading and of the site-finder press.
+- **The Design tab's intro** is the Design tab's tooltip and each class row's ("Open the designer
+  for … Kit choices open as military research lands."); the obsolete toggles' explanation is the
+  tooltip of the "Unit types" heading and of each toggle.
 
 ### Grouped by theatre (Ben, 2026-10-28)
 
@@ -52,9 +69,10 @@ wing's range. The wing card on the Selection band sets the mission and lists the
 
 - **No military base** → Recruit says **"No military base"** and offers the Construction ledger's
   site finder pre-set to the military base, because the base is the door to every hire
-  (`../../military/MILITARY.md` § The muster interface). Nothing on the roster is pressable.
-- **A base, nothing affordable** → the roster still lists every type; each Raise is disabled with its
-  reason (`rejected_funds`, a missing good), the same idiom as the tile card's disabled build rows.
+  (`../../military/MILITARY.md` § The muster interface). Why — every unit is raised at a base — is
+  the tooltip of the heading and the press. Nothing on the roster is pressable.
+- **A base, nothing affordable** → the roster still lists every type; each Raise is disabled, its
+  reason (`rejected_funds`, a missing good) the press's tooltip.
 
 ### The designer (Ben, 2026-10-28)
 
@@ -95,6 +113,10 @@ this kind of unit carrying, and what can it carry instead?"
   their unit card offers the refit.
 - Closing the designer (the toggle rule — the press that opened it — its return control, or
   Escape) returns to the ledger or card it was opened from, which the takeover never covered.
+- **Closing the ledger closes the designer (Ben, 2026-10-30).** However the Military ledger closes —
+  its rail icon, the active tab's re-press, another ledger opening — an open designer closes with
+  it, through the same close catch: an unsaved draft asks Save or Discard first. A designer opened
+  from a unit card while the ledger is shut is not the ledger's, and stays.
 
 ### The stat grid (Ben, 2026-10-29)
 
@@ -133,7 +155,7 @@ recruit flow, as the placement lens is of the build flow, not an `overlay_mode`.
 ## 5. Toggle / close semantics
 
 Standard: the rail icon toggles the ledger; re-clicking the active tab closes it; switching tabs is
-a view change. The base picker is a target selector (exempt from the toggle rule, like the body
+a view change. Any close of the ledger also closes the unit designer (§ The designer). The base picker is a target selector (exempt from the toggle rule, like the body
 and market combos). **Raise is a press, not a toggle** — it has no active state.
 
 ## Settled (Ben, 2026-10-27)
