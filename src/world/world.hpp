@@ -48,7 +48,10 @@ struct asteroid_belt
 /// refusal: some player source shipped the good there this pass.
 enum class trade_refusal : std::uint8_t
 {
-    no_lane = 0, ///< Another body, and no leg off this one is viable.
+    /// BL-1418: the destination market's nation embargoes the shipper (RELATIONS.md
+    /// § 3). The worst class: no price, route or room would let the cargo land.
+    embargoed = 0,
+    no_lane,     ///< Another body, and no leg off this one is viable.
     gate,        ///< The destination's price does not clear the margin over the source's.
     no_route,    ///< Same body, and no viable leg reaches it.
     costly,      ///< Routed, but the haul eats the margin.

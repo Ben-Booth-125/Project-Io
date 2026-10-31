@@ -32,6 +32,7 @@ struct trade_tick
     int   manual_shipments = 0;    ///< Shipments of manual trades.
     int   auto_shipments   = 0;    ///< Shipments auto trade chose.
     int   refused_no_lp    = 0;    ///< Shipments the passive Logistic Point cap refused outright.
+    int   refused_embargo  = 0;    ///< BL-1418: shipments refused because the destination's nation embargoes the trader.
     float units_shipped    = 0.0f; ///< Units of every good sent.
 };
 

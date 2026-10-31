@@ -259,6 +259,18 @@ uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
         if (v.alarm != 0.0f)
             fold_f32(h, v.alarm);
     }
+    // BL-1418: the embargoes, folded only when there is one, behind a tag, so a
+    // world with no embargo (every generated world) digests as before.
+    if (!w.nation_embargoes.empty())
+    {
+        fold_u32(h, 0x454D4247u); // 'EMBG'
+        fold_u32(h, static_cast<uint32_t>(w.nation_embargoes.size()));
+        for (const auto& [a, b] : w.nation_embargoes)
+        {
+            fold_u32(h, a);
+            fold_u32(h, b);
+        }
+    }
     // BL-1458 / BL-1432: the emitters' gathered conduct - the pending queue, the
     // trade accumulator and the trade streaks - folded only when there is any, behind a tag, so the
     // empty case (every world at the handoff: the settle gathers nothing) digests

@@ -40,6 +40,10 @@ enum class interception_outcome : std::uint8_t
 {
     captured  = 0, ///< Credited whole to the interceptor's pool at the interception tile's market.
     destroyed = 1, ///< Nothing credited anywhere — the fallback, never a mint.
+    /// BL-1418: refused at the destination's border by an embargo and destroyed —
+    /// nothing credited anywhere. `interceptor_corp` names the embargoing nation,
+    /// `interceptor_unit` is null, and `tile` is the destination market's centre.
+    refused_embargo = 2,
 };
 
 /// One interception, as it happened. Returned by `intercept_convoys` for the

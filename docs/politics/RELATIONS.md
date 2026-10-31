@@ -32,7 +32,7 @@ This table is the reason the document exists. Read it before touching any of the
 | **Sentiment** | *What has B's conduct earned with A?* | three floats (Access, Trust, Alarm) per (observer nation, subject nation) | **derived** | informs a declaration; never makes one |
 | **Alarm** | *How threatened does A feel by B?* | **a third sentiment dimension**, per (observer nation, subject nation) | **derived** | informs a rival's embargo, coalition and war scoring; never makes one (§ 6) |
 | **Reputation** | *Will B do business with A again?* | **a VIEW of sentiment's Trust**, not a store | **earned** | nothing — its procurement-quote consumer retired (§ 2) |
-| **Embargo** | *Is A forbidden to trade in B's terms?* | a `condition_set` per actor | **authored** | B's goods entering A's markets (§ 3) |
+| **Embargo** | *Is A forbidden to trade in B's terms?* | a set of (author nation, embargoed nation) pairs | **authored** | B's goods entering A's markets (§ 3) |
 | **Standing** | *How strong is A?* | five bands on three axes | **derived** | nothing — it is a readout |
 | **War** | *Why are A and B fighting, and how does it end?* | a record per (declarer, defender): goals, score, exhaustion | **declared**, then **derived** | peace terms; cession (§ 7) |
 

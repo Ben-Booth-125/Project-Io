@@ -22,6 +22,7 @@
 #include "survey_system.hpp"
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
 #include "state_industry.hpp"  // state_uncommitted_treasury (BL-1401: a nation actor's money)
+#include "embargo.hpp"         // BL-1418: embargo_refuses (a dead pin is unpinned, earns no reserve)
 #include "trade.hpp"           // BL-1267: rank_trade_routes, corp_trade_markets (the shared route estimate)
 #include "unit_roster.hpp"
 #include "world.hpp"
@@ -3635,7 +3636,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             for (const standing_trade& t : mine)
             {
                 float loss = 0.0f;
-                if (trade_is_valid(w, reg, t))
+                // BL-1418: a trade into a market whose nation embargoes it ships
+                // nothing and never will while the embargo holds — a dead pin,
+                // cleared (scored as a route that cannot run) to free its points.
+                if (!embargo_refuses(w, corp, t.to_market) && trade_is_valid(w, reg, t))
                 {
                     const std::size_t ri = static_cast<std::size_t>(t.resource);
                     const float price_a = posted_price(w.markets.at(t.from_market), ri);
@@ -3880,7 +3884,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 reserve_pending = false;
                 float manual = 0.0f;
                 for (const standing_trade& t : w.trades)
-                    if (t.owner == corp)
+                    if (t.owner == corp && !embargo_refuses(w, corp, t.to_market)) // BL-1418: a dead pin earns no reserve
                         manual += t.points;
                 const float held_reserve = actor_books(w, actor).trade_reserve;
                 if (!(std::fabs(manual - held_reserve) > 1e-4f) || !(manual <= max_trade_points))

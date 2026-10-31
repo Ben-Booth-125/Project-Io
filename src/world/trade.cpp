@@ -1,5 +1,6 @@
 #include "trade.hpp"
 
+#include "embargo.hpp"         // BL-1418: embargo_refuses (ranking and dispatch skip a closed border)
 #include "market_clearing.hpp" // market_for_tile, shelf_admits, posted_price
 #include "supply_system.hpp"   // price_trade_leg, commit_trade_shipment, trade_room
 
@@ -216,6 +217,10 @@ void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nod
             {
                 if (b == a)
                     continue;
+                // BL-1418: a market whose nation embargoes this trader is no
+                // destination at all — auto trade and the scorer's pins skip it.
+                if (embargo_refuses(w, corp, b))
+                    continue;
                 const float price_b = dispatch_market_price(w.markets.at(b), ri);
                 // A gross price that cannot clear the margin cannot clear it net.
                 if (!(price_b - price_a > margin * price_a))
@@ -292,6 +297,17 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
                         bool is_auto) -> float {
             if (!(units > 0.0f) || !std::isfinite(units))
                 return 0.0f;
+            // BL-1418 (RELATIONS.md § 3): the destination's nation embargoes this
+            // trader, so nothing is bought. The player's refusal is named for the
+            // Trade-flow lens (a better class this pass, e.g. sent, is kept).
+            if (embargo_refuses(w, corp, b))
+            {
+                if (corp == w.player_entity)
+                    tf.best.emplace(std::make_pair(b, static_cast<std::uint16_t>(ri)),
+                                    trade_refusal::embargoed);
+                ++out.refused_embargo;
+                return 0.0f;
+            }
             const convoy_leg leg = price_trade_leg(w, reg, nodes, corp, a, b, ri, units);
             if (!leg.viable)
                 return 0.0f;

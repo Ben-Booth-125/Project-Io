@@ -468,7 +468,7 @@ int main()
                   && back.province_cessions.size() == 1 && back.war_exhaustion_residual.size() == 1,
               "R4i the wars, truces, cessions and residual round-trip the snapshot byte for byte");
         uint32_t ver = 0; std::memcpy(&ver, b.data() + 4, 4);
-        check(ver == world_save_version && world_save_version >= 69, "R4j the stream is version 69 or later (BL-1418: 70)");
+        check(ver == world_save_version && world_save_version == 70, "R4j the stream is version 70 (BL-1418's embargo section follows the wars)");
         check(b.size() >= world_save_war_section_bytes(w), "R4k the war section's measured length fits the stream");
         // An older stream loads with no wars.
         std::ostringstream o67(std::ios::binary);

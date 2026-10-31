@@ -833,6 +833,18 @@ uint64_t world::state_hash(int tick) const
             fnv1a_f32(h, v);
         }
     }
+    // BL-1418: the embargoes (author, embargoed), a std::set walked in order, and
+    // folded only when there is one, so a world with no embargo hashes as before.
+    if (!nation_embargoes.empty())
+    {
+        fnv1a_u32(h, 0x454D4247u); // 'EMBG'
+        fnv1a_u32(h, static_cast<uint32_t>(nation_embargoes.size()));
+        for (const auto& [a, b] : nation_embargoes)
+        {
+            fnv1a_u32(h, a);
+            fnv1a_u32(h, b);
+        }
+    }
 
     return h;
 }

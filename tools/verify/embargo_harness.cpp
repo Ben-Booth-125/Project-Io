@@ -24,10 +24,29 @@
 //   R9  SAVE (v70): the embargoes round-trip byte for byte; a v69 stream (today's
 //       less the embargo section) loads with none; a pair naming a ghost nation, a
 //       self pair, or a pair out of order is refused whole, the destination untouched.
+//   R10 THE BORDER REFUSAL IS RECORDED as interception records a cut: an
+//       interception_record with outcome refused_embargo comes back through out_cuts.
+//   R11 THE DISPATCH REFUSAL IS NAMED: trade_tick::refused_embargo counts it and the
+//       player's trade-flow pass records (market, good) as trade_refusal::embargoed.
+//   R12 RETREAT IS NEVER REFUSED: shrinking or clearing a trade into an embargoed
+//       market applies; raising it or creating one is rejected_embargo.
+//   R13 THE SHARED RANKING (`rank_trade_routes`, which auto trade and the scorer's
+//       pins both read) skips an embargoed destination and leads with the next-best.
+//   R14 A PRE-v70 STREAM WITH A NON-EMPTY LEGACY EMBARGO STORE reads past it and
+//       drops it without trace; a malformed legacy record still refuses the stream.
+//   R15 world::state_hash folds the embargoes (direction included) and is untouched
+//       when there are none.
+//
+// NOT HERE: a rival scorer pass. corp_ai's trade candidates are gated on
+// `!actor.is_nation`, and every actor is a nation (BL-1407), so no rival pins,
+// unpins or reserves a manual trade today. The scorer's UNPIN and reserve read the
+// embargo anyway, so the gate re-opening finds them right.
 //
 // The process exits non-zero if any assertion FAILs.
 
+#include "world/binary_io.hpp" // R14: hand-writes a legacy embargo record
 #include "world/components.hpp"
+#include "world/condition_set.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/embargo.hpp"
@@ -461,6 +480,194 @@ int main()
             std::memcpy(&bad[sec], &huge, 4);
             refused(bad, "R9g a count past nations x nations is refused whole");
         }
+    }
+
+    // --- R10..R14: the fix round (cold review) -------------------------------
+    scenario t = make_scenario();
+    const entity_id TA = t.author, TB = t.trader;
+    check(apply_corp_command(t.w, reg, trade_cmd(t)) == corp_command_result::applied
+              && trade_pass(t, reg).manual_shipments == 1 && t.w.convoys.size() == 1,
+          "R10 fixture: a second world ships B's convoy toward A's market");
+    if (t.w.convoys.size() != 1)
+    {
+        std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
+        return 1;
+    }
+    check(apply_corp_command(t.w, reg, embargo_cmd(TA, TB, 1)) == corp_command_result::applied,
+          "R10 fixture: A embargoes B");
+
+    // R10: cargo destroyed at the border is recorded as interception records a cut.
+    std::printf("\n-- R10 the border refusal is recorded, never silent --\n");
+    {
+        const std::uint32_t cid = t.w.convoys.front().id;
+        const float q = t.w.convoys.front().cargo_qty;
+        t.w.convoys.front().arrived = true;
+        std::vector<interception_record> cuts;
+        credit_arrived_convoys(t.w, 7, &cuts);
+        const entity_id centre = t.w.markets.at(t.dst).centre_tile;
+        check(cuts.size() == 1 && cuts[0].outcome == interception_outcome::refused_embargo
+                  && cuts[0].convoy_id == cid && cuts[0].victim_corp == TB && cuts[0].interceptor_corp == TA
+                  && cuts[0].interceptor_unit == null_entity && cuts[0].tile == centre
+                  && cuts[0].body == t.body && cuts[0].cargo_resource == resource_type::iron_ore
+                  && cuts[0].cargo_qty == q && cuts[0].tick == 7,
+              "R10 the refused cargo comes back through out_cuts as refused_embargo: the convoy, "
+              "B the victim, A the refuser, the market centre, the cargo and the tick");
+        check(t.w.convoys.empty() && t.w.landed_this_tick.empty(),
+              "R10b ...and it still landed nothing");
+    }
+
+    // R11: the dispatch refusal is named for the Trade-flow lens.
+    std::printf("\n-- R11 the dispatch refusal is named --\n");
+    {
+        const trade_tick tt = trade_pass(t, reg);
+        const auto& pass = t.w.player_trade_flow.back();
+        const auto it = pass.best.find({ t.dst, static_cast<std::uint16_t>(r_iron) });
+        check(tt.refused_embargo == 1 && tt.manual_shipments == 0 && pass.corp == TB
+                  && it != pass.best.end() && it->second == trade_refusal::embargoed,
+              "R11 the trade pass counts one embargo refusal and records the player's (dst, iron) "
+              "as trade_refusal::embargoed");
+        check(static_cast<int>(trade_refusal::embargoed) == 0
+                  && static_cast<int>(trade_refusal::no_lane) == 1,
+              "R11b embargoed is the worst class, leading the worst-first order");
+    }
+
+    // R12: retreating from an embargoed market is never refused; advancing is.
+    std::printf("\n-- R12 shrink and clear admitted, raise and create refused --\n");
+    {
+        const std::uint32_t id = t.w.trades.front().id;
+        corp_command raise = trade_cmd(t);
+        raise.order = id;
+        raise.quantity = 2.0f;
+        check_rejected(t, reg, raise, corp_command_result::rejected_embargo,
+                       "R12a raising the embargoed trade's points is rejected_embargo, mutating nothing");
+        corp_command fresh = trade_cmd(t);
+        fresh.quantity = 0.5f; // order 0: a new trade, however small
+        check_rejected(t, reg, fresh, corp_command_result::rejected_embargo,
+                       "R12b a NEW trade into the embargoed market, however small, is rejected_embargo");
+        corp_command shrink = trade_cmd(t);
+        shrink.order = id;
+        shrink.quantity = 0.25f;
+        check(apply_corp_command(t.w, reg, shrink) == corp_command_result::applied
+                  && t.w.trades.size() == 1 && t.w.trades.front().points == 0.25f && t.w.trades.front().id == id,
+              "R12c shrinking the embargoed trade on its own route is applied in place");
+        corp_command clear;
+        clear.corp = TB;
+        clear.verb = corp_verb::clear_trade;
+        clear.order = id;
+        check(apply_corp_command(t.w, reg, clear) == corp_command_result::applied && t.w.trades.empty(),
+              "R12d clearing the embargoed trade is applied");
+    }
+
+    // R13: the ranking every trader shares skips a closed border and offers the next.
+    std::printf("\n-- R13 ranking skips an embargoed destination --\n");
+    {
+        const entity_id dst2 = t.w.create_entity();
+        market_component m2{};
+        m2.body = t.body;
+        m2.centre_tile = tile_at(t.w, t.body, 0, 2); // the lp_fixture nation's ground
+        m2.base_price[r_iron] = 8.0f;
+        m2.price = m2.base_price;
+        t.w.markets[dst2] = m2;
+        t.w.markets.at(t.dst).base_price[r_iron] = 10.0f;
+        t.w.markets.at(t.dst).price[r_iron] = 10.0f;
+        const auto first_dest = [&]() {
+            const logistics_nodes nodes = collect_logistics_nodes(t.w);
+            trade_haul_memo memo;
+            std::vector<trade_route_offer> routes;
+            rank_trade_routes(t.w, reg, nodes, memo, TB, std::vector<entity_id>{ t.src }, routes);
+            bool any_dst = false;
+            for (const trade_route_offer& r : routes) any_dst = any_dst || r.b == t.dst;
+            return std::make_pair(routes.empty() ? null_entity : routes.front().b, any_dst);
+        };
+        const auto shut = first_dest();
+        check(shut.first == dst2 && !shut.second,
+              "R13a with A's embargo B's ranking leads with the next-best market and never offers A's");
+        check(apply_corp_command(t.w, reg, embargo_cmd(TA, TB, 0)) == corp_command_result::applied,
+              "R13 fixture: the embargo is lifted");
+        const auto open = first_dest();
+        check(open.first == t.dst && open.second,
+              "R13b lifted, A's dearer market leads B's ranking again");
+    }
+
+    // R14: a pre-v70 stream whose legacy embargo store is NOT empty reads past it and
+    // drops it. The slot sits just before the hostility set, so a single (B, A)
+    // hostility row marks it: u32 0 (the empty slot), u32 1, B, A.
+    std::printf("\n-- R14 a legacy embargo store is read and dropped --\n");
+    using namespace bio;
+    {
+        t.w.corp_hostile_pairs.insert({ TB, TA });
+        // R10's enactment left one pending event (B -> A) whose bytes would mimic
+        // the marker in the emitter section; fold it so the marker is unique.
+        fold_pending_sentiment(t.w, reg);
+        std::ostringstream o69(std::ios::binary);
+        write_world_snapshot_pre_embargo(t.w, o69);
+        const std::string b69 = o69.str();
+        // The marker spans the empty trades, quotes and contracts vectors (R12d
+        // cleared the one trade), the empty legacy slot, and the one hostility row.
+        std::string marker(28, '\0');
+        const uint32_t one = 1;
+        std::memcpy(&marker[16], &one, 4);
+        std::memcpy(&marker[20], &TB, 4);
+        std::memcpy(&marker[24], &TA, 4);
+        const std::size_t first = b69.find(marker);
+        std::size_t hits = 0;
+        for (std::size_t p = first; p != std::string::npos; p = b69.find(marker, p + 1)) ++hits;
+        const std::size_t at = first + 12; // the legacy slot's count
+        check(t.w.trades.empty() && hits == 1,
+              "R14 fixture: the legacy slot is located uniquely in the v69 stream");
+        if (hits == 1)
+        {
+            // Two legacy entries: a ghost corporation with one real condition, and a
+            // nation with an empty set — exactly what the retired w_condition_set wrote.
+            std::ostringstream legacy(std::ios::binary);
+            w_u32(legacy, 2);
+            w_u32(legacy, 0x70000001u);
+            w_u32(legacy, 1);
+            w_enum(legacy, condition_subject::surplus);
+            w_enum(legacy, condition_comparator::at_least);
+            w_f32(legacy, 1.0e12f);
+            w_enum(legacy, resource_type::iron_ore);
+            w_enum(legacy, building_type::none);
+            w_str(legacy, "legacy-key");
+            w_u32(legacy, no_province);
+            w_u32(legacy, TA);
+            w_u32(legacy, 0);
+            std::string spliced = b69;
+            spliced.replace(at, 4, legacy.str());
+            world plain, fromlegacy;
+            const bool ok_plain = from_bytes(b69, plain);
+            const bool ok_legacy = from_bytes(spliced, fromlegacy);
+            check(spliced.size() > b69.size() && ok_plain && ok_legacy && fromlegacy.nation_embargoes.empty()
+                      && to_bytes(fromlegacy) == to_bytes(plain),
+                  "R14 a v69 stream with two legacy embargo entries loads, holds no embargo, and "
+                  "re-saves byte-identical to the same stream with the slot empty: dropped without trace");
+            std::string truncated = b69;
+            std::ostringstream bad(std::ios::binary);
+            w_u32(bad, 1);
+            w_u32(bad, 0x70000001u);
+            w_u32(bad, 1);
+            w_enum(bad, condition_subject::surplus);
+            w_enum(bad, static_cast<condition_comparator>(250)); // past the enum
+            truncated.replace(at, 4, bad.str());
+            world untouched;
+            check(!from_bytes(truncated, untouched) && untouched.nations.empty(),
+                  "R14b a malformed legacy record still refuses the stream whole");
+        }
+    }
+
+    // R15: the state hash sees an embargo and is untouched by its absence.
+    std::printf("\n-- R15 the state hash folds the embargoes --\n");
+    {
+        world h = t.w;
+        h.nation_embargoes.clear();
+        const uint64_t none = h.state_hash(0);
+        h.nation_embargoes.insert({ TA, TB });
+        const uint64_t ab = h.state_hash(0);
+        h.nation_embargoes = { { TB, TA } };
+        const uint64_t ba = h.state_hash(0);
+        h.nation_embargoes.clear();
+        check(ab != none && ba != none && ab != ba && h.state_hash(0) == none,
+              "R15 an embargo moves state_hash, its direction matters, and lifting it restores the hash");
     }
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);

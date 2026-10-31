@@ -871,6 +871,8 @@ no nation's shipments and do not appear either.
 
 **The classes** name the nation dispatcher's rule that refused, ranked by how far a
 destination got through those rules, best last:
+- **embargoed** — the destination's nation embargoes the player (`../politics/RELATIONS.md` § 3);
+  nothing is bought for it.
 - **no lane** — another body, and no lane off this one.
 - **price gate** — the destination does not pay the margin over the source. The dispatcher
   tests this before it prices a route.

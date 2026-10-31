@@ -233,7 +233,24 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
         // refuses such a shipment (`commit_trade_shipment`), so only cargo
         // already in flight when the embargo was enacted reaches here.
         if (embargo_refuses(w, convoy.corp, convoy.dest_market))
+        {
+            // Recorded as interception records a cut, so the loss is never silent.
+            if (out_cuts != nullptr)
+            {
+                interception_record rec;
+                rec.convoy_id        = convoy.id;
+                rec.victim_corp      = convoy.corp;
+                rec.interceptor_corp = embargo_market_nation(w, convoy.dest_market);
+                rec.tile             = mit->second.centre_tile;
+                rec.body             = dest_body;
+                rec.cargo_resource   = convoy.cargo_resource;
+                rec.cargo_qty        = convoy.cargo_qty;
+                rec.outcome          = interception_outcome::refused_embargo;
+                rec.tick             = tick;
+                out_cuts->push_back(rec);
+            }
             continue;
+        }
 
         // BL-1265 (TRADE.md § A trade, step 3): the cargo LANDS on the
         // destination market and is sold there at this tick's clear — landing

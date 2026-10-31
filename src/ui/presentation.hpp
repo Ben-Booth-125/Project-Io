@@ -182,10 +182,11 @@ inline constexpr ImU32 owned_grey = IM_COL32(138, 140, 150, 255);
 // --- Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens) ---
 // The flow arrows take a neutral logistics hue — a shipment is not an identity.
 // The refusal classes run worst -> best, indexed by `trade_refusal` up to `room`
-// (grey, violet, red, orange, brown, yellow, blue, green): the later the class,
+// (dark crimson, grey, violet, red, orange, brown, yellow, blue, green): the later the class,
 // the closer the player's surplus came to going there.
 inline constexpr ImU32 trade_flow_arrow = IM_COL32(205, 214, 228, 225);
-inline constexpr ImU32 trade_refusal_colour[8] = {
+inline constexpr ImU32 trade_refusal_colour[9] = {
+    IM_COL32(120,  30,  45, 255), // embargoed (BL-1418)
     IM_COL32(130, 132, 142, 255), // no lane
     IM_COL32(170, 125, 225, 255), // price gate
     IM_COL32(216,  90,  80, 255), // no route

@@ -1169,9 +1169,24 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                     return corp_command_result::rejected_placement;
             }
             // BL-1418 (RELATIONS.md § 3): the destination's nation embargoes the
-            // actor, so nothing it ships there may land — refused, nothing written.
+            // actor, so nothing it ships there may land. CREATING such a trade, or
+            // RAISING one (more points, or a change that re-points it), is refused
+            // with nothing written; SHRINKING an existing trade on the same route is
+            // a retreat and is admitted, as clearing one always is.
             if (embargo_refuses(w, cmd.corp, t.to_market))
-                return corp_command_result::rejected_embargo;
+            {
+                bool shrink = false;
+                if (cmd.order != 0)
+                {
+                    const auto it = std::find_if(w.trades.begin(), w.trades.end(),
+                                                 [&](const standing_trade& x) { return x.id == cmd.order; });
+                    shrink = it != w.trades.end() && it->owner == cmd.corp
+                          && it->from_market == t.from_market && it->to_market == t.to_market
+                          && it->resource == t.resource && t.points <= it->points;
+                }
+                if (!shrink)
+                    return corp_command_result::rejected_embargo;
+            }
             if (cmd.order != 0)
             {
                 // CHANGE an existing trade, keeping its id and its place in the
