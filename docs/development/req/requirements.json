@@ -7712,7 +7712,7 @@
      "verification": [
       "headless: war_harness"
      ],
-     "requirement": "War score in [-100, 100], positive for the declarer: half occupation (each side's goals it holds by province_holder, weighted by tiles: declarer's held goals less the defender's, over all goals named) and half battles (strength destroyed between the pair: declarer's share less the defender's).",
+     "requirement": "War score in [-100, 100], positive for the declarer: half occupation and half battles. Occupation normalises each side by its own goals (Ben, 2026-10-31, NR-1103): the tile-weighted share of the declarer's goals the declarer holds by province_holder, less the share of the defender's answered goals the defender holds; holding every goal named and losing none of one's own is the full half for either side, so either side can reach +-100 in an answered war. Battles: strength destroyed between the pair, declarer's share less the defender's.",
      "notes": null
     },
     {

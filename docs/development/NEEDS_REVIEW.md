@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*31 entries — 26 open, 5 resolved.*
+*31 entries — 25 open, 6 resolved.*
 
 ---
 
@@ -184,21 +184,6 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 (a) The free source is the lowest-id running inland logistics hub on the capital. Seeds 10, 11, 12, 25 and 31 had a railway station or port standing as the capital's source and no hub, so nothing ran free and the opening cut removed their capitals' buildings (dark at the handoff). The seeding's step 0 now stands a hub on EVERY capital, beside any station or port already there. (b) purse_room_of now carries the settle cap for every spend - builds, retools, hires, refits, roads and survey dispatch alike; surveys in the settle were not separately ruled.
 
 **Why it matters.** (a) changes world shape: every capital opens with one more building (the shape probe was not re-run). The alternative is to let a station or port on the capital be the free source instead. (b) a poor nation may send fewer surveys in the settle. Merged at b0a9e9b5, G1t50 full 84.6. Work: BL-1452 (carried supplies).
-
-### NR-1103 — An answered war can never reach a score of 100
-*question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
-
-The occupation half divides held goals by ALL goals named. Once the defender answers with its own goals, neither side can reach +-100: holding every enemy goal while losing none reads 83 in the harness (P1e), and the defender tops out lower still (P1f: -67). So the defender can never impose, and the declarer can impose only while the war is unanswered. A cold review (2026-10-31) adds: the defender's score is bounded above -100 in EVERY war, since the declarer always names a goal, so the defender can never impose at all; and the battles half needs the imposer to lose almost nothing.
-
-**Why it matters.** Impose at 100 (NR-1101 C) silently becomes declarer-only, and answering a war makes it unwinnable by force. Work: BL-1428 (war goals and peace).
-
-- A: normalise each side by its own goals: (my held share of your goals) less (your held share of mine), so holding all of theirs and losing none is 100
-- B: keep as built; imposing is only for an unanswered war
-- C: keep the formula, lower the impose threshold
-
-> **Recommendation:** A. It keeps half-occupation, half-battles and makes 100 reachable for either side.
-
-*Files: `src/world/war.cpp`, `docs/politics/RELATIONS.md`*
 
 ### NR-1104 — Grievance can almost never hold
 *question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
@@ -423,4 +408,21 @@ With capitals open as goals, two cases now exist that nothing owned. (a) A natio
 > **Recommendation:** B. Elimination is a whole subject. The floor keeps every nation on the map until it is designed on purpose.
 
 > **RESOLVED.** Ben, 2026-10-30: B - the capital moves to the largest remaining population centre (with its free hub); a nation's last province can never be ceded, so no nation leaves the map by war. Written into RELATIONS.md § 7 and ledgers/diplomacy.md.
+
+### NR-1103 — An answered war can never reach a score of 100
+*question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
+
+The occupation half divides held goals by ALL goals named. Once the defender answers with its own goals, neither side can reach +-100: holding every enemy goal while losing none reads 83 in the harness (P1e), and the defender tops out lower still (P1f: -67). So the defender can never impose, and the declarer can impose only while the war is unanswered. A cold review (2026-10-31) adds: the defender's score is bounded above -100 in EVERY war, since the declarer always names a goal, so the defender can never impose at all; and the battles half needs the imposer to lose almost nothing.
+
+**Why it matters.** Impose at 100 (NR-1101 C) silently becomes declarer-only, and answering a war makes it unwinnable by force. Work: BL-1428 (war goals and peace).
+
+- A: normalise each side by its own goals: (my held share of your goals) less (your held share of mine), so holding all of theirs and losing none is 100
+- B: keep as built; imposing is only for an unanswered war
+- C: keep the formula, lower the impose threshold
+
+> **Recommendation:** A. It keeps half-occupation, half-battles and makes 100 reachable for either side.
+
+> **RESOLVED.** Ben, 2026-10-31: A - each side is normalised by its own goals; holding every goal you named and losing none of your own is the full occupation half, for either side. Written into RELATIONS.md § 7 War score; code in BL-1428 (war goals and peace).
+
+*Files: `src/world/war.cpp`, `docs/politics/RELATIONS.md`*
 

@@ -366,7 +366,7 @@
    "title": "An answered war can never reach a score of 100",
    "raised": "2026-10-31",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31",
    "what": "The occupation half divides held goals by ALL goals named. Once the defender answers with its own goals, neither side can reach +-100: holding every enemy goal while losing none reads 83 in the harness (P1e), and the defender tops out lower still (P1f: -67). So the defender can never impose, and the declarer can impose only while the war is unanswered. A cold review (2026-10-31) adds: the defender's score is bounded above -100 in EVERY war, since the declarer always names a goal, so the defender can never impose at all; and the battles half needs the imposer to lose almost nothing.",
    "why_it_matters": "Impose at 100 (NR-1101 C) silently becomes declarer-only, and answering a war makes it unwinnable by force. Work: BL-1428 (war goals and peace).",
@@ -380,7 +380,7 @@
     "src/world/war.cpp",
     "docs/politics/RELATIONS.md"
    ],
-   "resolution": null
+   "resolution": "Ben, 2026-10-31: A - each side is normalised by its own goals; holding every goal you named and losing none of your own is the full occupation half, for either side. Written into RELATIONS.md § 7 War score; code in BL-1428 (war goals and peace)."
   },
   {
    "id": "NR-1104",
