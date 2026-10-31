@@ -1078,6 +1078,10 @@ void cede_provinces(world& w, entity_id from, entity_id to, const std::vector<ui
         new_capital = capital_after_cession(w, from);
         if (new_capital != null_entity)
         {
+            // Generation's capital stays the identity (nation_preference): stamp it
+            // first where a fixture never did, then move the live capital.
+            if (loser.generation_capital_tile == null_entity)
+                loser.generation_capital_tile = loser.capital_tile;
             loser.capital_tile = new_capital;
             if (free_hub != null_entity)
             {

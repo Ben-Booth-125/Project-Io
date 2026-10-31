@@ -1941,6 +1941,33 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // (author, embargoed) pair, ascending as the set holds them.
     if (version >= k_world_save_version_embargo)
         w_id_pair_set(out, w.nation_embargoes);
+
+    // world_save_version 71 (BL-1460): THE GENERATION CAPITALS, the last section —
+    // every nation, ascending id, as (nation, generation capital tile).
+    if (version >= k_world_save_version_gen_capital)
+    {
+        std::vector<entity_id> nids;
+        nids.reserve(w.nations.size());
+        for (const auto& [nid, nc] : w.nations) { (void)nc; nids.push_back(nid); }
+        std::sort(nids.begin(), nids.end());
+        w_u32(out, static_cast<uint32_t>(nids.size()));
+        for (const entity_id nid : nids)
+        {
+            w_id(out, nid);
+            w_id(out, w.nations.at(nid).generation_capital_tile);
+        }
+    }
+}
+
+void write_world_snapshot_pre_gen_capital(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1460): the v70 stream shape — no generation-capital section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_gen_capital);
+}
+
+std::size_t world_save_gen_capital_section_bytes(const world& w)
+{
+    return 4 + 8 * w.nations.size();
 }
 
 void write_world_snapshot_pre_embargo(const world& w, std::ostream& out)
@@ -2174,7 +2201,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_battle_carry // BL-1453: v66, no battle carry
             && version != k_world_save_version_pre_alarm      // BL-1432: v67, every Alarm 0
             && version != k_world_save_version_pre_war         // BL-1459: v68, no wars
-            && version != k_world_save_version_pre_embargo))   // BL-1418: v69, no embargoes
+            && version != k_world_save_version_pre_embargo     // BL-1418: v69, no embargoes
+            && version != k_world_save_version_pre_gen_capital)) // BL-1460: v70, generation capital = capital
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -3648,6 +3676,33 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             s.nation_embargoes.insert(key);
         }
     }
+
+    // world_save_version 71 (BL-1460): THE GENERATION CAPITALS. One record per nation
+    // of the stream, strictly ascending, each tile null or a tile of the stream.
+    // Refused whole otherwise. A v70 (or older) stream ends before it: each nation's
+    // generation capital is its capital (no cession could stand before v69).
+    if (version >= k_world_save_version_gen_capital)
+    {
+        uint32_t nn = 0;
+        if (!r_count(in, nn) || nn != s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < nn; ++k)
+        {
+            entity_id nid = null_entity, tile = null_entity;
+            if (!r_id(in, nid) || !r_id(in, tile))
+                return false;
+            const auto nit = s.nations.find(nid);
+            if (nid == null_entity || (k > 0 && nid <= prev) || nit == s.nations.end()
+                || (tile != null_entity && s.tiles.count(tile) == 0))
+                return false;
+            prev = nid;
+            nit->second.generation_capital_tile = tile;
+        }
+    }
+    else
+        for (auto& [nid, nc] : s.nations)
+            nc.generation_capital_tile = nc.capital_tile;
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

@@ -335,7 +335,7 @@ int main()
         const std::size_t fronts_tail = 8 + 4 + 12 + 24 + 4 + world_save_battle_carry_section_bytes(f.w)
                                       + world_save_alarm_section_bytes(f.w)
                                       + world_save_war_section_bytes(f.w) // BL-1459 (v69)
-                                      + world_save_embargo_section_bytes(f.w); // BL-1418 (v70)
+                                      + world_save_embargo_section_bytes(f.w) + world_save_gen_capital_section_bytes(f.w); // BL-1418 (v70)
         check(ok60 && v60.size() == bytes.size() - (4 + 10) - fronts_tail && !unit_refitting(old.units.at(b))
                   && old.units.at(b).type == levy,
               "R5b a v60 stream (14 bytes shorter) reads as no refit");

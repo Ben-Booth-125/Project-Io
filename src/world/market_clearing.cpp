@@ -1137,8 +1137,12 @@ float nation_preference(entity_id nation, const nation_component* nc,
         // not steer the world (a revolution's rename moved seed 32's economy
         // through exactly this fold); the capital is generated content too, so
         // two worlds with coinciding nation ids still crave differently.
+        // BL-1460 fix round: the capital as GENERATION left it, never the live one — a
+        // capital ceded at a peace moves, and must not re-roll the nation's cravings.
+        // Equal to `capital_tile` in every generated world, so no digest moves.
+        const entity_id cap = generation_capital_of(*nc);
         for (int i = 0; i < 8; ++i)
-            mix_byte(static_cast<std::uint8_t>((static_cast<std::uint64_t>(nc->capital_tile) >> (8 * i)) & 0xFF));
+            mix_byte(static_cast<std::uint8_t>((static_cast<std::uint64_t>(cap) >> (8 * i)) & 0xFF));
         mix_byte(static_cast<std::uint8_t>(nc->politics));
         mix_byte(static_cast<std::uint8_t>(nc->posture));
         mix_byte(static_cast<std::uint8_t>(nc->focus));
@@ -1163,6 +1167,11 @@ float nation_preference(entity_id nation, const nation_component* nc,
 }
 
 } // namespace
+
+float nation_endemic_preference(entity_id nation, const nation_component* nc, std::size_t r, float spread)
+{
+    return nation_preference(nation, nc, r, spread);
+}
 
 void inject_endemic_demand(world& w, const recipe_registry& reg)
 {

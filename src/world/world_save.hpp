@@ -630,7 +630,21 @@ inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 /// entry, so there is no nation pair to map one to. v69 is a STRICT PREFIX of v70 and
 /// is read too (`k_world_save_version_pre_embargo`), as a world with no embargo; so is
 /// every older version the reader already accepted.
-inline constexpr uint32_t world_save_version = 70;
+///
+/// Bumped to 71 (BL-1460 fix round, cession moves territory; RELATIONS.md § 7): A
+/// TRAILING SECTION after v70's embargo section carries every nation's GENERATION
+/// CAPITAL (`nation_component::generation_capital_tile`), after a u32 count equal to
+/// the nation count, in ascending nation id, each as (nation, tile) — the tile null or
+/// a tile in the stream. v70 is a STRICT PREFIX of v71 and is read too
+/// (`k_world_save_version_pre_gen_capital`), each nation's generation capital then
+/// equal to its `capital_tile` (exact: no stream before v69 held a cession).
+inline constexpr uint32_t world_save_version = 71;
+
+/// BL-1460: the first version carrying the generation-capital section (see above).
+inline constexpr uint32_t k_world_save_version_gen_capital = 71;
+
+/// BL-1460: v70, a strict prefix of v71 (the generation-capital section is v71's only addition).
+inline constexpr uint32_t k_world_save_version_pre_gen_capital = 70;
 
 /// BL-1418: the first version carrying the embargo section (see above).
 inline constexpr uint32_t k_world_save_version_embargo = 70;
@@ -764,8 +778,12 @@ std::size_t world_save_alarm_section_bytes(const world& w);
 std::size_t world_save_war_section_bytes(const world& w);
 
 /// BL-1418: the byte length of the v70 embargo section `w` writes — 4 for the count
-/// plus 8 an embargo. The LAST section of a v70 stream.
+/// plus 8 an embargo. The last section of a v70 stream.
 std::size_t world_save_embargo_section_bytes(const world& w);
+
+/// BL-1460: the byte length of the v71 generation-capital section `w` writes — 4 for
+/// the count plus 8 a nation. The LAST section of a v71 stream.
+std::size_t world_save_gen_capital_section_bytes(const world& w);
 
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and
@@ -852,6 +870,8 @@ void write_world_snapshot_pre_alarm(const world& w, std::ostream& out);
 void write_world_snapshot_pre_war(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1418): @p w as a v69 stream — no embargo section.
 void write_world_snapshot_pre_embargo(const world& w, std::ostream& out);
+/// VERIFICATION ONLY (BL-1460): @p w as a v70 stream — no generation-capital section.
+void write_world_snapshot_pre_gen_capital(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

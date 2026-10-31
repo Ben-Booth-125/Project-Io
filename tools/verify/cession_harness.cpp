@@ -533,6 +533,42 @@ void run_seed(lua_state& lua, std::uint32_t seed)
                   (ull)old_capital, (ull)ln.capital_tile, (ull)expect, (ull)hub, hub_ok ? "yes" : "NO"));
     }
     {
+        // C8: the ceded capital leaves the loser's endemic demand weights unchanged —
+        // they hash the GENERATION capital, which the peace does not move. The
+        // counterfactual: hashed from the live (moved) capital, they would differ.
+        const nation_component& before_nc = pre.nations.at(L);
+        const nation_component& after_nc  = w.nations.at(L);
+        nation_component live = after_nc;
+        live.generation_capital_tile = null_entity; // read the live capital instead
+        const float spread = 0.5f;
+        int same = 0, moved_live = 0;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float b = nation_endemic_preference(L, &before_nc, r, spread);
+            same       += nation_endemic_preference(L, &after_nc, r, spread) == b ? 1 : 0;
+            moved_live += nation_endemic_preference(L, &live, r, spread) != b ? 1 : 0;
+        }
+        check(same == static_cast<int>(resource_count) && moved_live > 0
+                  && after_nc.generation_capital_tile == old_capital && before_nc.generation_capital_tile == old_capital,
+              "C8", fmt("a ceded capital leaves the loser's endemic demand weights unchanged (%d of %zu equal; the "
+                        "generation capital stays tile %llu); hashed from the moved capital %d would have re-rolled",
+                        same, resource_count, (ull)after_nc.generation_capital_tile, moved_live));
+        // C9: the v71 section carries it; a v70 stream (no section) loads it equal to
+        // the capital.
+        world back71, back70;
+        const bool r71 = from_bytes(to_bytes(w), back71);
+        std::ostringstream o70(std::ios::binary);
+        write_world_snapshot_pre_gen_capital(w, o70);
+        const std::string b70 = o70.str();
+        const bool r70 = from_bytes(b70, back70);
+        bool eq70 = r70;
+        for (const auto& [nid, nc] : back70.nations) eq70 = eq70 && nc.generation_capital_tile == nc.capital_tile;
+        check(r71 && back71.nations.at(L).generation_capital_tile == old_capital && r70 && eq70
+                  && b70.size() == to_bytes(w).size() - world_save_gen_capital_section_bytes(w),
+              "C9", "the v71 stream carries the generation capital through a save; a v70 stream (today's less the "
+                    "section) loads every nation's generation capital equal to its capital");
+    }
+    {
         // Whittle the loser down by real cessions to other nations, then refuse the last.
         world v = w;
         std::vector<entity_id> takers;

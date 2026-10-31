@@ -1707,7 +1707,11 @@ std::vector<entity_id> generate_nations(
             if (seed_polity_of(rep) >= 0 || core_off_speck[static_cast<std::size_t>(rep)])
             {
                 const entity_id tid = tile_ids[static_cast<std::size_t>(core_tile[static_cast<std::size_t>(ni)])];
-                if (tid != null_entity) nation_data[static_cast<std::size_t>(ni)].capital_tile = tid;
+                if (tid != null_entity)
+                {
+                    nation_data[static_cast<std::size_t>(ni)].capital_tile = tid;
+                    nation_data[static_cast<std::size_t>(ni)].generation_capital_tile = tid; // BL-1460
+                }
             }
         }
         in_territory = territory_tiles(land_owner, water, gw, gh, core_tile);
@@ -1744,6 +1748,8 @@ std::vector<entity_id> generate_nations(
             if (nation_data[static_cast<std::size_t>(ni)].capital_tile != null_entity) continue;
             if (pass == 0 && !in_territory.empty() && !in_territory[static_cast<std::size_t>(seeds[si])]) continue;
             nation_data[static_cast<std::size_t>(ni)].capital_tile = tile_ids[static_cast<std::size_t>(seeds[si])];
+            nation_data[static_cast<std::size_t>(ni)].generation_capital_tile =
+                nation_data[static_cast<std::size_t>(ni)].capital_tile; // BL-1460
             if (si < seed_speech.size() && seed_speech[si].usable() && !nation_speech[static_cast<std::size_t>(ni)].usable())
                 nation_speech[static_cast<std::size_t>(ni)] = seed_speech[si];
         }
@@ -1777,6 +1783,8 @@ std::vector<entity_id> generate_nations(
             const int moved = seat_off_speck(land_owner, gw, gh, ni, cap, provinces, cap, &water);
             if (moved == cap || tile_ids[static_cast<std::size_t>(moved)] == null_entity) continue;
             nation_data[static_cast<std::size_t>(ni)].capital_tile = tile_ids[static_cast<std::size_t>(moved)];
+            nation_data[static_cast<std::size_t>(ni)].generation_capital_tile =
+                nation_data[static_cast<std::size_t>(ni)].capital_tile; // BL-1460
             if (fold_out) ++fold_out->cores_speck_moved;
         }
     }
@@ -2166,6 +2174,7 @@ int seat_capitals_on_centres(world& w, int* unseated)
         if (city != nc.capital_tile)
         {
             nc.capital_tile = city;
+            nc.generation_capital_tile = city; // BL-1460: generation's capital, with it
             ++moved;
         }
     }

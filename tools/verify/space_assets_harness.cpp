@@ -442,7 +442,7 @@ int main()
                                + world_save_battle_carry_section_bytes(w) // BL-1453 (v67)
                                + world_save_alarm_section_bytes(w)       // BL-1432 (v68)
                                + world_save_war_section_bytes(w)          // BL-1459 (v69)
-                               + world_save_embargo_section_bytes(w);     // BL-1418 (v70)
+                               + world_save_embargo_section_bytes(w) + world_save_gen_capital_section_bytes(w);     // BL-1418 (v70)
         const std::string b55 = v55_of(w);
         std::string v50 = b55.substr(0, b55.size() - tail55_of(w));
         const std::uint32_t pre = k_world_save_version_pre_space;

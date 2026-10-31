@@ -439,19 +439,19 @@ int main()
               "R9a three embargoes round-trip with their directions, byte for byte");
         uint32_t ver = 0;
         std::memcpy(&ver, b.data() + 4, 4);
-        check(ver == world_save_version && ver == k_world_save_version_embargo, "R9b the stream is v70");
+        check(ver == world_save_version && ver >= k_world_save_version_embargo, "R9b the stream is v70 or later (v71: BL-1460's generation capitals follow the embargoes)");
 
         std::ostringstream o69(std::ios::binary);
         write_world_snapshot_pre_embargo(s.w, o69);
         const std::string b69 = o69.str();
         world old;
         check(from_bytes(b69, old) && old.nation_embargoes.empty()
-                  && b69.size() == b.size() - world_save_embargo_section_bytes(s.w)
+                  && b69.size() == b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w)
                   && world_save_embargo_section_bytes(s.w) == 4 + 8 * 3,
               "R9c a v69 stream (today's less the 28-byte embargo section) loads with no embargo");
 
         // The section is last: count, then (author, embargoed) pairs ascending.
-        const std::size_t sec = b.size() - world_save_embargo_section_bytes(s.w);
+        const std::size_t sec = b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w);
         const auto refused = [&](std::string bad, const char* what) {
             world untouched;
             check(!from_bytes(bad, untouched) && untouched.nations.empty() && untouched.nation_embargoes.empty(), what);

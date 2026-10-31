@@ -2484,6 +2484,17 @@ struct nation_component
     /// the field and has nowhere to source it from.
     entity_id capital_tile = null_entity;
 
+    /// BL-1460 fix round: THE CAPITAL AS GENERATION LEFT IT. Written beside
+    /// `capital_tile` at every generation site that sets it, so the two are equal in
+    /// every generated world; only a ceded capital (war.cpp `cede_provinces`) moves
+    /// `capital_tile` away from it. Read by `nation_preference` (market_clearing.cpp)
+    /// as the identity a nation's endemic cravings are hashed from, so a capital that
+    /// moves at a peace does not re-roll what the nation craves. `null_entity` (a
+    /// hand-built fixture) reads as `capital_tile` (`generation_capital_of`).
+    /// SERIALISED in the v71 trailing section; an older stream loads it equal to
+    /// `capital_tile` (exact: no stream before v69 could hold a cession).
+    entity_id generation_capital_tile = null_entity;
+
     /// BL-613 (qualification fraction; docs/economy/POPULATION.md § Qualification):
     /// the share of this nation's workforce that is QUALIFIED, in [0, 1].
     /// Nation-grain deliberately — it reads as a national development level.
@@ -2607,6 +2618,13 @@ struct nation_component
     /// Written only by `set_air_design`. Saved (world_save_version 65).
     std::vector<uint16_t> air_design_kit;
 };
+
+/// BL-1460 fix round: the capital a nation's generated identity reads —
+/// `generation_capital_tile`, or `capital_tile` when it was never stamped.
+inline entity_id generation_capital_of(const nation_component& nc)
+{
+    return nc.generation_capital_tile != null_entity ? nc.generation_capital_tile : nc.capital_tile;
+}
 
 // ---------------------------------------------------------------------------
 // The exchange record (BL-685)

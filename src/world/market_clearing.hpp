@@ -146,6 +146,13 @@ void inject_background_demand(world& w, const recipe_registry& reg);
 /// @param w World; market demand arrays are mutated in place.
 void inject_endemic_demand(world& w, const recipe_registry& reg);
 
+/// BL-1460 fix round: a nation's endemic preference for resource @p r — the national
+/// character multiplier `inject_endemic_demand` weights its craving by, uniform in
+/// [1 - spread, 1 + spread). Pure: hashed from the nation's id, its GENERATION capital
+/// (`generation_capital_of`, never the live capital a peace may move) and its three
+/// character axes. Exposed for the harnesses that pin it.
+float nation_endemic_preference(entity_id nation, const nation_component* nc, std::size_t r, float spread);
+
 /// BL-652 — one basket entry the injectors CANNOT price, named.
 struct unpriced_basket_entry
 {

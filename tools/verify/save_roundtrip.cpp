@@ -602,7 +602,7 @@ int main()
                                        + world_save_battle_carry_section_bytes(wd) // BL-1453 (v67)
                                        + world_save_alarm_section_bytes(wd)       // BL-1432 (v68), last
                                        + world_save_war_section_bytes(wd)          // BL-1459 (v69)
-                                       + world_save_embargo_section_bytes(wd);     // BL-1418 (v70), last
+                                       + world_save_embargo_section_bytes(wd) + world_save_gen_capital_section_bytes(wd);     // BL-1418 (v70), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -674,7 +674,7 @@ int main()
                                          + world_save_battle_carry_section_bytes(wu) // BL-1453 (v67)
                                          + world_save_alarm_section_bytes(wu)       // BL-1432 (v68), last
                                          + world_save_war_section_bytes(wu)          // BL-1459 (v69)
-                                         + world_save_embargo_section_bytes(wu);     // BL-1418 (v70), last
+                                         + world_save_embargo_section_bytes(wu) + world_save_gen_capital_section_bytes(wu);     // BL-1418 (v70), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
