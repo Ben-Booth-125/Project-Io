@@ -405,52 +405,6 @@
    "written": "2026-10-27",
    "parked": false,
    "blocked_on": null,
-   "author": "main session",
-   "requires": [],
-   "id": "BL-1440",
-   "short_name": "R0B_BUDGET_WORLD",
-   "category": "Verification",
-   "priority": "B",
-   "difficulty": 2,
-   "authority_doc": "docs/military/MILITARY.md",
-   "files": [
-    "tools/verify/rival_military_seeding_harness.cpp"
-   ],
-   "title": "rival_military_seeding_harness R0b fails three rows: its budget world charters nothing",
-   "design": "Three R0b \"budget world\" rows fail on main and on 2929a347, before the capital-base work: the log reads \"no charter budget: nothing chartered, nobody seated\", so the seat-move checks never reach arming. Every other row passes. Find why the fixture spends no charter budget since corporations were retired (BL-1407), and re-point the fixture or retire the rows with a reason. Never weaken a check to pass it."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-27",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session",
-   "requires": [],
-   "id": "BL-1441",
-   "short_name": "FRONT_EDGE_CASES",
-   "category": "Military",
-   "priority": "B",
-   "difficulty": 3,
-   "authority_doc": "docs/military/MILITARY.md",
-   "files": [
-    "src/world/fronts.cpp",
-    "src/world/corp_ai.cpp",
-    "tools/verify/fronts_harness.cpp"
-   ],
-   "title": "Fronts: a neighbour with no free key tile has no front; unreachable front marches retry every tick",
-   "design": "Two edge cases from the BL-1427 (fronts) cold review. (1) Keys are unique per nation and claimed smallest span first, so a span whose every tile another front already claimed has no key and is dropped: a nation touching B only at one tile it also shares with A has no front toward B, against \"Every neighbour has fronts\" (MILITARY.md § Fronts). 0 cases on the generated world; fronts_harness F1g fails if a seed hits one. Fix by naming a front by (neighbour, tile) or a tie rule that never leaves a span unnamed. (2) A front march the game refuses (the slot or push target on another landmass) is re-issued every tick, re-pathing the province each time; the rival scorer assigns idle units with no reachability check. Assign only to fronts the unit can reach, or stop re-issuing a refused march."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-27",
-   "parked": false,
-   "blocked_on": null,
    "author": "main session (Ben, 2026-10-27)",
    "requires": [],
    "id": "BL-1442",
@@ -466,28 +420,6 @@
    ],
    "title": "After construction capacity: processors finish faster than their inputs; G1 at tick 50 under its gate",
    "design": "Ben, 2026-10-27: merge BL-1438 (retire construction capacity), keep G1t50 at 85, and treat the new starvation and decommissions as follow-on work. market_viability FULL on main at 9503aa06: G1 92.9, G1t50 78.9 (FAIL; 2106/2668), G1b 3.1, G2 186.3, G3 100.0. In the lane's 16-seed tick-50 totals, processors built 1446 -> 2762, running 1269 -> 2195, input-starved 32 -> 158, decommissioned 54 -> 209. Measure first: which recipes starve, which inputs are short, and whether the scorer now over-builds processors ahead of their extractors (no capacity throttle remains). Fix the cause in the world (input supply, build sequencing by the scorer); never lower the gate or clamp builds to pass it. CARRIED to sprint 59 (Ben, 2026-10-28: cut with G1t50 failing). Main at 302bba15: market_viability FULL G1 93.3 G1t50 79.8 (FAIL) G1b 2.8 G2 191.0 G3 100.0 after the own-market ceiling rule. The remaining gap: power plants over-built into glutted grids (the held bl1232 scorer gate), state buildings left unfunded, remote spare the trade pass does not move, household goods priced over the ceiling; construction draws push steel over the ceiling where steel-using plants stand."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "written": "2026-10-28",
-   "parked": false,
-   "blocked_on": null,
-   "author": "Ben (sprint 58 close, 2026-10-28)",
-   "requires": [],
-   "id": "BL-1444",
-   "short_name": "BATTLE_CARD_MARCH_STALL",
-   "category": "Verification",
-   "priority": "B",
-   "difficulty": 2,
-   "authority_doc": "docs/military/MILITARY.md",
-   "files": [
-    "scripts/verify/battle_card.lua",
-    "src/core/verify_api.cpp"
-   ],
-   "title": "battle_card.lua: the march is accepted but the unit never moves in the verify world",
-   "design": "SPRINT 58 CLOSE, 2026-10-28. scripts/verify/battle_card.lua fails: march_unit is accepted, but the unit sits at (250,76) for 120 ticks, state \"marching\". Likely refused each step by the Logistic Point gate, which the verify world does not feed. It was broken before sprint 58 (it died at its first line); the sprint's fix let it run far enough to show this. THE WORK: name why the march does not advance in the verify world (LP gate, path, or fixture), fix the cause or stage the fixture, and get the capture to a battle card. Do not weaken the check."
   },
   {
    "status": "proposed",
@@ -540,28 +472,6 @@
    ],
    "title": "Unit stat grid on the unit card and in the designer, with signed deltas while editing",
    "design": "Written in docs/ui/ledgers/military.md § The stat grid and SELECTION.md § The unit element's layout (Ben, 2026-10-29). One shared grid: HP, readiness, morale, food, ammunition, equipment, soft, hard, defence, breakthrough, hardness, recon, stealth, speed. Unit card: class image left, grid fills the centre (Strength and Roster pages fold in). Designer: bottom right, design stats only, signed +/- deltas against the live design for the draft and the hovered item. Rival unit: design stats only once seen (battle or recon), internals hidden. Needs a live click."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.2.4",
-   "written": "2026-10-30",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (2026-10-30)",
-   "category": "Verification",
-   "authority_doc": "docs/ui/SELECTION.md",
-   "id": "BL-1457",
-   "short_name": "BUILDING_ELEMENT_STALE_AIM",
-   "priority": "B",
-   "difficulty": 1,
-   "requires": [],
-   "files": [
-    "scripts/verify/building_element.lua"
-   ],
-   "title": "building_element.lua aims at hard-coded coordinates that no longer accept an iron extraction site",
-   "design": "The script sweeps a 7x7 box around (155,37) for a tile that accepts an iron_ore extraction placement and errors when none does. On main 2652c244's build_rel it fails: 44 tiles refuse invalid_tile and 5 foreign_ground; none for funds. Aim the placement without fixed coordinates - verify.find_deposit_tile(\"iron_ore\") on the player's own ground, or the site finder rows - so generation moves cannot rot it. Script-only; no new verify grant."
   },
   {
    "status": "proposed",
@@ -780,6 +690,51 @@
    ],
    "title": "lp_pool_harness L7 measures a stale save-stream tail",
    "design": "Found by Lane W, sprint 61 (2026-10-31), failing on main: row L7 does byte arithmetic on a v49 stream and has not subtracted any section added since v56. Correct the arithmetic as save_roundtrip does (subtract each later section), never loosen the assertion. Check: lp_pool_harness all rows."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-31",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 delivery, from lane reports, 2026-10-31)",
+   "requires": [],
+   "id": "BL-1466",
+   "short_name": "MARCH_PATH_DOMAIN",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "priority": "A",
+   "difficulty": 2,
+   "files": [
+    "src/world/corp_command.cpp",
+    "tools/verify/fronts_harness.cpp"
+   ],
+   "title": "A land unit's march path crosses open ocean",
+   "design": "Found by Lane F, sprint 61 (2026-10-31), fronts_harness F9g: on a cylinder split by ocean columns, march_check ACCEPTS a land unit's march from (4,0) to (9,2), an 8-tile path with one water tile, because the domain check reads only the destination tile. MILITARY.md § Domains and traversal: land classes cross coastal water only where owned and never open ocean. Every tile of the path must pass the class's domain test (the path search should refuse illegal tiles, not only the endpoint). Turn F9g from a printed observation into an assertion. Check: fronts_harness F9g, campaign_battle_harness, move_by_days_harness, world_determinism (digests may move; report, do not re-bless)."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-31",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 delivery, from lane reports, 2026-10-31)",
+   "requires": [],
+   "id": "BL-1467",
+   "short_name": "BUILDING_ELEMENT_PRODUCING",
+   "category": "UI",
+   "authority_doc": "docs/ui/SELECTION.md",
+   "priority": "C",
+   "difficulty": 1,
+   "files": [
+    "scripts/verify/building_element.lua"
+   ],
+   "title": "building_element.lua's producing capture shows a construction site",
+   "design": "Found by Lane F, sprint 61 (2026-10-31): aimed at the site finder's top Iron Mine row, the placed site at (1,93) is still under construction after 40 economy steps, so building_element_player captures a site, not a producing building. Pick the first row whose local market can supply the build materials (the BL-095 reason the old tile was chosen), or step until complete, and assert completion before the capture."
   }
  ]
 }

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*28 entries — 23 open, 5 resolved.*
+*30 entries — 25 open, 5 resolved.*
 
 ---
 
@@ -312,6 +312,28 @@ A coastal capital's state port sits on the coastal tile nearest the capital, a r
 > **Recommendation:** Write the siting rule, open sea included, into LOGISTICS.md § 4b beside the harbour rules.
 
 *Files: `src/world/state_industry.cpp`*
+
+### NR-1113 — Alarm's new vocabulary: five factors, three modifier subjects
+*novel-work · raised 2026-10-31 · from Lane S report, sprint 61 (BL-1458 sentiment emitters, BL-1432 Alarm as sentiment), 2026-10-31*
+
+To make Alarm's RELATIONS § 6 causes emit, the lane added five sentiment factors (technology_visible, facility_visible, border_force, trade_severed, unrest_visible authored zero), three modifier subjects on the meta layer (alarm_toward multiply, alarm_tell add in points, alarm_decay multiply) read by nation_tech.cpp, and widened the tech-store audit grammar (a points subject; "N% faster" reads as +N). A large facility is a state asset costing at least 450 (launchpad, airbase; not the university). 14 Digitisation effect rows now write Alarm; six stay unread (no Nuclear Plant, no accord-partner store, "spike" and "drift" ambiguous, no capability-only scale, no world-wide decay scale).
+
+**Why it matters.** New META_LAYER vocabulary and five enumerators no doc named. The emitter module sentiment_emitters.cpp has no owning doc section beyond RELATIONS § Who emits.
+
+> **Recommendation:** Accept; write the five factors into RELATIONS § Who emits and the three subjects into META_LAYER at merge.
+
+*Files: `src/world/sentiment_emitters.cpp`, `src/world/modifier_set.hpp`, `tools/session/tech_tree_store.js`*
+
+### NR-1114 — Which pair trade counts for, and when trade is severed
+*decision taken on your behalf · raised 2026-10-31 · from Lane S report, sprint 61 (BL-1458 sentiment emitters, BL-1432 Alarm as sentiment), 2026-10-31*
+
+(1) trade_conducted counts the cargo owner's nation and the destination market's nation (the import-tariff foreign-goods rule), foreign landings only, one event each way per tick. (2) trade_severed is raised by the receiver toward the shipper (+2 Alarm, once) when a pair that traded at the last fold lands nothing now; a pair whose trade flickers raises repeated spikes. (3) embargo_imposed has no emitter yet: no embargo law is enacted anywhere; BL-1418 (embargo bars goods) is where it gets one. (4) BL-1432's rival scorer reading Alarm and its player surface are left to BL-1461 (rivals declare war) and BL-1462 (diplomacy ledger).
+
+**Why it matters.** (2) may want a streak (several ticks of trade, then several of none) before it counts; flicker is common on thin lanes.
+
+> **Recommendation:** Accept (1), (3), (4); for (2), require two ticks traded and two ticks silent - in-band, delegated unless you object.
+
+*Files: `src/world/sentiment_emitters.cpp`*
 
 ---
 
