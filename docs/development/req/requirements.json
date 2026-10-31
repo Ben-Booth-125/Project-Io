@@ -7866,12 +7866,12 @@
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "visual: scripts/verify/diplomacy_ledger.lua"
      ],
      "requirement": "Slot 8 (MENU.md's slot; diplomacy.md said 9 in error) opens the ledger. Nations shows one row per nation with stance chips and Access/Trust/Alarm toward the player; an expanded row shows the reverse sentiment, power and front strength, trade exposure, friendship, embargo and Declare war. Wars lists every war with score, exhaustion and goals.",
-     "notes": null
+     "notes": "main 3233826b, 2026-10-31: diplomacy_ledger.lua 0 failures on the integrated build (slot 8, 40 nation rows, expand, declaration with canvas goals and price, embargo enact/lift, tab switch closes the declaration, Wars 2 of 2, peace composer, toggle rule). The hover cause line is BL-1470."
     },
     {
      "id": "R2",
@@ -7880,16 +7880,16 @@
       "live"
      ],
      "requirement": "In the running game: open slot 9, expand a row, declare war choosing a goal on the canvas with the price shown, answer and offer peace from Wars, offer friendship, toggle the embargo; each press does what it says and the toggle rule holds.",
-     "notes": null
+     "notes": "Owed: Ben's live click (the ten-step list in the Lane L report)."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "static: question_log.json, ui_elements.json, ACTIONS.json"
      ],
      "requirement": "The surface carries its question log entry, a ui_elements entry with its checks, and an ACTIONS.json entry per press.",
-     "notes": null
+     "notes": "question_log diplomacy_ledger, ui_elements UI-133, ACTIONS.json ledger.diplomacy_* entries (212), mirrors regenerated."
     }
    ]
   }
