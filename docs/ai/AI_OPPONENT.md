@@ -2364,3 +2364,11 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   Diplomacy ledger issues. **Not admitted:** a war, offer or peace that is not its own; acting for
   the player's nation, whose wars only the player answers and ends; a war planned beyond the next
   verb. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **Rival nations build bunkers on their own ground — granted (Ben, 2026-10-31;
+  `../military/MILITARY.md` § Fortifications).** A new subject, fortification rather than force,
+  granted on the standing terms. A rival nation's scorer may build a bunker on a tile of its own
+  ground, choosing the tile by scored utility over what it can see (its fronts, its own units, the
+  build price), through the same legal build verb the player uses. **Not admitted:** building on
+  another nation's ground, the player's included, or for the player; repairing or degrading another
+  nation's bunker; a fortification line planned beyond the next build. Pure, seeded, deterministic,
+  replayable, legal verbs only, never a planner.

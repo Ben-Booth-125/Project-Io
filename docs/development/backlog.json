@@ -249,7 +249,7 @@
     "src/world/campaign_battle.cpp"
    ],
    "title": "A bunker building adds defence and hardness to the units on its tile",
-   "design": "MILITARY.md § Fortifications. A building type; units on its tile gain defence, defenders gain hardness. Degraded by artillery and strikes, repaired over time."
+   "design": "MILITARY.md § Fortifications. A building type; units on its tile gain defence, defenders gain hardness. Degraded by artillery and strikes, repaired over time. Rivals build bunkers too: granted (Ben, 2026-10-31), AI_OPPONENT.md § 11 \"Rival nations build bunkers on their own ground\" - own ground only, scored over its fronts, units and the build price, through the player's build verb."
   },
   {
    "status": "proposed",
