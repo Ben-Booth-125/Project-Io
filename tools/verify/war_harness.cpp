@@ -1249,6 +1249,46 @@ int main()
             check(bytes[0] == bytes[1] && rows[0] == rows[1] && rows[0] > 0,
                   "RW9 the pass replays: two built worlds, twenty ticks of every nation's pass, byte-identical");
         }
+        // RW10 - a STALE offer is refused, so the war does not freeze behind it, and a
+        // new offer can follow (cold review, 2026-10-31). Twice: from a rival, and from
+        // the player's nation.
+        for (const bool from_player : { false, true })
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 10;
+            const std::vector<uint32_t> dg = { f.provs[f.B][0] };
+            (void)declare_war(w, sp, f.A, f.B, dg);
+            (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+            w.province_holder[holder_index(w, dg[0])] = f.A;
+            peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.A; cede.provinces = dg;
+            const bool filed = offer_peace(w, f.A, f.B, cede) == war_result::applied;
+            w.province_holder[holder_index(w, dg[0])] = f.B; // B re-takes it: the terms go stale
+            // B is weary enough that the terms, were they live, would score ACCEPT:
+            // without the stale check the pass would try accept_peace, be refused,
+            // and leave the offer standing - the freeze this row pins.
+            w.wars.at({ f.A, f.B }).defender_exhaustion = 80.0f;
+            if (from_player) w.player_entity = f.A;
+            w.current_econ_tick = 20;
+            {
+                world probe = w;
+                check(filed && accept_peace(probe, sp, f.B, f.A) == war_result::rejected_state
+                          && probe.peace_offers.count({ f.A, f.B }) == 1,
+                      std::string("RW10 (setup") + (from_player ? ", player" : "")
+                          + ") the stale offer: accept_peace refuses it and the offer stands");
+            }
+            trace.clear();
+            score_nation_war(w, reg, f.B, 20);
+            check(at_war(w, f.A, f.B) && w.peace_offers.empty() && did(war_ai_choice::refuse, f.B, f.A)
+                      && !did(war_ai_choice::accept, f.B, f.A),
+                  std::string("RW10") + (from_player ? "b a stale offer from the PLAYER'S nation" : " a stale offer")
+                      + " is refused through refuse_peace; the war goes on and the offer is gone");
+            trace.clear();
+            score_nation_war(w, reg, f.B, 20);
+            const auto oit = w.peace_offers.find({ f.A, f.B });
+            check(oit != w.peace_offers.end() && oit->second.offerer == f.B && did(war_ai_choice::offer, f.B, f.A),
+                  std::string("RW10") + (from_player ? "b'" : "'") + " a new offer can follow: the weary rival now offers peace");
+        }
         war_ai_trace_sink() = nullptr;
     }
 

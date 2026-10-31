@@ -14,7 +14,7 @@
 //
 //   --seeds   the worlds (default: the 16 of docs/generation/seed_library.json)
 //   --ticks   the last econ tick stepped (default 40: settle 0..11, live 12..T)
-//   --replay  run the FIRST seed twice from scratch and require the war tables, the
+//   --replay  run EVERY seed given twice from scratch and require the war tables, the
 //             trace and the world's state hash to match (R1: replayable)
 //   --trace   print every declaration candidate the pass weighed
 //
@@ -246,18 +246,20 @@ int main(int argc, char** argv)
                 full ? "" : " (a shard: the pooled table across every shard settles it)");
     if (total_declared == 0 && full) ++failures;
 
-    if (replay && !rows.empty())
-    {
-        const seed_result again = run_seed(rows.front().seed, last_tick, false);
-        const bool ok = again.hash == rows.front().hash && again.war_bytes == rows.front().war_bytes
-                     && same_trace(again.trace, rows.front().trace);
-        std::printf("  %s  R1 replay: seed %u run twice from scratch - state hash %016llx vs %016llx, war tables %s, trace %s\n",
-                    ok ? "PASS" : "FAIL", rows.front().seed,
-                    static_cast<unsigned long long>(rows.front().hash), static_cast<unsigned long long>(again.hash),
-                    again.war_bytes == rows.front().war_bytes ? "identical" : "DIFFER",
-                    same_trace(again.trace, rows.front().trace) ? "identical" : "DIFFERS");
-        if (!ok) ++failures;
-    }
+    if (replay)
+        for (const seed_result& first : rows) // EVERY seed given, each rebuilt from scratch
+        {
+            const seed_result again = run_seed(first.seed, last_tick, false);
+            const bool tables = again.war_bytes == first.war_bytes;
+            const bool traces = same_trace(again.trace, first.trace);
+            const bool ok = again.hash == first.hash && tables && traces;
+            std::printf("  %s  R1 replay: seed %u run twice from scratch - state hash %016llx vs %016llx, "
+                        "%d declared, war tables %s, trace %s (%zu rows)\n",
+                        ok ? "PASS" : "FAIL", first.seed, static_cast<unsigned long long>(first.hash),
+                        static_cast<unsigned long long>(again.hash), first.declared,
+                        tables ? "identical" : "DIFFER", traces ? "identical" : "DIFFERS", first.trace.size());
+            if (!ok) ++failures;
+        }
     std::printf("war_census: %s (%d failure(s))\n", failures == 0 ? "ALL PASS" : "FAILURES", failures);
     return failures == 0 ? 0 : 1;
 }

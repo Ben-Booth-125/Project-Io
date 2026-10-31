@@ -2032,6 +2032,19 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         if (oit != w.peace_offers.end() && oit->second.offerer == other)
         {
             const peace_terms t = oit->second.terms;
+            // STALE TERMS ARE REFUSED FIRST. accept_peace re-validates and refuses
+            // terms that no longer hold (a ceded goal re-taken, a holder moved), but
+            // it leaves the offer standing - and the offerer skips a war while its own
+            // offer stands - so a stale offer would freeze the war until someone
+            // reached 100. Refusing clears it, and either side may offer again.
+            if (check_peace_terms(w, war, t) != war_result::applied)
+            {
+                const corp_command cmd = war_cmd(nation, tick, corp_verb::refuse_peace, other, {});
+                const bool ok = apply_corp_command(w, reg, cmd) == corp_command_result::applied;
+                war_trace(tick, nation, other, war_ai_choice::refuse, 0.0f, 0, 0, 0, 0, 0,
+                          static_cast<int>(t.provinces.size()), ok);
+                continue;
+            }
             float stake = 0.0f;
             if (t.kind == peace_kind::cession)
                 stake = (t.gainer == nation ? 1.0f : -1.0f) * static_cast<float>(t.provinces.size());
@@ -2114,11 +2127,23 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         {
             const std::vector<uint32_t> goals(pf.their_provs.begin(),
                                               pf.their_provs.begin() + static_cast<std::ptrdiff_t>(k));
+            // The MOTIVE first, and cheaply: the sentiment test needs no price, and
+            // when it fails only the justification rows are read (war_justifications
+            // skips the price's bordering walk over every tile). The price is taken
+            // only for a candidate with a motive. NOT a `break` on failure: LOST
+            // GROUND reads the goals themselves (a goal the declarer once ceded to
+            // the target), so a larger goal set can hold a justification the
+            // smaller one lacks. Grievance, embargo and a friend attacked do not
+            // depend on the goals.
+            if (g + a < k_war_ai_min_motive)
+            {
+                const auto j = war_justifications(w, sp, nation, target, goals);
+                if (std::none_of(j.begin(), j.end(), [](bool b) { return b; }))
+                    continue; // no motive at this goal count
+            }
             const war_price price = declaration_price(w, sp, nation, target, goals);
             if (!price.valid)
                 continue;
-            if (g + a < k_war_ai_min_motive && !price.justified)
-                break; // no motive: nothing to weigh
             const float p = (base_trust < 0.0f && others > 0)
                                 ? price.sum_trust / (base_trust * static_cast<float>(others)) : 0.0f;
             const float u = k_war_ai_w_grievance * g + k_war_ai_w_alarm * a - k_war_ai_w_warmth * warm
