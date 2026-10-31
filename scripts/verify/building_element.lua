@@ -31,46 +31,71 @@ verify.show_panel("build",        false)
 -- readout. Passive infrastructure (the port) produces nothing, and the check exists
 -- to prove it says so rather than printing a hollow "0.0 Iron Ore / tick" off the
 -- default target — which is exactly what the first cut of this panel did.
--- The seeded player corporation owns a single Port and no producing building, so
--- the producing case has to be built rather than found. build_first_valid places an
--- extraction site on the first valid tile and selects it; the ticks after it let the
--- building finish construction and appear in the economy report, which is what the
--- output lead and the rate bar read.
--- Construction is material-gated (BL-095): a site draws build materials from its
--- LOCAL market each tick and stays paused forever while that market is dry. So the
--- tile is chosen, not taken from build_first_valid's global first hit — (154,37)
--- sits in the worked cluster around the rival extraction + processing sites at
--- (155,36)/(156,37), whose output is what makes that market able to supply a build.
--- Tile data is deliberately not exposed to Lua (standing rule), so the script cannot
--- ask which tiles carry iron. It sweeps the neighbourhood of the rival cluster
--- instead and takes the first tile that accepts the placement.
+-- The player's nation may own no producing building to find, so the producing case
+-- is built rather than found; the ticks after it let the building finish
+-- construction and appear in the economy report, which is what the output lead and
+-- the rate bar read.
+--
+-- THE PICK IS THE PLAYER'S OWN GROUND (BL-1457, building element stale aim). It used
+-- to sweep a 7x7 box around (155,37), the rival cluster of an older generation; once
+-- generation moved and BL-1399 kept a nation to its own ground, every tile there
+-- answered invalid_tile or foreign_ground and the script errored. The verify API names
+-- no tile's owner, by design, so the pick asks the SURFACE that already answers
+-- "where may the player build this?": the site finder, whose rows are exactly the
+-- tiles the build door accepts an Iron Mine on (own ground, tech, road, stack,
+-- province ceiling, treasury). Its rows are read in drawn order (profit, ties by tile
+-- id), deterministic for a seed, and they follow the player's ground wherever
+-- generation moves it. The same idiom as construction_progress.lua.
+verify.show_panel("build", true)
+verify.frames(1)
+local picked_ok = verify.site_pick("Iron Mine")
+verify.frames(3)
+local sites = verify.site_finder()
+print(string.format("building_element: site finder armed=%s, %d Iron Mine site(s) of %d own tile(s)",
+                    tostring(picked_ok), sites.n_rows or 0, sites.own_tiles or 0))
+if not (picked_ok and (sites.n_rows or 0) > 0) then
+    error("building_element.lua: the site finder lists no player ground for an Iron Mine")
+end
+verify.site_clear()
+verify.show_panel("build", false)
+verify.frames(2)
+
 verify.place_mode("extraction", "iron_ore")
-
 local placed = nil
-for dx = -3, 3 do
-    for dy = -3, 3 do
-        local r = verify.build_at(155 + dx, 37 + dy)
-        if r == "placed" then
-            placed = true
-            break
-        end
+local refusals = "" -- in row order (the verify state opens no `table` library)
+for i = 1, sites.n_rows do
+    local row = sites.rows[i]
+    local r = verify.build_at(row.x, row.y)
+    if r == "placed" then
+        placed = row
+        break
     end
-    if placed then break end
+    refusals = refusals .. string.format("%s(%d,%d)=%s", refusals == "" and "" or ", ", row.x, row.y, r)
 end
-
 if not placed then
-    error("building_element.lua: no valid iron tile near the rival cluster")
+    error("building_element.lua: no site-finder row accepted the placement: " .. refusals)
 end
+print(string.format("building_element: placed an Iron Mine at (%d,%d)", placed.x, placed.y))
 
 verify.econ_step(40) -- finish the build, then produce for a few ticks
 
+-- The building WE placed: the player's Extraction Site on the placed tile, not
+-- whichever player Extraction Site the list happens to end on.
 local built = nil
 for _, b in ipairs(verify.buildings()) do
-    if b.player and b.type == "Extraction Site" then built = b end
+    if b.player and b.type == "Extraction Site" and b.x == placed.x and b.y == placed.y then
+        built = b
+        break
+    end
 end
 if built == nil then
-    error("building_element.lua: the placed extraction site did not register")
+    error(string.format("building_element.lua: the extraction site placed at (%d,%d) did not register",
+                        placed.x, placed.y))
 end
+-- A site still under construction after 40 economy steps (its local market dry of build
+-- materials, BL-095) captures as a site, not as a producing building: say so.
+print(string.format("building_element: the site at (%d,%d) is %s after 40 economy steps", placed.x, placed.y,
+                    built.complete and "complete" or "STILL UNDER CONSTRUCTION"))
 
 -- Producing building: the primary shape of the element.
 verify.center_tile(built.x, built.y)
