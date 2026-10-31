@@ -188,7 +188,7 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 ### NR-1103 — An answered war can never reach a score of 100
 *question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
 
-The occupation half divides held goals by ALL goals named. Once the defender answers with its own goals, neither side can reach +-100: holding every enemy goal while losing none reads 83 in the harness (P1e), and the defender tops out lower still (P1f: -67). So the defender can never impose, and the declarer can impose only while the war is unanswered.
+The occupation half divides held goals by ALL goals named. Once the defender answers with its own goals, neither side can reach +-100: holding every enemy goal while losing none reads 83 in the harness (P1e), and the defender tops out lower still (P1f: -67). So the defender can never impose, and the declarer can impose only while the war is unanswered. A cold review (2026-10-31) adds: the defender's score is bounded above -100 in EVERY war, since the declarer always names a goal, so the defender can never impose at all; and the battles half needs the imposer to lose almost nothing.
 
 **Why it matters.** Impose at 100 (NR-1101 C) silently becomes declarer-only, and answering a war makes it unwinnable by force. Work: BL-1428 (war goals and peace).
 
@@ -232,7 +232,7 @@ declare_war now writes the hostility row, and a bare declare_hostile between war
 ### NR-1106 — Four war calls the lane took
 *decision taken on your behalf · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
 
-(1) A province belongs, for goal validity and cession, to the plurality of tile_to_nation over its tiles, ties to the lower id; province_holder is only the military holder. (2) A right-click attack on a stack standing off the defender's ground takes the defender's capital province as the first goal. (3) Justifications are pair-measure rows in war.cpp in the condition grammar (measure, comparator, operand), not condition_subject entries, which measure one actor; promoting them with a counterparty qualifier would change the save layout. (4) Exhaustion's field days are counted once a quarter from where units stand then.
+(1) A province belongs, for goal validity and cession, to the plurality of tile_to_nation over its tiles, ties to the lower id; province_holder is only the military holder. (2) A right-click attack on a stack standing off the defender's ground takes the defender's capital province as the first goal. (3) Justifications are pair-measure rows in war.cpp in the condition grammar (measure, comparator, operand), not condition_subject entries, which measure one actor; promoting them with a counterparty qualifier would change the save layout. (4) Exhaustion's field days are counted once a quarter from where units stand then. Cold review (2026-10-31): (4) deviates from RELATIONS § 7 ("each day in the field") and is being fixed to a daily accumulation, so it drops out of this list.
 
 **Why it matters.** (2) means a declaration can name a capital the player never pointed at; (3) leaves a second predicate grammar beside META_LAYER.md.
 
