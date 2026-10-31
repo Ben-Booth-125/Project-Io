@@ -1,4 +1,5 @@
 #include "economy_system.hpp"
+#include "war.hpp" // BL-1428: note_war_battles, run_war_quarter
 #include "logistic_points.hpp"
 
 #include "input_reach.hpp"     // recipe_inputs_obtainable (BL-1206 recipe rescue gate)
@@ -3495,6 +3496,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     phase_stamp(10); // (the battle phase is daily now: run_military_day)
     phase_stamp(11); // (recovery and the march are daily now: run_military_day)
 
+    // BL-1428 (RELATIONS.md § 7): the wars' quarter — field days and held provinces
+    // raise exhaustion, a nation at peace sheds it, expired truces go, the morale
+    // ceiling holds. A no-op with no wars, residual or truces.
+    run_war_quarter(w);
+
     // BL-454: the unit pass — goods draw, the decay rule, orphan cleanup. LAST,
     // deliberately: the strategic tier above demolishes at tick rate, so running
     // after it means a muster base torn down THIS tick orphans its units in the
@@ -4917,6 +4923,10 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     // may end and release them).
     const std::set<entity_id> fought = units_in_live_battles(w);
     out.battles = run_battles(w, reg, day_tick);
+    // BL-1428 (RELATIONS.md § 7): today's battles between war parties feed the war's
+    // battles score and each side's exhaustion, and exhaustion's morale ceiling.
+    // A no-op with no wars.
+    note_war_battles(w, out.battles);
     // THE CARRIED SUPPLIES' DAY (BL-1452; MILITARY.md § Carried supplies): after the
     // rounds that read the stocks, drain and refill them at the unit's road share, and
     // starve a unit with no food - before the disband, so a unit starvation takes to

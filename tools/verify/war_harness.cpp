@@ -170,6 +170,12 @@ float access_of(const world& w, entity_id o, entity_id s) { return sentiment_tow
 
 } // namespace
 
+// The ACTIONS.json entries name these numbers (corp_verb is append-only).
+static_assert(static_cast<int>(corp_verb::declare_war) == 47 && static_cast<int>(corp_verb::answer_war) == 48
+                  && static_cast<int>(corp_verb::offer_peace) == 49 && static_cast<int>(corp_verb::accept_peace) == 50
+                  && static_cast<int>(corp_verb::refuse_peace) == 51 && static_cast<int>(corp_verb::impose_peace) == 52,
+              "the war verbs' values as ACTIONS.json names them");
+
 int main()
 {
     std::printf("=== war (BL-1459, BL-1428) ===\n");
@@ -486,6 +492,344 @@ int main()
         check(apply_corp_command(w, reg, c) == corp_command_result::applied
                   && war_between(w, f.A, f.B)->declarer_goals.front() == target && is_hostile(w, f.A, f.B),
               "R5c the declare opens a war whose first goal is the attacked tile's province");
+    }
+
+    // =====================================================================
+    std::printf("\nP-R1 - the war score\n");
+    {
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> dg = { f.provs[f.B][0], f.provs[f.B][1] };
+        const std::vector<uint32_t> fg = { f.provs[f.A][0] };
+        (void)declare_war(w, sp, f.A, f.B, dg);
+        (void)answer_war(w, f.B, f.A, fg);
+        const auto score = [&] { return war_score(w, *war_between(w, f.A, f.B)); };
+        const auto tiles = [&](uint32_t p) { return static_cast<double>(w.provinces.find(p)->tiles.size()); };
+        check(score() == 0, "P1a a fresh war scores 0 (no goal held, no battle)");
+        w.province_holder[holder_index(w, dg[0])] = f.A;
+        const double total = tiles(dg[0]) + tiles(dg[1]) + tiles(fg[0]);
+        const int want1 = static_cast<int>(std::llround(50.0 * tiles(dg[0]) / total));
+        check(score() == want1, "P1b the declarer holding one goal scores 50 x its tiles over all goals' tiles ("
+                                    + std::to_string(want1) + ")");
+        w.province_holder[holder_index(w, fg[0])] = f.B;
+        const int want2 = static_cast<int>(std::llround(50.0 * (tiles(dg[0]) - tiles(fg[0])) / total));
+        check(score() == want2, "P1c the defender holding its goal subtracts its tiles (" + std::to_string(want2) + ")");
+        war_record& rec = w.wars.at({ f.A, f.B });
+        rec.declarer_men_lost = 100; rec.defender_men_lost = 300;
+        const int want3 = static_cast<int>(std::llround(50.0 * (tiles(dg[0]) - tiles(fg[0])) / total + 50.0 * 200.0 / 400.0));
+        check(score() == want3, "P1d battles: the declarer's share of strength destroyed less the defender's, half the score ("
+                                    + std::to_string(want3) + ")");
+        // THE FORMULA AS WRITTEN (RELATIONS.md § 7): the denominator is EVERY goal named,
+        // so once the defender has answered, holding all of one's own goals is not the
+        // whole occupation half — neither side can reach +-100 in an answered war. Raised
+        // in the BL-1428 report as a design question; asserted here as the formula reads.
+        w.province_holder[holder_index(w, dg[1])] = f.A;
+        w.province_holder[holder_index(w, fg[0])] = f.A; // A also keeps its own province
+        rec.declarer_men_lost = 0;
+        const int want5 = static_cast<int>(std::llround(50.0 * (tiles(dg[0]) + tiles(dg[1])) / total + 50.0));
+        check(score() == want5 && want5 < 100,
+              "P1e answered war: every declarer goal held, only defender losses scores 50 x its goals' share + 50 ("
+                  + std::to_string(want5) + "), short of 100");
+        w.province_holder[holder_index(w, dg[0])] = f.B; w.province_holder[holder_index(w, dg[1])] = f.B;
+        w.province_holder[holder_index(w, fg[0])] = f.B;
+        rec.declarer_men_lost = 500; rec.defender_men_lost = 0;
+        const int want6 = static_cast<int>(std::llround(-50.0 * tiles(fg[0]) / total - 50.0));
+        check(score() == want6 && want6 > -100,
+              "P1f the mirror: the defender holding its goal, only declarer losses (" + std::to_string(want6) + ")");
+        {
+            // An unanswered war: the declarer's goals are every goal named, so +100 is reachable.
+            fixture g; build(g);
+            const std::vector<uint32_t> gg = { g.provs[g.B][0], g.provs[g.B][1] };
+            (void)declare_war(g.w, sp, g.A, g.B, gg);
+            for (const uint32_t p : gg) g.w.province_holder[holder_index(g.w, p)] = g.A;
+            g.w.wars.at({ g.A, g.B }).defender_men_lost = 10;
+            check(war_score(g.w, *war_between(g.w, g.A, g.B)) == 100,
+                  "P1h unanswered: every goal held and only defender losses scores +100");
+        }
+        bool in_range = true;
+        for (int dl : { 0, 1, 7, 1000 }) for (int fl : { 0, 3, 999 })
+        {
+            rec.declarer_men_lost = dl; rec.defender_men_lost = fl;
+            const int s = score();
+            in_range = in_range && s >= -100 && s <= 100;
+        }
+        check(in_range, "P1g the score stays in [-100, 100]");
+    }
+
+    // =====================================================================
+    std::printf("\nP-R2 - exhaustion and morale\n");
+    {
+        fixture f; build(f);
+        world& w = f.w;
+        (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+        const auto unit = [&](entity_id owner, entity_id tile, int men) {
+            const entity_id u = w.create_entity();
+            unit_component uc{}; uc.position = tile; uc.owner = owner; uc.count = men; uc.establishment = men;
+            w.units[u] = uc;
+            return u;
+        };
+        const entity_id home_tile  = w.provinces.find(f.provs[f.A][1])->tiles.front();
+        const entity_id enemy_tile = w.provinces.find(f.provs[f.B][2])->tiles.front();
+        const entity_id ua = unit(f.A, home_tile, 900);
+        const entity_id ub = unit(f.B, w.provinces.find(f.provs[f.B][1])->tiles.front(), 1000);
+        // Strength lost: a dispatch of a battle between the pair.
+        battle_tick bt;
+        battle_dispatch d; d.attacker = f.A; d.defender = f.B; d.attacker_men_lost = 100; d.defender_men_lost = 0;
+        bt.dispatches.push_back(d);
+        note_war_battles(w, bt);
+        war_record* rec = &w.wars.at({ f.A, f.B });
+        const float want = k_war_exhaustion_loss_full * 100.0f / (900.0f + 100.0f);
+        check(rec->declarer_men_lost == 100 && std::fabs(rec->declarer_exhaustion - want) < 1e-4f
+                  && rec->defender_exhaustion == 0.0f,
+              "P2a strength lost raises its side's exhaustion (60 x 100 lost / 1000 standing-plus-lost = 6) and only its side's");
+        // A battle between nations not at war with each other moves nothing.
+        battle_tick other; battle_dispatch od = d; od.attacker = f.C; od.defender = f.D; other.dispatches.push_back(od);
+        const snap s0 = take(w);
+        note_war_battles(w, other);
+        check(same(s0, w), "P2b a battle between nations not at war moves no war");
+        // Field days: one of A's two units stands on B's ground for a quarter.
+        const float e0 = rec->declarer_exhaustion;
+        const entity_id ua2 = unit(f.A, enemy_tile, 100);
+        run_war_quarter(w);
+        rec = &w.wars.at({ f.A, f.B });
+        const float field = k_war_exhaustion_per_field_day * 90.0f * 0.5f; // half its units abroad
+        check(std::fabs(rec->declarer_exhaustion - (e0 + field)) < 1e-3f && rec->defender_exhaustion == 0.0f,
+              "P2c each day in the field raises exhaustion (0.1 a day x 90 days x half the force abroad = 4.5)");
+        // Provinces the enemy holds.
+        w.province_holder[holder_index(w, f.provs[f.B][3])] = f.A;
+        const float e1 = rec->defender_exhaustion;
+        w.units.erase(ua2);
+        run_war_quarter(w);
+        rec = &w.wars.at({ f.A, f.B });
+        check(std::fabs(rec->defender_exhaustion - (e1 + k_war_exhaustion_per_held_province)) < 1e-4f,
+              "P2d each of its provinces the enemy holds raises the owner's exhaustion (2 a quarter)");
+        // Morale: the ceiling follows exhaustion.
+        rec->declarer_exhaustion = 40.0f;
+        w.units.at(ua).morale_permille = 1000; w.units.at(ua).readiness_permille = 1000;
+        apply_war_morale_ceiling(w);
+        check(war_morale_ceiling(w, f.A) == 800 && w.units.at(ua).morale_permille == 800
+                  && w.units.at(ua).readiness_permille == 800
+                  && w.units.at(ub).morale_permille == war_morale_ceiling(w, f.B)
+                  && war_morale_ceiling(w, f.B) == 1000 - static_cast<int>(rec->defender_exhaustion * 5.0f + 0.5f),
+              "P2e exhaustion moves morale: 40 exhaustion caps the nation's units at 800, readiness under it; the other side by its own");
+        // Out-of-contact recovery does not lift morale back above the ceiling.
+        w.units.at(ua).morale_permille = 500; w.units.at(ua).readiness_permille = 500;
+        for (int day = 0; day < 90; ++day) recover_out_of_contact(w);
+        check(w.units.at(ua).morale_permille == 800 && w.units.at(ua).readiness_permille == 800 && !recovery_pending(w),
+              "P2f daily recovery climbs no higher than the ceiling (" + std::to_string(w.units.at(ua).morale_permille) + ")");
+        // Exhaustion stays in [0, 100].
+        rec->declarer_exhaustion = 99.0f;
+        battle_tick big; battle_dispatch bd = d; bd.attacker_men_lost = 100000; big.dispatches.push_back(bd);
+        note_war_battles(w, big);
+        rec = &w.wars.at({ f.A, f.B });
+        check(rec->declarer_exhaustion == 100.0f, "P2g exhaustion saturates at 100");
+        // Decay at peace: the residual carries out and falls while at peace.
+        rec->declarer_exhaustion = 40.0f;
+        check(offer_peace(w, f.A, f.B, peace_terms{}) == war_result::applied
+                  && accept_peace(w, sp, f.B, f.A) == war_result::applied,
+              "P2h (a white peace closes the war)");
+        const float r0 = w.war_exhaustion_residual.count(f.A) ? w.war_exhaustion_residual.at(f.A) : -1.0f;
+        run_war_quarter(w);
+        const float r1 = w.war_exhaustion_residual.count(f.A) ? w.war_exhaustion_residual.at(f.A) : -1.0f;
+        check(r0 == 40.0f && std::fabs(r1 - 40.0f * (1.0f - k_war_exhaustion_decay)) < 1e-4f,
+              "P2i at peace the nation's exhaustion carries out of the war and decays (40 -> 30 a quarter)");
+        for (int q = 0; q < 40; ++q) run_war_quarter(w);
+        check(w.war_exhaustion_residual.count(f.A) == 0 && war_morale_ceiling(w, f.A) == 1000,
+              "P2j and is gone in time, the morale ceiling back at 1000");
+        // A nation still at war does not shed its residual.
+        w.war_exhaustion_residual[f.C] = 20.0f;
+        w.current_econ_tick += 100; // past every truce
+        (void)declare_war(w, sp, f.C, f.D, { f.provs[f.D][0] });
+        run_war_quarter(w);
+        check(w.war_exhaustion_residual.at(f.C) == 20.0f, "P2k a nation in an open war keeps its residual");
+    }
+
+    // =====================================================================
+    std::printf("\nP-R3 - offers, cession, impose, truce, the peace factors\n");
+    {
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> dg = { f.provs[f.B][0], f.provs[f.B][1], f.provs[f.B][2] };
+        (void)declare_war(w, sp, f.A, f.B, dg);
+        (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+        const auto key = std::make_pair(f.A, f.B);
+        peace_terms white;
+        peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.A; cede.provinces = { dg[0] };
+
+        snap s = take(w);
+        check(offer_peace(w, f.A, f.B, cede) == war_result::rejected_state && same(s, w),
+              "P3a a cession of a goal the receiver does not hold is refused, mutating nothing");
+        w.province_holder[holder_index(w, dg[0])] = f.A;
+        peace_terms nongoal = cede; nongoal.provinces = { f.provs[f.B][3] };
+        w.province_holder[holder_index(w, f.provs[f.B][3])] = f.A;
+        s = take(w);
+        check(offer_peace(w, f.A, f.B, nongoal) == war_result::rejected_state && same(s, w),
+              "P3b a cession of a held province that is not a goal is refused, mutating nothing");
+        peace_terms badshape = white; badshape.provinces = { dg[0] };
+        check(offer_peace(w, f.A, f.B, badshape) == war_result::rejected_invalid && same(s, w),
+              "P3c white peace naming a province is refused, mutating nothing");
+        check(offer_peace(w, f.A, f.C, white) == war_result::rejected_state && same(s, w),
+              "P3d an offer with no war between the pair is refused, mutating nothing");
+        check(offer_peace(w, f.A, f.B, cede) == war_result::applied && w.peace_offers.count(key) == 1
+                  && at_war(w, f.A, f.B),
+              "P3e a legal offer files in its own table; a pending offer is not a peace");
+        s = take(w);
+        check(offer_peace(w, f.B, f.A, white) == war_result::rejected_state && same(s, w),
+              "P3f one pending offer per war: a second (from either side) is refused, mutating nothing");
+        check(accept_peace(w, sp, f.A, f.B) == war_result::rejected_state && same(s, w),
+              "P3g the offerer cannot accept its own offer, mutating nothing");
+        check(refuse_peace(w, f.B, f.A) == war_result::applied && w.peace_offers.empty() && at_war(w, f.A, f.B),
+              "P3h refusing erases the offer; the war goes on");
+        // Cession accepted.
+        check(offer_peace(w, f.A, f.B, cede) == war_result::applied, "P3i (re-offer the cession)");
+        const float trust_ab = trust_of(w, f.A, f.B), trust_ba = trust_of(w, f.B, f.A);
+        const float acc_ba = access_of(w, f.B, f.A);
+        w.current_econ_tick = 20;
+        check(accept_peace(w, sp, f.B, f.A) == war_result::applied, "P3j the receiver accepts the cession");
+        check(!at_war(w, f.A, f.B) && !is_hostile(w, f.A, f.B) && !is_hostile(w, f.B, f.A)
+                  && w.peace_offers.empty() && w.war_history.size() == 1
+                  && w.war_history.back().end == war_end::cession && w.war_history.back().gainer == f.A
+                  && w.war_history.back().ceded == std::vector<uint32_t>({ dg[0] }),
+              "P3k at peace both hostility rows clear and the record closes into the history");
+        check(w.province_cessions.size() == 1 && w.province_cessions[0].from == f.B && w.province_cessions[0].to == f.A
+                  && w.province_cessions[0].province == dg[0]
+                  && province_holder_for(w, dg[0]) == f.A && province_owner(w, dg[0]) == f.B,
+              "P3l the cession stub records the ceded province and keeps its holder; tile_to_nation is BL-1460's (still B's)");
+        check(trust_of(w, f.A, f.B) - trust_ab == 4.0f
+                  && trust_of(w, f.B, f.A) - trust_ba == 4.0f - 6.0f
+                  && access_of(w, f.B, f.A) - acc_ba == -6.0f,
+              "P3m peace_concluded warms both rows; province_ceded lands on the loser's row toward the winner (x provinces ceded)");
+        check(truce_between(w, f.A, f.B) && w.truces.at(canonical_pair(f.A, f.B)) == 20 + k_war_truce_ticks,
+              "P3n a truce of 16 ticks stands");
+        s = take(w);
+        check(declare_war(w, sp, f.A, f.B, { dg[1] }) == war_result::rejected_state
+                  && declare_war(w, sp, f.B, f.A, { f.provs[f.A][2] }) == war_result::rejected_state && same(s, w),
+              "P3o the truce refuses declare_war either way, mutating nothing");
+        w.current_econ_tick = 20 + k_war_truce_ticks - 1;
+        check(declare_war(w, sp, f.B, f.A, { f.provs[f.A][2] }) == war_result::rejected_state,
+              "P3p ...through its fifteenth tick");
+        w.current_econ_tick = 20 + k_war_truce_ticks;
+        // The lost ground the loser can now name.
+        const auto j = war_justifications(w, sp, f.B, f.A, { dg[0] });
+        check(j[2], "P3q the ceded province is LOST GROUND for the loser (a goal it ceded to the declarer's target)");
+    }
+    {
+        // White peace hands the occupied goals back.
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> dg = { f.provs[f.B][0] };
+        (void)declare_war(w, sp, f.A, f.B, dg);
+        (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+        w.province_holder[holder_index(w, dg[0])] = f.A;
+        w.province_holder[holder_index(w, f.provs[f.A][0])] = f.B;
+        check(offer_peace(w, f.B, f.A, peace_terms{}) == war_result::applied
+                  && accept_peace(w, sp, f.A, f.B) == war_result::applied
+                  && province_holder_for(w, dg[0]) == f.B && province_holder_for(w, f.provs[f.A][0]) == f.A
+                  && w.province_cessions.empty() && w.war_history.back().end == war_end::white_peace,
+              "P3r a white peace changes no hands: every occupied goal's holder returns to its owner");
+    }
+    {
+        // Impose at 100, and only at 100.
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> dg = { f.provs[f.B][0], f.provs[f.B][1] };
+        (void)declare_war(w, sp, f.A, f.B, dg);
+        peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.A; cede.provinces = dg;
+        w.province_holder[holder_index(w, dg[0])] = f.A;
+        w.wars.at({ f.A, f.B }).defender_men_lost = 50;
+        snap s = take(w);
+        check(war_score(w, *war_between(w, f.A, f.B)) < 100
+                  && impose_peace(w, sp, f.A, f.B, peace_terms{}) == war_result::rejected_state && same(s, w),
+              "P3s below 100 the declarer cannot impose, mutating nothing");
+        w.province_holder[holder_index(w, dg[1])] = f.A;
+        s = take(w);
+        check(war_score(w, *war_between(w, f.A, f.B)) == 100
+                  && impose_peace(w, sp, f.B, f.A, peace_terms{}) == war_result::rejected_state && same(s, w),
+              "P3t at +100 the DEFENDER cannot impose, mutating nothing");
+        check(impose_peace(w, sp, f.A, f.B, cede) == war_result::applied && !at_war(w, f.A, f.B)
+                  && w.war_history.back().end == war_end::imposed_cession && w.war_history.back().final_score == 100
+                  && w.province_cessions.size() == 2,
+              "P3u at +100 the declarer imposes its cession without acceptance");
+    }
+    {
+        // Never the loser's last province.
+        fixture f; build(f);
+        world& w = f.w;
+        // Give all but one of B's provinces to C on the territorial map, leaving B one.
+        const std::vector<uint32_t> bp = f.provs[f.B];
+        for (std::size_t i = 1; i < bp.size(); ++i)
+            for (const entity_id t : w.provinces.find(bp[i])->tiles) w.set_tile_nation(t, f.C);
+        (void)declare_war(w, sp, f.A, f.B, { bp[0] });
+        w.province_holder[holder_index(w, bp[0])] = f.A;
+        w.wars.at({ f.A, f.B }).defender_men_lost = 10;
+        peace_terms cede; cede.kind = peace_kind::cession; cede.gainer = f.A; cede.provinces = { bp[0] };
+        const snap s = take(w);
+        check(war_score(w, *war_between(w, f.A, f.B)) == 100
+                  && offer_peace(w, f.A, f.B, cede) == war_result::rejected_state
+                  && impose_peace(w, sp, f.A, f.B, cede) == war_result::rejected_state && same(s, w),
+              "P3v a cession of the loser's last province is refused, offered or imposed, mutating nothing (NR-1102)");
+    }
+
+    // =====================================================================
+    std::printf("\nP-R4 - saved, and through the seam\n");
+    {
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> dg = { f.provs[f.B][0] };
+        (void)declare_war(w, sp, f.A, f.B, dg);
+        w.province_holder[holder_index(w, dg[0])] = f.A;
+        w.wars.at({ f.A, f.B }).declarer_exhaustion = 17.5f;
+        w.wars.at({ f.A, f.B }).defender_men_lost = 40;
+        const snap s = take(w);
+        corp_command bad = war_cmd(corp_verb::offer_peace, f.A, f.B, { dg[0] }, 3);
+        check(apply_corp_command(w, reg, bad) == corp_command_result::rejected_invalid && same(s, w),
+              "R4a terms byte 3 is refused whole, mutating nothing");
+        check(apply_corp_command(w, reg, war_cmd(corp_verb::offer_peace, f.A, f.B, { dg[0] }, 0))
+                      == corp_command_result::rejected_invalid && same(s, w),
+              "R4b white peace naming a province is refused whole, mutating nothing");
+        check(apply_corp_command(w, reg, war_cmd(corp_verb::offer_peace, f.A, f.B, {}, 1))
+                      == corp_command_result::rejected_invalid && same(s, w),
+              "R4c a cession naming nothing is refused whole, mutating nothing");
+        check(apply_corp_command(w, reg, war_cmd(corp_verb::accept_peace, f.B, f.A, {}))
+                      == corp_command_result::rejected_state && same(s, w),
+              "R4d accepting an offer nobody made is refused, mutating nothing");
+        check(apply_corp_command(w, reg, war_cmd(corp_verb::offer_peace, f.A, f.B, { dg[0] }, 1))
+                      == corp_command_result::applied && w.peace_offers.size() == 1,
+              "R4e a cession offer applies through the seam");
+        w.truces[canonical_pair(f.C, f.D)] = 30;
+        w.war_exhaustion_residual[f.D] = 9.0f;
+        const std::string b = to_bytes(w);
+        world back;
+        check(from_bytes(b, back) && to_bytes(back) == b && back.state_hash(0) == w.state_hash(0)
+                  && back.peace_offers.size() == 1 && back.wars.at({ f.A, f.B }).declarer_exhaustion == 17.5f
+                  && back.wars.at({ f.A, f.B }).defender_men_lost == 40
+                  && war_score(back, back.wars.at({ f.A, f.B })) == war_score(w, w.wars.at({ f.A, f.B })),
+              "R4f offers, truces, the score's inputs and exhaustion round-trip the snapshot");
+        check(apply_corp_command(w, reg, war_cmd(corp_verb::refuse_peace, f.B, f.A, {})) == corp_command_result::applied
+                  && w.peace_offers.empty(),
+              "R4g refuse_peace applies through the seam");
+        w.wars.at({ f.A, f.B }).declarer_men_lost = 40; // battles even: the score is 50
+        check(apply_corp_command(w, reg, war_cmd(corp_verb::impose_peace, f.A, f.B, {}, 0))
+                      == corp_command_result::rejected_state,
+              "R4h impose_peace short of 100 is refused through the seam");
+        check(apply_corp_command(w, reg, war_cmd(corp_verb::offer_peace, f.B, f.A, {}, 0)) == corp_command_result::applied
+                  && apply_corp_command(w, reg, war_cmd(corp_verb::accept_peace, f.A, f.B, {})) == corp_command_result::applied
+                  && !at_war(w, f.A, f.B) && w.war_history.size() == 1,
+              "R4i a white offer and its acceptance conclude the peace through the seam");
+        // A corrupt offer (terms byte 7) is refused on load.
+        (void)declare_war(w, sp, f.C, f.E, { f.provs[f.E][0] });
+        (void)offer_peace(w, f.C, f.E, peace_terms{});
+        const std::string b2 = to_bytes(w);
+        std::string bad2 = b2;
+        // The offer sits after the war count + one war record + the truce table.
+        const war_record& wr = w.wars.begin()->second;
+        const std::size_t off = b2.size() - world_save_war_section_bytes(w) + 4
+                              + (4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 * wr.declarer_goals.size() + 4 + 4 * wr.defender_goals.size())
+                              + 4 + 12 * w.truces.size() + 4 + 4 + 4 + 4 + 4; // to the kind byte
+        bad2[off] = 7;
+        world untouched;
+        check(w.wars.size() == 1 && !from_bytes(bad2, untouched) && untouched.nations.empty(),
+              "R4j a corrupt peace offer (kind byte 7) is refused whole on load");
     }
 
     // =====================================================================

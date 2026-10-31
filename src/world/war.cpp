@@ -398,14 +398,437 @@ war_result answer_war(world& w, entity_id defender, entity_id declarer,
     return war_result::applied;
 }
 
+
 // ---------------------------------------------------------------------------
-// Peace — W3 (BL-1428) fills these; until then the seam refuses every peace verb.
+// War score, exhaustion and morale (BL-1428)
 // ---------------------------------------------------------------------------
 
-war_result offer_peace(world&, entity_id, entity_id, const peace_terms&) { return war_result::rejected_state; }
-war_result accept_peace(world&, const sentiment_params&, entity_id, entity_id) { return war_result::rejected_state; }
-war_result refuse_peace(world&, entity_id, entity_id) { return war_result::rejected_state; }
-war_result impose_peace(world&, const sentiment_params&, entity_id, entity_id, const peace_terms&)
+int war_score(const world& w, const war_record& war)
 {
-    return war_result::rejected_state;
+    // Occupation: tile-weighted goals held, the declarer's less the defender's, over
+    // every goal named. A goal an in-play merge has removed weighs nothing.
+    int64_t total = 0, dec_held = 0, def_held = 0;
+    for (const uint32_t g : war.declarer_goals)
+        if (const province* pr = w.provinces.find(g))
+        {
+            const int64_t n = static_cast<int64_t>(pr->tiles.size());
+            total += n;
+            if (province_holder_for(w, g) == war.declarer)
+                dec_held += n;
+        }
+    for (const uint32_t g : war.defender_goals)
+        if (const province* pr = w.provinces.find(g))
+        {
+            const int64_t n = static_cast<int64_t>(pr->tiles.size());
+            total += n;
+            if (province_holder_for(w, g) == war.defender)
+                def_held += n;
+        }
+    const double occupation =
+        total > 0 ? static_cast<double>(dec_held - def_held) / static_cast<double>(total) : 0.0;
+    // Battles: the strength each side destroyed — the other side's men lost.
+    const int64_t lost = war.declarer_men_lost + war.defender_men_lost;
+    const double battles =
+        lost > 0 ? static_cast<double>(war.defender_men_lost - war.declarer_men_lost)
+                       / static_cast<double>(lost)
+                 : 0.0;
+    const long long s = std::llround(50.0 * occupation + 50.0 * battles);
+    return static_cast<int>(std::clamp<long long>(s, -100, 100));
+}
+
+float nation_war_exhaustion(const world& w, entity_id nation)
+{
+    float e = 0.0f;
+    if (const auto it = w.war_exhaustion_residual.find(nation); it != w.war_exhaustion_residual.end())
+        e = it->second;
+    for (const auto& [key, war] : w.wars)
+    {
+        if (war.declarer == nation) e = std::max(e, war.declarer_exhaustion);
+        if (war.defender == nation) e = std::max(e, war.defender_exhaustion);
+    }
+    return std::clamp(e, 0.0f, 100.0f);
+}
+
+int war_morale_ceiling(const world& w, entity_id nation)
+{
+    const float e = nation_war_exhaustion(w, nation);
+    const int drop = static_cast<int>(e * static_cast<float>(k_war_morale_per_exhaustion) + 0.5f);
+    return std::clamp(1000 - drop, 0, 1000);
+}
+
+namespace
+{
+/// Every nation whose exhaustion lowers its morale ceiling, with that ceiling.
+std::map<entity_id, int> morale_ceilings(const world& w)
+{
+    std::map<entity_id, int> out;
+    if (w.wars.empty() && w.war_exhaustion_residual.empty())
+        return out;
+    std::set<entity_id> parties;
+    for (const auto& [key, war] : w.wars) { parties.insert(war.declarer); parties.insert(war.defender); }
+    for (const auto& [n, v] : w.war_exhaustion_residual) parties.insert(n);
+    for (const entity_id n : parties)
+        if (const int c = war_morale_ceiling(w, n); c < 1000)
+            out.emplace(n, c);
+    return out;
+}
+
+float add_exhaustion(float e, float d) { return std::clamp(e + d, 0.0f, 100.0f); }
+} // namespace
+
+void apply_war_morale_ceiling(world& w)
+{
+    const std::map<entity_id, int> ceil = morale_ceilings(w);
+    if (ceil.empty())
+        return;
+    // Each unit's write reads only itself and its nation's ceiling, so the walk
+    // order over the unordered unit store cannot reach the result.
+    for (auto& [uid, u] : w.units)
+    {
+        const auto it = ceil.find(u.owner);
+        if (it == ceil.end())
+            continue;
+        u.morale_permille    = std::min(u.morale_permille, it->second);
+        u.readiness_permille = std::min(u.readiness_permille, u.morale_permille);
+    }
+}
+
+void note_war_battles(world& w, const battle_tick& battles)
+{
+    if (w.wars.empty() || battles.dispatches.empty())
+        return;
+    // Men standing per nation, read once (after the day's rounds, before the
+    // disband): the denominator of the loss share.
+    std::map<entity_id, int64_t> standing;
+    bool counted = false;
+    const auto men_of = [&](entity_id n) {
+        if (!counted)
+        {
+            for (const auto& [uid, u] : w.units) // integer sums: order-free
+                if (u.count > 0) standing[u.owner] += u.count;
+            counted = true;
+        }
+        const auto it = standing.find(n);
+        return it == standing.end() ? int64_t{0} : it->second;
+    };
+    const auto exhaust = [&](float& e, entity_id n, int lost) {
+        if (lost <= 0) return;
+        const double share = static_cast<double>(lost) / static_cast<double>(men_of(n) + lost);
+        e = add_exhaustion(e, static_cast<float>(k_war_exhaustion_loss_full * share));
+    };
+    bool any = false;
+    for (const battle_dispatch& d : battles.dispatches) // battle order: sorted
+    {
+        war_record* war = find_war_mut(w, d.attacker, d.defender);
+        if (war == nullptr)
+            continue;
+        any = true;
+        const bool att_is_dec = d.attacker == war->declarer;
+        const int dec_lost = att_is_dec ? d.attacker_men_lost : d.defender_men_lost;
+        const int def_lost = att_is_dec ? d.defender_men_lost : d.attacker_men_lost;
+        war->declarer_men_lost += std::max(0, dec_lost);
+        war->defender_men_lost += std::max(0, def_lost);
+        exhaust(war->declarer_exhaustion, war->declarer, dec_lost);
+        exhaust(war->defender_exhaustion, war->defender, def_lost);
+    }
+    if (any)
+        apply_war_morale_ceiling(w);
+}
+
+void run_war_quarter(world& w)
+{
+    // Expired truces go (a truce stands while current_econ_tick < expiry, so the
+    // read is the same whenever this runs).
+    for (auto it = w.truces.begin(); it != w.truces.end();)
+        it = (w.current_econ_tick >= it->second) ? w.truces.erase(it) : std::next(it);
+
+    if (!w.wars.empty())
+    {
+        // Units per nation and, per war, each party's units in the field: standing
+        // on the other party's ground, or fighting it in a live battle.
+        std::map<std::pair<entity_id, entity_id>, std::set<entity_id>> fighting; // (owner, enemy) -> units
+        for (const active_battle& b : w.battles)
+        {
+            for (const entity_id u : b.attacker_units) fighting[{ b.attacker, b.defender }].insert(u);
+            for (const entity_id u : b.defender_units) fighting[{ b.defender, b.attacker }].insert(u);
+        }
+        std::map<entity_id, int> units_of;
+        for (const auto& [uid, u] : w.units)
+            if (u.count > 0) ++units_of[u.owner];
+        const auto field_share = [&](entity_id n, entity_id enemy) {
+            const auto tot = units_of.find(n);
+            if (tot == units_of.end() || tot->second <= 0)
+                return 0.0f;
+            const auto fit = fighting.find({ n, enemy });
+            int in_field = 0;
+            for (const auto& [uid, u] : w.units)
+            {
+                if (u.owner != n || u.count <= 0)
+                    continue;
+                const auto tn = w.tile_to_nation.find(u.position);
+                const bool abroad = tn != w.tile_to_nation.end() && tn->second == enemy;
+                const bool fights = fit != fighting.end() && fit->second.count(uid) != 0;
+                if (abroad || fights)
+                    ++in_field;
+            }
+            return static_cast<float>(in_field) / static_cast<float>(tot->second);
+        };
+
+        // Provinces each party owns that the other holds: walk the holders once.
+        std::map<std::pair<entity_id, entity_id>, int> held; // (owner, holder) -> provinces
+        std::set<entity_id> at_war_nations;
+        for (const auto& [key, war] : w.wars) { at_war_nations.insert(war.declarer); at_war_nations.insert(war.defender); }
+        for (std::size_t i = 0; i < w.provinces.provinces.size() && i < w.province_holder.size(); ++i)
+        {
+            const entity_id holder = w.province_holder[i];
+            if (holder == null_entity || at_war_nations.count(holder) == 0)
+                continue;
+            const entity_id owner = province_owner(w, w.provinces.provinces[i].id);
+            if (owner != null_entity && owner != holder)
+                ++held[{ owner, holder }];
+        }
+        const auto held_by = [&](entity_id owner, entity_id holder) {
+            const auto it = held.find({ owner, holder });
+            return it == held.end() ? 0 : it->second;
+        };
+
+        const float quarter_days = static_cast<float>(k_construction_quarter_days);
+        for (auto& [key, war] : w.wars) // ascending (declarer, defender)
+        {
+            war.declarer_exhaustion = add_exhaustion(
+                war.declarer_exhaustion,
+                k_war_exhaustion_per_field_day * quarter_days * field_share(war.declarer, war.defender)
+                    + k_war_exhaustion_per_held_province * static_cast<float>(held_by(war.declarer, war.defender)));
+            war.defender_exhaustion = add_exhaustion(
+                war.defender_exhaustion,
+                k_war_exhaustion_per_field_day * quarter_days * field_share(war.defender, war.declarer)
+                    + k_war_exhaustion_per_held_province * static_cast<float>(held_by(war.defender, war.declarer)));
+        }
+    }
+
+    // A nation in no open war sheds its residual.
+    for (auto it = w.war_exhaustion_residual.begin(); it != w.war_exhaustion_residual.end();)
+    {
+        bool fighting_now = false;
+        for (const auto& [key, war] : w.wars)
+            if (war.declarer == it->first || war.defender == it->first) { fighting_now = true; break; }
+        if (!fighting_now)
+            it->second *= (1.0f - k_war_exhaustion_decay);
+        it = (it->second < k_war_exhaustion_epsilon) ? w.war_exhaustion_residual.erase(it) : std::next(it);
+    }
+
+    apply_war_morale_ceiling(w);
+}
+
+// ---------------------------------------------------------------------------
+// Peace (BL-1428)
+// ---------------------------------------------------------------------------
+
+namespace
+{
+std::pair<entity_id, entity_id> war_key(const war_record& war) { return { war.declarer, war.defender }; }
+
+/// Land provinces @p nation owns (politically), counted over the provinces its
+/// tiles touch.
+std::size_t provinces_owned(const world& w, entity_id nation)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return 0;
+    std::set<uint32_t> touched;
+    for (const entity_id t : nit->second.tiles)
+        if (const uint32_t p = w.provinces.province_of(t); p != 0)
+            touched.insert(p);
+    std::size_t n = 0;
+    for (const uint32_t p : touched)
+        if (province_kind_of(w, p) == province_kind::land && province_owner(w, p) == nation)
+            ++n;
+    return n;
+}
+
+void set_holder(world& w, uint32_t pid, entity_id holder)
+{
+    const auto& v = w.provinces.provinces;
+    const auto it = std::lower_bound(v.begin(), v.end(), pid,
+                                     [](const province& p, uint32_t x) { return p.id < x; });
+    if (it == v.end() || it->id != pid)
+        return;
+    const std::size_t i = static_cast<std::size_t>(it - v.begin());
+    if (i < w.province_holder.size())
+        w.province_holder[i] = holder;
+}
+
+/// Closes the war under @p key on @p terms (already validated). One mutation.
+void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, entity_id> key,
+                    const peace_terms& terms, bool imposed)
+{
+    const war_record war = w.wars.at(key);
+    war_history_entry h;
+    h.declarer    = war.declarer;
+    h.defender    = war.defender;
+    h.opened_tick = war.opened_tick;
+    h.closed_tick = w.current_econ_tick;
+    h.final_score = war_score(w, war);
+
+    std::vector<sentiment_event> events;
+    events.push_back(sentiment_event{ war.declarer, war.defender, sentiment_factor_kind::peace_concluded, 1.0f });
+    events.push_back(sentiment_event{ war.defender, war.declarer, sentiment_factor_kind::peace_concluded, 1.0f });
+
+    if (terms.kind == peace_kind::cession)
+    {
+        const entity_id loser = terms.gainer == war.declarer ? war.defender : war.declarer;
+        cede_provinces(w, loser, terms.gainer, terms.provinces);
+        h.end    = imposed ? war_end::imposed_cession : war_end::cession;
+        h.gainer = terms.gainer;
+        h.ceded  = terms.provinces;
+        events.push_back(sentiment_event{ loser, terms.gainer, sentiment_factor_kind::province_ceded,
+                                          static_cast<float>(terms.provinces.size()) });
+    }
+    else
+    {
+        // White peace: every occupied goal's holder goes back to its owner.
+        // TODO(BL-1460, cession moves territory): the occupying units withdraw by the
+        // retreat rule; for now they stay where they stand.
+        for (const std::vector<uint32_t>* goals : { &war.declarer_goals, &war.defender_goals })
+            for (const uint32_t g : *goals)
+            {
+                const entity_id owner = province_owner(w, g);
+                if (owner != null_entity && province_holder_for(w, g) != owner)
+                    set_holder(w, g, owner);
+            }
+        h.end = imposed ? war_end::imposed_white : war_end::white_peace;
+    }
+
+    // Both hostility rows clear; the record closes; the offer goes; a truce opens.
+    w.corp_hostile_pairs.erase({ war.declarer, war.defender });
+    w.corp_hostile_pairs.erase({ war.defender, war.declarer });
+    for (const auto& [n, e] : { std::make_pair(war.declarer, war.declarer_exhaustion),
+                                std::make_pair(war.defender, war.defender_exhaustion) })
+        if (e >= k_war_exhaustion_epsilon)
+        {
+            float& r = w.war_exhaustion_residual[n];
+            r = std::max(r, e);
+        }
+    w.war_history.push_back(std::move(h));
+    w.peace_offers.erase(key);
+    w.wars.erase(key);
+    w.truces[canonical_pair(war.declarer, war.defender)] = w.current_econ_tick + k_war_truce_ticks;
+    apply_sentiment_events(w.sentiment, p, events);
+}
+
+war_result pair_check(const world& w, entity_id a, entity_id b)
+{
+    if (a == b || !is_nation(w, a) || !is_nation(w, b))
+        return war_result::rejected_invalid;
+    if (!at_war(w, a, b))
+        return war_result::rejected_state;
+    return war_result::applied;
+}
+} // namespace
+
+war_result check_peace_terms(const world& w, const war_record& war, const peace_terms& terms)
+{
+    if (terms.kind == peace_kind::white)
+        return (terms.gainer == null_entity && terms.provinces.empty()) ? war_result::applied
+                                                                        : war_result::rejected_invalid;
+    if (terms.kind != peace_kind::cession)
+        return war_result::rejected_invalid;
+    if (terms.gainer != war.declarer && terms.gainer != war.defender)
+        return war_result::rejected_invalid;
+    if (terms.provinces.empty() || terms.provinces.size() > k_war_goals_max)
+        return war_result::rejected_invalid;
+    bool distinct = true;
+    if (sorted_goals(terms.provinces, distinct) != terms.provinces || !distinct)
+        return war_result::rejected_invalid; // ascending, distinct
+    const entity_id loser = terms.gainer == war.declarer ? war.defender : war.declarer;
+    const std::vector<uint32_t>& goals =
+        terms.gainer == war.declarer ? war.declarer_goals : war.defender_goals;
+    for (const uint32_t pid : terms.provinces)
+    {
+        if (std::find(goals.begin(), goals.end(), pid) == goals.end())
+            return war_result::rejected_state; // only goals
+        if (province_holder_for(w, pid) != terms.gainer)
+            return war_result::rejected_state; // only held ones
+        if (province_owner(w, pid) != loser)
+            return war_result::rejected_state; // still the loser's to cede
+    }
+    // Never the loser's last province (Ben, 2026-10-30, NR-1102).
+    if (provinces_owned(w, loser) <= terms.provinces.size())
+        return war_result::rejected_state;
+    return war_result::applied;
+}
+
+war_result offer_peace(world& w, entity_id offerer, entity_id other, const peace_terms& terms)
+{
+    if (const war_result r = pair_check(w, offerer, other); r != war_result::applied)
+        return r;
+    const war_record& war = *war_between(w, offerer, other);
+    const auto key = war_key(war);
+    if (w.peace_offers.count(key) != 0)
+        return war_result::rejected_state; // one pending offer per war
+    if (const war_result r = check_peace_terms(w, war, terms); r != war_result::applied)
+        return r;
+    peace_offer o;
+    o.offerer      = offerer;
+    o.terms        = terms;
+    o.offered_tick = w.current_econ_tick;
+    w.peace_offers.emplace(key, std::move(o));
+    return war_result::applied;
+}
+
+war_result accept_peace(world& w, const sentiment_params& p, entity_id receiver, entity_id offerer)
+{
+    if (const war_result r = pair_check(w, receiver, offerer); r != war_result::applied)
+        return r;
+    const auto key = war_key(*war_between(w, receiver, offerer));
+    const auto oit = w.peace_offers.find(key);
+    if (oit == w.peace_offers.end() || oit->second.offerer != offerer)
+        return war_result::rejected_state;
+    const peace_terms terms = oit->second.terms;
+    if (check_peace_terms(w, w.wars.at(key), terms) != war_result::applied)
+        return war_result::rejected_state; // the terms no longer hold; the offer stays
+    conclude_peace(w, p, key, terms, false);
+    return war_result::applied;
+}
+
+war_result refuse_peace(world& w, entity_id receiver, entity_id offerer)
+{
+    if (const war_result r = pair_check(w, receiver, offerer); r != war_result::applied)
+        return r;
+    const auto key = war_key(*war_between(w, receiver, offerer));
+    const auto oit = w.peace_offers.find(key);
+    if (oit == w.peace_offers.end() || oit->second.offerer != offerer)
+        return war_result::rejected_state;
+    w.peace_offers.erase(oit);
+    return war_result::applied;
+}
+
+war_result impose_peace(world& w, const sentiment_params& p, entity_id imposer, entity_id other,
+                        const peace_terms& terms)
+{
+    if (const war_result r = pair_check(w, imposer, other); r != war_result::applied)
+        return r;
+    const war_record& war = *war_between(w, imposer, other);
+    const int score = war_score(w, war);
+    const bool won = imposer == war.declarer ? score >= 100 : score <= -100;
+    if (const war_result r = check_peace_terms(w, war, terms); r != war_result::applied)
+        return r;
+    if (!won)
+        return war_result::rejected_state;
+    conclude_peace(w, p, war_key(war), terms, true);
+    return war_result::applied;
+}
+
+void cede_provinces(world& w, entity_id from, entity_id to, const std::vector<uint32_t>& provinces)
+{
+    // THE STUB (BL-1460, cession moves territory, fills it in wave 2). Today a
+    // cession moves only the military holder — already `to` for a legal cession —
+    // and records the cession for the LOST GROUND justification. `tile_to_nation`
+    // is deliberately NOT moved here: the ground changing nation (buildings,
+    // centres, law, roads, fronts, the capital) is BL-1460's.
+    for (const uint32_t pid : provinces)
+    {
+        set_holder(w, pid, to);
+        w.province_cessions.push_back(province_cession{ from, to, pid, w.current_econ_tick });
+    }
 }
