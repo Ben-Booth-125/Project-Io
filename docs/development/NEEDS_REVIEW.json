@@ -593,6 +593,46 @@
     "docs/politics/RELATIONS.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1116",
+   "title": "An embargo is a verb and a pair, not a law record",
+   "raised": "2026-10-31",
+   "kind": "question",
+   "status": "open",
+   "source": "Lane E report, sprint 61 (BL-1418 embargo bars goods), 2026-10-31",
+   "what": "RELATIONS § 3 says an embargo's author is a law (the relationship family). No law verb could carry it, so the lane added one verb, set_embargo (author, target, enact or repeal), stored as an (author, embargoed) pair set and saved at v70. Nothing is a law record with a law_effect_kind. Refused cargo is destroyed at the border (it was bought and hauled at dispatch), and dispatch itself now refuses an embargoed shipment so a standing trade does not buy goods to burn each tick.",
+   "why_it_matters": "Either the doc sentence changes to match, or the embargo is re-housed as a law (and then the Diplomacy ledger's Embargo press becomes a law press). The ledger is being built against set_embargo.",
+   "options": [
+    "A: keep the verb; RELATIONS § 3 says the author is the nation, enacted by set_embargo",
+    "B: re-house as a law record with a law_effect_kind, enacted through the law verb"
+   ],
+   "recommendation": "A. A pair set is the legible form; nothing else in the law family reads it.",
+   "files": [
+    "src/world/embargo.cpp",
+    "docs/politics/RELATIONS.md"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1117",
+   "title": "May rival nations embargo?",
+   "raised": "2026-10-31",
+   "kind": "question",
+   "status": "open",
+   "source": "Lane E report, sprint 61 (BL-1418 embargo bars goods), 2026-10-31",
+   "what": "set_embargo exists and the player can press it; no scorer issues it, so rivals never embargo. Letting them would be a new subject under the AI-behaviour prohibition (a relation, not an action on own ground), so it is raised, not assumed.",
+   "why_it_matters": "Without it, embargo_imposed only ever names the player as author, and the embargo justification for war only ever fires against the player.",
+   "options": [
+    "A: grant - a rival may enact or repeal an embargo against a nation, scored over its own sentiment, Alarm and trade exposure, on the standing terms",
+    "B: not now; embargo stays the player's"
+   ],
+   "recommendation": "A, as a dated grant in AI_OPPONENT § 11, built with BL-1461 (rivals declare war) since it shares the scorer.",
+   "files": [
+    "src/world/corp_ai.cpp",
+    "docs/ai/AI_OPPONENT.md"
+   ],
+   "resolution": null
   }
  ]
 }

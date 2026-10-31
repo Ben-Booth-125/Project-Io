@@ -709,6 +709,28 @@
    ],
    "title": "Seed 32 opens a consumer on the map's top row that no Logistic Point can connect",
    "design": "Found by Lane G, sprint 61 (2026-10-31): lp_coverage_census's new UC rule (no unconnectable consumers, BL-1420) fails on seed 32 only - building 82511 of Thuzi Thuthal at (141,0), the top row, counted unconnectable; present already at fe811118. Either Logistic Point source placement cannot reach the top row (a fix) or a top-row consumer is placed where nothing can serve it (fix the placement). Do not exempt the row. Check: lp_coverage_census on all 16 library seeds."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-31",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 delivery, from Lane E, 2026-10-31)",
+   "requires": [],
+   "id": "BL-1469",
+   "short_name": "CONVOY_COMMAND_LP_FIXTURE",
+   "category": "Logistics",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "priority": "B",
+   "difficulty": 1,
+   "files": [
+    "tools/verify/convoy_command.cpp"
+   ],
+   "title": "convoy_command fails on main: its fixture hub stands where cover is zero",
+   "design": "Found by Lane E, sprint 61 (2026-10-31): convoy_command fails R0.5, R0.12, R1.14, R3.1, R4.1 on main, each refused for Logistic Points. Its lp_fixture hub stands one tile off the source centre; on a roadless grid that tile gets cover 0. Put the hub where the fixture means it (on the source centre, as embargo_harness does) and confirm each row then tests what it names; never loosen an assertion. Check: convoy_command all rows."
   }
  ]
 }
