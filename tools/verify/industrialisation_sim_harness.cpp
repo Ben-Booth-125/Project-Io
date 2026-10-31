@@ -4292,9 +4292,12 @@ int main(int argc, char** argv)
                 "     Industrialisation's and do not exist.\n\n");
 
     // ---- 13 -----------------------------------------------------------------
-    std::printf("[13] Catastrophe lean - n/a: it splits worlds by world war (reading 11 is n/a) and reads\n"
-                "     aggregate Alarm against Ceiling, and the campaign world seeds neither a per-nation Alarm\n"
-                "     nor a Ceiling.\n\n");
+    // BL-1432: renamed from "Catastrophe lean" - the Era catastrophe retired and Alarm
+    // became a third sentiment dimension (RELATIONS.md section 6).
+    std::printf("[13] Alarm lean - n/a: it splits worlds by world war (reading 11 is n/a), and Alarm\n"
+                "     is a sentiment dimension the campaign accumulates from conduct (RELATIONS.md\n"
+                "     section 6) - a generated world opens with none (generation seeds no Alarm\n"
+                "     and the settle writes no conduct), and there is no Ceiling.\n\n");
 
     // ---- SUMMARY (BL-1029: the states are computed, not hand-typed) ----------
     {

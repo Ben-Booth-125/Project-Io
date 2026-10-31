@@ -72,6 +72,14 @@ enum class stance_result : uint8_t
 /// or `from` is already hostile toward `to`.
 stance_result declare_hostile(world& w, entity_id from, entity_id to);
 
+/// THE HOSTILITY WRITE, UNCHECKED (BL-1459): `declare_hostile`'s mutation alone —
+/// insert `from`'s directed row toward `to`, dissolve the friendship row between
+/// them and withdraw any pending offer either way (invariant 2). For a caller that
+/// has ALREADY validated the pair and must write hostility as one part of a larger
+/// atomic mutation: `declare_war` and `answer_war` (war.cpp). Idempotent on an
+/// existing row. Every other caller uses `declare_hostile`.
+void write_hostility(world& w, entity_id from, entity_id to);
+
 /// Offers friendship from `offerer` to `target`. Records a PENDING offer only —
 /// not a stance (invariant 1); nothing reads this as friendship until accepted.
 /// Rejects if `offerer == target`, either corp is unknown, the pair is already
@@ -93,5 +101,7 @@ stance_result accept_friendship(world& w, entity_id offerer, entity_id target);
 /// rule. Also withdraws any pending offer between the two, in either
 /// direction, since a corp returning to neutral should not leave a stale offer
 /// live. Rejects (`rejected_state`, mutating nothing) if none of the above
-/// existed to clear.
+/// existed to clear. BL-1459 (RELATIONS.md § 7, "a war ends only in peace"):
+/// also rejects (`rejected_state`, mutating nothing) while a war stands between
+/// the pair, in either direction.
 stance_result return_to_neutral(world& w, entity_id corp, entity_id counterparty);

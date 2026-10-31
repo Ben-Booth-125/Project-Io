@@ -1,5 +1,6 @@
 #include "header_panel.hpp"
 
+#include "corporation_dashboard.hpp" // BL-1415: nation_operating_net
 #include "format.hpp"
 #include "presentation.hpp"
 #include "text_fit.hpp"
@@ -23,20 +24,35 @@ float player_treasury(const world& w)
     return p != nullptr ? *p : 0.0f;
 }
 
-/// The last economy tick's net change to the player nation's treasury, read from
-/// the nation's own row of the state ledger (`world::state_ledger`: the treasury
-/// as the funding gate opened the tick, and as the budget settled it). False when
-/// the nation holds no row this tick — no state industry ran — so the caller falls
-/// back to the treasury series.
+/// The last economy tick's OPERATING net for the player nation — BL-1415 (Ben,
+/// 2026-10-26, NR-1002 B): the Balance card's own "Net this quarter", read
+/// through `nation_operating_net`, so the strip and the card agree. Refunds (the
+/// seat's cancelled construction credited back) and flat construction are not
+/// operating flows; the treasury's close-less-open would fold both in. False
+/// when the nation holds no state-ledger row this tick — no state industry ran —
+/// so the caller falls back to the treasury series.
 bool ledger_net(const world& w, float& net)
 {
     const entity_id nation = player_nation(w);
     if (nation == null_entity) // BL-1407: every world is the nations'
         return false;
+    return nation_operating_net(w, nation, net);
+}
+
+/// The last economy tick's actual TREASURY MOVEMENT for the player nation — its
+/// state-ledger row's close less open, construction and refunds included. The
+/// RUNWAY reads this, not the operating NET: "how long the treasury lasts at the
+/// current burn" is about cash, and a nation building at +10 operating while
+/// construction takes 200 a quarter is burning (BL-1415 review). False with no row.
+bool ledger_burn(const world& w, float& movement)
+{
+    const entity_id nation = player_nation(w);
+    if (nation == null_entity)
+        return false;
     const auto it = w.state_ledger.find(nation);
     if (it == w.state_ledger.end())
         return false;
-    net = it->second.treasury_close - it->second.treasury_open;
+    movement = it->second.treasury_close - it->second.treasury_open;
     return true;
 }
 
@@ -105,11 +121,19 @@ void draw_header_panel(const world& w,
     const float treasury  = player_treasury(w);
     const float valuation = player_cargo_value(w);
 
-    // Last-tick net change: the nation's own state-ledger row (close less open);
+    // Last-tick operating net: the Balance card's net (BL-1415, refunds excluded);
     // with no row this tick, the most recent step of the treasury series.
+    const float series_step = balance_history.size() >= 2
+                                  ? balance_history.back() - balance_history[balance_history.size() - 2]
+                                  : 0.0f;
     float net = 0.0f;
-    if (!ledger_net(w, net) && balance_history.size() >= 2)
-        net = balance_history.back() - balance_history[balance_history.size() - 2];
+    if (!ledger_net(w, net))
+        net = series_step;
+    // The runway's burn: the treasury's own movement (close less open), never the
+    // operating NET — construction spends cash the operating figure leaves out.
+    float burn = 0.0f;
+    if (!ledger_burn(w, burn))
+        burn = series_step;
 
     // Guaranteed-fit strip (LAYOUT.md container vocabulary): the strip never wraps
     // to a second line. The three treasury/cargo/net figures are bounded-length
@@ -133,10 +157,10 @@ void draw_header_panel(const world& w,
     std::string runway_text;
     std::string runway_tip;
     bool        runway_urgent = false;
-    const bool  runway_meaningful = net < 0.0f;
+    const bool  runway_meaningful = burn < 0.0f;
     if (runway_meaningful)
     {
-        const int quarters = static_cast<int>(std::max(0.0f, treasury) / -net);
+        const int quarters = static_cast<int>(std::max(0.0f, treasury) / -burn);
         char      buf[32];
         std::snprintf(buf, sizeof(buf), "%dq", quarters);
         runway_text = buf;
@@ -145,16 +169,16 @@ void draw_header_panel(const world& w,
         char tip[320];
         if (subsidies > 0.0f)
             std::snprintf(tip, sizeof(tip),
-                          "About %d quarters of cushion: treasury divided by the current\n"
-                          "quarterly loss. Assumes the burn holds steady - it moves as\n"
+                          "About %d quarters of cushion: treasury divided by how far it fell\n"
+                          "last quarter, construction included. Assumes the burn holds steady - it moves as\n"
                           "prices, wages and upkeep change. Includes Cr %.0f of contract\n"
                           "income this quarter - a one-off payment, not a steady rate.\n"
                           "When the treasury runs out, a losing building idles.",
                           quarters, static_cast<double>(subsidies));
         else
             std::snprintf(tip, sizeof(tip),
-                          "About %d quarters of cushion: treasury divided by the current\n"
-                          "quarterly loss. Assumes the burn holds steady - it moves as\n"
+                          "About %d quarters of cushion: treasury divided by how far it fell\n"
+                          "last quarter, construction included. Assumes the burn holds steady - it moves as\n"
                           "prices, wages and upkeep change.\n"
                           "When the treasury runs out, a losing building idles.", quarters);
         runway_tip = tip;

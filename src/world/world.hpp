@@ -12,6 +12,7 @@
 #include "province.hpp"     // province_partition (BL-466 province partition, below)
 #include "sentiment.hpp"    // sentiment_table (BL-545 relational substrate, below)
 #include "space_assets.hpp" // space_asset (BL-1327: nations' space assets, below)
+#include "war.hpp"          // war_record, peace_offer (BL-1459/BL-1428 wars, below)
 
 #include <atomic>
 #include <cstdint>
@@ -1122,6 +1123,27 @@ struct world
     /// is a sorted walk over ids (BL-158).
     sentiment_table sentiment;
 
+    /// BL-1458 (RELATIONS.md § Who emits each factor): conduct observed since
+    /// the last fold, gathered by every emitter (`sentiment_emitters.hpp`) and
+    /// folded ONCE a tick, as one canonicalised batch, at the end of
+    /// `run_economy_step`. Conduct between ticks (a battle day, an accepted
+    /// friendship) waits here for that fold, so the queue crosses the save seam
+    /// (world_save_version 68). Gather order is never observable: the fold
+    /// sorts the batch before it folds it.
+    std::vector<sentiment_event> sentiment_pending;
+
+    /// BL-1458: the value of cargo landed this tick per (shipper nation,
+    /// receiving nation) — a convoy's owner nation and its destination
+    /// market's nation, foreign pairs only. Turned into one `trade_conducted`
+    /// per party per pair at the fold, then cleared. Saved (v68).
+    std::map<std::pair<entity_id, entity_id>, float> sentiment_trade_landed;
+
+    /// BL-1432: each (shipper, receiver) pair's trade streak across folds, so a
+    /// pair whose trade STOPPED can be told from one whose convoys merely missed
+    /// a tick (`trade_severed`'s window, `sentiment_trade_streak`). Only pairs
+    /// with something to remember are held. Saved (v68).
+    std::map<std::pair<entity_id, entity_id>, sentiment_trade_streak> sentiment_trade_streaks;
+
     /// BL-350's Q3 counterparty reputation, as a VIEW rather than a store
     /// (BL-546). Reputation IS sentiment's Trust dimension from the BUYER
     /// toward the SUPPLIER — directed, keyed exactly as `corp_reputation` was,
@@ -1184,6 +1206,33 @@ struct world
     /// must never be readable as a friendship by any consumer that only
     /// checks the friendship table.
     std::set<std::pair<entity_id, entity_id>> corp_friend_offers;
+
+    /// WARS (BL-1459, BL-1428; RELATIONS.md § 7). war.hpp owns the meaning. One
+    /// open war per pair, keyed (declarer, defender); `war_between` looks it up in
+    /// either direction. A `std::map`, so every walk is ascending (declarer, defender).
+    /// Saved (world_save_version 69) and folded into `state_hash` when non-empty.
+    std::map<std::pair<entity_id, entity_id>, war_record> wars;
+
+    /// Truces, keyed canonical (min id, max id) -> the econ tick the truce
+    /// expires: it stands while `current_econ_tick < expiry`. A truce bars either
+    /// party declaring on the other. Saved (v69).
+    std::map<std::pair<entity_id, entity_id>, int32_t> truces;
+
+    /// The one pending peace offer a war may carry, keyed by the war's key
+    /// (declarer, defender). A pending offer is not a peace (the friendship-offer
+    /// precedent, § 1). Saved (v69).
+    std::map<std::pair<entity_id, entity_id>, peace_offer> peace_offers;
+
+    /// Closed wars, in close order — the record a peace closes into. Saved (v69).
+    std::vector<war_history_entry> war_history;
+
+    /// Provinces ceded at a peace, in cession order — what the LOST GROUND
+    /// justification reads. Saved (v69).
+    std::vector<province_cession> province_cessions;
+
+    /// A nation's exhaustion carried out of its closed wars, decaying while it is
+    /// in no open war (war.hpp § nation_war_exhaustion). Absent = 0. Saved (v69).
+    std::map<entity_id, float> war_exhaustion_residual;
 
     /// Strategic AI decision log (BL-202): a fixed 256-entry ring of the most
     /// recent corp commands + score rationale, in deterministic application

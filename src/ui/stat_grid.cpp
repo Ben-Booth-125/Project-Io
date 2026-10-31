@@ -357,6 +357,10 @@ bool unit_seen_by_player(const world& w, entity_id unit)
         return false;
     if (is_player_side(w, it->second.owner))
         return true;
+    // Revealed by recon: the last air day's reveal set (world::air_revealed, BL-1449) -
+    // the player's air superiority or a recon wing over the unit's province.
+    if (const entity_id me = player_nation(w); me != null_entity && w.air_revealed.count({me, unit}) != 0)
+        return true;
     for (const active_battle& b : w.battles)
     {
         const bool att = std::binary_search(b.attacker_units.begin(), b.attacker_units.end(), unit);

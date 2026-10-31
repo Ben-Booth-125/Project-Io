@@ -1199,10 +1199,23 @@ void recipe_registry::load_from_lua(lua_state& lua)
                                                   sp.access_decay_per_tick, "economy.sentiment");
         sp.trust_decay_per_tick  = read_unit_rate(*sentiment_tbl, "trust_decay_per_tick",
                                                   sp.trust_decay_per_tick,  "economy.sentiment");
+        // BL-1432: Alarm's rate, validated the same way (finite, in [0, 1]).
+        sp.alarm_decay_per_tick  = read_unit_rate(*sentiment_tbl, "alarm_decay_per_tick",
+                                                  sp.alarm_decay_per_tick,  "economy.sentiment");
         sp.neutral_epsilon       = sentiment_tbl->get_or("neutral_epsilon",       sp.neutral_epsilon);
         sp.limit                 = sentiment_tbl->get_or("limit",                 sp.limit);
         sp.band_edge_near        = sentiment_tbl->get_or("band_edge_near",        sp.band_edge_near);
         sp.band_edge_far         = sentiment_tbl->get_or("band_edge_far",         sp.band_edge_far);
+        // BL-1432: the large-facility threshold, a credit figure - rejected at
+        // load unless finite and non-negative, never clamped.
+        {
+            const double v = sentiment_tbl->get_or("alarm_large_facility_cost",
+                                                   static_cast<double>(sp.alarm_large_facility_cost));
+            if (!std::isfinite(v) || v < 0.0 || v > 1.0e30)
+                throw std::runtime_error("economy.sentiment.alarm_large_facility_cost = "
+                                         + std::to_string(v) + " is not a finite cost >= 0");
+            sp.alarm_large_facility_cost = static_cast<float>(v);
+        }
 
         sol::optional<sol::table> factors = (*sentiment_tbl)["factors"];
         if (factors)
@@ -1214,6 +1227,29 @@ void recipe_registry::load_from_lua(lua_state& lua)
                     continue;
                 sp.factors[i].access = row->get_or("access", sp.factors[i].access);
                 sp.factors[i].trust  = row->get_or("trust",  sp.factors[i].trust);
+                sp.factors[i].alarm  = row->get_or("alarm",  sp.factors[i].alarm); // BL-1432
+                // BL-1432: a factor emitted EVERY TICK (Alarm's capability factors)
+                // is authored as the Alarm it SETTLES AT per unit of magnitude, and
+                // its per-tick weight derived here as level x alarm_decay_per_tick:
+                // decay-then-fold has v = v(1 - r) + r L as its fixed point v = L, so
+                // retuning the decay keeps the authored level true. Rejected unless
+                // finite; authoring both keys on one row is refused as ambiguous.
+                const sol::object settles = (*row)["alarm_settles_at"];
+                if (settles.valid() && settles.get_type() != sol::type::lua_nil)
+                {
+                    const std::string at = std::string("economy.sentiment.factors.")
+                                         + sentiment_factor_names[i] + ".alarm_settles_at";
+                    if (settles.get_type() != sol::type::number)
+                        throw std::runtime_error(at + " is not a number");
+                    const double level = settles.as<double>();
+                    if (!std::isfinite(level) || std::fabs(level) > 1.0e6)
+                        throw std::runtime_error(at + " = " + std::to_string(level)
+                                                 + " is not a finite Alarm level");
+                    const sol::object direct = (*row)["alarm"];
+                    if (direct.valid() && direct.get_type() != sol::type::lua_nil)
+                        throw std::runtime_error(at + " and .alarm are both authored");
+                    sp.factors[i].alarm = static_cast<float>(level * sp.alarm_decay_per_tick);
+                }
             }
         }
 

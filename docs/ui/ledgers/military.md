@@ -151,11 +151,11 @@ and is the one grid the unit card and the designer share, so the two cannot disa
   cross one plains tile** (`march_days_per_tile`), so fewer is faster; it carries no delta. The
   stored stats' bars use the counter's colours for HP and readiness, the card's blue for morale,
   and one colour per stock (`palette::unit_food`, `unit_ammo`, `unit_equipment`).
-- **Seen, as read today (reading, BL-1454).** "Seen" is derived, not remembered: a rival's unit is
-  seen while it stands in a live battle opposite one of the player's units (the attacker's recon
-  is spent inside that same battle). Once the battle closes it reads unseen again. A remembered
-  sighting — and recon outside a battle — would need a per-nation record in the world (open
-  question 6).
+- **Seen, as read today (reading, BL-1454).** A rival's unit is seen while it stands in a live
+  battle opposite one of the player's units, or while the last air day revealed it to the player's
+  nation (`world::air_revealed` — the player's air superiority or a recon wing over its province;
+  `../../military/MILITARY.md` § Air). Both are the present, not a memory: once the battle closes
+  or the air moves on, it reads unseen again (open question 6).
 - **On the unit group card** the grid sits between the counter and the unit rows, the group's
   means with the range beneath. A rival group's internals read "—"; its design stats are the
   means of the units seen.
@@ -226,6 +226,6 @@ and market combos). **Raise is a press, not a toggle** — it has no active stat
 4. **Where do fronts live** once BL-1427 exists — a third tab here, or the canvas only?
 5. **Manpower.** Answered (Ben, 2026-10-30): Recruit heads each theatre with its recruit pool.
 6. **Does a sighting last?** (BL-1454.) The stat grid reads a rival's design stats while its unit
-   fights one of the player's in a live battle, and "—" again once the battle ends. Should a
-   sighting be remembered — per nation, per unit or per design — and should recon outside a battle
-   (an air recon mission over the province) reveal it? Either needs a saved per-nation record.
+   fights one of the player's in a live battle or the player's air reveals it, and "—" again once
+   neither holds. Should a sighting be remembered — per nation, per unit or per design? That needs
+   a saved per-nation record.

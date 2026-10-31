@@ -89,7 +89,9 @@ bool event_order_less(const sentiment_event& a, const sentiment_event& b)
         return a.subject < b.subject;
     if (a.kind != b.kind)
         return a.kind < b.kind;
-    return a.magnitude < b.magnitude;
+    if (a.magnitude != b.magnitude)
+        return a.magnitude < b.magnitude;
+    return a.alarm_scale < b.alarm_scale;
 }
 
 /// An event the substrate will act on at all. Every rejection below mutates
@@ -104,7 +106,7 @@ bool well_formed(const sentiment_event& e)
         return false;
     if (static_cast<std::size_t>(e.kind) >= sentiment_factor_count)
         return false;
-    if (!std::isfinite(e.magnitude))
+    if (!std::isfinite(e.magnitude) || !std::isfinite(e.alarm_scale))
         return false;
     return true;
 }
@@ -119,9 +121,17 @@ sentiment_value sentiment_toward(const sentiment_table& t, entity_id observer, e
 
 void decay_sentiment(sentiment_table& t, const sentiment_params& p)
 {
+    decay_sentiment(t, p, nullptr);
+}
+
+void decay_sentiment(sentiment_table& t, const sentiment_params& p,
+                     const std::map<entity_id, float>* alarm_decay_scale)
+{
     // Nothing decays: not one line of arithmetic runs, and no row is visited.
-    if (p.access_decay_per_tick <= 0.0f && p.trust_decay_per_tick <= 0.0f)
+    if (p.access_decay_per_tick <= 0.0f && p.trust_decay_per_tick <= 0.0f
+        && p.alarm_decay_per_tick <= 0.0f)
         return;
+    const bool scaled = alarm_decay_scale != nullptr && !alarm_decay_scale->empty();
 
     // A sorted walk over (observer, subject) — `pairs` is a std::map, so this
     // is the BL-158 rule satisfied by the container choice rather than by a
@@ -131,6 +141,16 @@ void decay_sentiment(sentiment_table& t, const sentiment_params& p)
         sentiment_value& v = it->second;
         v.access = decayed(v.access, p.access_decay_per_tick, p.neutral_epsilon);
         v.trust  = decayed(v.trust, p.trust_decay_per_tick, p.neutral_epsilon);
+        // BL-1432: Alarm's own rate, times the SUBJECT's scale where one is
+        // given (a held "decays N% faster" node). `decayed` clamps above 1.
+        float alarm_rate = p.alarm_decay_per_tick;
+        if (scaled && alarm_rate > 0.0f)
+        {
+            const auto s = alarm_decay_scale->find(it->first.second);
+            if (s != alarm_decay_scale->end() && std::isfinite(s->second) && s->second > 0.0f)
+                alarm_rate *= s->second;
+        }
+        v.alarm  = decayed(v.alarm, alarm_rate, p.neutral_epsilon);
 
         // Absent == neutral, always: a row that has decayed all the way home is
         // erased rather than kept as a row of zeroes, so the table stays sparse
@@ -166,17 +186,24 @@ void apply_sentiment_events(sentiment_table& t, const sentiment_params& p,
         const sentiment_factor& f = p.factors[static_cast<std::size_t>(e.kind)];
         const float delta_access = f.access * e.magnitude;
         const float delta_trust  = f.trust * e.magnitude;
+        // BL-1432: Alarm folds by the same weight-times-magnitude, and the
+        // subject's "Alarm toward you" scale shrinks (or grows) only the Alarm
+        // an occurrence RAISES — relief is never discounted by the holder's tech.
+        float delta_alarm = f.alarm * e.magnitude;
+        if (delta_alarm > 0.0f)
+            delta_alarm *= e.alarm_scale;
 
         // A zero-weighted factor leaves NO TRACE: it must not conjure a row of
         // zeroes, which would be a state change (and a serialised one) caused by
         // an authored nothing.
-        if (delta_access == 0.0f && delta_trust == 0.0f)
+        if (delta_access == 0.0f && delta_trust == 0.0f && delta_alarm == 0.0f)
             continue;
 
         const std::pair<entity_id, entity_id> key{e.observer, e.subject};
         sentiment_value&                      v = t.pairs[key];
         v.access = saturated(v.access + delta_access, p.limit);
         v.trust  = saturated(v.trust + delta_trust, p.limit);
+        v.alarm  = saturated(v.alarm + delta_alarm, p.limit);
 
         // An event that cancels a row exactly back to neutral erases it, for
         // decay's reason: absent == neutral, with no second spelling.
@@ -231,6 +258,7 @@ void write_sentiment(const sentiment_table& t, std::ostream& out)
         write_u32(out, key.second); // subject
         write_f32(out, value.access);
         write_f32(out, value.trust);
+        write_f32(out, value.alarm); // BL-1432 (version 2)
     }
 }
 
@@ -241,8 +269,10 @@ bool read_sentiment(sentiment_table& t, std::istream& in)
         return false;
 
     uint32_t version = 0;
-    if (!read_u32(in, version) || version != sentiment_version)
+    if (!read_u32(in, version)
+        || (version != sentiment_version && version != sentiment_version_pre_alarm))
         return false;
+    const bool has_alarm = version >= sentiment_version; // BL-1432: v1 reads Alarm 0
 
     uint32_t count = 0;
     if (!read_u32(in, count) || count > sentiment_max_records)
@@ -261,6 +291,8 @@ bool read_sentiment(sentiment_table& t, std::istream& in)
         sentiment_value v;
         if (!read_f32(in, v.access) || !read_f32(in, v.trust))
             return false;
+        if (has_alarm && !read_f32(in, v.alarm))
+            return false;
 
         // The same well-formedness the fold enforces, applied to the stream:
         // a null id, a self pair or a non-finite value cannot have been written
@@ -268,7 +300,7 @@ bool read_sentiment(sentiment_table& t, std::istream& in)
         // than reinterpreted.
         if (observer == null_entity || subject == null_entity || observer == subject)
             return false;
-        if (!std::isfinite(v.access) || !std::isfinite(v.trust))
+        if (!std::isfinite(v.access) || !std::isfinite(v.trust) || !std::isfinite(v.alarm))
             return false;
         // A stored neutral row cannot exist either (absent == neutral), so one
         // in the stream is corruption by the same argument.

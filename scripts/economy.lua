@@ -1334,8 +1334,51 @@ economy = {
     sentiment = {
         trust_decay_per_tick  = 0.074125,
         access_decay_per_tick = 0.074125,
+        -- BL-1432 (RELATIONS.md § 6): Alarm, the third dimension, decays at the
+        -- same nine-quarter half-life (1 - 2^(-1/9)); there is no separate ruling
+        -- for it, so it takes the anchor the other two take.
+        alarm_decay_per_tick  = 0.074125,
+        -- BL-1432: a building whose authored build_cost reaches this is a LARGE
+        -- SINGLE-SITE FACILITY for facility_visible. 450 picks the launchpad (500)
+        -- and the airbase (450): the sites a rival cannot miss and has reason to
+        -- fear. A university (400) is not. Calibration.
+        alarm_large_facility_cost = 450.0,
+        -- Every weight below is a FIRST CUT (BL-1458 / BL-1432, 2026-10-30): small,
+        -- signed per RELATIONS.md § Who emits each factor, and calibration only.
+        -- At a 0.074 decay a factor emitted EVERY tick at weight w and magnitude m
+        -- settles at w*m/0.074; a one-off of weight w is half gone in nine ticks.
         factors = {
             contract_failed = { trust = -4.0 },
+            -- Magnitude: credits of cargo landed this tick between the pair, each
+            -- way. 0.002 a credit: a pair landing 500 a tick settles near +13.5.
+            trade_conducted     = { access = 0.002, trust = 0.002, alarm = -0.002 },
+            -- Lane W emits these from declare_war and the peace (BL-1459, BL-1428).
+            hostility_declared  = { access = -5.0, trust = -5.0, alarm = 5.0 },
+            war_declared        = { trust = -2.0, alarm = 3.0 },
+            peace_concluded     = { trust = 3.0, alarm = -3.0 },
+            province_ceded      = { access = -3.0, trust = -3.0, alarm = 3.0 }, -- per province
+            friendship_accepted = { access = 5.0, trust = 5.0, alarm = -3.0 },
+            -- No emitter: the campaign has no embargo law to enact (RELATIONS.md § 3).
+            embargo_imposed     = { access = -5.0, trust = -3.0 },
+            -- Magnitude: men the observer lost. 1000 men lost is -2 Trust, +2 Alarm.
+            force_used          = { trust = -0.002, alarm = 0.002 },
+            -- Alarm's capability factors (§ 6) are emitted EVERY TICK, so each is
+            -- authored as the Alarm it SETTLES AT per unit of magnitude
+            -- (alarm_settles_at); the loader derives the per-tick weight as that
+            -- level x alarm_decay_per_tick, so retuning the decay keeps the level.
+            -- A subject's "Alarm toward you" nodes then scale the level (x0.99 for
+            -- -1%), and its "decays N% faster" nodes divide it (x1.10 settles at
+            -- 1/1.10 of it) — both by design.
+            --   a technology's tell: per tell point (+10 settles at +10);
+            technology_visible  = { alarm_settles_at = 1.0 },
+            --   each large facility settles at +2 (the Nuclear Plant's "by 2");
+            facility_visible    = { alarm_settles_at = 2.0 },
+            --   each 1000 men on a shared front or inside the observer's ground: +1.
+            border_force        = { alarm_settles_at = 1.0 },
+            -- One-off, the tick a shipper stops landing cargo with the observer.
+            trade_severed       = { alarm = 2.0 },
+            -- Unrest has no store, so nothing emits this.
+            unrest_visible      = { alarm = 0.0 },
         },
     },
 

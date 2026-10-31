@@ -253,6 +253,43 @@ uint64_t deep_digest(const world& w, const era_minus_one_fixture& fx)
         fold_u32(h, pair.second);
         fold_f32(h, v.access);
         fold_f32(h, v.trust);
+        // BL-1432: Alarm only where it is not zero, so a world with no Alarm
+        // digests as before. Every generated world is one: generation seeds none,
+        // and the settle writes no conduct (sentiment_conduct_live).
+        if (v.alarm != 0.0f)
+            fold_f32(h, v.alarm);
+    }
+    // BL-1458 / BL-1432: the emitters' gathered conduct - the pending queue, the
+    // trade accumulator and the trade streaks - folded only when there is any, behind a tag, so the
+    // empty case (every world at the handoff: the settle gathers nothing) digests
+    // exactly as a world from before the emitters did.
+    if (!w.sentiment_pending.empty() || !w.sentiment_trade_streaks.empty()
+        || !w.sentiment_trade_landed.empty())
+    {
+        fold_u32(h, 0x53454E54u); // 'SENT'
+        fold_u32(h, static_cast<uint32_t>(w.sentiment_pending.size()));
+        for (const sentiment_event& e : w.sentiment_pending)
+        {
+            fold_u32(h, e.observer);
+            fold_u32(h, e.subject);
+            fold_u32(h, static_cast<uint32_t>(e.kind));
+            fold_f32(h, e.magnitude);
+        }
+        fold_u32(h, static_cast<uint32_t>(w.sentiment_trade_landed.size()));
+        for (const auto& [pair, v] : w.sentiment_trade_landed)
+        {
+            fold_u32(h, pair.first);
+            fold_u32(h, pair.second);
+            fold_f32(h, v);
+        }
+        fold_u32(h, static_cast<uint32_t>(w.sentiment_trade_streaks.size()));
+        for (const auto& [pair, st] : w.sentiment_trade_streaks)
+        {
+            fold_u32(h, pair.first);
+            fold_u32(h, pair.second);
+            fold_u32(h, static_cast<uint32_t>(st.traded) | (static_cast<uint32_t>(st.idle) << 8)
+                            | (st.armed ? 0x10000u : 0u));
+        }
     }
 
     // Road EDGES per tile, SPARSE (BL-1340: a road is an edge between two tiles):

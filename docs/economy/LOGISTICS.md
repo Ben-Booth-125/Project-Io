@@ -586,12 +586,23 @@ land at one end, the lower seat tile is its seat.
   already holds a network source, or whose stack is full, is passed over for the next nearest. A
   harbour one of whose ends is already the mouth of a standing port (any of its six hex sides) is
   served by that port and gets none.
+- **Every end within two steps of its port** (BL-1420, lane and port defects: a delegated reading of the two-tile ruling
+  under chaining). A chain can carry an end farther than two hex steps over the sea from the land
+  beside another end, which would leave it a dead spur on a portless coast. So the port's land is
+  taken first among the tiles whose mouths lie **within two hex steps over the sea of every end** —
+  the land beside an end, nearest the seats, then the land beside the sea within two steps of an
+  end, nearest the seats. A mouth serves an end only on the same **four-way** piece of sea, since
+  the lane walk takes the four cardinal steps and no lane crosses a sea joined only across a hex
+  diagonal. "Room" includes a holder: land no nation holds is passed over for the next candidate,
+  as a full stack is. Only where no such land has room does the nearest land beside an end
+  stand the port, and the ends it leaves beyond two steps are served as a harbour of their own, by
+  these same rules; where that harbour can stand no port, their lanes are walked on to the first.
 - **Every lane reaches its port.** An end of the harbour that is not the port's own mouth is walked
   on over the sea, by the lane walk above, to the nearest of the port's mouths, so the lane runs into
   the harbour on the map. Where the lane already passes the port's mouth, the end is a spur of at
   most two tiles beyond it, and the harbour serves it.
 - **Whose.** The nation holding that ground in the finished world, as a building of that nation on
-  its own ground. Ground no nation holds gets none and is counted; a harbour with no land beside any
+  its own ground. A harbour whose only room is ground no nation holds gets none and is counted; a harbour with no land beside any
   of its ends is open sea, gets none, and is counted.
 - **Free.** The port is history's infrastructure, as the old roads (§ 4a) and the stations the rail
   handover stands (§ 4c): it stands complete, staffed full, and no treasury pays to found it. Its

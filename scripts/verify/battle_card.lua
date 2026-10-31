@@ -39,33 +39,73 @@ for _, u in ipairs(verify.units()) do
 end
 assert(player_corp, "no player-owned unit found; cannot identify the player nation")
 
--- Pick the player's unit and the nearest rival unit.
-local mine, theirs = nil, nil
+-- Pick the NEAREST (player unit, rival unit) pair. BL-1444 (battle card march stall):
+-- this used to take the player's first unit and the FIRST rival unit in the units
+-- table, wherever it stood. On the verify world that rival stood ~150 tiles away
+-- ((250,76) -> (102,18)): the march was accepted and walked every day, but 720 days
+-- covered only ~80 tiles of it, so no contact ever came. (The older stall - a march
+-- that never left its tile - went when movement stopped drawing Logistic Points,
+-- MILITARY.md § Marching.) Hex steps on the odd-r grid, no cylinder wrap: a
+-- deterministic "near", not an exact one. Ties go to the earlier pair in table order.
+-- The next pair is tried only after a refusal, so on the verify world the first one wins.
+local function hex_steps(a, b)
+    local function cube(col, row)
+        local x = col - (row - (row % 2)) / 2
+        return x, row, -x - row
+    end
+    local ax, ay, az = cube(a.col, a.row)
+    local bx, by, bz = cube(b.col, b.row)
+    return math.max(math.abs(ax - bx), math.abs(ay - by), math.abs(az - bz))
+end
+local own, rivals = {}, {}
 for _, u in ipairs(verify.units()) do
     if u.col ~= nil then
-        if u.owner == player_corp then
-            if mine == nil then mine = u end
-        elseif theirs == nil then
-            theirs = u
-        end
+        if u.owner == player_corp then own[#own + 1] = u else rivals[#rivals + 1] = u end
     end
 end
-assert(mine,   "the player has no unit on the surface (BL-331 seeds one)")
-assert(theirs, "no rival unit on the surface (BL-476: named rivals are armed)")
+assert(#own > 0,    "the player has no unit on the surface (BL-331 seeds one)")
+assert(#rivals > 0, "no rival unit on the surface (BL-476: named rivals are armed)")
+local candidates = {} -- every (player unit, rival unit) pair, in (own, rival) table order
+for _, m in ipairs(own) do
+    for _, t in ipairs(rivals) do
+        candidates[#candidates + 1] = { d = hex_steps(m, t), mine = m, theirs = t }
+    end
+end
+
+-- The nearest untried pair, by a min-scan (the verify state opens no `table`
+-- library); ties to the earlier pair. Scanned again only after a refusal.
+local function nearest_untried()
+    local best = nil
+    for _, p in ipairs(candidates) do
+        if not p.tried and (best == nil or p.d < best.d) then best = p end
+    end
+    return best
+end
+
+-- The march onto the rival's tile first (BL-1443: contact is the attack), then
+-- hostility BOTH WAYS toward that rival, and only that one: a refused pair (another
+-- landmass, a class wall) declares nothing and gives way to the next nearest. The
+-- battle opens on contact, days later, by which time both stances stand. Hostility
+-- is a directed state, and making the intent explicit beats relying on discovery's
+-- "at least one direction" rule holding forever.
+local mine, theirs, march_result = nil, nil, nil
+local p = nearest_untried()
+while p ~= nil do
+    p.tried = true
+    march_result = verify.corp_command{ verb = VERB_MARCH_UNIT, corp = player_corp,
+                                        subject = p.mine.id, col = p.theirs.col, row = p.theirs.row }
+    print(string.format("battle_card: march %s from (%d,%d) onto (%d,%d), %d hex steps",
+                        tostring(march_result), p.mine.col, p.mine.row, p.theirs.col, p.theirs.row, p.d))
+    if march_result == "applied" then mine, theirs = p.mine, p.theirs; break end
+    p = nearest_untried()
+end
+assert(march_result == "applied", "every march onto a rival stack was refused: " .. tostring(march_result))
+verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = player_corp,  counterparty = theirs.owner }
+verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = theirs.owner, counterparty = player_corp }
 
 local target_province = verify.select_province(theirs.col, theirs.row)
 assert(target_province ~= 0, "the rival's unit stands on an unpartitioned tile")
 verify.clear_selection()
-
--- Hostility BOTH WAYS. It is a directed state, and making the intent explicit
--- beats relying on discovery's "at least one direction" rule holding forever.
-verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = player_corp,  counterparty = theirs.owner }
-verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = theirs.owner, counterparty = player_corp }
-
-local march_result = verify.corp_command{ verb = VERB_MARCH_UNIT, corp = player_corp,
-                     subject = mine.id, col = theirs.col, row = theirs.row }
-print(string.format("battle_card: march %s from (%d,%d) onto (%d,%d)", tostring(march_result), mine.col, mine.row, theirs.col, theirs.row))
-assert(march_result == "applied", "the march onto the rival stack was refused: " .. tostring(march_result)) -- BL-1443: march onto their tile; contact is the attack
 
 -- Step DAYS until contact (BL-1453, NR-587's fix): verify.day_step walks the day
 -- loop's own path, so the battle is seen live on the day it opens rather than

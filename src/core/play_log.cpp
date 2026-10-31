@@ -225,6 +225,12 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::hire_wing:            return "hire_wing";          // BL-1449
         case corp_verb::assign_air_mission:   return "assign_air_mission"; // BL-1449
         case corp_verb::set_air_design:       return "set_air_design";     // BL-1449
+        case corp_verb::declare_war:          return "declare_war";        // BL-1459
+        case corp_verb::answer_war:           return "answer_war";         // BL-1459
+        case corp_verb::offer_peace:          return "offer_peace";        // BL-1428
+        case corp_verb::accept_peace:         return "accept_peace";       // BL-1428
+        case corp_verb::refuse_peace:         return "refuse_peace";       // BL-1428
+        case corp_verb::impose_peace:         return "impose_peace";       // BL-1428
     }
     return "verb?";
 }

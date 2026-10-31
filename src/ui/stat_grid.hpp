@@ -69,9 +69,9 @@ void draw_stat_grid(const char* id, const stat_bands& bands, float width);
 // ---- The builders -----------------------------------------------------------
 
 /// Has the player SEEN @p unit (a rival's)? Seen while it fights one of the player's
-/// units in a live battle (military.md § The stat grid: "in a battle ... or revealed by
-/// recon" - an attacker's recon is spent inside that same battle). The player's own
-/// units are always seen.
+/// units in a live battle, or while the last air day revealed it to the player's nation
+/// (`world::air_revealed`) - military.md § The stat grid: "in a battle ... or revealed
+/// by recon". The player's own units are always seen.
 bool unit_seen_by_player(const world& w, entity_id unit);
 
 /// One land unit's bands: Condition, Supply, Combat, Field. A rival's internals read

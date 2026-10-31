@@ -8,9 +8,9 @@
 
 ## Headline
 
-**115 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**114 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**54 of 115 elements can be changed without any check going red.**
+**53 of 114 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
@@ -18,7 +18,7 @@ and so is the safety net.
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
 | **ASSERTED** | 58 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
-| **CLIP-ONLY** | 13 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
+| **CLIP-ONLY** | 12 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
 | **CAPTURE-ONLY** | 33 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
@@ -72,7 +72,7 @@ and so is the safety net.
 | `UI-093` New World wizard > Wizard planetology round (System or Life) | sub-element | `planetology_generation`, `life_to_people` | 9 | 1 | 0 |
 | `UI-096` Planetary Canvas > National border band | sub-element | `border_band` | 6 | 0 | 3 |
 | `UI-097` Planetary Canvas > Province render and selection | sub-element | `province_render`, `lens_structure_pivot` | 10 | 0 | 1 |
-| `UI-098` Lens system (overlay_mode family) > Logistics lens | sub-element | `logistics_lens`, `logistics_chain`, `lens_strip_and_fields` | 50 | 0 | 2 |
+| `UI-098` Lens system (overlay_mode family) > Logistics lens | sub-element | `logistics_lens`, `logistics_chain`, `lens_strip_and_fields` | 59 | 0 | 2 |
 | `UI-122` Lens system (overlay_mode family) > Nations lens | sub-element | `nations_lens` | 4 | 0 | 1 |
 | `UI-100` Nation overview | ledger | `corp_dashboard`, `nation_seat_ui` | 19 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
@@ -91,9 +91,9 @@ and so is the safety net.
 | `UI-126` Construction Ledger > Rail rows | sub-element | `rail_construction` | 17 | 0 | 4 |
 | `UI-127` Construction Ledger > Site ledger (the site finder) | sub-element | `construction_sites` | 29 | 0 | 1 |
 | `UI-128` Planetary Canvas > Placement lens | sub-element | `construction_sites` | 29 | 0 | 1 |
-| `UI-132` Unit designer | view | `unit_designer` | 2 | 0 | 12 |
+| `UI-132` Unit designer | view | `unit_designer`, `stat_grid` | 4 | 0 | 41 |
 
-## CLIP-ONLY (13)
+## CLIP-ONLY (12)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -103,7 +103,6 @@ and so is the safety net.
 | `UI-025` Minimap | element | `shell_pass` | 0 | 1 | 1 |
 | `UI-026` Minimap > Minimap title bar | sub-element | `shell_pass` | 0 | 1 | 1 |
 | `UI-057` Profile (identity tile) | panel | `shell_pass` | 0 | 1 | 1 |
-| `UI-058` Profile (identity tile) > Nation emblem | sub-element | `shell_pass` | 0 | 1 | 1 |
 | `UI-059` Navigation pane (nav rail) | panel | `nav_rail`, `shell_pass` | 0 | 1 | 1 |
 | `UI-061` System menu (session-control popup) | control | `shell_pass` | 0 | 1 | 1 |
 | `UI-067` Time panel | panel | `time_controls`, `shell_pass` | 0 | 1 | 1 |
@@ -167,6 +166,7 @@ and so is the safety net.
 Checks driving a surface no catalogue element claims. This is the catalogue's
 staleness detector — a non-empty list means the UI grew and the spine did not.
 
+- `air_ui` (16 captures, 0 expects) — Verify the air UI (BL-1450; docs/ui/ledgers/military.md § Grouped by theatre,
 - `border_hard_edges` (4 captures, 1 expects) — BL-1292 (borders hard edges) — the plain canvas at the three widest rungs, framed
 - `campaign_lapse` (4 captures, 1 expects) — campaign_lapse — BL-723's visual half: the spectated campaign as a film strip.
 - `canvas_vector_perf` (1 captures, 0 expects) — The Planetary canvas's vector layer at every rung (sprint 51; PLANETARY.md

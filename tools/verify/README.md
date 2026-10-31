@@ -1280,6 +1280,10 @@ quantity (the sum of the host's sources' made points × their reach at that tile
 source field, not a cap, since the pool is not spatial. Buckets: majors / minors, coastal /
 landlocked. Every nation whose pool falls short of its claim is named with its shortfall (`S` lines).
 
+It gates on rules (`R`, `P`, and BL-1420's `UC`: **no consumer is unconnectable** — rule 3's
+excuse for an uncovered consumer is itself checked, so every `U` line fails the seed); `RULES`
+is the verdict and the exit code.
+
 Every line is `key=value` records (`K` markets, `W` world, `N` nation, `B` bucket, `S` shortfall,
 `T` totals) so two runs diff cleanly — it is the BEFORE baseline for roads-as-edges, the road-tier
 reach extension and rail's point-to-point carry.

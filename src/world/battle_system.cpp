@@ -1,4 +1,5 @@
 #include "battle_system.hpp"
+#include "war.hpp" // BL-1428: war_morale_ceiling (exhaustion moves morale)
 
 #include "air_combat.hpp" // air_land_recon_milli: the air's recon over a battle (BL-1453)
 #include "carried_supplies.hpp" // BL-1452: the round's supply term and the recovery step
@@ -6,6 +7,7 @@
 #include "placement_rules.hpp"
 #include "province.hpp"
 #include "recipe_registry.hpp"
+#include "sentiment_emitters.hpp" // BL-1458: force_used
 #include "stance.hpp"
 #include "terrain_combat.hpp"
 #include "unit_roster.hpp"
@@ -323,15 +325,45 @@ void recovery_step(const unit_component& u, const campaign_battle_params& p, int
 /// itself, so the visit order cannot matter. A fully supplied unit at full
 /// readiness and morale is untouched, so a world that never fights is unmoved.
 /// DAILY (Ben, 2026-10-28): the daily military pass calls it once a day.
+namespace
+{
+/// BL-1428 (RELATIONS.md § 7, MILITARY.md § Land — the unit's stats: morale is moved
+/// by its nation's war exhaustion): the morale ceiling of each nation exhaustion
+/// lowers, read once per pass. Empty — and so free — in a world with no war.
+std::map<entity_id, int> exhaustion_ceilings(const world& w)
+{
+    std::map<entity_id, int> out;
+    if (w.wars.empty() && w.war_exhaustion_residual.empty())
+        return out;
+    for (const auto& [nid, nc] : w.nations)
+        if (const int c = war_morale_ceiling(w, nid); c < 1000)
+            out.emplace(nid, c);
+    return out;
+}
+
+/// Recovery's step, then the exhaustion ceiling over it (readiness never above morale).
+void capped_recovery_step(const unit_component& u, const campaign_battle_params& p,
+                          const std::map<entity_id, int>& ceil, int& morale, int& ready)
+{
+    recovery_step(u, p, morale, ready);
+    if (const auto it = ceil.find(u.owner); it != ceil.end())
+    {
+        morale = std::min(morale, it->second);
+        ready  = std::min(ready, morale);
+    }
+}
+} // namespace
+
 void recover_out_of_contact(world& w, const campaign_battle_params& p)
 {
     const std::set<entity_id> in_contact = units_in_live_battles(w);
+    const std::map<entity_id, int> ceil = exhaustion_ceilings(w);
     for (auto& [uid, u] : w.units)
     {
         if (u.count <= 0 || in_contact.count(uid) != 0)
             continue;
         int morale = 0, ready = 0;
-        recovery_step(u, p, morale, ready);
+        capped_recovery_step(u, p, ceil, morale, ready);
         u.morale_permille    = morale;
         u.readiness_permille = ready;
     }
@@ -340,12 +372,13 @@ void recover_out_of_contact(world& w, const campaign_battle_params& p)
 bool recovery_pending(const world& w, const campaign_battle_params& p)
 {
     const std::set<entity_id> in_contact = units_in_live_battles(w);
+    const std::map<entity_id, int> ceil = exhaustion_ceilings(w);
     for (const auto& [uid, u] : w.units) // a pure any-of: walk order cannot reach it
     {
         if (u.count <= 0 || in_contact.count(uid) != 0)
             continue;
         int morale = 0, ready = 0;
-        recovery_step(u, p, morale, ready);
+        capped_recovery_step(u, p, ceil, morale, ready);
         if (morale != u.morale_permille || ready != u.readiness_permille)
             return true;
     }
@@ -1005,6 +1038,10 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         const int lost_a = write_back(w, atk);
         const int lost_d = write_back(w, def);
         out.losses += lost_a + lost_d;
+        // BL-1458 (RELATIONS.md § Who emits): force_used, the side that lost
+        // men toward the other, magnitude the men lost. Queued, folded at the
+        // next tick's fold.
+        note_battle_losses(w, b.attacker, b.defender, lost_a, lost_d);
 
         // A spent unit leaves the fight one tile away from its enemies; a side that
         // withdrew leaves whole.

@@ -3888,8 +3888,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         dl->ChannelsSplit(3);
         dl->ChannelsSetCurrent(2);
     }
-    // The washes over the bake (player identity, construction suitability, the
-    // vision fog) are collected as the tile loop meets them and emitted into
+    // The washes over the bake (construction suitability, the vision fog; the
+    // player-identity wash is retired, BL-1416) are collected as the tile loop meets them and emitted into
     // channel 1 — over the ground, under every stroke — so a run of equal washes
     // along a row can be ONE quad (see the tile loop's on_bake branch).
     struct ground_wash { ImVec2 c; float r; ImVec2 p0, p1; ImU32 col; bool hex; };
@@ -5808,8 +5808,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (on_bake)
             {
                 // The baked ground already carries terrain, relief and grain.
-                // What the fill path also carried — the player-identity wash,
-                // the construction-suitability washes, the vision fog — draws
+                // What the fill path also carried — the construction-
+                // suitability washes and the vision fog (the player-identity
+                // wash is retired, BL-1416) — draws
                 // as translucent full-radius washes over the bake, at the
                 // same strengths compute_tile_fill blends them in at.
                 //
@@ -6121,7 +6122,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             state.structure_hit_zones);
 
             // Persistent player footprint: outline the player's own tiles under
-            // EVERY lens (and the plain default), so "these are mine" never
+            // EVERY lens, so "these are mine" never
             // disappears when a lens is picked. Under the Corporation lens the fill
             // is already the player colour, so the bright selection accent keeps the
             // edge visible; elsewhere the player identity colour reads as ownership

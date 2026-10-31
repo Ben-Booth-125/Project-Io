@@ -37,7 +37,9 @@
 // routing a tile's cover is at most 1, so that is the peak - NR-1063); every consumer
 // is covered save those the seeding counted unconnectable. One `R` line per seed and a
 // `RULES` verdict; the exit code is 1 when any seed breaks a rule. Uncovered GROUND is
-// not a rule - it is the room the logistics game is played in.
+// not a rule - it is the room the logistics game is played in. Two more rules gate with
+// the three: every capital stands on a city (`P`), and NO consumer is unconnectable (`UC`,
+// BL-1420) - rule 3's excuse is checked, not trusted.
 //
 // Build:  bash tools/verify/build_lua_harness.sh lp_coverage_census
 // Run:    build_gen/verify/lp_coverage_census.exe [--seeds 0,28,46]
@@ -732,6 +734,13 @@ int main(int argc, char** argv)
             const bool r4 = caps_on_city == caps_read;
             std::printf("P seed=%u capitals=%d on_city=%d | %s every-capital-on-a-city\n", seed,
                         caps_read, caps_on_city, r4 ? "PASS" : "FAIL");
+            // BL-1420 (a): NO CONSUMER IS UNCONNECTABLE. Rule 3 excuses a consumer the seeding
+            // counted unconnectable; that excuse is itself a claim - "the seeding connects
+            // every consumer" - and this is its check. Every `U` line above is a failure here,
+            // and so is any consumer the seeding left cut off.
+            const bool r5 = rep.unconnectable == 0; // cut_off is a subset, printed for the cause
+            std::printf("UC seed=%u unconnectable=%d cut_off=%d | %s no-consumer-unconnectable\n", seed,
+                        rep.unconnectable, rep.unconnectable_cut_off, r5 ? "PASS" : "FAIL");
 
             // THE CAPITAL'S SUPPLIED / REQUESTED (Ben, 2026-10-26): the routed requests
             // crossing the capital tile against what the chain makes available there
@@ -771,7 +780,7 @@ int main(int argc, char** argv)
                 std::printf("CS seed=%u capitals=%d hubs=%d stacked_capitals=%d short=%d requested=%.0f available=%.0f\n",
                             seed, n_read, hubs_total, stacked_caps, n_short, sum_req, sum_av);
             }
-            if (!(r1 && r2 && r3 && r4))
+            if (!(r1 && r2 && r3 && r4 && r5))
                 ++rule_fail_seeds;
         }
 

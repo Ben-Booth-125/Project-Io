@@ -352,7 +352,10 @@ own form, distinct at its tier's scale — an extraction head-frame, a processin
 stacks, a port's quay, a well's housing, a wharf's jetty — and a processing facility's
 form keys on its active recipe's family the way the retired glyph did, so *what is made
 here* reads before a hover. The type is public (DISCOVERY.md, the competitor-visibility
-rule), so a rival's structure draws exactly as the player's.
+rule), so a rival's structure draws exactly as the player's. **No identity wash** tints the player's
+structures or ground (Ben, 2026-10-26): ownership on the plain canvas is the national border
+band (`PLANETARY.md` § The national border band), and under a lens the player footprint
+outline (`LENSES.md` § Rung applicability).
 
 **A stacked tile stands a cluster** (Ben, 2026-10-08). One structure per **stack** —
 `(type, target)`, `placement_rules::stack_members` — placed by a fixed in-tile layout,

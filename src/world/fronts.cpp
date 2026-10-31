@@ -368,6 +368,41 @@ std::vector<front> fronts_of(const world& w, raster_source& rs, entity_id nation
                 break;
             }
     }
+    // BL-1441 (front edge cases): A SPAN IS NEVER LEFT UNNAMED. A span whose every
+    // tile an earlier span already claimed (a one-tile salient touching two
+    // neighbours, say) takes instead the lowest unclaimed tile of its NEIGHBOUR'S
+    // ground across it. Such a tile is never in any of this nation's spans, so it
+    // cannot collide with a span key, and tiles across toward different neighbours
+    // are different nations' tiles, so they cannot collide with each other. Claimed
+    // in the same order as above. Only a span the first rule left bare is touched,
+    // so every other key is exactly what it was.
+    for (const std::size_t i : claim)
+    {
+        if (out[i].key != null_entity)
+            continue;
+        std::set<entity_id> across;
+        for (const entity_id t : out[i].span)
+        {
+            const auto tit = w.tiles.find(t);
+            if (tit == w.tiles.end())
+                continue;
+            for (int side = 0; side < 6; ++side)
+            {
+                const entity_id n = neighbour_of(w, rs, tit->second, side);
+                if (n != null_entity && owner_of(w, n) == out[i].neighbour)
+                    across.insert(n);
+            }
+        }
+        for (const entity_id t : across) // ascending
+            if (used.insert(t).second)
+            {
+                out[i].key = t;
+                break;
+            }
+    }
+    // Not known to occur, not proven impossible (it would take two spans
+    // toward one neighbour, each wholly claimed, sharing their only tile across);
+    // the one case that still drops a front; erased so a key is never null.
     out.erase(std::remove_if(out.begin(), out.end(),
                              [](const front& f) { return f.key == null_entity; }),
               out.end());
@@ -646,8 +681,46 @@ entity_id front_push_target(const world& w, const front& f, int64_t* defence)
     return best;
 }
 
-void advance_fronts(world& w, const recipe_registry& reg)
+bool front_reachable(world& w, const recipe_registry& reg, entity_id unit, const front& f)
 {
+    const auto uit = w.units.find(unit);
+    if (uit == w.units.end() || f.span.empty())
+        return false;
+    // A lone unit's slot is span[len / 2]; walk outward from it as `hold` does,
+    // nearest first, ties to the lower index.
+    const std::size_t len = f.span.size(), s = len / 2;
+    const std::function<bool(const tile_component&)> wall =
+        class_wall(reg.military(), uit->second.type);
+    std::vector<entity_id> order;
+    order.reserve(len);
+    for (std::size_t d = 0; d < len; ++d)
+    {
+        if (d > s && s + d >= len)
+            break;
+        if (d <= s)
+            order.push_back(f.span[s - d]);
+        if (d > 0 && s + d < len)
+            order.push_back(f.span[s + d]);
+    }
+    for (const entity_id t : order)
+    {
+        if (wall)
+        {
+            const auto tit = w.tiles.find(t);
+            if (tit != w.tiles.end() && wall(tit->second))
+                continue;
+        }
+        if (uit->second.position == t)
+            return true;
+        return march_check(w, f.nation, unit, t, null_entity, nullptr, &reg.military())
+            == corp_command_result::applied;
+    }
+    return false;
+}
+
+front_step advance_fronts(world& w, const recipe_registry& reg)
+{
+    front_step out;
     reanchor_fronts(w);
 
     // (nation, key) -> its assigned units, ascending id.
@@ -658,7 +731,7 @@ void advance_fronts(world& w, const recipe_registry& reg)
             if (u.front != null_entity)
                 ids.push_back(uid);
         if (ids.empty())
-            return;
+            return out;
         std::sort(ids.begin(), ids.end());
         for (const entity_id uid : ids)
             groups[{ w.units.at(uid).owner, w.units.at(uid).front }].push_back(uid);
@@ -672,7 +745,21 @@ void advance_fronts(world& w, const recipe_registry& reg)
         cmd.verb      = verb;
         cmd.subject   = uid;
         cmd.tile      = tile; // every march goes to a tile (2026-10-27)
-        return apply_corp_command(w, reg, cmd); // a refusal mutates nothing; next tick asks again
+        const corp_command_result r = apply_corp_command(w, reg, cmd); // a refusal mutates nothing
+        if (verb == corp_verb::march_unit)
+            ++(r == corp_command_result::applied ? out.marches_applied : out.marches_refused);
+        return r;
+    };
+    // BL-1441 (front edge cases): A MARCH THE GAME WOULD REFUSE IS NEVER ISSUED. Every
+    // march a front orders is asked of `march_check` first - the verb's own read-only
+    // test - and only an accepted one is issued. A refused slot (unreachable round
+    // foreign stacks, a domain the unit cannot enter) leaves the unit standing where it
+    // is (a standing order is halted), rather than re-issuing a refused march every
+    // tick. Stateless: the test runs again on the next tick, and the slot is taken the
+    // day it opens. An accepted march is solved twice, once here and once by the verb,
+    // and only on the tick it is issued (the next tick finds `order.dest` on it).
+    const auto would_march = [&](entity_id uid, entity_id owner, entity_id tile) {
+        return march_check(w, owner, uid, tile, null_entity, nullptr, &reg.military());
     };
     const auto busy = [&](entity_id uid, const unit_component& u) {
         return u.count <= 0 || u.position == null_entity || unit_refitting(u) || unit_in_battle(w, uid);
@@ -712,8 +799,9 @@ void advance_fronts(world& w, const recipe_registry& reg)
         // HOLD: the slot is the span tile at the unit's index; on a walled slot, the
         // nearest UNWALLED span tile by index (ties to the lower index). A unit with no
         // unwalled slot on the span holds where it stands - halted once, never
-        // re-issued daily. (A legal slot the march refuses for another reason - another
-        // landmass - is asked again next day, as before.)
+        // re-issued daily. BL-1441: a slot `march_check` refuses (unreachable, a domain
+        // the unit cannot enter) is never issued - the unit stands where it is, halted,
+        // and the slot is asked of `march_check` again next day.
         const auto hold = [&](std::size_t i) {
             const entity_id uid = uids[i];
             const unit_component& u = w.units.at(uid);
@@ -744,7 +832,10 @@ void advance_fronts(world& w, const recipe_registry& reg)
                 }
                 if (u.order.dest == slot)
                     return;
-                issue(uid, nk.first, corp_verb::march_unit, slot);
+                if (would_march(uid, nk.first, slot) == corp_command_result::applied)
+                    issue(uid, nk.first, corp_verb::march_unit, slot);
+                else if (u.order.dest != null_entity)
+                    issue(uid, nk.first, corp_verb::halt_unit, null_entity); // stand where it is
                 return;
             }
             // No legal slot: hold where it stands.
@@ -796,14 +887,16 @@ void advance_fronts(world& w, const recipe_registry& reg)
                         done = true; // already on its way
                         break;
                     }
-                    const corp_command_result res = issue(uid, nk.first, corp_verb::march_unit, r.t);
+                    // BL-1441: asked of march_check first; only an accepted march is issued.
+                    const corp_command_result res = would_march(uid, nk.first, r.t);
                     if (res == corp_command_result::applied)
                     {
+                        issue(uid, nk.first, corp_verb::march_unit, r.t);
                         done = true;
                         break;
                     }
                     if (res != corp_command_result::rejected_terrain)
-                        break; // another landmass and the like: hold, as before
+                        break; // unreachable and the like: hold (which asks the same of its slot)
                 }
                 // Nothing left to push onto, or no target reachable: hold the slot
                 // rather than stand idle (cold review, 2026-10-27).
@@ -816,4 +909,5 @@ void advance_fronts(world& w, const recipe_registry& reg)
         for (std::size_t i = 0; i < n; ++i)
             hold(i);
     }
+    return out;
 }

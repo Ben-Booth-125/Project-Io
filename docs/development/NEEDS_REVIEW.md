@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*18 entries — 13 open, 5 resolved.*
+*31 entries — 26 open, 5 resolved.*
 
 ---
 
@@ -184,6 +184,170 @@ Recipe ids are list positions saved in every building, so the five capacity-yard
 (a) The free source is the lowest-id running inland logistics hub on the capital. Seeds 10, 11, 12, 25 and 31 had a railway station or port standing as the capital's source and no hub, so nothing ran free and the opening cut removed their capitals' buildings (dark at the handoff). The seeding's step 0 now stands a hub on EVERY capital, beside any station or port already there. (b) purse_room_of now carries the settle cap for every spend - builds, retools, hires, refits, roads and survey dispatch alike; surveys in the settle were not separately ruled.
 
 **Why it matters.** (a) changes world shape: every capital opens with one more building (the shape probe was not re-run). The alternative is to let a station or port on the capital be the free source instead. (b) a poor nation may send fewer surveys in the settle. Merged at b0a9e9b5, G1t50 full 84.6. Work: BL-1452 (carried supplies).
+
+### NR-1103 — An answered war can never reach a score of 100
+*question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
+
+The occupation half divides held goals by ALL goals named. Once the defender answers with its own goals, neither side can reach +-100: holding every enemy goal while losing none reads 83 in the harness (P1e), and the defender tops out lower still (P1f: -67). So the defender can never impose, and the declarer can impose only while the war is unanswered. A cold review (2026-10-31) adds: the defender's score is bounded above -100 in EVERY war, since the declarer always names a goal, so the defender can never impose at all; and the battles half needs the imposer to lose almost nothing.
+
+**Why it matters.** Impose at 100 (NR-1101 C) silently becomes declarer-only, and answering a war makes it unwinnable by force. Work: BL-1428 (war goals and peace).
+
+- A: normalise each side by its own goals: (my held share of your goals) less (your held share of mine), so holding all of theirs and losing none is 100
+- B: keep as built; imposing is only for an unanswered war
+- C: keep the formula, lower the impose threshold
+
+> **Recommendation:** A. It keeps half-occupation, half-battles and makes 100 reachable for either side.
+
+*Files: `src/world/war.cpp`, `docs/politics/RELATIONS.md`*
+
+### NR-1104 — Grievance can almost never hold
+*question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
+
+The grievance justification reads the adverse band, Trust <= -50 toward the target. With the nine-tick decay and the authored weights, conduct between two nations rarely pushes Trust that far, so grievance will almost never halve a price. The other three (embargo, lost ground, a friend attacked) hold as designed.
+
+**Why it matters.** A justification that never holds is a rule nobody meets. The threshold is RELATIONS § 7 design, not calibration inside a ruled range.
+
+- A: grievance holds at the hostile-leaning band (Trust <= -25)
+- B: keep -50 and let war price grievance only after long conduct
+- C: grievance counts the seeded grudge too, so an inherited war justifies the next one
+
+> **Recommendation:** A, measured once rivals declare (BL-1461 rivals declare war) so the census shows how often it holds.
+
+*Files: `src/world/war.cpp`*
+
+### NR-1105 — Is hostility without a war retired?
+*question · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
+
+declare_war now writes the hostility row, and a bare declare_hostile between war parties is refused, so the defender must answer instead. Between nations NOT at war, declare_hostile still writes a hostility row with no war record: no goals, no score, no peace, and return_to_neutral ends it.
+
+**Why it matters.** Two ways to be hostile with different exits is the opposite of legible. RELATIONS § 1 predates § 7 here.
+
+- A: retire bare hostility; declare_hostile becomes declare_war (the right-click path already is)
+- B: keep both; hostility is a cold stance, war is the hot one
+
+> **Recommendation:** A. Every hostility then has goals, a score and a peace.
+
+*Files: `src/world/stance.cpp`, `docs/politics/RELATIONS.md`*
+
+### NR-1106 — Four war calls the lane took
+*decision taken on your behalf · raised 2026-10-31 · from Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31*
+
+(1) A province belongs, for goal validity and cession, to the plurality of tile_to_nation over its tiles, ties to the lower id; province_holder is only the military holder. (2) A right-click attack on a stack standing off the defender's ground takes the defender's capital province as the first goal. (3) Justifications are pair-measure rows in war.cpp in the condition grammar (measure, comparator, operand), not condition_subject entries, which measure one actor; promoting them with a counterparty qualifier would change the save layout. (4) Exhaustion's field days are counted once a quarter from where units stand then. Cold review (2026-10-31): (4) deviates from RELATIONS § 7 ("each day in the field") and is being fixed to a daily accumulation, so it drops out of this list.
+
+**Why it matters.** (2) means a declaration can name a capital the player never pointed at; (3) leaves a second predicate grammar beside META_LAYER.md.
+
+> **Recommendation:** Accept all four; promote (3) into META_LAYER only if another pair rule needs it.
+
+*Files: `src/world/war.cpp`, `src/core/app.cpp`*
+
+### NR-1107 — A front key may now sit across the border
+*novel-work · raised 2026-10-31 · from Lane F report, sprint 61 (BL-1441 front edge cases), 2026-10-31*
+
+A span whose every tile an earlier span already claimed used to be dropped, leaving a front unnamed. It is now keyed by the lowest unclaimed tile on the neighbour's side. The lane wrote the rule into MILITARY.md § Fronts. Rival front assignment also now skips a front no march can reach (front_reachable); a player-assigned unit with a refused march is still re-issued each tick.
+
+**Why it matters.** An authority-doc rule changed inside a defect fix. Digests did not move.
+
+> **Recommendation:** Accept; the key is an identity, not a place.
+
+*Files: `docs/military/MILITARY.md`, `src/world/fronts.cpp`*
+
+### NR-1108 — Trade-flow room: nothing computes "no room" today
+*question · raised 2026-10-31 · from Lane U report, sprint 61 (UI carries), 2026-10-31, BL-1414 (trade-flow room)*
+
+BL-1414 asks the Trade-flow lens to compute a lane's room without rivals' cargo, so a no-room marker never reveals a rival's shipments. But the dispatcher (src/world/trade.cpp) only ever records trade_refusal::sent, so the lens never draws a refusal marker and there is no room figure to change. The item was skipped.
+
+**Why it matters.** Building a room figure is new lens-side economics, not polish. The brief and the row also disagreed on which way rivals' cargo counts.
+
+- A: bring the refusal classes back in the dispatcher, room computed without rivals' cargo (private stays private)
+- B: cancel BL-1414; the lens shows flows only
+- C: park it until trade capacity is next touched
+
+> **Recommendation:** B unless a refusal marker answers a question the player is asking now; the lens question is "where do my goods go".
+
+*Files: `src/world/trade.cpp`, `docs/economy/TRADE.md`*
+
+### NR-1109 — The "always-on player outline" draws only under a lens
+*question · raised 2026-10-31 · from Lane U report, sprint 61 (UI carries), 2026-10-31, BL-1416 (identity wash)*
+
+The 2026-10-26 ruling says "keep the always-on player outline". Since the 2026-10-24 ruling the outline draws only under a lens, and PLANETARY.md and LENSES.md both say the plain canvas has no outline. The lane removed the stale wash wording and did not bring the outline back.
+
+**Why it matters.** Two dated rulings disagree; the code and two docs follow the earlier one.
+
+- A: the plain canvas has no outline (as built and documented)
+- B: the player outline is always on, plain canvas included
+
+> **Recommendation:** A: read "always-on" as "under every lens", and amend the 10-26 wording.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/canvases/PLANETARY.md`*
+
+### NR-1110 — Five UI calls the lane took
+*decision taken on your behalf · raised 2026-10-31 · from Lane U report, sprint 61 (UI carries), 2026-10-31*
+
+(1) BL-1417: with the emblem gone, the profile card marks the nation by a thin rule in its colour beside the name. (2) BL-1454: new colours palette::unit_food, unit_ammo, unit_equipment. (3) A rival unit's design stats count as "seen" only while it is in a battle against the player or air-revealed to the player; nothing remembers a past sighting, since that needs a save field. (4) New verify reads verify.unit_stat_grid(id) and verify.unit_designer().grid return only the cells the screen draws (unit stats, no tile data). (5) The unit card's Strength/Roster pager is gone; verify.unit_card_page is kept as a no-op. Cold review (2026-10-31): air_revealed is rebuilt every air pass, so (3) blanks a rival's stats the day after any battle; ledgers/military.md § The stat grid says "only once seen", which reads as remembered.
+
+**Why it matters.** (3) means a rival's stats blank again the day a battle ends, which may read as forgetting. The rest are look-and-feel; each is in the live click list.
+
+> **Recommendation:** Accept (1), (2), (4), (5). For (3), a saved per-nation set of seen rival designs matches the doc's "once seen"; it is a save field, so it would ride the next save bump (the war or embargo lane).
+
+*Files: `src/ui/unit_stat_grid.cpp`, `src/ui/profile_panel.cpp`*
+
+### NR-1111 — A harbour group's far ends get their own harbour
+*decision taken on your behalf · raised 2026-10-31 · from Lane G report, sprint 61 (BL-1420 lane and port defects), 2026-10-31*
+
+The ruling that colonial ends within two tiles share one harbour port and LOGISTICS.md § 4b's chaining of harbour groups could not both hold: a chain carried an end three or four steps from its port (seed 13). The lane kept the two-tile reach: harbour land is now chosen so its sea mouths lie within two steps of every end in the group, and ends still beyond two steps get a harbour of their own. Written into § 4b as a delegated reading.
+
+**Why it matters.** More, smaller harbours on chained coasts (seed 10 gained two ports). The alternative accepts longer dead spurs and loosens the check.
+
+> **Recommendation:** Accept.
+
+*Files: `src/world/road_generation.cpp`, `docs/economy/LOGISTICS.md`*
+
+### NR-1112 — State port siting has no doc home
+*novel-work · raised 2026-10-31 · from Lane G report, sprint 61 (BL-1420 lane and port defects), 2026-10-31*
+
+A coastal capital's state port sits on the coastal tile nearest the capital, a rule stated only in a code comment. On seed 40 that tile lay in a sea pocket joined to open water only across a hex diagonal, which the four-step lane walk cannot cross, so no lane left it. The lane added a preference for open sea (the largest four-connected piece of the six-connected sea) in code only.
+
+**Why it matters.** A generation rule with no authority doc. It moves D_land on every seed with such a pocket.
+
+> **Recommendation:** Write the siting rule, open sea included, into LOGISTICS.md § 4b beside the harbour rules.
+
+*Files: `src/world/state_industry.cpp`*
+
+### NR-1113 — Alarm's new vocabulary: five factors, three modifier subjects
+*novel-work · raised 2026-10-31 · from Lane S report, sprint 61 (BL-1458 sentiment emitters, BL-1432 Alarm as sentiment), 2026-10-31*
+
+To make Alarm's RELATIONS § 6 causes emit, the lane added five sentiment factors (technology_visible, facility_visible, border_force, trade_severed, unrest_visible authored zero), three modifier subjects on the meta layer (alarm_toward multiply, alarm_tell add in points, alarm_decay multiply) read by nation_tech.cpp, and widened the tech-store audit grammar (a points subject; "N% faster" reads as +N). A large facility is a state asset costing at least 450 (launchpad, airbase; not the university). 14 Digitisation effect rows now write Alarm; six stay unread (no Nuclear Plant, no accord-partner store, "spike" and "drift" ambiguous, no capability-only scale, no world-wide decay scale).
+
+**Why it matters.** New META_LAYER vocabulary and five enumerators no doc named. The emitter module sentiment_emitters.cpp has no owning doc section beyond RELATIONS § Who emits.
+
+> **Recommendation:** Accept; write the five factors into RELATIONS § Who emits and the three subjects into META_LAYER at merge.
+
+*Files: `src/world/sentiment_emitters.cpp`, `src/world/modifier_set.hpp`, `tools/session/tech_tree_store.js`*
+
+### NR-1114 — Which pair trade counts for, and when trade is severed
+*decision taken on your behalf · raised 2026-10-31 · from Lane S report, sprint 61 (BL-1458 sentiment emitters, BL-1432 Alarm as sentiment), 2026-10-31*
+
+(1) trade_conducted counts the cargo owner's nation and the destination market's nation (the import-tariff foreign-goods rule), foreign landings only, one event each way per tick. (2) trade_severed is raised by the receiver toward the shipper (+2 Alarm, once) when a pair that traded at the last fold lands nothing now; a pair whose trade flickers raises repeated spikes. (3) embargo_imposed has no emitter yet: no embargo law is enacted anywhere; BL-1418 (embargo bars goods) is where it gets one. (4) BL-1432's rival scorer reading Alarm and its player surface are left to BL-1461 (rivals declare war) and BL-1462 (diplomacy ledger).
+
+**Why it matters.** (2) may want a streak (several ticks of trade, then several of none) before it counts; flicker is common on thin lanes.
+
+> **Recommendation:** Accept (1), (3), (4); for (2), require two ticks traded and two ticks silent - in-band, delegated unless you object. Cold review agreed the flicker is real (alternating landings net about +7 Alarm, worse than not trading); the two-and-two window is being built.
+
+*Files: `src/world/sentiment_emitters.cpp`*
+
+### NR-1115 — Can Alarm go below zero?
+*question · raised 2026-10-31 · from Cold review of Lane S, sprint 61 (BL-1432 Alarm as sentiment), 2026-10-31*
+
+Relief - live trade, an accepted friendship, a peace - lowers Alarm below zero, and the floor is the substrate's -100. A pair landing 500 credits a tick sits near -13.5, so a later war declaration (+3) or a modest border force still reads as reassured on balance. RELATIONS § 6 says positive is alarmed and lists relief as decay toward neutral and live trade; it does not say relief can bank a reserve.
+
+**Why it matters.** A banked reserve means trade buys immunity to Alarm; a floor at 0 means relief only ever cancels Alarm already raised. The rival war scorer (BL-1461 rivals declare war) will read this number.
+
+- A: Alarm's floor is 0 - relief cancels raised Alarm and never goes past neutral (Alarm is a one-sided dimension)
+- B: Alarm is signed like Access and Trust; negative is reassured, and a reserve is intended
+
+> **Recommendation:** A. Reassurance is already what Trust measures; a signed Alarm double-counts it.
+
+*Files: `src/world/sentiment.cpp`, `docs/politics/RELATIONS.md`*
 
 ---
 

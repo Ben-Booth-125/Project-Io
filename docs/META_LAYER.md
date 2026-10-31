@@ -128,7 +128,7 @@ reading the rest of this document as a description of what runs, rather than of 
 **One scalar modifier is `<subject> <op> <magnitude>`.** Three ops — `add`, `subtract`, `multiply`
 — *"and no more; an open-ended expression tree would re-open the callback door."*
 
-**Six subjects.** Each names one scalar the simulation already computes, and each is read at
+**Eleven subjects.** Each names one scalar the simulation already computes, and each is read at
 exactly one place — **a subject earns its row by naming its consumer** (Ben, 2026-08-22):
 
 | Subject | Moves | Read by |
@@ -139,6 +139,11 @@ exactly one place — **a subject earns its row by naming its consumer** (Ben, 2
 | `logistics_cost` | per-unit haulage on the reach/convoy network | BL-464 (logistic points): active LP resolution costs credits |
 | `wage_floor` | the wage term of building opex (BL-049) | BL-538 (treasury priority lines): the schooling line raises labour productivity |
 | `collapse_strain` | the era's collapse pressure (BL-477) — the ancient era's imperial strain, the industrial era's rupture proximity | BL-477 keeps the accumulator; BL-548 (event system) reads it, since events **express** the collapse metagame rather than driving it (Ben, 2026-08-22) |
+| `national_research` | a nation's research points a quarter | `advance_research` (nation_tech.cpp): scope `all` with op `add` is a "+N% national research" share summed into `research_multiplier`; scope `building:university` with op `multiply` scales the University term |
+| `market_pull` | how far a market centre's attraction reaches (`../economy/MARKETS.md` § The pull) | `centre_pull` (market_clearing.cpp), which divides a tile's logistics cost to the centre by the pull |
+| `alarm_toward` | the Alarm OTHER nations gain toward the holder (`politics/RELATIONS.md` § 6) | the sentiment fold's stamp (`fold_pending_sentiment`, sentiment_emitters.cpp): op `multiply`, scope `all`, folded over the held nodes into one per-subject scale that multiplies only an Alarm delta that RAISES Alarm — relief, Access and Trust are never scaled. "-1% Alarm toward you" is ×0.99 |
+| `alarm_tell` | the public tell of a held technology, in Alarm points | `emit_alarm_capability` (sentiment_emitters.cpp): op `add` from a base of 0, scope `all`, summed per nation and emitted each tick as `technology_visible` from every other nation — the level each settles at. "every rival's Alarm toward you +10" is +10 |
+| `alarm_decay` | how fast Alarm held TOWARD the holder decays | `alarm_decay_scales` → `decay_sentiment`'s per-subject Alarm rate at the head of `run_economy_step`: op `multiply`, scope `all`. "decays 10% faster" is ×1.10, so a level emitted every tick settles at 1/1.10 of what it would |
 
 Vocabulary-only is a **promise**, not a state: a subject that cannot name the item that reads it has
 not earned its row, and should be removed rather than left waiting. That is what keeps *a shape is
@@ -188,7 +193,7 @@ Worth stating plainly, because it is invisible from either file alone.
 
 | | Predicate side | Effect side |
 |---|---|---|
-| Subjects | **9** | **6** |
+| Subjects | **9** | **11** |
 | Consumers | 2 (law, embargo) | 1 (tech, via `nation_scalar`) |
 | Included by | 5 files | **1 file** (`nation_tech.hpp`) |
 

@@ -120,6 +120,14 @@ std::size_t corp_card_count();
 corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
                                  const economy_report& report, entity_id corp);
 
+/// BL-1415 (HEADER.md § Contents; Ben, 2026-10-26, NR-1002 B): the OPERATING net
+/// of @p nation's last economy tick — exactly the Balance card's "Net this
+/// quarter" (`derive_corp_rollups(...).net()`), so the header strip and the card
+/// cannot disagree. Refunds and flat construction are not operating flows and are
+/// excluded — the nation's card carries neither (its refunds line is a firm's, and
+/// no firm exists). False when the nation holds no state-ledger row this tick.
+bool nation_operating_net(const world& w, entity_id nation, float& net);
+
 /// Draw the Corporation ledger into the shell fold-out column, plus the
 /// full-canvas takeover when one is open. The card draws its chart in both
 /// hosts, from one builder, so the two cannot show different things.

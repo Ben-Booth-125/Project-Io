@@ -64,7 +64,9 @@ for (const n of nodes) if (!n.requires.length && !(n.tier === 'travel' && /-T1$/
 // effect is nation_tech.cpp's declaration, and nation_tech_harness's R1 audit holds the two together
 // (the header this store renders into, via gen_tech_tree_table.js, is what that audit reads).
 const SUBJECTS = new Set(['extraction_rate', 'processing_yield', 'unit_upkeep', 'logistics_cost',
-                          'wage_floor', 'collapse_strain', 'national_research']); // modifier_set.hpp
+                          'wage_floor', 'collapse_strain', 'national_research',
+                          'alarm_toward', 'alarm_tell', 'alarm_decay']); // modifier_set.hpp (BL-1432)
+const POINT_SUBJECTS = new Set(['alarm_tell']); // added in points, not percent (BL-1432)
 const SCOPE_RE = /^(all|resource:[a-z_]+|group:[A-Za-z &]+|recipe:[a-z_]+|building:[a-z_]+|site:[a-z_]+)$/;
 const str = v => typeof v === 'string' && v.length > 0;
 // An effect has two states (RESEARCH.md): read, or unread. No third.
@@ -75,8 +77,9 @@ const STATES_ONLY = new Set(['kind', 'subject', 'scope', 'op', 'value', 'recipe'
 // unless an unread effect carries it); those an unread effect's own `what` carries are struck out
 // in order; what remains must equal the node's modifiers, in order: multiply value = 1 + p/100,
 // add value = p/100.
-const pcts = s => [...String(s).replace(/−/g, '-').matchAll(/([+-]?)(\d+(?:\.\d+)?)%/g)]
-  .map(m => (m[1] ? (m[1] === '-' ? -1 : 1) * Number(m[2]) : NaN));
+// "N% faster" reads as +N (BL-1432: "Alarm toward you decays 10% faster" is a x1.10 rate).
+const pcts = s => [...String(s).replace(/−/g, '-').matchAll(/([+-]?)(\d+(?:\.\d+)?)%( faster)?/g)]
+  .map(m => (m[1] ? (m[1] === '-' ? -1 : 1) * Number(m[2]) : m[3] ? Number(m[2]) : NaN));
 const close = (a, b) => (Number.isNaN(a) && Number.isNaN(b)) || Math.abs(a - b) < 1e-9;
 const unparsed = [];
 
@@ -118,7 +121,20 @@ for (const n of nodes) {
       }
     }
     if (rest.some(Number.isNaN)) { ok = false; unparsed.push(`${n.id}: an unsigned percentage no unread effect carries, in "${n.advantage}"`); }
-    const mods = n.effects.filter(x => x.kind === 'modifier')
+    // A POINT subject (BL-1432: alarm_tell, in Alarm points) is not a percentage, so it
+    // sits outside the percentage audit; its own check is that the prose names the same
+    // signed figure after the word Alarm.
+    for (const e of n.effects.filter(x => x.kind === 'modifier' && POINT_SUBJECTS.has(x.subject))) {
+      const fig = (e.value > 0 ? '+' : '') + e.value;
+      const named = n.advantage.split(/[;.]/).some(c => {
+        const at = c.indexOf('Alarm');
+        if (at < 0) return false;
+        const m = c.slice(at).match(/([+-]\d+(?:\.\d+)?)(?![\d%])/);
+        return m !== null && Number(m[1]) === e.value;
+      });
+      if (e.op !== 'add' || !named) err(`${n.id}: point modifier ${e.subject} ${fig} is not named as "Alarm ... ${fig}" in "${n.advantage}"`);
+    }
+    const mods = n.effects.filter(x => x.kind === 'modifier' && !POINT_SUBJECTS.has(x.subject))
       .map(e => (e.op === 'multiply' ? (e.value - 1) * 100 : e.value * 100));
     if (ok && (mods.length !== rest.length || !mods.every((m, i) => close(Math.round(m * 1e6) / 1e6, rest[i])))) {
       err(`${n.id}: modifier direction/size [${mods.map(m => (m > 0 ? '+' : '') + Math.round(m * 1e6) / 1e6 + '%').join(', ')}]` +

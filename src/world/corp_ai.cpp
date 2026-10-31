@@ -450,6 +450,12 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::hire_wing:       return "hire wing";      // BL-1449
         case corp_verb::assign_air_mission: return "air mission"; // BL-1449
         case corp_verb::set_air_design:  return "air design";     // BL-1449: never issued by a rival
+        case corp_verb::declare_war:     return "war declaration"; // BL-1459
+        case corp_verb::answer_war:      return "war answer";      // BL-1459
+        case corp_verb::offer_peace:     return "peace offer";     // BL-1428
+        case corp_verb::accept_peace:    return "peace acceptance"; // BL-1428
+        case corp_verb::refuse_peace:    return "peace refusal";   // BL-1428
+        case corp_verb::impose_peace:    return "imposed peace";   // BL-1428
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";
@@ -1274,7 +1280,8 @@ ranked_site_map rank_extraction_sites(const world& w, const recipe_registry& reg
 //   ASSIGN. An idle unit — its own, unassigned, no march order, not in a battle,
 //   not refitting, and not standing in the capital province (the capital's force
 //   stays home) — goes to the front with the fewest assigned units per span tile,
-//   ties to the first in (neighbour, key) order. Units are taken in ascending id,
+//   ties to the first in (neighbour, key) order, among the fronts it can reach
+//   (`front_reachable`, BL-1441). Units are taken in ascending id,
 //   and each assignment counts before the next is placed.
 //   ORDER. A front is set to PUSH when the nation is hostile to its neighbour, a
 //   push target exists, and the strength assigned to it (summed `unit_strength`)
@@ -1331,11 +1338,33 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
             continue;
         if (capital_prov != 0 && w.provinces.province_of(u.position) == capital_prov)
             continue;
-        std::size_t best = 0;
-        for (std::size_t i = 1; i < fronts.size(); ++i)
-            // count_i / span_i < count_best / span_best, cross-multiplied
-            if (count[i] * fronts[best].span.size() < count[best] * fronts[i].span.size())
-                best = i;
+        // BL-1441 (front edge cases): only a front the unit can REACH (`front_reachable`:
+        // a march onto its lone slot the game would accept). Assigning one it cannot
+        // reach re-issued a refused march every tick. Fronts are tried in preference
+        // order; the first reachable wins, and a unit that reaches none stays idle.
+        std::vector<char> tried(fronts.size(), 0);
+        std::size_t best = fronts.size();
+        for (std::size_t left = fronts.size(); left > 0; --left)
+        {
+            std::size_t pick = fronts.size();
+            for (std::size_t i = 0; i < fronts.size(); ++i)
+            {
+                if (tried[i])
+                    continue;
+                // count_i / span_i < count_pick / span_pick, cross-multiplied
+                if (pick == fronts.size()
+                    || count[i] * fronts[pick].span.size() < count[pick] * fronts[i].span.size())
+                    pick = i;
+            }
+            tried[pick] = 1;
+            if (front_reachable(w, reg, uid, fronts[pick]))
+            {
+                best = pick;
+                break;
+            }
+        }
+        if (best == fronts.size())
+            continue;
         corp_command cmd;
         cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
         cmd.verb = corp_verb::assign_front; cmd.subject = uid; cmd.tile = fronts[best].key;

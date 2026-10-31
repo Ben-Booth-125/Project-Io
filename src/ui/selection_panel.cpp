@@ -475,10 +475,10 @@ namespace {
 
 // A small kind glyph for the header (BL-093) — a coloured primitive so each
 // selection kind reads at a glance in place of the former placeholder portrait
-// column. BL-090 promotes the corporation and building kinds to the shared corp
-// emblem (shape + identity colour), so the header reads *whose* it is and matches
-// the identity card and the on-canvas markers; body/tile keep their plain
-// primitives. @p id is the selected entity, used to resolve the owning corp.
+// column. BL-1417 (PROFILE.md § Emblem; Ben, 2026-10-26): no emblem stands in for
+// an owner until one is designed, so no shape is keyed off an owner's id. A
+// building's square takes its owner's identity COLOUR (ownership is public,
+// BL-068) — the colour is the only mark a nation has. @p id is the selected entity.
 void draw_selection_icon(const world& w, ImDrawList* dl, selection_kind kind,
                          entity_id id, ImVec2 c, float r)
 {
@@ -488,25 +488,17 @@ void draw_selection_icon(const world& w, ImDrawList* dl, selection_kind kind,
         case selection_kind::body:
             dl->AddCircleFilled(c, r, col, 20);
             break;
-        case selection_kind::corporation:
-            // The selected entity *is* the corporation.
-            icons::corp_emblem(dl, c, r, palette::corp_emblem_shape(id),
-                               palette::corp_identity_colour(id, w.player_entity));
-            break;
         case selection_kind::building:
         {
-            // The owning corp's emblem (player or rival — ownership is public,
-            // BL-068). Falls back to the plain square if the owner won't resolve.
-            // BL-1406: the owner is a corporation or a NATION (building_owner_of);
-            // the player's nation wears the player's emblem, as the profile does.
+            // BL-1406: the owner is a NATION (building_owner_of); the player's
+            // nation takes the player identity colour, as the canvas does.
             entity_id owner = building_owner_of(w, id).id;
             if (owner != null_entity && owner == player_actor(w))
                 owner = w.player_entity;
-            if (owner != null_entity)
-                icons::corp_emblem(dl, c, r, palette::corp_emblem_shape(owner),
-                                   palette::corp_identity_colour(owner, w.player_entity));
-            else
-                dl->AddRectFilled({c.x - r, c.y - r}, {c.x + r, c.y + r}, col, 2.0f);
+            const ImU32 fill = owner != null_entity
+                                   ? palette::corp_identity_colour(owner, w.player_entity)
+                                   : col;
+            dl->AddRectFilled({c.x - r, c.y - r}, {c.x + r, c.y + r}, fill, 2.0f);
             break;
         }
         case selection_kind::tile:
@@ -1306,6 +1298,52 @@ std::string unit_roster_display_name(std::uint16_t type)
     return buf;
 }
 
+// THE STRENGTH AND UPKEEP LINES (BL-1454 fold of the Strength page): under the
+// stat grid, the player's own unit only.
+//
+// Strength is DERIVED — count x the roster row's quality x the unit's supply
+// factor, x100 fixed point (BL-459 removed the stored duplicate of `count`) — so
+// the line shows the derivation rather than one opaque number. Count is the HP
+// cell's numerator, so it is not repeated.
+//
+// Upkeep (BL-454): the per-tick credit wage and its goods draw, read from the SAME
+// resolve_unit_upkeep the budget and the unit pass read, so the card cannot
+// disagree with the money. Silent when no rate is authored (the shipped default):
+// an all-zero line would be chrome that says nothing.
+static void draw_unit_strength_lines(const world& w, const recipe_registry& reg, const unit_component& u)
+{
+    ImGui::TextDisabled("Strength");
+    ImGui::SameLine();
+    ImGui::Text("%lld", static_cast<long long>(unit_strength(w, u)));
+    ImGui::SameLine();
+    ImGui::TextDisabled("= %d x %.2f quality x %.2f supply", u.count,
+                        roster_type_quality_permille(u.type) / 1000.0f,
+                        u.supply_factor_permille / 1000.0f);
+
+    const unit_upkeep_draw d = resolve_unit_upkeep(u, reg.military().upkeep);
+    if (d.credits > 0.0f || d.any_goods)
+    {
+        std::string line;
+        char        part[64];
+        if (d.credits > 0.0f)
+        {
+            std::snprintf(part, sizeof part, "%.1f cr", static_cast<double>(d.credits));
+            line += part;
+        }
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (d.goods[r] <= 0.0f)
+                continue;
+            std::snprintf(part, sizeof part, "%s%.2f %s", line.empty() ? "" : ", ",
+                          static_cast<double>(d.goods[r]), resource_name(static_cast<resource_type>(r)));
+            line += part;
+        }
+        ImGui::TextDisabled("Upkeep / tick");
+        ImGui::SameLine();
+        ImGui::TextWrapped("%s", line.c_str());
+    }
+}
+
 // BL-1425: the land class a unit fights as (world/unit_designs.hpp's
 // `unit_land_class`, the same rule this file once kept a copy of), and its display
 // word (MILITARY.md § Land — the classes). Shared by the Roster page and the unit
@@ -1493,6 +1531,10 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             if (u.supply_factor_permille < 1000)
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
                                    "Unsupplied: strength at %.0f%%", u.supply_factor_permille / 10.0f);
+            // The Strength page's lines (BL-1454 fix round, cold review): the derived
+            // strength with its derivation, and the Upkeep / tick line, so the card
+            // cannot disagree with the money.
+            draw_unit_strength_lines(w, reg, u);
         }
         ImGui::EndChild();
     }
@@ -1609,9 +1651,25 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
             const entity_id       nation = w.player_entity;
             std::vector<uint16_t> targets =
                 refit_targets(w, nation, u, campaign_roster_band_for(reg.era())); // BL-1434: own row first when its design is stale
+            // BL-1447 (4): the live-design entry (the unit's own row) stays FIRST even
+            // when that row is obsolete; only the newer rows sink when obsolete.
             std::stable_partition(targets.begin(), targets.end(), [&](uint16_t t) {
-                return !roster_row_obsolete(w, nation, t);
+                return t == u.type || !roster_row_obsolete(w, nation, t);
             });
+            // The goods of each slot the live design changes — bought by EVERY refit,
+            // a design refit and a type refit alike (`kit_refit_goods`).
+            const land_class lc = unit_land_class(u);
+            const std::array<float, resource_count> slot_goods =
+                kit_refit_goods(lc, u.kit, design_of(w, nation, lc));
+            std::string slot_text;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (slot_goods[r] > 0.0f)
+                {
+                    char part[64];
+                    std::snprintf(part, sizeof part, " + %.0f %s", static_cast<double>(slot_goods[r]),
+                                  resource_name(static_cast<resource_type>(r)));
+                    slot_text += part;
+                }
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Refit to");
             ImGui::Separator();
             if (targets.empty())
@@ -1621,14 +1679,17 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
                 const corp_command_result why = refit_check(w, reg, nation, sel, t);
                 const bool        ok   = (why == corp_command_result::applied);
                 const roster_gate& g   = unit_roster_table()[t].gate;
-                const bool        kit  = g.ore_q > 0 || g.farm_q > 0 || g.energy_q > 0;
-                char label[160];
-                std::snprintf(label, sizeof label, "%s%s%s \xe2\x80\x94 %s%s, %d d##refit%u",
+                // BL-1447 (4): a design refit keeps its row, so it buys none of the
+                // row's gated goods — "+ kit" names those, and only a type refit pays.
+                const bool        kit  = t != u.type && (g.ore_q > 0 || g.farm_q > 0 || g.energy_q > 0);
+                char label[256];
+                std::snprintf(label, sizeof label, "%s%s%s \xe2\x80\x94 %s%s%s, %d d##refit%u",
                               unit_roster_display_name(t).c_str(),
                               t == u.type ? " (live design)" : "",
                               roster_row_obsolete(w, nation, t) ? " (obsolete)" : "",
                               fmt::credits(refit_credit_cost(reg, u.type, t)).c_str(),
-                              kit ? " + kit" : "", muster_days_for(t), static_cast<unsigned>(t));
+                              kit ? " + kit" : "", slot_text.c_str(), muster_days_for(t),
+                              static_cast<unsigned>(t));
                 ImGui::BeginDisabled(!ok);
                 if (ImGui::Selectable(label) && ok)
                 {

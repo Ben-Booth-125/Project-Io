@@ -439,7 +439,9 @@ int main()
                                + 12  // BL-1434 (v64): the designs section, three empty counts
                                + 24  // BL-1449 (v65): the air section, six empty counts
                                + 4   // BL-1452 (v66): the carried-supplies section, one empty count
-                               + world_save_battle_carry_section_bytes(w); // BL-1453 (v67)
+                               + world_save_battle_carry_section_bytes(w) // BL-1453 (v67)
+                               + world_save_alarm_section_bytes(w)       // BL-1432 (v68)
+                               + world_save_war_section_bytes(w);         // BL-1459 (v69)
         const std::string b55 = v55_of(w);
         std::string v50 = b55.substr(0, b55.size() - tail55_of(w));
         const std::uint32_t pre = k_world_save_version_pre_space;

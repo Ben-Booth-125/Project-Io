@@ -722,6 +722,30 @@
    "The designer opened on an air class (ledger.military_open_air_designer; canvas.air_designer_slot_pick). Also a corp_verb (corp_verb::set_air_design, 46) on the command seam."
   ],
   [
+   "gameplay.declare_war",
+   "The right-click declare-and-attack (ledger.unit_order_declare_confirm) opens a war with the attacked tile's province as its first goal; the Diplomacy ledger's declaration (BL-1462) is its full surface. Also a corp_verb (corp_verb::declare_war, 47) on the command seam."
+  ],
+  [
+   "gameplay.answer_war",
+   "The right-click declare-and-attack by a nation already declared on and not yet answering sends this instead of declare_war; the Diplomacy ledger (BL-1462) is its full surface. Also a corp_verb (corp_verb::answer_war, 48) on the command seam."
+  ],
+  [
+   "gameplay.offer_peace",
+   "The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::offer_peace, 49) on the command seam."
+  ],
+  [
+   "gameplay.accept_peace",
+   "The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::accept_peace, 50) on the command seam."
+  ],
+  [
+   "gameplay.refuse_peace",
+   "The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::refuse_peace, 51) on the command seam."
+  ],
+  [
+   "gameplay.impose_peace",
+   "The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::impose_peace, 52) on the command seam."
+  ],
+  [
    "ledger.military_theatre_header",
    "Military ledger (nav rail slot 7), Recruit and Design tabs: the collapsible theatre headers 'Land (N)' and 'Air (N)' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes)."
   ],

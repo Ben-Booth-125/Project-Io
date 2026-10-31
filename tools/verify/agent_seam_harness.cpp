@@ -40,6 +40,7 @@
 #include "world/economy_system.hpp"
 #include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/stance.hpp" // BL-1428: is_hostile, canonical_pair (the truce row)
 #include "world/world.hpp"
 
 #include <chrono>
@@ -518,6 +519,7 @@ int main()
             return 1;
 
         const std::string cmd_head = "COMMAND corp=" + std::to_string(s.corp);
+        s.w.truces[canonical_pair(s.corp, s.other)] = s.w.current_econ_tick + k_war_truce_ticks; // BL-1428
         const std::string bad =
               cmd_head + " verb=99 subject=" + std::to_string(s.bld) + "\n"                         // out-of-range verb
             + line_set_wf(s.corp, s.bld, "4294967396") + "\n"                                        // would wrap to 100
@@ -536,6 +538,20 @@ int main()
             + "COMMAND corp=" + std::to_string(s.other) + " verb="
                        + std::to_string(vi(corp_verb::set_workforce))
                        + " subject=" + std::to_string(s.bld) + " workforce=50\n"                     // actor gate
+            // BL-1459 / BL-1428: the war verbs' lists and terms are validated as they land.
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::declare_war))
+                       + " counterparty=" + std::to_string(s.other) + " provinces=1,2,3,4\n" // a fourth goal
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::declare_war))
+                       + " counterparty=" + std::to_string(s.other) + " provinces=0\n"       // province 0
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::answer_war))
+                       + " counterparty=" + std::to_string(s.other) + " provinces=1,x\n"     // malformed list
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::offer_peace))
+                       + " counterparty=" + std::to_string(s.other) + " order=3\n"           // no such terms
+            // BL-1428 fix round: a bare declare_hostile, here under a standing truce. The
+            // wire refuses the verb outright (not a nation verb on the wire); the seam's
+            // own truce refusal is war_harness F2a.
+            + cmd_head + " verb=" + std::to_string(vi(corp_verb::declare_hostile))
+                       + " counterparty=" + std::to_string(s.other) + "\n"
             + "FROBNICATE\n";                                                                        // unknown op
 
         std::size_t sent = 0;
@@ -561,7 +577,7 @@ int main()
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
         seam.drain_boundary(s.w, reg, 0);
-        for (int i = 0; i < 200 && count_of(rx, "\n") < 11; ++i)
+        for (int i = 0; i < 200 && count_of(rx, "\n") < 16; ++i)
         {
             seam.pump(s.w, reg, 0);
             client_recv_into(client, rx);
@@ -572,9 +588,12 @@ int main()
         const uint64_t h_after = s.w.state_hash(0);
         check(h_before == h_after,
               "R2.2 state_hash before == after: a rejection mutates NOTHING");
-        check(count_of(rx, "RESULT result=rejected_invalid building=-1") == 9,
-              "R2.3 all nine malformed commands rejected WHOLE with the typed reason "
-              "(incl. BL-1201: a nonzero quantity or floor that narrows to +/-0)");
+        check(count_of(rx, "RESULT result=rejected_invalid building=-1") == 14,
+              "R2.3 all fourteen malformed commands rejected WHOLE with the typed reason "
+              "(incl. BL-1201: a nonzero quantity or floor that narrows to +/-0; BL-1459/BL-1428: "
+              "a fourth war goal, province 0, a malformed list, an unknown peace term, a declare_hostile under truce)");
+        check(s.w.wars.empty() && s.w.peace_offers.empty() && !is_hostile(s.w, s.corp, s.other),
+              "R2.3b no war opened and no peace offered by the malformed war commands");
         check(count_of(rx, "RESULT result=rejected_not_owner building=-1") == 1,
               "R2.4 the actor gate refuses a corp the session is not (typed)");
         check(count_of(rx, "ERR unknown op") == 1,
