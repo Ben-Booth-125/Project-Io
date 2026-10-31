@@ -883,22 +883,35 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
     // is a per-class WALL in the path. The route is solved around it; an order with no
     // legal route because of it is refused with its own reason - a walled destination,
     // or a destination the unit could reach were it not for the walls.
+    //
+    // DOMAINS ALONG THE WAY (BL-1466; MILITARY.md § Domains and traversal): the domain
+    // test above reads the destination; the PATH is solved around every tile the class
+    // may not stand on (`domain_wall`) - a land class never routes over open ocean or
+    // another polity's shore. A destination reachable only across such water is
+    // unreachable for this class: rejected_invalid, the domain refusal's own reason.
     const std::set<entity_id> foreign = foreign_held_tiles(w, uit->second.owner);
-    std::function<bool(const tile_component&)> wall;
+    std::function<bool(const tile_component&)> cwall;
     if (mil != nullptr)
     {
-        wall = class_wall(*mil, uit->second.type); // empty when the class has no blocking row
-        if (wall && wall(dit->second))
+        cwall = class_wall(*mil, uit->second.type); // empty when the class has no blocking row
+        if (cwall && cwall(dit->second))
             return corp_command_result::rejected_terrain; // the class cannot enter it
     }
+    const std::function<bool(const tile_component&)> dwall =
+        domain_wall(w, uit->second.owner, uit->second.type);
+    const std::function<bool(const tile_component&)> wall =
+        march_wall(w, uit->second.owner, uit->second.type, cwall);
     const std::vector<entity_id> path =
         march_path(w, sit->second.body, uit->second.position, tile, foreign,
                    wall ? &wall : nullptr);
     if (path.size() < 2)
     {
-        // The second search names the reason, and runs only where walls exist.
-        if (wall
-            && march_path(w, sit->second.body, uit->second.position, tile, foreign).size() >= 2)
+        // The second search names the reason, and runs only where class walls exist:
+        // solved around the domain alone, a route found means only the class's walls
+        // stand in the way.
+        if (cwall
+            && march_path(w, sit->second.body, uit->second.position, tile, foreign,
+                          dwall ? &dwall : nullptr).size() >= 2)
             return corp_command_result::rejected_terrain; // only the walls stand in the way
         return corp_command_result::rejected_invalid; // unreachable
     }

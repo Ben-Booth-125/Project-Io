@@ -770,16 +770,14 @@ int main()
               std::string(label) + ": unit 1 still takes its own (reachable) slot");
     };
     {
-        // SAME BODY, ANOTHER LANDMASS - AN OBSERVATION, NOT A ROW. Columns 0 and 6 become
-        // ocean from pole to pole, splitting the cylinder into two landmasses. A land
-        // unit west of column 6 is asked to march to (9,2), east of it. MEASURED
-        // (fix round, 2026-10-31): `march_check` ACCEPTS it - `march_path` reads
-        // `intra_body_path`, which crosses water as a sea leg, and the march's domain
-        // test reads only the destination - so on one body no landmass split refuses a
-        // march, and there is no refused march here for the fix to suppress. Printed,
-        // not asserted, so this harness does not pin what may be a march-domain defect
-        // (a land unit's path crossing open ocean; MILITARY.md § Domains and traversal).
-        // The refusal the fix stops at is F9h's.
+        // SAME BODY, ANOTHER LANDMASS (BL-1466; MILITARY.md § Domains and traversal).
+        // Columns 0 and 6 become ocean from pole to pole, splitting the cylinder into two
+        // landmasses. A land unit west of column 6 is asked to march to (9,2), east of it.
+        // A land class crosses coastal water only where owned and never open ocean, and
+        // the march's PATH is solved around every tile the class may not stand on - not
+        // only its destination - so the march is refused, with no path. (Before the fix
+        // `march_check` accepted it: an 8-tile path with one water tile.) A march on the
+        // unit's own landmass still applies, its path dry.
         fixture f; build(f);
         for (int y = 0; y < H; ++y)
             for (const int x : { 0, 6 })
@@ -790,8 +788,17 @@ int main()
             march_check(f.w, f.A, u, f.at(9, 2), null_entity, &path, &reg.military());
         std::size_t wet = 0;
         for (const entity_id t : path) wet += is_water(f.w.tiles.at(t).substrate) ? 1 : 0;
-        std::printf("  [info] F9g other landmass (observation): march (4,0) -> (9,2) across the ocean column: "
+        std::printf("  [info] F9g other landmass: march (4,0) -> (9,2) across the ocean column: "
                     "march_check %d, path %zu tiles, %zu of them water\n", static_cast<int>(r), path.size(), wet);
+        check(r == corp_command_result::rejected_invalid && path.empty(),
+              "F9g a land unit's march across an open-ocean column is refused (rejected_invalid), no path");
+        std::vector<entity_id> dry;
+        const corp_command_result r2 =
+            march_check(f.w, f.A, u, f.at(2, 2), null_entity, &dry, &reg.military());
+        std::size_t dry_wet = 0;
+        for (const entity_id t : dry) dry_wet += is_water(f.w.tiles.at(t).substrate) ? 1 : 0;
+        check(r2 == corp_command_result::applied && dry.size() >= 2 && dry_wet == 0,
+              "F9g a march on the unit's own landmass still applies, its path crossing no water");
     }
     {
         // SAME LANDMASS, A RINGED SLOT: every neighbour of slot 2 holds a stack of C's

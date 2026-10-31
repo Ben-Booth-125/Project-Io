@@ -595,6 +595,49 @@ std::function<bool(const tile_component&)> class_wall(const military_capability_
     };
 }
 
+std::function<bool(const tile_component&)> domain_wall(world& w, entity_id owner, uint16_t type)
+{
+    const auto& rows = unit_roster_table();
+    if (type >= rows.size())
+        return {};
+    const roster_row* row = &rows[type];
+    const entity_id home = owner_home_nation(w, owner);
+    return [&w, row, home](const tile_component& t) {
+        traversal_domain d = traversal_domain::land;
+        if (is_open_ocean(t.substrate))
+            d = traversal_domain::open_ocean;
+        else if (is_water(t.substrate))
+            d = traversal_domain::coastal_water;
+        bool owned = false;
+        if (d == traversal_domain::coastal_water && home != null_entity)
+        {
+            const auto bit = w.bodies.find(t.body);
+            if (bit != w.bodies.end())
+            {
+                const int gw = bit->second.grid_width;
+                const std::vector<entity_id>& grid = body_tile_grid(w, t.body);
+                const std::size_t idx = static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(gw)
+                                      + static_cast<std::size_t>(t.grid_x);
+                if (gw > 0 && idx < grid.size() && grid[idx] != null_entity)
+                    owned = province_holder_for(w, w.provinces.province_of(grid[idx])) == home;
+            }
+        }
+        return !row_can_traverse(*row, d, owned);
+    };
+}
+
+std::function<bool(const tile_component&)>
+march_wall(world& w, entity_id owner, uint16_t type,
+           const std::function<bool(const tile_component&)>& class_wall_fn)
+{
+    std::function<bool(const tile_component&)> dom = domain_wall(w, owner, type);
+    if (!class_wall_fn)
+        return dom;
+    if (!dom)
+        return class_wall_fn;
+    return [dom, class_wall_fn](const tile_component& t) { return dom(t) || class_wall_fn(t); };
+}
+
 terrain_class_effect unit_terrain_effects(const world& w, const military_capability_params& mil,
                                           const unit_component& u)
 {
