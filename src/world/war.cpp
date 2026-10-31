@@ -10,6 +10,9 @@
 #include "sentiment_emitters.hpp" // queue_conduct, sentiment_conduct_live (BL-1458)
 #include "province.hpp"
 #include "stance.hpp" // write_hostility, are_friends, canonical_pair
+#include "logistics.hpp"      // invalidate_logistics_caches (BL-1460)
+#include "state_industry.hpp" // capital_free_source (BL-1460)
+#include "fronts.hpp"         // reanchor_fronts (BL-1460)
 #include "world.hpp"
 
 #include <algorithm>
@@ -671,20 +674,18 @@ namespace
 {
 std::pair<entity_id, entity_id> war_key(const war_record& war) { return { war.declarer, war.defender }; }
 
-/// Land provinces @p nation owns (politically), counted over the provinces its
-/// tiles touch.
+/// Land provinces @p nation owns (politically): every land province whose
+/// `tile_to_nation` plurality is @p nation. Counted over the WHOLE partition by the
+/// territorial map (BL-1460), never over a list a nation keeps, so a cession at an
+/// earlier peace — which moved the ground — counts here, and the last-province floor
+/// holds across wars.
 std::size_t provinces_owned(const world& w, entity_id nation)
 {
-    const auto nit = w.nations.find(nation);
-    if (nit == w.nations.end())
+    if (w.nations.find(nation) == w.nations.end())
         return 0;
-    std::set<uint32_t> touched;
-    for (const entity_id t : nit->second.tiles)
-        if (const uint32_t p = w.provinces.province_of(t); p != 0)
-            touched.insert(p);
     std::size_t n = 0;
-    for (const uint32_t p : touched)
-        if (province_kind_of(w, p) == province_kind::land && province_owner(w, p) == nation)
+    for (const province& pr : w.provinces.provinces) // ascending id
+        if (province_kind_of(w, pr) == province_kind::land && province_owner(w, pr.id) == nation)
             ++n;
     return n;
 }
@@ -729,16 +730,40 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
     }
     else
     {
-        // White peace: every occupied goal's holder goes back to its owner.
-        // TODO(BL-1460, cession moves territory): the occupying units withdraw by the
-        // retreat rule; for now they stay where they stand.
+        // White peace: every occupied goal's holder goes back to its owner, and the
+        // occupying units withdraw by the retreat rule (BL-1460): the occupier's
+        // units standing on that province's ground the owner holds.
+        std::vector<uint32_t> returned;
+        std::map<uint32_t, std::pair<entity_id, entity_id>> occupied; // goal -> (owner, occupier)
         for (const std::vector<uint32_t>* goals : { &war.declarer_goals, &war.defender_goals })
             for (const uint32_t g : *goals)
             {
-                const entity_id owner = province_owner(w, g);
-                if (owner != null_entity && province_holder_for(w, g) != owner)
+                const entity_id owner  = province_owner(w, g);
+                const entity_id holder = province_holder_for(w, g);
+                if (owner != null_entity && holder != owner)
+                {
                     set_holder(w, g, owner);
+                    returned.push_back(g);
+                    occupied[g] = { owner, holder };
+                }
             }
+        if (!returned.empty())
+        {
+            std::sort(returned.begin(), returned.end());
+            std::vector<entity_id> leaving;
+            for (const auto& [uid, u] : w.units) // collected; withdraw_units walks ascending
+            {
+                if (u.count <= 0 || u.position == null_entity)
+                    continue;
+                const auto oit = occupied.find(w.provinces.province_of(u.position));
+                if (oit == occupied.end() || u.owner != oit->second.second)
+                    continue;
+                const auto tn = w.tile_to_nation.find(u.position);
+                if (tn != w.tile_to_nation.end() && tn->second == oit->second.first)
+                    leaving.push_back(uid);
+            }
+            (void)withdraw_units(w, leaving, returned);
+        }
         h.end = imposed ? war_end::imposed_white : war_end::white_peace;
     }
 
@@ -876,16 +901,224 @@ war_result impose_peace(world& w, const sentiment_params& p, entity_id imposer, 
     return war_result::applied;
 }
 
-void cede_provinces(world& w, entity_id from, entity_id to, const std::vector<uint32_t>& provinces)
+namespace
 {
-    // THE STUB (BL-1460, cession moves territory, fills it in wave 2). Today a
-    // cession moves only the military holder — already `to` for a legal cession —
-    // and records the cession for the LOST GROUND justification. `tile_to_nation`
-    // is deliberately NOT moved here: the ground changing nation (buildings,
-    // centres, law, roads, fronts, the capital) is BL-1460's.
+/// BL-1460 (NR-1102): where a nation whose capital was ceded puts its capital — the
+/// tile of the largest population centre on its remaining land provinces (ties to
+/// the lower province id, then the lower centre id). Read AFTER the ground moved.
+entity_id capital_after_cession(const world& w, entity_id nation)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return null_entity;
+    const auto owns = [&](entity_id t) {
+        const auto it = w.tile_to_nation.find(t);
+        return it != w.tile_to_nation.end() && it->second == nation;
+    };
+    // The nation's land provinces, by the territorial map.
+    std::set<uint32_t> candidates;
+    {
+        std::set<uint32_t> touched;
+        for (const entity_id t : nit->second.tiles)
+            if (owns(t))
+                if (const uint32_t p = w.provinces.province_of(t); p != 0)
+                    touched.insert(p);
+        for (const uint32_t p : touched)
+            if (province_kind_of(w, p) == province_kind::land && province_owner(w, p) == nation)
+                candidates.insert(p);
+    }
+    if (candidates.empty())
+        return null_entity;
+    // Each candidate's largest centre on the nation's own ground: (population, centre
+    // id, tile). Strictly larger wins; a tie keeps the lower centre id, whatever the
+    // unordered store's walk order.
+    struct best_centre { int population = -1; entity_id centre = null_entity; entity_id tile = null_entity; };
+    std::map<uint32_t, best_centre> largest;
+    for (const auto& [cid, pc] : w.population_centres)
+    {
+        const auto tit = w.population_centre_tile.find(cid);
+        if (tit == w.population_centre_tile.end() || !owns(tit->second))
+            continue;
+        const uint32_t p = w.provinces.province_of(tit->second);
+        if (candidates.count(p) == 0)
+            continue;
+        best_centre& b = largest[p];
+        if (pc.population > b.population || (pc.population == b.population && cid < b.centre))
+            b = best_centre{ pc.population, cid, tit->second };
+    }
+    // The province with the largest centre, ties to the lower province id (the map
+    // walks ascending, and only a strictly larger centre replaces the best).
+    uint32_t  best_p = 0;
+    int       best_pop = -1;
+    entity_id best_tile = null_entity;
+    for (const auto& [p, b] : largest)
+        if (b.population > best_pop)
+        {
+            best_p    = p;
+            best_pop  = b.population;
+            best_tile = b.tile;
+        }
+    if (best_tile != null_entity)
+        return best_tile;
+    // No centre stands on any of its provinces (a hand-built fixture): the lowest
+    // province id, at its lowest tile the nation owns.
+    (void)best_p;
+    const province* pr = w.provinces.find(*candidates.begin());
+    if (pr == nullptr)
+        return null_entity;
+    for (const entity_id t : pr->tiles) // ascending
+        if (owns(t))
+            return t;
+    return null_entity;
+}
+
+} // namespace
+
+void cede_provinces(world& w, entity_id from, entity_id to, const std::vector<uint32_t>& provinces_in)
+{
+    std::vector<uint32_t> provinces = provinces_in;
+    std::sort(provinces.begin(), provinces.end());
+    provinces.erase(std::unique(provinces.begin(), provinces.end()), provinces.end());
+    // BL-1460 (RELATIONS.md § 7, "Cession moves the territory"): the holder (already
+    // `to` for a legal cession) and the LOST GROUND record, then the ground itself.
     for (const uint32_t pid : provinces)
     {
         set_holder(w, pid, to);
         w.province_cessions.push_back(province_cession{ from, to, pid, w.current_econ_tick });
     }
+    const auto fit = w.nations.find(from);
+    const auto tit_n = w.nations.find(to);
+    if (fit == w.nations.end() || tit_n == w.nations.end() || from == to)
+        return;
+    nation_component& loser  = fit->second;
+    nation_component& gainer = tit_n->second;
+
+    // The loser's free logistics hub, read while its capital is still its own: the
+    // one `capital_free_source` names.
+    entity_id free_hub = null_entity;
+    for (const entity_id bid : loser.state_assets)
+        if (capital_free_source(w, bid))
+        {
+            free_hub = bid;
+            break;
+        }
+
+    // 1. THE GROUND. Every tile of each ceded province the loser owns passes to the
+    //    gainer, through the one owner setter (which bumps the catchment and front
+    //    stamps). Tiles a third nation owns stay its own. Ascending province, then
+    //    ascending tile: the order is a property of the ids.
+    std::vector<entity_id> moved;
+    for (const uint32_t pid : provinces)
+        if (const province* pr = w.provinces.find(pid))
+            for (const entity_id t : pr->tiles)
+                if (const auto it = w.tile_to_nation.find(t);
+                    it != w.tile_to_nation.end() && it->second == from)
+                {
+                    w.set_tile_nation(t, to);
+                    moved.push_back(t);
+                }
+    std::sort(moved.begin(), moved.end());
+    if (moved.empty())
+        return;
+    const auto was_ceded = [&](entity_id t) { return std::binary_search(moved.begin(), moved.end(), t); };
+
+    // 2. THE NATION'S TILE LIST AND ITS DEPOSIT PROFILE follow: the loser keeps its
+    //    list's order less the ceded tiles; the gainer appends them ascending. The
+    //    Pass-3 profile moves by each tile's deposits (the loser's never below 0).
+    loser.tiles.erase(std::remove_if(loser.tiles.begin(), loser.tiles.end(), was_ceded), loser.tiles.end());
+    for (const entity_id t : moved)
+    {
+        gainer.tiles.push_back(t);
+        if (const auto tc = w.tiles.find(t); tc != w.tiles.end())
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                loser.resource_abundance[r]  = std::max(0.0f, loser.resource_abundance[r] - tc->second.resource_deposit[r]);
+                gainer.resource_abundance[r] += tc->second.resource_deposit[r];
+            }
+    }
+
+    // 3. A CEDED CAPITAL MOVES (NR-1102): to the remaining province with the largest
+    //    population centre, ties to the lower id; its free hub moves with it — unless a
+    //    running hub of the loser already stands there (that one is now the free
+    //    source, and the old one passes with its ground).
+    bool hub_moves = false;
+    entity_id new_capital = null_entity;
+    if (loser.capital_tile != null_entity && was_ceded(loser.capital_tile))
+    {
+        new_capital = capital_after_cession(w, from);
+        if (new_capital != null_entity)
+        {
+            loser.capital_tile = new_capital;
+            if (free_hub != null_entity)
+            {
+                bool already = false;
+                for (const entity_id bid : loser.state_assets)
+                    if (const auto bit = w.buildings.find(bid);
+                        bid != free_hub && bit != w.buildings.end() && bit->second.tile == new_capital
+                        && bit->second.type == building_type::inland_logistics_hub
+                        && bit->second.ticks_remaining <= 0 && !bit->second.decommissioned)
+                        already = true;
+                const auto ct = w.tiles.find(new_capital);
+                hub_moves = !already && ct != w.tiles.end() && !is_water(ct->second.substrate);
+                if (hub_moves)
+                    w.buildings.at(free_hub).tile = new_capital;
+            }
+        }
+    }
+
+    // 4. THE BUILDINGS ON IT change owner with the ground (NATIONS.md: a nation owns
+    //    every building on its ground): out of the loser's list in its order, onto
+    //    the end of the gainer's in that same order.
+    {
+        std::vector<entity_id> keep, pass;
+        keep.reserve(loser.state_assets.size());
+        for (const entity_id bid : loser.state_assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit != w.buildings.end() && was_ceded(bit->second.tile))
+                pass.push_back(bid);
+            else
+                keep.push_back(bid);
+        }
+        loser.state_assets = std::move(keep);
+        gainer.state_assets.insert(gainer.state_assets.end(), pass.begin(), pass.end());
+    }
+
+    // 5. ITS TRACK follows its ground, as the fold hands track to its ground nation.
+    for (const entity_id t : moved)
+        if (const auto rt = w.rail_track.find(t); rt != w.rail_track.end() && rt->second == from)
+            rt->second = to;
+
+    // 6. A muster the loser was raising at a base that passed is dropped: the base is
+    //    no longer its own (the queue's own rule for a base that is gone).
+    w.musters.erase(std::remove_if(w.musters.begin(), w.musters.end(),
+                                   [&](const muster_order& m) {
+                                       return m.owner == from && w.buildings.count(m.base) != 0
+                                           && owner_nation_of(w, m.base) == to;
+                                   }),
+                    w.musters.end());
+    // A unit of the loser raised at such a base no longer records it (null = "no
+    // muster base recorded", never orphaned): the base is another nation's now, and
+    // its demolition there must not disband the loser's unit. Each write reads only
+    // its own unit, so the unordered walk cannot reach the result.
+    for (auto& [uid, u] : w.units)
+        if (u.owner == from && u.muster_base != null_entity && w.buildings.count(u.muster_base) != 0
+            && owner_nation_of(w, u.muster_base) == to)
+            u.muster_base = null_entity;
+
+    // 7. Every derived answer that read the old map: the logistics caches (reach,
+    //    anchors, the power grid, LP fields) drop here; the market catchment and the
+    //    fronts re-derive off the stamps `set_tile_nation` bumped.
+    invalidate_logistics_caches(w);
+
+    // 8. THE LOSER'S UNITS ON CEDED GROUND WITHDRAW by the retreat rule.
+    std::vector<entity_id> leaving;
+    for (const auto& [uid, u] : w.units) // collected, then walked ascending by withdraw_units
+        if (u.owner == from && u.count > 0 && was_ceded(u.position))
+            leaving.push_back(uid);
+    (void)withdraw_units(w, leaving, provinces);
+
+    // 9. Fronts re-anchor onto the new border now, so a save taken before the next
+    //    tick holds no assignment keyed on ground its unit's nation no longer holds.
+    reanchor_fronts(w);
 }

@@ -871,6 +871,65 @@ shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params*
     return out;
 }
 
+int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vector<uint32_t>& leave,
+                   const military_capability_params* mil)
+{
+    if (units.empty() || leave.empty())
+        return 0;
+    std::vector<entity_id> ids = units;
+    std::sort(ids.begin(), ids.end());
+    ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
+    const auto in_leave = [&](entity_id tile) {
+        const uint32_t p = w.provinces.province_of(tile);
+        return p != 0 && std::binary_search(leave.begin(), leave.end(), p);
+    };
+
+    std::set<entity_id> moved;
+    for (const entity_id uid : ids)
+    {
+        const auto uit = w.units.find(uid);
+        if (uit == w.units.end() || uit->second.count <= 0 || uit->second.position == null_entity)
+            continue;
+        unit_component& u = uit->second;
+        std::set<entity_id> visited;
+        bool stepped = false;
+        for (int step = 0; step < k_withdraw_max_steps && in_leave(u.position); ++step)
+        {
+            // Read as the world stands NOW (earlier steps count), plus every tile this
+            // walk has left, so the walk cannot cycle.
+            std::set<entity_id> barred = foreign_held_tiles(w, u.owner);
+            barred.insert(visited.begin(), visited.end());
+            const entity_id to =
+                retreat_tile(w, u, w.provinces.province_of(u.position), barred, true, mil);
+            if (to == null_entity)
+                break;
+            visited.insert(u.position);
+            u.position = to;
+            stepped    = true;
+        }
+        if (!stepped)
+            continue;
+        u.order              = movement_order{};
+        u.tile_since_day     = w.current_day_tick; // it came onto this tile now
+        u.battle_ready_carry = 0;
+        u.battle_hp_carry    = 0;
+        moved.insert(uid);
+    }
+    if (moved.empty())
+        return 0;
+    const auto strip = [&](std::vector<entity_id>& v) {
+        v.erase(std::remove_if(v.begin(), v.end(), [&](entity_id x) { return moved.count(x) != 0; }),
+                v.end());
+    };
+    for (active_battle& b : w.battles)
+    {
+        strip(b.attacker_units);
+        strip(b.defender_units);
+        strip(b.attacking_units);
+    }
+    return static_cast<int>(moved.size());
+}
+
 int unit_entrench_recovery_permille(const world& w, entity_id unit, const campaign_battle_params& p)
 {
     const auto it = w.units.find(unit);

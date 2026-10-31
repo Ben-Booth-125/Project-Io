@@ -717,8 +717,8 @@ int main()
               "P3k at peace both hostility rows clear and the record closes into the history");
         check(w.province_cessions.size() == 1 && w.province_cessions[0].from == f.B && w.province_cessions[0].to == f.A
                   && w.province_cessions[0].province == dg[0]
-                  && province_holder_for(w, dg[0]) == f.A && province_owner(w, dg[0]) == f.B,
-              "P3l the cession stub records the ceded province and keeps its holder; tile_to_nation is BL-1460's (still B's)");
+                  && province_holder_for(w, dg[0]) == f.A && province_owner(w, dg[0]) == f.A,
+              "P3l the cession records the ceded province, keeps its holder, and moves its ground to the gainer (BL-1460)");
         (void)fold_pending_sentiment(w, reg);
         const sentiment_factor& pc = weight(sp, sentiment_factor_kind::peace_concluded);
         const sentiment_factor& ce = weight(sp, sentiment_factor_kind::province_ceded);
@@ -821,6 +821,71 @@ int main()
                   && offer_peace(w, f.A, f.B, cede) == war_result::rejected_state
                   && impose_peace(w, sp, f.A, f.B, cede) == war_result::rejected_state && same(s, w),
               "P3v a cession of the loser's last province is refused, offered or imposed, mutating nothing (NR-1102)");
+    }
+
+    {
+        // BL-1460: with the ground moving at a cession, the LOST GROUND justification
+        // holds through the real flow (war-record-and-declaration R2) and the
+        // last-province floor counts across wars (war-goals-and-peace R3). Every
+        // cession below is a real peace; no cession row is forged.
+        fixture f; build(f);
+        world& w = f.w;
+        const std::vector<uint32_t> bp = f.provs[f.B];
+        const std::vector<uint32_t> first(bp.begin(), bp.begin() + 3);
+        const std::size_t keep = bp.size() - 3; // provinces B keeps after the first peace
+        // War 1: A takes three of B's provinces.
+        check(declare_war(w, sp, f.A, f.B, first) == war_result::applied, "P3y (A declares on three of B's provinces)");
+        for (const uint32_t p : first) w.province_holder[holder_index(w, p)] = f.A;
+        peace_terms cede1; cede1.kind = peace_kind::cession; cede1.gainer = f.A; cede1.provinces = first;
+        check(offer_peace(w, f.A, f.B, cede1) == war_result::applied && accept_peace(w, sp, f.B, f.A) == war_result::applied,
+              "P3y (B accepts the cession of three provinces)");
+        bool moved = true;
+        for (const uint32_t p : first) moved = moved && province_owner(w, p) == f.A;
+        check(moved, "P3y a real cession moves the ceded provinces to the gainer on the territorial map");
+        // Lost ground, through declare_war itself: B names a province it ceded, now A's.
+        w.current_econ_tick += k_war_truce_ticks;
+        const war_price pr = declaration_price(w, sp, f.B, f.A, { first[0] });
+        check(pr.valid && pr.justifications[2] && pr.justified
+                  && declare_war(w, sp, f.B, f.A, { first[0] }) == war_result::applied
+                  && w.wars.count({ f.B, f.A }) == 1,
+              "P3z LOST GROUND holds through the real flow: B declares on A naming a province it ceded, "
+              "the preview shows the justification, and the declaration is accepted (it was refused while "
+              "the ground stayed B's)");
+        // The floor across wars: whittle B down to one province by successive real
+        // cessions to other declarers, then the last one is refused.
+        const entity_id takers[4] = { f.C, f.D, f.E, f.F };
+        std::size_t left = keep, taker = 0;
+        bool whittled = true;
+        while (left > 1 && taker < 64)
+        {
+            const entity_id t = takers[taker++ % 4];
+            if (taker % 4 == 1) w.current_econ_tick += k_war_truce_ticks; // each pair's truce has run
+            std::vector<uint32_t> goals;
+            for (std::size_t i = 3; i < bp.size() && goals.size() < std::min<std::size_t>(3, left - 1); ++i)
+                if (province_owner(w, bp[i]) == f.B) goals.push_back(bp[i]);
+            whittled = whittled && declare_war(w, sp, t, f.B, goals) == war_result::applied;
+            for (const uint32_t p : goals) w.province_holder[holder_index(w, p)] = t;
+            peace_terms c; c.kind = peace_kind::cession; c.gainer = t; c.provinces = goals;
+            whittled = whittled && offer_peace(w, t, f.B, c) == war_result::applied
+                    && accept_peace(w, sp, f.B, t) == war_result::applied;
+            left -= goals.size();
+        }
+        uint32_t last = 0;
+        for (const uint32_t p : bp) if (province_owner(w, p) == f.B) last = p;
+        check(whittled && left == 1 && last != 0, "P3v2 (B is down to one province after cessions in "
+              + std::to_string(taker + 1) + " wars)");
+        w.current_econ_tick += k_war_truce_ticks;
+        const entity_id t = f.C;
+        const bool declared = declare_war(w, sp, t, f.B, { last }) == war_result::applied;
+        w.province_holder[holder_index(w, last)] = t;
+        peace_terms c; c.kind = peace_kind::cession; c.gainer = t; c.provinces = { last };
+        w.wars.at({ t, f.B }).defender_men_lost = 10; // score 100: impose is reachable
+        const snap s = take(w);
+        check(declared && offer_peace(w, t, f.B, c) == war_result::rejected_state
+                  && impose_peace(w, sp, t, f.B, c) == war_result::rejected_state && same(s, w)
+                  && province_owner(w, last) == f.B,
+              "P3v2 the last-province floor counts ACROSS wars: after earlier peaces ceded the rest, a "
+              "cession of B's last province is refused, offered or imposed, mutating nothing (NR-1102)");
     }
 
     // =====================================================================

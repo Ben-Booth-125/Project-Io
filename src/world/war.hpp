@@ -352,9 +352,21 @@ war_result refuse_peace(world& w, entity_id receiver, entity_id offerer);
 war_result impose_peace(world& w, const sentiment_params& p, entity_id imposer,
                         entity_id other, const peace_terms& terms);
 
-/// THE CESSION STUB (wave 2 fills it: BL-1460, cession moves territory). For now
-/// sets `province_holder` to @p to (already so for a legal cession) and records
-/// each province in `world::province_cessions`. `tile_to_nation` is NOT moved.
+/// A CESSION MOVES THE TERRITORY (BL-1460; RELATIONS.md § 7). For each province
+/// (ascending): `province_holder` becomes @p to (already so for a legal cession)
+/// and the cession is recorded in `world::province_cessions` (the LOST GROUND
+/// record). Then every tile of those provinces that @p from owns passes to @p to
+/// in `tile_to_nation` (through `set_tile_nation`, so the catchment and front stamps
+/// move) and in both nations' tile lists and deposit profiles; every building of
+/// @p from's on that ground joins @p to's `state_assets`, in its stored order; its
+/// track follows; a muster @p from was raising at a base that passed is dropped. A
+/// ceded capital moves to @p from's remaining province with the largest population
+/// centre (ties to the lower province id) and its free logistics hub moves with it
+/// (NR-1102). The logistics caches drop; @p from's units on the ceded ground
+/// withdraw by the retreat rule (`withdraw_units`); fronts re-anchor. Population
+/// centres and the jurisdiction of law read `tile_to_nation` live, so they follow
+/// with it. Called only by a concluded cession, whose terms already refused the
+/// loser's last province.
 void cede_provinces(world& w, entity_id from, entity_id to,
                     const std::vector<uint32_t>& provinces);
 

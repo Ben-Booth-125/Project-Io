@@ -942,7 +942,8 @@ private:
 // land province with neither an anchor nor a plurality.
 //
 // Deliberately NARROW: `tile_to_nation` (the territorial map) does NOT follow
-// the holder here — the political map changing hands is unowned work. A held
+// the holder here — only a ceding peace moves the ground (`cede_provinces`,
+// war.hpp; RELATIONS.md § 7). A held
 // province is a fact `condition_subject::province_held` (BL-570) reads.
 //
 // TIES BREAK ON ASCENDING NATION ENTITY ID, the codebase's standing

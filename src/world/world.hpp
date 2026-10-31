@@ -805,9 +805,9 @@ struct world
     /// holder is exactly the kind of tick-mutable state the hash exists to
     /// catch a divergence in (the same distinction battles/provinces already
     /// draw, see the note above). Deliberately narrow: `tile_to_nation` (the
-    /// territorial map) does NOT follow the holder — the political map
-    /// changing hands is unowned work. See docs/military/MILITARY.md § The
-    /// field.
+    /// territorial map) does NOT follow the holder in war — only a ceding
+    /// peace moves the ground (`cede_provinces`, war.hpp; RELATIONS.md § 7).
+    /// See docs/military/MILITARY.md § The field.
     std::vector<entity_id> province_holder;
 
     /// Battles in progress (BL-467) — the record that makes a fight a thing in

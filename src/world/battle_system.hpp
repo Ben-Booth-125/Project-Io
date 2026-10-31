@@ -358,6 +358,24 @@ struct shared_tile_fix
 /// enter (`retreat_tile`'s wall test); a unit with no other way off is disbanded.
 shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params* mil = nullptr);
 
+/// Most retreat steps one unit takes in a `withdraw_units` walk.
+inline constexpr int k_withdraw_max_steps = 32;
+
+/// BL-1460 (RELATIONS.md § 7, "Cession moves the territory"): a peace's WITHDRAWAL.
+/// Each unit of @p units (any order; walked ascending id, each unit once) standing
+/// in a province of @p leave (ascending province ids) steps off by the retreat rule
+/// (`retreat_tile`, with the province term read against the province it stands in):
+/// one crossable land neighbour no other nation's units hold as the world stands at
+/// that step, preferring ground outside its current province, then its own nation's
+/// ground, ties to the lowest tile id — repeated, never back onto a tile this walk
+/// already left, until it stands outside @p leave or @p k_withdraw_max_steps are
+/// taken. A unit with no step stays where it is (the retreat rule's own answer). A
+/// unit that moved loses its order and its battle carries, and leaves every
+/// battle's lists, as a retreat does. No morale is charged: a withdrawal at peace
+/// is not a rout. @return units moved.
+int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vector<uint32_t>& leave,
+                   const military_capability_params* mil = nullptr);
+
 /// The march path @p from -> @p dest on @p body for a unit of @p owner, in TRAVEL
 /// order (path[0] == @p from), solved around every tile in @p blocked save @p dest
 /// itself. The cached `intra_body_path` when its route crosses no blocked tile —
