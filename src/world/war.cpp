@@ -535,6 +535,63 @@ void note_war_battles(world& w, const battle_tick& battles)
         apply_war_morale_ceiling(w);
 }
 
+void accumulate_war_field_days(world& w, int days)
+{
+    if (w.wars.empty() || days <= 0)
+        return;
+    // Per war, each party's units in the field: standing on the other party's
+    // ground, or fighting it in a live battle — as a share of its standing units.
+    std::map<std::pair<entity_id, entity_id>, std::set<entity_id>> fighting; // (owner, enemy) -> units
+    for (const active_battle& b : w.battles)
+    {
+        if (b.state.end != campaign_battle_end::in_progress)
+            continue;
+        for (const entity_id u : b.attacker_units) fighting[{ b.attacker, b.defender }].insert(u);
+        for (const entity_id u : b.defender_units) fighting[{ b.defender, b.attacker }].insert(u);
+    }
+    // (owner, enemy) -> units in the field; owner -> units standing. Integer
+    // counts, so the unordered walk cannot reach them.
+    std::map<std::pair<entity_id, entity_id>, int> in_field;
+    std::map<entity_id, int> units_of;
+    std::map<entity_id, std::vector<entity_id>> enemies;
+    for (const auto& [key, war] : w.wars)
+    {
+        enemies[war.declarer].push_back(war.defender);
+        enemies[war.defender].push_back(war.declarer);
+    }
+    for (const auto& [uid, u] : w.units)
+    {
+        if (u.count <= 0)
+            continue;
+        ++units_of[u.owner];
+        const auto eit = enemies.find(u.owner);
+        if (eit == enemies.end())
+            continue;
+        const auto tn = w.tile_to_nation.find(u.position);
+        for (const entity_id enemy : eit->second)
+        {
+            const bool abroad = tn != w.tile_to_nation.end() && tn->second == enemy;
+            const auto fit = fighting.find({ u.owner, enemy });
+            const bool fights = fit != fighting.end() && fit->second.count(uid) != 0;
+            if (abroad || fights)
+                ++in_field[{ u.owner, enemy }];
+        }
+    }
+    const auto share = [&](entity_id n, entity_id enemy) {
+        const auto tot = units_of.find(n);
+        const auto f = in_field.find({ n, enemy });
+        if (tot == units_of.end() || tot->second <= 0 || f == in_field.end())
+            return 0.0f;
+        return static_cast<float>(f->second) / static_cast<float>(tot->second);
+    };
+    const float d = static_cast<float>(days);
+    for (auto& [key, war] : w.wars) // ascending
+    {
+        war.declarer_field_days += d * share(war.declarer, war.defender);
+        war.defender_field_days += d * share(war.defender, war.declarer);
+    }
+}
+
 void run_war_quarter(world& w)
 {
     // Expired truces go (a truce stands while current_econ_tick < expiry, so the
@@ -544,36 +601,6 @@ void run_war_quarter(world& w)
 
     if (!w.wars.empty())
     {
-        // Units per nation and, per war, each party's units in the field: standing
-        // on the other party's ground, or fighting it in a live battle.
-        std::map<std::pair<entity_id, entity_id>, std::set<entity_id>> fighting; // (owner, enemy) -> units
-        for (const active_battle& b : w.battles)
-        {
-            for (const entity_id u : b.attacker_units) fighting[{ b.attacker, b.defender }].insert(u);
-            for (const entity_id u : b.defender_units) fighting[{ b.defender, b.attacker }].insert(u);
-        }
-        std::map<entity_id, int> units_of;
-        for (const auto& [uid, u] : w.units)
-            if (u.count > 0) ++units_of[u.owner];
-        const auto field_share = [&](entity_id n, entity_id enemy) {
-            const auto tot = units_of.find(n);
-            if (tot == units_of.end() || tot->second <= 0)
-                return 0.0f;
-            const auto fit = fighting.find({ n, enemy });
-            int in_field = 0;
-            for (const auto& [uid, u] : w.units)
-            {
-                if (u.owner != n || u.count <= 0)
-                    continue;
-                const auto tn = w.tile_to_nation.find(u.position);
-                const bool abroad = tn != w.tile_to_nation.end() && tn->second == enemy;
-                const bool fights = fit != fighting.end() && fit->second.count(uid) != 0;
-                if (abroad || fights)
-                    ++in_field;
-            }
-            return static_cast<float>(in_field) / static_cast<float>(tot->second);
-        };
-
         // Provinces each party owns that the other holds: walk the holders once.
         std::map<std::pair<entity_id, entity_id>, int> held; // (owner, holder) -> provinces
         std::set<entity_id> at_war_nations;
@@ -592,17 +619,20 @@ void run_war_quarter(world& w)
             return it == held.end() ? 0 : it->second;
         };
 
-        const float quarter_days = static_cast<float>(k_construction_quarter_days);
+        // The field days the quarter's days accumulated (`accumulate_war_field_days`)
+        // are charged here and reset.
         for (auto& [key, war] : w.wars) // ascending (declarer, defender)
         {
             war.declarer_exhaustion = add_exhaustion(
                 war.declarer_exhaustion,
-                k_war_exhaustion_per_field_day * quarter_days * field_share(war.declarer, war.defender)
+                k_war_exhaustion_per_field_day * war.declarer_field_days
                     + k_war_exhaustion_per_held_province * static_cast<float>(held_by(war.declarer, war.defender)));
             war.defender_exhaustion = add_exhaustion(
                 war.defender_exhaustion,
-                k_war_exhaustion_per_field_day * quarter_days * field_share(war.defender, war.declarer)
+                k_war_exhaustion_per_field_day * war.defender_field_days
                     + k_war_exhaustion_per_held_province * static_cast<float>(held_by(war.defender, war.declarer)));
+            war.declarer_field_days = 0.0f;
+            war.defender_field_days = 0.0f;
         }
     }
 
@@ -698,6 +728,18 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
             }
         h.end = imposed ? war_end::imposed_white : war_end::white_peace;
     }
+
+    // Every battle still being fought between the pair ENDS with the peace, closed
+    // as drawn: erased with no dispatch, no retreat and no holder write, so nothing
+    // a peace settled (a white peace's returned holders, a cession) is undone by a
+    // fight that outlived it. Its units are out of contact from now on.
+    w.battles.erase(
+        std::remove_if(w.battles.begin(), w.battles.end(),
+                       [&](const active_battle& b) {
+                           return (b.attacker == war.declarer && b.defender == war.defender)
+                               || (b.attacker == war.defender && b.defender == war.declarer);
+                       }),
+        w.battles.end());
 
     // Both hostility rows clear; the record closes; the offer goes; a truce opens.
     w.corp_hostile_pairs.erase({ war.declarer, war.defender });

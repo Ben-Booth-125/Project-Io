@@ -116,6 +116,13 @@ struct war_record
     /// Each party's exhaustion from this war, [0, 100].
     float declarer_exhaustion = 0.0f;
     float defender_exhaustion = 0.0f;
+
+    /// Field days this quarter, per party: the share of its standing units in the
+    /// field (on the enemy's ground or fighting it), summed over the days walked
+    /// (`accumulate_war_field_days`). Charged into exhaustion and reset by
+    /// `run_war_quarter`.
+    float declarer_field_days = 0.0f;
+    float defender_field_days = 0.0f;
 };
 
 /// What a peace hands over. White: nothing. Cession: `provinces` pass from the
@@ -354,6 +361,13 @@ void cede_provinces(world& w, entity_id from, entity_id to,
 /// each side's exhaustion; then exhaustion's morale ceiling is applied to the
 /// units of every nation at war. A no-op with no wars.
 void note_war_battles(world& w, const battle_tick& battles);
+
+/// The daily accumulation (advance_quarter_to): adds @p days x each party's share
+/// of its standing units in the field to the war's field-day accumulator. Called
+/// once per military day walked, and once with the REST of the quarter's days when
+/// the walk stops early because nothing military moves (the positions then hold
+/// for the remainder, so the share is the same every one of those days).
+void accumulate_war_field_days(world& w, int days);
 
 /// The quarterly pass (run_economy_step): field days and held provinces raise
 /// each open war's exhaustion; a nation in no open war sheds its residual;

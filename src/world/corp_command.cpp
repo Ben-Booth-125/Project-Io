@@ -1219,6 +1219,11 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             // answer_war, which names its goals. A bare declare is refused there.
             if (at_war(w, cmd.corp, cmd.counterparty))
                 return corp_command_result::rejected_state;
+            // BL-1428 (RELATIONS.md § 7): a truce bars either party declaring on the
+            // other — a bare hostility as much as a war, or a truce could be walked
+            // around the tick after the peace, with no price and no goals.
+            if (truce_between(w, cmd.corp, cmd.counterparty))
+                return corp_command_result::rejected_state;
             const stance_result r = declare_hostile(w, cmd.corp, cmd.counterparty);
             return (r == stance_result::applied) ? corp_command_result::applied
                  : (r == stance_result::rejected_invalid) ? corp_command_result::rejected_invalid

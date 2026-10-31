@@ -17,6 +17,7 @@
 #include "world/battle_system.hpp"
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
+#include "world/economy_system.hpp"
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/sentiment.hpp"
@@ -590,6 +591,7 @@ int main()
         // Field days: one of A's two units stands on B's ground for a quarter.
         const float e0 = rec->declarer_exhaustion;
         const entity_id ua2 = unit(f.A, enemy_tile, 100);
+        accumulate_war_field_days(w, 90); // the quarter's 90 days, as advance_quarter_to walks them
         run_war_quarter(w);
         rec = &w.wars.at({ f.A, f.B });
         const float field = k_war_exhaustion_per_field_day * 90.0f * 0.5f; // half its units abroad
@@ -824,12 +826,155 @@ int main()
         // The offer sits after the war count + one war record + the truce table.
         const war_record& wr = w.wars.begin()->second;
         const std::size_t off = b2.size() - world_save_war_section_bytes(w) + 4
-                              + (4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 * wr.declarer_goals.size() + 4 + 4 * wr.defender_goals.size())
+                              + (4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 + 4 + 4 * wr.declarer_goals.size() + 4 + 4 * wr.defender_goals.size())
                               + 4 + 12 * w.truces.size() + 4 + 4 + 4 + 4 + 4; // to the kind byte
         bad2[off] = 7;
         world untouched;
         check(w.wars.size() == 1 && !from_bytes(bad2, untouched) && untouched.nations.empty(),
               "R4j a corrupt peace offer (kind byte 7) is refused whole on load");
+    }
+
+    // =====================================================================
+    std::printf("\nF - the cold-review fixes\n");
+    {
+        // F1: a peace ends every live battle between the parties, with no holder write.
+        fixture f; build(f);
+        world& w = f.w;
+        const uint32_t goal = f.provs[f.B][0];
+        (void)declare_war(w, sp, f.A, f.B, { goal });
+        (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+        const province& gp = *w.provinces.find(goal);
+        entity_id t = null_entity, nb = null_entity;
+        for (const entity_id c : gp.tiles)
+        {
+            const tile_component& tc = w.tiles.at(c);
+            if (tc.grid_x > 0 && tc.grid_x < GW - 1)
+            {
+                t = c;
+                nb = f.at(tc.grid_x - 1, tc.grid_y);
+                if (nb == null_entity || w.provinces.province_of(nb) == 0) nb = f.at(tc.grid_x + 1, tc.grid_y);
+                break;
+            }
+        }
+        const auto unit = [&](entity_id owner, entity_id tile, int men) {
+            const entity_id u = w.create_entity();
+            unit_component uc{}; uc.position = tile; uc.owner = owner; uc.count = men; uc.establishment = men;
+            w.units[u] = uc;
+            return u;
+        };
+        const entity_id ua = unit(f.A, nb, 3000);
+        (void)unit(f.B, t, 1); // one man: the battle, left running, would end it (F1e)
+        w.province_holder[holder_index(w, goal)] = f.A; // A occupies the goal
+        const bool opened = open_tile_battle(w, 0, t, f.A, f.B, { ua });
+        check(opened && w.battles.size() == 1, "F1a setup: a live battle between the parties in the goal province");
+        check(offer_peace(w, f.B, f.A, peace_terms{}) == war_result::applied
+                  && accept_peace(w, sp, f.A, f.B) == war_result::applied,
+              "F1b a white peace is concluded during the battle");
+        check(w.battles.empty() && province_holder_for(w, goal) == f.B,
+              "F1c the peace ends the battle (closed as drawn) and the goal's holder is returned to its owner");
+        for (int day = 1; day <= 30; ++day)
+            (void)run_military_day(w, reg, day);
+        check(w.battles.empty() && province_holder_for(w, goal) == f.B,
+              "F1d thirty days later no battle has run and the holder stays returned");
+        // The counterfactual, so F1d can fail: the same battle left running after the
+        // holder is handed back DOES write the holder within the thirty days.
+        fixture g; build(g);
+        (void)declare_war(g.w, sp, g.A, g.B, { goal });
+        const entity_id ga = g.w.create_entity();
+        { unit_component uc{}; uc.position = nb; uc.owner = g.A; uc.count = 3000; uc.establishment = 3000; g.w.units[ga] = uc; }
+        { const entity_id gb = g.w.create_entity(); unit_component uc{}; uc.position = t; uc.owner = g.B; uc.count = 1; uc.establishment = 1; g.w.units[gb] = uc; }
+        (void)open_tile_battle(g.w, 0, t, g.A, g.B, { ga });
+        g.w.province_holder[holder_index(g.w, goal)] = g.B;
+        for (int day = 1; day <= 30; ++day)
+            (void)run_military_day(g.w, reg, day);
+        std::printf("    [F1e] battles=%zu holder=%s units=%zu rounds=%d\n", g.w.battles.size(),
+                    province_holder_for(g.w, goal) == g.A ? "A" : "B", g.w.units.size(),
+                    g.w.battles.empty() ? -1 : g.w.battles.front().state.rounds_fought);
+        check(province_holder_for(g.w, goal) == g.A,
+              "F1e (counterfactual) a battle left running moves the holder within thirty days");
+    }
+    {
+        // F2: a truce refuses a bare hostility too, either way, mutating nothing.
+        fixture f; build(f);
+        world& w = f.w;
+        (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+        (void)offer_peace(w, f.A, f.B, peace_terms{});
+        (void)accept_peace(w, sp, f.B, f.A);
+        const snap s = take(w);
+        corp_command dh; dh.verb = corp_verb::declare_hostile;
+        dh.corp = f.A; dh.as_nation = f.A; dh.counterparty = f.B;
+        const corp_command_result r1 = apply_corp_command(w, reg, dh);
+        dh.corp = f.B; dh.as_nation = f.B; dh.counterparty = f.A;
+        const corp_command_result r2 = apply_corp_command(w, reg, dh);
+        check(truce_between(w, f.A, f.B) && r1 == corp_command_result::rejected_state
+                  && r2 == corp_command_result::rejected_state && same(s, w),
+              "F2a under a truce declare_hostile is refused either way, mutating nothing");
+        w.current_econ_tick += k_war_truce_ticks;
+        dh.corp = f.A; dh.as_nation = f.A; dh.counterparty = f.B;
+        check(apply_corp_command(w, reg, dh) == corp_command_result::applied, "F2b once the truce expires it applies");
+    }
+    {
+        // F3: field days accumulate daily.
+        fixture f; build(f);
+        world& w = f.w;
+        (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+        const entity_id abroad = w.provinces.find(f.provs[f.B][2])->tiles.front();
+        const entity_id home   = w.provinces.find(f.provs[f.A][1])->tiles.front();
+        const entity_id u = w.create_entity();
+        unit_component uc{}; uc.position = abroad; uc.owner = f.A; uc.count = 500; uc.establishment = 500;
+        w.units[u] = uc;
+        for (int day = 0; day < 89; ++day) accumulate_war_field_days(w, 1);
+        w.units.at(u).position = home; // steps home on day 90
+        accumulate_war_field_days(w, 1);
+        run_war_quarter(w);
+        const float e = w.wars.at({ f.A, f.B }).declarer_exhaustion;
+        check(std::fabs(e - 8.9f) < 1e-3f && w.wars.at({ f.A, f.B }).declarer_field_days == 0.0f,
+              "F3a 89 days in the field then a step home charges 8.9 (" + std::to_string(e) + "), and the accumulator resets");
+        // The days the walk skips (nothing military moving) count at today's share.
+        w.units.at(u).position = abroad;
+        w.construction_quarter_day = 0;
+        const int walked = advance_quarter_to(w, reg, 90, 0);
+        check(walked == 90 && std::fabs(w.wars.at({ f.A, f.B }).declarer_field_days - 90.0f) < 1e-3f,
+              "F3b a quarter the military pass skips still counts every one of its days (90 field days)");
+    }
+    {
+        // F4: state_hash folds the cessions, the history, opened_day and the offer.
+        fixture f; build(f);
+        world& w = f.w;
+        (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+        const uint64_t h0 = w.state_hash(0);
+        w.wars.at({ f.A, f.B }).opened_day += 1;
+        const uint64_t h1 = w.state_hash(0);
+        w.province_cessions.push_back(province_cession{ f.C, f.D, f.provs[f.C][0], 0 });
+        const uint64_t h2 = w.state_hash(0);
+        w.war_history.push_back(war_history_entry{});
+        w.war_history.back().declarer = f.C; w.war_history.back().defender = f.D;
+        const uint64_t h3 = w.state_hash(0);
+        (void)offer_peace(w, f.A, f.B, peace_terms{});
+        const uint64_t h4 = w.state_hash(0);
+        w.peace_offers.begin()->second.offered_tick += 1;
+        const uint64_t h5 = w.state_hash(0);
+        check(h0 != h1 && h1 != h2 && h2 != h3 && h3 != h4 && h4 != h5,
+              "F4 state_hash moves with opened_day, a cession, a history entry, an offer and its tick");
+    }
+    {
+        // F5: the loader refuses a war whose hostility rows are missing.
+        fixture f; build(f);
+        world& w = f.w;
+        (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+        world a = w;
+        a.corp_hostile_pairs.erase({ f.A, f.B });
+        world back;
+        check(!from_bytes(to_bytes(a), back) && back.nations.empty(),
+              "F5a a war with no declarer->defender hostility row is refused whole on load");
+        (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+        world b = w;
+        b.corp_hostile_pairs.erase({ f.B, f.A });
+        world back2;
+        check(!from_bytes(to_bytes(b), back2) && back2.nations.empty(),
+              "F5b an answered war with no defender->declarer row is refused whole on load");
+        world back3;
+        check(from_bytes(to_bytes(w), back3), "F5c the intact stream loads");
     }
 
     // =====================================================================

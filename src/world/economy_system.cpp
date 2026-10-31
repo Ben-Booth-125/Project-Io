@@ -4962,10 +4962,16 @@ int advance_quarter_to(world& w, const recipe_registry& reg, int day_in_quarter,
             // Nothing military left to walk: construction takes the rest in one call,
             // which walks the identical days (advance_construction_to is days-outer).
             advance_construction_to(w, reg, to);
+            // BL-1428: no unit moves and no battle runs on the days skipped, so each
+            // party's field share is today's for all of them — charged in one call.
+            accumulate_war_field_days(w, to - d + 1);
             break;
         }
         advance_construction_to(w, reg, d);
         military_day_result r = run_military_day(w, reg, quarter_first_day_tick + d);
+        // BL-1428 (RELATIONS.md § 7, "each day its units stand in the field"): the
+        // day's positions, after its march, count one day.
+        accumulate_war_field_days(w, 1);
         if (dispatches != nullptr)
             dispatches->insert(dispatches->end(),
                                std::make_move_iterator(r.battles.dispatches.begin()),

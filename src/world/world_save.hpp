@@ -608,7 +608,8 @@ inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 /// RELATIONS.md § 7): A TRAILING SECTION after v68's Alarm section carries, each after
 /// a u32 count: every open war in (declarer, defender) order as (declarer, defender, u8
 /// answered, i32 opened tick, i32 opened day, i64 declarer men lost, i64 defender men
-/// lost, f32 declarer exhaustion, f32 defender exhaustion, u32 n + n x u32 declarer
+/// lost, f32 declarer exhaustion, f32 defender exhaustion, f32 declarer field days, f32
+/// defender field days, u32 n + n x u32 declarer
 /// goals, u32 m + m x u32 defender goals); every truce in canonical-pair order as (a, b,
 /// i32 expiry tick); every pending peace offer in war-key order as (declarer, defender,
 /// offerer, i32 tick, u8 kind, gainer, u32 n + n x u32 provinces); the closed-war

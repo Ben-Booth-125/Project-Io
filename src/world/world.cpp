@@ -744,7 +744,7 @@ uint64_t world::state_hash(int tick) const
     // inputs, exhaustion, a truce, a pending offer. Each table is an ordered map,
     // folded in its own order, and contributes NOTHING when empty, so a world that
     // never goes to war hashes exactly as it did before wars existed. The closed
-    // history and the cessions are consequences of these and are not folded.
+    // history and the cessions are folded below on the same gate.
     if (!wars.empty())
     {
         fnv1a_u32(h, 0x57415253u); // 'WARS'
@@ -755,6 +755,9 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, r.defender);
             fnv1a_u32(h, r.answered ? 1u : 0u);
             fnv1a_i32(h, r.opened_tick);
+            fnv1a_i32(h, r.opened_day);
+            fnv1a_f32(h, r.declarer_field_days);
+            fnv1a_f32(h, r.defender_field_days);
             fnv1a_bytes(h, &r.declarer_men_lost, sizeof r.declarer_men_lost);
             fnv1a_bytes(h, &r.defender_men_lost, sizeof r.defender_men_lost);
             fnv1a_f32(h, r.declarer_exhaustion);
@@ -783,9 +786,42 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, key.first);
             fnv1a_u32(h, key.second);
             fnv1a_u32(h, o.offerer);
+            fnv1a_i32(h, o.offered_tick);
             fnv1a_u32(h, static_cast<uint32_t>(o.terms.kind));
             fnv1a_u32(h, o.terms.gainer);
+            fnv1a_u32(h, static_cast<uint32_t>(o.terms.provinces.size()));
             for (const uint32_t p : o.terms.provinces) fnv1a_u32(h, p);
+        }
+    }
+    // The cessions feed a declaration's price (lost ground) and the history is the
+    // record a war closes into: both are state a divergence would show in.
+    if (!province_cessions.empty())
+    {
+        fnv1a_u32(h, 0x43454453u); // 'CEDS'
+        fnv1a_u32(h, static_cast<uint32_t>(province_cessions.size()));
+        for (const province_cession& c : province_cessions)
+        {
+            fnv1a_u32(h, c.from);
+            fnv1a_u32(h, c.to);
+            fnv1a_u32(h, c.province);
+            fnv1a_i32(h, c.tick);
+        }
+    }
+    if (!war_history.empty())
+    {
+        fnv1a_u32(h, 0x48495354u); // 'HIST'
+        fnv1a_u32(h, static_cast<uint32_t>(war_history.size()));
+        for (const war_history_entry& e : war_history)
+        {
+            fnv1a_u32(h, e.declarer);
+            fnv1a_u32(h, e.defender);
+            fnv1a_i32(h, e.opened_tick);
+            fnv1a_i32(h, e.closed_tick);
+            fnv1a_u32(h, static_cast<uint32_t>(e.end));
+            fnv1a_u32(h, e.gainer);
+            fnv1a_i32(h, e.final_score);
+            fnv1a_u32(h, static_cast<uint32_t>(e.ceded.size()));
+            for (const uint32_t p : e.ceded) fnv1a_u32(h, p);
         }
     }
     if (!war_exhaustion_residual.empty())

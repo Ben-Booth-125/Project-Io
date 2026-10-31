@@ -1884,6 +1884,8 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i64(out, r.defender_men_lost);
             w_f32(out, r.declarer_exhaustion);
             w_f32(out, r.defender_exhaustion);
+            w_f32(out, r.declarer_field_days);
+            w_f32(out, r.defender_field_days);
             w_provs(r.declarer_goals);
             w_provs(r.defender_goals);
         }
@@ -1944,7 +1946,7 @@ std::size_t world_save_war_section_bytes(const world& w)
 {
     std::size_t n = 6 * 4;
     for (const auto& [key, r] : w.wars)
-        n += 4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 * r.declarer_goals.size() + 4
+        n += 4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 + 4 + 4 * r.declarer_goals.size() + 4
            + 4 * r.defender_goals.size();
     n += 12 * w.truces.size();
     for (const auto& [key, o] : w.peace_offers)
@@ -3463,6 +3465,10 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             return true;
         };
         const auto exh_ok = [](float v) { return std::isfinite(v) && v >= 0.0f && v <= 100.0f; };
+        // A quarter's field days are at most its days (share <= 1 a day).
+        const auto days_ok = [](float v) {
+            return std::isfinite(v) && v >= 0.0f && v <= static_cast<float>(k_construction_quarter_days);
+        };
         const std::size_t pairs_max = s.nations.size() * s.nations.size();
 
         uint32_t nw = 0;
@@ -3476,13 +3482,20 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 || !r_i32(in, r.opened_tick) || !r_i32(in, r.opened_day)
                 || !r_i64(in, r.declarer_men_lost) || !r_i64(in, r.defender_men_lost)
                 || !r_f32(in, r.declarer_exhaustion) || !r_f32(in, r.defender_exhaustion)
+                || !r_f32(in, r.declarer_field_days) || !r_f32(in, r.defender_field_days)
                 || !r_provs(r.declarer_goals, 1, k_war_goals_max)
                 || !r_provs(r.defender_goals, 0, k_war_goals_max))
                 return false;
             if (answered > 1 || !nation_ok(r.declarer) || !nation_ok(r.defender)
                 || r.declarer == r.defender || r.declarer_men_lost < 0 || r.defender_men_lost < 0
                 || !exh_ok(r.declarer_exhaustion) || !exh_ok(r.defender_exhaustion)
+                || !days_ok(r.declarer_field_days) || !days_ok(r.defender_field_days)
                 || (answered == 1) != !r.defender_goals.empty())
+                return false;
+            // A war's hostility is its gate (RELATIONS.md § 7): the declarer's row
+            // toward the defender always stands, and the defender's once it answered.
+            if (s.corp_hostile_pairs.count({ r.declarer, r.defender }) == 0
+                || (answered == 1 && s.corp_hostile_pairs.count({ r.defender, r.declarer }) == 0))
                 return false;
             r.answered = answered == 1;
             const std::pair<entity_id, entity_id> key{r.declarer, r.defender};
