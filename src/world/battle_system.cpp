@@ -602,28 +602,47 @@ std::function<bool(const tile_component&)> domain_wall(world& w, entity_id owner
         return {};
     const roster_row* row = &rows[type];
     const entity_id home = owner_home_nation(w, owner);
-    return [&w, row, home](const tile_component& t) {
-        traversal_domain d = traversal_domain::land;
-        if (is_open_ocean(t.substrate))
-            d = traversal_domain::open_ocean;
-        else if (is_water(t.substrate))
-            d = traversal_domain::coastal_water;
-        bool owned = false;
-        if (d == traversal_domain::coastal_water && home != null_entity)
+    const bool land_row = (row->domains & domain_bit(traversal_domain::land)) != 0;
+    return [&w, row, home, land_row](const tile_component& t) {
+        return tile_domain_blocks(w, *row, land_row, home, t);
+    };
+}
+
+bool tile_domain_blocks(world& w, const roster_row& row, bool land_row, entity_id home,
+                        const tile_component& t)
+{
+    traversal_domain d = traversal_domain::land;
+    if (is_open_ocean(t.substrate))
+        d = traversal_domain::open_ocean;
+    else if (is_water(t.substrate))
+        d = traversal_domain::coastal_water;
+    // A BRIDGE IS A ROAD (Ben, 2026-10-17; LOGISTICS.md § 4): a roaded water tile is
+    // crossed as land by a land class - the road lifts the domain wall as it lifts the
+    // class's terrain wall (`class_wall`, blocked unless roaded). A naval row still
+    // reads the water under it.
+    if (d != traversal_domain::land && land_row && tile_has_road(t))
+        d = traversal_domain::land;
+    bool owned = false;
+    if (d == traversal_domain::coastal_water && home != null_entity)
+    {
+        // WATER IS OWNED PER TILE (PROVINCES.md § Who owns water): the shoreline ring and
+        // lakes carry their owner in `tile_to_nation` (derive_water_ownership); a water
+        // province has no holder, so the province accessor would read every shore unowned.
+        const auto bit = w.bodies.find(t.body);
+        if (bit != w.bodies.end())
         {
-            const auto bit = w.bodies.find(t.body);
-            if (bit != w.bodies.end())
+            const int gw = bit->second.grid_width;
+            const std::vector<entity_id>& grid = body_tile_grid(w, t.body);
+            const std::size_t idx = static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(gw)
+                                  + static_cast<std::size_t>(t.grid_x);
+            if (gw > 0 && idx < grid.size() && grid[idx] != null_entity)
             {
-                const int gw = bit->second.grid_width;
-                const std::vector<entity_id>& grid = body_tile_grid(w, t.body);
-                const std::size_t idx = static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(gw)
-                                      + static_cast<std::size_t>(t.grid_x);
-                if (gw > 0 && idx < grid.size() && grid[idx] != null_entity)
-                    owned = province_holder_for(w, w.provinces.province_of(grid[idx])) == home;
+                const auto it = w.tile_to_nation.find(grid[idx]);
+                owned = it != w.tile_to_nation.end() && it->second == home;
             }
         }
-        return !row_can_traverse(*row, d, owned);
-    };
+    }
+    return !row_can_traverse(row, d, owned);
 }
 
 std::function<bool(const tile_component&)>

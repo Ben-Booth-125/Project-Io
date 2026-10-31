@@ -690,7 +690,7 @@ bool front_reachable(world& w, const recipe_registry& reg, entity_id unit, const
     // nearest first, ties to the lower index.
     const std::size_t len = f.span.size(), s = len / 2;
     const std::function<bool(const tile_component&)> wall =
-        class_wall(reg.military(), uit->second.type);
+        march_wall(w, uit->second.owner, uit->second.type, class_wall(reg.military(), uit->second.type));
     std::vector<entity_id> order;
     order.reserve(len);
     for (std::size_t d = 0; d < len; ++d)
@@ -788,6 +788,9 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
         // front routes as a march does, so a tile the unit's class cannot enter (blocked
         // unless roaded, no road) is never its slot or its target. `walled_for` is the
         // class's wall test; an empty test (a class the ground never walls) walls nothing.
+        // BL-1466: the wall is `march_wall` - the class's DOMAIN too, so a slot on water
+        // the unit may not stand on (open ocean, another polity's shore) is skipped for
+        // the next candidate, not asked of march_check and refused every day.
         using wall_fn = std::function<bool(const tile_component&)>;
         const auto walled_for = [&](const wall_fn& wall, entity_id t) {
             if (!wall)
@@ -807,7 +810,7 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
             const unit_component& u = w.units.at(uid);
             if (busy(uid, u))
                 return;
-            const wall_fn wall = class_wall(reg.military(), u.type);
+            const wall_fn wall = march_wall(w, u.owner, u.type, class_wall(reg.military(), u.type));
             const std::size_t s = slot_index(i);
             std::vector<entity_id> slots; // nearest first, ties to the lower index
             slots.reserve(len);
@@ -876,7 +879,7 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
                     if (a.d != b.d) return a.d < b.d;
                     return a.t < b.t;
                 });
-                const wall_fn wall = class_wall(reg.military(), u.type);
+                const wall_fn wall = march_wall(w, u.owner, u.type, class_wall(reg.military(), u.type));
                 bool done = false;
                 for (const ranked& r : order)
                 {

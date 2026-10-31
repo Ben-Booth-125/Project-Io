@@ -801,6 +801,73 @@ int main()
               "F9g a march on the unit's own landmass still applies, its path crossing no water");
     }
     {
+        // F9k-F9n (BL-1466 fix round; MILITARY.md § Domains and traversal, PROVINCES.md §
+        // Who owns water): WATER IS OWNED PER TILE. Column 0 is ocean pole to pole (no way
+        // round the cylinder) and column 6 is a strait: rows 0-2 the test's water, rows 3-5
+        // ocean. A land unit at (4,1) marches to (9,1); the strait is the only crossing.
+        // The province holders are seeded as `seed_province_holders` seeds them - land
+        // provinces held, WATER PROVINCES NULL - so a province-holder reading of ownership
+        // (the bug) reads every shore unowned, and F9k/F9n fail under it.
+        enum class strait { own_coast, foreign_coast, own_ocean, foreign_bridge };
+        const auto strait_case = [&](strait kind, std::size_t& wet_out) {
+            fixture f; build(f);
+            for (int y = 0; y < H; ++y)
+                f.w.tiles.at(f.at(0, y)).substrate = terrain_substrate::ocean;
+            for (int y = 3; y < H; ++y)
+                f.w.tiles.at(f.at(6, y)).substrate = terrain_substrate::ocean;
+            for (int y = 0; y < 3; ++y)
+            {
+                tile_component& t = f.w.tiles.at(f.at(6, y));
+                t.substrate = (kind == strait::own_ocean) ? terrain_substrate::ocean : terrain_substrate::coast;
+                if (kind == strait::foreign_coast || kind == strait::foreign_bridge)
+                    f.w.set_tile_nation(f.at(6, y), f.C);
+                if (kind == strait::foreign_bridge)
+                    t.road_edges = road_edges_on_every_side(1);
+            }
+            f.w.province_holder.assign(f.w.provinces.provinces.size(), null_entity);
+            for (std::size_t i = 0; i < f.w.provinces.provinces.size(); ++i)
+            {
+                const province& p = f.w.provinces.provinces[i];
+                const tile_component& t0 = f.w.tiles.at(p.tiles.front());
+                if (is_water(t0.substrate))
+                {
+                    // A water province holds nobody (seed_province_holders). F9l instead
+                    // gives C's strait a holder that DISAGREES with its tiles (A), so a
+                    // province reading would let A wade C's water: only the per-tile
+                    // owner refuses it.
+                    if (kind == strait::foreign_coast)
+                        f.w.province_holder[i] = f.A;
+                    continue;
+                }
+                const auto tn = f.w.tile_to_nation.find(p.tiles.front());
+                if (tn != f.w.tile_to_nation.end())
+                    f.w.province_holder[i] = tn->second;
+            }
+            const entity_id u = add_unit(f, f.A, f.at(4, 1));
+            std::vector<entity_id> path;
+            const corp_command_result r =
+                march_check(f.w, f.A, u, f.at(9, 1), null_entity, &path, &reg.military());
+            wet_out = 0;
+            for (const entity_id t : path) wet_out += is_water(f.w.tiles.at(t).substrate) ? 1 : 0;
+            return r;
+        };
+        std::size_t wet = 0;
+        const corp_command_result own = strait_case(strait::own_coast, wet);
+        std::printf("  [info] F9k own strait: march_check %d, %zu water tile(s) on the path\n", static_cast<int>(own), wet);
+        check(own == corp_command_result::applied && wet > 0,
+              "F9k a land unit's march across its OWN nation's coastal strait is accepted, the path crossing it");
+        const corp_command_result foreign = strait_case(strait::foreign_coast, wet);
+        check(foreign == corp_command_result::rejected_invalid,
+              "F9l a march across ANOTHER nation's coastal water is refused (rejected_invalid)");
+        const corp_command_result ocean = strait_case(strait::own_ocean, wet);
+        check(ocean == corp_command_result::rejected_invalid,
+              "F9m a march across open ocean is refused, whoever's tiles they are");
+        const corp_command_result bridge = strait_case(strait::foreign_bridge, wet);
+        std::printf("  [info] F9n bridged foreign strait: march_check %d, %zu water tile(s) on the path\n", static_cast<int>(bridge), wet);
+        check(bridge == corp_command_result::applied && wet > 0,
+              "F9n a roaded crossing (a bridge is a road) over another nation's coastal water is crossed as land");
+    }
+    {
         // SAME LANDMASS, A RINGED SLOT: every neighbour of slot 2 holds a stack of C's
         // (not hostile to A), and a march path never crosses a foreign-held tile.
         fixture f; build(f);

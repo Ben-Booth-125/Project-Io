@@ -814,39 +814,24 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
     const auto dit = w.tiles.find(tile);
     if (dit == w.tiles.end())
         return corp_command_result::rejected_invalid;
-    const uint32_t dprov = w.provinces.province_of(tile);
-    const province* dp   = w.provinces.find(dprov);
 
     // BL-778: MAY THIS TYPE BE THERE. A unit type declares the domains it
     // may cross (docs/military/MILITARY.md § Domains and traversal). A land
     // type may enter coastal water its OWN polity holds and no other water.
-    // The tile's domain is its province's kind; a tile no province holds is
-    // read off its substrate (water is the open ocean, at any price).
+    // BL-1466 fix round: the ONE test the path is solved around
+    // (`tile_domain_blocks`): the tile's domain off its substrate, coastal water
+    // owned PER TILE (`tile_to_nation`; a water province has no holder, so the
+    // province accessor read every shore unowned), a bridge crossed as land.
     {
-        traversal_domain dest_domain = traversal_domain::land;
-        if (dp != nullptr)
-        {
-            const province_kind pk = province_kind_of(w, *dp);
-            dest_domain = (pk == province_kind::open_ocean)    ? traversal_domain::open_ocean
-                        : (pk == province_kind::coastal_water) ? traversal_domain::coastal_water
-                                                               : traversal_domain::land;
-        }
-        else if (is_water(dit->second.substrate))
-            dest_domain = traversal_domain::open_ocean;
-
         const std::vector<roster_row>& rows = unit_roster_table();
         if (uit->second.type >= rows.size())
             return corp_command_result::rejected_invalid; // no such row to ask
-
-        bool owned_by_mover = false;
-        if (dest_domain == traversal_domain::coastal_water)
-        {
-            // BL-1402: owner-generic — a corporation's home nation, or the
-            // nation itself when it marches as itself.
-            const entity_id home = owner_home_nation(w, actor);
-            owned_by_mover = (home != null_entity) && (province_holder_for(w, dprov) == home);
-        }
-        if (!row_can_traverse(rows[uit->second.type], dest_domain, owned_by_mover))
+        const roster_row& row = rows[uit->second.type];
+        // BL-1402: owner-generic - a corporation's home nation, or the
+        // nation itself when it marches as itself.
+        const entity_id home = owner_home_nation(w, actor);
+        const bool land_row = (row.domains & domain_bit(traversal_domain::land)) != 0;
+        if (tile_domain_blocks(w, row, land_row, home, dit->second))
             return corp_command_result::rejected_invalid;
     }
 
