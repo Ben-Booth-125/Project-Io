@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*36 entries — 30 open, 6 resolved.*
+*37 entries — 31 open, 6 resolved.*
 
 ---
 
@@ -401,6 +401,20 @@ The war grant's Not-admitted clause says the player's wars "only the player answ
 > **Recommendation:** 1A, 2A, 3A. (3) answers diplomacy.md open question 2 as well.
 
 *Files: `src/world/corp_ai.cpp`, `src/world/war.cpp`*
+
+### NR-1121 — Wars cost the economy gate 1.6 points: G1 at tick 50 now 83.5
+*decision · raised 2026-10-31 · from Sprint 61 wave 2 gate on main 37b8ac7c (rivals declare war merged), 2026-10-31*
+
+War census, 16 library seeds to tick 40: 34 wars on 9 seeds (seed 25 has 13, with 11 of 43 nations at war at once); seeds 12, 28, 31, 32, 37, 38, 40 see none; every peace by tick 40 is white; one rival declares on the player (seed 10). market_viability full with wars: G1 93.2, G1b 2.5, G2 190.5, G3 100 all pass; G1 at tick 50 falls from 85.1 to 83.5 against its 85 floor (seed 25 92.1 -> 84.6, seed 0 87.5 -> 83.1). Hostile cargo is intercepted, so a war idles the processors that fed on it - the designed consequence, measured.
+
+**Why it matters.** G1t50 is already the marginal gate BL-1442 (post-capacity starvation) carries; wars push it under. The war band, and this cost, are what the wave re-bless will pin.
+
+- A: accept - wars are meant to cost trade; BL-1442 carries G1t50 as before
+- B: calm the rivals (raise the declaration bar) until G1t50 clears 85 with wars on
+
+> **Recommendation:** A. A war that costs nothing would be the defect; damping rivals to protect a gate is a forced outcome.
+
+*Files: `src/world/corp_ai.cpp`, `tools/verify/war_census.cpp`*
 
 ---
 

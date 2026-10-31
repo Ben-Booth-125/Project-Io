@@ -7639,11 +7639,11 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1459 - sprint 61 (Ben, 2026-10-30)",
    "batch": "sprint-61",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-31",
+   "resolution": "All rows complete on main 13ee6831.",
    "rows": [
     {
      "id": "R1",
@@ -7656,12 +7656,12 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: war_harness"
      ],
      "requirement": "The price: hostility_declared on the defender's row toward the declarer; war_declared on every other nation's row toward the declarer, magnitude doubled for a nation bordering either party and raised per goal past the first; halved when any justification holds. Each of the four justifications (grievance, embargo, lost ground, a friend attacked) is detected by its condition row, and a preview read returns the same price the declaration then charges.",
-     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness R2a-R2m pass, but the lost-ground justification cannot hold through the real flow while cession moves only province_holder (cold review); completes with BL-1460 (cession moves territory)."
+     "notes": "main 13ee6831, 2026-10-31: war_harness 158/0; P3z: after a real cession the loser declares naming the province it lost, the preview shows lost ground and declare_war is accepted."
     },
     {
      "id": "R3",
@@ -7700,11 +7700,11 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1428 - sprint 61 (Ben, 2026-10-30)",
    "batch": "sprint-61",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-31",
+   "resolution": "All rows complete on main 13ee6831.",
    "rows": [
     {
      "id": "R1",
@@ -7726,12 +7726,12 @@
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: war_harness"
      ],
      "requirement": "Peace offers live in their own table, one pending per war. White peace changes nothing hands; cession passes only named goals the receiver holds, never the loser's last province. A side at score 100 may impose without acceptance. At peace both hostility rows clear, the record closes, and a 16-tick truce refuses declare_war either way. peace_concluded and province_ceded emit as RELATIONS.md says.",
-     "notes": "integrated main 3f2c068a, 2026-10-31: war_harness P3 passes incl. defender impose (P3x), but the last-province guard does not count across wars and cessions are not final while tile_to_nation stays with the loser; completes with BL-1460."
+     "notes": "main 13ee6831, 2026-10-31: war_harness P3v2: successive real cessions bring a nation to one province; ceding it is refused offered or imposed, world unchanged; P3r2/P3r3 every peace returns the war's uncedeed goals, third nations untouched."
     },
     {
      "id": "R4",
@@ -7752,42 +7752,42 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1460 - sprint 61 (Ben, 2026-10-30)",
    "batch": "sprint-61",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-31",
+   "resolution": "All rows complete on main 13ee6831.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: cession_harness"
      ],
      "requirement": "On a library seed, a ceded province's tiles move to the receiver in tile_to_nation; every building on them changes owner with the ground; its population centre, law jurisdiction and road network membership follow; fronts re-derive; the loser's units on ceded ground withdraw by the retreat rule.",
-     "notes": null
+     "notes": "main 13ee6831, 2026-10-31: cession_harness 23/0 on seed 28 (C1 ground, buildings, centres, jurisdiction, roads, fronts, withdrawal; C3 capital and hub, last-province refusal; C4 white peace; C2/C5 caches, money, save, determinism; C6 load-safe fronts; C7 wings; C8/C9 cravings fixed at v71); money_conservation, fold_census, fronts_harness, world_determinism unmoved."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: cession_harness"
      ],
      "requirement": "A ceded capital moves the loser's capital to its remaining province with the largest population centre (ties to the lower id), and the free logistics hub moves with it. A peace that would cede the last province is refused.",
-     "notes": null
+     "notes": "main 13ee6831, 2026-10-31: cession_harness 23/0 on seed 28 (C1 ground, buildings, centres, jurisdiction, roads, fronts, withdrawal; C3 capital and hub, last-province refusal; C4 white peace; C2/C5 caches, money, save, determinism; C6 load-safe fronts; C7 wings; C8/C9 cravings fixed at v71); money_conservation, fold_census, fronts_harness, world_determinism unmoved."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: cession_harness"
      ],
      "requirement": "A white peace returns every occupied goal's holder to its owner, and the occupying units withdraw by the retreat rule.",
-     "notes": null
+     "notes": "main 13ee6831, 2026-10-31: cession_harness 23/0 on seed 28 (C1 ground, buildings, centres, jurisdiction, roads, fronts, withdrawal; C3 capital and hub, last-province refusal; C4 white peace; C2/C5 caches, money, save, determinism; C6 load-safe fronts; C7 wings; C8/C9 cravings fixed at v71); money_conservation, fold_census, fronts_harness, world_determinism unmoved."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: money_conservation",
       "headless: fold_census",
@@ -7796,7 +7796,7 @@
       "headless: the front harnesses"
      ],
      "requirement": "Conservation, the fold, the save and determinism hold across a cession; no consumer of tile_to_nation keeps a stale cache.",
-     "notes": null
+     "notes": "main 13ee6831, 2026-10-31: cession_harness 23/0 on seed 28 (C1 ground, buildings, centres, jurisdiction, roads, fronts, withdrawal; C3 capital and hub, last-province refusal; C4 white peace; C2/C5 caches, money, save, determinism; C6 load-safe fronts; C7 wings; C8/C9 cravings fixed at v71); money_conservation, fold_census, fronts_harness, world_determinism unmoved."
     }
    ]
   },
@@ -7806,49 +7806,49 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1461 - sprint 61 (Ben, 2026-10-30)",
    "batch": "sprint-61",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-10-31",
+   "resolution": "All rows complete on main 13ee6831.",
    "rows": [
     {
      "id": "R1",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: stance_determinism",
       "headless: spectator_determinism"
      ],
      "requirement": "A rival's war choices are pure, seeded and replayable: two runs of one seed declare, answer and make peace identically.",
-     "notes": null
+     "notes": "main 13ee6831, 2026-10-31: war_harness RW9/RW10; war_census --replay byte-identical on seeds 0, 11, 25, 41 (stance_determinism does not reach the war pass, recorded)."
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: war_census (par-seeds, 16 seeds)"
      ],
      "requirement": "Across the 16 library seeds by tick 40 at least one war is declared somewhere, and no seed has every nation at war. The measured counts are reported as a decision entry (the band is calibration).",
-     "notes": null
+     "notes": "main 13ee6831, 2026-10-31: war_census 16 seeds to tick 40: 34 wars on 9 seeds, max 11 of 43 at war, none on 7 seeds, no settle wars; decision entry NR-1121."
     },
     {
      "id": "R3",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: war_harness"
      ],
      "requirement": "A rival answers a declaration against it, offers and accepts or refuses peace, and imposes at 100, only through the legal verbs; the player's nation is never acted for.",
-     "notes": null
+     "notes": "main 13ee6831, 2026-10-31: war_harness RW1-RW10b: answers, offers, accepts, refuses, imposes at 100 only through verbs; the player's nation is never acted for."
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "headless: market_viability (full)",
       "headless: world_determinism"
      ],
      "requirement": "The economy readings and digest movement are reported with their cause; only invariants gate the merge, and the wave's re-bless waits on Ben.",
-     "notes": null
+     "notes": "main 13ee6831, 2026-10-31: market_viability FULL with wars: G1 93.2 PASS, G1t50 83.5 FAIL (85.1 before wars; a calibration gate carried by BL-1442, not an invariant), G1b 2.5, G2 190.5, G3 100; world_determinism unmoved; live-tick digests move - re-bless waits on Ben (NR-1121)."
     }
    ]
   },
