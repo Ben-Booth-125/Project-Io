@@ -394,9 +394,9 @@ int main()
     // script, the registry and the rows no longer exist.
     //
     // WORTH KNOWING RATHER THAN JUST DELETING: those rows were the ONLY AUTHORED
-    // `condition_set` CONTENT IN THE GAME. The substrate is intact and still has a
-    // live consumer (`world::corp_embargo_conditions`), but nothing authors a
-    // non-empty one any more, so META_LAYER.md's predicate layer is now a
+    // `condition_set` CONTENT IN THE GAME. The substrate is intact (laws carry one;
+    // the corp-keyed embargo store that also did became BL-1418's nation pairs), but
+    // nothing authors a non-empty one any more, so META_LAYER.md's predicate layer is now a
     // mechanism with no content exercising it end to end. C1-C8 still measure the
     // substrate itself; what is no longer covered is a real authored table
     // parsing into it.

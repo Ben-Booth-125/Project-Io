@@ -205,8 +205,8 @@ enum class sentiment_factor_kind : uint8_t
     /// butter.
     levy_charged = 6,
 
-    /// The subject refused to deal with the observer at all — the embargo
-    /// predicate (`world::corp_embargo_conditions`, BL-350 Q2) firing.
+    /// The subject refused to deal with the observer at all — the subject
+    /// enacted an embargo of the observer (`world::nation_embargoes`, BL-1418).
     embargo_imposed = 7,
 
     /// The subject spent to move a nation against the observer (BL-539). The

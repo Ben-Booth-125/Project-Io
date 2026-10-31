@@ -1097,15 +1097,15 @@ struct world
     uint32_t next_procurement_id = 1;
     uint32_t allocate_procurement_id() { return next_procurement_id++; }
 
-    /// A supplier's standing embargo predicate (BL-350's Q2, the law/embargo
-    /// decline condition) — keyed by the SUPPLIER corp; `request_quote`
-    /// evaluates it against the buyer. Absent = no entry = the default
-    /// `condition_set{}` (empty = always true = no embargo), so a supplier
-    /// with no authored embargo declines nothing on this axis. Nothing
-    /// authors a non-empty entry yet — the read path is the mechanism BL-350
-    /// exists to prove condition_set reaches procurement "for free"; content
-    /// (an enacted law that populates this) is a BL-343/BL-350 follow-on.
-    faithful_unordered_map<entity_id, condition_set> corp_embargo_conditions;
+    /// BL-1418 (RELATIONS.md § 3 Embargo): every embargo in force, as the pair
+    /// (author nation, embargoed nation). Presence means the author refuses the
+    /// embargoed nation's cargo landing in any market on the author's ground
+    /// (`embargo.hpp`); one-way, so (B, A) is B's own embargo. Written only by
+    /// `set_embargo` (the `set_embargo` verb). Replaced the corp-keyed
+    /// `corp_embargo_conditions` predicate store, which nothing authored and which
+    /// retired with the corporations; a pre-v70 stream's entries are dropped.
+    /// Serialised (v70 trailing section); a `std::set`, so ascending as held.
+    std::set<std::pair<entity_id, entity_id>> nation_embargoes;
 
     /// THE RELATIONAL SUBSTRATE (BL-545): one directed, continuous, DERIVED
     /// value from an observer to a subject, on two dimensions (Access, Trust),

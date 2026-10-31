@@ -1174,7 +1174,9 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     w_vec(out, w.trades, w_trade);
     w_vec(out, w.procurement_quotes, w_quote);
     w_vec(out, w.procurement_contracts, w_contract);
-    w_store(out, w.corp_embargo_conditions, w_condition_set);
+    // BL-1418 (v70): the retired corp-keyed embargo store keeps its slot as an
+    // empty store; the embargoes themselves ride the trailing section.
+    w_count(out, 0);
 
     // --- stance (BL-448) ----------------------------------------------------
     // Written in the sets' own sorted order, which is why they need no re-sort
@@ -1934,6 +1936,22 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_f32(out, v);
         }
     }
+
+    // world_save_version 70 (BL-1418): THE EMBARGOES, the last section — every
+    // (author, embargoed) pair, ascending as the set holds them.
+    if (version >= k_world_save_version_embargo)
+        w_id_pair_set(out, w.nation_embargoes);
+}
+
+void write_world_snapshot_pre_embargo(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1418): the v69 stream shape — no embargo section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_embargo);
+}
+
+std::size_t world_save_embargo_section_bytes(const world& w)
+{
+    return 4 + 8 * w.nation_embargoes.size();
 }
 
 void write_world_snapshot_pre_war(const world& w, std::ostream& out)
@@ -2155,7 +2173,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_supplies     // BL-1452: v65, every unit's stocks full
             && version != k_world_save_version_pre_battle_carry // BL-1453: v66, no battle carry
             && version != k_world_save_version_pre_alarm      // BL-1432: v67, every Alarm 0
-            && version != k_world_save_version_pre_war))       // BL-1459: v68, no wars
+            && version != k_world_save_version_pre_war         // BL-1459: v68, no wars
+            && version != k_world_save_version_pre_embargo))   // BL-1418: v69, no embargoes
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -2291,8 +2310,14 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         return false;
     if (!r_vec(in, s.procurement_contracts, r_contract))
         return false;
-    if (!r_store(in, s.corp_embargo_conditions, r_condition_set))
-        return false;
+    // BL-1418 (v70): the retired corp-keyed embargo store. Read whole (a bad record
+    // still refuses the stream) and DROPPED: it was keyed by a supplier corporation,
+    // and corporations are retired. A v70 stream writes it empty.
+    {
+        faithful_unordered_map<entity_id, condition_set> retired_embargo_conditions;
+        if (!r_store(in, retired_embargo_conditions, r_condition_set))
+            return false;
+    }
 
     if (!r_id_pair_set(in, s.corp_hostile_pairs))
         return false;
@@ -3598,6 +3623,29 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                     && !(s.war_exhaustion_residual.rbegin()->first < n)))
                 return false;
             s.war_exhaustion_residual.emplace(n, v);
+        }
+    }
+
+    // world_save_version 70 (BL-1418): THE EMBARGOES. Each pair names two distinct
+    // standing nations, strictly ascending (the writer's set order), at most one
+    // per ordered pair. Refused whole otherwise. A v69 stream ends before it: a
+    // world with no embargo.
+    if (version >= k_world_save_version_embargo)
+    {
+        uint32_t ne = 0;
+        if (!r_count(in, ne) || ne > s.nations.size() * s.nations.size())
+            return false;
+        for (uint32_t k = 0; k < ne; ++k)
+        {
+            entity_id a = null_entity, b = null_entity;
+            if (!r_id(in, a) || !r_id(in, b))
+                return false;
+            const std::pair<entity_id, entity_id> key{ a, b };
+            if (a == null_entity || b == null_entity || a == b || s.nations.count(a) == 0
+                || s.nations.count(b) == 0
+                || (!s.nation_embargoes.empty() && !(*s.nation_embargoes.rbegin() < key)))
+                return false;
+            s.nation_embargoes.insert(key);
         }
     }
 

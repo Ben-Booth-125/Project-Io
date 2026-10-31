@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*196 entries — 52 gameplay · 35 canvas · 16 lens · 60 ledger · 33 chrome.*
+*197 entries — 53 gameplay · 35 canvas · 16 lens · 60 ledger · 33 chrome.*
 
 ---
 
@@ -415,6 +415,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - BL-1406 (Ben, 2026-10-23: the player IS its nation; corporations and companies are retired - docs/CONCEPT.md § Player identity, docs/GLOSSARY.md): THE ACTOR IS THE NATION. On the wire a session acts as its nation - `COMMAND corp=<nation> nation=<nation> ...` (the seam's nation-self form, corp_command::as_nation == corp). The session corporation's id is still accepted as the actor's NAME and, once the world is folded (every campaign start), re-pointed to its nation before the seam; any other actor is rejected_not_owner. The app files the player's press the same way (app::player_command). Money is the treasury's UNCOMMITTED part - a nation never runs into debt (rejected_funds past it) - and what the verb makes or moves is the nation's (its state_assets, units, trades).
 - The acting corporation exists (rejected_no_corp otherwise).
 - The trade is well-formed (`trade_is_valid`; rejected_invalid otherwise): two distinct existing markets, a good trade carries (capacity > 0, not a grid good), finite points > 0 and <= 1e6.
+- The destination market's nation does not embargo the actor (rejected_embargo otherwise; BL-1418, RELATIONS.md § 3). A trade already standing when an embargo is enacted is kept and ships nothing while it holds.
 - When changing (nonzero order): the id names one of the caller's OWN trades. Another corporation's trade and a nonexistent one both answer rejected_invalid — no existence oracle (BL-397).
 - When adding: the corporation holds fewer than max_trades_per_corp (64) trades (rejected_state otherwise — the list is capped and a trade past the cap is refused, not dropped).
 - NOT checked at set time, by design: whether the leg can run (a route, a Launchpad and propellant for a space leg), whether the source shelf holds the good, or whether the corporation makes any trade points. A trade that cannot ship this tick simply ships nothing; it stands until its owner changes it.
@@ -973,6 +974,25 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** As gameplay.accept_peace, without the other side's acceptance; any pending offer is erased.
 
 **Reason to select.** The war is won outright: dictate the terms.
+
+### `gameplay.set_embargo` — No control yet: the command seam only (BL-1418). A corp_verb (corp_verb::set_embargo, 53).
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=53 counterparty=<nation> order=<0|1>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `counterparty` | `entity_id (nation)` | The nation embargoed: none of its cargo lands in a market on the actor's ground. |
+| `order` | `uint32 on/off` | 1 enacts the embargo; 0 repeals it. |
+
+**Valid when:**
+- The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).
+- order is 0 or 1 (rejected_invalid otherwise, the whole command, before anything is read).
+- counterparty is a nation other than the actor (rejected_invalid otherwise).
+- Enacting: no embargo of counterparty by the actor stands; repealing: one does (rejected_state otherwise). A refusal mutates nothing.
+
+**Expected output.** Enacted: the pair (actor, counterparty) joins world::nation_embargoes. From then no cargo counterparty owns lands in a market on the actor's ground: a shipment there is never bought, a manual trade naming such a market is refused (rejected_embargo), and cargo already in flight is refused at the border and destroyed. counterparty's sentiment toward the actor takes embargo_imposed (Access -, Trust -). It is one-way: the actor's goods still enter counterparty's markets. Repealed: the pair is erased and trade resumes; a repeal moves no sentiment.
+
+**Reason to select.** Shut a rival's goods out of your markets: protect your producers or punish its conduct, at the cost of its regard and of what its goods would have supplied.
 
 ---
 

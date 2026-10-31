@@ -32,8 +32,8 @@
 //   E   THE EMITTERS (BL-1458, RELATIONS.md § Who emits each factor): trade_conducted
 //       (once a tick per pair, magnitude the value landed), friendship_accepted,
 //       force_used (magnitude the men lost) and trade_severed write their stated
-//       rows and signs through the one gathered fold; embargo_imposed has no
-//       emitter (no embargo law exists) and the row says so.
+//       rows and signs through the one gathered fold; embargo_imposed is
+//       emitted by enacting an embargo (BL-1418) and respects the settle gate.
 //   A   ALARM (BL-1432, § 6): the third float, folded, decayed at its own rate,
 //       erased only with the other two, scaled per subject, saved; THE INVARIANT
 //       holds for it.
@@ -49,6 +49,7 @@
 // ---------------------------------------------------------------------------
 
 #include "world/digitisation_tree_data.hpp" // BL-1432: the tree's Alarm rows
+#include "world/embargo.hpp" // BL-1418: set_embargo, embargo_imposed's emitter
 #include "world/fronts.hpp"
 #include "world/nation_tech.hpp"
 #include "world/recipe_registry.hpp"
@@ -886,11 +887,32 @@ int main()
                   "lost (12 = 8 + 4 over two days): Trust -, Alarm +");
         }
 
-        // E4 embargo_imposed: no emitter, and saying so is the row. The campaign
-        // has no embargo law and no enactment event (RELATIONS.md § 3); the factor
-        // is authored at its directions so the emitter is one call when it lands.
-        std::printf("NOTE  E4 embargo_imposed has no emitter: no embargo law is enacted anywhere "
-                    "in the campaign (reported, not invented)\n");
+        // E4 embargo_imposed (BL-1418): enacting the embargo is its one call site.
+        // The embargoed observes the author, Access -, Trust -, no Alarm; a repeal
+        // queues nothing; under the settle the enactment lands but writes no row.
+        {
+            world w;
+            const entity_id A = add_nation(w, "Author");
+            const entity_id B = add_nation(w, "Embargoed");
+            check(set_embargo(w, A, B, true) == embargo_result::applied
+                      && w.sentiment_pending.size() == 1,
+                  "E4a enacting an embargo queues its conduct (one event)");
+            fold_pending_sentiment(w, reg);
+            check(sentiment_toward(w.sentiment, B, A) == sentiment_value{ -4.0f, -2.0f, 0.0f }
+                      && w.sentiment.pairs.count({ A, B }) == 0,
+                  "E4b embargo_imposed: the embargoed -> the author, Access -, Trust -, Alarm "
+                  "untouched; the author forms nothing");
+            check(set_embargo(w, A, B, false) == embargo_result::applied
+                      && w.sentiment_pending.empty(),
+                  "E4c a repeal queues nothing");
+            world g;
+            const entity_id GA = add_nation(g, "Author");
+            const entity_id GB = add_nation(g, "Embargoed");
+            g.settle_build_gate = true;
+            check(set_embargo(g, GA, GB, true) == embargo_result::applied
+                      && embargoes(g, GA, GB) && g.sentiment_pending.empty(),
+                  "E4d under the settle the embargo is enacted but gathers no conduct");
+        }
 
         // E6 the fold is order-blind: the same gathered conduct queued in two
         // orders folds to bit-identical tables.

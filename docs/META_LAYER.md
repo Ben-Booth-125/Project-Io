@@ -119,8 +119,8 @@ world-wide actor scalars above. That contract was retired on 2026-08-30
 
 **The consequence is worth stating plainly: nothing in the game authors a non-empty
 `condition_set` any more.** The substrate is intact and `province_held` is still a valid subject;
-the one live consumer of a stored predicate is `world::corp_embargo_conditions`, which no content
-populates. So this layer is currently a mechanism without content — which is a reason to be careful
+no store holds a predicate: the one that did, the corp-keyed embargo store, became the nation pair
+set `world::nation_embargoes` (`politics/RELATIONS.md` § 3), which holds no `condition_set`. So this layer is currently a mechanism without content — which is a reason to be careful
 reading the rest of this document as a description of what runs, rather than of what it is for.
 
 ## The effect side — `modifier_set`

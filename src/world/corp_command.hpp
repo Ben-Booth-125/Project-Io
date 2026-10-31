@@ -149,7 +149,7 @@ enum class corp_verb : uint8_t
     // Appended AFTER take_seat, same append-only rule. TRADE.md § A trade and
     // § Auto and reserved trade. The player's, and a rival's under the
     // AI_OPPONENT.md § 11 grant (a rival may set its own trades).
-    set_trade,         ///< Set a MANUAL trade: move good `target` from market `subject` to market `counterparty` with `quantity` trade points per tick. `order` 0 adds a trade; a nonzero `order` changes the caller's own trade with that id in place.
+    set_trade,         ///< Set a MANUAL trade: move good `target` from market `subject` to market `counterparty` with `quantity` trade points per tick. `order` 0 adds a trade; a nonzero `order` changes the caller's own trade with that id in place. rejected_embargo when `counterparty`'s nation embargoes the actor (BL-1418).
     clear_trade,       ///< Erase the caller's own manual trade with id `order`.
     set_trade_reserve, ///< `corp`'s trade points reserved for manual trades := `quantity` (finite, >= 0; clamped to what it makes at use). The rest is auto.
     // --- BL-1276: the research queue joins the seam (2026-10-10) ---
@@ -228,6 +228,10 @@ enum class corp_verb : uint8_t
     accept_peace,         ///< `corp` accepts the pending peace offer `counterparty` made; the peace concludes on its terms. rejected_state (no such offer, or its terms no longer hold).
     refuse_peace,         ///< `corp` refuses the pending peace offer `counterparty` made; the offer is erased. rejected_state (no such offer).
     impose_peace,         ///< `corp` concludes peace with `counterparty` on terms `order` (as offer_peace) without acceptance — only at war score 100 in its favour. rejected_invalid (bad terms shape) / rejected_state (no war, score short of 100, terms not legal).
+    // --- BL-1418: the embargo (RELATIONS.md § 3; NATIONS.md § 4 Law authorship) ---
+    // Appended after impose_peace, same append-only rule. A nation acting for
+    // itself enacts or repeals its own embargo; no scorer issues it (embargo.hpp).
+    set_embargo,          ///< `corp` enacts (`order` 1) or repeals (`order` 0) its embargo of nation `counterparty`: no cargo `counterparty` owns lands in a market on `corp`'s ground. Enactment queues embargo_imposed (counterparty -> corp). rejected_invalid (any other `order`, counterparty not a nation, or the actor itself) / rejected_state (enacting one in force, repealing one that is not). A refusal mutates nothing.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -237,7 +241,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::impose_peace) + 1;
+    static_cast<uint8_t>(corp_verb::set_embargo) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.
@@ -423,7 +427,7 @@ enum class corp_command_result : uint8_t
     // --- BL-350: request_quote's four distinguishable decline conditions ---
     rejected_no_capacity,     ///< The named supplier holds no completed building that can produce the good.
     rejected_no_input_access, ///< The supplier's local market cannot supply the recipe's inputs.
-    rejected_embargo,         ///< The supplier's condition_set evaluates false against the buyer.
+    rejected_embargo,         ///< BL-1418: set_trade names a destination market whose nation embargoes the actor (RELATIONS.md § 3).
     rejected_reputation,      ///< The (buyer, supplier) reputation pair sits below the standing floor.
     rejected_cooldown,        ///< BL-430: economy.recipe_switch's cooldown has not elapsed on this building.
     rejected_no_lp,           ///< BL-597: no passive Logistic Points at the source anchor for this leg.

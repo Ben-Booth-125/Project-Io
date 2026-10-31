@@ -1,5 +1,6 @@
 #include "supply_system.hpp"
 
+#include "embargo.hpp" // BL-1418: the embargo refuses at the tariff border and at dispatch
 #include "law.hpp" // the import tariff at arrival: any_import_tariff_enacted / nation_tariff_rate
 #include "logistics.hpp"
 #include "market_clearing.hpp" // processor_reservation (BL-995)
@@ -223,6 +224,16 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
         if (mit == w.markets.end())
             continue;
         const entity_id dest_body = mit->second.body;
+
+        // BL-1418 (RELATIONS.md § 3): THE EMBARGO, at the tariff border. Cargo
+        // owned by a nation the destination market's nation embargoes does not
+        // land. It is destroyed, as a cut cargo with nowhere to land is: no
+        // shelf, no payment, no Traded-in, no duty, no route record. It was
+        // bought and hauled at dispatch, so the loss is the owner's. Dispatch
+        // refuses such a shipment (`commit_trade_shipment`), so only cargo
+        // already in flight when the embargo was enacted reaches here.
+        if (embargo_refuses(w, convoy.corp, convoy.dest_market))
+            continue;
 
         // BL-1265 (TRADE.md § A trade, step 3): the cargo LANDS on the
         // destination market and is sold there at this tick's clear — landing
@@ -1062,6 +1073,10 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
                            float* out_sent, float* io_committed)
 {
     if (!leg.viable || ri >= resource_count || !std::isfinite(qty) || !(qty > 0.0f))
+        return false;
+    // BL-1418: a shipment the destination's border would refuse (an embargo by
+    // the market's nation on the owner's) is never bought.
+    if (embargo_refuses(w, corp_id, dest_market_id))
         return false;
     // The trader's purse: a corporation's balance, or -- for a state port's
     // trade (Ben, 2026-10-14) -- the nation's treasury, which pays the haul

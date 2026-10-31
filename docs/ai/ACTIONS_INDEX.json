@@ -742,6 +742,10 @@
    "The Diplomacy ledger (BL-1462). A corp_verb (corp_verb::impose_peace, 52) on the command seam."
   ],
   [
+   "gameplay.set_embargo",
+   "No control yet: the command seam only (BL-1418). A corp_verb (corp_verb::set_embargo, 53)."
+  ],
+  [
    "ledger.military_theatre_header",
    "Military ledger (nav rail slot 7), Recruit and Design tabs: the collapsible theatre headers 'Land (N)' and 'Air (N)' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes)."
   ],

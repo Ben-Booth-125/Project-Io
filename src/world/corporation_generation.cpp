@@ -3959,8 +3959,6 @@ int remove_specialist_roster(world& w)
             w.forget_air_unit(uid); // BL-1449
         }
 
-        w.corp_embargo_conditions.erase(cid);
-
         if (cc.is_player) // BL-1407: the provisional seat goes with its corporation
             w.player_entity = null_entity;
         w.gen_charters.erase(cid);
@@ -8131,8 +8129,8 @@ void major_absorb_specialist(world& w, entity_id buyer, entity_id seller)
     for (const entity_id uid : owned)
         w.units.at(uid).owner = buyer;
 
-    w.corp_embargo_conditions.erase(seller);
-    for (auto* pairs : { &w.corp_hostile_pairs, &w.corp_friend_pairs, &w.corp_friend_offers })
+    for (auto* pairs : { &w.corp_hostile_pairs, &w.corp_friend_pairs, &w.corp_friend_offers,
+                         &w.nation_embargoes })
         for (auto it = pairs->begin(); it != pairs->end();)
             it = (it->first == seller || it->second == seller) ? pairs->erase(it) : std::next(it);
 

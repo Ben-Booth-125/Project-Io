@@ -99,7 +99,7 @@ flow, not an `overlay_mode`.
 | Power | `standing` reach and market share; GDP (`../../economy/FINANCE.md` § Disclosure) |
 | Front strength | the shared fronts (`../../military/MILITARY.md` § Fronts) and `unit_strength` of the units standing on them |
 | Trade exposure | cargo landed between the pair over the last four ticks, as shares of the player's imports and exports |
-| Embargo | `corp_embargo_conditions`; the press is the law verb |
+| Embargo | `nation_embargoes`; the press is the `set_embargo` verb |
 | Wars, offers, truces | the war record (RELATIONS § 7) |
 | Presses | `declare_war`, the answer, the peace verbs, `offer_friendship` / `accept_friendship`, the embargo law — each an `ACTIONS.json` entry |
 

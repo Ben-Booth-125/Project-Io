@@ -186,6 +186,7 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::accept_peace:       // BL-1428
         case corp_verb::refuse_peace:       // BL-1428
         case corp_verb::impose_peace:       // BL-1428
+        case corp_verb::set_embargo:        // BL-1418: the actor's own embargo; on/off rides `order=`
         // BL-1407: every player verb is sent as the nation, these included.
         case corp_verb::survey:
         case corp_verb::hold_convoy:

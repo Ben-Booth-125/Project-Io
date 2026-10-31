@@ -367,10 +367,15 @@ read-back).
 
 ### 3. Embargo — an authored refusal
 
-`world::corp_embargo_conditions` — a `condition_set` per actor, serialised in the world snapshot.
-When the predicate fires the embargoing party refuses the other outright, and the refusal is
-conduct: `embargo_imposed` is its sentiment factor. Its first consumer was `request_quote`, the
-named-supplier quote, which retired with the corporations (Ben, 2026-10-23).
+`world::nation_embargoes` — the pairs (author nation, embargoed nation), serialised in the world
+snapshot. The author refuses the embargoed nation outright, and the refusal is conduct:
+`embargo_imposed` is its sentiment factor, emitted on enactment. The store was once a corp-keyed
+`condition_set` whose one consumer was `request_quote`, the named-supplier quote; both retired with
+the corporations (Ben, 2026-10-23).
+
+A nation enacts and repeals its own embargo through one verb, `set_embargo` (`../ai/ACTIONS.json`).
+Cargo the bar refuses is never bought at dispatch; cargo already in flight when the embargo is
+enacted is refused at the border and destroyed, as an intercepted cargo with nowhere to land is.
 
 **An embargo bars a nation's goods from entering your markets (Ben, 2026-10-26).** When A embargoes
 B, no cargo B owns lands in a market on A's ground. It is a one-way bar: it does not stop A's goods
@@ -556,7 +561,7 @@ rival declares, answers and makes peace under the stance grant (§ 1), on its st
 | The relational substrate | `src/world/sentiment.{hpp,cpp}`; the table on `world.hpp` § `sentiment` |
 | Reputation (a **view**) | `src/world/world.hpp` § `procurement_reputation` / `note_conduct`; written from `economy_system.cpp` (completion) and `corp_command.cpp` (cancellation) |
 | The authored factor weights and decay | `src/world/recipe_registry.hpp` § `seed_procurement_sentiment`, `sentiment()`; loaded from `economy.sentiment` in `scripts/economy.lua` |
-| Embargo | `src/world/world.hpp` § `corp_embargo_conditions`; the bar reads at a market's arrival border (`../economy/MARKETS.md` § Tariffs) |
+| Embargo | `src/world/world.hpp` § `nation_embargoes`; `src/world/embargo.{hpp,cpp}`; the bar reads at a market's arrival border (`../economy/MARKETS.md` § Tariffs) and at dispatch |
 | Standing bands | `src/world/standing.{hpp,cpp}` |
 | Interdiction gate | `src/world/supply_system.cpp` |
 | Battle engagement gate | `src/world/battle_system.cpp` |

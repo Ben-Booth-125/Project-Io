@@ -37,9 +37,8 @@ class recipe_registry;
 //   border_force         } re-anchor of the fronts
 //   trade_severed        fold_pending_sentiment, through the trade streak's
 //                        persistence window (sentiment_trade_streak)
-//   embargo_imposed      NO EMITTER: the campaign has no embargo law and no
-//                        enactment event for one (RELATIONS.md § 3). Authored
-//                        at its directions so an emitter is one call when it lands.
+//   embargo_imposed      set_embargo (embargo.cpp), on enactment -> queue_conduct
+//                        (the embargoed -> the author; RELATIONS.md § 3)
 //   unrest_visible       NO EMITTER: unrest has no store. Authored zero.
 // ---------------------------------------------------------------------------
 

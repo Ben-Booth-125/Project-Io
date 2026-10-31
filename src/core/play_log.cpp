@@ -231,6 +231,7 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::accept_peace:         return "accept_peace";       // BL-1428
         case corp_verb::refuse_peace:         return "refuse_peace";       // BL-1428
         case corp_verb::impose_peace:         return "impose_peace";       // BL-1428
+        case corp_verb::set_embargo:          return "set_embargo";        // BL-1418
     }
     return "verb?";
 }

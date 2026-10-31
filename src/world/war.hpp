@@ -210,7 +210,7 @@ enum class war_result : uint8_t
 enum class war_measure : uint8_t
 {
     declarer_trust_toward_defender = 0, ///< sentiment Trust, declarer -> defender.
-    defender_embargoes_declarer,        ///< 1 if the defender's embargo condition_set refuses the declarer, else 0.
+    defender_embargoes_declarer,        ///< 1 if the defender embargoes the declarer (BL-1418, `embargoes`), else 0.
     goals_ceded_by_declarer,            ///< Goals the declarer ceded to the defender at an earlier peace.
     defender_wars_on_declarer_friends,  ///< Wars the defender DECLARED on a friend of the declarer.
 };

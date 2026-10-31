@@ -1952,15 +1952,14 @@ fold_report fold_legacy_firms(world& w, const std::map<entity_id, legacy_firm>& 
         w.player_entity = w.nations.count(fit->second.home_nation) != 0 ? fit->second.home_nation
                                                                         : null_entity;
     // Every store still keyed by a firm id names an actor that no longer exists:
-    // the stance pairs, the embargo conditions and the workforce overrides
+    // the stance pairs, the embargo pairs and the workforce overrides
     // (hostility, friendship and an override are a nation's now), and any
     // sentiment pair naming a firm. Dropped, in their own sorted orders.
     const auto is_firm = [&firms](entity_id id) { return firms.count(id) != 0; };
-    for (auto* pairs : { &w.corp_hostile_pairs, &w.corp_friend_pairs, &w.corp_friend_offers })
+    for (auto* pairs : { &w.corp_hostile_pairs, &w.corp_friend_pairs, &w.corp_friend_offers,
+                         &w.nation_embargoes })
         for (auto it = pairs->begin(); it != pairs->end();)
             it = (is_firm(it->first) || is_firm(it->second)) ? pairs->erase(it) : std::next(it);
-    for (auto it = w.corp_embargo_conditions.begin(); it != w.corp_embargo_conditions.end();)
-        it = is_firm(it->first) ? w.corp_embargo_conditions.erase(it) : std::next(it);
     for (auto it = w.workforce_supply_overrides.begin(); it != w.workforce_supply_overrides.end();)
         it = is_firm(it->first.first) ? w.workforce_supply_overrides.erase(it) : std::next(it);
     for (auto it = w.sentiment.pairs.begin(); it != w.sentiment.pairs.end();)

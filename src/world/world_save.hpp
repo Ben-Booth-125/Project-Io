@@ -618,7 +618,25 @@ inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 /// to, u32 province, i32 tick); and the residual exhaustion in nation order as (nation,
 /// f32). v68 is a STRICT PREFIX of v69 and is read too (`k_world_save_version_pre_war`),
 /// as a world with no wars; so is v67, with every Alarm 0 as well.
-inline constexpr uint32_t world_save_version = 69;
+///
+/// Bumped to 70 (BL-1418, an embargo bars a nation's goods; RELATIONS.md § 3): A
+/// TRAILING SECTION after v69's war section carries every embargo in force,
+/// `world::nation_embargoes`, after a u32 count, ascending as held, each as (author,
+/// embargoed) — two distinct nations. The retired corp-keyed `corp_embargo_conditions`
+/// keeps its mid-stream slot (after the procurement contracts) so the layout before
+/// the tail is unchanged: a v70 writer writes it as an EMPTY store, and every reader
+/// reads whatever an older stream holds there and DROPS it — the store was keyed by
+/// the supplier corporation, corporations are retired, and nothing ever authored an
+/// entry, so there is no nation pair to map one to. v69 is a STRICT PREFIX of v70 and
+/// is read too (`k_world_save_version_pre_embargo`), as a world with no embargo; so is
+/// every older version the reader already accepted.
+inline constexpr uint32_t world_save_version = 70;
+
+/// BL-1418: the first version carrying the embargo section (see above).
+inline constexpr uint32_t k_world_save_version_embargo = 70;
+
+/// BL-1418: v69, a strict prefix of v70 (the embargo section is v70's only addition).
+inline constexpr uint32_t k_world_save_version_pre_embargo = 69;
 
 /// BL-1459: the first version carrying the war section (see above).
 inline constexpr uint32_t k_world_save_version_war = 69;
@@ -745,6 +763,10 @@ std::size_t world_save_alarm_section_bytes(const world& w);
 /// counts, plus each record's length. The LAST section of a v69 stream.
 std::size_t world_save_war_section_bytes(const world& w);
 
+/// BL-1418: the byte length of the v70 embargo section `w` writes — 4 for the count
+/// plus 8 an embargo. The LAST section of a v70 stream.
+std::size_t world_save_embargo_section_bytes(const world& w);
+
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and
 /// folds them away (`fold_legacy_firms`); the verification writer below writes
@@ -828,6 +850,8 @@ void write_world_snapshot_pre_battle_carry(const world& w, std::ostream& out);
 void write_world_snapshot_pre_alarm(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1459): @p w as a v67 stream — no war section.
 void write_world_snapshot_pre_war(const world& w, std::ostream& out);
+/// VERIFICATION ONLY (BL-1418): @p w as a v69 stream — no embargo section.
+void write_world_snapshot_pre_embargo(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

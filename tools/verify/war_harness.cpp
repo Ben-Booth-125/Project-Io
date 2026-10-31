@@ -358,11 +358,8 @@ int main()
         jtest(0, "grievance (declarer's Trust toward the defender in the adverse band)", [&](fixture& g) {
             g.w.sentiment.pairs[{ g.A, g.C }] = sentiment_value{ 0.0f, -60.0f };
         });
-        jtest(1, "embargo (the defender's condition_set refuses the declarer)", [&](fixture& g) {
-            condition c; c.subject = condition_subject::surplus;
-            c.comparator = condition_comparator::at_least; c.operand = 1.0e12f;
-            condition_set cs; cs.all.push_back(c);
-            g.w.corp_embargo_conditions[g.C] = cs;
+        jtest(1, "embargo (the defender embargoes the declarer, BL-1418)", [&](fixture& g) {
+            g.w.nation_embargoes.insert({ g.C, g.A });
         });
         jtest(2, "lost ground (a goal the declarer ceded to the defender at an earlier peace)", [&](fixture& g) {
             g.w.province_cessions.push_back(province_cession{ g.A, g.C, g.provs[g.C][1], 0 });
@@ -471,7 +468,7 @@ int main()
                   && back.province_cessions.size() == 1 && back.war_exhaustion_residual.size() == 1,
               "R4i the wars, truces, cessions and residual round-trip the snapshot byte for byte");
         uint32_t ver = 0; std::memcpy(&ver, b.data() + 4, 4);
-        check(ver == world_save_version && world_save_version == 69, "R4j the stream is version 69");
+        check(ver == world_save_version && world_save_version >= 69, "R4j the stream is version 69 or later (BL-1418: 70)");
         check(b.size() >= world_save_war_section_bytes(w), "R4k the war section's measured length fits the stream");
         // An older stream loads with no wars.
         std::ostringstream o67(std::ios::binary);
@@ -480,11 +477,13 @@ int main()
         world old;
         check(from_bytes(b67, old) && old.wars.empty() && old.truces.empty() && old.peace_offers.empty()
                   && old.war_history.empty() && old.province_cessions.empty()
-                  && b67.size() == b.size() - world_save_war_section_bytes(w),
-              "R4l a v68 stream (today's less the war section) loads with no wars");
+                  && b67.size() == b.size() - world_save_war_section_bytes(w)
+                                              - world_save_embargo_section_bytes(w), // BL-1418 (v70)
+              "R4l a v68 stream (today's less the war and embargo sections) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;
-        const std::size_t war0 = b.size() - world_save_war_section_bytes(w) + 4; // past the war count
+        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) // BL-1418 (v70), last
+                               - world_save_war_section_bytes(w) + 4; // past the war count
         bad[war0 + 8] = 2;
         world untouched;
         check(!from_bytes(bad, untouched) && untouched.nations.empty(),
@@ -874,7 +873,7 @@ int main()
         std::string bad2 = b2;
         // The offer sits after the war count + one war record + the truce table.
         const war_record& wr = w.wars.begin()->second;
-        const std::size_t off = b2.size() - world_save_war_section_bytes(w) + 4
+        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_war_section_bytes(w) + 4
                               + (4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 + 4 + 4 * wr.declarer_goals.size() + 4 + 4 * wr.defender_goals.size())
                               + 4 + 12 * w.truces.size() + 4 + 4 + 4 + 4 + 4; // to the kind byte
         bad2[off] = 7;

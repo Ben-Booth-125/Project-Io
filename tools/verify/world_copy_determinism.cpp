@@ -238,7 +238,6 @@ std::vector<order_row> audit_world_orders(const world& a, const world& b)
     rows.push_back(audit_order("body_reach_cost", a.body_reach_cost, b.body_reach_cost));
     rows.push_back(audit_order("body_market_index", a.body_market_index, b.body_market_index));
     rows.push_back(audit_order("body_centre_index", a.body_centre_index, b.body_centre_index));
-    rows.push_back(audit_order("corp_embargo_conditions", a.corp_embargo_conditions, b.corp_embargo_conditions));
     rows.push_back(audit_order("provinces.tile_province", a.provinces.tile_province, b.provinces.tile_province));
     return rows;
 }

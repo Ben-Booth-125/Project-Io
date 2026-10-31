@@ -6,6 +6,7 @@
 #include "hex_neighbors.hpp"
 #include "modifier_set.hpp"      // modifier_subject::alarm_toward, effect_target
 #include "nation_tech.hpp"       // nation_scalar: the alarm scale the fold stamps
+#include "embargo.hpp" // BL-1418: the embargo justification reads embargoes()
 #include "sentiment_emitters.hpp" // queue_conduct, sentiment_conduct_live (BL-1458)
 #include "province.hpp"
 #include "stance.hpp" // write_hostility, are_friends, canonical_pair
@@ -123,12 +124,8 @@ float measure(const world& w, war_measure m, entity_id declarer, entity_id defen
             return sentiment_toward(w.sentiment, declarer, defender).trust;
         case war_measure::defender_embargoes_declarer:
         {
-            // An embargo is the defender's standing condition_set evaluating FALSE
-            // against the declarer (the `request_quote` reading: empty = no embargo).
-            const auto it = w.corp_embargo_conditions.find(defender);
-            if (it == w.corp_embargo_conditions.end() || it->second.always())
-                return 0.0f;
-            return evaluate(it->second, w, declarer) ? 0.0f : 1.0f;
+            // BL-1418 (RELATIONS.md § 3): the defender's embargo of the declarer.
+            return embargoes(w, defender, declarer) ? 1.0f : 0.0f;
         }
         case war_measure::goals_ceded_by_declarer:
         {

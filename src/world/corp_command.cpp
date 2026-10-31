@@ -19,6 +19,7 @@
 #include "province.hpp"       // BL-511: march_unit's destination is a province
 #include "recipe_registry.hpp"
 #include "state_industry.hpp" // BL-1296: state_runs (the state build/retool doors)
+#include "embargo.hpp" // BL-1418: set_embargo, and set_trade's rejected_embargo
 #include "war.hpp"    // BL-1459/BL-1428: declare_war, answer_war, the peace verbs
 #include "stance.hpp" // BL-448: corp stance verbs (declare_hostile / offer_friendship / accept_friendship / return_to_neutral)
 #include "supply_system.hpp"
@@ -370,6 +371,8 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::accept_peace:
         case corp_verb::refuse_peace:
         case corp_verb::impose_peace:
+        // BL-1418 (RELATIONS.md § 3): a nation enacts its own embargo.
+        case corp_verb::set_embargo:
             return true;
         default:
             return false;
@@ -1165,6 +1168,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                                      static_cast<std::size_t>(t.resource), 1.0f).viable)
                     return corp_command_result::rejected_placement;
             }
+            // BL-1418 (RELATIONS.md § 3): the destination's nation embargoes the
+            // actor, so nothing it ships there may land — refused, nothing written.
+            if (embargo_refuses(w, cmd.corp, t.to_market))
+                return corp_command_result::rejected_embargo;
             if (cmd.order != 0)
             {
                 // CHANGE an existing trade, keeping its id and its place in the
@@ -1336,6 +1343,24 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
         case corp_verb::refuse_peace:
             return map_war(refuse_peace(w, cmd.corp, cmd.counterparty));
+
+        // --- BL-1418: the embargo (embargo.hpp) -------------------------------
+        // The untrusted-boundary translation: `order` is the on/off byte and
+        // anything but 0 or 1 refuses the whole command before anything is read;
+        // set_embargo validates the pair (both nations, distinct) and the state
+        // before it writes, so every refusal mutates nothing.
+        case corp_verb::set_embargo:
+        {
+            if (cmd.order > 1)
+                return corp_command_result::rejected_invalid;
+            switch (set_embargo(w, cmd.corp, cmd.counterparty, cmd.order == 1))
+            {
+                case embargo_result::applied:          return corp_command_result::applied;
+                case embargo_result::rejected_invalid: return corp_command_result::rejected_invalid;
+                case embargo_result::rejected_state:   return corp_command_result::rejected_state;
+            }
+            return corp_command_result::rejected_invalid;
+        }
 
         // --- BL-470: the unit march seam -------------------------------------
         // Extends THIS seam (BL-470's ruling 2) — no parallel unit_command

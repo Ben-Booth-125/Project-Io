@@ -601,7 +601,8 @@ int main()
                                        + supplies_section_bytes(wd)  // BL-1452 (v66)
                                        + world_save_battle_carry_section_bytes(wd) // BL-1453 (v67)
                                        + world_save_alarm_section_bytes(wd)       // BL-1432 (v68), last
-                                       + world_save_war_section_bytes(wd);         // BL-1459 (v69), last
+                                       + world_save_war_section_bytes(wd)          // BL-1459 (v69)
+                                       + world_save_embargo_section_bytes(wd);     // BL-1418 (v70), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -672,7 +673,8 @@ int main()
                                          + supplies_section_bytes(wu)  // BL-1452 (v66)
                                          + world_save_battle_carry_section_bytes(wu) // BL-1453 (v67)
                                          + world_save_alarm_section_bytes(wu)       // BL-1432 (v68), last
-                                         + world_save_war_section_bytes(wu);         // BL-1459 (v69), last
+                                         + world_save_war_section_bytes(wu)          // BL-1459 (v69)
+                                         + world_save_embargo_section_bytes(wu);     // BL-1418 (v70), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
@@ -1436,7 +1438,7 @@ int main()
             { "trades", w.trades.size(), loaded.trades.size() },
             { "procurement_quotes", w.procurement_quotes.size(), loaded.procurement_quotes.size() },
             { "procurement_contracts", w.procurement_contracts.size(), loaded.procurement_contracts.size() },
-            { "corp_embargo_conditions", w.corp_embargo_conditions.size(), loaded.corp_embargo_conditions.size() },
+            { "nation_embargoes", w.nation_embargoes.size(), loaded.nation_embargoes.size() }, // BL-1418
             { "corp_hostile_pairs", w.corp_hostile_pairs.size(), loaded.corp_hostile_pairs.size() },
             { "corp_friend_pairs", w.corp_friend_pairs.size(), loaded.corp_friend_pairs.size() },
             { "corp_friend_offers", w.corp_friend_offers.size(), loaded.corp_friend_offers.size() },
@@ -1682,7 +1684,13 @@ int main()
         embargo.all.push_back({ condition_subject::province_held, condition_comparator::at_least,
                                 1.0f, resource_type::furs, building_type::military_base, "",
                                 4242u });
-        f.corp_embargo_conditions[c3] = embargo;
+        // BL-1418 (v70): two embargoes between the world's two lowest nations, one
+        // each way, so a swapped pair would read back as a different set.
+        if (pn1 != null_entity)
+        {
+            f.nation_embargoes.insert({ pn1, pn2 });
+            f.nation_embargoes.insert({ pn2, pn1 });
+        }
 
         f.corp_hostile_pairs.insert({ c1, c2 });
         f.corp_hostile_pairs.insert({ c3, c1 });
@@ -1730,13 +1738,19 @@ int main()
                       && back.procurement_contracts[0].delivery_body == b1
                       && back.procurement_contracts[0].ticks_elapsed == 3,
                   "P8 a procurement contract keeps delivery body and elapsed ticks");
-            const auto& e = back.corp_embargo_conditions.at(c3);
+            // BL-1418: the condition_set rides the law below now (the corp-keyed
+            // embargo store that also carried one retired).
+            const auto& e = back.laws.back().conditions;
             check(e.all.size() == 2 && e.all[0].key == "embargo-key"
                       && e.all[0].subject == condition_subject::military_strength
                       && e.all[1].structure == building_type::military_base,
-                  "P8 a condition_set nested in a map survives, strings included");
+                  "P8 a condition_set nested in a law survives, strings included");
             check(e.all[0].province == no_province && e.all[1].province == 4242u,
                   "P8 BL-570: condition::province round-trips (default AND a real id)");
+            check(pn1 == null_entity
+                      || (back.nation_embargoes.size() == 2 && back.nation_embargoes.count({ pn1, pn2 }) == 1
+                          && back.nation_embargoes.count({ pn2, pn1 }) == 1),
+                  "P8 BL-1418: the embargo pairs round-trip with their directions (v70)");
             check(back.corp_hostile_pairs.size() == 2 && back.corp_friend_pairs.size() == 1
                       && back.corp_friend_offers.count({ c2, c3 }) == 1
                       && back.corp_hostile_pairs.count({ c1, c2 }) == 1,
