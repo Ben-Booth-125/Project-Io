@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*30 entries — 25 open, 5 resolved.*
+*31 entries — 26 open, 5 resolved.*
 
 ---
 
@@ -331,9 +331,23 @@ To make Alarm's RELATIONS § 6 causes emit, the lane added five sentiment factor
 
 **Why it matters.** (2) may want a streak (several ticks of trade, then several of none) before it counts; flicker is common on thin lanes.
 
-> **Recommendation:** Accept (1), (3), (4); for (2), require two ticks traded and two ticks silent - in-band, delegated unless you object.
+> **Recommendation:** Accept (1), (3), (4); for (2), require two ticks traded and two ticks silent - in-band, delegated unless you object. Cold review agreed the flicker is real (alternating landings net about +7 Alarm, worse than not trading); the two-and-two window is being built.
 
 *Files: `src/world/sentiment_emitters.cpp`*
+
+### NR-1115 — Can Alarm go below zero?
+*question · raised 2026-10-31 · from Cold review of Lane S, sprint 61 (BL-1432 Alarm as sentiment), 2026-10-31*
+
+Relief - live trade, an accepted friendship, a peace - lowers Alarm below zero, and the floor is the substrate's -100. A pair landing 500 credits a tick sits near -13.5, so a later war declaration (+3) or a modest border force still reads as reassured on balance. RELATIONS § 6 says positive is alarmed and lists relief as decay toward neutral and live trade; it does not say relief can bank a reserve.
+
+**Why it matters.** A banked reserve means trade buys immunity to Alarm; a floor at 0 means relief only ever cancels Alarm already raised. The rival war scorer (BL-1461 rivals declare war) will read this number.
+
+- A: Alarm's floor is 0 - relief cancels raised Alarm and never goes past neutral (Alarm is a one-sided dimension)
+- B: Alarm is signed like Access and Trust; negative is reassured, and a reserve is intended
+
+> **Recommendation:** A. Reassurance is already what Trust measures; a signed Alarm double-counts it.
+
+*Files: `src/world/sentiment.cpp`, `docs/politics/RELATIONS.md`*
 
 ---
 

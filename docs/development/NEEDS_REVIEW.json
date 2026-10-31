@@ -568,9 +568,29 @@
    "source": "Lane S report, sprint 61 (BL-1458 sentiment emitters, BL-1432 Alarm as sentiment), 2026-10-31",
    "what": "(1) trade_conducted counts the cargo owner's nation and the destination market's nation (the import-tariff foreign-goods rule), foreign landings only, one event each way per tick. (2) trade_severed is raised by the receiver toward the shipper (+2 Alarm, once) when a pair that traded at the last fold lands nothing now; a pair whose trade flickers raises repeated spikes. (3) embargo_imposed has no emitter yet: no embargo law is enacted anywhere; BL-1418 (embargo bars goods) is where it gets one. (4) BL-1432's rival scorer reading Alarm and its player surface are left to BL-1461 (rivals declare war) and BL-1462 (diplomacy ledger).",
    "why_it_matters": "(2) may want a streak (several ticks of trade, then several of none) before it counts; flicker is common on thin lanes.",
-   "recommendation": "Accept (1), (3), (4); for (2), require two ticks traded and two ticks silent - in-band, delegated unless you object.",
+   "recommendation": "Accept (1), (3), (4); for (2), require two ticks traded and two ticks silent - in-band, delegated unless you object. Cold review agreed the flicker is real (alternating landings net about +7 Alarm, worse than not trading); the two-and-two window is being built.",
    "files": [
     "src/world/sentiment_emitters.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1115",
+   "title": "Can Alarm go below zero?",
+   "raised": "2026-10-31",
+   "kind": "question",
+   "status": "open",
+   "source": "Cold review of Lane S, sprint 61 (BL-1432 Alarm as sentiment), 2026-10-31",
+   "what": "Relief - live trade, an accepted friendship, a peace - lowers Alarm below zero, and the floor is the substrate's -100. A pair landing 500 credits a tick sits near -13.5, so a later war declaration (+3) or a modest border force still reads as reassured on balance. RELATIONS § 6 says positive is alarmed and lists relief as decay toward neutral and live trade; it does not say relief can bank a reserve.",
+   "why_it_matters": "A banked reserve means trade buys immunity to Alarm; a floor at 0 means relief only ever cancels Alarm already raised. The rival war scorer (BL-1461 rivals declare war) will read this number.",
+   "options": [
+    "A: Alarm's floor is 0 - relief cancels raised Alarm and never goes past neutral (Alarm is a one-sided dimension)",
+    "B: Alarm is signed like Access and Trust; negative is reassured, and a reserve is intended"
+   ],
+   "recommendation": "A. Reassurance is already what Trust measures; a signed Alarm double-counts it.",
+   "files": [
+    "src/world/sentiment.cpp",
+    "docs/politics/RELATIONS.md"
    ],
    "resolution": null
   }
