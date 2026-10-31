@@ -1280,8 +1280,8 @@ std::string draw_workforce_bar(const building_component& b)
 //
 // Placeholder scaffolding (BL-393 notes units are largely inert in the live
 // economy today) — Ben's explicit direction was to build the card shape now
-// rather than wait. The centre is the stat grid (BL-1454), reading REAL
-// unit_component fields: no fabricated numbers.
+// rather than wait. Two pages, both reading REAL unit_component fields: no
+// fabricated numbers.
 
 // unit_component::type indexes unit_roster_table() directly — corp_command.cpp's
 // hire_unit sets it from that same table's index (`cmd.unit_type`), so this is
@@ -1299,49 +1299,111 @@ std::string unit_roster_display_name(std::uint16_t type)
     return buf;
 }
 
-// THE STRENGTH AND UPKEEP LINES (BL-1454 fold of the Strength page): under the
-// stat grid, the player's own unit only.
-//
-// Strength is DERIVED — count x the roster row's quality x the unit's supply
-// factor, x100 fixed point (BL-459 removed the stored duplicate of `count`) — so
-// the line shows the derivation rather than one opaque number. Count is the HP
-// cell's numerator, so it is not repeated.
-//
-// Upkeep (BL-454): the per-tick credit wage and its goods draw, read from the SAME
-// resolve_unit_upkeep the budget and the unit pass read, so the card cannot
-// disagree with the money. Silent when no rate is authored (the shipped default):
-// an all-zero line would be chrome that says nothing.
-static void draw_unit_strength_lines(const world& w, const recipe_registry& reg, const unit_component& u)
+std::vector<unit_page> unit_pages(const world& w, entity_id id)
 {
-    ImGui::TextDisabled("Strength");
+    std::vector<unit_page> pages;
+    if (w.units.find(id) == w.units.end())
+        return pages;
+    pages.push_back({"Strength", unit_page_kind::strength});
+    pages.push_back({"Roster",   unit_page_kind::roster});
+    return pages;
+}
+
+// Strength page: the DERIVED strength, its two multipliers, and what the unit
+// costs to keep.
+//
+// The NEEDS_REVIEW note this comment used to carry is resolved: strength was a
+// stored duplicate of `count` (every writer set the two equal), and BL-459
+// removed the stored field. It is computed now — count x the roster row's
+// quality x the unit's supply factor, x100 fixed point — so the page shows the
+// derivation rather than one opaque number the player cannot account for.
+//
+// BL-454 adds the upkeep line beneath it: a unit's per-tick credit wage and its
+// goods draw. Both read the SAME resolve_unit_upkeep the budget and the unit
+// pass read, so the card cannot disagree with the money.
+/// One labelled condition bar (BL-1425): label and value on a line, the bar beneath,
+/// in the colour the canvas counter uses for the same quantity.
+void draw_unit_condition_bar(const char* label, float share, ImU32 col, const char* value)
+{
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", label);
     ImGui::SameLine();
+    ImGui::TextDisabled("%s", value);
+    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImGui::ColorConvertU32ToFloat4(col));
+    ImGui::ProgressBar(std::clamp(share, 0.0f, 1.0f), ImVec2(-1.0f, 6.0f), "");
+    ImGui::PopStyleColor();
+}
+
+void draw_unit_strength_page(const world& w, const recipe_registry& reg, const unit_component& u)
+{
+    // BL-1425: THE FIGHT'S STATE FIRST (MILITARY.md § Land — the unit's stats) —
+    // HP, readiness, morale, the three numbers the canvas counter and the land
+    // round read. The player's own units only: a rival's internals stay private
+    // (BL-068, the battle card's precedent; NR-1088 asks Ben).
+    if (u.owner == player_actor(w) || u.owner == w.player_entity)
+    {
+        char v[48];
+        const int est = unit_establishment(u);
+        std::snprintf(v, sizeof v, "%d / %d men", u.count, est);
+        draw_unit_condition_bar("HP", est > 0 ? static_cast<float>(u.count) / est : 0.0f,
+                                palette::unit_hp, v);
+        std::snprintf(v, sizeof v, "%.0f%%", u.readiness_permille / 10.0f);
+        draw_unit_condition_bar("Readiness", u.readiness_permille / 1000.0f, palette::unit_readiness, v);
+        std::snprintf(v, sizeof v, "%.0f%%", u.morale_permille / 10.0f);
+        draw_unit_condition_bar("Morale", u.morale_permille / 1000.0f, palette::unit_morale, v);
+        // Refit to a newer type (Ben, 2026-10-27): shown on the card's first page too,
+        // since the action slot's tooltip does not show while it is disabled.
+        if (unit_refitting(u))
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                               "Refitting to %s \xe2\x80\x94 %d d left",
+                               unit_roster_display_name(u.refit_type).c_str(), u.refit_days);
+        // BL-1427: the front it holds, if any — what Assign to front set.
+        if (const front_view* fv = front_by_key(w, u.owner, u.front))
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(
+                                   front_stance_colour(stance_toward(w, u.owner, fv->f.neighbour))),
+                               "Front: %s", fv->label.c_str());
+        ImGui::Spacing();
+    }
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Strength");
     ImGui::Text("%lld", static_cast<long long>(unit_strength(w, u)));
-    ImGui::SameLine();
-    ImGui::TextDisabled("= %d x %.2f quality x %.2f supply", u.count,
+    ImGui::TextDisabled("%d x %.2f quality x %.2f supply",
+                        u.count,
                         roster_type_quality_permille(u.type) / 1000.0f,
                         u.supply_factor_permille / 1000.0f);
 
+    ImGui::Spacing();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Count");
+    ImGui::Text("%d", u.count);
+
+    // Supply: called out only when it is NOT full, so a healthy unit spends no
+    // space on a line that always says the same thing.
+    if (u.supply_factor_permille < 1000)
+    {
+        ImGui::Spacing();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Supply");
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                           "%.0f%% — unsupplied, weakening",
+                           u.supply_factor_permille / 10.0f);
+    }
+
+    // Upkeep (BL-454): the credit wage plus every good actually drawn. Silent
+    // when no rate is authored, which is the shipped default — an all-zero
+    // upkeep line would be chrome that says nothing.
     const unit_upkeep_draw d = resolve_unit_upkeep(u, reg.military().upkeep);
     if (d.credits > 0.0f || d.any_goods)
     {
-        std::string line;
-        char        part[64];
+        ImGui::Spacing();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Upkeep / tick");
         if (d.credits > 0.0f)
-        {
-            std::snprintf(part, sizeof part, "%.1f cr", static_cast<double>(d.credits));
-            line += part;
-        }
+            ImGui::Text("%.1f cr", static_cast<double>(d.credits));
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             if (d.goods[r] <= 0.0f)
                 continue;
-            std::snprintf(part, sizeof part, "%s%.2f %s", line.empty() ? "" : ", ",
-                          static_cast<double>(d.goods[r]), resource_name(static_cast<resource_type>(r)));
-            line += part;
+            ImGui::Text("%.2f %s",
+                        static_cast<double>(d.goods[r]),
+                        resource_name(static_cast<resource_type>(r)));
         }
-        ImGui::TextDisabled("Upkeep / tick");
-        ImGui::SameLine();
-        ImGui::TextWrapped("%s", line.c_str());
     }
 }
 
@@ -1357,6 +1419,72 @@ static const char* land_class_display_name(land_class cls)
     };
     const int i = static_cast<int>(cls);
     return (i >= 0 && i < static_cast<int>(land_class_count)) ? k_class_names[i] : "\xe2\x80\x94";
+}
+
+// Roster page: type name (real lookup, see unit_roster_display_name) + owner
+// (resolved via the same corp-name lookup the building card's rival summary
+// and the tile card's Manage button already use).
+void draw_unit_roster_page(const world& w, const unit_component& u, ui_state* ui)
+{
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Type");
+    // The type name is the designer's second door (military.md § The designer) on
+    // the player's own unit: it opens the designer for the unit's class, lit while
+    // open, and pressing it again closes it. A rival's unit shows the name only —
+    // the designer edits the player's own designs.
+    if (ui != nullptr && is_player_side(w, u.owner) && kit_slot_count(unit_land_class(u)) > 0)
+    {
+        const land_class  lc = unit_land_class(u);
+        const std::string nm = unit_roster_display_name(u.type);
+        if (ImGui::Selectable((nm + "##unit_type_designer").c_str(), unit_designer_open_on(*ui, lc), 0,
+                              {ImGui::CalcTextSize(nm.c_str()).x, 0.0f}))
+            toggle_unit_designer(*ui, lc);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Open the designer for this class");
+        ui->designer.card_type_x = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
+        ui->designer.card_type_y = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+        if (unit_design_stale(w, u))
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::research_warning),
+                               "On an older design \xe2\x80\x94 refit to take the live one");
+    }
+    else
+        ImGui::Text("%s", unit_roster_display_name(u.type).c_str());
+    // Refit to a newer type (Ben, 2026-10-27): the unit keeps its old type, and
+    // fights as it, until the refit's days pass. The player's own units only.
+    if (unit_refitting(u) && is_player_side(w, u.owner))
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                           "Refitting to %s \xe2\x80\x94 %d d left",
+                           unit_roster_display_name(u.refit_type).c_str(), u.refit_days);
+
+    // BL-1425: the land class the row fights as, and the numbers the round reads
+    // (per man, quality-scaled; MILITARY.md § Land — the classes).
+    {
+        const land_combat_stats st = unit_land_stats(u);
+        ImGui::Spacing();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Fights as");
+        ImGui::Text("%s", land_class_display_name(unit_land_class(u)));
+        ImGui::TextDisabled("soft %d  hard %d  hardness %d%%", st.soft, st.hard, st.hardness / 10);
+    }
+    ImGui::Spacing();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Owner");
+    const char* owner_name = owner_display_name(w, u.owner); // BL-1406: a nation's unit
+    ImGui::Text("%s", owner_name != nullptr ? owner_name : "\xe2\x80\x94");
+}
+
+void draw_unit_page(const world& w, const recipe_registry& reg, entity_id id, unit_page_kind kind,
+                    ui_state* ui)
+{
+    const auto uit = w.units.find(id);
+    if (uit == w.units.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    switch (kind)
+    {
+        // BL-454: the strength page now reads the registry, for the upkeep line.
+        case unit_page_kind::strength: draw_unit_strength_page(w, reg, uit->second); break;
+        case unit_page_kind::roster:   draw_unit_roster_page(w, uit->second, ui);    break;
+    }
 }
 
 namespace {
@@ -1537,7 +1665,6 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
                                    "Supply %.0f%% \xe2\x80\x94 unsupplied, weakening",
                                    u.supply_factor_permille / 10.0f);
-            draw_unit_strength_lines(w, reg, u); // BL-1454: the Strength page's lines
         }
         else if (!rival_unit_seen(w, sel))
             ImGui::TextDisabled("Not yet seen \xe2\x80\x94 fight it or reveal it by recon");
