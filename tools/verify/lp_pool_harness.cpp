@@ -110,6 +110,15 @@ std::string to_bytes(const world& w)
     return os.str();
 }
 
+/// BL-1465: @p w as a v52-shaped stream (the verification-only pre-edge writer) - the
+/// base an older-than-v53 stream is sliced from.
+std::string to_bytes_pre_road_edges(const world& w)
+{
+    std::ostringstream os(std::ios::binary);
+    write_world_snapshot_pre_road_edges(w, os);
+    return os.str();
+}
+
 bool from_bytes(const std::string& b, world& w)
 {
     std::istringstream is(b, std::ios::binary);
@@ -638,26 +647,50 @@ void mechanics(app_start_world& out, std::uint32_t seed)
         check(rt && r.state_hash(0) == c.state_hash(0) && r.nations.at(pn).lp_shares.set
                   && r.nations.at(pn).lp_shares.share == c.nations.at(pn).lp_shares.share,
               "L7", "v51 round-trips the share rule with an equal state_hash");
-        // v49: the stream less its trailing section (u32 count + 1 x (id + 3 floats)),
-        // and less BL-1327's v51 space-asset section after it (one empty count).
-        // BL-1335 (v52): and less the tax section after that (count + 9 bytes a
-        // nation whose tier or Discontent moved).
-        // BL-1337 (v54): and less the exact-net section after THAT.
-        const std::size_t tax_tail = world_save_tax_section_bytes(c) + world_save_net_section_bytes(c)
-                                   + world_save_major_section_bytes(c); // BL-1404 (v55): the majors, last
-        std::string b49 = b51.substr(0, b51.size() - (4 + 4 + 12) - 4 - tax_tail);
+        // v49: a v52-SHAPED stream less its trailing sections. BL-1465: since v53 (the
+        // tile record became road edges, BL-1340) and v56 (no corporation store, BL-1407)
+        // the current stream is no longer a strict superset of v49, so slicing it - however
+        // many later sections were subtracted - relabels a v69 body as v49. The base is the
+        // verification-only pre-edge writer (save_roundtrip's P20b/P20c do the same), which
+        // writes at v52 and ends after the tax section: so v49 = that stream less the share
+        // rules (u32 count + 1 x (id + 3 floats)), BL-1327's v51 space count (4 bytes, no
+        // assets here) and BL-1335's v52 tax section. No v54+ section is in that stream.
+        const std::string pre_edge = to_bytes_pre_road_edges(c);
+        const std::size_t lp_bytes = 4 + 4 + 12;
+        const std::size_t v52_tail = 4 + world_save_tax_section_bytes(c); // v51 space + v52 tax
+        // The share record (id, 0.2, 0.5, 0.3) located by its bytes must sit exactly where
+        // the arithmetic puts it - one occurrence, ending v52_tail before the stream's end.
+        std::string rec(16, '\0');
+        {
+            const std::uint32_t id32 = static_cast<std::uint32_t>(pn);
+            std::memcpy(&rec[0], &id32, 4);
+            for (int k = 0; k < 3; ++k)
+                std::memcpy(&rec[4 + 4 * k], &c.nations.at(pn).lp_shares.share[k], 4);
+        }
+        const std::size_t at_pre = pre_edge.find(rec);
+        const bool placed = at_pre != std::string::npos && pre_edge.rfind(rec) == at_pre
+                         && at_pre + 16 + v52_tail == pre_edge.size();
+        check(placed, "L7", fmt("the pre-edge stream's share record sits where the tail arithmetic puts it (at %zu, size %zu, tail %zu)",
+                                at_pre, pre_edge.size(), v52_tail));
+        std::string b49 = pre_edge.substr(0, pre_edge.size() - lp_bytes - v52_tail);
         const std::uint32_t v49 = k_world_save_version_pre_lp;
         std::memcpy(&b49[4], &v49, 4);
         world r49;
         const bool ok49 = from_bytes(b49, r49);
         check(ok49 && !r49.nations.at(pn).lp_shares.set, "L7", "a v49 stream reads, every nation on the mechanical default");
-        // A bad share in the stream refuses it whole.
+        // A bad share in the CURRENT stream refuses it whole. BL-1465: the share record is
+        // addressed by its bytes (one occurrence), not by a tail offset that every later
+        // trailing section moves - the old offset landed in a later section, so the stream
+        // was refused for a reason other than the share.
+        const std::size_t at = b51.find(rec);
+        check(at != std::string::npos && b51.rfind(rec) == at, "L7", "the v69 stream holds the share record exactly once");
         std::string bad = b51;
         const float f = 0.9f;
-        std::memcpy(&bad[bad.size() - 8 - tax_tail], &f, 4); // other := 0.9: the sum is 1.6 (before v51's 4-byte space count and v52's tax section)
+        if (at != std::string::npos)
+            std::memcpy(&bad[at + 12], &f, 4); // other := 0.9: the sum is 1.6
         world rb;
         rb.current_econ_tick = 77;
-        const bool okb = from_bytes(bad, rb);
+        const bool okb = at != std::string::npos && from_bytes(bad, rb);
         check(!okb && rb.current_econ_tick == 77, "L7", "a share rule not summing to 1 refuses the stream whole");
     }
 }
