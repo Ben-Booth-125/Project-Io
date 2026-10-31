@@ -502,9 +502,9 @@
    "kind": "decision-taken",
    "status": "open",
    "source": "Lane U report, sprint 61 (UI carries), 2026-10-31",
-   "what": "(1) BL-1417: with the emblem gone, the profile card marks the nation by a thin rule in its colour beside the name. (2) BL-1454: new colours palette::unit_food, unit_ammo, unit_equipment. (3) A rival unit's design stats count as \"seen\" only while it is in a battle against the player or air-revealed to the player; nothing remembers a past sighting, since that needs a save field. (4) New verify reads verify.unit_stat_grid(id) and verify.unit_designer().grid return only the cells the screen draws (unit stats, no tile data). (5) The unit card's Strength/Roster pager is gone; verify.unit_card_page is kept as a no-op.",
+   "what": "(1) BL-1417: with the emblem gone, the profile card marks the nation by a thin rule in its colour beside the name. (2) BL-1454: new colours palette::unit_food, unit_ammo, unit_equipment. (3) A rival unit's design stats count as \"seen\" only while it is in a battle against the player or air-revealed to the player; nothing remembers a past sighting, since that needs a save field. (4) New verify reads verify.unit_stat_grid(id) and verify.unit_designer().grid return only the cells the screen draws (unit stats, no tile data). (5) The unit card's Strength/Roster pager is gone; verify.unit_card_page is kept as a no-op. Cold review (2026-10-31): air_revealed is rebuilt every air pass, so (3) blanks a rival's stats the day after any battle; ledgers/military.md § The stat grid says \"only once seen\", which reads as remembered.",
    "why_it_matters": "(3) means a rival's stats blank again the day a battle ends, which may read as forgetting. The rest are look-and-feel; each is in the live click list.",
-   "recommendation": "Accept; ask for a saved \"seen once\" record only if (3) feels wrong on the live click.",
+   "recommendation": "Accept (1), (2), (4), (5). For (3), a saved per-nation set of seen rival designs matches the doc's \"once seen\"; it is a save field, so it would ride the next save bump (the war or embargo lane).",
    "files": [
     "src/ui/unit_stat_grid.cpp",
     "src/ui/profile_panel.cpp"
