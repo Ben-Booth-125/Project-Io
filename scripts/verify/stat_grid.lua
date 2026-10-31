@@ -12,6 +12,7 @@
 --    hover on a cell shows its tooltip (captured).
 -- 2. A rival's unit: its internals read a dash; unseen (in no battle against the
 --    player), every cell does.
+-- 2b. A rival in battle with the player (seen): design stats shown, internals a dash.
 -- 3. The land designer with a delta: Combat and Field only; hovering a live kit
 --    pick previews it with a signed delta; the pick drafts and the delta stays;
 --    speed never carries one. The kit-lock waive is staging and is turned off.
@@ -21,6 +22,8 @@
 --
 -- Staging: an airbase and a wing are STAGED (stage_building, stage_wing); two hires
 -- at the player's base go through the real hire verb, as unit_counter.lua does.
+-- The seen rival is a real battle: a march onto the nearest rival stack with
+-- hostility declared both ways, days stepped until contact (battle_card.lua).
 -- Every press aims at a point the surface published.
 
 verify.goto_surface("home")
@@ -136,6 +139,88 @@ if theirs ~= nil then
 else
     print("stat_grid: no rival unit on the surface; the rival check is not taken")
 end
+verify.clear_selection()
+settle()
+
+-- 2b. A SEEN rival (military.md § The stat grid; run before the stack's quarter
+--    steps, which leave no rival unit listed): march the player's unit onto the
+--    nearest rival stack with hostility both ways (battle_card.lua's staging), step
+--    days until the battle opens, and read the rival's card. While it fights the
+--    player its design stats show; its internals (Condition, Supply) never do.
+local VERB_DECLARE_HOSTILE = 17
+local VERB_MARCH_UNIT      = 21
+local function hex_steps(a, b)
+    local function cube(col, row)
+        local x = col - (row - (row % 2)) / 2
+        return x, row, -x - row
+    end
+    local ax, ay, az = cube(a.col, a.row)
+    local bx, by, bz = cube(b.col, b.row)
+    return math.max(math.abs(ax - bx), math.abs(ay - by), math.abs(az - bz))
+end
+local function section6()
+    local player = nil
+    local own, rivals = {}, {}
+    for _, u in ipairs(verify.units()) do
+        if u.col ~= nil and u.count > 0 then
+            if u.player then player = u.owner; own[#own + 1] = u else rivals[#rivals + 1] = u end
+        end
+    end
+    print(string.format("stat_grid: seen staging: player %s, %d own, %d rival unit(s), %d listed", tostring(player), #own, #rivals, #verify.units()))
+    if player == nil or #rivals == 0 then fail("no player/rival pair to fight for the seen check"); return end
+    local pairs_ = {}
+    for _, m in ipairs(own) do
+        for _, t in ipairs(rivals) do pairs_[#pairs_ + 1] = { d = hex_steps(m, t), mine = m, theirs = t } end
+    end
+    local mine, foe = nil, nil
+    while true do
+        local best = nil
+        for _, p in ipairs(pairs_) do
+            if not p.tried and (best == nil or p.d < best.d) then best = p end
+        end
+        if best == nil then break end
+        best.tried = true
+        local r = verify.corp_command{ verb = VERB_MARCH_UNIT, corp = player, subject = best.mine.id,
+                                       col = best.theirs.col, row = best.theirs.row }
+        if r == "applied" then mine, foe = best.mine, best.theirs; break end
+    end
+    if foe == nil then fail("every march onto a rival stack was refused"); return end
+    verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = player, counterparty = foe.owner }
+    verify.corp_command{ verb = VERB_DECLARE_HOSTILE, corp = foe.owner, counterparty = player }
+    local fighting = false
+    for _ = 1, 720 do
+        verify.day_step(1)
+        if verify.select_battle(foe.col, foe.row) then fighting = true; break end
+    end
+    if not fighting then fail("no battle opened within 720 days of marching into contact"); return end
+    verify.center_tile(foe.col, foe.row, 10.0)
+    verify.clear_selection()
+    local target = foe
+    for _, u in ipairs(verify.units()) do
+        if not u.player and u.col == foe.col and u.row == foe.row and u.count > 0 then target = u; break end
+    end
+    local sel_ok = verify.select_unit(target.id, false)
+    settle()
+    print("stat_grid: seen rival " .. tostring(target.id) .. " selected=" .. tostring(sel_ok)
+          .. " kind=" .. tostring(verify.pointer_target().selection_kind))
+    settle()
+    local gs = grid("unit_card")
+    dump("seen rival", gs)
+    if gs == nil then fail("the seen rival's card drew no stat grid"); return end
+    local internals, design = true, true
+    for _, c in ipairs(gs) do
+        local inside = c.band == "Condition" or c.band == "Supply"
+        if inside and c.value ~= DASH then internals = false end
+        if not inside and c.value == DASH then design = false end
+    end
+    if internals then ok("a seen rival's internals still read a dash") else fail("a seen rival's internals show") end
+    if design then ok("a rival fighting the player shows its design stats") else
+        fail("a rival in battle with the player still hides its design stats") end
+    verify.capture("stat_grid_rival_seen")
+end
+local ok6, err6 = pcall(section6)
+if not ok6 then fail("seen section: " .. tostring(err6)) end
+
 verify.clear_selection()
 settle()
 
@@ -304,6 +389,7 @@ else
     verify.capture("stat_grid_stack_tooltip")
     settle()
 end
+
 
 print(string.format("stat_grid: %d failure(s)", fails))
 verify.clear_selection()
