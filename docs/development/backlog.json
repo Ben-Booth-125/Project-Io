@@ -736,6 +736,50 @@
    ],
    "title": "Recruits: bases make land and air recruits from their province's people; hires and refills spend them",
    "design": "Written in MILITARY.md § Recruits (Ben, 2026-10-30). A military base makes land recruits and an airbase air recruits, a fixed number per quarter (economy.military.recruits), each taken from the population centres of the base's province, largest first. One national land pool and one air pool, capped at 15x the theatre's quarterly output. A hire spends its men (a wing its crew) and is refused when the pool cannot fill it; a unit below full men refills from the pool at a Logistic Point cost per recruit paid at its paying road, as supply is. Bases carry no upkeep. The Recruit tab heads each theatre with its pool. Supersedes BL-1424 (soldiers from labour). Save bump (the two pools). Measure the population drain and G1t50 before tuning the rate; rivals hire through the same gate."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-31",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 delivery, from lane reports, 2026-10-31)",
+   "priority": "B",
+   "requires": [],
+   "id": "BL-1464",
+   "short_name": "CAPITAL_BASE_MISSING",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "difficulty": 2,
+   "files": [
+    "tools/verify/capital_military_base.cpp"
+   ],
+   "title": "A quarter of nations open with no capital military base",
+   "design": "Found by Lane F, sprint 61 (2026-10-31), on main: capital_military_base --seeds 46 fails C1 and C3. 15 of 40 nations end with no capital base, though the run log says 36 laid and 4 adopted. Either the laying is lost after it is logged (a fold or a later pass erases it) or the census counts something else. Diagnose first; check: capital_military_base on seed 46 and two more library seeds."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-10-31",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61 delivery, from lane reports, 2026-10-31)",
+   "priority": "B",
+   "requires": [],
+   "id": "BL-1465",
+   "short_name": "LP_POOL_L7_TAIL",
+   "category": "Logistics",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "difficulty": 1,
+   "files": [
+    "tools/verify/lp_pool_harness.cpp"
+   ],
+   "title": "lp_pool_harness L7 measures a stale save-stream tail",
+   "design": "Found by Lane W, sprint 61 (2026-10-31), failing on main: row L7 does byte arithmetic on a v49 stream and has not subtracted any section added since v56. Correct the arithmetic as save_roundtrip does (subtract each later section), never loosen the assertion. Check: lp_pool_harness all rows."
   }
  ]
 }
