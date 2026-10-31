@@ -22,33 +22,8 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
                           const economy_report& report, entity_id id,
                           std::string* net_out = nullptr, std::string* exp_out = nullptr);
 
-/// One page of the unit Selection card's accordion — the pager the building card
-/// once had (retired BL-1312), kept for the Soldier card (placeholder, BL-393 notes units are largely
-/// inert today). Strength: the DERIVED strength (BL-459) with its count/quality/
-/// supply derivation and the BL-454 upkeep line; Roster: roster-type name + owner.
-enum class unit_page_kind { strength, roster };
-
-/// A titled accordion page for the unit card.
-struct unit_page
-{
-    std::string   label;
-    unit_page_kind kind;
-};
-
-/// Every accordion page for @p id (a unit/unit-stack entity). Always both
-/// pages today — a unit_component always carries strength/count/type/owner —
-/// but kept as a list (not hard-coded two pages) so the shared draw dispatch
-/// below stays the one thing both this and a future full-canvas takeover read,
-/// one shared page list.
-std::vector<unit_page> unit_pages(const world& w, entity_id id);
-
-/// Draw one unit accordion page's content, dispatched by kind. Read-only —
-/// unlike the building card, nothing on this placeholder card mutates the
-/// unit. Takes the registry since BL-454, for the strength page's upkeep line.
-/// @p ui, when given, lets the roster page's type name open the unit designer
-/// (view state only); null draws the name as plain text.
-void draw_unit_page(const world& w, const recipe_registry& reg,
-                    entity_id id, unit_page_kind kind, ui_state* ui = nullptr);
+// BL-1454: the unit card's Strength / Roster pager folded into the stat grid
+// (unit_stat_grid.hpp); its page list and page draw are gone.
 
 /// Draw the **Selection content** — the polymorphic detail of the current
 /// selection (ui_state::selected_entity), emitted into whatever window the caller
