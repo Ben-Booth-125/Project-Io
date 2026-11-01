@@ -416,7 +416,19 @@ conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
 - **Losses refill from the pool, paid in Logistic Points.** A unit below its full men draws recruits
   from its pool as it refits. Each recruit drawn costs Logistic Points, paid at the unit's paying road
   exactly as its supply is (§ Upkeep, "Supply is drawn where the unit stands"); past the 8-tile draw
-  no recruit reaches it.
+  no recruit reaches it. A refill is drawn in **whole recruits**: a unit granted part of its request
+  receives the recruits that part pays for in full, and no point is drawn for a fraction of one.
+- **A refill shares its unit's one supply share (Ben, 2026-10-31).** The points a refill costs join
+  the unit's supply request, and the request is granted as one: a unit short of points is short of
+  both, so refilling thins its supplies. There is no separate refill share.
+- **Wings refill too (Ben, 2026-10-31).** A wing below full HP draws air recruits from its nation's
+  air pool, paid in Logistic Points at its paying road (its airbase's tile, up to 8 tiles off its
+  roads) as a land refill is, and none past the 8-tile draw. A class's crew is its full HP: each
+  recruit restores one crew's share of it, a wing short of any HP asks at least one recruit, and the
+  recruit that makes it whole tops it up exactly.
+- **A dropped muster refunds its men (Ben, 2026-10-31).** A hire queued at a base that is lost,
+  demolished or decommissioned before the unit stands returns its recruits to the land pool. The
+  refund is not held to the pool's cap, so nothing is discarded; the credits paid are not returned.
 - **Bases carry no upkeep.** A military base or airbase has no maintenance and no wage of its own;
   the cost of a force is its units' upkeep and the people it takes.
 - **Seen on the Recruit tab.** The Military ledger's Recruit tab heads each theatre with its pool:

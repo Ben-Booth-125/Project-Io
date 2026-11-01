@@ -583,8 +583,27 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& su
                 sr.share_permille = ratio >= 1.0f - k_share_eps
                     ? 1000
                     : std::min(1000, static_cast<int>(std::floor((ratio + k_share_eps) * 1000.0f)));
+                // BL-1463 (MILITARY.md § Recruits): the refill is granted in WHOLE
+                // recruits at this share. The share's grant of the recruits' part is
+                // trimmed to what the delivered recruits cost, so no point is drawn for
+                // a fraction of a recruit nobody receives (a share of 990 on one missing
+                // man delivers none and pays none). The supplies' part is untouched.
+                if (c.recruits > 0)
+                    sr.recruits_delivered = static_cast<int>(
+                        static_cast<int64_t>(c.recruits) * sr.share_permille / 1000);
+                if (c.recruits > 0 && c.lp_per_recruit > 0.0f)
+                {
+                    const float recruit_need = static_cast<float>(c.recruits) * c.lp_per_recruit;
+                    const float granted_part = sr.granted * std::clamp(recruit_need / c.need, 0.0f, 1.0f);
+                    const float paid_part    = static_cast<float>(sr.recruits_delivered) * c.lp_per_recruit;
+                    const float excess       = std::max(0.0f, granted_part - paid_part);
+                    sr.granted       = std::max(0.0f, sr.granted - excess);
+                    r.supply_granted = std::max(0.0f, r.supply_granted - excess);
+                }
             }
         }
+        else
+            sr.recruits_delivered = std::max(0, c.recruits); // a request of zero is granted whole
         out.supplies.push_back(sr);
         out.supply_share[sr.unit] = sr.share_permille;
     }

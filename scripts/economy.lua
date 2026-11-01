@@ -281,10 +281,13 @@ economy = {
         -- supply anchor: military reach IS the economic reach field (ruling 3),
         -- so a base extends nothing. Dearer than a hub (a garrison installation,
         -- not a waypoint), cheaper than a launchpad.
+        -- BL-1463 (MILITARY.md § Recruits, Ben 2026-10-30): BASES CARRY NO UPKEEP. No
+        -- maintenance and no wage of their own (was 15 / 10, airbase 20 / 10): the cost
+        -- of a force is its units' upkeep and the people it takes.
         military_base = {
             base_rate   = 0.0,
-            maintenance = 15.0,
-            base_wage   = 10.0,
+            maintenance = 0.0,
+            base_wage   = 0.0,
             build_cost  = 300.0,
             build_duration_days = 360,
             resource_costs = { steel = 35.0 },
@@ -296,8 +299,8 @@ economy = {
         -- upkeep than a garrison.
         airbase = {
             base_rate   = 0.0,
-            maintenance = 20.0,
-            base_wage   = 10.0,
+            maintenance = 0.0, -- BL-1463: bases carry no upkeep (above)
+            base_wage   = 0.0,
             build_cost  = 450.0,
             build_duration_days = 360,
             resource_costs = { steel = 50.0 },
@@ -723,6 +726,26 @@ economy = {
         hire_base_cost      = 120.0, -- BL-744 / NR-781: x2.776 with the head wage (was 40.0)
         hire_cost_per_power = 1.4,   -- same factor (was 0.5)
 
+        -- BL-1463 (MILITARY.md § Recruits, Ben 2026-10-30): soldiers are RECRUITS, and
+        -- bases make them. Each quarter a completed, running military base makes
+        -- `land_per_base` land recruits and an airbase `air_per_base` air recruits, each
+        -- one head taken from the population centres of the base's province, largest
+        -- first. They go to the nation's one land pool and one air pool, each capped at
+        -- 15 quarters of its theatre's output. A hire spends its men (a land unit's
+        -- 50, `hire_batch_manpower`) or its crew (air.classes.*.crew); a unit below its
+        -- full men refills from the land pool, each recruit costing `lp_per_recruit`
+        -- Logistic Points at the unit's paying road, as its supply does. The same
+        -- numbers are the C++ defaults (src/world/recruit_params.hpp).
+        --   land_per_base 50: one hire's men a quarter, the muster queue's own cadence.
+        --   air_per_base  20: a fighter wing's crew a quarter.
+        --   lp_per_recruit 1: one point admits one unit of cargo (LOGISTICS.md); a
+        --                     recruit is priced as one unit of it.
+        recruits = {
+            land_per_base  = 50,
+            air_per_base   = 20,
+            lp_per_recruit = 1.0,
+        },
+
         -- BL-454: standing-force UPKEEP — what it costs to KEEP a unit, as
         -- against hire_* above, which is what it costs to raise one. Before
         -- this, `w.units` appeared in the economy, budget and construction
@@ -1067,7 +1090,7 @@ economy = {
         -- march (Ben, 2026-10-28: movement takes no Logistic Points; a march is paid in
         -- days). Once a quarter each unit requests the QUANTITY of its supplies - its
         -- upkeep goods (unit_upkeep.goods_per_head x heads, above) plus what an HP refill
-        -- draws (none yet: no refill mechanism) - at the tile it stands on, routed from
+        -- draws (BL-1463: recruits.lp_per_recruit per recruit refilled) - at the tile it stands on, routed from
         -- its own nation's sources like a building's request and served ahead of
         -- production (NR-917). There is no second rate to author: one point admits one
         -- unit of goods, as a shipment's cargo does (LOGISTICS.md settled rule 3).
@@ -1107,37 +1130,37 @@ economy = {
             classes = {
                 fighter = {
                     hp = 100, air = 2000, superiority_permille = 1000, range = 15,
-                    ad_vulnerability_permille = 700, muster_days = 135, hire_cost = 900.0,
+                    ad_vulnerability_permille = 700, muster_days = 135, hire_cost = 900.0, crew = 20,
                     hire_goods = { alloys = 4.0, electronics = 3.0, machinery = 2.0, refined_fuel = 2.0 },
                     missions = { "superiority" },
                 },
                 multirole = {
                     hp = 100, air = 1500, superiority_permille = 600, soft = 80, hard = 60,
-                    range = 12, ad_vulnerability_permille = 1000, muster_days = 135, hire_cost = 1100.0,
+                    range = 12, ad_vulnerability_permille = 1000, muster_days = 135, hire_cost = 1100.0, crew = 24,
                     hire_goods = { alloys = 4.0, electronics = 3.0, machinery = 2.0, ordnance = 2.0 },
                     missions = { "tactical", "superiority" },
                 },
                 bomber = {
                     hp = 140, strategic = 12, superiority_permille = 0, range = 40,
-                    ad_vulnerability_permille = 1600, muster_days = 180, hire_cost = 1600.0,
+                    ad_vulnerability_permille = 1600, muster_days = 180, hire_cost = 1600.0, crew = 40,
                     hire_goods = { alloys = 6.0, electronics = 3.0, machinery = 3.0, ordnance = 3.0 },
                     missions = { "strategic" },
                 },
                 helicopter = {
                     hp = 60, soft = 50, hard = 120, superiority_permille = 0, range = 6,
-                    ad_vulnerability_permille = 1300, muster_days = 90, hire_cost = 500.0,
+                    ad_vulnerability_permille = 1300, muster_days = 90, hire_cost = 500.0, crew = 12,
                     hire_goods = { alloys = 2.0, machinery = 2.0, electronics = 1.0 },
                     missions = { "tactical" },
                 },
                 drone = {
                     hp = 40, soft = 40, hard = 40, recon = 150, superiority_permille = 0, range = 10,
-                    ad_vulnerability_permille = 1200, has_morale = false, muster_days = 90, hire_cost = 400.0,
+                    ad_vulnerability_permille = 1200, has_morale = false, muster_days = 90, hire_cost = 400.0, crew = 6,
                     hire_goods = { electronics = 2.0, alloys = 1.0 },
                     missions = { "tactical", "recon" },
                 },
                 recon = {
                     hp = 80, recon = 300, superiority_permille = 0, range = 20,
-                    ad_vulnerability_permille = 800, muster_days = 135, hire_cost = 800.0,
+                    ad_vulnerability_permille = 800, muster_days = 135, hire_cost = 800.0, crew = 30,
                     hire_goods = { alloys = 3.0, electronics = 4.0 },
                     missions = { "recon" },
                 },

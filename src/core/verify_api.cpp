@@ -5041,6 +5041,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             case corp_command_result::rejected_era_locked:  return "rejected_era_locked";
             case corp_command_result::rejected_wrong_air:   return "rejected_wrong_air";
             case corp_command_result::rejected_terrain:     return "rejected_terrain"; // BL-1455
+            case corp_command_result::rejected_no_recruits: return "rejected_no_recruits"; // BL-1463
             case corp_command_result::rejected_cooldown:    return "rejected_cooldown";
             case corp_command_result::rejected_embargo:     return "rejected_embargo";
             case corp_command_result::rejected_no_capacity: return "rejected_no_capacity";

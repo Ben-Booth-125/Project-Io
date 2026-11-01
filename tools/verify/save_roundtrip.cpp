@@ -602,7 +602,7 @@ int main()
                                        + world_save_battle_carry_section_bytes(wd) // BL-1453 (v67)
                                        + world_save_alarm_section_bytes(wd)       // BL-1432 (v68), last
                                        + world_save_war_section_bytes(wd)          // BL-1459 (v69)
-                                       + world_save_embargo_section_bytes(wd) + world_save_gen_capital_section_bytes(wd);     // BL-1418 (v70), last
+                                       + world_save_embargo_section_bytes(wd) + world_save_gen_capital_section_bytes(wd) + world_save_recruits_section_bytes(wd) /* BL-1463 (v73) */;     // BL-1418 (v70), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section + world_save_kit_goods_bytes(wd) && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -674,7 +674,7 @@ int main()
                                          + world_save_battle_carry_section_bytes(wu) // BL-1453 (v67)
                                          + world_save_alarm_section_bytes(wu)       // BL-1432 (v68), last
                                          + world_save_war_section_bytes(wu)          // BL-1459 (v69)
-                                         + world_save_embargo_section_bytes(wu) + world_save_gen_capital_section_bytes(wu);     // BL-1418 (v70), last
+                                         + world_save_embargo_section_bytes(wu) + world_save_gen_capital_section_bytes(wu) + world_save_recruits_section_bytes(wu) /* BL-1463 (v73) */;     // BL-1418 (v70), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section + world_save_kit_goods_bytes(wu),
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
@@ -1848,8 +1848,8 @@ int main()
     // wide) still reads, the five goods zero and everything else as written.
     // -----------------------------------------------------------------------
     {
-        static_assert(world_save_version == k_world_save_version_kit_goods,
-                      "PK pins v72 as the kit goods' version");
+        static_assert(world_save_version >= k_world_save_version_kit_goods,
+                      "PK: v72 is the kit goods' version");
         static_assert(resource_count == k_resource_count_pre_kit_goods + 5,
                       "PK: the kit goods are five appended values");
         world k = w;
@@ -1903,7 +1903,8 @@ int main()
                 && m0.price[st] == mk.price[st] && m0.inventory[st] == mk.inventory[st]
                 && old.tiles.size() == k.tiles.size() && old.markets.size() == k.markets.size();
             // Every narrowed array lost exactly five elements: 4 bytes a float, 1 a bool.
-            ok71 = ok71 && b72.size() > b71.size() && b72.size() - b71.size() == world_save_kit_goods_bytes(k);
+            ok71 = ok71 && b72.size() > b71.size()
+                 && b72.size() - b71.size() == world_save_kit_goods_bytes(k) + world_save_recruits_section_bytes(k); // BL-1463: v73's recruits follow
         }
         check(ok71, "PK a v71 stream (arrays 49 wide) reads, the kit goods zero and the rest as written");
 

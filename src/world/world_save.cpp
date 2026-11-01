@@ -1966,6 +1966,38 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_id(out, w.nations.at(nid).generation_capital_tile);
         }
     }
+
+    // world_save_version 73 (BL-1463, recruits): THE RECRUIT POOLS AND THE HEAD CARRY,
+    // the last section, after the generation capitals (v71). Every nation holding recruits, ascending
+    // id, as (id, land pool, air pool); then every population centre carrying heads,
+    // ascending id, as (id, carry). Only deviations.
+    if (version >= k_world_save_version_recruits)
+    {
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.land_recruits != 0 || nc.air_recruits != 0)
+                nids.push_back(nid);
+        std::sort(nids.begin(), nids.end());
+        w_u32(out, static_cast<uint32_t>(nids.size()));
+        for (const entity_id nid : nids)
+        {
+            const nation_component& nc = w.nations.at(nid);
+            w_id(out, nid);
+            w_i32(out, nc.land_recruits);
+            w_i32(out, nc.air_recruits);
+        }
+        std::vector<entity_id> cids;
+        for (const auto& [cid, pc] : w.population_centres)
+            if (pc.recruit_heads_taken != 0)
+                cids.push_back(cid);
+        std::sort(cids.begin(), cids.end());
+        w_u32(out, static_cast<uint32_t>(cids.size()));
+        for (const entity_id cid : cids)
+        {
+            w_id(out, cid);
+            w_i32(out, w.population_centres.at(cid).recruit_heads_taken);
+        }
+    }
 }
 
 void write_world_snapshot_pre_gen_capital(const world& w, std::ostream& out)
@@ -1981,10 +2013,30 @@ std::size_t world_save_gen_capital_section_bytes(const world& w)
 
 std::size_t world_save_kit_goods_bytes(const world& w)
 {
+    // v72 against v71: the two differ in the widening alone (BL-1463's v73 recruits
+    // section is measured by world_save_recruits_section_bytes).
     std::ostringstream wide(std::ios::binary), narrow(std::ios::binary);
-    write_world_snapshot(w, wide);
+    write_world_snapshot_at(w, wide, k_world_save_version_kit_goods);
     write_world_snapshot_pre_kit_goods(w, narrow);
     return wide.str().size() - narrow.str().size();
+}
+
+void write_world_snapshot_pre_recruits(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1463): the v72 stream shape — no recruits section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_recruits);
+}
+
+std::size_t world_save_recruits_section_bytes(const world& w)
+{
+    std::size_t n = 4 + 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.land_recruits != 0 || nc.air_recruits != 0)
+            n += 12;
+    for (const auto& [cid, pc] : w.population_centres)
+        if (pc.recruit_heads_taken != 0)
+            n += 8;
+    return n;
 }
 
 void write_world_snapshot_pre_embargo(const world& w, std::ostream& out)
@@ -2227,7 +2279,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_war         // BL-1459: v68, no wars
             && version != k_world_save_version_pre_embargo     // BL-1418: v69, no embargoes
             && version != k_world_save_version_pre_gen_capital  // BL-1460: v70, generation capital = capital
-            && version != k_world_save_version_pre_kit_goods))  // BL-1422: v71, arrays 49 wide
+            && version != k_world_save_version_pre_kit_goods  // BL-1422: v71, arrays 49 wide
+            && version != k_world_save_version_pre_recruits)) // BL-1463: v72, no recruits
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -3734,6 +3787,53 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     else
         for (auto& [nid, nc] : s.nations)
             nc.generation_capital_tile = nc.capital_tile;
+
+    // v73 (BL-1463, recruits; MILITARY.md § Recruits): the recruit pools and the centres'
+    // head carry. Untrusted: nation rows strictly ascending, each a nation in the stream,
+    // both pools in [0, 2^30] and not both 0; centre rows strictly ascending, each a
+    // centre in the stream, the carry in [1, 999]. Refused whole otherwise. A v72 (and
+    // older) stream ends before it: every pool empty, every carry 0.
+    if (version >= k_world_save_version_recruits)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            int32_t land = 0, air = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev)
+                || !r_i32(in, land) || !r_i32(in, air))
+                return false;
+            prev = nid;
+            if (land < 0 || air < 0 || land > (1 << 30) || air > (1 << 30) || (land == 0 && air == 0))
+                return false;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            nit->second.land_recruits = land;
+            nit->second.air_recruits  = air;
+        }
+        uint32_t nc = 0;
+        if (!r_u32(in, nc) || nc > s.population_centres.size())
+            return false;
+        prev = null_entity;
+        for (uint32_t k = 0; k < nc; ++k)
+        {
+            entity_id cid = null_entity;
+            int32_t carry = 0;
+            if (!r_id(in, cid) || cid == null_entity || (k > 0 && cid <= prev) || !r_i32(in, carry))
+                return false;
+            prev = cid;
+            if (carry < 1 || carry > 999)
+                return false;
+            const auto cit = s.population_centres.find(cid);
+            if (cit == s.population_centres.end())
+                return false;
+            cit->second.recruit_heads_taken = carry;
+        }
+    }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

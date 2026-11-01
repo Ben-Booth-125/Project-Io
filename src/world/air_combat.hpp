@@ -131,10 +131,12 @@ entity_id airbase_at(const world& w, entity_id nation, entity_id tile);
 /// Every check `hire_wing` makes before money moves, READ-ONLY, in its order:
 /// @p row is a real air row (rejected_invalid) the nation fields now
 /// (rejected_invalid); @p tile is a tile (rejected_invalid) carrying the nation's own
-/// completed airbase (rejected_placement — a military base hosts no wings). The
-/// payment legs are the seam's (corp_command.cpp). @p base_out receives the airbase.
-corp_command_result hire_wing_check(const world& w, entity_id nation, entity_id tile,
-                                    uint16_t row, entity_id* base_out = nullptr);
+/// completed airbase (rejected_placement — a military base hosts no wings); BL-1463
+/// (MILITARY.md § Recruits): its air pool holds the class's crew, `wing_crew`
+/// (rejected_no_recruits). The payment legs are the seam's (corp_command.cpp).
+/// @p base_out receives the airbase.
+corp_command_result hire_wing_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                    entity_id tile, uint16_t row, entity_id* base_out = nullptr);
 
 /// Every check `assign_air_mission` makes, READ-ONLY, in its order: the wing exists
 /// (rejected_invalid) and is @p nation's (rejected_not_owner); @p mission is a mission

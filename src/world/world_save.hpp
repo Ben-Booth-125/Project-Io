@@ -648,7 +648,22 @@ inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 /// a stream before v72 is read and written with every array of `resource_count`
 /// elements at `k_resource_count_pre_kit_goods` (49) wide (`bio::scoped_array_width`,
 /// binary_io.hpp), the five new goods reading as zero everywhere. Nothing else moved.
-inline constexpr uint32_t world_save_version = 72;
+///
+/// Bumped to 73 (BL-1463, recruits; MILITARY.md § Recruits): A TRAILING SECTION after
+/// v71's generation-capital section carries, after a u32 count, every nation holding
+/// recruits, ascending id, as (id, i32 land pool, i32 air pool) — both in [0, 2^30], not
+/// both 0; then, after a u32 count, every population centre with heads taken but not yet
+/// off its thousands, ascending id, as (id, i32 carry in [1, 999]). v72 is a STRICT PREFIX
+/// of v73 and is read too (`k_world_save_version_pre_recruits`), as a world whose pools
+/// are empty and whose centres carry nothing; so is every older version the reader
+/// already accepted.
+inline constexpr uint32_t world_save_version = 73;
+
+/// BL-1463: the first version carrying the recruits section (see above).
+inline constexpr uint32_t k_world_save_version_recruits = 73;
+
+/// BL-1463: v72, a strict prefix of v73 (the recruits section is v73's only addition).
+inline constexpr uint32_t k_world_save_version_pre_recruits = 72;
 
 /// BL-1422: the first version whose per-resource arrays are 54 wide.
 inline constexpr uint32_t k_world_save_version_kit_goods = 72;
@@ -785,8 +800,8 @@ std::size_t world_save_books_section_bytes(const world& w);
 /// that measure an older stream as today's less its later sections.
 std::size_t world_save_battle_carry_section_bytes(const world& w);
 
-/// BL-1432 (v68): the bytes the Alarm / emitter section takes for @p w, the stream's
-/// LAST section - four counts, then 12 an Alarm row, 13 a pending event, 12 a landed
+/// BL-1432 (v68): the bytes the Alarm / emitter section takes for @p w, the section
+/// before the wars (v69) - four counts, then 12 an Alarm row, 13 a pending event, 12 a landed
 /// pair and 11 a trade streak. For harnesses that address a section from the tail.
 std::size_t world_save_alarm_section_bytes(const world& w);
 /// BL-1459: the byte length of the v69 war section `w` writes — 24 for six empty
@@ -802,9 +817,17 @@ std::size_t world_save_embargo_section_bytes(const world& w);
 std::size_t world_save_gen_capital_section_bytes(const world& w);
 
 /// BL-1422: the bytes the kit goods' five extra elements add to every per-resource
-/// array of the stream `w` writes - today's stream less the v71 stream, which differ in
+/// array of the stream `w` writes - the v72 stream less the v71 stream, which differ in
 /// nothing else. A harness comparing an older stream's length against today's adds it.
 std::size_t world_save_kit_goods_bytes(const world& w);
+
+/// BL-1463: the byte length of the v73 recruits section `w` writes — 4 + 12 per nation
+/// holding recruits + 4 + 8 per centre carrying heads. For the harnesses that measure an
+/// older stream as today's less its later sections.
+std::size_t world_save_recruits_section_bytes(const world& w);
+
+/// VERIFICATION ONLY (BL-1463): the v72 stream shape — no recruits section.
+void write_world_snapshot_pre_recruits(const world& w, std::ostream& out);
 
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and
