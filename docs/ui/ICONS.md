@@ -60,7 +60,7 @@ void glyph(ImDrawList* dl, ImVec2 centre, float r, /* trailing type/tier/colour 
 - **trailing parameters** — most glyphs take a single colour; the multi-parameter
   cases are `building` (a `building_type` + a `resource_type` identity, § 1c, +
   `fill`), `settlement` (a `tier` + `colour`), `landform` (a
-  `terrain_landform` + `colour`) and `stack_ring` (an ARRAY of colours + a count —
+  `terrain_landform` + `colour`), `stat` (a `stat_glyph` + `colour`, § 2c) and `stack_ring` (an ARRAY of colours + a count —
   the one glyph whose colour parameter is plural, because it draws one mark per
   member of a set).
 
@@ -302,6 +302,37 @@ glyph — the shape says *which system the slot is for*, and **colour alone** ca
 hollow squares tells a new player nothing; a tooltip cannot be seen without hovering, and never
 appears in a capture. A slot with no glyph *and* no tooltip is uninterpretable and does not exist
 on the rail. Reserved slots stay `BeginDisabled`.
+
+### 2c. Stat glyphs — the stat grid's cells
+
+`stat(…, stat_glyph which, colour)` draws one glyph per number a land unit or an air wing fights
+with: the icon at the left of each stat grid cell (`ledgers/military.md` § The stat grid,
+`src/ui/stat_grid.*`). A cell carries **no text label** — its name is the hover tooltip — so the
+glyph is the only name a glance gets, and each must read apart from its row-mates at a cell's
+6–8 px radius. All are **line glyphs in the stroke family**: `colour` is the stroke; only a pupil,
+a pip or an inner plate is filled. Drawn in chrome (the Selection band, the designer), never on a
+canvas, so the outline rule does not apply.
+
+| Stat | `stat_glyph` | Shape | Read against |
+|---|---|---|---|
+| HP | `hp` | An outlined Greek (medic's) cross | The market's circle-and-cross: no circle here, and the cross is an outline with width |
+| Readiness | `readiness` | A gauge: the upper half-dial on a baseline, its needle near full | — |
+| Morale | `morale` | An outlined heart | The capital's filled five-point star (a star was the first thought and collides) |
+| Food | `food` | A wheat ear: a stem with three pairs of grains angled up | — |
+| Ammunition | `ammunition` | Two shells side by side, each a banded case under a pointed nose | — |
+| Equipment | `equipment` | A helmet: a dome over a brim, a chin strap | — |
+| Soft attack | `soft_attack` | A reticle: a ring and four ticks | Air attack's ring holds a chevron, not ticks |
+| Hard attack | `hard_attack` | An arrow striking a thick plate | Breakthrough's arrow passes *through* a gap |
+| Defence | `defence` | A shield outline | — |
+| Breakthrough | `breakthrough` | An arrow through a gap in a two-piece wall | Hard attack's arrow stops at the plate |
+| Hardness | `hardness` | A hexagonal plate outline with a filled inner plate | — |
+| Recon | `recon` | An open eye: two arcs and a filled pupil | — |
+| Stealth | `stealth` | The recon eye struck through | — |
+| Speed | `speed` | A double open chevron | The convoy's single chevron |
+| Air attack | `air_attack` | An upward chevron inside a ring | Soft attack's ticked reticle |
+| Strategic | `strategic` | A finned bomb, nose down, over a ground line | — |
+| Range | `range` | A point at the lower left with three quarter-rings out from it | The activity pulse's full concentric rings |
+| Supply (a wing's) | `supply` | The `supply` route pair (§ 1), reused | — |
 
 ### 3. Map-lens glyphs — the overlay control strip
 

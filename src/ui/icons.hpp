@@ -659,4 +659,41 @@ void rail_line(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour (the nation's identity colour).
 void capital(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// BL-1454 (docs/ui/ledgers/military.md § The stat grid): the STAT glyphs - one per
+/// number a land unit or an air wing fights with, the icon at the left of each stat
+/// grid cell (a cell carries no text label; its name is the hover tooltip). Line
+/// glyphs in the stroke family: @p colour is the stroke; only a pupil, a pip or an
+/// inner plate is filled. Keyed by @p which, as `landform` is by its landform.
+enum class stat_glyph : uint8_t
+{
+    hp,           ///< Men fit to fight / airframes fit to fly: an outlined medic's cross.
+    readiness,    ///< Cohesion in contact: a gauge - a half-dial with its needle up.
+    morale,       ///< Will to fight: an outlined heart.
+    food,         ///< Carried food: a wheat ear - a stem with paired grains.
+    ammunition,   ///< Carried ammunition: two shells standing side by side.
+    equipment,    ///< Carried kit: a helmet - a dome over a brim.
+    soft_attack,  ///< Hits on the soft share: a reticle (circle and four ticks).
+    hard_attack,  ///< Hits on the hard share: an arrow striking a thick plate.
+    defence,      ///< Hits absorbed defending: a shield outline.
+    breakthrough, ///< Hits absorbed attacking: an arrow through a broken wall.
+    hardness,     ///< The armoured share: a hexagonal plate with an inner plate.
+    recon,        ///< What the side sees: an open eye.
+    stealth,      ///< What it takes to see the unit: the eye struck through.
+    speed,        ///< Days a tile: a double chevron (the convoy's is single).
+    air_attack,   ///< Hits on aircraft: an upward chevron inside a reticle ring.
+    strategic,    ///< Hits on buildings: a bomb falling onto a ground line.
+    range,        ///< Reach from the airbase: three quarter-rings from a corner point.
+    supply,       ///< Upkeep met: the `supply` route pair.
+};
+
+/// Draw stat glyph @p which centred at @p centre, half-extent @p r, stroked in
+/// @p colour. See `stat_glyph` for each shape; ICONS.md § 2c catalogues them.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param which  The stat to depict.
+/// @param colour Stroke colour.
+void stat(ImDrawList* dl, ImVec2 centre, float r, stat_glyph which, ImU32 colour);
+
 } // namespace ui::icons

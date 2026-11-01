@@ -91,7 +91,7 @@ and so is the safety net.
 | `UI-126` Construction Ledger > Rail rows | sub-element | `rail_construction` | 17 | 0 | 4 |
 | `UI-127` Construction Ledger > Site ledger (the site finder) | sub-element | `construction_sites` | 29 | 0 | 1 |
 | `UI-128` Planetary Canvas > Placement lens | sub-element | `construction_sites` | 29 | 0 | 1 |
-| `UI-132` Unit designer | view | `unit_designer` | 2 | 0 | 38 |
+| `UI-132` Unit designer | view | `unit_designer`, `stat_grid` | 4 | 0 | 41 |
 
 ## CLIP-ONLY (12)
 

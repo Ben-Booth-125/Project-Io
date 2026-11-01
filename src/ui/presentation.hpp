@@ -106,6 +106,12 @@ inline constexpr ImU32 negative = IM_COL32(216, 100,  96, 255); ///< Loss, defic
 inline constexpr ImU32 unit_hp        = IM_COL32(110, 200, 120, 255); ///< Men fit to fight — `positive`'s green.
 inline constexpr ImU32 unit_readiness = IM_COL32(240, 140,  40, 255); ///< Cohesion in contact — orange (Ben, 2026-10-27), distinct from HP.
 inline constexpr ImU32 unit_morale    = IM_COL32(120, 160, 230, 255); ///< Will to fight — blue, the card only.
+// The carried stocks (BL-1452) and an air wing's supply, as the stat grid's bars draw
+// them (BL-1454; military.md § The stat grid). The card only, beside the three above.
+inline constexpr ImU32 unit_food      = IM_COL32(214, 190,  96, 255); ///< Carried food — wheat yellow.
+inline constexpr ImU32 unit_ammo      = IM_COL32(204, 120,  88, 255); ///< Carried ammunition — brass-red.
+inline constexpr ImU32 unit_equipment = IM_COL32(150, 170, 196, 255); ///< Carried kit — steel grey-blue.
+inline constexpr ImU32 unit_supply    = IM_COL32(160, 200, 200, 255); ///< A wing's upkeep met — pale teal.
 inline constexpr ImU32 neutral  = IM_COL32(170, 175, 185, 255); ///< No change / not applicable.
 
 // --- a front's line, by the stance toward its neighbour (BL-1427; MILITARY.md § Fronts) ---

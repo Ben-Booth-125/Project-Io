@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*212 entries — 53 gameplay · 36 canvas · 16 lens · 74 ledger · 33 chrome.*
+*213 entries — 53 gameplay · 36 canvas · 16 lens · 74 ledger · 34 chrome.*
 
 ---
 
@@ -2418,14 +2418,14 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Answers 'what is this kind of unit carrying, and what can it carry instead?'. Open it to see what each slot holds, what research would open, and to change the class's live design.
 
-### `ledger.selection_unit_type_designer` — Selection band, the unit card's Roster page (the card's second page): the unit type's name under 'Type', for the player's own unit.
+### `ledger.selection_unit_type_designer` — Selection band, the unit card's centre column: the unit type's name at its head, above the stat grid, for the player's own unit (BL-1454: the card is one page; its Roster page retired).
 
 **Press.** Click the type name. Clicking it again while the designer is open on that unit's class closes it (the toggle rule) - unless a slot's draft is unsaved, when the designer stays open and asks Save or Discard (canvas.designer_save).
 
 **Valid when:**
-- A unit of your own nation is selected and its card is on the Roster page. A rival's unit shows its type as plain text: the designer edits your own designs.
+- A unit of your own nation is selected (its own card, not its group). A rival's unit shows its type as plain text: the designer edits your own designs.
 
-**Expected output.** Opens the unit designer on the full canvas for the land class the unit fights as (as ledger.military_open_designer). When the unit's recorded design differs from the class's live design, the page also says it is on an older design and the Refit menu offers its own type as '(live design)'. Nothing in the world changes.
+**Expected output.** Opens the unit designer on the full canvas for the land class the unit fights as (as ledger.military_open_designer). When the unit's recorded design differs from the class's live design, the line under the stat grid says it is on an older design and the Refit menu offers its own type as '(live design)'. Nothing in the world changes.
 
 **Reason to select.** To see or change what this kind of unit carries, straight from a unit in front of you.
 
@@ -3209,4 +3209,16 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Sets world_params::epoch_year — the calendar the clock rebases to at Begin — and nothing else. Default 1960. Generation runs the history 2400 BCE → 1960 whatever the epoch (the migration, the Empires, the Exploration and Industrialisation spans on one engine), so every epoch builds the same world; the flag names the date it is met on. The recipe band is NOT the epoch's: every nation opens on the industrial band whatever the epoch (Ben, 2026-10-10; docs/economy/ERAS.md § Where the ladder starts). Epoch 0 is retired (Ben, 2026-09-25, NR-920): no band override and no ancient-roster sandbox. The UI calendar follows it: ui::fmt::campaign_epoch_year() is published from the live world_params, so a 1960 campaign renders 1960-based dates and a 1900 campaign renders 1900-based ones. That is display only and never enters `world` — the serialised history datum (::history_datum_year) is a separate fixed constant and does not move with the epoch.
 
 **Reason to select.** To date the campaign in a year other than 1960: the world is the same, only the calendar moves. The default 1960 start needs no flag.
+
+### `chrome.stat_grid_cell_hover` — The stat grid (BL-1454; ledgers/military.md § The stat grid): on the unit card and the unit group card in the Selection band, on the wing card, and at the bottom right of the land and air designers. Labelled bands - Condition, Supply, Combat, Field for a land unit; Condition, Combat, Field for a wing - of cells, each a stat glyph with its value right-aligned and no text label.
+
+**Press.** Hover a cell. A read, not a command: nothing is pressed.
+
+**Valid when:**
+- A unit, a unit group or a wing is selected, or the designer is open.
+- A rival unit's internals (HP, readiness, morale, food, ammunition, equipment) read a dash; its design stats read a dash unless it stands in a live battle opposite one of your units. A rival wing's every cell reads a dash.
+
+**Expected output.** A tooltip names the stat and says in one line what it does, with a dim line beneath where one applies (a unit's men over establishment; a group's 'Mean of N units'; why a cell reads a dash). On a group's card each cell is the mean, its lowest-to-highest range beneath. In the designer each design stat carries a signed delta against the live design - for the draft, or for the kit item hovered in an open slot list, previewed fitted. Nothing in the world changes.
+
+**Reason to select.** To learn what a number on a unit or design means, or to compare a stack's spread before sending it.
 
