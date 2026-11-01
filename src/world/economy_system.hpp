@@ -303,6 +303,9 @@ struct economy_report
     /// recruits the refills delivered at their granted share.
     recruitment_tick recruitment;
     int              recruits_refilled = 0;
+    /// BL-1423 (MILITARY.md § Land — equipment, refit and manpower): the men the land
+    /// refills regained and the equipment goods they drew off the shelves.
+    refit_tally      refit;
     int              air_recruits_refilled = 0; ///< Ben, 2026-10-31: wings refill too
 
     /// BL-1266 (TRADE.md § The Planetary Marketplace): every building whose goods

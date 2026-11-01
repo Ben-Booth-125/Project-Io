@@ -2801,7 +2801,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     report.logistic_points =
         resolve_logistic_points(w, collect_supply_claims(w, reg, refill_plan, wing_plan));
     charge_supply_draws(w, reg, report.logistic_points);
-    report.recruits_refilled = apply_recruit_refills(w, refill_plan, report.logistic_points);
+    report.recruits_refilled = apply_recruit_refills(w, refill_plan, report.logistic_points, &report.refit);
     report.air_recruits_refilled = apply_wing_refills(w, reg, wing_plan, report.logistic_points);
     lp_ready = true;
 
@@ -4572,7 +4572,7 @@ float unit_supply_need(const unit_component& u, const unit_upkeep_params& up)
     // unit in the field this quarter, as a shipment's draw is its cargo.
     //   - its upkeep goods: food rations and ordnance per head
     //     (`economy.military.unit_upkeep.goods_per_head`, `resolve_unit_upkeep`);
-    //   - the manpower its HP refill draws while wounded: BL-1463 (MILITARY.md
+    //   - the manpower and equipment its HP refill draws while wounded: BL-1463 (MILITARY.md
     //     § Recruits) adds the quarter's refill plan, its recruits x `lp_per_recruit`,
     //     in `collect_supply_claims` - so that half is not computed here.
     if (u.count <= 0)
@@ -4620,9 +4620,17 @@ std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_
             [](const recruit_refill& r, entity_id v) { return r.unit < v; });
         if (pit != plan.end() && pit->unit == id)
         {
-            c.need          += recruit_refill_lp_need(reg, *pit);
+            // BL-1423 (MILITARY.md § Upkeep: the supplies include "the recruits and
+            // equipment that refill its HP"; the request is their quantity): each
+            // recruit carries his share of the unit's kit, so a recruit's points are
+            // the authored rate plus the quantity of that share.
+            float kit_per_man = 0.0f;
+            for (const float q : refill_goods_per_man(u)) // resource order: a fixed sum
+                kit_per_man += q;
+            const float per_recruit = reg.military().recruits.lp_per_recruit + kit_per_man;
+            c.need          += static_cast<float>(pit->planned) * per_recruit;
             c.recruits       = pit->planned; // granted in whole recruits (logistic_points.cpp)
-            c.lp_per_recruit = reg.military().recruits.lp_per_recruit;
+            c.lp_per_recruit = per_recruit;
         }
         // WHOSE POOL: THE UNIT'S OWN NATION'S, routed from its own sources - never the
         // ground's, which would fund an invasion out of the invaded nation's points.
