@@ -355,9 +355,11 @@ tab (`../ui/ledgers/military.md`).
   tree); a node the tree does not hold is held by no nation, so its item stays locked.
 - **Kit is goods (Ben, 2026-10-27).** A hire buys the kit goods of its design's later items beside
   its row's gated goods, both checked before either is taken; a hire whose kit the shelves cannot
-  supply is refused. Until the six kit goods by kind exist (§ Land — equipment, refit and
-  manpower), an item names the goods they are made of — steel, machinery, alloys, electronics and
-  ordnance — later items more of them.
+  supply is refused. An item names the kit goods by kind it takes (§ Land — equipment, refit and
+  manpower): body armour and rifles small arms; every vehicle, hull and plate armoured vehicles;
+  every gun, launcher and tow artillery pieces; every missile, guided shell and submunition guided
+  weapons; every drone drones. A later item in its slot takes more of them, and the second
+  generation and later add electronics.
 - **A unit records its design (Ben, 2026-10-28).** A hire is raised to its class's live design as
   it stood when the hire was paid, and the unit keeps that design: changing the live design leaves
   units in the field on their old kit until they **refit to it** (§ The muster interface, "Refit
@@ -378,7 +380,8 @@ tab (`../ui/ledgers/military.md`).
 | Air defence | low | — | — | Shoots aircraft, drones and missiles over its province. |
 
 **Small drones are equipment, not units.** An FPV drone stock raises a land unit's soft and hard
-attack and draws a drone good, which is how they are used.
+attack and draws a drone good, which is how they are used. It is a weapon-slot item of the classes
+whose weapon slot has room for it (motorised and mechanised infantry).
 
 ### Land — equipment, refit and manpower
 
@@ -386,6 +389,9 @@ attack and draws a drone good, which is how they are used.
 **Six goods, by kind, not by generation (Ben, 2026-10-27):** small arms, armoured vehicles,
 artillery pieces, guided weapons and drones, with the existing electronics; later kit needs more of
 them and adds electronics, so the economy feels each generation without a good for every rung.
+Each is made in an Arms Works from the goods below it: small arms and artillery pieces from steel
+and machinery, armoured vehicles from steel, machinery and alloys, guided weapons from electronics
+and ordnance, drones from electronics and alloys (`../economy/RESOURCES.md` § The kit goods).
 Ordnance stays every unit's per-tick draw. **Refit**: a wounded unit regains HP by drawing equipment off the shelf and men from its nation's
 recruit pool (§ Recruits). A unit whose kit cannot be bought, or whose pool is empty, stays
 wounded; the economy is the war's ceiling.

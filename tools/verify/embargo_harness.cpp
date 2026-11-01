@@ -447,6 +447,7 @@ int main()
         world old;
         check(from_bytes(b69, old) && old.nation_embargoes.empty()
                   && b69.size() == b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w)
+                                  - world_save_kit_goods_bytes(s.w) // BL-1422: v69 arrays are 49 wide
                   && world_save_embargo_section_bytes(s.w) == 4 + 8 * 3,
               "R9c a v69 stream (today's less the 28-byte embargo section) loads with no embargo");
 

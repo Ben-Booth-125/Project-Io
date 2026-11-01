@@ -471,7 +471,7 @@ int main()
                   && back.province_cessions.size() == 1 && back.war_exhaustion_residual.size() == 1,
               "R4i the wars, truces, cessions and residual round-trip the snapshot byte for byte");
         uint32_t ver = 0; std::memcpy(&ver, b.data() + 4, 4);
-        check(ver == world_save_version && world_save_version == 71, "R4j the stream is version 71 (BL-1418's embargo section, then BL-1460's generation capitals, follow the wars)");
+        check(ver == world_save_version && world_save_version == 72, "R4j the stream is version 72 (BL-1418's embargo section, then BL-1460's generation capitals, follow the wars; BL-1422 widened the resource arrays)");
         check(b.size() >= world_save_war_section_bytes(w), "R4k the war section's measured length fits the stream");
         // An older stream loads with no wars.
         std::ostringstream o67(std::ios::binary);
@@ -481,7 +481,8 @@ int main()
         check(from_bytes(b67, old) && old.wars.empty() && old.truces.empty() && old.peace_offers.empty()
                   && old.war_history.empty() && old.province_cessions.empty()
                   && b67.size() == b.size() - world_save_war_section_bytes(w)
-                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w), // BL-1418 (v70)
+                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) // BL-1418 (v70)
+                                              - world_save_kit_goods_bytes(w), // BL-1422: v68 arrays are 49 wide
               "R4l a v68 stream (today's less the war and embargo sections) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;

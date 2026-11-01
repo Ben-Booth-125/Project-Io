@@ -653,6 +653,10 @@ economy = {
             machinery = 0.66, alloys = 0.47, electronics = 1.0,
             spacecraft_components = 0.13, consumer_goods = 0.66, ordnance = 0.26,
             tools = 0.44,
+            -- BL-1422: the kit goods by kind, dense products like ordnance; a
+            -- vehicle is the bulkiest of them, a rifle crate the lightest.
+            small_arms = 0.4, armoured_vehicles = 0.1, artillery_pieces = 0.15,
+            guided_weapons = 0.2, drones = 0.3,
         },
     },
 
@@ -1860,6 +1864,12 @@ economy = {
         spacecraft_components = 0.02,
         ordnance              = 0.02,
         tools                 = 0.02,
+        -- durable: the kit goods by kind (BL-1422)
+        small_arms            = 0.02,
+        armoured_vehicles     = 0.02,
+        artillery_pieces      = 0.02,
+        guided_weapons        = 0.02,
+        drones                = 0.02,
     },
 
     -- ===================================================================

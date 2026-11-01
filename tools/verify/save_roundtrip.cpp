@@ -603,7 +603,7 @@ int main()
                                        + world_save_alarm_section_bytes(wd)       // BL-1432 (v68), last
                                        + world_save_war_section_bytes(wd)          // BL-1459 (v69)
                                        + world_save_embargo_section_bytes(wd) + world_save_gen_capital_section_bytes(wd);     // BL-1418 (v70), last
-        check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
+        check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section + world_save_kit_goods_bytes(wd) && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
         // Untrusted: a cursor past the quarter is refused whole.
@@ -675,7 +675,7 @@ int main()
                                          + world_save_alarm_section_bytes(wu)       // BL-1432 (v68), last
                                          + world_save_war_section_bytes(wu)          // BL-1459 (v69)
                                          + world_save_embargo_section_bytes(wu) + world_save_gen_capital_section_bytes(wu);     // BL-1418 (v70), last
-        check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
+        check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section + world_save_kit_goods_bytes(wu),
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
         // Untrusted: readiness past 1000 is refused whole. The first row's
@@ -1840,6 +1840,83 @@ int main()
                   "(ten since BL-644) + reserve for two nations, the non-dyadic 0.3f "
                   "included");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // PK (BL-1422, the kit goods by kind) -- v72 widens every per-resource array
+    // 49 -> 54. The five goods round-trip by value; a v71 stream (every array 49
+    // wide) still reads, the five goods zero and everything else as written.
+    // -----------------------------------------------------------------------
+    {
+        static_assert(world_save_version == k_world_save_version_kit_goods,
+                      "PK pins v72 as the kit goods' version");
+        static_assert(resource_count == k_resource_count_pre_kit_goods + 5,
+                      "PK: the kit goods are five appended values");
+        world k = w;
+        entity_id mid = null_entity;
+        for (const auto& [id, m] : k.markets)
+            if (mid == null_entity || id < mid)
+                mid = id;
+        entity_id tid = null_entity;
+        for (const auto& [id, t] : k.tiles)
+            if (tid == null_entity || id < tid)
+                tid = id;
+        const std::size_t sa = static_cast<std::size_t>(resource_type::small_arms);
+        const std::size_t dr = static_cast<std::size_t>(resource_type::drones);
+        const std::size_t st = static_cast<std::size_t>(resource_type::steel);
+        if (mid != null_entity)
+        {
+            k.markets.at(mid).inventory[sa] = 12.5f;
+            k.markets.at(mid).price[dr]     = 171.25f;
+            k.markets.at(mid).unposted_bid_tick[dr] = 9;
+        }
+        if (tid != null_entity)
+            k.tiles.at(tid).resource_deposit[dr] = 0.5f;
+        const std::string b72 = to_bytes(k);
+        world back;
+        bool ok = mid != null_entity && tid != null_entity && from_bytes(b72, back)
+               && back.markets.at(mid).inventory[sa] == 12.5f
+               && back.markets.at(mid).price[dr] == 171.25f
+               && back.markets.at(mid).unposted_bid_tick[dr] == 9
+               && back.tiles.at(tid).resource_deposit[dr] == 0.5f
+               && to_bytes(back) == b72;
+        check(ok, "PK v72: the kit goods' market, shelf and tile slots round-trip by value (bytes equal)");
+
+        std::string b71;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_kit_goods(k, o);
+            b71 = o.str();
+        }
+        uint32_t stamped = 0;
+        if (b71.size() >= 8)
+            std::memcpy(&stamped, b71.data() + 4, sizeof stamped);
+        world old;
+        bool ok71 = stamped == k_world_save_version_pre_kit_goods && from_bytes(b71, old)
+                 && mid != null_entity && tid != null_entity;
+        if (ok71)
+        {
+            const market_component& m0 = old.markets.at(mid);
+            const market_component& mk = k.markets.at(mid);
+            ok71 = m0.inventory[sa] == 0.0f && m0.price[dr] == 0.0f && m0.unposted_bid_tick[dr] == 0
+                && old.tiles.at(tid).resource_deposit[dr] == 0.0f
+                && m0.price[st] == mk.price[st] && m0.inventory[st] == mk.inventory[st]
+                && old.tiles.size() == k.tiles.size() && old.markets.size() == k.markets.size();
+            // Every narrowed array lost exactly five elements: 4 bytes a float, 1 a bool.
+            ok71 = ok71 && b72.size() > b71.size() && b72.size() - b71.size() == world_save_kit_goods_bytes(k);
+        }
+        check(ok71, "PK a v71 stream (arrays 49 wide) reads, the kit goods zero and the rest as written");
+
+        // A v71 stream re-stamped v72 is short by the widening and is REFUSED whole.
+        std::string bad = b71;
+        if (bad.size() >= 8)
+        {
+            const uint32_t v72 = k_world_save_version_kit_goods;
+            std::memcpy(&bad[4], &v72, sizeof v72);
+        }
+        world sentinel;
+        check(!from_bytes(bad, sentinel) && sentinel.tiles.empty(),
+              "PK a 49-wide stream stamped v72 is REFUSED, destination untouched");
     }
 
     std::printf("\n");

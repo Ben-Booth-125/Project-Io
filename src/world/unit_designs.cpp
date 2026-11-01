@@ -13,12 +13,15 @@
 // soft attack is 60), ADDED to the class before the row's quality scale; hardness
 // is per-mille. A first cut, tuned against campaign_battle_harness.
 //
-// GOODS. Kit is goods (Ben, 2026-10-27). The six kit goods by kind (small arms,
-// armoured vehicles, artillery pieces, guided weapons, drones, with electronics)
-// are BL-1422's kit half and not yet resources, so each item names the EXISTING
-// goods they are made of: steel and machinery for small arms and guns, steel,
-// machinery and alloys for vehicles, electronics and ordnance for guided weapons,
-// electronics and alloys for drones. Later items need more, and add electronics.
+// GOODS. Kit is goods (Ben, 2026-10-27): the six kit goods BY KIND (BL-1422;
+// MILITARY.md § Land — equipment, refit and manpower) - small arms (SA), armoured
+// vehicles (AV), artillery pieces (AP), guided weapons (GW) and drones (DR), with the
+// existing electronics (E). Each later item names the kinds it is made of; a later
+// item in its slot needs MORE of them, and the generation-two and later items ADD
+// electronics, so the economy feels each generation without a good for every rung.
+// Body armour is small arms' kind (personal kit); every vehicle, hull and plate is
+// armoured vehicles'; every gun, launcher and tow is artillery pieces'; every
+// missile, guided shell and submunition is guided weapons'; every drone is drones'.
 //
 // RESEARCH. Every later item names the age-tree node that opens it. The nodes are
 // BL-1436's (kit in the age tree) to place; the ids below follow the tree's
@@ -34,11 +37,12 @@ namespace {
 using lc = land_class;
 using rt = resource_type;
 
-constexpr kit_good S(float q) { return {rt::steel, q}; }
-constexpr kit_good M(float q) { return {rt::machinery, q}; }
-constexpr kit_good A(float q) { return {rt::alloys, q}; }
+constexpr kit_good SA(float q) { return {rt::small_arms, q}; }
+constexpr kit_good AV(float q) { return {rt::armoured_vehicles, q}; }
+constexpr kit_good AP(float q) { return {rt::artillery_pieces, q}; }
+constexpr kit_good GW(float q) { return {rt::guided_weapons, q}; }
+constexpr kit_good DR(float q) { return {rt::drones, q}; }
 constexpr kit_good E(float q) { return {rt::electronics, q}; }
-constexpr kit_good O(float q) { return {rt::ordnance, q}; }
 
 /// A base item: no delta, no goods, no node.
 constexpr kit_item base(const char* id, const char* name, lc c, uint8_t slot)
@@ -59,89 +63,99 @@ constexpr kit_item later(const char* id, const char* name, lc c, uint8_t slot,
 constexpr kit_item k_items[] = {
     // --- Infantry: Weapon (0) · Armour (1) ---------------------------------
     base ("inf.weapon.battle_rifle",          "Battle rifle",                      lc::infantry, 0),
-    later("inf.weapon.assault_rifle",         "Assault rifle",                     lc::infantry, 0, {10, 0, 0, 0, 0}, "DG-KIT-INF-WEAPON-1", S(2), M(1)),
-    later("inf.weapon.light_mortar",          "Light mortar",                      lc::infantry, 0, {20, 0, 0, 0, 0}, "DG-KIT-INF-WEAPON-2", S(2), O(2)),
-    later("inf.weapon.wire_guided_atgm",      "Wire-guided anti-tank missile",     lc::infantry, 0, {0, 25, 0, 0, 0}, "DG-KIT-INF-WEAPON-3", M(1), E(1), O(2)),
-    later("inf.weapon.fire_and_forget_atgm",  "Fire-and-forget anti-tank missile", lc::infantry, 0, {0, 40, 0, 0, 0}, "DG-KIT-INF-WEAPON-4", E(2), O(2)),
+    later("inf.weapon.assault_rifle",         "Assault rifle",                     lc::infantry, 0, {10, 0, 0, 0, 0}, "DG-KIT-INF-WEAPON-1", SA(2)),
+    later("inf.weapon.light_mortar",          "Light mortar",                      lc::infantry, 0, {20, 0, 0, 0, 0}, "DG-KIT-INF-WEAPON-2", SA(2), AP(1)),
+    later("inf.weapon.wire_guided_atgm",      "Wire-guided anti-tank missile",     lc::infantry, 0, {0, 25, 0, 0, 0}, "DG-KIT-INF-WEAPON-3", SA(1), GW(2)),
+    later("inf.weapon.fire_and_forget_atgm",  "Fire-and-forget anti-tank missile", lc::infantry, 0, {0, 40, 0, 0, 0}, "DG-KIT-INF-WEAPON-4", SA(1), GW(3), E(1)),
     base ("inf.armour.steel_helmet",          "Steel helmet",                      lc::infantry, 1),
-    later("inf.armour.flak_vest",             "Flak vest",                         lc::infantry, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-KIT-INF-ARMOUR-1", S(1), A(1)),
-    later("inf.armour.ceramic_plates",        "Ceramic plate carrier",             lc::infantry, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-KIT-INF-ARMOUR-2", A(2)),
-    later("inf.armour.networked_kit",         "Networked soldier kit",             lc::infantry, 1, {10, 0, 0, 15, 10, 10, 15}, "DG-KIT-INF-ARMOUR-3", A(1), E(2)),
+    later("inf.armour.flak_vest",             "Flak vest",                         lc::infantry, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-KIT-INF-ARMOUR-1", SA(1)),
+    later("inf.armour.ceramic_plates",        "Ceramic plate carrier",             lc::infantry, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-KIT-INF-ARMOUR-2", SA(2), E(1)),
+    later("inf.armour.networked_kit",         "Networked soldier kit",             lc::infantry, 1, {10, 0, 0, 15, 10, 10, 15}, "DG-KIT-INF-ARMOUR-3", SA(2), E(3)),
 
     // --- Motorised infantry: Weapon (0) · Armour (1) · Vehicle (2) ---------
     base ("mot.weapon.battle_rifle",          "Battle rifle",                      lc::motorised, 0),
-    later("mot.weapon.assault_rifle",         "Assault rifle",                     lc::motorised, 0, {10, 0, 0, 0, 0}, "DG-KIT-MOT-WEAPON-1", S(2), M(1)),
-    later("mot.weapon.wire_guided_atgm",      "Wire-guided anti-tank missile",     lc::motorised, 0, {0, 25, 0, 0, 0}, "DG-KIT-MOT-WEAPON-2", M(1), E(1), O(2)),
+    later("mot.weapon.assault_rifle",         "Assault rifle",                     lc::motorised, 0, {10, 0, 0, 0, 0}, "DG-KIT-MOT-WEAPON-1", SA(2)),
+    later("mot.weapon.wire_guided_atgm",      "Wire-guided anti-tank missile",     lc::motorised, 0, {0, 25, 0, 0, 0}, "DG-KIT-MOT-WEAPON-2", SA(1), GW(2)),
     base ("mot.armour.steel_helmet",          "Steel helmet",                      lc::motorised, 1),
-    later("mot.armour.flak_vest",             "Flak vest",                         lc::motorised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-KIT-MOT-ARMOUR-1", S(1), A(1)),
-    later("mot.armour.ceramic_plates",        "Ceramic plate carrier",             lc::motorised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-KIT-MOT-ARMOUR-2", A(2)),
+    later("mot.armour.flak_vest",             "Flak vest",                         lc::motorised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-KIT-MOT-ARMOUR-1", SA(1)),
+    later("mot.armour.ceramic_plates",        "Ceramic plate carrier",             lc::motorised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-KIT-MOT-ARMOUR-2", SA(2), E(1)),
     base ("mot.vehicle.trucks",               "Trucks",                            lc::motorised, 2),
-    later("mot.vehicle.protected_trucks",     "Protected trucks",                  lc::motorised, 2, {0, 0, 150, 10, 0}, "DG-KIT-MOT-VEHICLE-1", S(3), M(1)),
-    later("mot.vehicle.wheeled_carriers",     "Wheeled carriers",                  lc::motorised, 2, {0, 0, 250, 0, 15}, "DG-KIT-MOT-VEHICLE-2", S(4), M(2), A(1)),
+    later("mot.vehicle.protected_trucks",     "Protected trucks",                  lc::motorised, 2, {0, 0, 150, 10, 0}, "DG-KIT-MOT-VEHICLE-1", AV(1)),
+    later("mot.vehicle.wheeled_carriers",     "Wheeled carriers",                  lc::motorised, 2, {0, 0, 250, 0, 15}, "DG-KIT-MOT-VEHICLE-2", AV(2), E(1)),
 
     // --- Mechanised infantry: Weapon (0) · Armour (1) · Vehicle (2) --------
     base ("mech.weapon.battle_rifle",         "Battle rifle",                      lc::mechanised, 0),
-    later("mech.weapon.assault_rifle",        "Assault rifle",                     lc::mechanised, 0, {10, 0, 0, 0, 0}, "DG-KIT-MECH-WEAPON-1", S(2), M(1)),
-    later("mech.weapon.fire_and_forget_atgm", "Fire-and-forget anti-tank missile", lc::mechanised, 0, {0, 40, 0, 0, 0}, "DG-KIT-MECH-WEAPON-2", E(2), O(2)),
+    later("mech.weapon.assault_rifle",        "Assault rifle",                     lc::mechanised, 0, {10, 0, 0, 0, 0}, "DG-KIT-MECH-WEAPON-1", SA(2)),
+    later("mech.weapon.fire_and_forget_atgm", "Fire-and-forget anti-tank missile", lc::mechanised, 0, {0, 40, 0, 0, 0}, "DG-KIT-MECH-WEAPON-2", SA(1), GW(3), E(1)),
     base ("mech.armour.steel_helmet",         "Steel helmet",                      lc::mechanised, 1),
-    later("mech.armour.flak_vest",            "Flak vest",                         lc::mechanised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-KIT-MECH-ARMOUR-1", S(1), A(1)),
-    later("mech.armour.ceramic_plates",       "Ceramic plate carrier",             lc::mechanised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-KIT-MECH-ARMOUR-2", A(2)),
+    later("mech.armour.flak_vest",            "Flak vest",                         lc::mechanised, 1, {0, 0, 0, 10, 0, 0, 5}, "DG-KIT-MECH-ARMOUR-1", SA(1)),
+    later("mech.armour.ceramic_plates",       "Ceramic plate carrier",             lc::mechanised, 1, {0, 0, 0, 20, 0, 0, 10}, "DG-KIT-MECH-ARMOUR-2", SA(2), E(1)),
     base ("mech.vehicle.apc",                 "Armoured personnel carrier",        lc::mechanised, 2),
-    later("mech.vehicle.ifv_autocannon",      "Infantry fighting vehicle (autocannon)", lc::mechanised, 2, {20, 15, 0, 0, 0}, "DG-KIT-MECH-VEHICLE-1", S(4), M(2)),
-    later("mech.vehicle.ifv_missiles",        "Fighting vehicle with missiles",    lc::mechanised, 2, {20, 30, 0, 0, 0}, "DG-KIT-MECH-VEHICLE-2", S(4), M(2), E(1)),
-    later("mech.vehicle.heavy_ifv",           "Heavy fighting vehicle, active protection", lc::mechanised, 2, {20, 30, 150, 20, 0, 5, 0}, "DG-KIT-MECH-VEHICLE-3", S(5), A(2), E(2)),
+    later("mech.vehicle.ifv_autocannon",      "Infantry fighting vehicle (autocannon)", lc::mechanised, 2, {20, 15, 0, 0, 0}, "DG-KIT-MECH-VEHICLE-1", AV(2)),
+    later("mech.vehicle.ifv_missiles",        "Fighting vehicle with missiles",    lc::mechanised, 2, {20, 30, 0, 0, 0}, "DG-KIT-MECH-VEHICLE-2", AV(3), GW(1), E(1)),
+    later("mech.vehicle.heavy_ifv",           "Heavy fighting vehicle, active protection", lc::mechanised, 2, {20, 30, 150, 20, 0, 5, 0}, "DG-KIT-MECH-VEHICLE-3", AV(4), E(2)),
 
     // --- Medium armour (the armour class): Armament (0) · Armour (1) · Tracks (2)
     base ("arm.armament.rifled_gun",          "Rifled gun",                        lc::armour, 0),
-    later("arm.armament.smoothbore_gun",      "Smoothbore gun",                    lc::armour, 0, {0, 30, 0, 0, 0}, "DG-KIT-ARM-ARMAMENT-1", S(3), M(2)),
-    later("arm.armament.penetrators_thermal", "Improved penetrators, thermal sights", lc::armour, 0, {15, 55, 0, 0, 0, 5, 0}, "DG-KIT-ARM-ARMAMENT-2", S(3), M(2), E(1)),
-    later("arm.armament.gun_missiles",        "Gun-launched missiles, networked fire control", lc::armour, 0, {30, 80, 0, 0, 0, 10, 0}, "DG-KIT-ARM-ARMAMENT-3", M(2), E(3), O(2)),
+    later("arm.armament.smoothbore_gun",      "Smoothbore gun",                    lc::armour, 0, {0, 30, 0, 0, 0}, "DG-KIT-ARM-ARMAMENT-1", AP(2)),
+    later("arm.armament.penetrators_thermal", "Improved penetrators, thermal sights", lc::armour, 0, {15, 55, 0, 0, 0, 5, 0}, "DG-KIT-ARM-ARMAMENT-2", AP(3), E(1)),
+    later("arm.armament.gun_missiles",        "Gun-launched missiles, networked fire control", lc::armour, 0, {30, 80, 0, 0, 0, 10, 0}, "DG-KIT-ARM-ARMAMENT-3", AP(3), GW(2), E(2)),
     base ("arm.armour.rolled_steel",          "Rolled steel",                      lc::armour, 1),
-    later("arm.armour.composite",             "Composite armour",                  lc::armour, 1, {0, 0, 0, 15, 15}, "DG-KIT-ARM-ARMOUR-1", S(2), A(3)),
-    later("arm.armour.reactive",              "Reactive armour",                   lc::armour, 1, {0, 0, 0, 30, 15}, "DG-KIT-ARM-ARMOUR-2", A(3), O(2)),
-    later("arm.armour.active_protection",     "Active protection",                 lc::armour, 1, {0, 0, 0, 50, 35}, "DG-KIT-ARM-ARMOUR-3", A(3), E(3)),
+    later("arm.armour.composite",             "Composite armour",                  lc::armour, 1, {0, 0, 0, 15, 15}, "DG-KIT-ARM-ARMOUR-1", AV(2)),
+    later("arm.armour.reactive",              "Reactive armour",                   lc::armour, 1, {0, 0, 0, 30, 15}, "DG-KIT-ARM-ARMOUR-2", AV(3), E(1)),
+    later("arm.armour.active_protection",     "Active protection",                 lc::armour, 1, {0, 0, 0, 50, 35}, "DG-KIT-ARM-ARMOUR-3", AV(4), E(3)),
     base ("arm.tracks.torsion_bar",           "Torsion-bar tracks",                lc::armour, 2),
-    later("arm.tracks.hydropneumatic",        "Hydropneumatic suspension",         lc::armour, 2, {0, 0, 0, 0, 10}, "DG-KIT-ARM-TRACKS-1", S(2), M(2)),
-    later("arm.tracks.composite_tracks",      "Lightweight composite tracks",      lc::armour, 2, {0, 0, 0, 5, 15}, "DG-KIT-ARM-TRACKS-2", A(2), M(2)),
+    later("arm.tracks.hydropneumatic",        "Hydropneumatic suspension",         lc::armour, 2, {0, 0, 0, 0, 10}, "DG-KIT-ARM-TRACKS-1", AV(1)),
+    later("arm.tracks.composite_tracks",      "Lightweight composite tracks",      lc::armour, 2, {0, 0, 0, 5, 15}, "DG-KIT-ARM-TRACKS-2", AV(2), E(1)),
 
     // --- Light armour: Armament (0) · Armour (1) · Wheels (2) --------------
     base ("lt.armament.heavy_mg",             "Heavy machine gun",                 lc::light_armour, 0),
-    later("lt.armament.autocannon",           "Autocannon",                        lc::light_armour, 0, {15, 10, 0, 0, 0}, "DG-KIT-LT-ARMAMENT-1", S(2), M(1)),
-    later("lt.armament.thermal_autocannon",   "Autocannon with thermal imaging",   lc::light_armour, 0, {30, 10, 0, 0, 0, 20, 0}, "DG-KIT-LT-ARMAMENT-2", S(2), M(1), E(1)),
-    later("lt.armament.atgm_mount",           "Anti-tank missile mount",           lc::light_armour, 0, {0, 30, 0, 0, 0}, "DG-KIT-LT-ARMAMENT-3", M(1), E(1), O(2)),
+    later("lt.armament.autocannon",           "Autocannon",                        lc::light_armour, 0, {15, 10, 0, 0, 0}, "DG-KIT-LT-ARMAMENT-1", AP(1)),
+    later("lt.armament.thermal_autocannon",   "Autocannon with thermal imaging",   lc::light_armour, 0, {30, 10, 0, 0, 0, 20, 0}, "DG-KIT-LT-ARMAMENT-2", AP(2), E(1)),
+    later("lt.armament.atgm_mount",           "Anti-tank missile mount",           lc::light_armour, 0, {0, 30, 0, 0, 0}, "DG-KIT-LT-ARMAMENT-3", AP(1), GW(2), E(1)),
     base ("lt.armour.light_plate",            "Light steel plate",                 lc::light_armour, 1),
-    later("lt.armour.spaced",                 "Spaced armour",                     lc::light_armour, 1, {0, 0, 0, 10, 0}, "DG-KIT-LT-ARMOUR-1", S(2)),
-    later("lt.armour.composite_applique",     "Composite applique",                lc::light_armour, 1, {0, 0, 100, 15, 0}, "DG-KIT-LT-ARMOUR-2", A(2)),
+    later("lt.armour.spaced",                 "Spaced armour",                     lc::light_armour, 1, {0, 0, 0, 10, 0}, "DG-KIT-LT-ARMOUR-1", AV(1)),
+    later("lt.armour.composite_applique",     "Composite applique",                lc::light_armour, 1, {0, 0, 100, 15, 0}, "DG-KIT-LT-ARMOUR-2", AV(2), E(1)),
     base ("lt.wheels.scout_car",              "Scout car",                         lc::light_armour, 2),
-    later("lt.wheels.six_wheeler",            "Run-flat six-wheeler",              lc::light_armour, 2, {0, 0, 0, 0, 10, 0, 5}, "DG-KIT-LT-WHEELS-1", S(2), M(1)),
-    later("lt.wheels.tracked_scout",          "Tracked scout",                     lc::light_armour, 2, {0, 0, 100, 0, 15}, "DG-KIT-LT-WHEELS-2", S(3), M(2)),
+    later("lt.wheels.six_wheeler",            "Run-flat six-wheeler",              lc::light_armour, 2, {0, 0, 0, 0, 10, 0, 5}, "DG-KIT-LT-WHEELS-1", AV(1)),
+    later("lt.wheels.tracked_scout",          "Tracked scout",                     lc::light_armour, 2, {0, 0, 100, 0, 15}, "DG-KIT-LT-WHEELS-2", AV(2), E(1)),
 
     // --- Artillery: Gun (0) · Munitions (1) · Tow (2) ----------------------
     base ("art.gun.towed_howitzer",           "Towed howitzer",                    lc::artillery, 0),
-    later("art.gun.long_barrel",              "Long-barrel howitzer",              lc::artillery, 0, {20, 0, 0, 0, 0}, "DG-KIT-ART-GUN-1", S(3), M(1)),
-    later("art.gun.rocket_launcher",          "Multiple rocket launcher",          lc::artillery, 0, {60, 0, 0, 0, 0}, "DG-KIT-ART-GUN-2", S(3), M(2), O(2)),
-    later("art.gun.guided_rockets",           "Guided long-range rockets",         lc::artillery, 0, {40, 20, 0, 0, 0}, "DG-KIT-ART-GUN-3", M(2), E(2), O(2)),
+    later("art.gun.long_barrel",              "Long-barrel howitzer",              lc::artillery, 0, {20, 0, 0, 0, 0}, "DG-KIT-ART-GUN-1", AP(2)),
+    later("art.gun.rocket_launcher",          "Multiple rocket launcher",          lc::artillery, 0, {60, 0, 0, 0, 0}, "DG-KIT-ART-GUN-2", AP(3), E(1)),
+    later("art.gun.guided_rockets",           "Guided long-range rockets",         lc::artillery, 0, {40, 20, 0, 0, 0}, "DG-KIT-ART-GUN-3", AP(3), GW(2), E(2)),
     base ("art.munitions.he_shells",          "High-explosive shells",             lc::artillery, 1),
-    later("art.munitions.guided_shells",      "Guided shells",                     lc::artillery, 1, {20, 20, 0, 0, 0}, "DG-KIT-ART-MUNITIONS-1", O(2), E(1)),
-    later("art.munitions.submunitions",       "Anti-armour submunitions",          lc::artillery, 1, {0, 40, 0, 0, 0}, "DG-KIT-ART-MUNITIONS-2", O(3), E(1)),
-    later("art.munitions.loitering_drones",   "Loitering drones",                  lc::artillery, 1, {20, 40, 0, 0, 0, 25, 0}, "DG-KIT-ART-MUNITIONS-3", E(2), A(2)),
+    later("art.munitions.guided_shells",      "Guided shells",                     lc::artillery, 1, {20, 20, 0, 0, 0}, "DG-KIT-ART-MUNITIONS-1", GW(1)),
+    later("art.munitions.submunitions",       "Anti-armour submunitions",          lc::artillery, 1, {0, 40, 0, 0, 0}, "DG-KIT-ART-MUNITIONS-2", GW(2), E(1)),
+    later("art.munitions.loitering_drones",   "Loitering drones",                  lc::artillery, 1, {20, 40, 0, 0, 0, 25, 0}, "DG-KIT-ART-MUNITIONS-3", DR(3), E(2)),
     base ("art.tow.gun_tractor",              "Gun tractor",                       lc::artillery, 2),
-    later("art.tow.self_propelled",           "Self-propelled chassis",            lc::artillery, 2, {0, 0, 300, 0, 15}, "DG-KIT-ART-TOW-1", S(4), M(2)),
-    later("art.tow.armoured_sp",              "Armoured self-propelled chassis",   lc::artillery, 2, {0, 0, 400, 10, 15}, "DG-KIT-ART-TOW-2", S(5), M(2), A(1)),
+    later("art.tow.self_propelled",           "Self-propelled chassis",            lc::artillery, 2, {0, 0, 300, 0, 15}, "DG-KIT-ART-TOW-1", AV(2)),
+    later("art.tow.armoured_sp",              "Armoured self-propelled chassis",   lc::artillery, 2, {0, 0, 400, 10, 15}, "DG-KIT-ART-TOW-2", AV(3), E(1)),
 
     // --- Air defence: Launcher (0) · Fire control (1) · Vehicle (2) --------
     // Its kit is mostly for the air theatre (BL-1429); the ground effects stay small.
     base ("ad.launcher.radar_guns",           "Radar-directed guns",               lc::air_defence, 0),
-    later("ad.launcher.short_range",          "Short-range missiles",              lc::air_defence, 0, {0, 5, 0, 0, 0}, "DG-KIT-AD-LAUNCHER-1", E(1), O(2)),
-    later("ad.launcher.medium_range",         "Medium-range missiles",             lc::air_defence, 0, {0, 10, 0, 0, 0}, "DG-KIT-AD-LAUNCHER-2", E(2), O(2)),
-    later("ad.launcher.layered",              "Layered defence with counter-drone", lc::air_defence, 0, {5, 10, 0, 0, 0}, "DG-KIT-AD-LAUNCHER-3", E(3), O(2)),
+    later("ad.launcher.short_range",          "Short-range missiles",              lc::air_defence, 0, {0, 5, 0, 0, 0}, "DG-KIT-AD-LAUNCHER-1", GW(2)),
+    later("ad.launcher.medium_range",         "Medium-range missiles",             lc::air_defence, 0, {0, 10, 0, 0, 0}, "DG-KIT-AD-LAUNCHER-2", GW(3), E(1)),
+    later("ad.launcher.layered",              "Layered defence with counter-drone", lc::air_defence, 0, {5, 10, 0, 0, 0}, "DG-KIT-AD-LAUNCHER-3", GW(3), DR(1), E(2)),
     base ("ad.fire_control.optical",          "Optical",                           lc::air_defence, 1),
     later("ad.fire_control.search_radar",     "Search radar",                      lc::air_defence, 1, {0, 0, 0, 5, 0, 5, 0}, "DG-KIT-AD-FIRE-1", E(2)),
     later("ad.fire_control.integrated",       "Integrated network",                lc::air_defence, 1, {0, 0, 0, 10, 0, 10, 0}, "DG-KIT-AD-FIRE-2", E(3)),
-    later("ad.fire_control.electronic_warfare", "Electronic warfare",              lc::air_defence, 1, {5, 0, 0, 10, 0}, "DG-KIT-AD-FIRE-3", E(3), A(1)),
+    later("ad.fire_control.electronic_warfare", "Electronic warfare",              lc::air_defence, 1, {5, 0, 0, 10, 0}, "DG-KIT-AD-FIRE-3", E(4)),
     base ("ad.vehicle.towed_mount",           "Towed mount",                       lc::air_defence, 2),
-    later("ad.vehicle.truck_mounted",         "Truck-mounted",                     lc::air_defence, 2, {0, 0, 0, 0, 5}, "DG-KIT-AD-VEHICLE-1", S(2), M(1)),
-    later("ad.vehicle.tracked_carrier",       "Tracked carrier",                   lc::air_defence, 2, {0, 0, 200, 5, 0}, "DG-KIT-AD-VEHICLE-2", S(3), M(2)),
+    later("ad.vehicle.truck_mounted",         "Truck-mounted",                     lc::air_defence, 2, {0, 0, 0, 0, 5}, "DG-KIT-AD-VEHICLE-1", AV(1)),
+    later("ad.vehicle.tracked_carrier",       "Tracked carrier",                   lc::air_defence, 2, {0, 0, 200, 5, 0}, "DG-KIT-AD-VEHICLE-2", AV(2), E(1)),
+
+    // --- BL-1422: FPV drones (MILITARY.md § Land — the classes, "Small drones are
+    // equipment, not units"): an FPV drone stock raises soft AND hard attack and draws
+    // the drone good. APPENDED at the table's end, never inserted: a nation's design
+    // stores catalogue ids (`unit_design_kit`), so an insertion would re-point them.
+    // Each is the last item of its weapon slot. Infantry's weapon slot already holds
+    // the four later items a slot may carry, so the drone stock rides the two classes
+    // whose weapon slot has room.
+    later("mot.weapon.fpv_drones",            "FPV attack drones",                 lc::motorised, 0, {15, 20, 0, 0, 0, 10, 0}, "DG-KIT-MOT-WEAPON-3", SA(1), DR(3), E(1)),
+    later("mech.weapon.fpv_drones",           "FPV attack drones",                 lc::mechanised, 0, {15, 20, 0, 0, 0, 10, 0}, "DG-KIT-MECH-WEAPON-3", SA(1), DR(3), E(1)),
 };
 
 constexpr std::size_t k_item_count = sizeof(k_items) / sizeof(k_items[0]);

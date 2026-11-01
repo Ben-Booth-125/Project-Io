@@ -806,7 +806,7 @@ void w_market_history(std::ostream& o, const ui::market_plot_history& m)
     }
 }
 
-bool r_market_history(std::istream& i, ui::market_plot_history& m)
+bool r_market_history(std::istream& i, ui::market_plot_history& m, std::size_t width)
 {
     uint32_t n = 0;
     if (!r_count(i, n))
@@ -819,9 +819,13 @@ bool r_market_history(std::istream& i, ui::market_plot_history& m)
         if (!r_id(i, id))
             return false;
         std::array<ui::resource_plot_series, resource_count> series;
-        for (ui::resource_plot_series& s : series)
+        // BL-1422: an envelope before v24 carries 49 series a market; the rest stay empty.
+        for (std::size_t r = 0; r < width && r < resource_count; ++r)
+        {
+            ui::resource_plot_series& s = series[r];
             if (!(r_floats(i, s.price) && r_floats(i, s.supply) && r_floats(i, s.demand)))
                 return false;
+        }
         m.emplace(id, std::move(series));
     }
     return true;
@@ -905,12 +909,15 @@ void w_envelope(std::ostream& o, const save_envelope& e)
     w_int(o, e.params.major_target);
 }
 
-/// Every envelope field a v22 stream carries, in order (defined below).
-bool r_envelope_v22(std::istream& i, save_envelope& e);
+/// Every envelope field a v22 stream carries, in order (defined below). @p history_width
+/// is the market history's series a market (BL-1422: 49 before v24).
+bool r_envelope_v22(std::istream& i, save_envelope& e, std::size_t history_width);
 
 bool r_envelope(std::istream& i, save_envelope& e, uint32_t version)
 {
-    if (!r_envelope_v22(i, e))
+    const std::size_t width = version < save_game_version_kit_goods ? k_resource_count_pre_kit_goods
+                                                                    : resource_count;
+    if (!r_envelope_v22(i, e, width))
         return false;
     if (version == save_game_version_prefix_compatible)
     {
@@ -925,13 +932,13 @@ bool r_envelope(std::istream& i, save_envelope& e, uint32_t version)
         && nation_targets_valid(e.params);
 }
 
-bool r_envelope_v22(std::istream& i, save_envelope& e)
+bool r_envelope_v22(std::istream& i, save_envelope& e, std::size_t history_width)
 {
     return r_u64(i, e.sim_tick) && r_u64(i, e.day_tick) && r_u64(i, e.econ_tick)
         && r_f64(i, e.elapsed_days) && r_int(i, e.speed) && r_world_params(i, e.params)
         && r_report(i, e.report) && r_floats(i, e.balance_history)
         && r_floats(i, e.income_history) && r_floats(i, e.expenditure_history)
-        && r_market_history(i, e.market_history)
+        && r_market_history(i, e.market_history, history_width)
         && r_vec(i, e.building_rank_hist, r_rank_snapshot)
         && r_enum(i, e.primary_level, max_canvas) && r_enum(i, e.overlay, max_overlay)
         && r_id(i, e.active_body) && r_id(i, e.selected_entity)
@@ -977,8 +984,9 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
 
     uint32_t version = 0;
     if (!r_u32(in, version)
-        || (version != save_game_version && version != save_game_version_prefix_compatible))
-        return false; // LAYOUT 23: v22 is a strict prefix of v23, the one accepted predecessor
+        || (version != save_game_version && version != save_game_version_pre_kit_goods
+            && version != save_game_version_prefix_compatible))
+        return false; // LAYOUT 24: v23 and v22 read with a 49-wide market history (BL-1422)
 
     // Both halves build into scratch. `read_world_snapshot` already guarantees
     // this for the world; doing the same for the envelope is what lets a caller

@@ -638,7 +638,23 @@ inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 /// a tile in the stream. v70 is a STRICT PREFIX of v71 and is read too
 /// (`k_world_save_version_pre_gen_capital`), each nation's generation capital then
 /// equal to its `capital_tile` (exact: no stream before v69 held a cession).
-inline constexpr uint32_t world_save_version = 71;
+///
+/// Bumped to 72 (BL-1422, the kit goods by kind; MILITARY.md § Land — equipment, refit
+/// and manpower): `resource_type` gains `small_arms`, `armoured_vehicles`,
+/// `artillery_pieces`, `guided_weapons` and `drones` at the enum's tail, so
+/// `resource_count` moves 49 -> 54 and EVERY per-resource array in the stream (tile
+/// deposits, pools, stockpiles, market arrays, `produced_ever`, the unposted-bid ticks)
+/// is five elements longer. Unlike the v21/v22 appends, the older streams STAY readable:
+/// a stream before v72 is read and written with every array of `resource_count`
+/// elements at `k_resource_count_pre_kit_goods` (49) wide (`bio::scoped_array_width`,
+/// binary_io.hpp), the five new goods reading as zero everywhere. Nothing else moved.
+inline constexpr uint32_t world_save_version = 72;
+
+/// BL-1422: the first version whose per-resource arrays are 54 wide.
+inline constexpr uint32_t k_world_save_version_kit_goods = 72;
+
+/// BL-1422: v71, every per-resource array 49 wide; otherwise the v72 layout.
+inline constexpr uint32_t k_world_save_version_pre_kit_goods = 71;
 
 /// BL-1460: the first version carrying the generation-capital section (see above).
 inline constexpr uint32_t k_world_save_version_gen_capital = 71;
@@ -785,6 +801,11 @@ std::size_t world_save_embargo_section_bytes(const world& w);
 /// the count plus 8 a nation. The LAST section of a v71 stream.
 std::size_t world_save_gen_capital_section_bytes(const world& w);
 
+/// BL-1422: the bytes the kit goods' five extra elements add to every per-resource
+/// array of the stream `w` writes - today's stream less the v71 stream, which differ in
+/// nothing else. A harness comparing an older stream's length against today's adds it.
+std::size_t world_save_kit_goods_bytes(const world& w);
+
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and
 /// folds them away (`fold_legacy_firms`); the verification writer below writes
@@ -871,6 +892,10 @@ void write_world_snapshot_pre_war(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1418): @p w as a v69 stream — no embargo section.
 void write_world_snapshot_pre_embargo(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1460): @p w as a v70 stream — no generation-capital section.
+/// BL-1422, VERIFICATION ONLY (save_roundtrip): the v71 stream - every per-resource
+/// array 49 wide, the kit goods dropped - so the narrowed reader has a producer.
+void write_world_snapshot_pre_kit_goods(const world& w, std::ostream& out);
+
 void write_world_snapshot_pre_gen_capital(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to

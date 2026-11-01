@@ -60,7 +60,8 @@ const char* strategic_sector_name(strategic_sector s);
 ///               propellant
 ///   energy      a processor making power or refined_fuel
 ///   steel       a processor making steel
-///   arms        a processor making ordnance
+///   arms        a processor making ordnance or a kit good (small arms, armoured
+///               vehicles, artillery pieces, guided weapons, drones; BL-1422)
 ///
 /// Everything else — every extraction site, every other recipe, every other
 /// type — is private (`none`). A processor with no recipe is private.

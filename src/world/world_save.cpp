@@ -13,6 +13,7 @@
 #include "war.hpp"         // BL-1459: the war section
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
+#include <sstream>
 #include <algorithm>
 #include <cmath> // std::isfinite -- the sentiment record's own rejection (BL-546)
 #include <istream>
@@ -306,7 +307,8 @@ void w_market(std::ostream& o, const market_component& m)
     w_f32_array(o, m.household_weight); // BL-1203: world_save_version 36
     w_f32_array(o, m.hauler_want);      // BL-1203: world_save_version 36
     w_f32_array(o, m.unposted_bid);     // BL-1227: world_save_version 38
-    for (const int32_t t : m.unposted_bid_tick) w_i32(o, t); // BL-1227: world_save_version 38
+    for (std::size_t k = 0; k < stream_array_width<resource_count>(); ++k) // BL-1422: the stream's width
+        w_i32(o, m.unposted_bid_tick[k]); // BL-1227: world_save_version 38
     // BL-1265 (v46): the dial's pool-draw register (v40) retired with the pool.
     w_f32_array(o, m.background_fill); // BL-1217 G1b R2: world_save_version 43
     w_f32(o, m.trade_lp_spare);        // world_save_version 46
@@ -314,9 +316,12 @@ void w_market(std::ostream& o, const market_component& m)
 
 bool r_i32_array(std::istream& i, std::array<int32_t, resource_count>& a)
 {
-    for (int32_t& v : a)
-        if (!r_i32(i, v))
+    const std::size_t n = stream_array_width<resource_count>(); // BL-1422: an older stream's width
+    for (std::size_t k = 0; k < n; ++k)
+        if (!r_i32(i, a[k]))
             return false;
+    for (std::size_t k = n; k < resource_count; ++k)
+        a[k] = 0;
     return true;
 }
 
@@ -1082,6 +1087,10 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
 {
     w_u32(out, world_save_magic);
     w_u32(out, version);
+    // BL-1422: a stream before the kit goods carries every per-resource array 49 wide.
+    const bio::scoped_array_width kit_width(
+        resource_count, version < k_world_save_version_kit_goods ? k_resource_count_pre_kit_goods
+                                                                 : resource_count);
 
     // --- well-known entities, the belt, and the allocator cursor -------------
     w_id(out, w.player_entity);
@@ -1970,6 +1979,14 @@ std::size_t world_save_gen_capital_section_bytes(const world& w)
     return 4 + 8 * w.nations.size();
 }
 
+std::size_t world_save_kit_goods_bytes(const world& w)
+{
+    std::ostringstream wide(std::ios::binary), narrow(std::ios::binary);
+    write_world_snapshot(w, wide);
+    write_world_snapshot_pre_kit_goods(w, narrow);
+    return wide.str().size() - narrow.str().size();
+}
+
 void write_world_snapshot_pre_embargo(const world& w, std::ostream& out)
 {
     // VERIFICATION ONLY (BL-1418): the v69 stream shape — no embargo section.
@@ -2155,6 +2172,13 @@ void write_world_snapshot_legacy(const world& w,
     write_world_snapshot_at(w, out, version, &corps);
 }
 
+void write_world_snapshot_pre_kit_goods(const world& w, std::ostream& out)
+{
+    // BL-1422, VERIFICATION ONLY: the v71 shape - arrays 49 wide. The game never
+    // writes an old version.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_kit_goods);
+}
+
 void write_world_snapshot_pre_road_edges(const world& w, std::ostream& out)
 {
     // BL-1340, VERIFICATION ONLY (road_edges harness): the v52 stream shape — one road
@@ -2202,8 +2226,15 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_alarm      // BL-1432: v67, every Alarm 0
             && version != k_world_save_version_pre_war         // BL-1459: v68, no wars
             && version != k_world_save_version_pre_embargo     // BL-1418: v69, no embargoes
-            && version != k_world_save_version_pre_gen_capital)) // BL-1460: v70, generation capital = capital
+            && version != k_world_save_version_pre_gen_capital  // BL-1460: v70, generation capital = capital
+            && version != k_world_save_version_pre_kit_goods))  // BL-1422: v71, arrays 49 wide
         return false; // mismatched version -- refuse rather than misread
+
+    // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
+    // the five kit goods read as zero.
+    const bio::scoped_array_width kit_width(
+        resource_count, version < k_world_save_version_kit_goods ? k_resource_count_pre_kit_goods
+                                                                 : resource_count);
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
     // world state) and folded away once every section has been read.

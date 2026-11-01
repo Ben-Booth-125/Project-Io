@@ -830,6 +830,71 @@ recipes = {
         outputs      = { steel = 1.0 },
         centre_proximity_radius = 6, -- the heavy processor class, as the steel recipe
     },
+
+    -- =====================================================================
+    -- BL-1422 (MILITARY.md § Land — equipment, refit and manpower; Ben,
+    -- 2026-10-27): THE KIT GOODS, BY KIND. "Six goods, by kind, not by
+    -- generation: small arms, armoured vehicles, artillery pieces, guided
+    -- weapons and drones, with the existing electronics." Electronics already
+    -- has its Electronics Lab; these five are the Arms Works, one recipe each,
+    -- APPENDED (a recipe's id is its index and is stored in every building).
+    --
+    -- The inputs are docs/research/MILITARY_KIT.md § 3's proposal: small arms
+    -- and artillery pieces from steel + machinery, armoured vehicles from steel
+    -- + machinery + alloys, guided weapons from electronics + ordnance, drones
+    -- from electronics + alloys. Same depth tier as ordnance (id 27) and the
+    -- same qualified share, so they are a growth-track object, not a tick-one
+    -- build. Industrial band: the kit is 1960 and later.
+    --
+    -- PRICES ARE DERIVED (world_gen.lua base_price): what each route needs
+    -- under the recipe margin anchor (PRODUCTION.md; tools/verify/recipe_margin).
+    -- Nothing in generation asks for them until a kit item is researched and a
+    -- unit draws it, so generation charters no Arms Works on its own.
+    {
+        name         = "small_arms",
+        display_name = "Arms Works (small arms)",
+        era          = "industrial",
+        group        = "Arms Works",
+        inputs       = { steel = 1.0, machinery = 0.5 },
+        outputs      = { small_arms = 1.0 },
+        qualified_workforce = 0.25,
+    },
+    {
+        name         = "armoured_vehicles",
+        display_name = "Arms Works (armoured vehicles)",
+        era          = "industrial",
+        group        = "Arms Works",
+        inputs       = { steel = 2.0, machinery = 1.0, alloys = 1.0 },
+        outputs      = { armoured_vehicles = 1.0 },
+        qualified_workforce = 0.25,
+    },
+    {
+        name         = "artillery_pieces",
+        display_name = "Arms Works (artillery pieces)",
+        era          = "industrial",
+        group        = "Arms Works",
+        inputs       = { steel = 2.0, machinery = 1.0 },
+        outputs      = { artillery_pieces = 1.0 },
+        qualified_workforce = 0.25,
+    },
+    {
+        name         = "guided_weapons",
+        display_name = "Arms Works (guided weapons)",
+        era          = "industrial",
+        group        = "Arms Works",
+        inputs       = { electronics = 1.0, ordnance = 0.5 },
+        outputs      = { guided_weapons = 1.0 },
+        qualified_workforce = 0.25,
+    },
+    {
+        name         = "drones",
+        display_name = "Arms Works (drones)",
+        era          = "industrial",
+        group        = "Arms Works",
+        inputs       = { electronics = 1.0, alloys = 0.5 },
+        outputs      = { drones = 1.0 },
+        qualified_workforce = 0.25,
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

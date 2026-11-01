@@ -77,6 +77,13 @@ const std::unordered_map<std::string, resource_type>& name_table()
         // again: the name lands here in the same change as the enum append, or
         // recipes.lua and world_gen.lua both throw on the unknown key.
         { "construction_capacity", resource_type::construction_capacity },
+        // BL-1422 — the kit goods by kind. Same rule: the names land here in the
+        // same change as the enum append.
+        { "small_arms",            resource_type::small_arms },
+        { "armoured_vehicles",     resource_type::armoured_vehicles },
+        { "artillery_pieces",      resource_type::artillery_pieces },
+        { "guided_weapons",        resource_type::guided_weapons },
+        { "drones",                resource_type::drones },
     };
     return table;
 }

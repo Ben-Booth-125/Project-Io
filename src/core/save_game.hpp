@@ -335,8 +335,16 @@ inline constexpr uint32_t save_game_magic =
 /// `exclave_ceded` precedent: no field moves, so no version bump; a build that
 /// predates it refuses such a stream on the kind range check. (The world
 /// snapshot inside the envelope carries its own version, world_save v56.)
-inline constexpr uint32_t save_game_version = 23; // BL-1278: nation_total_target, major_target at the envelope tail
-/// The one earlier layout `read_save_game` still accepts (see LAYOUT 23).
+/// LAYOUT 24 (BL-1422, the kit goods by kind): `resource_count` moved 49 -> 54, so the
+/// market history's per-market block of one series per resource is five series longer.
+/// Nothing else moved. v23 and v22 stay readable: their market history is read 49
+/// series wide (`k_resource_count_pre_kit_goods`), the kit goods' series empty.
+inline constexpr uint32_t save_game_version = 24; // BL-1422: the market history 54 series wide
+/// The first layout whose market history is 54 series wide.
+inline constexpr uint32_t save_game_version_kit_goods = 24;
+/// v23: the v24 layout with the market history 49 series wide.
+inline constexpr uint32_t save_game_version_pre_kit_goods = 23;
+/// The earliest layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;
 
 /// Default extension for a save file. One place, so the CLI, the quick-save

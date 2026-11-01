@@ -72,6 +72,7 @@
 //       the wrong question. Every sibling pair is bucketed, so none escapes by
 //       being unclassifiable.
 
+#include "world/unit_designs.hpp" // BL-1422: kit_catalogue (the kit draw)
 #include "scripting/lua_state.hpp"
 #include "world/components.hpp"
 #include "world/placement_rules.hpp"
@@ -200,6 +201,7 @@ enum class injector
     building_upkeep_draw,       ///< BL-708: run_building_upkeep's per-type, era-banded goods draw.
     construction_material_draw,
     launch_draw,
+    kit_draw,                   ///< BL-1422: a kit item's goods, bought at a hire, a refit and a refill.
 };
 
 const char* injector_label(injector i)
@@ -215,6 +217,7 @@ const char* injector_label(injector i)
         case injector::building_upkeep_draw:       return "run_building_upkeep goods draw";
         case injector::construction_material_draw: return "construction material draw";
         case injector::launch_draw:                return "commit_convoy launch draw";
+        case injector::kit_draw:                   return "kit goods draw (hire, refit, refill)";
     }
     return "(unknown injector)";
 }
@@ -226,7 +229,7 @@ constexpr injector k_injectors[] = {
     injector::population_demand, injector::background_demand,
     injector::endemic_demand,    injector::state_purchase,
     injector::unit_upkeep_draw,  injector::construction_material_draw,
-    injector::launch_draw,
+    injector::launch_draw,       injector::kit_draw,
 };
 
 /// Does the pass named by @p i really move resource @p r? Every branch reads the
@@ -297,6 +300,20 @@ bool injector_moves(const recipe_registry& reg, injector i, std::size_t r)
         }
         case injector::launch_draw:
             return launch_draw_per_convoy()[r] > 0.0f;
+        // BL-1422: the land kit catalogue's items name the goods a hire, a refit and a
+        // wounded unit's refill buy - read off the catalogue itself, so a good no item
+        // names any more turns its row red by name.
+        // BAND: the kit is the 1960-and-later standard and its research nodes are the
+        // industrial age tree's, so an ANCIENT registry draws none - R1b asks the
+        // industrial band, where the Arms Works stand.
+        case injector::kit_draw:
+            if (reg.era() == era_band::ancient)
+                return false;
+            for (const kit_item& it : kit_catalogue())
+                for (std::size_t g = 0; g < it.goods_count; ++g)
+                    if (static_cast<std::size_t>(it.goods[g].res) == r && it.goods[g].qty > 0.0f)
+                        return true;
+            return false;
         case injector::construction_material_draw:
         {
             // The base cost of every building type, then every per-building
@@ -370,6 +387,18 @@ const exemption k_actor_consumed[] = {
     // that behaviour rather than trusting this comment.
     { resource_type::ordnance, injector::unit_upkeep_draw,
       "BL-454 unit upkeep draw (per-tick, per unit)" },
+    // BL-1422: the kit goods by kind. Terminal - no recipe takes them in - and bought
+    // by the kit draw: a hire's, a refit's and a wounded unit's refill.
+    { resource_type::small_arms, injector::kit_draw,
+      "BL-1422 kit goods: rifles, section weapons, body armour" },
+    { resource_type::armoured_vehicles, injector::kit_draw,
+      "BL-1422 kit goods: fighting vehicles, tanks, scouts, carriers" },
+    { resource_type::artillery_pieces, injector::kit_draw,
+      "BL-1422 kit goods: guns, launchers, mortars" },
+    { resource_type::guided_weapons, injector::kit_draw,
+      "BL-1422 kit goods: missiles, guided rockets and shells, submunitions" },
+    { resource_type::drones, injector::kit_draw,
+      "BL-1422 kit goods: FPV and loitering drones" },
 
     // BL-708. Power is produced by the two generation recipes and consumed by
     // NO recipe, so it reads as terminal — but it is not an orphan, and this row

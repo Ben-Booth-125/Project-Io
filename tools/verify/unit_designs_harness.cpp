@@ -88,6 +88,9 @@ uint16_t item(const char* id)
 constexpr resource_type k_shelf_goods[] = {
     resource_type::steel, resource_type::coal, resource_type::machinery,
     resource_type::alloys, resource_type::electronics, resource_type::ordnance,
+    // BL-1422: the kit goods by kind, which the kit catalogue's items now name.
+    resource_type::small_arms, resource_type::armoured_vehicles, resource_type::artillery_pieces,
+    resource_type::guided_weapons, resource_type::drones,
 };
 
 struct fixture
@@ -341,13 +344,13 @@ int main()
         const auto r = hire(f, reg, rifle);
         check(r == corp_command_result::applied && f.w.musters.size() == 1 && f.w.musters[0].kit == d,
               "U4a the hire applies and its muster carries the live design");
-        // assault rifle: 2 steel + 1 machinery; flak vest: 1 steel + 1 alloys.
-        check(near(shelf(f, resource_type::steel), 97.0f) && near(shelf(f, resource_type::machinery), 99.0f)
-                  && near(shelf(f, resource_type::alloys), 99.0f) && near(shelf(f, resource_type::electronics), 100.0f),
-              "U4b it buys the kit's goods: 3 steel, 1 machinery, 1 alloys");
+        // BL-1422: assault rifle 2 small arms; flak vest 1 small arms.
+        check(near(shelf(f, resource_type::small_arms), 97.0f) && near(shelf(f, resource_type::steel), 100.0f)
+                  && near(shelf(f, resource_type::alloys), 100.0f) && near(shelf(f, resource_type::electronics), 100.0f),
+              "U4b it buys the kit's goods: 3 small arms, and no raw steel or alloys");
         const float hire_cost = reg.military().hire_base_cost
             + reg.military().hire_cost_per_power * static_cast<float>(unit_roster_table()[rifle].power_mod);
-        check(near(tre - f.w.nations.at(f.nation).treasury, hire_cost + 5.0f * 10.0f),
+        check(near(tre - f.w.nations.at(f.nation).treasury, hire_cost + 3.0f * 10.0f),
               "U4c and pays the hire price plus the goods (" + std::to_string(tre - f.w.nations.at(f.nation).treasury) + " cr)");
         f.w.musters[0].days_remaining = 0;
         advance_musters(f.w);
@@ -362,7 +365,7 @@ int main()
                   + std::to_string(a.soft) + ", defence " + std::to_string(b.defence) + " -> " + std::to_string(a.defence));
 
         fixture g;
-        build(g, /*shelf=*/1.0f); // 3 steel needed
+        build(g, /*shelf=*/1.0f); // 3 small arms needed
         design(g, reg, g.nation, INF, 0, ar);
         design(g, reg, g.nation, INF, 1, vest);
         const std::string pre = to_bytes(g.w);
@@ -424,9 +427,11 @@ int main()
                   && uc.refit_kit == design_of(f.w, f.nation, land_class::infantry) && uc.kit.is_base()
                   && uc.refit_days == muster_days_for(static_cast<uint16_t>(rifle)),
               "U5d it applies: the unit keeps its row and kit, the live design recorded as its refit");
-        check(near(shelf(f, resource_type::alloys), 98.0f) && near(shelf(f, resource_type::steel), 100.0f)
-                  && near(tre - f.w.nations.at(f.nation).treasury, 2.0f * 10.0f),
-              "U5e it buys only the changed slot's kit (2 alloys, 20 cr) and no credits");
+        // BL-1422: ceramic plates are 2 small arms + 1 electronics.
+        check(near(shelf(f, resource_type::small_arms), 98.0f) && near(shelf(f, resource_type::electronics), 99.0f)
+                  && near(shelf(f, resource_type::steel), 100.0f)
+                  && near(tre - f.w.nations.at(f.nation).treasury, 3.0f * 10.0f),
+              "U5e it buys only the changed slot's kit (2 small arms + 1 electronics, 30 cr) and no credits");
         const uint64_t mid = f.w.state_hash(2);
         {
             world back;
