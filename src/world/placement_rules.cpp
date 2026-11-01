@@ -293,6 +293,7 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
                                                   // reach rule still applies at the world level, and the
                                                   // base is NOT an anchor, so it earns no exemption there.
         case building_type::airbase:              // BL-1449: as the military base — any non-ocean land tile.
+        case building_type::bunker:               // BL-1426: any non-ocean land tile; one to a tile (world level).
         case building_type::research_institute:  // BL-332: same shape as military_base — passive,
                                                   // no deposit needed, any non-ocean land tile.
         case building_type::none:
@@ -647,6 +648,16 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // generated building stands complete, so no generated tile holds a site.
     if (tile_has_site_under_construction(w, tile_id))
         return placement_reason::site_under_construction;
+
+    // ONE BUNKER TO A TILE (BL-1426; MILITARY.md § Fortifications): the cover is the
+    // tile's, so a second one would add nothing. Refused as a full slot.
+    if (type == building_type::bunker)
+        for (const auto& [bid, b] : w.buildings)
+        {
+            (void)bid;
+            if (b.type == building_type::bunker && b.tile == tile_id)
+                return placement_reason::slot_full;
+        }
 
     // Stack ceiling: a tile carries several sites working one deposit, but not
     // without limit. Checked last — a full stack is the least interesting reason

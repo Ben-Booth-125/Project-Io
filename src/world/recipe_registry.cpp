@@ -568,6 +568,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "planetary_marketplace", building_type::planetary_marketplace }, // BL-1266
             { "railway_station",      building_type::railway_station },      // BL-1255
             { "airbase",              building_type::airbase },              // BL-1449
+            { "bunker",               building_type::bunker },               // BL-1426
         };
         for (const named_type& nt : types)
         {
@@ -1050,6 +1051,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "planetary_marketplace", building_type::planetary_marketplace }, // BL-1266
             { "railway_station",      building_type::railway_station },      // BL-1255
             { "airbase",              building_type::airbase },              // BL-1449
+            { "bunker",               building_type::bunker },               // BL-1426
         };
         struct named_band { const char* key; era_band band; };
         const named_band bands[] = {

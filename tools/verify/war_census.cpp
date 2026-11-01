@@ -51,6 +51,7 @@ struct seed_result
     int nations = 0;
     int declared = 0, at_peace = 0, at_war_end = 0, at_war_max = 0, cessions = 0, imposes = 0;
     int answers = 0, offers = 0, accepts = 0, refuses = 0, on_player = 0;
+    int bunkers = 0, bunkers_done = 0, player_bunkers = 0; ///< BL-1426: rivals' bunkers (built or building), completed, the player's
     std::uint64_t hash = 0;
     std::string war_bytes; ///< the war tables, for --replay
     std::vector<war_ai_trace_row> trace;
@@ -168,6 +169,23 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
                         static_cast<double>(t.grievance), static_cast<double>(t.alarm),
                         static_cast<double>(t.edge), static_cast<double>(t.price),
                         static_cast<double>(t.trade), t.goals, t.applied ? "" : " (refused)");
+    // BL-1426 (AI_OPPONENT.md § 11, "Rival nations build bunkers on their own ground"):
+    // the rivals' bunkers, and the player's (nothing builds for the player: must be 0,
+    // as no harness here presses the player's build).
+    for (const auto& [nid, nc] : w.nations)
+        for (const entity_id bid : nc.state_assets)
+            if (const auto bit = w.buildings.find(bid);
+                bit != w.buildings.end() && bit->second.type == building_type::bunker)
+            {
+                if (nid == player) { ++r.player_bunkers; continue; }
+                ++r.bunkers;
+                r.bunkers_done += bit->second.ticks_remaining <= 0 ? 1 : 0;
+            }
+    if (r.player_bunkers != 0)
+    {
+        std::printf("  FAIL  seed %u: a bunker was built for the player's nation\n", seed);
+        player_clean = false;
+    }
     r.hash      = w.state_hash(0);
     r.war_bytes = war_tables(w);
     r.trace     = std::move(trace);
@@ -233,12 +251,17 @@ int main(int argc, char** argv)
     }
 
     std::printf("\nWAR CENSUS (econ tick %d)\n", last_tick);
-    std::printf("  seed nations declared at_peace at_war_end at_war_max cessions imposes answers offers accepts refuses on_player\n");
+    std::printf("  seed nations declared at_peace at_war_end at_war_max cessions imposes answers offers accepts refuses on_player bunkers built\n");
     for (const seed_result& r : rows)
-        std::printf("  %4u %7d %8d %8d %10d %10d %8d %7d %7d %6d %7d %7d %9d\n", r.seed, r.nations, r.declared,
+        std::printf("  %4u %7d %8d %8d %10d %10d %8d %7d %7d %6d %7d %7d %9d %7d %5d\n", r.seed, r.nations, r.declared,
                     r.at_peace, r.at_war_end, r.at_war_max, r.cessions, r.imposes, r.answers, r.offers,
-                    r.accepts, r.refuses, r.on_player);
+                    r.accepts, r.refuses, r.on_player, r.bunkers, r.bunkers_done);
     std::printf("  TOTAL declared %d across %zu seed(s)\n", total_declared, rows.size());
+    {
+        int tb = 0, td = 0;
+        for (const seed_result& r : rows) { tb += r.bunkers; td += r.bunkers_done; }
+        std::printf("  TOTAL rival bunkers %d (%d completed) across %zu seed(s)\n", tb, td, rows.size());
+    }
     // A shard (fewer seeds than the library) only reports: the pooled table settles R2.
     const bool full = seeds.size() >= k_library.size();
     std::printf("  %s  at least one war declared across the seeds run%s\n",

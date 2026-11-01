@@ -111,6 +111,10 @@ bool condition_bites(building_type t)
         case building_type::university:
         case building_type::planetary_marketplace:
         case building_type::railway_station:
+        // BL-1426 (MILITARY.md § Fortifications: "strikes and artillery degrade
+        // it"): a bunker's condition scales the cover it gives, so a strategic
+        // mission may wear it down too.
+        case building_type::bunker:
             return true;
         default:
             return false;

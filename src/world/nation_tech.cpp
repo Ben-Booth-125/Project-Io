@@ -476,6 +476,7 @@ bool parse_building(std::string_view s, building_type& out)
         { "inland_logistics_hub", building_type::inland_logistics_hub },
         { "military_base", building_type::military_base },
         { "airbase", building_type::airbase }, // BL-1449
+        { "bunker", building_type::bunker }, // BL-1426
         { "research_institute", building_type::research_institute },
         { "schooling", building_type::schooling },
         { "university", building_type::university },

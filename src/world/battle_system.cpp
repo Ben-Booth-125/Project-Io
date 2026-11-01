@@ -10,6 +10,7 @@
 #include "sentiment_emitters.hpp" // BL-1458: force_used
 #include "stance.hpp"
 #include "terrain_combat.hpp"
+#include "unit_designs.hpp" // BL-1426: unit_land_class (artillery wears a bunker)
 #include "unit_roster.hpp"
 #include "world.hpp"
 
@@ -1027,6 +1028,24 @@ int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vec
     return static_cast<int>(moved.size());
 }
 
+entity_id tile_bunker(const world& w, entity_id tile, entity_id owner)
+{
+    const auto nit = w.nations.find(owner);
+    if (tile == null_entity || nit == w.nations.end())
+        return null_entity;
+    entity_id best = null_entity;
+    for (const entity_id bid : nit->second.state_assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end() || bit->second.type != building_type::bunker
+            || bit->second.tile != tile || bit->second.ticks_remaining > 0 || bit->second.decommissioned)
+            continue;
+        if (best == null_entity || bid < best)
+            best = bid;
+    }
+    return best;
+}
+
 int unit_entrench_recovery_permille(const world& w, entity_id unit, const campaign_battle_params& p)
 {
     const auto it = w.units.find(unit);
@@ -1147,6 +1166,15 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         std::vector<land_combatant> atk = build_combatants(w, b.attacker_units, &reg.military(), b.tile);
         std::vector<land_combatant> def = build_combatants(w, b.defender_units, &reg.military(), b.tile);
 
+        // BL-1426 (MILITARY.md § Fortifications): the defender's own bunker on the
+        // defended tile raises every defending unit's defence and hardness, by
+        // today's condition. Read once a day, before the rounds; artillery wears it
+        // after them (below), so today's shelling counts from tomorrow.
+        const entity_id bunker = tile_bunker(w, b.tile, b.defender);
+        if (bunker != null_entity)
+            for (land_combatant& c : def)
+                fortify_combatant(c, w.buildings.at(bunker).condition_permille, params);
+
         const int before_a = b.state.attacker_strength_permille;
         const int before_d = b.state.defender_strength_permille;
         const int rounds_before = b.state.rounds_fought;
@@ -1183,6 +1211,26 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         {
             ++out.stepped;
             out.rounds += fought;
+        }
+
+        // BL-1426: THE ATTACKER'S ARTILLERY WEARS THE BUNKER — each of its units
+        // still fighting after the day, by its carried attack, once per day fought.
+        if (bunker != null_entity && fought > 0)
+        {
+            std::vector<int> guns; // ascending unit id, the combatant contract
+            for (const land_combatant& c : atk)
+                if (land_combatant_fighting(c))
+                    if (const auto uit = w.units.find(c.unit);
+                        uit != w.units.end() && unit_land_class(uit->second) == land_class::artillery)
+                        guns.push_back(c.supply);
+            if (!guns.empty())
+            {
+                building_component& bk = w.buildings.at(bunker);
+                const int lost = std::min(std::max(0, bk.condition_permille),
+                                          bunker_shelling_day(guns, params) * fought);
+                bk.condition_permille -= lost;
+                out.bunker_condition_lost += lost;
+            }
         }
 
         // -------------------------------------------------------------------

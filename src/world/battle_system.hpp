@@ -163,6 +163,7 @@ struct battle_tick
     int concluded  = 0; ///< Battles that ended this tick (any end reason).
     int withdrew   = 0; ///< Battles ended by an honoured withdrawal request.
     int losses     = 0; ///< Total men removed from unit_component::count.
+    int bunker_condition_lost = 0; ///< BL-1426: bunker condition artillery took off, per-mille summed.
 
     /// One record per battle that did something this tick — the material the
     /// dispatch stream (BL-468) and the card (BL-469) read. Includes battles that
@@ -200,6 +201,11 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick);
 /// reaches it.
 int64_t battle_side_recon_milli(const world& w, const recipe_registry& reg, const active_battle& b,
                                 bool attacker_side);
+
+/// BL-1426 (MILITARY.md § Fortifications): the completed, working bunker nation
+/// @p owner holds on @p tile — the one whose cover that nation's units defending the
+/// tile fight from — or null. Lowest id should two ever stand (placement admits one).
+entity_id tile_bunker(const world& w, entity_id tile, entity_id owner);
 
 /// BL-1453 (MILITARY.md § Battles, "Like forces entrench, and supply decides the
 /// stalemate"): the readiness, per-mille, unit @p unit regains each DAY of an

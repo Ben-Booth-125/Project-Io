@@ -89,7 +89,8 @@ bool air_class_flies(const recipe_registry& reg, air_class c, air_mission m);
 /// research institute (research points). NOT the military base or the airbase
 /// (BL-1449 fix round: their muster and sortie are not scaled by condition, so they
 /// are excluded from strategic targeting rather than bombed to no effect), nor the
-/// launchpad or schooling, which have no throughput the condition reaches.
+/// launchpad or schooling, which have no throughput the condition reaches. The BUNKER
+/// is targeted (BL-1426): its condition scales the defence and hardness it gives.
 bool condition_bites(building_type t);
 
 /// Tactical and strategic missions bomb; superiority and recon do not.
