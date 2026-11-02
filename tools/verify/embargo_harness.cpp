@@ -446,13 +446,13 @@ int main()
         const std::string b69 = o69.str();
         world old;
         check(from_bytes(b69, old) && old.nation_embargoes.empty()
-                  && b69.size() == b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) /* BL-1463 (v72) */
-                                  - world_save_kit_goods_bytes(s.w) // BL-1422: v69 arrays are 49 wide
+                  && b69.size() == b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w)
+                                  - world_save_kit_goods_bytes(s.w) // BL-1422: arrays 49 wide before v74
                   && world_save_embargo_section_bytes(s.w) == 4 + 8 * 3,
               "R9c a v69 stream (today's less the 28-byte embargo section) loads with no embargo");
 
         // The section is last: count, then (author, embargoed) pairs ascending.
-        const std::size_t sec = b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) /* BL-1463 (v72) */;
+        const std::size_t sec = b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w);
         const auto refused = [&](std::string bad, const char* what) {
             world untouched;
             check(!from_bytes(bad, untouched) && untouched.nations.empty() && untouched.nation_embargoes.empty(), what);

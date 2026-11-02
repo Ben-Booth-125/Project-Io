@@ -1998,6 +1998,39 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, w.population_centres.at(cid).recruit_heads_taken);
         }
     }
+
+    // world_save_version 73 (Ben, 2026-11-02, ports make sea recruits): THE SEA POOLS,
+    // the last section, after the recruits (v72). Every nation holding sea recruits,
+    // ascending id, as (id, sea pool). Only deviations.
+    if (version >= k_world_save_version_sea_recruits)
+    {
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.sea_recruits != 0)
+                nids.push_back(nid);
+        std::sort(nids.begin(), nids.end());
+        w_u32(out, static_cast<uint32_t>(nids.size()));
+        for (const entity_id nid : nids)
+        {
+            w_id(out, nid);
+            w_i32(out, w.nations.at(nid).sea_recruits);
+        }
+    }
+}
+
+void write_world_snapshot_pre_sea_recruits(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (Ben, 2026-11-02): the v72 stream shape — no sea-recruits section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_sea_recruits);
+}
+
+std::size_t world_save_sea_recruits_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.sea_recruits != 0)
+            n += 8;
+    return n;
 }
 
 void write_world_snapshot_pre_recruits(const world& w, std::ostream& out)
@@ -2224,7 +2257,7 @@ void write_world_snapshot_legacy(const world& w,
 
 void write_world_snapshot_pre_kit_goods(const world& w, std::ostream& out)
 {
-    // BL-1422, VERIFICATION ONLY: the v72 shape - arrays 49 wide. The game never
+    // BL-1422, VERIFICATION ONLY: the v73 shape - arrays 49 wide. The game never
     // writes an old version.
     write_world_snapshot_at(w, out, k_world_save_version_pre_kit_goods);
 }
@@ -2294,7 +2327,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_embargo     // BL-1418: v69, no embargoes
             && version != k_world_save_version_pre_gen_capital  // BL-1460: v70, generation capital = capital
             && version != k_world_save_version_pre_recruits     // BL-1463: v71, no recruits
-            && version != k_world_save_version_pre_kit_goods))  // BL-1422: v72, arrays 49 wide
+            && version != k_world_save_version_pre_sea_recruits // 2026-11-02: v72, no sea pools
+            && version != k_world_save_version_pre_kit_goods))  // BL-1422: v73, arrays 49 wide
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -3849,6 +3883,31 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         }
     }
 
+    // v73 (Ben, 2026-11-02, ports make sea recruits): the sea pools. Untrusted: rows
+    // strictly ascending, each a nation in the stream, the pool in [1, 2^30]. Refused
+    // whole otherwise. A v72 (and older) stream ends before it: every sea pool empty.
+    if (version >= k_world_save_version_sea_recruits)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            int32_t sea = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev) || !r_i32(in, sea))
+                return false;
+            prev = nid;
+            if (sea < 1 || sea > (1 << 30))
+                return false;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            nit->second.sea_recruits = sea;
+        }
+    }
+
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all
     // ids distinct — the only trades the seam can write. Refused whole.
@@ -3898,7 +3957,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     if (version <= k_world_save_version_pre_tile)
         (void)resolve_shared_tiles(s, mil); // BL-1455: never onto a class wall
 
-    // BL-1422: a stream before v73 predates the kit goods - its markets hold them at base
+    // BL-1422: a stream before v74 predates the kit goods - its markets hold them at base
     // price 0 (unbuyable). Priced from the authored table, as generation prices them.
     if (version < k_world_save_version_kit_goods && base_price != nullptr)
         reauthor_kit_goods_prices(s, *base_price);

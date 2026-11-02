@@ -509,6 +509,26 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // Ben, 2026-11-02 (ports make sea recruits): each nation's sea pool, folded only
+    // where non-zero (sorted walk), so a world without one hashes as it did.
+    {
+        std::vector<entity_id> sea;
+        for (const auto& [nid, nc] : nations)
+            if (nc.sea_recruits != 0)
+                sea.push_back(nid);
+        if (!sea.empty())
+        {
+            std::sort(sea.begin(), sea.end());
+            fnv1a_u32(h, 0x52435253u); // "RCRS"
+            fnv1a_u32(h, static_cast<uint32_t>(sea.size()));
+            for (const entity_id nid : sea)
+            {
+                fnv1a_u32(h, nid);
+                fnv1a_i32(h, nations.at(nid).sea_recruits);
+            }
+        }
+    }
+
     // BL-1434 (unit designs): each nation's live designs (its non-base kit ids),
     // folded only for a nation that has any (sorted walk; nations is unordered), so
     // a world where every nation fields base kit hashes as it did.

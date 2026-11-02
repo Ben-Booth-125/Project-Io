@@ -754,9 +754,14 @@ economy = {
         --   air_per_base  20: a fighter wing's crew a quarter.
         --   lp_per_recruit 1: one point admits one unit of cargo (LOGISTICS.md); a
         --                     recruit is priced as one unit of it.
+        --   sea_per_port  20: Ben, 2026-11-02 - a completed, running port makes sea
+        --                     recruits into the nation's one sea pool (cap 15 quarters).
+        --                     20 matches an airbase; an in-band pick, since nothing
+        --                     spends the sea pool until ships are raised.
         recruits = {
             land_per_base  = 50,
             air_per_base   = 20,
+            sea_per_port   = 20,
             lp_per_recruit = 1.0,
         },
 

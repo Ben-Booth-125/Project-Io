@@ -707,7 +707,7 @@
   ],
   [
    "gameplay.hire_wing",
-   "The Military ledger's air rows (nav rail slot 7, Recruit tab, under the Air header; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too."
+   "The Military ledger's air rows (nav rail slot 7, Recruit tab, Air theatre tab; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too."
   ],
   [
    "gameplay.assign_air_mission",
@@ -746,24 +746,28 @@
    "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam."
   ],
   [
-   "ledger.military_theatre_header",
-   "Military ledger (nav rail slot 7), Recruit and Design tabs: the collapsible theatre headers 'Land (N)' and 'Air (N)' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes)."
+   "ledger.military_theatre_tab",
+   "Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0). The active one is lit."
+  ],
+  [
+   "chrome.header_recruit_hover",
+   "The header strip's top right (HEADER.md § Contents, Recruits): three recruit readouts, land, air and sea in that order - each the theatre's glyph (soldier, aircraft, anchor), the nation's recruits held against the pool's cap ('120 / 750') and a thin bar of held over cap beneath. A narrow window shows the held figure alone, then the glyph and bar only (HEADER.md § Fit and degradation); the bars never drop."
   ],
   [
    "ledger.military_air_raise",
-   "Military ledger, Recruit tab, under the Air header: the airbase picker ('Raise at' - one row per completed airbase of your nation, with the wings based there) and one row per air class (Interceptor Wing, Strike Wing, Strategic Bomber Wing, Attack Helicopter Wing, Strike Drone Wing, Airborne Early Warning Wing), each with its class, the missions it flies, its live design's numbers (air, soft, hard, strategic, recon, range), its price and a 'Raise' press. With no airbase the theatre reads 'No airbase' and offers 'Find a site for an airbase'."
+   "Military ledger, Recruit tab, with the Air theatre tab chosen: the airbase picker ('Raise at' - one row per completed airbase of your nation, with the wings based there) and one row per air class (Interceptor Wing, Strike Wing, Strategic Bomber Wing, Attack Helicopter Wing, Strike Drone Wing, Airborne Early Warning Wing), each with its class, the missions it flies, its live design's numbers (air, soft, hard, strategic, recon, range), its price and a 'Raise' press. With no airbase the theatre reads 'No airbase' and offers 'Find a site for an airbase'."
   ],
   [
    "ledger.military_find_airbase_site",
-   "Military ledger, Recruit tab, Air header: 'Find a site for an airbase' - shown only when your nation has no completed airbase."
+   "Military ledger, Recruit tab, Air theatre tab: 'Find a site for an airbase' - shown only when your nation has no completed airbase."
   ],
   [
    "ledger.military_select_wing",
-   "Military ledger, Recruit tab, Air header, 'Your wings': one row per wing of your nation - its type and what it is doing ('mustering, N d left', 'no mission', or '<mission> over N provinces')."
+   "Military ledger, Recruit tab, Air theatre tab, 'Your wings': one row per wing of your nation - its type and what it is doing ('mustering, N d left', 'no mission', or '<mission> over N provinces')."
   ],
   [
    "ledger.military_open_air_designer",
-   "Military ledger, Design tab, under the Air header: one row per air class (Fighter, Strike / multirole, Strategic bomber, Attack helicopter, Strike drone, Recon / AWACS), its name a press with the missions it flies and its live design's numbers under it."
+   "Military ledger, Design tab, Air theatre tab: one row per air class (Fighter, Strike / multirole, Strategic bomber, Attack helicopter, Strike drone, Recon / AWACS), its name a press with the missions it flies and its live design's numbers under it."
   ],
   [
    "canvas.air_designer_slot_pick",

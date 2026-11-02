@@ -445,8 +445,13 @@ conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
   state is sized down before the game starts (`../generation/NATION_GENERATION.md`, the opening
   sizing), and that sizing prices each base at the upkeep it carried before bases went free. So a
   poor nation opens with fewer bases, as it did; once play begins a base costs nothing to keep.
-- **Seen on the Recruit tab.** The Military ledger's Recruit tab heads each theatre with its pool:
-  recruits held, the cap, and the quarter's output (`../ui/ledgers/military.md`).
+- **Ports make sea recruits (Ben, 2026-11-02).** A completed `port` makes **sea recruits** at a fixed
+  number per quarter (`economy.military.recruits`), taken from its province's centres as a base's are,
+  into the nation's one **sea pool**, capped at fifteen quarters of its ports' output. Nothing spends
+  the sea pool until ships are raised (the naval system); until then it fills to its cap and stops.
+- **Seen in the header (Ben, 2026-11-02).** The header's top right shows each theatre's pool - land,
+  air and sea - as an icon, recruits held against the cap, and a bar of the pool's fill beneath
+  (`../ui/HEADER.md`).
 
 ### Land — on the canvas
 

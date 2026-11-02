@@ -34,6 +34,10 @@ struct recruit_params
     /// Air recruits one completed, running `airbase` makes a quarter. 20 is a fighter
     /// wing's crew (`air_class_stats::crew`): an airbase sustains about one wing a quarter.
     int air_per_base = 20;
+    /// Sea recruits one completed, running `port` makes a quarter (Ben, 2026-11-02: ports
+    /// make sea recruits). 20 matches an airbase: an in-band choice made before any ship
+    /// spends the pool - nothing spends it yet, so it only sets how fast the pool fills.
+    int sea_per_port = 20;
     /// Logistic Points one recruit costs when it refills a unit, paid at the unit's
     /// paying road as its supply is (LOGISTICS.md: one point admits one unit of cargo; a
     /// recruit is priced as one unit of it).

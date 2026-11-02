@@ -52,11 +52,14 @@ explains, never wrapped text in the column.
   for … Kit choices open as military research lands."); the obsolete toggles' explanation is the
   tooltip of the "Unit types" heading and of each toggle.
 
-### Grouped by theatre (Ben, 2026-10-28)
+### Grouped by theatre (Ben, 2026-10-28; tabs, Ben, 2026-11-02)
 
-**Recruit and Design group their rows by theatre** — Land, then Air (and Sea and Space as they
-arrive) — each under a **collapsible header** carrying the theatre's name and its count. A header
-is a toggle: pressing it folds or unfolds its rows. On Recruit the base picker lists military bases
+**Recruit and Design group their rows by theatre** — **Land**, **Air** and **Sea** (and Space as it
+arrives) — as a row of **theatre tabs** under the Recruit / Design tabs, one theatre shown at a time,
+each tab carrying the theatre's name and its count. A theatre tab switches what the view lists, so it
+is a selector, not a toggle: re-pressing the active one does nothing (the Recruit / Design tabs keep
+the toggle rule). The **Sea** tab is a stub: it reads that ships are not raised yet, and lists the
+nation's ports under a base picker, the sea pool showing in the header as the other two do. On Recruit the base picker lists military bases
 under Land and airbases under Air, and a row raises at a base of its own theatre only. Design lists
 the air classes beside the land ones; each opens the same full-canvas designer with its own slots
 (airframe, armament, avionics).
@@ -202,8 +205,10 @@ and market combos). **Raise is a press, not a toggle** — it has no active stat
   swappable slots — not templates (B) and not a free designer (C).
 - **Raising takes time**: a muster queue at the base, shown on Recruit like Construction's queue.
 - **Fronts live on the canvas**, not in this ledger.
-- **Manpower shows on Recruit** (Ben, 2026-10-30): each theatre is headed by its recruit pool -
-  recruits held, the cap and the quarter's output (`../../military/MILITARY.md` § Recruits).
+- **Manpower shows in the header** (Ben, 2026-11-02; on Recruit before, Ben, 2026-10-30): the
+  header's top right reads each theatre's recruit pool (`../HEADER.md`), so Recruit carries no pool
+  strip of its own; a Raise the pool cannot fill still says why in its tooltip
+  (`../../military/MILITARY.md` § Recruits).
 
 ## The questions as they were put
 
@@ -224,7 +229,7 @@ and market combos). **Raise is a press, not a toggle** — it has no active stat
    *Helicopter Lift* and *Proven Readiness* already promise "muster time -10% / -20%") would give
    Recruit a queue like Construction's.
 4. **Where do fronts live** once BL-1427 exists — a third tab here, or the canvas only?
-5. **Manpower.** Answered (Ben, 2026-10-30): Recruit heads each theatre with its recruit pool.
+5. **Manpower.** Answered (Ben, 2026-10-30): Recruit heads each theatre with its recruit pool; moved to the header (Ben, 2026-11-02).
 6. **Does a sighting last?** (BL-1454.) The stat grid reads a rival's design stats while its unit
    fights one of the player's in a live battle or the player's air reveals it, and "—" again once
    neither holds. Should a sighting be remembered — per nation, per unit or per design? That needs

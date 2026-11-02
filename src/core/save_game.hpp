@@ -416,7 +416,7 @@ bool write_save_game(const std::string& path, const world& w, const save_envelop
 
 /// VERIFICATION ONLY (BL-1422): write @p env and @p w at an older envelope layout
 /// (`save_game_version_pre_kit_goods` or `save_game_version_prefix_compatible`): the
-/// world as a v72 snapshot and every resource_count-wide envelope array 49 wide, so the
+/// world as a v73 snapshot and every resource_count-wide envelope array 49 wide, so the
 /// narrowed reader has a genuine producer. False for any other version.
 bool write_save_game_at(const std::string& path, const world& w, const save_envelope& env,
                         uint32_t version);
@@ -437,7 +437,7 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
 /// legacy stream's load-time step-off never lands a unit on a class wall.
 /// @p base_price (BL-1422): the authored market base prices (world_gen.lua's
 /// `kepler_market.base_price`, the table generation prices markets from), threaded to
-/// `read_world_snapshot` so a pre-v73 world's markets get the five kit goods priced.
+/// `read_world_snapshot` so a pre-v74 world's markets get the five kit goods priced.
 bool read_save_game(const std::string& path, world& w, save_envelope& env,
                     const military_capability_params* mil = nullptr,
                     const std::array<float, resource_count>* base_price = nullptr);

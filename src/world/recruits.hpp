@@ -29,6 +29,11 @@
 //     its paying road within 8 tiles exactly as its supply is; the unit receives its
 //     planned recruits x the share it was granted (`apply_recruit_refills`). Past the
 //     8-tile draw the share is 0 and nothing refills.
+//   * PORTS MAKE SEA RECRUITS (Ben, 2026-11-02). Every completed, running `port` makes
+//     `sea_per_port` SEA recruits a quarter, from its province's centres exactly as a
+//     base does, into the nation's one sea pool (`nation_component::sea_recruits`),
+//     capped at 15 quarters of its ports' output. Nothing spends the sea pool until ships
+//     are raised: no hire, no refill and no refund touches it, so it fills and stops.
 //
 // DETERMINISM. Nations, bases, centres and units are walked in ascending id; all of it is
 // integer arithmetic save the LP need, which is the resolver's own float path. No RNG.
@@ -48,11 +53,12 @@ struct population_centre_component;
 struct muster_order;
 class recipe_registry;
 
-/// The two theatres a pool belongs to.
+/// The three theatres a pool belongs to.
 enum class recruit_theatre : uint8_t
 {
     land = 0, ///< military_base -> land_recruits
     air  = 1, ///< airbase       -> air_recruits
+    sea  = 2, ///< port          -> sea_recruits (Ben, 2026-11-02); nothing spends it yet
 };
 
 /// The land recruits a hire of land roster row @p row spends: its men at muster.
@@ -87,11 +93,13 @@ struct recruitment_row
     int       air_made   = 0; ///< air recruits into the pool this quarter
     int       land_short = 0; ///< land recruits the bases' rate asked that the provinces could not give
     int       air_short  = 0;
+    int       sea_made   = 0; ///< sea recruits into the pool this quarter (ports)
+    int       sea_short  = 0;
 };
 
 struct recruitment_tick
 {
-    std::vector<recruitment_row> nations; ///< ascending nation id, every nation with a running base
+    std::vector<recruitment_row> nations; ///< ascending nation id, every nation with a running base or port
     int64_t heads_taken = 0;              ///< heads taken from population centres, world-wide
     int     centres_lost_thousand = 0;    ///< times a centre's population fell by one (thousand)
 };

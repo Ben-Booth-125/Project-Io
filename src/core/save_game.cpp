@@ -992,7 +992,7 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
                         uint32_t version)
 {
     // VERIFICATION ONLY (BL-1422): an envelope at an OLDER layout, its embedded world at
-    // the matching shape - for v23/v22, a v72 world snapshot (every per-resource array 49
+    // the matching shape - for v23/v22, a v73 world snapshot (every per-resource array 49
     // wide) and an envelope whose endowments and market history are 49 wide (and, for
     // v22, no nation targets). The game writes only `write_save_game`.
     if (version != save_game_version && version != save_game_version_pre_kit_goods

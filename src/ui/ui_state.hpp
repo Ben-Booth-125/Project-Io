@@ -375,9 +375,10 @@ struct military_ledger_state
     std::vector<drawn_class> class_rows;
 
     // ── BL-1450: grouped by theatre (military.md § Grouped by theatre) ──────────
-    /// Each theatre header's fold, per tab: [tab][theatre], theatre 0 Land, 1 Air.
-    /// A header is a toggle — its press folds or unfolds its rows. Open by default.
-    bool      theatre_open[2][2] = {{true, true}, {true, true}};
+    /// BL-1472 (theatre tabs, Ben 2026-11-02): the theatre each tab shows, per tab
+    /// ([0] Recruit, [1] Design): 0 Land, 1 Air, 2 Sea. A theatre tab is a SELECTOR,
+    /// not a toggle: re-pressing the active one does nothing.
+    int       theatre[2] = {0, 0};
     /// The chosen AIRBASE (Recruit's Air picker), as `base` is the military base's.
     entity_id air_base = null_entity;
     /// An air Raise press queued for app::render, which sends `hire_wing` at the
@@ -389,8 +390,10 @@ struct military_ledger_state
     bool          air_raise_refused = false; ///< The seam refused it: its answer is that row's tooltip.
 
     // Published each frame (x < 0 = absent).
-    struct drawn_header { int tab = 0, theatre = 0; float x = -1.0f, y = -1.0f; bool open = false; int count = 0; };
-    std::vector<drawn_header> headers;
+    /// BL-1472: the theatre tabs drawn under Recruit / Design - each one's press, whether
+    /// it is the active one, and the count it carries.
+    struct drawn_theatre_tab { int tab = 0, theatre = 0; float x = -1.0f, y = -1.0f; bool active = false; int count = 0; };
+    std::vector<drawn_theatre_tab> theatre_tabs;
     std::vector<drawn_base>   air_bases;   ///< The Air picker's rows (`units` = wings based there).
     struct drawn_air_raise
     {
@@ -404,6 +407,14 @@ struct military_ledger_state
     struct drawn_wing { entity_id id = null_entity; float x = -1.0f, y = -1.0f; };
     std::vector<drawn_wing> wing_rows;     ///< Recruit's "Your wings" rows: each press selects the wing.
     std::vector<drawn_class> air_class_rows; ///< Design's Air rows (cls = air_class): each opens the designer.
+
+    // The recruit pools moved to the header (BL-1472; HEADER.md § Contents, Recruits):
+    // Recruit carries no pool strip, and `ui::header_recruits_drawn()` records them.
+
+    // ── BL-1472: the Sea tab's stub (military.md § Grouped by theatre) ──
+    /// The chosen PORT (the Sea picker), a target selector as `base` is.
+    entity_id sea_base = null_entity;
+    std::vector<drawn_base> ports; ///< The Sea picker's rows (`units` unused, 0).
 };
 
 /// The Diplomacy ledger's view state (rail slot 8; docs/ui/ledgers/diplomacy.md):

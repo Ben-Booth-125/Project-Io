@@ -647,6 +647,17 @@ inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 /// PREFIX of v72 and is read too (`k_world_save_version_pre_recruits`), as a world whose
 /// pools are empty and whose centres carry nothing; so is every older version the reader
 /// already accepted.
+///
+/// Bumped to 73 (Ben, 2026-11-02, ports make sea recruits; MILITARY.md § Recruits): A
+/// TRAILING SECTION after v72's recruits section carries, after a u32 count, every nation
+/// holding sea recruits, ascending id, as (id, i32 sea pool in [1, 2^30]). v72 is a STRICT
+/// PREFIX of v73 and is read too (`k_world_save_version_pre_sea_recruits`), as a world
+/// whose sea pools are empty; so is every older version the reader already accepted.
+/// Ben, 2026-11-02: the first version carrying the sea-recruits section (see above).
+inline constexpr uint32_t k_world_save_version_sea_recruits = 73;
+
+/// Ben, 2026-11-02: v72, a strict prefix of v73 (the sea section is v73's only addition).
+inline constexpr uint32_t k_world_save_version_pre_sea_recruits = 72;
 
 /// BL-1463: the first version carrying the recruits section (see above).
 inline constexpr uint32_t k_world_save_version_recruits = 72;
@@ -654,22 +665,22 @@ inline constexpr uint32_t k_world_save_version_recruits = 72;
 /// BL-1463: v71, a strict prefix of v72 (the recruits section is v72's only addition).
 inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 
-/// Bumped to 73 (BL-1422, the kit goods by kind; MILITARY.md § Land — equipment, refit
+/// Bumped to 74 (BL-1422, the kit goods by kind; MILITARY.md § Land — equipment, refit
 /// and manpower): `resource_type` gains `small_arms`, `armoured_vehicles`,
 /// `artillery_pieces`, `guided_weapons` and `drones` at the enum's tail, so
 /// `resource_count` moves 49 -> 54 and EVERY per-resource array in the stream (tile
 /// deposits, pools, stockpiles, market arrays, `produced_ever`, the unposted-bid ticks)
 /// is five elements longer. Unlike the v21/v22 appends, the older streams STAY readable:
-/// a stream before v73 is read and written with every array of `resource_count`
+/// a stream before v74 is read and written with every array of `resource_count`
 /// elements at `k_resource_count_pre_kit_goods` (49) wide (`bio::scoped_array_width`,
 /// binary_io.hpp), the five new goods reading as zero everywhere. Nothing else moved.
-inline constexpr uint32_t world_save_version = 73;
+inline constexpr uint32_t world_save_version = 74;
 
 /// BL-1422: the first version whose per-resource arrays are 54 wide.
-inline constexpr uint32_t k_world_save_version_kit_goods = 73;
+inline constexpr uint32_t k_world_save_version_kit_goods = 74;
 
-/// BL-1422: v72, every per-resource array 49 wide; otherwise the v73 layout.
-inline constexpr uint32_t k_world_save_version_pre_kit_goods = 72;
+/// BL-1422: v73, every per-resource array 49 wide; otherwise the v74 layout.
+inline constexpr uint32_t k_world_save_version_pre_kit_goods = 73;
 
 /// BL-1460: the first version carrying the generation-capital section (see above).
 inline constexpr uint32_t k_world_save_version_gen_capital = 71;
@@ -822,8 +833,12 @@ std::size_t world_save_gen_capital_section_bytes(const world& w);
 /// older stream as today's less its later sections.
 std::size_t world_save_recruits_section_bytes(const world& w);
 
+/// Ben, 2026-11-02: the byte length of the v73 sea-recruits section `w` writes — 4 + 8
+/// per nation holding sea recruits. The LAST section of a v73 stream.
+std::size_t world_save_sea_recruits_section_bytes(const world& w);
+
 /// BL-1422: the bytes the kit goods' five extra elements add to every per-resource
-/// array of the stream `w` writes - the v73 stream less the v72 stream, which differ in
+/// array of the stream `w` writes - the v74 stream less the v73 stream, which differ in
 /// nothing else. A harness comparing an older stream's length against today's adds it.
 std::size_t world_save_kit_goods_bytes(const world& w);
 
@@ -915,12 +930,15 @@ void write_world_snapshot_pre_embargo(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1460): @p w as a v70 stream — no generation-capital section.
 void write_world_snapshot_pre_gen_capital(const world& w, std::ostream& out);
 
-/// BL-1422, VERIFICATION ONLY (save_roundtrip): the v72 stream - every per-resource
+/// BL-1422, VERIFICATION ONLY (save_roundtrip): the v73 stream - every per-resource
 /// array 49 wide, the kit goods dropped - so the narrowed reader has a producer.
 void write_world_snapshot_pre_kit_goods(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1463): the v71 stream shape — no recruits section.
 void write_world_snapshot_pre_recruits(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (Ben, 2026-11-02): the v72 stream shape — no sea-recruits section.
+void write_world_snapshot_pre_sea_recruits(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in
@@ -949,7 +967,7 @@ int32_t legacy_battle_recon_milli(const world& w, const active_battle& b);
 ///
 /// @p base_price (BL-1422): the authored market base prices - world_gen.lua's
 /// `kepler_market.base_price`, the one table generation prices every market from. A
-/// stream before v73 predates the five kit goods, so its markets read them at base
+/// stream before v74 predates the five kit goods, so its markets read them at base
 /// price 0, which is UNBUYABLE (MARKETS.md § What trades); given the table, every
 /// market of such a stream has the kit goods' base price (and its resolved price, 0 in
 /// the stream) set from it, exactly as generation would have. Null leaves them 0 - a
@@ -964,7 +982,7 @@ inline constexpr resource_type k_kit_goods[] = {
 };
 
 /// BL-1422: set every market's kit-goods base price (and a zero resolved price) from
-/// @p base_price. What `read_world_snapshot` does for a pre-v73 stream.
+/// @p base_price. What `read_world_snapshot` does for a pre-v74 stream.
 void reauthor_kit_goods_prices(world& w, const std::array<float, resource_count>& base_price);
 
 /// Drop every derived cache on @p w so the next read of each rebuilds.

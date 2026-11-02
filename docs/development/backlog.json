@@ -550,6 +550,34 @@
    ],
    "title": "A seat whose capital base the state cut removed keeps its raised opening unit",
    "design": "The seated nation opens unarmed (MILITARY.md; move_seat_force -> disarm_corporation removes every unit unit_is_raised calls raised). Found by the sprint 61 re-bless bisect (2026-10-31), seed 13 at b3fc19a6: size_opening_state_to_chest cut nation 47736's capital military_base at (122,69); demolishing a base nulls its units' muster_base, so the 50-man opening unit (id 91961) raised there reads as a garrison (unit_is_raised needs a non-null muster_base) and the seated player kept it: 6x200 + 50 = 1250 men. On main the road steer (BL-1468) spares that base and the count is the intended 1200, so the leak is latent, not gone. THE WORK: either the cut never removes a capital base (it is the muster point the opening force needs), or a unit raised at a base keeps a raised mark when the base goes, so disarm still removes it. Check: a fixture where the cut takes the seat's capital base; the seat opens with garrisons only. Digest-moving only on seeds where the cut hits a base."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-02",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, recruits follow-up, 2026-11-02)",
+   "requires": [
+    "BL-1463"
+   ],
+   "id": "BL-1472",
+   "short_name": "RECRUIT_HEADER_TABS",
+   "category": "Military",
+   "authority_doc": "docs/ui/HEADER.md",
+   "priority": "B",
+   "difficulty": 3,
+   "files": [
+    "src/world/recruits.cpp",
+    "src/world/world_save.cpp",
+    "scripts/economy.lua",
+    "src/ui/header_panel.cpp",
+    "src/ui/military_ledger.cpp"
+   ],
+   "title": "Recruit pools in the header (land, air, sea), ports make sea recruits, theatre tabs in the military ledger",
+   "design": "Written in docs/military/MILITARY.md § Recruits (ports make sea recruits; seen in the header), docs/ui/HEADER.md (Recruits readouts top right, fit ladder step 2) and docs/ui/ledgers/military.md § Grouped by theatre (Land / Air / Sea tabs, Sea a stub) (Ben, 2026-11-02). Work: a sea pool fed by completed ports, 15-quarter cap, saved and hashed; three header readouts (glyph, held / cap, fill bar) with the fit ladder; the Recruit tab pool strip retires; theatre tabs replace the collapsible headers on Recruit and Design; the Sea tab stub lists ports and says ships are not raised yet."
   }
  ]
 }

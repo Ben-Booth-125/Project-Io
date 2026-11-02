@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*213 entries — 53 gameplay · 36 canvas · 16 lens · 74 ledger · 34 chrome.*
+*214 entries — 53 gameplay · 36 canvas · 16 lens · 74 ledger · 35 chrome.*
 
 ---
 
@@ -823,9 +823,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Fit the best researched kit in each slot of the classes you raise, weighing its goods against what your shelves hold: a design whose kit cannot be bought cannot be hired.
 
-### `gameplay.hire_wing` — The Military ledger's air rows (nav rail slot 7, Recruit tab, under the Air header; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too.
+### `gameplay.hire_wing` — The Military ledger's air rows (nav rail slot 7, Recruit tab, Air theatre tab; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too.
 
-**Press.** UI: open the Military ledger on Recruit, unfold the Air header, choose an airbase in its 'Raise at' picker, and click 'Raise' on an air row. Over the seam: COMMAND corp=<nation> nation=<nation> verb=44 tile=<the airbase's tile> unit_type=<air roster row: 0 Interceptor Wing (fighter), 1 Strike Wing (multirole), 2 Strategic Bomber Wing, 3 Attack Helicopter Wing, 4 Strike Drone Wing, 5 Airborne Early Warning Wing (recon)>.
+**Press.** UI: open the Military ledger on Recruit, press the Air theatre tab, choose an airbase in its 'Raise at' picker, and click 'Raise' on an air row. Over the seam: COMMAND corp=<nation> nation=<nation> verb=44 tile=<the airbase's tile> unit_type=<air roster row: 0 Interceptor Wing (fighter), 1 Strike Wing (multirole), 2 Strategic Bomber Wing, 3 Attack Helicopter Wing, 4 Strike Drone Wing, 5 Airborne Early Warning Wing (recon)>.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -2166,7 +2166,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: each theatre's header (Land, Air) carries its recruit pool - 'Recruits <held> / <cap>, +<output> a quarter' (BL-1463, MILITARY.md § Recruits), read whether the theatre is folded or open; then a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed, the goods or port it lacks on its Raise press's tooltip; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base' (why is the tooltip of both). Explanation is never ledger text: every refusal reason and intro sentence is the hover tooltip of the control it explains (Ben, 2026-10-30). DESIGN: one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its live design's numbers; pressing a class opens the unit designer on the full canvas (ledger.military_open_designer). Below, every unit type with its obsolete toggle (gameplay.set_unit_obsolete). Closing the ledger by any path (this icon, the active tab's re-press, another ledger opening) also closes an open unit designer, through its close catch: an unsaved draft asks Save or Discard first.
+**Expected output.** Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; under the Recruit / Design tabs a row of THEATRE TABS, Land / Air / Sea, each with its count (ledger.military_theatre_tab; Land by default), one theatre shown at a time. The recruit pools are NOT in the ledger: they are the header's recruit readouts (chrome.header_recruit_hover); a Raise needs its men (50) or a wing its crew from the theatre's pool, and a Raise the pool cannot fill says so in its tooltip. Land: the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed, the goods or port it lacks on its Raise press's tooltip; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base' (why is the tooltip of both). Explanation is never ledger text: every refusal reason and intro sentence is the hover tooltip of the control it explains (Ben, 2026-10-30). Air: the airbase picker, the six air rows and your wings. Sea: a stub - 'Ships are not raised yet.' and your nation's ports under a picker. DESIGN (the same theatre tabs; Sea reads 'Ships are not designed yet.'): Land - one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its live design's numbers; pressing a class opens the unit designer on the full canvas (ledger.military_open_designer). Below, every unit type with its obsolete toggle (gameplay.set_unit_obsolete). Closing the ledger by any path (this icon, the active tab's re-press, another ledger opening) also closes an open unit designer, through its close catch: an unsaved draft asks Save or Discard first.
 
 **Reason to select.** Answers 'what force can I raise, where, at what cost - and what is it raised with?'. It is the broad door to every hire: every base and every unit type on one surface, where the tile card's Hire list shows one base's rows only.
 
@@ -2468,23 +2468,23 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** A front does nothing without units on it: assigned units spread along the span, fill gaps and push when ordered.
 
-### `ledger.military_theatre_header` — Military ledger (nav rail slot 7), Recruit and Design tabs: the collapsible theatre headers 'Land (N)' and 'Air (N)' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes).
+### `ledger.military_theatre_tab` — Military ledger (nav rail slot 7), Recruit and Design tabs: the row of theatre tabs under them, 'Land N', 'Air N' and 'Sea N' - each names its theatre and counts its rows (Recruit Land: the land types shown; Recruit Air and Design Air: the six air classes; Design Land: the seven land classes; Sea: 0). The active one is lit.
 
-**Press.** Click a header to fold its rows; click it again to unfold them (the toggle rule). Each tab keeps its own folds; both open by default.
+**Press.** Click a theatre tab. A SELECTOR, not a toggle (ledgers/military.md § Grouped by theatre, Ben 2026-11-02): re-pressing the active tab does nothing. Each of Recruit and Design keeps its own theatre; Land by default.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `tab` | `0 Recruit, 1 Design` | The tab the header sits on. |
-| `theatre` | `0 Land, 1 Air` | The header pressed. |
+| `tab` | `0 Recruit, 1 Design` | The tab the theatre row sits under. |
+| `theatre` | `0 Land, 1 Air, 2 Sea` | The theatre tab pressed. |
 
 **Valid when:**
 - The Military ledger is open (nav rail slot 7).
 
-**Expected output.** The theatre's rows hide or show; the arrow on the header turns. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Design's Land holds the land classes and the obsolete toggles; Design's Air holds the six air classes. No world change.
+**Expected output.** The view lists that theatre alone. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Recruit's Sea is a stub - 'Ships are not raised yet.' and one row per completed port of your nation under a picker (the first chosen; choosing one is a target selection with no other effect), or 'No port'. Design's Land holds the land classes and the obsolete toggles; Design's Air the six air classes; Design's Sea reads 'Ships are not designed yet.'. No world change.
 
-**Reason to select.** Keep the theatre you are working in on screen: the ledger column is narrow and both theatres together are long.
+**Reason to select.** Work one theatre at a time: the ledger column is narrow, and land and air together are long.
 
-### `ledger.military_air_raise` — Military ledger, Recruit tab, under the Air header: the airbase picker ('Raise at' - one row per completed airbase of your nation, with the wings based there) and one row per air class (Interceptor Wing, Strike Wing, Strategic Bomber Wing, Attack Helicopter Wing, Strike Drone Wing, Airborne Early Warning Wing), each with its class, the missions it flies, its live design's numbers (air, soft, hard, strategic, recon, range), its price and a 'Raise' press. With no airbase the theatre reads 'No airbase' and offers 'Find a site for an airbase'.
+### `ledger.military_air_raise` — Military ledger, Recruit tab, with the Air theatre tab chosen: the airbase picker ('Raise at' - one row per completed airbase of your nation, with the wings based there) and one row per air class (Interceptor Wing, Strike Wing, Strategic Bomber Wing, Attack Helicopter Wing, Strike Drone Wing, Airborne Early Warning Wing), each with its class, the missions it flies, its live design's numbers (air, soft, hard, strategic, recon, range), its price and a 'Raise' press. With no airbase the theatre reads 'No airbase' and offers 'Find a site for an airbase'.
 
 **Press.** Click an airbase in the picker to choose it (a target selector: pressing the chosen one keeps it), then click 'Raise' on an air row. 'Find a site for an airbase' opens the Construction ledger's site finder armed on the Airbase.
 
@@ -2501,7 +2501,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Raise air power at an airbase: fighters to hold the air, strike wings and helicopters to hit units, bombers for industry, drones and early warning to spot.
 
-### `ledger.military_find_airbase_site` — Military ledger, Recruit tab, Air header: 'Find a site for an airbase' - shown only when your nation has no completed airbase.
+### `ledger.military_find_airbase_site` — Military ledger, Recruit tab, Air theatre tab: 'Find a site for an airbase' - shown only when your nation has no completed airbase.
 
 **Press.** Click 'Find a site for an airbase'.
 
@@ -2512,7 +2512,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** The airbase is the one door every wing is hired at, so with none the next move is to place one.
 
-### `ledger.military_select_wing` — Military ledger, Recruit tab, Air header, 'Your wings': one row per wing of your nation - its type and what it is doing ('mustering, N d left', 'no mission', or '<mission> over N provinces').
+### `ledger.military_select_wing` — Military ledger, Recruit tab, Air theatre tab, 'Your wings': one row per wing of your nation - its type and what it is doing ('mustering, N d left', 'no mission', or '<mission> over N provinces').
 
 **Press.** Click a wing's row.
 
@@ -2527,7 +2527,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Reach any wing from one list, wherever its airbase stands.
 
-### `ledger.military_open_air_designer` — Military ledger, Design tab, under the Air header: one row per air class (Fighter, Strike / multirole, Strategic bomber, Attack helicopter, Strike drone, Recon / AWACS), its name a press with the missions it flies and its live design's numbers under it.
+### `ledger.military_open_air_designer` — Military ledger, Design tab, Air theatre tab: one row per air class (Fighter, Strike / multirole, Strategic bomber, Attack helicopter, Strike drone, Recon / AWACS), its name a press with the missions it flies and its live design's numbers under it.
 
 **Press.** Click the class name. Clicking the lit row of the class the designer is open on closes it (the toggle rule); clicking another class switches it. Either one, while a slot's draft is unsaved, keeps the designer open and asks Save or Discard (canvas.air_designer_save).
 
@@ -2536,7 +2536,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 | `class` | `air_class (0 fighter .. 5 recon)` | The row pressed. |
 
 **Valid when:**
-- The Military ledger is open on Design, the Air header unfolded.
+- The Military ledger is open on Design, the Air theatre tab chosen.
 
 **Expected output.** The unit designer takes the canvas region on the air class: the aircraft in the middle (a placeholder image until air art lands), one box per slot - Airframe, Armament, Avionics - beside it with a leader line, each showing the slot, the drafted item and its change; under it the design's HP, air attack, soft and hard attack, strategic, recon and range, its kit goods per wing, how many of your wings fly an older design, and the Save design / Revert row. Closes on the same press, its return control, Esc, or the Military ledger closing - asking first when a draft is unsaved. No world change.
 
@@ -3223,4 +3223,19 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** A tooltip names the stat and says in one line what it does, with a dim line beneath where one applies (a unit's men over establishment; a group's 'Mean of N units'; why a cell reads a dash). On a group's card each cell is the mean, its lowest-to-highest range beneath. In the designer each design stat carries a signed delta against the live design - for the draft, or for the kit item hovered in an open slot list, previewed fitted. Nothing in the world changes.
 
 **Reason to select.** To learn what a number on a unit or design means, or to compare a stack's spread before sending it.
+
+### `chrome.header_recruit_hover` — The header strip's top right (HEADER.md § Contents, Recruits): three recruit readouts, land, air and sea in that order - each the theatre's glyph (soldier, aircraft, anchor), the nation's recruits held against the pool's cap ('120 / 750') and a thin bar of held over cap beneath. A narrow window shows the held figure alone, then the glyph and bar only (HEADER.md § Fit and degradation); the bars never drop.
+
+**Press.** Hover a readout. A read, not a command: nothing is pressed.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `theatre` | `land, air or sea` | The readout hovered. |
+
+**Valid when:**
+- In-game (the header is always drawn).
+
+**Expected output.** A tooltip: '<Theatre> recruits: held / cap', what the pool is for and where it comes from (the military bases, airbases or ports of your nation, from their provinces' people), the quarter's output as sources x rate (50 a military base, 20 an airbase), the cap (fifteen quarters of the output), that a full pool takes none, and 'Full now' or 'nothing fills it' where either holds. Sea reads 0 / 0 until ports make sea recruits. Nothing in the world changes.
+
+**Reason to select.** Before raising: is there the manpower, how fast does it come back, and has a full pool stopped your bases making any? A hire the pool cannot fill is refused before money moves (MILITARY.md § Recruits).
 

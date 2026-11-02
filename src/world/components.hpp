@@ -262,7 +262,7 @@ enum class resource_type : uint8_t
     // kit goods, MILITARY.md § Land — equipment, refit and manpower). Named in
     // chain_depth's R1 exemption table beside ordnance rather than assumed.
     //
-    // world_save_version bumped 72 -> 73 for this append (world_save.hpp): every
+    // world_save_version bumped 73 -> 74 for this append (world_save.hpp): every
     // per-resource array widens 49 -> 54, and an older stream is read at its own
     // width (`k_resource_count_pre_kit_goods`), the new goods zero.
     small_arms             = 49, ///< Arms Works, from steel + machinery. Rifles and section weapons.
@@ -275,7 +275,7 @@ enum class resource_type : uint8_t
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);
 
-/// BL-1422: the roster's width before the kit goods were appended (v72 and older
+/// BL-1422: the roster's width before the kit goods were appended (v73 and older
 /// streams carry per-resource arrays this wide; world_save.cpp reads them so).
 static constexpr std::size_t k_resource_count_pre_kit_goods = 49;
 
@@ -2671,6 +2671,10 @@ struct nation_component
     /// negative. Saved (world_save_version 68) and hashed only when non-zero.
     int32_t land_recruits = 0;
     int32_t air_recruits  = 0;
+    /// Ben, 2026-11-02 (MILITARY.md § Recruits): the ONE sea pool, filled by the nation's
+    /// ports (`run_recruitment`) up to 15 quarters of their output. Nothing spends it
+    /// until ships are raised. Saved (world_save_version 73) and hashed only when non-zero.
+    int32_t sea_recruits  = 0;
 };
 
 /// BL-1460 fix round: the capital a nation's generated identity reads —

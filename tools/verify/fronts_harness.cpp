@@ -919,7 +919,7 @@ int main()
                                      - world_save_alarm_section_bytes(f.w) // BL-1432 (v68)
                                      - world_save_war_section_bytes(f.w) // BL-1459 (v69)
                                      - world_save_embargo_section_bytes(f.w) - world_save_gen_capital_section_bytes(f.w) // BL-1418 (v70)
-                                     - world_save_recruits_section_bytes(f.w), // BL-1463: v72's recruits, last
+                                     - world_save_recruits_section_bytes(f.w) - world_save_sea_recruits_section_bytes(f.w), // BL-1463: v72's recruits, last
               "F7c a v61 stream (the section's 33 bytes, v63's 4-byte stack count and v64's 12-byte designs section shorter) reads as no fronts");
 
         // A row naming nothing: the first assignment's key -> a ghost tile.
@@ -929,7 +929,7 @@ int main()
                                + world_save_alarm_section_bytes(f.w)       // BL-1432: v68's Alarm, last
                                + world_save_war_section_bytes(f.w)          // BL-1459: v69's wars
                                + world_save_embargo_section_bytes(f.w) + world_save_gen_capital_section_bytes(f.w)     // BL-1418: v70's embargoes
-                               + world_save_recruits_section_bytes(f.w);    // BL-1463: v72's recruits, last
+                               + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w);    // BL-1463: v72's recruits, last
         const std::size_t key0 = bytes.size() - tail - (4 + 9) - 2 * 8 + 4;
         const entity_id ghost = 0x7FFFFFF0u;
         std::memcpy(&bad[key0], &ghost, sizeof ghost);
