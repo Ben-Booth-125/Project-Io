@@ -1046,6 +1046,19 @@ entity_id tile_bunker(const world& w, entity_id tile, entity_id owner)
     return best;
 }
 
+entity_id fortify_defenders(const world& w, const active_battle& b, std::vector<land_combatant>& def,
+                            const campaign_battle_params& p)
+{
+    const entity_id bunker = tile_bunker(w, b.tile, b.defender);
+    if (bunker == null_entity)
+        return null_entity;
+    const int cond = w.buildings.at(bunker).condition_permille;
+    for (land_combatant& c : def)
+        if (const auto uit = w.units.find(c.unit); uit != w.units.end() && uit->second.position == b.tile)
+            fortify_combatant(c, cond, p); // a unit joined from an adjacent tile stands in the open
+    return bunker;
+}
+
 int unit_entrench_recovery_permille(const world& w, entity_id unit, const campaign_battle_params& p)
 {
     const auto it = w.units.find(unit);
@@ -1167,13 +1180,11 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         std::vector<land_combatant> def = build_combatants(w, b.defender_units, &reg.military(), b.tile);
 
         // BL-1426 (MILITARY.md § Fortifications): the defender's own bunker on the
-        // defended tile raises every defending unit's defence and hardness, by
-        // today's condition. Read once a day, before the rounds; artillery wears it
-        // after them (below), so today's shelling counts from tomorrow.
-        const entity_id bunker = tile_bunker(w, b.tile, b.defender);
-        if (bunker != null_entity)
-            for (land_combatant& c : def)
-                fortify_combatant(c, w.buildings.at(bunker).condition_permille, params);
+        // defended tile raises the defence and hardness of the defending units ON
+        // that tile, by today's condition. Read once a day, before the rounds;
+        // artillery wears it after them (below), so today's shelling counts from
+        // tomorrow.
+        const entity_id bunker = fortify_defenders(w, b, def, params);
 
         const int before_a = b.state.attacker_strength_permille;
         const int before_d = b.state.defender_strength_permille;

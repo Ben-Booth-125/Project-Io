@@ -2895,7 +2895,7 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
         case building_type::airbase:
             return "Bases air wings";
         case building_type::bunker: // BL-1426
-            return "Your units defending here gain defence and hardness";
+            return "Its owner's defenders here gain defence and hardness";
         case building_type::research_institute:
         case building_type::university:
             return "Makes research points for its nation";
@@ -4414,7 +4414,7 @@ std::string candidate_effect_line(const recipe_registry& reg, building_type type
         case building_type::airbase:
             return "Bases air wings";
         case building_type::bunker: // BL-1426
-            return "Your units defending here gain defence and hardness";
+            return "Its owner's defenders here gain defence and hardness";
         case building_type::research_institute:
         case building_type::university:
             return "Makes research points for its nation";

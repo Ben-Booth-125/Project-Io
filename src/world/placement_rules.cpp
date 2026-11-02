@@ -655,8 +655,8 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
         for (const auto& [bid, b] : w.buildings)
         {
             (void)bid;
-            if (b.type == building_type::bunker && b.tile == tile_id)
-                return placement_reason::slot_full;
+            if (b.type == building_type::bunker && b.tile == tile_id && !b.decommissioned)
+                return placement_reason::slot_full; // a decommissioned one gives no cover either
         }
 
     // Stack ceiling: a tile carries several sites working one deposit, but not

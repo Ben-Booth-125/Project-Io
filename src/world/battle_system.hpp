@@ -207,6 +207,13 @@ int64_t battle_side_recon_milli(const world& w, const recipe_registry& reg, cons
 /// tile fight from — or null. Lowest id should two ever stand (placement admits one).
 entity_id tile_bunker(const world& w, entity_id tile, entity_id owner);
 
+/// BL-1426: fortify, by the defender's own bunker on @p b's defended tile, exactly the
+/// combatants of @p def whose unit STANDS on that tile (`fortify_combatant` at the
+/// bunker's condition). A defender joined from an adjacent tile is left as it is.
+/// @return the bunker, or null when there is none (nothing changed).
+entity_id fortify_defenders(const world& w, const active_battle& b, std::vector<land_combatant>& def,
+                            const campaign_battle_params& p = {});
+
 /// BL-1453 (MILITARY.md § Battles, "Like forces entrench, and supply decides the
 /// stalemate"): the readiness, per-mille, unit @p unit regains each DAY of an
 /// entrenched fight from its CARRIED STOCKS (BL-1452) — `p.entrench_recovery_permille`

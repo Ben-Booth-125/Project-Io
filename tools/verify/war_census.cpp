@@ -51,7 +51,8 @@ struct seed_result
     int nations = 0;
     int declared = 0, at_peace = 0, at_war_end = 0, at_war_max = 0, cessions = 0, imposes = 0;
     int answers = 0, offers = 0, accepts = 0, refuses = 0, on_player = 0;
-    int bunkers = 0, bunkers_done = 0, player_bunkers = 0; ///< BL-1426: rivals' bunkers (built or building), completed, the player's
+    int bunkers = 0, bunkers_done = 0, player_bunkers = 0; ///< BL-1426: rivals' bunkers (built or building), completed, the player's (ceded ones included)
+    int built_for_player = 0; ///< BL-1426: a bunker that first appeared in the player's assets - a build for it
     std::uint64_t hash = 0;
     std::string war_bytes; ///< the war tables, for --replay
     std::vector<war_ai_trace_row> trace;
@@ -129,6 +130,7 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
     r.nations = static_cast<int>(w.nations.size());
 
     constexpr int k_days = 90;
+    std::set<entity_id> rival_bunkers_seen, player_bunkers_flagged; // BL-1426
     for (int step = k_campaign_settle_ticks, k = 1; step <= last_tick; ++step, ++k)
     {
         advance_orbits(w, static_cast<double>(k_days));
@@ -136,6 +138,21 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
         w.current_day_tick = k * k_days;
         (void)run_settle_tick(w, reg, step, k * k_days, /*spectating=*/false);
         r.at_war_max = std::max(r.at_war_max, nations_at_war(w));
+        // BL-1426 (cold review): a bunker CEDED to the player is legal; one BUILT for it
+        // is not. A cession moves an existing building id, a build mints a new one, so a
+        // bunker id the player holds that no rival held at an earlier step was built for
+        // it. (One a rival built and ceded inside the same step would read as built for
+        // the player - a false alarm, never a miss.)
+        for (const auto& [nid, nc] : w.nations)
+            for (const entity_id bid : nc.state_assets)
+                if (const auto bit = w.buildings.find(bid);
+                    bit != w.buildings.end() && bit->second.type == building_type::bunker)
+                {
+                    if (nid != player)
+                        rival_bunkers_seen.insert(bid);
+                    else if (rival_bunkers_seen.count(bid) == 0 && player_bunkers_flagged.insert(bid).second)
+                        ++r.built_for_player;
+                }
     }
     war_ai_trace_sink() = nullptr;
 
@@ -170,8 +187,9 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
                         static_cast<double>(t.edge), static_cast<double>(t.price),
                         static_cast<double>(t.trade), t.goals, t.applied ? "" : " (refused)");
     // BL-1426 (AI_OPPONENT.md § 11, "Rival nations build bunkers on their own ground"):
-    // the rivals' bunkers, and the player's (nothing builds for the player: must be 0,
-    // as no harness here presses the player's build).
+    // the rivals' bunkers, and the player's - ceded ones are legal; a build for the
+    // player is caught step by step above (`built_for_player`, must be 0: no harness
+    // here presses the player's build).
     for (const auto& [nid, nc] : w.nations)
         for (const entity_id bid : nc.state_assets)
             if (const auto bit = w.buildings.find(bid);
@@ -181,9 +199,9 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
                 ++r.bunkers;
                 r.bunkers_done += bit->second.ticks_remaining <= 0 ? 1 : 0;
             }
-    if (r.player_bunkers != 0)
+    if (r.built_for_player != 0)
     {
-        std::printf("  FAIL  seed %u: a bunker was built for the player's nation\n", seed);
+        std::printf("  FAIL  seed %u: %d bunker(s) built for the player's nation\n", seed, r.built_for_player);
         player_clean = false;
     }
     r.hash      = w.state_hash(0);

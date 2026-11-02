@@ -996,6 +996,113 @@ int main()
         twin(t2);
         check(t1.w.state_hash(9) == t2.w.state_hash(9) && to_bytes(t1.w) == to_bytes(t2.w) && !t1.w.wings.empty(),
               "R11 twin rival-air runs hash and serialise alike");
+
+        // -------------------------------------------------------------------
+        // RB — BL-1426 rival bunkers (AI_OPPONENT.md § 11, "Rival nations build
+        // bunkers on their own ground"). B's front toward A is column 40.
+        std::printf("\nRB - rival bunkers (BL-1426)\n");
+        const auto road_on = [](fixture& g, int col, int row) {
+            for (int side = 0; side < 6; ++side)
+                if (lay_road_edge(g.w, tile(g, col, row), side, 1))
+                    return true;
+            return false;
+        };
+        const auto bunkers_of = [](const fixture& g, entity_id n) {
+            std::vector<entity_id> out;
+            for (const entity_id bid : g.w.nations.at(n).state_assets)
+                if (g.w.buildings.count(bid) && g.w.buildings.at(bid).type == building_type::bunker)
+                    out.push_back(bid);
+            return out;
+        };
+        {
+            // RB1: the rival AIR scorer gives a hostile bunker no weight.
+            fixture g;
+            entity_id c = null_entity;
+            rival_fixture(g, c);
+            declare_hostile(g.w, g.b, g.a);
+            add_building(g, g.a, 37, 2, building_type::bunker); // strip 9: A's, in range of nothing else
+            const int64_t only_bunker = rival_air_province_score(g.w, g.b, air_mission::strategic, strip(g, 9));
+            add_building(g, g.a, 38, 2, building_type::extraction_site);
+            const int64_t with_mine = rival_air_province_score(g.w, g.b, air_mission::strategic, strip(g, 9));
+            std::printf("        strategic score over a province: hostile bunker only %lld, plus a mine %lld\n",
+                        static_cast<long long>(only_bunker), static_cast<long long>(with_mine));
+            check(only_bunker == 0 && with_mine == 1000,
+                  "RB1 not admitted: a rival's air scorer never aims at another nation's bunker (a province holding only one scores 0)");
+        }
+        {
+            fixture g;
+            entity_id c = null_entity;
+            rival_fixture(g, c);
+            road_on(g, 40, 2);
+            road_on(g, 40, 3);
+            add_unit(g, g.b, 40, 1, rifle, 80);
+            add_unit(g, g.b, 40, 2, rifle, 30);
+            add_unit(g, g.b, 39, 1, rifle, 500); // on A's ground: never a candidate
+            add_unit(g, g.a, 39, 2, rifle, 50);  // the seat's own front toward B
+
+            const uint64_t h_peace = g.w.state_hash(1);
+            score_nation_bunkers(g.w, reg, g.b, 20);
+            check(g.w.state_hash(1) == h_peace, "RB2 at peace a rival builds no bunker");
+
+            declare_hostile(g.w, g.b, g.a);
+            const uint64_t h_settle = g.w.state_hash(1);
+            score_nation_bunkers(g.w, reg, g.b, 11);
+            check(g.w.state_hash(1) == h_settle, "RB3 no bunker in the settle (before econ tick 12)");
+
+            score_nation_bunkers(g.w, reg, g.b, 12);
+            std::vector<entity_id> bk = bunkers_of(g, g.b);
+            const bool first_ok = bk.size() == 1 && g.w.buildings.at(bk[0]).tile == tile(g, 40, 1)
+                && g.w.tile_to_nation.at(g.w.buildings.at(bk[0]).tile) == g.b;
+            check(first_ok, "RB4 at war it builds ONE bunker an evaluation, on its own front tile where most of its men stand ("
+                      + std::to_string(bk.size()) + ")");
+            score_nation_bunkers(g.w, reg, g.b, 13);
+            bk = bunkers_of(g, g.b);
+            bool own = true;
+            for (const entity_id bid : bk)
+                own = own && g.w.tile_to_nation.at(g.w.buildings.at(bid).tile) == g.b;
+            check(bk.size() == 2 && own,
+                  "RB5 not admitted: another nation's ground - every bunker stands on its own tiles, never where its units stand on A's");
+
+            // The cap: four built or building.
+            add_building(g, g.b, 45, 1, building_type::bunker);
+            add_building(g, g.b, 46, 1, building_type::bunker);
+            add_unit(g, g.b, 40, 3, rifle, 40);
+            const uint64_t h_cap = g.w.state_hash(1);
+            score_nation_bunkers(g.w, reg, g.b, 14);
+            check(g.w.state_hash(1) == h_cap && bunkers_of(g, g.b).size() == 4,
+                  "RB6 at its cap of four it builds no more, though a candidate tile remains");
+
+            // Never for the player's nation: the seat is hostile, has its own front unit.
+            declare_hostile(g.w, g.a, g.b);
+            const uint64_t h_seat = g.w.state_hash(1);
+            score_nation_bunkers(g.w, reg, g.a, 15);
+            check(g.w.state_hash(1) == h_seat && bunkers_of(g, g.a).empty(),
+                  "RB7 not admitted: building for the player - its nation's pass changes nothing");
+        }
+        {
+            // The treasury rule: twice the capex, uncommitted.
+            recipe_registry priced = reg;
+            building_economics be = priced.economics(building_type::bunker);
+            be.build_cost = 120.0f;
+            priced.set_economics(building_type::bunker, be);
+            fixture g;
+            entity_id c = null_entity;
+            rival_fixture(g, c);
+            add_unit(g, g.b, 40, 1, rifle, 80);
+            declare_hostile(g.w, g.b, g.a);
+            const float capex = construction_capex(g.w, priced, tile(g, 40, 1), building_type::bunker,
+                                                   resource_type::iron_ore);
+            g.w.nations.at(g.b).treasury = 1.9f * capex;
+            const uint64_t h_poor = g.w.state_hash(1);
+            score_nation_bunkers(g.w, priced, g.b, 12);
+            const bool poor_none = g.w.state_hash(1) == h_poor;
+            g.w.nations.at(g.b).treasury = 100.0f * capex;
+            score_nation_bunkers(g.w, priced, g.b, 13);
+            std::printf("        capex %.1f: at 1.9x it builds %s; at 100x %zu bunker(s)\n",
+                        static_cast<double>(capex), poor_none ? "nothing" : "SOMETHING", bunkers_of(g, g.b).size());
+            check(capex > 0.0f && poor_none && bunkers_of(g, g.b).size() == 1,
+                  "RB8 it builds only while its uncommitted treasury holds twice the capex");
+        }
     }
 
     std::printf("\n%d / %d checks passed\n", checks - failures, checks);

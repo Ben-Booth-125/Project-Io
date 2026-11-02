@@ -1487,8 +1487,12 @@ int64_t rival_air_score(const world& w, entity_id nation, const air_wing& wg, ai
                 for (const entity_id bid : nc.state_assets)
                 {
                     const auto bit = w.buildings.find(bid);
+                    // BL-1426 (cold review): NEVER a bunker. The bunker grant does not
+                    // admit degrading another nation's bunker, so the scorer gives one
+                    // no weight; a mission flown for other reasons may still hit it.
                     if (bit != w.buildings.end() && bit->second.ticks_remaining <= 0
-                        && condition_bites(bit->second.type) && bit->second.condition_permille > 0
+                        && condition_bites(bit->second.type) && bit->second.type != building_type::bunker
+                        && bit->second.condition_permille > 0
                         && w.provinces.province_of(bit->second.tile) == p)
                         s += 1000;
                 }
@@ -1510,6 +1514,12 @@ int64_t rival_air_score(const world& w, entity_id nation, const air_wing& wg, ai
 }
 
 } // namespace
+
+int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m, uint32_t province)
+{
+    const std::set<entity_id> fighting = units_in_live_battles(w);
+    return rival_air_score(w, nation, air_wing{}, m, province, fighting);
+}
 
 void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, int tick)
 {

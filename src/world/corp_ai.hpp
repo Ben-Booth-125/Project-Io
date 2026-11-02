@@ -512,6 +512,12 @@ bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
 /// run_corp_strategic_step for each due nation; exported for the harness.
 void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, int tick);
 
+/// The rival air pass's score for mission @p m over @p province, as @p nation would
+/// weigh it (the per-province term `score_nation_air` maximises). Read-only; exported
+/// for the harness - BL-1426: a province holding only a hostile bunker scores 0 for
+/// strategic bombing, the bunker grant admitting no strike on another's bunker.
+int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m, uint32_t province);
+
 /// BL-1426 (AI_OPPONENT.md § 11, "Rival nations build bunkers on their own ground",
 /// Ben 2026-10-31; MILITARY.md § Fortifications): a rival nation's bunker pass - in
 /// live play, at most ONE bunker an evaluation, through the build verb, on a tile of

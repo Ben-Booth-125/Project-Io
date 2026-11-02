@@ -1028,6 +1028,28 @@ int main()
         const int mended = art.w.buildings.at(abk).condition_permille;
         std::printf("        ten days of repair: %d -> %d\n", cond, mended);
         check(mended > cond && mended <= 1000, "B23f a worn bunker repairs over time");
+
+        // Only the defenders standing ON the bunker's tile fight from it: one joined
+        // from an adjacent tile stands in the open (cold review).
+        {
+            fixture g;
+            build_fixture(g);
+            add_bunker(g, g.def);
+            const entity_id beside = add_unit(g.w, g.def, tile_at(g.w, g.body, 4, 2), 300);
+            active_battle ab;
+            ab.tile = g.tile; ab.attacker = g.att; ab.defender = g.def;
+            ab.defender_units = { g.ub, beside };
+            const land_combat_stats inf = land_class_stats(land_class::infantry);
+            std::vector<land_combatant> def(2);
+            def[0].unit = g.ub;   def[0].men = 500; def[0].stats = inf;
+            def[1].unit = beside; def[1].men = 300; def[1].stats = inf;
+            const entity_id used = fortify_defenders(g.w, ab, def);
+            std::printf("        on the tile: defence %d cover %d; beside it: defence %d cover %d\n",
+                        def[0].stats.defence, def[0].cover, def[1].stats.defence, def[1].cover);
+            check(used != null_entity && def[0].cover > 0 && def[0].stats.defence > inf.defence
+                      && def[1].cover == 0 && def[1].stats.defence == inf.defence,
+                  "B23g only the defender standing on the bunker's tile is fortified; the adjacent one is not");
+        }
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);
