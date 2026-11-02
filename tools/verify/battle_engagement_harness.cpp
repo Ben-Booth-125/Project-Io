@@ -35,6 +35,7 @@
 // ---------------------------------------------------------------------------
 
 #include "core/battle_dispatch_text.hpp" // BL-468: the phrase bank, testable because it is its own TU
+#include "world/air_combat.hpp" // BL-1426: run_air_missions, the repair pass
 #include "world/battle_system.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
@@ -949,6 +950,106 @@ int main()
         recover_out_of_contact(f.w);
         check(f.w.units.at(f.ua).morale_permille == 1000 - p.morale_loss + p.morale_recovery_permille,
               "B22d ...and the day's recovery then moves it one step back, once");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nB23 — BL-1426 the bunker: its owner's defenders fight from it; artillery wears it; it repairs\n");
+    {
+        // A completed bunker on the defended tile, in @p owner's state assets.
+        const auto add_bunker = [](fixture& f, entity_id owner) {
+            const entity_id b = f.w.create_entity();
+            building_component bc{};
+            bc.tile = f.tile;
+            bc.type = building_type::bunker;
+            bc.workforce_assigned = 0.0f;
+            bc.ticks_remaining = 0;
+            f.w.buildings[b] = bc;
+            f.w.nations.at(owner).state_assets.push_back(b);
+            return b;
+        };
+        // The fixture's battle FOUGHT OUT through the daily pass, the attacker at 2:1
+        // (1000 men on 500): the day it ended, and whether the attacker took the tile.
+        // A whole fight, not one day: on day one recon is still building and a near-
+        // parity day is dug in (its readiness recovered), so one day measures neither.
+        const auto fight_out = [&reg](fixture& f) {
+            f.w.units.at(f.ua).count = 1000;
+            open_tile_battle(f.w, 0, f.tile, f.att, f.def, { f.ua });
+            int day = 0;
+            for (; day < 400 && !f.w.battles.empty(); ++day)
+                run_battles(f.w, reg, day);
+            return std::pair<int, bool>{ day, f.w.units.count(f.ua) != 0 && f.w.units.at(f.ua).position == f.tile };
+        };
+        fixture open, bunk, foreign;
+        build_fixture(open);
+        build_fixture(bunk);
+        build_fixture(foreign);
+        const entity_id bk = add_bunker(bunk, bunk.def);
+        add_bunker(foreign, foreign.att); // the ATTACKER's bunker on the defended tile
+        check(tile_bunker(bunk.w, bunk.tile, bunk.def) == bk && tile_bunker(bunk.w, bunk.tile, bunk.att) == null_entity,
+              "B23a tile_bunker names the owner's completed bunker on the tile, and nobody else's");
+        const auto o = fight_out(open);
+        const auto b = fight_out(bunk);
+        const auto x = fight_out(foreign);
+        std::printf("        2:1 fought out: open ground ends day %d (%s); in the defender's bunker day %d (%s); "
+                    "another nation's bunker day %d (%s)\n", o.first, o.second ? "tile taken" : "held",
+                    b.first, b.second ? "tile taken" : "held", x.first, x.second ? "tile taken" : "held");
+        check(o.second && (!b.second || b.first > o.first),
+              "B23b the defender fighting from its own bunker holds, or holds longer, against what takes it in the open");
+        check(x == o, "B23c a bunker that is not the defender's own gives it nothing");
+
+        // Artillery wears it: one fully armed battery beside the attacking infantry.
+        fixture art;
+        build_fixture(art);
+        const entity_id abk = add_bunker(art, art.def);
+        const entity_id gun = add_unit(art.w, art.att, tile_at(art.w, art.body, 2, 2), 300);
+        art.w.units.at(gun).type = static_cast<uint16_t>(modern_row_for(land_class::artillery));
+        open_tile_battle(art.w, 0, art.tile, art.att, art.def, { art.ua, gun });
+        const battle_tick bt = run_battles(art.w, reg, 0);
+        const int cond = art.w.buildings.at(abk).condition_permille;
+        std::printf("        one battery, one day: condition 1000 -> %d (reported lost %d); bunk (no guns) %d\n",
+                    cond, bt.bunker_condition_lost, bunk.w.buildings.at(bk).condition_permille);
+        check(cond < 1000 && bt.bunker_condition_lost == 1000 - cond,
+              "B23d the attacker's artillery takes condition off the bunker, and the pass reports it");
+        check(bunk.w.buildings.at(bk).condition_permille == 1000,
+              "B23e infantry alone does not wear the bunker");
+
+        // It repairs over time: the one repair pass (the air pass's). Its goods leg is
+        // air_combat_harness's subject; here the basket is emptied so the fixture, which
+        // has no market, measures the mend alone.
+        recipe_registry free_repair = reg;
+        {
+            military_capability_params mp = free_repair.military();
+            mp.air.repair_goods_per_permille = {};
+            free_repair.set_military(mp);
+        }
+        economy_report rep;
+        art.w.battles.clear();
+        (void)run_air_missions(art.w, free_repair, rep, 10);
+        const int mended = art.w.buildings.at(abk).condition_permille;
+        std::printf("        ten days of repair: %d -> %d\n", cond, mended);
+        check(mended > cond && mended <= 1000, "B23f a worn bunker repairs over time");
+
+        // Only the defenders standing ON the bunker's tile fight from it: one joined
+        // from an adjacent tile stands in the open (cold review).
+        {
+            fixture g;
+            build_fixture(g);
+            add_bunker(g, g.def);
+            const entity_id beside = add_unit(g.w, g.def, tile_at(g.w, g.body, 4, 2), 300);
+            active_battle ab;
+            ab.tile = g.tile; ab.attacker = g.att; ab.defender = g.def;
+            ab.defender_units = { g.ub, beside };
+            const land_combat_stats inf = land_class_stats(land_class::infantry);
+            std::vector<land_combatant> def(2);
+            def[0].unit = g.ub;   def[0].men = 500; def[0].stats = inf;
+            def[1].unit = beside; def[1].men = 300; def[1].stats = inf;
+            const entity_id used = fortify_defenders(g.w, ab, def);
+            std::printf("        on the tile: defence %d cover %d; beside it: defence %d cover %d\n",
+                        def[0].stats.defence, def[0].cover, def[1].stats.defence, def[1].cover);
+            check(used != null_entity && def[0].cover > 0 && def[0].stats.defence > inf.defence
+                      && def[1].cover == 0 && def[1].stats.defence == inf.defence,
+                  "B23g only the defender standing on the bunker's tile is fortified; the adjacent one is not");
+        }
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

@@ -1487,8 +1487,12 @@ int64_t rival_air_score(const world& w, entity_id nation, const air_wing& wg, ai
                 for (const entity_id bid : nc.state_assets)
                 {
                     const auto bit = w.buildings.find(bid);
+                    // BL-1426 (cold review): NEVER a bunker. The bunker grant does not
+                    // admit degrading another nation's bunker, so the scorer gives one
+                    // no weight; a mission flown for other reasons may still hit it.
                     if (bit != w.buildings.end() && bit->second.ticks_remaining <= 0
-                        && condition_bites(bit->second.type) && bit->second.condition_permille > 0
+                        && condition_bites(bit->second.type) && bit->second.type != building_type::bunker
+                        && bit->second.condition_permille > 0
                         && w.provinces.province_of(bit->second.tile) == p)
                         s += 1000;
                 }
@@ -1510,6 +1514,12 @@ int64_t rival_air_score(const world& w, entity_id nation, const air_wing& wg, ai
 }
 
 } // namespace
+
+int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m, uint32_t province)
+{
+    const std::set<entity_id> fighting = units_in_live_battles(w);
+    return rival_air_score(w, nation, air_wing{}, m, province, fighting);
+}
 
 void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, int tick)
 {
@@ -1723,6 +1733,94 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
             (void)apply_corp_command(w, reg, cmd);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// BL-1426 — a rival nation builds bunkers on its own ground (AI_OPPONENT.md § 11,
+// "Rival nations build bunkers on their own ground", Ben 2026-10-31; MILITARY.md
+// § Fortifications). The grant and nothing wider: a bunker on a tile of its OWN
+// ground, chosen by scored utility over what it can see - its fronts, its own units,
+// the build price - through the build verb the player uses. Never another nation's
+// ground (the verb's own-ground gate refuses it, and only its own front spans are
+// candidates), never for the player's nation, never a repair or a strike on another
+// nation's bunker, and never a line: at most ONE build an evaluation, the best tile
+// as the ground stands now. Pure arithmetic on sorted ids; no RNG.
+//
+//   WHEN. Live play only (not the settle), on a front toward a nation it is hostile
+//   to, or that is hostile to it, with fewer than `k_rival_bunker_cap` bunkers of its
+//   own built or building, and its uncommitted treasury holding twice the capex.
+//   WHERE. Every tile of such a front's span on which its own units stand (men > 0)
+//   and the door admits a bunker (`can_place_in_world`: own ground, a road, one site
+//   and one bunker to a tile). Score = its men standing there x 1000 / the tile's
+//   capex: the most men covered per credit, ties to the lowest tile id.
+// ---------------------------------------------------------------------------
+
+constexpr int k_rival_bunker_cap = 4;
+
+void score_nation_bunkers(world& w, const recipe_registry& reg, entity_id nation, int tick)
+{
+    // Never the player's nation (AI_OPPONENT.md § 11: "Not admitted: ... or for the player").
+    if (nation == null_entity || nation == player_nation(w) || w.nations.find(nation) == w.nations.end())
+        return;
+    if (tick < k_campaign_settle_ticks || !reg.building_available(building_type::bunker))
+        return;
+
+    int owned = 0;
+    for (const entity_id bid : w.nations.at(nation).state_assets)
+        if (const auto bit = w.buildings.find(bid);
+            bit != w.buildings.end() && bit->second.type == building_type::bunker && !bit->second.decommissioned)
+            ++owned;
+    if (owned >= k_rival_bunker_cap)
+        return;
+
+    // Candidate tiles: its own spans toward a hostile neighbour, deduplicated, sorted.
+    std::vector<entity_id> cands;
+    for (const front& f : nation_fronts(w, nation))
+        if (f.neighbour != null_entity
+            && (is_hostile(w, nation, f.neighbour) || is_hostile(w, f.neighbour, nation)))
+            cands.insert(cands.end(), f.span.begin(), f.span.end());
+    if (cands.empty())
+        return;
+    std::sort(cands.begin(), cands.end());
+    cands.erase(std::unique(cands.begin(), cands.end()), cands.end());
+
+    // Its own men standing on each candidate (a sum: walk order cannot reach it).
+    std::map<entity_id, int64_t> men;
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == nation && u.count > 0 && u.position != null_entity
+            && std::binary_search(cands.begin(), cands.end(), u.position))
+            men[u.position] += u.count;
+    if (men.empty())
+        return;
+
+    const float reach_budget = reg.construction().max_logistics_reach;
+    entity_id best = null_entity;
+    int64_t   best_s = 0;
+    float     best_capex = 0.0f;
+    for (const auto& [tid, m] : men) // ascending tile id: ties keep the lowest
+    {
+        const auto tit = w.tiles.find(tid);
+        if (tit == w.tiles.end())
+            continue;
+        body_reach_field(w, tit->second.body);
+        if (!placement_rules::can_place_in_world(w, tid, building_type::bunker,
+                                                 resource_type::iron_ore, reach_budget, nation))
+            continue;
+        const float capex = construction_capex(w, reg, tid, building_type::bunker, resource_type::iron_ore);
+        const int64_t s = m * 1000 / std::max<int64_t>(1, static_cast<int64_t>(std::lround(capex)));
+        if (best == null_entity || s > best_s)
+        {
+            best = tid;
+            best_s = s;
+            best_capex = capex;
+        }
+    }
+    if (best == null_entity || state_uncommitted_treasury(w, nation) < 2.0f * best_capex)
+        return;
+    corp_command cmd;
+    cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+    cmd.verb = corp_verb::build; cmd.tile = best; cmd.type = building_type::bunker;
+    (void)apply_corp_command(w, reg, cmd);
 }
 
 // ---------------------------------------------------------------------------
@@ -2333,6 +2431,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // above, and score_nation_air refuses the player's nation itself as well.
         if (actor.is_nation)
             score_nation_air(w, reg, corp, tick);
+
+        // BL-1426 (AI_OPPONENT.md § 11, "Rival nations build bunkers on their own
+        // ground", Ben 2026-10-31): at most one bunker an evaluation, on its own front
+        // where its own units stand. score_nation_bunkers refuses the player's nation
+        // and the settle itself as well.
+        if (actor.is_nation)
+            score_nation_bunkers(w, reg, corp, tick);
 
         // BL-1309 grant (AI_OPPONENT.md § 11, Ben 2026-10-15): a producing build
         // beyond its host nation's Logistic Point reach is scored with the capex of

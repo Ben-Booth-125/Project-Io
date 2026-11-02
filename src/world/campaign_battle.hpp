@@ -206,6 +206,29 @@ struct campaign_battle_params
     /// so a commander has a decision every day of the fight. Was `rounds_per_tick
     /// = 3` (two economy ticks, 180 days, to a stalemate).
     int rounds_per_day = 1;
+
+    /// BL-1426: THE BUNKER (MILITARY.md § Fortifications). Units defending a tile
+    /// that carries their own nation's completed bunker fight from concrete, each
+    /// term scaled by the bunker's condition (`fortify_combatant`):
+    ///   bunker_defence_permille  — added to the unit's defence, per-mille of it: at
+    ///     500 and full condition a defence of 90 absorbs as 135.
+    ///   bunker_hardness_permille — the share of the unit's SOFT part the concrete
+    ///     makes hard to soft attack (`land_combatant::cover`): (1000 - h) x this /
+    ///     1000. At 400 base infantry (hardness 0) takes soft fire on 600 of itself,
+    ///     so an infantry attacker's hits land at about 0.7 of the open-ground rate.
+    ///     Hardness plus cover stays inside 0..1000. It screens soft fire only: read
+    ///     as plain hardness it would open the unit to hard fire, and armour (hard
+    ///     140 over soft 100) would land 1.8x its open-ground hits on a bunker
+    ///     (campaign_battle_harness C8 measured it before this was settled).
+    ///   bunker_shelling_permille — condition each fighting ARTILLERY unit of the
+    ///     attacker takes off the bunker per day, scaled by its carried attack
+    ///     (`bunker_shelling_day`). At 12, three batteries strip a bunker in about a
+    ///     month; the quarter's repair pass (air_params::repair_permille_per_day, 4)
+    ///     mends it more slowly than one battery wears it.
+    /// First cuts, measured in campaign_battle_harness C8.
+    int bunker_defence_permille  = 500;
+    int bunker_hardness_permille = 400;
+    int bunker_shelling_permille = 12;
 };
 
 /// Which side is breaking off. `none` means fight it out.
@@ -309,6 +332,13 @@ struct land_combatant
     /// battle_ready_carry` / `battle_hp_carry`, saved).
     int64_t           ready_carry = 0;
     int64_t           hp_carry    = 0;
+    /// BL-1426 (MILITARY.md § Fortifications): THE BUNKER'S HARDNESS, per-mille — the
+    /// share of this unit's soft part that concrete makes hard to SOFT attack. It
+    /// takes the attacker's soft fire away and, unlike the unit's own hardness, does
+    /// not open it to hard fire: concrete never lets a tank hit infantry harder than
+    /// in the open. Held inside 1000 - stats.hardness. Set by `fortify_combatant` on a
+    /// defender; 0 elsewhere, which leaves the round exactly as it was.
+    int               cover       = 0;
 };
 
 /// BL-1453 (MILITARY.md § Recon, Ben 2026-10-29): THE VISIBLE SHARE of a defending
@@ -327,6 +357,20 @@ inline bool land_combatant_fighting(const land_combatant& c)
 /// per-mille, over combatants with men standing (0 when none). What the card,
 /// the phase, the dispatch and the withdrawal price read.
 int side_readiness(const std::vector<land_combatant>& side);
+
+/// BL-1426 (MILITARY.md § Fortifications): raise a DEFENDING combatant by the bunker
+/// on its tile at @p condition_permille (0..1000; 0 or below changes nothing). Its
+/// defence gains `bunker_defence_permille` of itself and `bunker_hardness_permille` of
+/// its soft share is screened from soft attack (`land_combatant::cover`), each scaled
+/// by the condition; hardness plus cover stays in 0..1000. Integer, pure. Called by
+/// the caller before each round; never on an attacker.
+void fortify_combatant(land_combatant& c, int condition_permille, const campaign_battle_params& p = {});
+
+/// BL-1426: the condition one day of shelling takes off a bunker — the sum over the
+/// attacker's fighting artillery of `bunker_shelling_permille` x that unit's carried
+/// attack (per-mille). @p artillery_attack_permille holds one entry per firing unit.
+int bunker_shelling_day(const std::vector<int>& artillery_attack_permille,
+                        const campaign_battle_params& p = {});
 
 /// A battle in progress. THE SPAN IS MODELLED EXPLICITLY: a caller steps this
 /// round by round, so the withdrawal window is a real window rather than a

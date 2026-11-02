@@ -649,6 +649,11 @@ enum class building_type : uint8_t
                   ///< nothing, staffs at zero, is no supply anchor. A wing records its airbase
                   ///< and is disbanded when it goes (the muster_base orphan rule). A military
                   ///< base hosts no wings.
+    bunker = 13, ///< BL-1426 (MILITARY.md § Fortifications): concrete on a tile. Produces
+                 ///< nothing, staffs at zero, no supply anchor. The owner's units defending
+                 ///< its tile gain defence and hardness, scaled by its `condition_permille`;
+                 ///< artillery in a battle there and strategic bombing degrade it, and the
+                 ///< one repair pass mends it. One to a tile.
 };
 
 /// One past the last building type — the wire parser's range gate (BL-396:
@@ -658,7 +663,7 @@ enum class building_type : uint8_t
 /// enum's tail, the same way resource_count derives from resource_type::count:
 /// appending a type means moving this with it.
 static constexpr uint8_t building_type_count =
-    static_cast<uint8_t>(building_type::airbase) + 1;
+    static_cast<uint8_t>(building_type::bunker) + 1;
 
 /// Infrastructure is every building that is not a producer (PRODUCTION.md §
 /// Infrastructure buildings): ports, logistics hubs, railway stations, the

@@ -305,6 +305,20 @@ economy = {
             build_duration_days = 360,
             resource_costs = { steel = 50.0 },
         },
+        -- BL-1426 (MILITARY.md § Fortifications): Bunker - concrete on a tile. The
+        -- owner's units defending its tile gain defence and hardness (the round's
+        -- `bunker_*` params, campaign_battle.hpp), scaled by its condition, which
+        -- artillery and strategic bombing wear down and the one repair pass mends.
+        -- Produces nothing, staffs at zero. A first cut priced well under the
+        -- military base: stone and a little steel, a short build, small upkeep.
+        bunker = {
+            base_rate   = 0.0,
+            maintenance = 5.0,
+            base_wage   = 0.0,
+            build_cost  = 120.0,
+            build_duration_days = 90,
+            resource_costs = { stone = 20.0, steel = 8.0 },
+        },
         -- BL-332: Research Institute — the dedicated tech-progress building.
         -- Same passive shape as military_base (base_rate 0, staffs at zero);
         -- its output is research points, each quarter, into the owning corp's
