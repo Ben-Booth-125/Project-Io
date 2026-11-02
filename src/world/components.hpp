@@ -2638,6 +2638,10 @@ struct nation_component
     /// negative. Saved (world_save_version 68) and hashed only when non-zero.
     int32_t land_recruits = 0;
     int32_t air_recruits  = 0;
+    /// Ben, 2026-11-02 (MILITARY.md § Recruits): the ONE sea pool, filled by the nation's
+    /// ports (`run_recruitment`) up to 15 quarters of their output. Nothing spends it
+    /// until ships are raised. Saved (world_save_version 73) and hashed only when non-zero.
+    int32_t sea_recruits  = 0;
 };
 
 /// BL-1460 fix round: the capital a nation's generated identity reads —

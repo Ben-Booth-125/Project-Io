@@ -647,7 +647,19 @@ inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 /// PREFIX of v72 and is read too (`k_world_save_version_pre_recruits`), as a world whose
 /// pools are empty and whose centres carry nothing; so is every older version the reader
 /// already accepted.
-inline constexpr uint32_t world_save_version = 72;
+///
+/// Bumped to 73 (Ben, 2026-11-02, ports make sea recruits; MILITARY.md § Recruits): A
+/// TRAILING SECTION after v72's recruits section carries, after a u32 count, every nation
+/// holding sea recruits, ascending id, as (id, i32 sea pool in [1, 2^30]). v72 is a STRICT
+/// PREFIX of v73 and is read too (`k_world_save_version_pre_sea_recruits`), as a world
+/// whose sea pools are empty; so is every older version the reader already accepted.
+inline constexpr uint32_t world_save_version = 73;
+
+/// Ben, 2026-11-02: the first version carrying the sea-recruits section (see above).
+inline constexpr uint32_t k_world_save_version_sea_recruits = 73;
+
+/// Ben, 2026-11-02: v72, a strict prefix of v73 (the sea section is v73's only addition).
+inline constexpr uint32_t k_world_save_version_pre_sea_recruits = 72;
 
 /// BL-1463: the first version carrying the recruits section (see above).
 inline constexpr uint32_t k_world_save_version_recruits = 72;
@@ -805,6 +817,10 @@ std::size_t world_save_gen_capital_section_bytes(const world& w);
 /// older stream as today's less its later sections.
 std::size_t world_save_recruits_section_bytes(const world& w);
 
+/// Ben, 2026-11-02: the byte length of the v73 sea-recruits section `w` writes — 4 + 8
+/// per nation holding sea recruits. The LAST section of a v73 stream.
+std::size_t world_save_sea_recruits_section_bytes(const world& w);
+
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and
 /// folds them away (`fold_legacy_firms`); the verification writer below writes
@@ -895,6 +911,9 @@ void write_world_snapshot_pre_gen_capital(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1463): the v71 stream shape — no recruits section.
 void write_world_snapshot_pre_recruits(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (Ben, 2026-11-02): the v72 stream shape — no sea-recruits section.
+void write_world_snapshot_pre_sea_recruits(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

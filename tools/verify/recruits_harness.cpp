@@ -21,14 +21,17 @@
 //       lasts, ascending unit id; its recruits x 1 LP join its supply request; on the
 //       road and exactly 8 tiles off it refills whole, 9 off it refills nothing;
 //   R6  bases carry no upkeep: zero maintenance and wage, so zero opex;
-//   R7  the save (v72): pools and carries round-trip; v71 and v67 streams read with empty pools and
+//   R7  the save (v72, now under v73's trailing sea section): pools and carries round-trip; v71 and v67 streams read with empty pools and
 //       are today's less exactly the later sections; a corrupt row is refused whole;
 //   R8  determinism: the same quarters twice are byte-identical, and the real economy
 //       step makes the quarter's recruits;
 //   R9  the loader rejects a bad recruits value, and a rate past its 1000 ceiling;
 //   R10 wings refill from the air pool (Ben, 2026-10-31): HP maps to crew, whole
 //       recruits, conservation, the 8-tile draw, ascending wing id, determinism;
-//   R11 a dropped muster refunds its men, uncapped; credits are not refunded.
+//   R11 a dropped muster refunds its men, uncapped; credits are not refunded;
+//   R12 ports make sea recruits (Ben, 2026-11-02): 20 a port a quarter from its
+//       province's centres, one sea pool per nation capped at 15 quarters, any owner;
+//       nothing spends it; the v73 save section, a v72 stream read empty; determinism.
 //
 // Build: bash tools/verify/build_lua_harness.sh recruits_harness. Run from the repo root.
 
@@ -257,6 +260,7 @@ int main()
     {
         const recruit_params def{};
         check(rp.land_per_base == def.land_per_base && rp.air_per_base == def.air_per_base
+                  && rp.sea_per_port == def.sea_per_port
                   && rp.lp_per_recruit == def.lp_per_recruit,
               "R0 the authored recruits equal the C++ defaults (a harness registry recruits what the game does)");
         const air_params defa = default_air_params();
@@ -760,9 +764,9 @@ int main()
         check(old_ok && old.nations.at(f.nation).land_recruits == 0 && old.nations.at(f.nation).air_recruits == 0
                   && old.population_centres.at(c).recruit_heads_taken == 0,
               "R7d a v71 stream reads, its pools empty and its carries 0");
-        check(v67.size() + world_save_recruits_section_bytes(f.w) == bytes.size()
+        check(v67.size() + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) == bytes.size()
                   && world_save_recruits_section_bytes(f.w) == 4 + 12 + 4 + 8,
-              "R7e a v71 stream is today's less exactly the recruits section (28 bytes here)");
+              "R7e a v71 stream is today's less exactly the recruits section (28 bytes here) and v73's sea section");
         {
             std::ostringstream o(std::ios::binary);
             write_world_snapshot_pre_alarm(f.w, o);
@@ -772,13 +776,15 @@ int main()
             check(ok67 && w67.nations.at(f.nation).land_recruits == 0
                       && v67s.size() + world_save_alarm_section_bytes(f.w) + world_save_war_section_bytes(f.w)
                              + world_save_embargo_section_bytes(f.w) + world_save_gen_capital_section_bytes(f.w)
-                             + world_save_recruits_section_bytes(f.w)
+                             + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w)
                              == bytes.size(),
-                  "R7e2 a v67 stream reads with empty pools and is today's less the Alarm (v68), war (v69), embargo (v70), generation-capital (v71) AND recruits (v72) sections");
+                  "R7e2 a v67 stream reads with empty pools and is today's less the Alarm (v68), war (v69), embargo (v70), generation-capital (v71) recruits (v72) AND sea (v73) sections");
         }
 
-        // Corrupt rows. The section is the tail: [n=1][id][land][air][m=1][cid][carry].
-        const std::size_t land_at = bytes.size() - 8 - 4 - 8; // land is 8 bytes into the nation row
+        // Corrupt rows. The section ends where v73's sea section (empty here: its count) begins:
+        // [n=1][id][land][air][m=1][cid][carry][sea n=0].
+        const std::size_t rtail = bytes.size() - world_save_sea_recruits_section_bytes(f.w);
+        const std::size_t land_at = rtail - 8 - 4 - 8; // land is 8 bytes into the nation row
         {
             std::string bad = bytes;
             const int32_t neg = -1;
@@ -797,14 +803,14 @@ int main()
         {
             std::string bad = bytes;
             const int32_t big = 1000;
-            std::memcpy(&bad[bytes.size() - 4], &big, sizeof big);
+            std::memcpy(&bad[rtail - 4], &big, sizeof big);
             world z;
             check(!from_bytes(bad, z) && z.nations.empty(), "R7h a centre carry of 1000 is refused whole");
         }
         {
             std::string bad = bytes;
             const entity_id ghost = 0x7FFFFFF0u;
-            std::memcpy(&bad[bytes.size() - 8], &ghost, sizeof ghost);
+            std::memcpy(&bad[rtail - 8], &ghost, sizeof ghost);
             world z;
             check(!from_bytes(bad, z) && z.nations.empty(), "R7i a carry naming no centre is refused whole");
         }
@@ -863,6 +869,20 @@ int main()
         check(rejects("economy.military.air.classes.fighter.crew = -4"), "R9e a negative crew");
         check(rejects("economy.military.recruits.land_per_base = 1001"),
               "R9f a rate past the ceiling (1000 a base a quarter) is refused");
+        check(rejects("economy.military.recruits.sea_per_port = 1001"),
+              "R9f2 a sea rate past the same ceiling (1000 a port a quarter) is refused");
+        check(rejects("economy.military.recruits.sea_per_port = -1"), "R9f3 a negative sea rate");
+        {
+            lua_state l;
+            l.load("scripts/recipes.lua");
+            l.load("scripts/economy.lua");
+            l.state().safe_script("economy.military.recruits.sea_per_port = 1000");
+            recipe_registry r;
+            bool ok = true;
+            try { r.load_from_lua(l); } catch (const std::exception&) { ok = false; }
+            check(ok && r.military().recruits.sea_per_port == k_recruit_rate_max,
+                  "R9g2 the sea ceiling itself (1000) loads");
+        }
         {
             lua_state l;
             l.load("scripts/recipes.lua");
@@ -897,6 +917,207 @@ int main()
             check(cap == k_recruit_pool_max, "R9i 72,000 bases at the ceiling rate: the cap is clamped to 2^30 ("
                                                  + std::to_string(cap) + ")");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nR12 - ports make sea recruits (Ben, 2026-11-02)\n");
+    {
+        check(rp.sea_per_port == 20, "R12a the authored rate is 20 sea recruits a port a quarter");
+
+        // Output per port, and the tick's row.
+        fixture f; build(f);
+        const entity_id big   = add_centre(f, 4, 5); // 5000 heads
+        const entity_id small = add_centre(f, 3, 3);
+        add_building(f, 5, building_type::port);
+        check(recruit_quarter_output(f.w, reg, f.nation, recruit_theatre::sea) == 20
+                  && recruit_cap(f.w, reg, f.nation, recruit_theatre::sea) == 300
+                  && recruit_quarter_output(f.w, reg, f.nation, recruit_theatre::land) == 0,
+              "R12b one port makes 20 sea recruits a quarter, capped at 300 (15 quarters); it is no base");
+        const recruitment_tick t = run_recruitment(f.w, reg);
+        std::printf("      sea %d land %d air %d; heads %lld; big carry %d small carry %d\n",
+                    nat(f).sea_recruits, nat(f).land_recruits, nat(f).air_recruits,
+                    static_cast<long long>(t.heads_taken), centre(f, big).recruit_heads_taken,
+                    centre(f, small).recruit_heads_taken);
+        check(recruit_pool(f.w, f.nation, recruit_theatre::sea) == 20 && nat(f).sea_recruits == 20
+                  && nat(f).land_recruits == 0 && nat(f).air_recruits == 0 && t.heads_taken == 20,
+              "R12c a quarter puts 20 into the sea pool, 20 heads taken, land and air untouched");
+        check(t.nations.size() == 1 && t.nations[0].sea_made == 20 && t.nations[0].sea_short == 0
+                  && t.nations[0].land_made == 0,
+              "R12d the tick's row reports the sea theatre's 20, none short");
+        add_building(f, 8, building_type::port);
+        check(recruit_quarter_output(f.w, reg, f.nation, recruit_theatre::sea) == 40
+                  && recruit_cap(f.w, reg, f.nation, recruit_theatre::sea) == 600,
+              "R12e two ports make 40 into the ONE sea pool, cap 600");
+
+        fixture g; build(g);
+        add_centre(g, 4, 5);
+        add_building(g, 5, building_type::port, /*ticks=*/3);
+        const entity_id dp = add_building(g, 6, building_type::port);
+        g.w.buildings.at(dp).decommissioned = true;
+        const entity_id sp = add_building(g, 7, building_type::port);
+        g.w.buildings.at(sp).state_idle = true;
+        const recruitment_tick tg = run_recruitment(g.w, reg);
+        check(nat(g).sea_recruits == 0 && tg.heads_taken == 0
+                  && recruit_quarter_output(g.w, reg, g.nation, recruit_theatre::sea) == 0,
+              "R12f a port under construction, idled, or idled by the state's funding makes none");
+
+        // The province draw, exactly a base's.
+        check(centre(f, big).recruit_heads_taken == 20 && centre(f, small).recruit_heads_taken == 0,
+              "R12g the port takes from its province's centre with the most heads");
+        fixture p; build(p);
+        const entity_id pa = add_centre(p, 3, 5);
+        const entity_id pb = add_centre(p, 25, 100); // province B
+        add_building(p, 5, building_type::port);
+        add_building(p, 6, building_type::military_base);
+        (void)run_recruitment(p.w, reg);
+        check(centre(p, pa).recruit_heads_taken == 70 && centre(p, pb).recruit_heads_taken == 0
+                  && nat(p).land_recruits == 50 && nat(p).sea_recruits == 20,
+              "R12h a port and a base in one province draw 50 + 20 = 70 heads from it, none from B");
+        fixture e; build(e);
+        add_centre(e, 3, 1, /*carry=*/990); // 10 heads left
+        add_building(e, 5, building_type::port);
+        const recruitment_tick te = run_recruitment(e.w, reg);
+        check(nat(e).sea_recruits == 10 && !te.nations.empty() && te.nations[0].sea_short == 10,
+              "R12i a province with 10 heads left makes 10, 10 short");
+        fixture o; build(o);
+        add_centre(o, 25, 50); // only in B
+        add_building(o, 5, building_type::port);
+        (void)run_recruitment(o.w, reg);
+        check(nat(o).sea_recruits == 0, "R12j a port in a province with no centre makes none");
+
+        // Any owner nation: a second nation's port fills its own pool.
+        fixture n2; build(n2);
+        add_centre(n2, 3, 5); add_centre(n2, 25, 5);
+        add_building(n2, 5, building_type::port);
+        const entity_id other = n2.w.create_entity();
+        nation_component oc{}; oc.name = "Others"; oc.treasury = 1000.0f;
+        n2.w.nations[other] = oc;
+        const entity_id op = n2.w.create_entity();
+        building_component ob{}; ob.tile = tile(n2, 25); ob.type = building_type::port;
+        n2.w.buildings[op] = ob;
+        n2.w.nations.at(other).state_assets.push_back(op);
+        (void)run_recruitment(n2.w, reg);
+        check(nat(n2).sea_recruits == 20 && n2.w.nations.at(other).sea_recruits == 20
+                  && recruit_cap(n2.w, reg, other, recruit_theatre::sea) == 300,
+              "R12k a port of any owner nation fills that nation's own sea pool");
+
+        // The cap.
+        fixture c; build(c);
+        const entity_id cc = add_centre(c, 3, 50);
+        add_building(c, 5, building_type::port);
+        int quarters = 0;
+        while (nat(c).sea_recruits < recruit_cap(c.w, reg, c.nation, recruit_theatre::sea) && quarters < 100)
+        {
+            (void)run_recruitment(c.w, reg);
+            ++quarters;
+        }
+        const int carry_full = centre(c, cc).recruit_heads_taken;
+        const recruitment_tick tc = run_recruitment(c.w, reg);
+        check(quarters == 15 && nat(c).sea_recruits == 300,
+              "R12l an empty sea pool fills to 300 in exactly 15 quarters (" + std::to_string(quarters) + ")");
+        check(nat(c).sea_recruits == 300 && tc.heads_taken == 0 && centre(c, cc).recruit_heads_taken == carry_full,
+              "R12m a full sea pool takes no more: no recruit, no head");
+        nat(c).sea_recruits = 400;
+        (void)run_recruitment(c.w, reg);
+        check(nat(c).sea_recruits == 400, "R12n a sea pool above its cap is never cut");
+
+        // Nothing spends it: a hire, a wing, a land refill, a wing's plan, a refund.
+        fixture s; build(s);
+        add_building(s, 0, building_type::inland_logistics_hub);
+        lay_row_road(s, 0, 2);
+        add_building(s, 5, building_type::military_base);
+        add_building(s, 6, building_type::airbase);
+        add_building(s, 7, building_type::port);
+        add_unit(s, 1, 10, 50);
+        nat(s).land_recruits = 500; nat(s).air_recruits = 200; nat(s).sea_recruits = 250;
+        const auto avail = available_rows(s.w, s.nation, campaign_roster_band_for(reg.era()));
+        const uint16_t row = avail.empty() ? 0
+            : static_cast<uint16_t>(avail.front() - unit_roster_table().data());
+        const corp_command_result hu = hire_unit(s, reg, 5, row);
+        const corp_command_result hw = hire_wing(s, reg, 6, 0);
+        const refill_result rr = refill_quarter(s, reg);
+        muster_order m; m.owner = s.nation; m.unit_type = row;
+        (void)refund_muster_recruits(s.w, m);
+        std::printf("      after hire, wing, refill (%d) and refund: land %d air %d sea %d\n", rr.delivered,
+                    nat(s).land_recruits, nat(s).air_recruits, nat(s).sea_recruits);
+        check(hu == corp_command_result::applied && hw == corp_command_result::applied && rr.delivered > 0
+                  && nat(s).sea_recruits == 250,
+              "R12o a unit hire, a wing hire, a land refill and a muster refund leave the sea pool alone");
+        nat(s).land_recruits = 0; nat(s).air_recruits = 0;
+        check(hire_unit_check(s.w, reg, s.nation, tile(s, 5), row) == corp_command_result::rejected_no_recruits
+                  && hire_wing_check(s.w, reg, s.nation, tile(s, 6), 0) == corp_command_result::rejected_no_recruits,
+              "R12p an empty land or air pool is refused even with 250 sea recruits held");
+
+        // The real step: ports fill the pool to its cap and it stops there.
+        fixture r; build(r);
+        add_centre(r, 3, 50);
+        add_building(r, 5, building_type::port);
+        int first = -1;
+        for (int q = 0; q < 18; ++q)
+        {
+            (void)run_economy_step(r.w, reg, /*spectating=*/false);
+            if (q == 0) first = nat(r).sea_recruits;
+        }
+        std::printf("      economy steps: after 1 sea %d, after 18 sea %d\n", first, nat(r).sea_recruits);
+        check(first == 20 && nat(r).sea_recruits == 300,
+              "R12q the economy step makes the port's 20, and 18 steps stop at the 300 cap");
+
+        // The save (v73).
+        fixture v; build(v);
+        add_centre(v, 3, 5);
+        add_building(v, 5, building_type::military_base);
+        add_building(v, 6, building_type::port);
+        (void)run_recruitment(v.w, reg);
+        const std::string bytes = to_bytes(v.w);
+        world back;
+        const bool ok = from_bytes(bytes, back);
+        check(ok && back.nations.at(v.nation).sea_recruits == 20 && back.nations.at(v.nation).land_recruits == 50
+                  && to_bytes(back) == bytes && back.state_hash(1) == v.w.state_hash(1),
+              "R12r the sea pool (20) round-trips; the reload re-writes byte-identical and hashes the same");
+        check(v.w.state_hash(1) != [&] { world z = v.w; z.nations.at(v.nation).sea_recruits = 0; return z.state_hash(1); }(),
+              "R12s the sea pool is in the state hash");
+        check(world_save_sea_recruits_section_bytes(v.w) == 4 + 8, "R12t the sea section is 12 bytes here");
+        std::ostringstream o72(std::ios::binary);
+        write_world_snapshot_pre_sea_recruits(v.w, o72);
+        const std::string v72 = o72.str();
+        world old;
+        const bool old_ok = from_bytes(v72, old);
+        check(old_ok && old.nations.at(v.nation).sea_recruits == 0 && old.nations.at(v.nation).land_recruits == 50
+                  && v72.size() + world_save_sea_recruits_section_bytes(v.w) == bytes.size(),
+              "R12u a v72 stream reads, its sea pool empty (land kept), and is today's less exactly the sea section");
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_recruits(v.w, o);
+            world w71;
+            check(from_bytes(o.str(), w71) && w71.nations.at(v.nation).sea_recruits == 0
+                      && w71.nations.at(v.nation).land_recruits == 0,
+                  "R12v a v71 stream reads with every pool empty, sea included");
+        }
+        const std::size_t sea_at = bytes.size() - 4; // the tail: [n=1][id][sea]
+        const auto refused = [&](std::size_t at, int32_t v32) {
+            std::string bad = bytes;
+            std::memcpy(&bad[at], &v32, sizeof v32);
+            world z;
+            return !from_bytes(bad, z) && z.nations.empty();
+        };
+        check(refused(sea_at, 0), "R12w a sea row holding 0 is refused whole");
+        check(refused(sea_at, -5), "R12x a negative sea pool is refused whole");
+        check(refused(sea_at, (1 << 30) + 1), "R12y a sea pool past 2^30 is refused whole");
+        check(refused(sea_at - 4, static_cast<int32_t>(0x7FFFFFF0)), "R12z a sea row naming no nation is refused whole");
+
+        // Determinism.
+        const auto run = [&]() {
+            fixture q; build(q);
+            add_centre(q, 3, 3); add_centre(q, 4, 3); add_centre(q, 25, 7);
+            add_building(q, 5, building_type::port);
+            add_building(q, 22, building_type::port);
+            add_building(q, 6, building_type::military_base);
+            add_building(q, 23, building_type::airbase);
+            for (int k = 0; k < 20; ++k)
+                (void)run_recruitment(q.w, reg);
+            return to_bytes(q.w);
+        };
+        check(run() == run(), "R12aa twenty quarters of ports and bases recruiting, twice: byte-identical");
     }
 
     std::printf("\nrecruits_harness: %d passed, %d failed\n", g_pass, g_fail);
