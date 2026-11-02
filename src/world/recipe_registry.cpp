@@ -1000,7 +1000,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
         }
 
         // BL-1463 (MILITARY.md § Recruits): economy.military.recruits. Absent = the C++
-        // defaults (which equal the shipped Lua). Every key must be one of the three;
+        // defaults (which equal the shipped Lua). Every key must be one of the four;
         // a count must be an integer in [0, k_recruit_rate_max = 1000], the LP cost finite in [0, 1000].
         // A bad value THROWS, never clamps (the authoring boundary's untrusted-input rule).
         {
@@ -1019,12 +1019,13 @@ void recipe_registry::load_from_lua(lua_state& lua)
                     if (kv.second.get_type() != sol::type::number)
                         throw std::runtime_error(ctx + "." + key + " must be a number");
                     const double v = kv.second.as<double>();
-                    if (key == "land_per_base" || key == "air_per_base")
+                    if (key == "land_per_base" || key == "air_per_base" || key == "sea_per_port")
                     {
                         if (!std::isfinite(v) || v < 0.0 || v > static_cast<double>(k_recruit_rate_max) || v != std::floor(v))
                             throw std::runtime_error(ctx + "." + key + " = " + std::to_string(v)
                                                      + " is not an integer in [0, " + std::to_string(k_recruit_rate_max) + "]");
-                        (key == "land_per_base" ? rp.land_per_base : rp.air_per_base) = static_cast<int>(v);
+                        (key == "land_per_base" ? rp.land_per_base
+                         : key == "air_per_base" ? rp.air_per_base : rp.sea_per_port) = static_cast<int>(v);
                     }
                     else if (key == "lp_per_recruit")
                     {

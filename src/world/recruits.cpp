@@ -19,20 +19,25 @@ namespace {
 /// owner, not idled by the state's funding plan.
 bool base_makes(const building_component& b, recruit_theatre t)
 {
-    const building_type want =
-        t == recruit_theatre::land ? building_type::military_base : building_type::airbase;
+    const building_type want = t == recruit_theatre::land ? building_type::military_base
+                             : t == recruit_theatre::air  ? building_type::airbase
+                                                          : building_type::port;
     return b.type == want && b.ticks_remaining <= 0 && !b.decommissioned && !b.state_idle;
 }
 
 int rate_of(const recipe_registry& reg, recruit_theatre t)
 {
     const recruit_params& rp = reg.military().recruits;
-    return std::max(0, t == recruit_theatre::land ? rp.land_per_base : rp.air_per_base);
+    return std::max(0, t == recruit_theatre::land ? rp.land_per_base
+                     : t == recruit_theatre::air  ? rp.air_per_base
+                                                  : rp.sea_per_port);
 }
 
 int32_t* pool_of(nation_component& n, recruit_theatre t)
 {
-    return t == recruit_theatre::land ? &n.land_recruits : &n.air_recruits;
+    return t == recruit_theatre::land ? &n.land_recruits
+         : t == recruit_theatre::air  ? &n.air_recruits
+                                      : &n.sea_recruits;
 }
 
 /// @p nation's running bases of theatre @p t, ascending building id.
@@ -82,7 +87,9 @@ int recruit_pool(const world& w, entity_id nation, recruit_theatre t)
     const auto nit = w.nations.find(nation);
     if (nit == w.nations.end())
         return 0;
-    return t == recruit_theatre::land ? nit->second.land_recruits : nit->second.air_recruits;
+    return t == recruit_theatre::land ? nit->second.land_recruits
+         : t == recruit_theatre::air  ? nit->second.air_recruits
+                                      : nit->second.sea_recruits;
 }
 
 int recruit_quarter_output(const world& w, const recipe_registry& reg, entity_id nation,
@@ -161,7 +168,8 @@ recruitment_tick run_recruitment(world& w, const recipe_registry& reg)
         recruitment_row row;
         row.nation = nid;
         bool any_base = false;
-        for (const recruit_theatre t : {recruit_theatre::land, recruit_theatre::air})
+        for (const recruit_theatre t :
+             {recruit_theatre::land, recruit_theatre::air, recruit_theatre::sea})
         {
             const std::vector<entity_id> bases = bases_of(w, nc, t);
             if (bases.empty())
@@ -209,8 +217,10 @@ recruitment_tick run_recruitment(world& w, const recipe_registry& reg)
                 made += got;
                 *pool += got;
             }
-            (t == recruit_theatre::land ? row.land_made : row.air_made)   = made;
-            (t == recruit_theatre::land ? row.land_short : row.air_short) = shortfall;
+            (t == recruit_theatre::land ? row.land_made
+             : t == recruit_theatre::air ? row.air_made : row.sea_made)   = made;
+            (t == recruit_theatre::land ? row.land_short
+             : t == recruit_theatre::air ? row.air_short : row.sea_short) = shortfall;
         }
         if (any_base)
             out.nations.push_back(row);

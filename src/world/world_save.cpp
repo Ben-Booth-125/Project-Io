@@ -1989,6 +1989,39 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, w.population_centres.at(cid).recruit_heads_taken);
         }
     }
+
+    // world_save_version 73 (Ben, 2026-11-02, ports make sea recruits): THE SEA POOLS,
+    // the last section, after the recruits (v72). Every nation holding sea recruits,
+    // ascending id, as (id, sea pool). Only deviations.
+    if (version >= k_world_save_version_sea_recruits)
+    {
+        std::vector<entity_id> nids;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.sea_recruits != 0)
+                nids.push_back(nid);
+        std::sort(nids.begin(), nids.end());
+        w_u32(out, static_cast<uint32_t>(nids.size()));
+        for (const entity_id nid : nids)
+        {
+            w_id(out, nid);
+            w_i32(out, w.nations.at(nid).sea_recruits);
+        }
+    }
+}
+
+void write_world_snapshot_pre_sea_recruits(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (Ben, 2026-11-02): the v72 stream shape — no sea-recruits section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_sea_recruits);
+}
+
+std::size_t world_save_sea_recruits_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.sea_recruits != 0)
+            n += 8;
+    return n;
 }
 
 void write_world_snapshot_pre_recruits(const world& w, std::ostream& out)
@@ -2253,7 +2286,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_war         // BL-1459: v68, no wars
             && version != k_world_save_version_pre_embargo     // BL-1418: v69, no embargoes
             && version != k_world_save_version_pre_gen_capital // BL-1460: v70, generation capital = capital
-            && version != k_world_save_version_pre_recruits))   // BL-1463: v71, no recruits
+            && version != k_world_save_version_pre_recruits     // BL-1463: v71, no recruits
+            && version != k_world_save_version_pre_sea_recruits)) // 2026-11-02: v72, no sea pools
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
@@ -3799,6 +3833,31 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             if (cit == s.population_centres.end())
                 return false;
             cit->second.recruit_heads_taken = carry;
+        }
+    }
+
+    // v73 (Ben, 2026-11-02, ports make sea recruits): the sea pools. Untrusted: rows
+    // strictly ascending, each a nation in the stream, the pool in [1, 2^30]. Refused
+    // whole otherwise. A v72 (and older) stream ends before it: every sea pool empty.
+    if (version >= k_world_save_version_sea_recruits)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            int32_t sea = 0;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev) || !r_i32(in, sea))
+                return false;
+            prev = nid;
+            if (sea < 1 || sea > (1 << 30))
+                return false;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            nit->second.sea_recruits = sea;
         }
     }
 
