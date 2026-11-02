@@ -76,7 +76,6 @@ const RESULT_CODES = new Set([
   // The later codes the seam's switch names (agent_protocol.cpp result_name):
   'rejected_era_locked', 'rejected_cooldown', 'rejected_no_lp', 'rejected_wrong_air',
   'rejected_terrain', // BL-1455: the unit's class cannot enter the ground without a road
-  'rejected_no_recruits', // BL-1463: the recruit pool cannot fill the hire
 ]);
 
 // The four BL-350 declines. If NONE of these is ever observable across a sweep of

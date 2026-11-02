@@ -642,38 +642,29 @@ void run_seed(lua_state& lua, std::uint32_t seed)
             const settle_tick_result r = run_settle_tick(c, reg, next_tick, 90 * (next_tick + 1),
                                                          /*spectating=*/false);
             const world::state_tick_ledger& L = c.state_ledger.at(victim);
-            bool all_idle = true, none_ran = true, free_runs = true, bases_run = true;
-            int  n_free = 0, n_bases = 0;
+            bool all_idle = true, none_ran = true, free_runs = true;
+            int  n_free = 0;
             std::set<entity_id> sa(c.nations.at(victim).state_assets.begin(),
                                    c.nations.at(victim).state_assets.end());
             // BL-1452 (Ben, 2026-10-29; LOGISTICS.md § Every capital holds a source): THE
             // CAPITAL'S SOURCE RUNS FREE - funded at a zero balance, never idled - so a zero
-            // treasury idles every state building EXCEPT it. BL-1463 (Ben, 2026-10-30;
-            // MILITARY.md § Recruits): and a military base or airbase carries no upkeep, so
-            // its bound is 0 and it is funded at any treasury too.
+            // treasury idles every state building EXCEPT it.
             for (const entity_id bid : sa)
             {
-                const building_type t = c.buildings.at(bid).type;
                 if (capital_free_source(c, bid))
                 {
                     ++n_free;
                     if (c.buildings.at(bid).state_idle) free_runs = false;
-                }
-                else if (t == building_type::military_base || t == building_type::airbase)
-                {
-                    ++n_bases;
-                    if (c.buildings.at(bid).state_idle) bases_run = false;
                 }
                 else if (!c.buildings.at(bid).state_idle)
                     all_idle = false;
             }
             for (const building_report& br : r.report.buildings)
                 if (sa.count(br.building) && br.output_quantity > 0.0f) none_ran = false;
-            check(all_idle && bases_run && L.funded == n_free + n_bases
-                      && L.idled == static_cast<int>(sa.size()) - n_free - n_bases,
+            check(all_idle && L.funded == n_free && L.idled == static_cast<int>(sa.size()) - n_free,
                   "S4", fmt("a zero treasury idles every one of nation %u's %zu state buildings "
-                            "except the capital's source (%d free) and its %d upkeep-free base(s)",
-                            static_cast<unsigned>(victim), sa.size(), n_free, n_bases));
+                            "except the capital's source (%d free)",
+                            static_cast<unsigned>(victim), sa.size(), n_free));
             check(n_free == 1 && free_runs, "S4",
                   "the capital's source stays funded at a zero treasury (it runs free)");
             // ...and it paid nothing for it: no credits, no wages, no goods (the ledger's

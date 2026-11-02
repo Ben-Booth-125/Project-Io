@@ -968,7 +968,6 @@ void recipe_registry::load_from_lua(lua_state& lua)
                     read_int(t, "range", 0, 100000, c.range, where);
                     read_int(t, "ad_vulnerability_permille", 0, 10000, c.ad_vulnerability_permille, where);
                     read_int(t, "muster_days", 1, 3650, c.muster_days, where);
-                    read_int(t, "crew", 0, 100000, c.crew, where); // BL-1463: the air recruits a hire spends
                     c.has_morale = t.get_or("has_morale", c.has_morale);
                     c.hire_cost  = t.get_or("hire_cost", c.hire_cost);
                     if (!std::isfinite(c.hire_cost) || c.hire_cost < 0.0f)
@@ -996,47 +995,6 @@ void recipe_registry::load_from_lua(lua_state& lua)
                 }
             }
             mp.air = ap;
-        }
-
-        // BL-1463 (MILITARY.md § Recruits): economy.military.recruits. Absent = the C++
-        // defaults (which equal the shipped Lua). Every key must be one of the three;
-        // a count must be an integer in [0, k_recruit_rate_max = 1000], the LP cost finite in [0, 1000].
-        // A bad value THROWS, never clamps (the authoring boundary's untrusted-input rule).
-        {
-            const sol::object ro = (*military)["recruits"];
-            if (ro.valid() && ro.get_type() != sol::type::lua_nil)
-            {
-                if (ro.get_type() != sol::type::table)
-                    throw std::runtime_error("military.recruits must be a table");
-                const std::string ctx = "military.recruits";
-                recruit_params rp = mp.recruits;
-                for (const auto& kv : ro.as<sol::table>())
-                {
-                    if (kv.first.get_type() != sol::type::string)
-                        throw std::runtime_error(ctx + " has a non-string key");
-                    const std::string key = kv.first.as<std::string>();
-                    if (kv.second.get_type() != sol::type::number)
-                        throw std::runtime_error(ctx + "." + key + " must be a number");
-                    const double v = kv.second.as<double>();
-                    if (key == "land_per_base" || key == "air_per_base")
-                    {
-                        if (!std::isfinite(v) || v < 0.0 || v > static_cast<double>(k_recruit_rate_max) || v != std::floor(v))
-                            throw std::runtime_error(ctx + "." + key + " = " + std::to_string(v)
-                                                     + " is not an integer in [0, " + std::to_string(k_recruit_rate_max) + "]");
-                        (key == "land_per_base" ? rp.land_per_base : rp.air_per_base) = static_cast<int>(v);
-                    }
-                    else if (key == "lp_per_recruit")
-                    {
-                        if (!std::isfinite(v) || v < 0.0 || v > 1000.0)
-                            throw std::runtime_error(ctx + ".lp_per_recruit = " + std::to_string(v)
-                                                     + " is outside [0, 1000]");
-                        rp.lp_per_recruit = static_cast<float>(v);
-                    }
-                    else
-                        throw std::runtime_error("Unknown key '" + key + "' in " + ctx);
-                }
-                mp.recruits = rp;
-            }
         }
 
         // BL-1453 (MILITARY.md § Recon): economy.military.recon. Absent = the C++

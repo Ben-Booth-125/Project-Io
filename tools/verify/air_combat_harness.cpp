@@ -191,11 +191,9 @@ void build(fixture& f, float shelf = 1000.0f)
 
     f.a = w.create_entity();
     nation_component na{}; na.name = "Aerie"; na.treasury = 100000.0f;
-    na.air_recruits = 10000; // BL-1463: a full air pool - this harness tests the air, not the recruits
     w.nations[f.a] = na;
     f.b = w.create_entity();
     nation_component nb{}; nb.name = "Bastion"; nb.treasury = 100000.0f;
-    nb.air_recruits = 10000; // BL-1463
     w.nations[f.b] = nb;
     w.player_entity = f.a;
     for (int r = 0; r < GH; ++r)
@@ -859,7 +857,6 @@ int main()
             g.b_airbase = null_entity;
             c = g.w.create_entity();
             nation_component nc{}; nc.name = "Corrie"; nc.treasury = 100000.0f;
-            nc.air_recruits = 10000; // BL-1463
             g.w.nations[c] = nc;
             for (int r = 0; r < GH; ++r)
                 for (int col = 56; col < 64; ++col) // strips 14-15, inside a drone's reach of B's base

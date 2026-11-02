@@ -564,7 +564,7 @@ void run_seed(lua_state& lua, std::uint32_t seed)
         bool eq70 = r70;
         for (const auto& [nid, nc] : back70.nations) eq70 = eq70 && nc.generation_capital_tile == nc.capital_tile;
         check(r71 && back71.nations.at(L).generation_capital_tile == old_capital && r70 && eq70
-                  && b70.size() == to_bytes(w).size() - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) /* BL-1463 (v73) */ - world_save_kit_goods_bytes(w), // BL-1422: v70 arrays are 49 wide
+                  && b70.size() == to_bytes(w).size() - world_save_gen_capital_section_bytes(w) - world_save_kit_goods_bytes(w), // BL-1422: v70 arrays are 49 wide
               "C9", "the v71 stream carries the generation capital through a save; a v70 stream (today's less the "
                     "section) loads every nation's generation capital equal to its capital");
     }

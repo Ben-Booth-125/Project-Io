@@ -1,5 +1,4 @@
 #include "state_industry.hpp"
-#include "recruits.hpp" // refund_muster_recruits
 
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability
 #include "construction.hpp"    // construct_state_building, construction_capex (the founding)
@@ -1054,9 +1053,6 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
                     ++rep.garrisons_unbased;
                 }
             const std::size_t before = w.musters.size();
-            for (const muster_order& m : w.musters) // Ben, 2026-10-31: a dropped muster refunds its men
-                if (m.base == bid)
-                    (void)refund_muster_recruits(w, m);
             w.musters.erase(std::remove_if(w.musters.begin(), w.musters.end(),
                                            [&](const muster_order& m) { return m.base == bid; }),
                             w.musters.end());

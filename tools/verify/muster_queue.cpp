@@ -66,7 +66,6 @@ void build(fixture& f, float treasury = 100000.0f)
     f.nation = w.create_entity();
     nation_component nc{};
     nc.name = "Hosts"; nc.treasury = treasury;
-    nc.land_recruits = 100000; // BL-1463: a full land pool - this harness tests the queue, not recruits
     f.base = w.create_entity();
     building_component b{};
     b.tile = f.tile; b.type = building_type::military_base; b.ticks_remaining = 0;

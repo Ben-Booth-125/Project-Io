@@ -205,7 +205,6 @@ void run_port_rows(const world& w0, const recipe_registry& reg, const std::vecto
                 const auto avail = available_rows(w, m, campaign_roster_band_for(reg.era()));
                 if (avail.empty()) continue;
                 tried = true;
-                w.nations.at(m).land_recruits = 100000; // BL-1463: the pool is not the refusal under test
                 const roster_row* row = avail.front();
                 const std::uint8_t type =
                     static_cast<std::uint8_t>(row - unit_roster_table().data());

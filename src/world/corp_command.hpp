@@ -433,7 +433,6 @@ enum class corp_command_result : uint8_t
     rejected_no_lp,           ///< BL-597: no passive Logistic Points at the source anchor for this leg.
     rejected_wrong_air,       ///< The recipe cannot run on this body's air: propellant_electrolysis only on an airless body, propellant_atmospheric only under air (Ben, 2026-10-09).
     rejected_terrain,         ///< BL-1455: the unit's class cannot enter the destination, or every route to it crosses ground the class cannot enter without a road (MILITARY.md § Terrain and the classes).
-    rejected_no_recruits,     ///< BL-1463: the nation's recruit pool cannot fill the hire - a unit's men from the land pool, a wing's crew from the air pool (MILITARY.md § Recruits). Refused before any money moves.
 };
 
 /// Refit to a newer type (Ben, 2026-10-27): the credits a refit of a unit of row
@@ -463,16 +462,6 @@ corp_command_result refit_check(const world& w, const recipe_registry& reg, enti
 /// `applied` means the verb would apply.
 corp_command_result unit_design_check(const world& w, entity_id nation, uint32_t cls,
                                       uint16_t slot, uint16_t item);
-
-/// Every check `hire_unit` makes BEFORE money moves, READ-ONLY, in its order — so the
-/// Raise press and a rival's scorer see the refusal the seam would give: @p row is a
-/// roster row (rejected_invalid) available to @p nation now (rejected_invalid); @p tile
-/// is a tile (rejected_invalid) carrying @p nation's own completed, not decommissioned
-/// military_base (rejected_placement); BL-1463 (MILITARY.md § Recruits): its land pool
-/// holds the hire's men, `hire_unit_recruits` (rejected_no_recruits). The payment legs
-/// follow in the seam. @p base_out receives the base (the lowest id on the tile).
-corp_command_result hire_unit_check(const world& w, const recipe_registry& reg, entity_id nation,
-                                    entity_id tile, uint16_t row, entity_id* base_out = nullptr);
 
 /// Every check `march_unit` makes, READ-ONLY save for the logistics path cache the
 /// route search warms, in its order — so a caller can ask before it acts (the

@@ -10,7 +10,6 @@
 #include "wing_card.hpp"          // BL-1450: air class / mission names
 
 #include "world/air_combat.hpp"   // BL-1450: the air roster, hire_wing_check
-#include "world/recruits.hpp"     // BL-1463: the recruit pools a Raise spends
 #include "world/unit_designs.hpp" // design_stats — a class row shows its live design
 #include "world/unit_roster.hpp"
 
@@ -102,33 +101,16 @@ std::string missing_air_gate(const roster_gate& g, const campaign_roster_gate_in
 /// A theatre's collapsible header (military.md § Grouped by theatre): its name and
 /// count; the press folds or unfolds its rows (a toggle by construction). Returns
 /// whether the rows draw.
-/// BL-1463 (MILITARY.md § Recruits, "Seen on the Recruit tab"): @p pool, when given, is
-/// the theatre's recruit pool line - held, the cap, the quarter's output - shown on the
-/// header itself so it reads whether the theatre is folded or open.
-bool theatre_header(military_ledger_state& m, int tab, int theatre, const char* name, int count,
-                    const char* pool = nullptr)
+bool theatre_header(military_ledger_state& m, int tab, int theatre, const char* name, int count)
 {
-    char label[160];
-    if (pool != nullptr && pool[0] != '\0')
-        std::snprintf(label, sizeof label, "%s  (%d)   %s###theatre_%d_%d", name, count, pool, tab, theatre);
-    else
-        std::snprintf(label, sizeof label, "%s  (%d)###theatre_%d_%d", name, count, tab, theatre);
+    char label[80];
+    std::snprintf(label, sizeof label, "%s  (%d)###theatre_%d_%d", name, count, tab, theatre);
     ImGui::SetNextItemOpen(m.theatre_open[tab][theatre], ImGuiCond_Always);
     const bool open = ImGui::CollapsingHeader(label);
     m.theatre_open[tab][theatre] = open;
     m.headers.push_back({tab, theatre, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                          (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f, open, count});
     return open;
-}
-
-/// BL-1463: a theatre's pool, in words: "Recruits 120 / 750, +50 a quarter".
-std::string recruit_pool_line(const world& w, const recipe_registry& reg, entity_id nation,
-                              recruit_theatre t)
-{
-    char buf[96];
-    std::snprintf(buf, sizeof buf, "Recruits %d / %d, +%d a quarter", recruit_pool(w, nation, t),
-                  recruit_cap(w, reg, nation, t), recruit_quarter_output(w, reg, nation, t));
-    return buf;
 }
 
 /// An air design's numbers on one line: the class's plus its live kit's.
@@ -208,8 +190,7 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
     for (const std::uint16_t idx : order)
         if (m.show_obsolete || !roster_row_obsolete(w, actor, idx))
             ++land_rows;
-    const std::string land_pool = recruit_pool_line(w, reg, actor, recruit_theatre::land);
-    if (!theatre_header(m, 0, 0, "Land", land_rows, land_pool.c_str()))
+    if (!theatre_header(m, 0, 0, "Land", land_rows))
     {
         draw_recruit_air(w, reg, s);
         return;
@@ -323,10 +304,6 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
         }
         else if (base_tile == null_entity)
             reason = "No military base to raise it at.";
-        else if (recruit_pool(w, actor, recruit_theatre::land) < hire_unit_recruits(idx))
-            // BL-1463 (MILITARY.md § Recruits): the seam's own refusal, in its words.
-            reason = recruit_shortfall_text(hire_unit_recruits(idx),
-                                            recruit_pool(w, actor, recruit_theatre::land)) + ".";
         else if (price > room)
             reason = "The treasury cannot cover it.";
         const bool enabled = reason.empty();
@@ -427,8 +404,7 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
     military_ledger_state& m = s.military;
     const entity_id actor = player_actor(w);
     const std::vector<air_roster_row>& table = air_roster_table();
-    const std::string air_pool = recruit_pool_line(w, reg, actor, recruit_theatre::air);
-    if (!theatre_header(m, 0, 1, "Air", static_cast<int>(table.size()), air_pool.c_str()))
+    if (!theatre_header(m, 0, 1, "Air", static_cast<int>(table.size())))
         return;
     ImGui::Indent(4.0f);
 
@@ -511,12 +487,7 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
         }
         else if (base_tile == null_entity)
             reason = "No airbase to raise it at.";
-        else if (const corp_command_result hc = hire_wing_check(w, reg, actor, base_tile, idx);
-                 hc == corp_command_result::rejected_no_recruits)
-            // BL-1463 (MILITARY.md § Recruits): the crew the air pool cannot fill.
-            reason = recruit_shortfall_text(wing_crew(reg, idx),
-                                            recruit_pool(w, actor, recruit_theatre::air)) + ".";
-        else if (hc != corp_command_result::applied)
+        else if (hire_wing_check(w, actor, base_tile, idx) != corp_command_result::applied)
             reason = "Cannot be raised at this airbase.";
         else if (price > room)
             reason = "The treasury cannot cover it.";

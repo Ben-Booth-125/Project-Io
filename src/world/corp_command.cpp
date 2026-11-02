@@ -28,7 +28,6 @@
 #include "unit_roster.hpp"
 #include "unit_designs.hpp" // BL-1434: the live design a hire and a refit read
 #include "air_combat.hpp"   // BL-1449: hire_wing / assign_air_mission / set_air_design
-#include "recruits.hpp"     // BL-1463: the recruit pools a hire spends
 #include "world.hpp"
 
 #include <algorithm>
@@ -700,58 +699,6 @@ float refit_credit_cost(const recipe_registry& reg, uint16_t from, uint16_t to)
     return std::max(0.0f, diff);
 }
 
-corp_command_result hire_unit_check(const world& w, const recipe_registry& reg, entity_id nation,
-                                    entity_id tile, uint16_t row_index, entity_id* base_out)
-{
-    const auto& table = unit_roster_table();
-    if (row_index >= table.size())
-        return corp_command_result::rejected_invalid;
-    const roster_row& row = table[row_index];
-
-    // Re-check availability against the LIVE gate rather than trusting a
-    // caller's cached list — mirrors construct_building's own re-validation
-    // of placement rather than the tile the UI last showed as buildable.
-    const auto avail = available_rows(w, nation, campaign_roster_band_for(reg.era()));
-    if (std::find(avail.begin(), avail.end(), &row) == avail.end())
-        return corp_command_result::rejected_invalid;
-
-    if (w.tiles.find(tile) == w.tiles.end())
-        return corp_command_result::rejected_invalid;
-
-    // BL-325 S2: hire moves onto the base. The tile must carry the actor's
-    // own COMPLETED military_base — supersedes hire-anywhere (BL-324). A
-    // base under construction (ticks_remaining > 0) or a decommissioned
-    // one does not qualify, mirroring the completed-hub idiom
-    // (supply_system.cpp's inland_logistics_hub check).
-    //
-    // BL-454: the WINNING base id is captured, not just a bool — it becomes the
-    // unit's `muster_base`, the key the upkeep pass uses to disband a unit whose
-    // base has been demolished. Lowest id wins rather than first-found, because
-    // w.buildings is an unordered_map and "first" is not a defined answer.
-    // BL-1402: "its own" is owner-generic (`owner_holds`).
-    entity_id muster_base = null_entity;
-    for (const auto& [bid, bc] : w.buildings)
-    {
-        if (bc.tile == tile && bc.type == building_type::military_base
-            && bc.ticks_remaining <= 0 && !bc.decommissioned && owner_holds(w, nation, bid))
-        {
-            if (muster_base == null_entity || bid < muster_base)
-                muster_base = bid;
-        }
-    }
-    if (muster_base == null_entity)
-        return corp_command_result::rejected_placement;
-
-    // BL-1463 (MILITARY.md § Recruits): A HIRE SPENDS ITS MEN, and one the land pool
-    // cannot fill is refused before money moves.
-    if (recruit_pool(w, nation, recruit_theatre::land) < hire_unit_recruits(row_index))
-        return corp_command_result::rejected_no_recruits;
-
-    if (base_out != nullptr)
-        *base_out = muster_base;
-    return corp_command_result::applied;
-}
-
 corp_command_result refit_check(const world& w, const recipe_registry& reg, entity_id nation,
                                 entity_id unit, uint16_t target)
 {
@@ -1014,15 +961,48 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
         case corp_verb::hire_unit:
         {
-            // Every check before money moves, read-only and shared with the Raise
-            // press and the scorers (`hire_unit_check`): the row, its availability,
-            // the base, and BL-1463's recruits.
+            const auto& table = unit_roster_table();
+            if (cmd.unit_type >= table.size())
+                return corp_command_result::rejected_invalid;
+            const roster_row& row = table[cmd.unit_type];
+
+            // Re-check availability against the LIVE gate rather than trusting a
+            // caller's cached list — mirrors construct_building's own re-validation
+            // of placement rather than the tile the UI last showed as buildable.
+            const auto avail = available_rows(w, cmd.corp, campaign_roster_band_for(reg.era()));
+            if (std::find(avail.begin(), avail.end(), &row) == avail.end())
+                return corp_command_result::rejected_invalid;
+
+            if (w.tiles.find(cmd.tile) == w.tiles.end())
+                return corp_command_result::rejected_invalid;
+
+            // BL-325 S2: hire moves onto the base. cmd.tile must carry the corp's
+            // own COMPLETED military_base — supersedes hire-anywhere (BL-324). A
+            // base under construction (ticks_remaining > 0) or a decommissioned
+            // one does not qualify, mirroring the completed-hub idiom
+            // (supply_system.cpp's inland_logistics_hub check).
             entity_id muster_base = null_entity;
-            if (const corp_command_result r =
-                    hire_unit_check(w, reg, cmd.corp, cmd.tile, cmd.unit_type, &muster_base);
-                r != corp_command_result::applied)
-                return r;
-            const roster_row& row = unit_roster_table()[cmd.unit_type];
+            {
+                // BL-454: the WINNING base id is captured, not just a bool — it
+                // becomes the unit's `muster_base`, the key the upkeep pass uses
+                // to disband a unit whose base has been demolished. Lowest id
+                // wins rather than first-found, because w.buildings is an
+                // unordered_map and "first" is not a defined answer.
+                // BL-1402: "its own" is owner-generic (`owner_holds`: a
+                // corporation's assets or a nation's state_assets).
+                for (const auto& [bid, bc] : w.buildings)
+                {
+                    if (bc.tile == cmd.tile && bc.type == building_type::military_base
+                        && bc.ticks_remaining <= 0 && !bc.decommissioned
+                        && owner_holds(w, cmd.corp, bid))
+                    {
+                        if (muster_base == null_entity || bid < muster_base)
+                            muster_base = bid;
+                    }
+                }
+                if (muster_base == null_entity)
+                    return corp_command_result::rejected_placement;
+            }
 
             // BL-394: the credit cost. Row 0's gate is all-zero, so the
             // resource debit below tested and spent nothing for the cheapest
@@ -1057,8 +1037,6 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
 
             debit_hire_goods(w, cmd.corp, &row, kit); // BL-1447: the plan the gate priced
             *purse_of(w, cmd.corp) -= hire_cost; // the actor exists: proven at the seam's top
-            // BL-1463: A HIRE SPENDS ITS MEN from the land pool (checked above).
-            w.nations.at(cmd.corp).land_recruits -= hire_unit_recruits(cmd.unit_type);
 
             // BL-1435: RAISING TAKES TIME (Ben, 2026-10-27; MILITARY.md § The muster
             // interface). The hire is paid now and QUEUED at the base; the unit
@@ -1084,7 +1062,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
         {
             // The airbase is the one door: every placement check first, read-only.
             entity_id base = null_entity;
-            const corp_command_result r = hire_wing_check(w, reg, cmd.corp, cmd.tile, cmd.unit_type, &base);
+            const corp_command_result r = hire_wing_check(w, cmd.corp, cmd.tile, cmd.unit_type, &base);
             if (r != corp_command_result::applied)
                 return r;
             const air_class cls = air_roster_table()[cmd.unit_type].cls;
@@ -1103,8 +1081,6 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 return corp_command_result::rejected_funds; // BL-1452: the goods' price counts too
             debit_kit_goods(w, cmd.corp, goods);
             *purse_of(w, cmd.corp) -= cs.hire_cost;
-            // BL-1463: a wing spends its crew from the air pool (hire_wing_check proved it).
-            w.nations.at(cmd.corp).air_recruits -= wing_crew(reg, cmd.unit_type);
 
             const entity_id wid = w.create_entity();
             air_wing wg;

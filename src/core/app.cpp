@@ -73,7 +73,6 @@
 #include "world/orbital_system.hpp"
 #include "world/resource_names.hpp" // BL-652: name the good in the unpriced-basket warning
 #include "world/supply_system.hpp"
-#include "world/recruits.hpp" // BL-1463: a refused Raise names the recruit pool
 
 #include <algorithm>
 #include <future>
@@ -3172,12 +3171,6 @@ void app::render()
                 // resource draw — the seam refuses both through one result.
                 m_ui.construction.last_message = "Can't afford or supply it.";
                 m_ui.military.raise_refused = true; break;
-            case corp_command_result::rejected_no_recruits:
-                // BL-1463 (MILITARY.md § Recruits): the land pool cannot fill its men.
-                m_ui.construction.last_message =
-                    recruit_shortfall_text(hire_unit_recruits(cmd.unit_type),
-                                           recruit_pool(m_world, player_actor(m_world), recruit_theatre::land)) + ".";
-                m_ui.military.raise_refused = true; break;
             default:
                 m_ui.construction.last_message = "Hiring failed.";
                 m_ui.military.raise_refused = true; break;
@@ -3516,12 +3509,6 @@ void app::render()
                 m_ui.military.air_message = "Can't afford or supply it."; break;
             case corp_command_result::rejected_placement:
                 m_ui.military.air_message = "No airbase of yours there."; break;
-            case corp_command_result::rejected_no_recruits:
-                // BL-1463 (MILITARY.md § Recruits): the air pool cannot fill its crew.
-                m_ui.military.air_message =
-                    recruit_shortfall_text(wing_crew(m_registry, cmd.unit_type),
-                                           recruit_pool(m_world, player_actor(m_world), recruit_theatre::air)) + ".";
-                break;
             default:
                 m_ui.military.air_message = "Raising the wing failed."; break;
         }
