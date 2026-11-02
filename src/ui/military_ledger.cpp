@@ -102,16 +102,33 @@ std::string missing_air_gate(const roster_gate& g, const campaign_roster_gate_in
 /// A theatre's collapsible header (military.md § Grouped by theatre): its name and
 /// count; the press folds or unfolds its rows (a toggle by construction). Returns
 /// whether the rows draw.
-bool theatre_header(military_ledger_state& m, int tab, int theatre, const char* name, int count)
+/// BL-1463 (MILITARY.md § Recruits, "Seen on the Recruit tab"): @p pool, when given, is
+/// the theatre's recruit pool line - held, the cap, the quarter's output - shown on the
+/// header itself so it reads whether the theatre is folded or open.
+bool theatre_header(military_ledger_state& m, int tab, int theatre, const char* name, int count,
+                    const char* pool = nullptr)
 {
-    char label[80];
-    std::snprintf(label, sizeof label, "%s  (%d)###theatre_%d_%d", name, count, tab, theatre);
+    char label[160];
+    if (pool != nullptr && pool[0] != '\0')
+        std::snprintf(label, sizeof label, "%s  (%d)   %s###theatre_%d_%d", name, count, pool, tab, theatre);
+    else
+        std::snprintf(label, sizeof label, "%s  (%d)###theatre_%d_%d", name, count, tab, theatre);
     ImGui::SetNextItemOpen(m.theatre_open[tab][theatre], ImGuiCond_Always);
     const bool open = ImGui::CollapsingHeader(label);
     m.theatre_open[tab][theatre] = open;
     m.headers.push_back({tab, theatre, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                          (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f, open, count});
     return open;
+}
+
+/// BL-1463: a theatre's pool, in words: "Recruits 120 / 750, +50 a quarter".
+std::string recruit_pool_line(const world& w, const recipe_registry& reg, entity_id nation,
+                              recruit_theatre t)
+{
+    char buf[96];
+    std::snprintf(buf, sizeof buf, "Recruits %d / %d, +%d a quarter", recruit_pool(w, nation, t),
+                  recruit_cap(w, reg, nation, t), recruit_quarter_output(w, reg, nation, t));
+    return buf;
 }
 
 /// An air design's numbers on one line: the class's plus its live kit's.
@@ -191,7 +208,8 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
     for (const std::uint16_t idx : order)
         if (m.show_obsolete || !roster_row_obsolete(w, actor, idx))
             ++land_rows;
-    if (!theatre_header(m, 0, 0, "Land", land_rows))
+    const std::string land_pool = recruit_pool_line(w, reg, actor, recruit_theatre::land);
+    if (!theatre_header(m, 0, 0, "Land", land_rows, land_pool.c_str()))
     {
         draw_recruit_air(w, reg, s);
         return;
@@ -409,7 +427,8 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
     military_ledger_state& m = s.military;
     const entity_id actor = player_actor(w);
     const std::vector<air_roster_row>& table = air_roster_table();
-    if (!theatre_header(m, 0, 1, "Air", static_cast<int>(table.size())))
+    const std::string air_pool = recruit_pool_line(w, reg, actor, recruit_theatre::air);
+    if (!theatre_header(m, 0, 1, "Air", static_cast<int>(table.size()), air_pool.c_str()))
         return;
     ImGui::Indent(4.0f);
 
