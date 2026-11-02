@@ -6,13 +6,10 @@
 #include "components.hpp"
 #include "logistic_points.hpp" // lp_tick::supply_share
 #include "recipe_registry.hpp"
-#include "unit_designs.hpp"    // BL-1423: kit_goods, unit_land_class - a refill's equipment
 #include "unit_roster.hpp"     // hire_batch_manpower
 #include "world.hpp"
 
 #include <algorithm>
-#include <cmath>
-#include <limits>
 #include <cstdio>
 #include <map>
 
@@ -221,69 +218,6 @@ recruitment_tick run_recruitment(world& w, const recipe_registry& reg)
     return out;
 }
 
-std::array<float, resource_count> refill_goods_per_man(const unit_component& u)
-{
-    std::array<float, resource_count> per{};
-    const std::vector<roster_row>& table = unit_roster_table();
-    if (u.type >= table.size())
-        return per;
-    const roster_row& row = table[u.type];
-    // What a hire of this unit bought: its recorded design's kit goods (none for base
-    // kit) and each gated axis's flat cost at the axis's first candidate - the unit's
-    // OWN kit, so a stale design refills on the kit it fights with.
-    per = kit_goods(unit_land_class(u), u.kit);
-    for (std::size_t i = 0; i < hire_axis_count; ++i)
-        if (gate_axis_q(row.gate, static_cast<hire_axis>(i)) > 0)
-            per[static_cast<std::size_t>(hire_axis_resources(static_cast<hire_axis>(i)).candidates[0])]
-                += hire_axis_cost;
-    for (float& q : per)
-        q /= static_cast<float>(hire_batch_manpower);
-    return per;
-}
-
-namespace {
-
-/// A hair over float noise, so a shelf holding exactly n men's goods equips n.
-constexpr float k_refit_eps = 1e-4f;
-
-/// The men @p avail goods equip at @p per a man (INT_MAX when nothing is needed).
-int men_equipped(const std::array<float, resource_count>& avail,
-                 const std::array<float, resource_count>& per)
-{
-    int64_t n = std::numeric_limits<int32_t>::max();
-    for (std::size_t r = 0; r < resource_count; ++r) // resource order: a fixed walk
-        if (per[r] > 0.0f)
-            n = std::min<int64_t>(n, static_cast<int64_t>(std::floor(std::max(0.0f, avail[r]) / per[r] + k_refit_eps)));
-    return static_cast<int>(std::max<int64_t>(0, n));
-}
-
-/// What @p nation can buy of resource @p r right now, mirroring `buy_from_corp_shelves`
-/// shelf by shelf: priced, admitted shelves in its market order. Quantity only.
-float shelf_buyable(const world& w, entity_id nation, std::size_t r)
-{
-    float total = 0.0f;
-    for (const entity_id mid : corp_markets(w, nation))
-    {
-        const market_component& mc = w.markets.at(mid);
-        if (!(mc.base_price[r] > 0.0f) || !shelf_admits(mc, r, 0.0f, /*off_buys=*/true))
-            continue;
-        total += std::max(0.0f, mc.inventory[r]);
-    }
-    return total;
-}
-
-/// The highest posted price @p nation could pay for @p r on its shelves.
-float shelf_price_bound(const world& w, entity_id nation, std::size_t r)
-{
-    float px = 0.0f;
-    for (const entity_id mid : corp_markets(w, nation))
-        if (const auto mit = w.markets.find(mid); mit != w.markets.end())
-            px = std::max(px, posted_price(mit->second, r));
-    return px;
-}
-
-} // namespace
-
 std::vector<recruit_refill> plan_recruit_refills(const world& w)
 {
     std::vector<recruit_refill> plan;
@@ -295,10 +229,6 @@ std::vector<recruit_refill> plan_recruit_refills(const world& w)
         ids.push_back(uid);
     std::sort(ids.begin(), ids.end());
     std::map<entity_id, int64_t> left; // nation -> land pool not yet planned
-    // BL-1423: nation -> the shelf stock not yet planned, read the first time a unit of
-    // that nation asks (ascending unit id decides who goes short, as the pool does).
-    std::map<entity_id, std::array<float, resource_count>> stock;
-    std::map<entity_id, float> room; // nation -> purse room not yet planned
     for (const entity_id uid : ids)
     {
         const unit_component& u = w.units.at(uid);
@@ -313,36 +243,10 @@ std::vector<recruit_refill> plan_recruit_refills(const world& w)
         auto lit = left.find(u.owner);
         if (lit == left.end())
             lit = left.emplace(u.owner, std::max<int32_t>(0, nit->second.land_recruits)).first;
-        int planned = static_cast<int>(std::min<int64_t>(lacks, lit->second));
+        const int planned = static_cast<int>(std::min<int64_t>(lacks, lit->second));
         if (planned <= 0)
             continue;
-        const std::array<float, resource_count> per = refill_goods_per_man(u);
-        auto sit = stock.find(u.owner);
-        if (sit == stock.end())
-        {
-            std::array<float, resource_count> s{};
-            for (std::size_t r = 0; r < resource_count; ++r)
-                s[r] = shelf_buyable(w, u.owner, r);
-            sit = stock.emplace(u.owner, s).first;
-        }
-        planned = std::min(planned, men_equipped(sit->second, per));
-        // And the purse room, at the highest posted price, after the units before it.
-        float per_cost = 0.0f;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (per[r] > 0.0f)
-                per_cost += per[r] * shelf_price_bound(w, u.owner, r);
-        auto rit = room.find(u.owner);
-        if (rit == room.end())
-            rit = room.emplace(u.owner, std::max(0.0f, purse_room_of(w, u.owner))).first;
-        if (per_cost > 0.0f)
-            planned = std::min<int>(planned, static_cast<int>(std::floor(rit->second / per_cost)));
-        if (planned <= 0)
-            continue;
-        rit->second = std::max(0.0f, rit->second - per_cost * static_cast<float>(planned));
         lit->second -= planned;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (per[r] > 0.0f)
-                sit->second[r] -= per[r] * static_cast<float>(planned);
         plan.push_back({uid, u.owner, planned});
     }
     return plan;
@@ -353,8 +257,7 @@ float recruit_refill_lp_need(const recipe_registry& reg, const recruit_refill& r
     return static_cast<float>(r.planned) * reg.military().recruits.lp_per_recruit;
 }
 
-int apply_recruit_refills(world& w, const std::vector<recruit_refill>& plan, const lp_tick& lp,
-                          refit_tally* tally)
+int apply_recruit_refills(world& w, const std::vector<recruit_refill>& plan, const lp_tick& lp)
 {
     int delivered = 0;
     for (const recruit_refill& r : plan) // ascending unit id
@@ -378,40 +281,9 @@ int apply_recruit_refills(world& w, const std::vector<recruit_refill>& plan, con
         n = std::min<int>(n, std::max<int32_t>(0, nit->second.land_recruits));
         if (n <= 0)
             continue;
-        // BL-1423: EACH MAN COMES WITH HIS EQUIPMENT. Bounded by what the shelves hold
-        // now (the plan reserved it, so this re-bound binds only if a shelf moved) and by
-        // the purse room at the highest posted price; then bought, ascending resource.
-        const std::array<float, resource_count> per = refill_goods_per_man(u);
-        const int granted = n;
-        {
-            std::array<float, resource_count> avail{};
-            float per_cost = 0.0f;
-            for (std::size_t g = 0; g < resource_count; ++g)
-                if (per[g] > 0.0f)
-                {
-                    avail[g] = shelf_buyable(w, r.nation, g);
-                    per_cost += per[g] * shelf_price_bound(w, r.nation, g);
-                }
-            n = std::min(n, men_equipped(avail, per));
-            if (per_cost > 0.0f)
-                n = std::min<int>(n, static_cast<int>(std::max(0.0f, std::floor(purse_room_of(w, r.nation) / per_cost))));
-        }
-        if (tally != nullptr)
-            tally->short_of_goods += granted - std::max(0, n);
-        if (n <= 0)
-            continue;
-        for (std::size_t g = 0; g < resource_count; ++g)
-            if (per[g] > 0.0f)
-            {
-                const float bought = buy_from_corp_shelves(w, r.nation, g, per[g] * static_cast<float>(n), 0.0f);
-                if (tally != nullptr)
-                    tally->goods[g] += bought;
-            }
         u.count += n;
         nit->second.land_recruits -= n;
         delivered += n;
-        if (tally != nullptr)
-            tally->men += n;
     }
     return delivered;
 }
