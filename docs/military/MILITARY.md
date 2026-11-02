@@ -462,6 +462,28 @@ A **bunker** is a building. Units on its tile gain defence, and the tile's defen
 — concrete makes infantry hard to soft attack. Strikes and artillery degrade it; it repairs over
 time.
 
+- **What it gives.** A nation's units defending a tile that carries its own completed bunker fight
+  from it: each unit's defence gains half of itself, and two fifths of its soft share is made
+  hard to **soft** attack: soft fire lands on `(1000 − hardness) × 0.6` of it, while hard fire
+  still meets only the unit's own hardness, so hardness and cover together stay inside 0..1000.
+  Concrete never lets a tank hit infantry harder than in the open, as plain hardness would
+  (armour's hard attack exceeds its soft). Both scale with the bunker's **condition**, 0..1000,
+  so a wrecked bunker gives nothing. Only the units **standing on** the bunker's tile fight from
+  it; a defender that joins the battle from an adjacent tile fights in the open. It never helps
+  an attacker, and a bunker on ground that changed hands helps nobody but the nation that owns it.
+  A decommissioned bunker gives nothing and does not take the tile's one bunker slot.
+- **What wears it.** Each fighting artillery unit of the attacker takes 12 per-mille of condition a
+  day, by its carried attack; a strategic air mission targets a bunker as it targets a factory.
+  A rival's air scorer never aims a mission at one (`../ai/AI_OPPONENT.md` § 11: the bunker grant
+  admits no degrading of another nation's bunker), though a mission flown there for other reasons
+  may hit it.
+- **What mends it.** The one repair pass that mends a bombed building, drawing goods at its tile.
+- **Where.** Any land tile of the builder's own ground the build door admits, one bunker to a tile.
+  It produces nothing and staffs at zero.
+- **Who builds.** The player through the build verb. A rival nation builds them on its own front
+  toward a hostile neighbour, where its own units stand, one at a time (`../ai/AI_OPPONENT.md`
+  § 11, "Rival nations build bunkers on their own ground").
+
 ### Fronts
 
 **A front is one contiguous span of a nation's border with one neighbour (Ben, 2026-10-27).** A

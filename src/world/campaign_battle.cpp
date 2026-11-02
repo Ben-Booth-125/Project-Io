@@ -46,17 +46,36 @@ int64_t side_hardness(const std::vector<land_combatant>& side)
     return men > 0 ? hard / men : 0;
 }
 
-/// Milli-hits a side deals against a target of @p target_hardness: per unit,
-/// men x (soft x (1 - h) + hard x h), scaled by the unit's morale and supply.
-/// Deterministic: no draw.
-int64_t side_hits(const std::vector<land_combatant>& side, int64_t target_hardness)
+/// BL-1426: the men-weighted COVER of a side's fighting units, per-mille — the share
+/// of their soft part a bunker screens from soft attack (`land_combatant::cover`).
+/// Each unit's cover is held inside 1000 - its hardness, so hardness + cover <= 1000
+/// for the side too. 0 for a side with no bunker, which leaves the round unchanged.
+int64_t side_cover(const std::vector<land_combatant>& side)
 {
+    int64_t men = 0, cover = 0;
+    for (const land_combatant& c : side)
+        if (land_combatant_fighting(c))
+        {
+            men   += c.men;
+            cover += static_cast<int64_t>(c.men)
+                   * std::clamp(c.cover, 0, 1000 - std::clamp(c.stats.hardness, 0, 1000));
+        }
+    return men > 0 ? cover / men : 0;
+}
+
+/// Milli-hits a side deals against a target of @p target_hardness and
+/// @p target_cover: per unit, men x (soft x (1 - h - cover) + hard x h), scaled by
+/// the unit's morale and supply. The cover takes soft fire away and gives none to
+/// hard fire (BL-1426). Deterministic: no draw.
+int64_t side_hits(const std::vector<land_combatant>& side, int64_t target_hardness, int64_t target_cover = 0)
+{
+    const int64_t soft_share = std::max<int64_t>(0, 1000 - target_hardness - std::max<int64_t>(0, target_cover));
     int64_t hits = 0;
     for (const land_combatant& c : side)
     {
         if (!land_combatant_fighting(c))
             continue;
-        const int64_t per_man = (static_cast<int64_t>(std::max(0, c.stats.soft)) * (1000 - target_hardness)
+        const int64_t per_man = (static_cast<int64_t>(std::max(0, c.stats.soft)) * soft_share
                                + static_cast<int64_t>(std::max(0, c.stats.hard)) * target_hardness) / 1000;
         hits += static_cast<int64_t>(c.men) * per_man
               * clamp_permille(c.morale) / 1000 * clamp_permille(c.supply) / 1000
@@ -295,6 +314,29 @@ int side_readiness(const std::vector<land_combatant>& side)
     return men > 0 ? static_cast<int>(ready / men) : 0;
 }
 
+void fortify_combatant(land_combatant& c, int condition_permille, const campaign_battle_params& p)
+{
+    const int64_t cond = clamp_permille(condition_permille);
+    if (cond <= 0)
+        return;
+    const int64_t def = std::max(0, c.stats.defence);
+    const int64_t add = def * std::max(0, p.bunker_defence_permille) / 1000 * cond / 1000;
+    c.stats.defence = static_cast<int>(std::min<int64_t>(def + add, INT32_MAX));
+    // THE CONCRETE SCREENS SOFT FIRE (see `land_combatant::cover`): the share of the
+    // unit's soft part it covers, so hardness + cover stays inside 0..1000.
+    const int64_t h = clamp_permille(c.stats.hardness);
+    const int64_t cover = (1000 - h) * clamp_permille(p.bunker_hardness_permille) / 1000 * cond / 1000;
+    c.cover = static_cast<int>(std::min<int64_t>(1000 - h, std::max(0, c.cover) + cover));
+}
+
+int bunker_shelling_day(const std::vector<int>& artillery_attack_permille, const campaign_battle_params& p)
+{
+    int64_t loss = 0;
+    for (const int a : artillery_attack_permille)
+        loss += int64_t{std::max(0, p.bunker_shelling_permille)} * clamp_permille(a) / 1000;
+    return static_cast<int>(std::min<int64_t>(loss, 1000));
+}
+
 bool battle_entrenched(int64_t a, int64_t b, const campaign_battle_params& params)
 {
     if (a <= 0 || b <= 0)
@@ -366,7 +408,7 @@ bool step_campaign_battle(campaign_battle_state&        st,
     const int64_t terrain_d = terrain_defence(st.terrain_sub, st.terrain_cov,
                                               st.terrain_density, st.terrain_lf);
     const int64_t ground = 1000 + std::max<int64_t>(0, terrain_d) * params.terrain_attack_scale / 1000;
-    const int64_t atk_hits = side_hits(attacker, side_hardness(defender)) * 1000 / ground;
+    const int64_t atk_hits = side_hits(attacker, side_hardness(defender), side_cover(defender)) * 1000 / ground;
     const int64_t def_hits = side_hits(defender, side_hardness(attacker));
     // The rout and entrenchment terms read the raw hits (the ground included).
     const int64_t atk_raw = atk_hits;

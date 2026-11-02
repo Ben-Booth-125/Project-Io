@@ -568,6 +568,118 @@ int main()
               "C7 a fight that lands nothing runs until withdrawn - the headless runner stops on its budget");
     }
 
+    // -----------------------------------------------------------------------
+    // C8 BL-1426 THE BUNKER (MILITARY.md § Fortifications)
+    // -----------------------------------------------------------------------
+    std::printf("\n--- C8 the bunker: defence and hardness by condition; shelling ---\n");
+    {
+        const campaign_battle_params p{};
+        land_combatant inf = unit_of(1, land_class::infantry, 100);
+        land_combatant full = inf, half = inf, none = inf;
+        fortify_combatant(full, 1000, p);
+        fortify_combatant(half, 500, p);
+        fortify_combatant(none, 0, p);
+        std::printf("      infantry defence/hardness+cover: open %d/%d+%d, full %d/%d+%d, half %d/%d+%d, wrecked %d/%d+%d\n",
+                    inf.stats.defence, inf.stats.hardness, inf.cover, full.stats.defence, full.stats.hardness,
+                    full.cover, half.stats.defence, half.stats.hardness, half.cover, none.stats.defence,
+                    none.stats.hardness, none.cover);
+        check(full.stats.defence == inf.stats.defence * 3 / 2 && full.cover == 400
+                  && full.stats.hardness == inf.stats.hardness,
+              "C8 a full bunker raises infantry's defence by half and makes two fifths of it hard to soft attack");
+        check(half.stats.defence > inf.stats.defence && half.stats.defence < full.stats.defence
+                  && half.cover == 200,
+              "C8 the cover scales with the bunker's condition");
+        check(none.stats.defence == inf.stats.defence && none.cover == 0
+                  && none.stats.soft == inf.stats.soft,
+              "C8 a wrecked bunker (condition 0) gives nothing");
+        land_combatant tank = unit_of(2, land_class::armour, 100);
+        campaign_battle_params over = p;
+        over.bunker_hardness_permille = 5000; // out of range: hardness + cover must stay inside 0..1000
+        fortify_combatant(tank, 1000, over);
+        fortify_combatant(tank, 1000, over); // and twice over
+        check(tank.stats.hardness == 900 && tank.cover >= 0 && tank.stats.hardness + tank.cover <= 1000,
+              "C8 hardness plus the bunker's cover stays inside 0..1000 however the parameter is set");
+
+        // The fight: base infantry on plains, 500 defenders, the attacker swept.
+        std::printf("      ratio    open ground             bunker (full)           bunker (wrecked)\n");
+        bool wrecked_same = true;
+        int open_break = 0, bunker_break = 0; // lowest swept ratio (x100) at which the defender breaks
+        for (const int pct : {100, 125, 150, 175, 200, 250, 300, 400})
+        {
+            const std::vector<land_combatant> a = side_of(land_class::infantry, 500 * pct / 100);
+            const std::vector<land_combatant> d = side_of(land_class::infantry, 500, 201);
+            std::vector<land_combatant> df = d, dw = d;
+            for (land_combatant& c : df) fortify_combatant(c, 1000, p);
+            for (land_combatant& c : dw) fortify_combatant(c, 0, p);
+            const campaign_battle_outcome o = fight(id_at(1), a, d);
+            const campaign_battle_outcome f = fight(id_at(1), a, df);
+            const campaign_battle_outcome x = fight(id_at(1), a, dw);
+            wrecked_same = wrecked_same && same_outcome(o, x);
+            if (o.end == campaign_battle_end::defender_broken && open_break == 0) open_break = pct;
+            if (f.end == campaign_battle_end::defender_broken && bunker_break == 0) bunker_break = pct;
+            std::printf("      %3d:100  %-17s d%-4d  %-17s d%-4d  %-17s d%d\n", pct,
+                        end_name(o.end), o.rounds_fought, end_name(f.end), f.rounds_fought,
+                        end_name(x.end), x.rounds_fought);
+        }
+        std::printf("      the defender first breaks at %d:100 in the open, %d:100 in a full bunker\n",
+                    open_break, bunker_break);
+        check(wrecked_same, "C8 a defender in a wrecked bunker fights exactly the open-ground battle");
+        check(open_break > 0 && (bunker_break == 0 || bunker_break > open_break),
+              "C8 TARGET a full bunker raises the force ratio needed to break its defenders");
+
+        // Armour attacking: its hard attack meets the concrete, so the bunker cuts its
+        // hits by a smaller share than infantry's (hardness turns SOFT attack away).
+        {
+            const std::vector<land_combatant> d = side_of(land_class::infantry, 500, 201);
+            std::vector<land_combatant> df = d;
+            for (land_combatant& c : df) fortify_combatant(c, 1000, p);
+            const std::vector<land_combatant> ai = side_of(land_class::infantry, 750);
+            const std::vector<land_combatant> aa = side_of(land_class::armour, 250);
+            const campaign_battle_outcome io = fight(id_at(1), ai, d), ib = fight(id_at(1), ai, df);
+            const campaign_battle_outcome ao = fight(id_at(1), aa, d), ab = fight(id_at(1), aa, df);
+            const int ip  = io.rounds.empty() ? 0 : io.rounds[0].attacker_power;
+            const int ibp = ib.rounds.empty() ? 0 : ib.rounds[0].attacker_power;
+            const int apw = ao.rounds.empty() ? 0 : ao.rounds[0].attacker_power;
+            const int abp = ab.rounds.empty() ? 0 : ab.rounds[0].attacker_power;
+            std::printf("      infantry 750 vs 500: open %s d%d, bunker %s d%d; armour 250 vs 500: open %s d%d, bunker %s d%d\n",
+                        end_name(io.end), io.rounds_fought, end_name(ib.end), ib.rounds_fought,
+                        end_name(ao.end), ao.rounds_fought, end_name(ab.end), ab.rounds_fought);
+            std::printf("      day-one hits landed: infantry %d -> %d (%d%%), armour %d -> %d (%d%%)\n",
+                        ip, ibp, ip > 0 ? ibp * 100 / ip : 0, apw, abp, apw > 0 ? abp * 100 / apw : 0);
+            check(ibp < ip && abp < apw,
+                  "C8 the bunker cuts the hits landed on its defenders on day one - armour's too (it never helps a tank)");
+        }
+        // The cover screens SOFT fire only: with the defence term off, a pure hard-attack
+        // attacker lands exactly what it lands in the open on a hard (mechanised) defender.
+        {
+            campaign_battle_params cover_only = p;
+            cover_only.bunker_defence_permille = 0;
+            const std::vector<land_combatant> d = side_of(land_class::mechanised, 500, 201);
+            std::vector<land_combatant> df = d;
+            for (land_combatant& c : df) fortify_combatant(c, 1000, cover_only);
+            std::vector<land_combatant> hard_only = side_of(land_class::armour, 250);
+            for (land_combatant& c : hard_only) c.stats.soft = 0;
+            std::vector<land_combatant> soft_only = side_of(land_class::infantry, 750);
+            for (land_combatant& c : soft_only) c.stats.hard = 0;
+            const campaign_battle_outcome ho = fight(id_at(1), hard_only, d), hb = fight(id_at(1), hard_only, df);
+            const campaign_battle_outcome so = fight(id_at(1), soft_only, d), sb = fight(id_at(1), soft_only, df);
+            const int hop = ho.rounds.empty() ? -1 : ho.rounds[0].attacker_power;
+            const int hbp = hb.rounds.empty() ? -2 : hb.rounds[0].attacker_power;
+            const int sop = so.rounds.empty() ? 0 : so.rounds[0].attacker_power;
+            const int sbp = sb.rounds.empty() ? 0 : sb.rounds[0].attacker_power;
+            std::printf("      cover only, mechanised defender: hard fire %d -> %d, soft fire %d -> %d\n",
+                        hop, hbp, sop, sbp);
+            check(hop == hbp && sbp < sop,
+                  "C8 the concrete screens soft fire and leaves hard fire as it was");
+        }
+
+        // Shelling: per fighting artillery unit, by its carried attack.
+        check(bunker_shelling_day({1000, 1000, 1000}, p) == 3 * p.bunker_shelling_permille,
+              "C8 three fully armed batteries take three times the day's shelling off the bunker");
+        check(bunker_shelling_day({500}, p) == p.bunker_shelling_permille / 2 && bunker_shelling_day({}, p) == 0,
+              "C8 shelling scales by the battery's carried attack; no artillery, no wear");
+    }
+
     std::printf("\n=== %s (%d pass, %d fail) ===\n",
                 g_fail == 0 ? "ALL PASS" : "FAILURES PRESENT", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

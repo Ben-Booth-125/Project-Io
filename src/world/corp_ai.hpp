@@ -512,6 +512,22 @@ bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
 /// run_corp_strategic_step for each due nation; exported for the harness.
 void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, int tick);
 
+/// The rival air pass's score for mission @p m over @p province, as @p nation would
+/// weigh it (the per-province term `score_nation_air` maximises). Read-only; exported
+/// for the harness - BL-1426: a province holding only a hostile bunker scores 0 for
+/// strategic bombing, the bunker grant admitting no strike on another's bunker.
+int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m, uint32_t province);
+
+/// BL-1426 (AI_OPPONENT.md § 11, "Rival nations build bunkers on their own ground",
+/// Ben 2026-10-31; MILITARY.md § Fortifications): a rival nation's bunker pass - in
+/// live play, at most ONE bunker an evaluation, through the build verb, on a tile of
+/// its own front toward a nation hostile either way where its own units stand: the
+/// most men covered per credit of capex, ties to the lowest tile, under a cap of four
+/// bunkers built or building and only while its uncommitted treasury holds twice the
+/// capex. Never another nation's ground, never for the player's nation, never a line.
+/// Called by run_corp_strategic_step for each due nation; exported for the harness.
+void score_nation_bunkers(world& w, const recipe_registry& reg, entity_id nation, int tick);
+
 /// BL-1461 (AI_OPPONENT.md § 11: the stance grant covers a rival declaring war; "Rival
 /// nations wage war whole" covers the rest; RELATIONS.md § 7): a rival nation's war
 /// pass over its OWN wars - answer a declaration against it, impose at a score of 100

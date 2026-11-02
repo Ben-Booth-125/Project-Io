@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*39 entries — 33 open, 6 resolved.*
+*40 entries — 34 open, 6 resolved.*
 
 ---
 
@@ -440,6 +440,22 @@ MILITARY.md § Domains and traversal lets land classes onto coastal water only w
 > **Recommendation:** Accept; a bridge is ground. Write it into § Domains and traversal.
 
 *Files: `src/world/battle_system.cpp`, `docs/military/MILITARY.md`*
+
+### NR-1124 — Bunkers: four first-cut calls (hardness as a soft-fire screen, strength, rival uptake, numbers)
+*decision · raised 2026-11-02 · from Sprint 61 kit lane, BL-1426 (bunkers) merged at 18b6b22e, 2026-11-02*
+
+(1) HARDNESS: MILITARY.md says concrete makes infantry hard to soft attack. Taken as plain hardness, armour's hard attack (140 > its soft 100) would land 1.8x its open-ground hits and take a bunker faster (day 13 vs day 23). Built instead as a soft-fire SCREEN: 40% of each on-tile defender's soft share screened, hard fire unchanged; MILITARY.md § Fortifications says so. (2) STRENGTH: +50% defence plus the screen, both scaled by condition. campaign_battle C8: first break 1.5:1 open vs 1.75:1 full bunker; at 2:1 the defender breaks day 12 open vs day 118 bunkered. Through the daily pass a supplied 2:1 attack takes open ground day 13 and never takes the bunker (held at day 400) - it falls inside the 1.25 dig-in band; breaking it needs artillery wear first (12 condition a day per battery) or more than about 2.1:1. (3) RIVAL UPTAKE: 1 rival bunker in 16 seeds to tick 40 (seed 25). A candidate is an own-ground front tile toward a hostile neighbour where the nation's own units stand, with a road; garrisons mostly stand on posts, not fronts. (4) NUMBERS: 120 credits + stone 20 + steel 8, 90 days, upkeep 5; shelling 12/day per battery; rival cap 4 built or building, only while uncommitted treasury holds 2x capex. Bunkers count against the province building ceiling and tile stack cap.
+
+**Why it matters.** (2) decides whether a supplied front can be broken without artillery; (3) decides whether rivals visibly fortify at all; (1) is a reading of a doc sentence.
+
+- (1) A keep the screen / B plain hardness
+- (2) A keep / B lower defence or screen so 2:1 eventually breaks a supplied bunker
+- (3) A keep / B widen candidates to tiles beside the front and posts on a hostile border
+- (4) A keep the first-cut numbers / B retune named ones
+
+> **Recommendation:** (1) A; (2) B - drop defence to +30% so a supplied 2:1 breaks it slowly and artillery shortens it; (3) B, posts on a hostile border count; (4) A.
+
+*Files: `src/world/battle_system.cpp`, `src/world/campaign_battle.cpp`, `src/world/corp_ai.cpp`, `scripts/economy.lua`, `docs/military/MILITARY.md`*
 
 ---
 

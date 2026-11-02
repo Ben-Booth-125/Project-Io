@@ -366,6 +366,7 @@ const char* building_type_name(building_type t)
         case building_type::planetary_marketplace: return "Planetary Marketplace"; // BL-1266
         case building_type::railway_station:      return "Railway Station";      // BL-1255
         case building_type::airbase:              return "Airbase";              // BL-1449
+        case building_type::bunker:               return "Bunker";               // BL-1426
     }
     return "None";
 }
@@ -785,6 +786,7 @@ ImU32 building_kind_colour(building_type type)
         case building_type::planetary_marketplace: return IM_COL32( 72, 186, 104, 255); // emerald — BL-1269, the trade house
         case building_type::railway_station:      return IM_COL32(150, 150, 160, 255); // iron grey — BL-1255
         case building_type::airbase:              return IM_COL32( 84, 100, 236, 255); // ultramarine — BL-1450, the air theatre (clear of hover blue and periwinkle)
+        case building_type::bunker:               return IM_COL32(160, 150, 130, 255); // concrete — BL-1426
         case building_type::none:                 break;
     }
     return neutral;
