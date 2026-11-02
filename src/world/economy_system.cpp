@@ -2003,7 +2003,10 @@ void advance_musters(world& w)
     {
         const auto bit = w.buildings.find(m.base);
         if (bit == w.buildings.end() || bit->second.decommissioned)
+        {
+            (void)refund_muster_recruits(w, m); // Ben, 2026-10-31: its men go back to the pool
             continue;
+        }
         m.days_remaining -= k_construction_quarter_days;
         if (m.days_remaining > 0)
         {
@@ -2786,8 +2789,20 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // producer (NR-917 kept), and the share each was granted is what the one decay
     // rule reads (`run_nation_garrison_upkeep`, through `lp_tick::supply_share`). The
     // draw is priced in credits as it is granted (`charge_supply_draws`).
-    report.logistic_points = resolve_logistic_points(w, collect_supply_claims(w, reg));
+    //
+    // BL-1463 (MILITARY.md § Recruits): FIRST the bases make the quarter's recruits from
+    // their provinces' people; then every land unit below its establishment plans its
+    // refill from its pool, and the plan's recruits join its supply request, paid at the
+    // same road; after the resolve each receives its plan at the share it was granted
+    // (0 past the 8-tile draw).
+    report.recruitment = run_recruitment(w, reg);
+    const std::vector<recruit_refill> refill_plan = plan_recruit_refills(w);
+    const std::vector<wing_refill> wing_plan = plan_wing_refills(w, reg); // Ben, 2026-10-31
+    report.logistic_points =
+        resolve_logistic_points(w, collect_supply_claims(w, reg, refill_plan, wing_plan));
     charge_supply_draws(w, reg, report.logistic_points);
+    report.recruits_refilled = apply_recruit_refills(w, refill_plan, report.logistic_points);
+    report.air_recruits_refilled = apply_wing_refills(w, reg, wing_plan, report.logistic_points);
     lp_ready = true;
 
     // ── Pass 5 pre-pass, BL-1209 (MARKETS.md § Price resolution, "A short shelf
@@ -4557,9 +4572,9 @@ float unit_supply_need(const unit_component& u, const unit_upkeep_params& up)
     // unit in the field this quarter, as a shipment's draw is its cargo.
     //   - its upkeep goods: food rations and ordnance per head
     //     (`economy.military.unit_upkeep.goods_per_head`, `resolve_unit_upkeep`);
-    //   - the equipment and manpower its HP refill draws while wounded. No refill
-    //     mechanism exists in the sim yet - a unit's `count` never climbs back toward
-    //     its `establishment` - so that half is zero until refill lands, and joins here.
+    //   - the manpower its HP refill draws while wounded: BL-1463 (MILITARY.md
+    //     § Recruits) adds the quarter's refill plan, its recruits x `lp_per_recruit`,
+    //     in `collect_supply_claims` - so that half is not computed here.
     if (u.count <= 0)
         return 0.0f;
     const unit_upkeep_draw d = resolve_unit_upkeep(u, up);
@@ -4572,8 +4587,15 @@ float unit_supply_need(const unit_component& u, const unit_upkeep_params& up)
 
 std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_registry& reg)
 {
+    return collect_supply_claims(w, reg, plan_recruit_refills(w), plan_wing_refills(w, reg));
+}
+
+std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_registry& reg,
+                                                   const std::vector<recruit_refill>& plan,
+                                                   const std::vector<wing_refill>& wing_plan)
+{
     std::vector<lp_supply_claim> claims;
-    if (w.units.empty())
+    if (w.units.empty() && wing_plan.empty())
         return claims;
     const unit_upkeep_params& up = reg.military().upkeep;
     // ASCENDING UNIT ID (Ben, 2026-10-28): the resolver serves the requests in the
@@ -4592,11 +4614,45 @@ std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_
         c.unit = id;
         c.tile = u.position;
         c.need = unit_supply_need(u, up);
+        // BL-1463: the refill's recruits, paid at the same road as the supplies. The
+        // plan is ascending unit id, as this walk is: a lower_bound finds the row.
+        const auto pit = std::lower_bound(plan.begin(), plan.end(), id,
+            [](const recruit_refill& r, entity_id v) { return r.unit < v; });
+        if (pit != plan.end() && pit->unit == id)
+        {
+            c.need          += recruit_refill_lp_need(reg, *pit);
+            c.recruits       = pit->planned; // granted in whole recruits (logistic_points.cpp)
+            c.lp_per_recruit = reg.military().recruits.lp_per_recruit;
+        }
         // WHOSE POOL: THE UNIT'S OWN NATION'S, routed from its own sources - never the
         // ground's, which would fund an invasion out of the invaded nation's points.
         if (w.nations.find(u.owner) != w.nations.end()) // BL-1407: every unit is a nation's
             c.nation = u.owner;
         claims.push_back(c);
+    }
+    // BL-1463 (Ben, 2026-10-31): A WING REFILLS TOO. Each wing refilling this quarter
+    // asks its planned air recruits x `lp_per_recruit`, routed from its airbase's tile -
+    // the closest road within 8 tiles, as a unit's supply is. Wings carry no supply
+    // claim of their own (their upkeep draws goods at the airbase), so a wing claims
+    // only while it refills, and a world with no wounded wing claims exactly as before.
+    // Merged into the ONE ascending-id order the resolver serves (a wing's id is an
+    // entity id like a unit's, never equal to one).
+    if (!wing_plan.empty())
+    {
+        const float lp_per = reg.military().recruits.lp_per_recruit;
+        for (const wing_refill& r : wing_plan)
+        {
+            lp_supply_claim c;
+            c.unit           = r.wing;
+            c.nation         = r.nation;
+            c.tile           = r.tile;
+            c.need           = static_cast<float>(r.planned) * lp_per;
+            c.recruits       = r.planned;
+            c.lp_per_recruit = lp_per;
+            claims.push_back(c);
+        }
+        std::stable_sort(claims.begin(), claims.end(),
+                         [](const lp_supply_claim& a, const lp_supply_claim& b) { return a.unit < b.unit; });
     }
     return claims;
 }
@@ -4616,10 +4672,14 @@ void charge_supply_draws(world& w, const recipe_registry& reg, const lp_tick& lp
     {
         if (!(s.granted > 0.0f))
             continue;
-        const auto uit = w.units.find(s.unit);
-        if (uit == w.units.end())
+        // A row is a unit's, or (BL-1463) a refilling wing's.
+        entity_id owner = null_entity;
+        if (const auto uit = w.units.find(s.unit); uit != w.units.end())
+            owner = uit->second.owner;
+        else if (const auto wit = w.wings.find(s.unit); wit != w.wings.end())
+            owner = wit->second.owner;
+        if (owner == null_entity)
             continue;
-        const entity_id owner = uit->second.owner;
         if (float* purse = purse_of(w, owner); purse != nullptr)
         {
             // A running cost of the supply draw: never capped by the settle's surplus gate.

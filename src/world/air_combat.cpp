@@ -6,6 +6,7 @@
 #include "economy_system.hpp"  // draw_goods_at_tile, step_unit_supply_toward, economy_report
 #include "province.hpp"        // province_holder_for
 #include "recipe_registry.hpp"
+#include "recruits.hpp"        // BL-1463: a wing spends its crew from the air pool
 #include "stance.hpp"          // is_hostile
 #include "unit_designs.hpp"
 #include "world.hpp"
@@ -237,8 +238,8 @@ entity_id airbase_at(const world& w, entity_id nation, entity_id tile)
     return best;
 }
 
-corp_command_result hire_wing_check(const world& w, entity_id nation, entity_id tile,
-                                    uint16_t row, entity_id* base_out)
+corp_command_result hire_wing_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                    entity_id tile, uint16_t row, entity_id* base_out)
 {
     if (row >= air_roster_table().size())
         return corp_command_result::rejected_invalid;
@@ -250,6 +251,10 @@ corp_command_result hire_wing_check(const world& w, entity_id nation, entity_id 
     const entity_id base = airbase_at(w, nation, tile);
     if (base == null_entity)
         return corp_command_result::rejected_placement;
+    // BL-1463 (MILITARY.md § Recruits): a wing spends its crew from the air pool; one the
+    // pool cannot fill is refused before money moves.
+    if (recruit_pool(w, nation, recruit_theatre::air) < wing_crew(reg, row))
+        return corp_command_result::rejected_no_recruits;
     if (base_out != nullptr)
         *base_out = base;
     return corp_command_result::applied;

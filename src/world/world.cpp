@@ -476,6 +476,39 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // BL-1463 (recruits): each nation's two recruit pools, then each population
+    // centre's head carry, folded only where non-zero (sorted walks; both maps are
+    // unordered), so a world that never recruits hashes as it did.
+    {
+        std::vector<entity_id> pooled;
+        for (const auto& [nid, nc] : nations)
+            if (nc.land_recruits != 0 || nc.air_recruits != 0)
+                pooled.push_back(nid);
+        std::vector<entity_id> carried;
+        for (const auto& [cid, pc] : population_centres)
+            if (pc.recruit_heads_taken != 0)
+                carried.push_back(cid);
+        if (!pooled.empty() || !carried.empty())
+        {
+            std::sort(pooled.begin(), pooled.end());
+            std::sort(carried.begin(), carried.end());
+            fnv1a_u32(h, 0x52435254u); // "RCRT"
+            fnv1a_u32(h, static_cast<uint32_t>(pooled.size()));
+            for (const entity_id nid : pooled)
+            {
+                fnv1a_u32(h, nid);
+                fnv1a_i32(h, nations.at(nid).land_recruits);
+                fnv1a_i32(h, nations.at(nid).air_recruits);
+            }
+            fnv1a_u32(h, static_cast<uint32_t>(carried.size()));
+            for (const entity_id cid : carried)
+            {
+                fnv1a_u32(h, cid);
+                fnv1a_i32(h, population_centres.at(cid).recruit_heads_taken);
+            }
+        }
+    }
+
     // BL-1434 (unit designs): each nation's live designs (its non-base kit ids),
     // folded only for a nation that has any (sorted walk; nations is unordered), so
     // a world where every nation fields base kit hashes as it did.

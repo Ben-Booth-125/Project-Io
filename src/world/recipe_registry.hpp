@@ -11,6 +11,7 @@
 #include "nation_tax.hpp"       // BL-1335: tax_params — the tax tiers and Discontent dials
 #include "air_params.hpp"  // BL-1449: air_params — the air theatre's authored numbers
 #include "land_recon_params.hpp" // BL-1453: land_recon_params — land recon's authored rates
+#include "recruit_params.hpp" // BL-1463: recruit_params — what bases make and a refill costs
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
 #include "carried_supplies.hpp" // BL-1452: carried_supply_params — the daily stock rates
 #include "terrain_class.hpp" // BL-1455: terrain_class_params — the per-class terrain rows
@@ -862,6 +863,11 @@ struct military_capability_params
     /// BL-1453 (MILITARY.md § Recon): the rates a battle's recon points are built
     /// from, authored under `economy.military.recon`. Defaults equal the Lua values.
     land_recon_params recon = {};
+
+    /// BL-1463 (MILITARY.md § Recruits): what a military base and an airbase make a
+    /// quarter, and the Logistic Points one refilled recruit costs. Authored under
+    /// `economy.military.recruits`. Defaults equal the Lua values.
+    recruit_params recruits = {};
 };
 
 /// BL-350 procurement/contract tunables, authored in scripts/economy.lua under the top-level

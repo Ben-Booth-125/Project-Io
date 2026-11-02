@@ -1620,6 +1620,10 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
             double best = 0.0;
             for (const uint16_t row : available_air_rows(w, nation)) // ascending
             {
+                // BL-1463: a row the seam would refuse before money moves - its crew more
+                // than the air pool holds (MILITARY.md § Recruits) - is not a candidate.
+                if (hire_wing_check(w, reg, nation, base_tile, row) != corp_command_result::applied)
+                    continue;
                 const air_class c = air_roster_table()[row].cls;
                 double value = 0.0;
                 switch (c)

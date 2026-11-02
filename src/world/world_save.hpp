@@ -638,7 +638,22 @@ inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 /// a tile in the stream. v70 is a STRICT PREFIX of v71 and is read too
 /// (`k_world_save_version_pre_gen_capital`), each nation's generation capital then
 /// equal to its `capital_tile` (exact: no stream before v69 held a cession).
-inline constexpr uint32_t world_save_version = 71;
+///
+/// Bumped to 72 (BL-1463, recruits; MILITARY.md § Recruits): A TRAILING SECTION after
+/// v71's generation-capital section carries, after a u32 count, every nation holding
+/// recruits, ascending id, as (id, i32 land pool, i32 air pool) — both in [0, 2^30], not
+/// both 0; then, after a u32 count, every population centre with heads taken but not yet
+/// off its thousands, ascending id, as (id, i32 carry in [1, 999]). v71 is a STRICT
+/// PREFIX of v72 and is read too (`k_world_save_version_pre_recruits`), as a world whose
+/// pools are empty and whose centres carry nothing; so is every older version the reader
+/// already accepted.
+inline constexpr uint32_t world_save_version = 72;
+
+/// BL-1463: the first version carrying the recruits section (see above).
+inline constexpr uint32_t k_world_save_version_recruits = 72;
+
+/// BL-1463: v71, a strict prefix of v72 (the recruits section is v72's only addition).
+inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 
 /// BL-1460: the first version carrying the generation-capital section (see above).
 inline constexpr uint32_t k_world_save_version_gen_capital = 71;
@@ -785,6 +800,11 @@ std::size_t world_save_embargo_section_bytes(const world& w);
 /// the count plus 8 a nation. The LAST section of a v71 stream.
 std::size_t world_save_gen_capital_section_bytes(const world& w);
 
+/// BL-1463: the byte length of the v72 recruits section `w` writes — 4 + 12 per nation
+/// holding recruits + 4 + 8 per centre carrying heads. For the harnesses that measure an
+/// older stream as today's less its later sections.
+std::size_t world_save_recruits_section_bytes(const world& w);
+
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and
 /// folds them away (`fold_legacy_firms`); the verification writer below writes
@@ -872,6 +892,9 @@ void write_world_snapshot_pre_war(const world& w, std::ostream& out);
 void write_world_snapshot_pre_embargo(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1460): @p w as a v70 stream — no generation-capital section.
 void write_world_snapshot_pre_gen_capital(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1463): the v71 stream shape — no recruits section.
+void write_world_snapshot_pre_recruits(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in
