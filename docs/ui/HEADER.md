@@ -26,6 +26,7 @@ The header reads left to right as three figures:
 - **Cargo valuation** (labelled **CARGO**) — an estimated value of the goods the player **owns**: its trades' cargo in transit, each in-flight shipment priced at its **destination** market's current price — the price it lands into. A nation holds no stockpiles (`../economy/MARKETS.md` § The shelf economy): what its buildings make is sold where it lands, so its trades' cargo is the only stock it owns between purchase and sale (`../economy/TRADE.md` § A trade). A single currency figure, deliberately *not* a per-resource inventory; it reads zero with nothing in flight.
 - **Net + trend** — the **last economy tick's operating net**: the Balance card's own "Net this quarter" (income, less expenditure, maintenance and wages, plus a nation's tax income), so the strip and the card always agree. **Refunds and flat construction are excluded** — cancelled construction credited back is not earnings, and construction is not an operating flow (Ben, 2026-10-26). The nation's Balance card has no refunds line either: its net is the same operating figure. Shown as a coloured signed per-quarter figure (`fmt::rate(net, "qtr")`, coloured by `palette::value_colour`), followed by a small **sparkline** of recent treasury values (`ImGui::PlotLines` over a capped history maintained in `app`, pushed each `step_economy()`).
 - **Runway** (BL-177, budget runway legibility) — how long the treasury lasts at the current burn: `RUNWAY  12q` (treasury ÷ the last tick's fall in the treasury). **Its source is not NET's**: the burn is the treasury's actual movement over the last economy tick (the state ledger's close less open — construction and refunds included), because a nation at a positive operating net can still be spending its cash on construction. NET answers "is my economy earning?"; RUNWAY answers "how long does my cash last?". **Shown only while it means something** — burning cash; a growing treasury shows nothing rather than a lying "infinite quarters" figure. **Urgency-coloured**: red under 8 quarters of cushion (about two years — the point it needs acting on), plain text otherwise. Tooltip explains the arithmetic and its steady-burn assumption. Load-bearing, not decorative — it degrades through the fit ladder below but the fact is never simply lost. When the treasury runs out, a losing building idles rather than the nation borrowing (`../politics/NATIONS.md` § What a nation owns).
+- **Recruits** (Ben, 2026-11-02) — at the **top right**, one readout per theatre: **land**, **air** and **sea**, in that order. Each is the theatre's glyph, then the nation's recruits held against the pool's cap (`120 / 750`), with a thin **bar** of held over cap beneath. Its tooltip names the pool, its quarterly output (the running bases, airbases or ports and their rate) and that a full pool takes none (`../military/MILITARY.md` § Recruits). A theatre with no source and nothing held reads `0 / 0` with an empty bar, so the three always stand. This widens the header's question to *and how many men can I raise?*
 - **The `[in debt]` flag retires** (Ben, 2026-10-23): it flagged a negative, interest-accruing balance, and a nation never runs into debt.
 
 ## Fit and degradation
@@ -40,7 +41,10 @@ fixed order:
    - value-only — `   |   12q` (label dropped, tooltip explains);
    - none — **folded into the NET figure's tooltip**, so the fact survives even when the strip
      cannot draw it.
-2. **Sparkline** — the last decorative element to drop.
+2. **Recruit readouts** — next, in two steps: the numbers drop to the held figure alone (`120`),
+   then the three readouts fold to glyph and bar only, their numbers moving into each glyph's
+   tooltip. The bars never drop.
+3. **Sparkline** — the last decorative element to drop.
 The three money figures (Treasury / Cargo / Net) are bounded-length (`fmt::credits` /
 `fmt::rate` abbreviate) and always drawn in full.
 
