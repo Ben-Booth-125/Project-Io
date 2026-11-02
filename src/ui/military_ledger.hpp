@@ -21,7 +21,9 @@ namespace ui {
 ///   and pressing the lit row again closes it. Below, the obsolete-type toggles.
 ///
 /// GROUPED BY THEATRE (BL-1450; military.md § Grouped by theatre): both tabs set
-/// their rows under collapsible Land and Air headers, each with its count. Recruit's
+/// their rows under a row of theatre tabs, Land / Air / Sea, each with its count,
+/// one theatre shown at a time (BL-1472). A theatre tab is a selector: re-pressing
+/// the active one does nothing. Sea is a stub listing the nation's ports. Recruit's
 /// Air holds an airbase picker, the six air rows (Raise queues `military.pending_wing_*`,
 /// which app sends as `hire_wing`) and the player's wings, each a press selecting it;
 /// Design's Air holds the six air classes, each opening the air designer

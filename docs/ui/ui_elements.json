@@ -876,7 +876,7 @@
     "src/ui/header_panel.hpp",
     "src/ui/header_panel.cpp"
    ],
-   "summary": "Always-visible full-width strip between the identity tile and time column: balance, cargo valuation, net+trend, runway, and a debt flag — the persistent financial dashboard.",
+   "summary": "Always-visible full-width strip between the identity tile and time column: treasury, cargo valuation, net+trend, runway, and at its top right the three recruit readouts (land, air, sea) — the persistent financial and manpower dashboard.",
    "interesting_question": "The header is a 'guaranteed-fit strip' that never wraps and never silently clips a load-bearing number, degrading in a fixed order instead — why treat this one surface as the reference case for a wider text-wrap audit rather than just wrapping like other panels?",
    "resolution": "Explicit precedent-setting intent: HEADER.md states 'This ladder is the reference case for BL-215 (text-wrap render audit)... the audit's job is to make every other worded surface degrade this honestly rather than wrap or clip' — the header's ladder is meant to generalise, not stay a one-off.",
    "checks": [
@@ -2047,6 +2047,26 @@
    "checks": [
     "diplomacy_ledger",
     "unit_orders"
+   ]
+  },
+  {
+   "id": "UI-134",
+   "name": "Recruit readouts",
+   "kind": "sub-element",
+   "parent": "UI-051",
+   "source": [
+    "docs/ui/HEADER.md § Contents (Recruits)",
+    "docs/ui/HEADER.md § Fit and degradation",
+    "docs/military/MILITARY.md § Recruits",
+    "src/ui/header_panel.cpp",
+    "src/ui/icons.cpp"
+   ],
+   "summary": "At the header's top right, one readout per theatre - land, air, sea, in that order: the theatre's glyph (soldier, aircraft, anchor), the nation's recruits held against the pool's cap (120 / 750) and a thin bar of held over cap beneath. The tooltip names the pool, its quarter's output (sources x rate) and that a full pool takes none. Fit ladder step 2: held alone, then glyph and bar with the numbers in the tooltip; the bars never drop. A theatre with no source reads 0 / 0 with an empty bar.",
+   "interesting_question": "The pools gate every Raise in the Military ledger. Why carry them in the always-on header rather than at the head of the Recruit theatres, where the Raise presses are?",
+   "resolution": "The header carries them (Ben, 2026-11-02; HEADER.md § Contents). The reading behind it: manpower is a standing national fact like the treasury - read before the ledger opens, and drawn on by refits with the ledger shut. The Raise press still says why the pool cannot fill it, in its tooltip.",
+   "checks": [
+    "military_ledger",
+    "air_ui"
    ]
   }
  ]

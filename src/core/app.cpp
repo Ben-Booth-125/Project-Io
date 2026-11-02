@@ -2803,7 +2803,7 @@ void app::render()
         // "introducing the shell's only gap here would read as a mistake". It was
         // the top band that carried the mistake.
         const float header_right = ui::right_chrome_left(disp);
-        ui::draw_header_panel(m_world, m_balance_history, m_last_econ_report, header_left, header_right);
+        ui::draw_header_panel(m_world, m_registry, m_balance_history, m_last_econ_report, header_left, header_right);
     }
 
     // Comms chat log (BL-205) — BL-227 re-homed it from the right chrome column

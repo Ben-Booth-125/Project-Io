@@ -529,6 +529,18 @@ void aircraft(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 void wing_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count,
                  bool hovered = false);
 
+/// BL-1472 (HEADER.md § Contents, Recruits): the ANCHOR — the sea theatre's glyph.
+/// A small ring at the head, a vertical shank, a crossbar stock below the ring, and
+/// curved arms sweeping up from the shank's foot to two short flukes. Stroke-only:
+/// the header draws it beside the land `unit_marker` and the air `aircraft`, and its
+/// open curve is the silhouette neither of those filled figures has.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void anchor(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// BL-1425: a land unit COUNTER — a rectangle 2.2r wide and 1.5r tall centred on
 /// @p centre. An owner-colour band (@p fill) on its left; the number of units on
 /// the tile (@p count) in the middle; and, when @p show_bars, two VERTICAL bars at
