@@ -797,11 +797,15 @@ void w_market_history(std::ostream& o, const ui::market_plot_history& m)
     for (const entity_id id : ids)
     {
         w_id(o, id);
-        for (const ui::resource_plot_series& s : m.at(id))
+        // BL-1422: one series per resource at the STREAM's width (49 for an envelope
+        // before v24, set by the caller's bio::scoped_array_width).
+        const auto& series = m.at(id);
+        const std::size_t width = stream_array_width<resource_count>();
+        for (std::size_t r = 0; r < width; ++r)
         {
-            w_floats(o, s.price);
-            w_floats(o, s.supply);
-            w_floats(o, s.demand);
+            w_floats(o, series[r].price);
+            w_floats(o, series[r].supply);
+            w_floats(o, series[r].demand);
         }
     }
 }
@@ -819,9 +823,15 @@ bool r_market_history(std::istream& i, ui::market_plot_history& m)
         if (!r_id(i, id))
             return false;
         std::array<ui::resource_plot_series, resource_count> series;
-        for (ui::resource_plot_series& s : series)
+        // BL-1422: an envelope before v24 carries 49 series a market (the stream width
+        // r_envelope sets); the rest stay empty.
+        const std::size_t width = stream_array_width<resource_count>();
+        for (std::size_t r = 0; r < width; ++r)
+        {
+            ui::resource_plot_series& s = series[r];
             if (!(r_floats(i, s.price) && r_floats(i, s.supply) && r_floats(i, s.demand)))
                 return false;
+        }
         m.emplace(id, std::move(series));
     }
     return true;
@@ -865,8 +875,13 @@ bool r_rank_snapshot(std::istream& i, std::unordered_map<entity_id, int>& snap)
 // The envelope
 // ---------------------------------------------------------------------------
 
-void w_envelope(std::ostream& o, const save_envelope& e)
+void w_envelope(std::ostream& o, const save_envelope& e, uint32_t version = save_game_version)
 {
+    // BL-1422: an envelope before v24 carries every resource_count-wide array (the body
+    // endowments, the market history) 49 wide - the verification writer's old shapes.
+    const bio::scoped_array_width kit_width(
+        resource_count, version < save_game_version_kit_goods ? k_resource_count_pre_kit_goods
+                                                              : resource_count);
     w_u64(o, e.sim_tick);
     w_u64(o, e.day_tick);
     w_u64(o, e.econ_tick);
@@ -900,9 +915,12 @@ void w_envelope(std::ostream& o, const save_envelope& e)
     // save_game_version 23 (BL-1278): the nation targets, at the TAIL so the
     // v22 layout is a strict prefix (save_game.hpp, LAYOUT 23). They belong to
     // `world_params` but are written here, not in w_world_params, for that
-    // reason alone. Keep r_envelope in step.
-    w_int(o, e.params.nation_total_target);
-    w_int(o, e.params.major_target);
+    // reason alone. Keep r_envelope in step. A v22 envelope ends before them.
+    if (version > save_game_version_prefix_compatible)
+    {
+        w_int(o, e.params.nation_total_target);
+        w_int(o, e.params.major_target);
+    }
 }
 
 /// Every envelope field a v22 stream carries, in order (defined below).
@@ -910,6 +928,12 @@ bool r_envelope_v22(std::istream& i, save_envelope& e);
 
 bool r_envelope(std::istream& i, save_envelope& e, uint32_t version)
 {
+    // BL-1422: an envelope before v24 carries EVERY resource_count-wide array - each
+    // body's planetology endowment (read twice a body) and the market history's series -
+    // 49 wide; the kit goods read as zero. Set for the whole read.
+    const bio::scoped_array_width kit_width(
+        resource_count, version < save_game_version_kit_goods ? k_resource_count_pre_kit_goods
+                                                              : resource_count);
     if (!r_envelope_v22(i, e))
         return false;
     if (version == save_game_version_prefix_compatible)
@@ -964,8 +988,33 @@ bool write_save_game(const std::string& path, const world& w, const save_envelop
     return static_cast<bool>(out); // one check for the whole file, not one per field
 }
 
+bool write_save_game_at(const std::string& path, const world& w, const save_envelope& env,
+                        uint32_t version)
+{
+    // VERIFICATION ONLY (BL-1422): an envelope at an OLDER layout, its embedded world at
+    // the matching shape - for v23/v22, a v73 world snapshot (every per-resource array 49
+    // wide) and an envelope whose endowments and market history are 49 wide (and, for
+    // v22, no nation targets). The game writes only `write_save_game`.
+    if (version != save_game_version && version != save_game_version_pre_kit_goods
+        && version != save_game_version_prefix_compatible)
+        return false;
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out)
+        return false;
+    w_u32(out, save_game_magic);
+    w_u32(out, version);
+    if (version < save_game_version_kit_goods)
+        write_world_snapshot_pre_kit_goods(w, out);
+    else
+        write_world_snapshot(w, out);
+    w_envelope(out, env, version);
+    out.flush();
+    return static_cast<bool>(out);
+}
+
 bool read_save_game(const std::string& path, world& w, save_envelope& env,
-                    const military_capability_params* mil)
+                    const military_capability_params* mil,
+                    const std::array<float, resource_count>* base_price)
 {
     std::ifstream in(path, std::ios::binary);
     if (!in)
@@ -977,8 +1026,9 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
 
     uint32_t version = 0;
     if (!r_u32(in, version)
-        || (version != save_game_version && version != save_game_version_prefix_compatible))
-        return false; // LAYOUT 23: v22 is a strict prefix of v23, the one accepted predecessor
+        || (version != save_game_version && version != save_game_version_pre_kit_goods
+            && version != save_game_version_prefix_compatible))
+        return false; // LAYOUT 24: v23 and v22 read with a 49-wide market history (BL-1422)
 
     // Both halves build into scratch. `read_world_snapshot` already guarantees
     // this for the world; doing the same for the envelope is what lets a caller
@@ -986,7 +1036,7 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
     world         scratch_world;
     save_envelope scratch_env;
 
-    if (!read_world_snapshot(scratch_world, in, mil))
+    if (!read_world_snapshot(scratch_world, in, mil, base_price))
         return false;
     if (!r_envelope(in, scratch_env, version))
         return false;

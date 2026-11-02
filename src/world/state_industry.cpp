@@ -63,7 +63,10 @@ strategic_sector strategic_sector_of(const recipe_registry& reg, building_type t
     };
     // Order is a tie-break only (no shipped recipe makes two of these): the
     // first sector named wins.
-    if (makes(resource_type::ordnance))
+    // BL-1422: the five kit goods by kind are arms, as ordnance is.
+    if (makes(resource_type::ordnance) || makes(resource_type::small_arms)
+        || makes(resource_type::armoured_vehicles) || makes(resource_type::artillery_pieces)
+        || makes(resource_type::guided_weapons) || makes(resource_type::drones))
         return strategic_sector::arms;
     if (makes(resource_type::spacecraft_components) || makes(resource_type::propellant))
         return strategic_sector::space;

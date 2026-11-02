@@ -604,7 +604,7 @@ int main()
                                        + world_save_war_section_bytes(wd)          // BL-1459 (v69)
                                        + world_save_embargo_section_bytes(wd) + world_save_gen_capital_section_bytes(wd)     // BL-1418 (v70)
                                        + world_save_recruits_section_bytes(wd) + world_save_sea_recruits_section_bytes(wd);    // BL-1463 (v72), last
-        check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section && rows >= 2,
+        check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section + world_save_kit_goods_bytes(wd) && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
         // Untrusted: a cursor past the quarter is refused whole.
@@ -677,7 +677,7 @@ int main()
                                          + world_save_war_section_bytes(wu)          // BL-1459 (v69)
                                          + world_save_embargo_section_bytes(wu) + world_save_gen_capital_section_bytes(wu)     // BL-1418 (v70)
                                          + world_save_recruits_section_bytes(wu) + world_save_sea_recruits_section_bytes(wu);    // BL-1463 (v72), last
-        check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section,
+        check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section + world_save_kit_goods_bytes(wu),
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
         // Untrusted: readiness past 1000 is refused whole. The first row's
@@ -1842,6 +1842,131 @@ int main()
                   "(ten since BL-644) + reserve for two nations, the non-dyadic 0.3f "
                   "included");
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // PK (BL-1422, the kit goods by kind) -- v74 widens every per-resource array
+    // 49 -> 54. The five goods round-trip by value; a v73 stream (every array 49
+    // wide) still reads, the five goods zero and everything else as written.
+    // -----------------------------------------------------------------------
+    {
+        static_assert(world_save_version == k_world_save_version_kit_goods,
+                      "PK pins v74 as the kit goods' version");
+        static_assert(resource_count == k_resource_count_pre_kit_goods + 5,
+                      "PK: the kit goods are five appended values");
+        world k = w;
+        entity_id mid = null_entity;
+        for (const auto& [id, m] : k.markets)
+            if (mid == null_entity || id < mid)
+                mid = id;
+        entity_id tid = null_entity;
+        for (const auto& [id, t] : k.tiles)
+            if (tid == null_entity || id < tid)
+                tid = id;
+        const std::size_t sa = static_cast<std::size_t>(resource_type::small_arms);
+        const std::size_t dr = static_cast<std::size_t>(resource_type::drones);
+        const std::size_t st = static_cast<std::size_t>(resource_type::steel);
+        if (mid != null_entity)
+        {
+            k.markets.at(mid).inventory[sa] = 12.5f;
+            k.markets.at(mid).price[dr]     = 171.25f;
+            k.markets.at(mid).unposted_bid_tick[dr] = 9;
+        }
+        if (tid != null_entity)
+            k.tiles.at(tid).resource_deposit[dr] = 0.5f;
+        const std::string b72 = to_bytes(k);
+        world back;
+        bool ok = mid != null_entity && tid != null_entity && from_bytes(b72, back)
+               && back.markets.at(mid).inventory[sa] == 12.5f
+               && back.markets.at(mid).price[dr] == 171.25f
+               && back.markets.at(mid).unposted_bid_tick[dr] == 9
+               && back.tiles.at(tid).resource_deposit[dr] == 0.5f
+               && to_bytes(back) == b72;
+        check(ok, "PK v74: the kit goods' market, shelf and tile slots round-trip by value (bytes equal)");
+
+        std::string b71;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_kit_goods(k, o);
+            b71 = o.str();
+        }
+        uint32_t stamped = 0;
+        if (b71.size() >= 8)
+            std::memcpy(&stamped, b71.data() + 4, sizeof stamped);
+        world old;
+        bool ok71 = stamped == k_world_save_version_pre_kit_goods && from_bytes(b71, old)
+                 && mid != null_entity && tid != null_entity;
+        if (ok71)
+        {
+            const market_component& m0 = old.markets.at(mid);
+            const market_component& mk = k.markets.at(mid);
+            ok71 = m0.inventory[sa] == 0.0f && m0.price[dr] == 0.0f && m0.unposted_bid_tick[dr] == 0
+                && old.tiles.at(tid).resource_deposit[dr] == 0.0f
+                && m0.price[st] == mk.price[st] && m0.inventory[st] == mk.inventory[st]
+                && old.tiles.size() == k.tiles.size() && old.markets.size() == k.markets.size();
+            // Every narrowed array lost exactly five elements: 4 bytes a float, 1 a bool.
+            ok71 = ok71 && b72.size() > b71.size() && b72.size() - b71.size() == world_save_kit_goods_bytes(k);
+        }
+        check(ok71, "PK a v73 stream (arrays 49 wide) reads, the kit goods zero and the rest as written");
+
+        // A v73 stream re-stamped v74 is short by the widening and is REFUSED whole.
+        std::string bad = b71;
+        if (bad.size() >= 8)
+        {
+            const uint32_t v72 = k_world_save_version_kit_goods;
+            std::memcpy(&bad[4], &v72, sizeof v72);
+        }
+        world sentinel;
+        check(!from_bytes(bad, sentinel) && sentinel.tiles.empty(),
+              "PK a 49-wide stream stamped v74 is REFUSED, destination untouched");
+
+        // A v72 world loaded WITH the authored base prices has its kit goods priced on
+        // every market - and a nation can buy one off a stocked shelf. Without the table
+        // they stay at base 0, unbuyable (the gap this re-author closes).
+        std::array<float, resource_count> table{};
+        table[sa] = 94.8f;
+        table[static_cast<std::size_t>(resource_type::armoured_vehicles)] = 358.0f;
+        table[static_cast<std::size_t>(resource_type::artillery_pieces)]  = 188.0f;
+        table[static_cast<std::size_t>(resource_type::guided_weapons)]    = 240.6f;
+        table[dr] = 169.8f;
+        world priced;
+        bool priced_ok = false;
+        {
+            std::istringstream in(b71, std::ios::binary);
+            priced_ok = read_world_snapshot(priced, in, nullptr, &table);
+        }
+        bool all_priced = priced_ok && !priced.markets.empty();
+        for (const auto& [id, m] : priced.markets)
+            for (const resource_type g : k_kit_goods)
+                all_priced = all_priced && m.base_price[static_cast<std::size_t>(g)] == table[static_cast<std::size_t>(g)]
+                                        && posted_price(m, static_cast<std::size_t>(g)) > 0.0f;
+        check(all_priced, "PK a v73 world loaded with the authored table prices all five kit goods on every market");
+        bool unpriced = old.markets.size() == k.markets.size();
+        for (const auto& [id, m] : old.markets)
+            unpriced = unpriced && m.base_price[sa] == 0.0f;
+        check(unpriced, "PK ...and loaded without it they stay at base 0 (the stream as written)");
+        // Buy one small arms as a nation that trades on a market.
+        entity_id buyer = null_entity, bmk = null_entity;
+        if (priced_ok)
+            for (const auto& [nid, nc] : priced.nations)
+            {
+                (void)nc;
+                const std::vector<entity_id> mids = corp_markets(priced, nid);
+                if (!mids.empty() && (buyer == null_entity || nid < buyer))
+                {
+                    buyer = nid;
+                    bmk   = mids.front();
+                }
+            }
+        float bought = 0.0f;
+        if (buyer != null_entity)
+        {
+            priced.markets.at(bmk).inventory[sa] = 5.0f;
+            priced.nations.at(buyer).treasury    = 1.0e6f;
+            bought = buy_from_corp_shelves(priced, buyer, sa, 1.0f, 0.0f);
+        }
+        check(buyer != null_entity && bought > 0.99f,
+              "PK and a nation on that world can buy a small arms off a stocked shelf");
     }
 
     std::printf("\n");

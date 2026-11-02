@@ -57,6 +57,40 @@ inline constexpr uint32_t max_field_bytes = 1u << 20; // 1 MiB
 /// the largest container in a snapshot -- is ~31.5k entries.
 inline constexpr uint32_t max_count = 1u << 26; // ~67M elements
 
+/// BL-1422 (the kit goods): a NARROWED fixed-array width for one stream. The world
+/// snapshot's per-resource arrays carry no count - their length is `resource_count` -
+/// so when the roster grew 49 -> 54 every older stream's arrays became shorter than
+/// the live type. A reader or writer of such a stream sets this override for its
+/// duration (`scoped_array_width`): every fixed array of exactly `wide` elements is
+/// then read or written at `narrow`, the tail read as zero. Thread-local, so two
+/// threads saving at once never see each other's width. `wide == 0` is off.
+struct array_width_override
+{
+    std::size_t wide   = 0;
+    std::size_t narrow = 0;
+};
+inline thread_local array_width_override t_array_width{};
+
+/// The width a fixed array of N elements has in the current stream.
+template <std::size_t N>
+inline std::size_t stream_array_width()
+{
+    return (t_array_width.wide == N && t_array_width.narrow < N) ? t_array_width.narrow : N;
+}
+
+/// Sets the override for one scope; restores the previous one on exit.
+struct scoped_array_width
+{
+    array_width_override prev;
+    scoped_array_width(std::size_t wide, std::size_t narrow) : prev(t_array_width)
+    {
+        t_array_width = {wide, narrow};
+    }
+    ~scoped_array_width() { t_array_width = prev; }
+    scoped_array_width(const scoped_array_width&) = delete;
+    scoped_array_width& operator=(const scoped_array_width&) = delete;
+};
+
 // ---------------------------------------------------------------------------
 // Write side
 // ---------------------------------------------------------------------------
@@ -123,16 +157,18 @@ inline void w_str(std::ostream& out, const std::string& s)
 template <std::size_t N>
 inline void w_f32_array(std::ostream& out, const std::array<float, N>& a)
 {
-    for (float v : a)
-        w_f32(out, v);
+    const std::size_t n = stream_array_width<N>(); // BL-1422: an older stream's width
+    for (std::size_t i = 0; i < n; ++i)
+        w_f32(out, a[i]);
 }
 
 /// Write a fixed-size bool array (one byte per element), same no-count rule.
 template <std::size_t N>
 inline void w_bool_array(std::ostream& out, const std::array<bool, N>& a)
 {
-    for (bool v : a)
-        w_bool(out, v);
+    const std::size_t n = stream_array_width<N>(); // BL-1422
+    for (std::size_t i = 0; i < n; ++i)
+        w_bool(out, a[i]);
 }
 
 /// Write a fixed-size entity-id array, same no-count rule as `w_f32_array` —
@@ -140,8 +176,9 @@ inline void w_bool_array(std::ostream& out, const std::array<bool, N>& a)
 template <std::size_t N>
 inline void w_id_array(std::ostream& out, const std::array<entity_id, N>& a)
 {
-    for (const entity_id id : a)
-        w_id(out, id);
+    const std::size_t n = stream_array_width<N>(); // BL-1422
+    for (std::size_t i = 0; i < n; ++i)
+        w_id(out, a[i]);
 }
 
 /// Write a count-prefixed vector of entity ids.
@@ -319,9 +356,12 @@ inline bool r_str(std::istream& in, std::string& s)
 template <std::size_t N>
 inline bool r_f32_array(std::istream& in, std::array<float, N>& a)
 {
-    for (std::size_t i = 0; i < N; ++i)
+    const std::size_t n = stream_array_width<N>(); // BL-1422: the tail past it reads 0
+    for (std::size_t i = 0; i < n; ++i)
         if (!r_f32(in, a[i]))
             return false;
+    for (std::size_t i = n; i < N; ++i)
+        a[i] = 0.0f;
     return true;
 }
 
@@ -329,13 +369,16 @@ inline bool r_f32_array(std::istream& in, std::array<float, N>& a)
 template <std::size_t N>
 inline bool r_bool_array(std::istream& in, std::array<bool, N>& a)
 {
-    for (std::size_t i = 0; i < N; ++i)
+    const std::size_t n = stream_array_width<N>(); // BL-1422
+    for (std::size_t i = 0; i < n; ++i)
     {
         bool b = false;
         if (!r_bool(in, b))
             return false;
         a[i] = b;
     }
+    for (std::size_t i = n; i < N; ++i)
+        a[i] = false;
     return true;
 }
 
@@ -343,9 +386,12 @@ inline bool r_bool_array(std::istream& in, std::array<bool, N>& a)
 template <std::size_t N>
 inline bool r_id_array(std::istream& in, std::array<entity_id, N>& a)
 {
-    for (std::size_t i = 0; i < N; ++i)
+    const std::size_t n = stream_array_width<N>(); // BL-1422
+    for (std::size_t i = 0; i < n; ++i)
         if (!r_id(in, a[i]))
             return false;
+    for (std::size_t i = n; i < N; ++i)
+        a[i] = null_entity;
     return true;
 }
 

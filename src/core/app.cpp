@@ -2459,7 +2459,15 @@ bool app::load_game_from(const std::string& path)
     save_envelope env;
 
     // Reads into scratch, so a rejected file leaves the running campaign whole.
-    if (!read_save_game(path, w, env, &m_registry.military())) // BL-1455: legacy step-offs read the walls
+    // BL-1422: the authored base prices, so a pre-v73 world's markets price the kit
+    // goods. Loaded from world_gen.lua here when no new game has loaded them this run.
+    if (m_worldgen_cfg.is_fallback)
+    {
+        m_lua.load("scripts/world_gen.lua");
+        m_worldgen_cfg.load_from_lua(m_lua);
+    }
+    if (!read_save_game(path, w, env, &m_registry.military(), // BL-1455: legacy step-offs read the walls
+                        &m_worldgen_cfg.kepler_base_price))
     {
         ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
                       ui::chat_state::k_field_channel,

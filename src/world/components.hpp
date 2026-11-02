@@ -246,10 +246,38 @@ enum class resource_type : uint8_t
     //
     // world_save_version bumped 21 -> 22 for the original append (world_save.hpp).
     construction_capacity  = 48, ///< RETIRED (BL-1438): nothing produces or consumes it; the slot keeps saved arrays aligned.
-    count                  = 49
+
+    // --- The kit goods, by kind (BL-1422; MILITARY.md § Land — equipment, refit and
+    //     manpower, Ben 2026-10-27) ---
+    //
+    // "Six goods, by kind, not by generation": small arms, armoured vehicles,
+    // artillery pieces, guided weapons and drones, with the existing electronics. A
+    // later kit item names how many of each it takes (unit_designs.cpp); later items
+    // need more and add electronics, so the economy feels each generation without a
+    // good for every rung. Ordnance stays every unit's per-tick draw.
+    //
+    // Admission rule (PRODUCTION.md / BL-340): PRODUCED by five authored Arms Works
+    // recipes (recipes.lua, this same change); CONSUMED by the kit draw — a hire, a
+    // refit and a wounded unit's refill buy them off the shelf (corp_command.cpp
+    // kit goods, MILITARY.md § Land — equipment, refit and manpower). Named in
+    // chain_depth's R1 exemption table beside ordnance rather than assumed.
+    //
+    // world_save_version bumped 73 -> 74 for this append (world_save.hpp): every
+    // per-resource array widens 49 -> 54, and an older stream is read at its own
+    // width (`k_resource_count_pre_kit_goods`), the new goods zero.
+    small_arms             = 49, ///< Arms Works, from steel + machinery. Rifles and section weapons.
+    armoured_vehicles      = 50, ///< Arms Works, from steel + machinery + alloys. Fighting vehicles, tanks, scouts.
+    artillery_pieces       = 51, ///< Arms Works, from steel + machinery. Guns and launchers.
+    guided_weapons         = 52, ///< Arms Works, from electronics + ordnance. Missiles, guided rockets, submunitions.
+    drones                 = 53, ///< Arms Works, from electronics + alloys. Every drone item.
+    count                  = 54
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);
+
+/// BL-1422: the roster's width before the kit goods were appended (v73 and older
+/// streams carry per-resource arrays this wide; world_save.cpp reads them so).
+static constexpr std::size_t k_resource_count_pre_kit_goods = 49;
 
 // ===========================================================================
 // BL-762 — where a resource CAME FROM
@@ -359,6 +387,11 @@ constexpr resource_origin resource_origin_of(resource_type r)
         case resource_type::rigging:
         case resource_type::power:
         case resource_type::construction_capacity:
+        case resource_type::small_arms:
+        case resource_type::armoured_vehicles:
+        case resource_type::artillery_pieces:
+        case resource_type::guided_weapons:
+        case resource_type::drones:
             return resource_origin::manufactured;
 
         case resource_type::count:

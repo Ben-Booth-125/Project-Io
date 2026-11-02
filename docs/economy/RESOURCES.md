@@ -333,6 +333,11 @@ Products are the highest-value goods and the primary driver of market price dive
 | Alloys | Steel + REE alloy | Fabricator | 85.0 |
 | Spacecraft components | Alloys + electronics | Assembly Plant | 310.0 |
 | **Ordnance** | **Steel + machinery** | **Fabricator**; also the **Smithy** on the ancient roster | 155.8 |
+| Small arms | Steel + machinery | Arms Works | 94.8 |
+| Armoured vehicles | Steel + machinery + alloys | Arms Works | 358.0 |
+| Artillery pieces | Steel + machinery | Arms Works | 188.0 |
+| Guided weapons | Electronics + ordnance | Arms Works | 240.6 |
+| Drones | Electronics + alloys | Arms Works | 169.8 |
 
 The margin ladder widens up the tiers — spacecraft components sits 123× iron ore — which is the
 value gradient the space-equipment premise rests on. Propellant and spacecraft components are the
@@ -370,6 +375,20 @@ Smithy — the same building that turns
 basket (`docs/economy/PRODUCTION.md` § The ancient chain). `chain_depth`'s R1b row (producer and
 consumer reachable in the *same* concrete era band) is the check that a good admitted on its
 consumer can also be made wherever it is drawn.
+
+### The kit goods
+
+A unit's equipment is goods on the shelf, **by kind, not by generation** (Ben, 2026-10-27;
+`docs/military/MILITARY.md` § Land — equipment, refit and manpower): **small arms, armoured
+vehicles, artillery pieces, guided weapons and drones**, with the existing electronics. A kit
+item names how many of each it takes; a later item takes more and adds electronics, so the
+economy feels each generation without a good for every rung. A hire, a refit and a wounded
+unit's refill buy them off the shelf. They are terminal: no recipe takes them in.
+
+Each is made in an **Arms Works** (`scripts/recipes.lua`, industrial band, the ordnance depth
+tier) and priced by `docs/economy/PRODUCTION.md` § The recipe margin anchor off its one route.
+Nothing asks for one until a nation holds a kit item that draws it, so generation charters no
+Arms Works on its own; like ordnance they are the arms sector of state industry.
 
 ---
 
@@ -414,7 +433,8 @@ A representative subset of **seven resources** is the hand-calibrated core the e
 
 The `resource_type` enum holds **38 values**: 7 Earth-sourced raws, 4 space-sourced raws, 5
 ambient raws, 4 endemic goods, 3 prototype refined goods, 3 ancient intermediates, propellant,
-7 processing-chain goods, 3 habitability goods, and ordnance. Adding a resource changes
+7 processing-chain goods, 3 habitability goods, and ordnance — and, appended since, the ancient
+roster's slices, power, the retired construction-capacity slot and the five kit goods. Adding a resource changes
 `resource_count` and with it the width of every serialised `std::array<float, resource_count>` —
 tile deposits and reserves, market supply/demand/price/base-price and shelf inventory, nation abundance
 and substrate capacity. **Extending the enum IS a save-format retrofit**, but every one of those

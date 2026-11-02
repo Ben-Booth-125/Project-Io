@@ -178,6 +178,19 @@ world_gen = {
             -- the price stays so an old save's leftover shelf stock still reads a
             -- finite price while it spoils away. Not a sizing anchor any more.
             construction_capacity  = 6.6,
+
+            -- BL-1422 — the kit goods by kind (MILITARY.md § Land — equipment,
+            -- refit and manpower). DERIVED, not picked: what each Arms Works
+            -- route needs under the recipe margin anchor (recipes.lua, the five
+            -- appended rows; tools/verify/recipe_margin is the check). Each is
+            -- 2 x (inputs at base + 0.75 wage a batch) + the table's usual 0.1:
+            -- small arms 2 x 47.35, armoured vehicles 2 x 178.95, artillery pieces
+            -- 2 x 93.95, guided weapons 2 x 120.25, drones 2 x 84.85.
+            small_arms             = 94.8,
+            armoured_vehicles      = 358,
+            artillery_pieces       = 188,
+            guided_weapons         = 240.6,
+            drones                 = 169.8,
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation

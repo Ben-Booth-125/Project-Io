@@ -40,8 +40,9 @@
 // HEADLESS. Pure world layer: no SDL, no Lua.
 // ---------------------------------------------------------------------------
 
-#include "entity.hpp"
+#include "components.hpp" // resource_count, unit_component
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -116,16 +117,44 @@ struct recruit_refill
 
 /// The quarter's refill plan: every living land unit of a nation below its establishment,
 /// ascending unit id, each planned min(what it lacks, what its nation's land pool has
-/// left after the units before it). Units planning nothing are left out. Pure.
-std::vector<recruit_refill> plan_recruit_refills(const world& w);
+/// left after the units before it, and - BL-1423 - the men its nation's shelves hold the
+/// equipment for after the units before it). Units planning nothing are left out. Pure.
+std::vector<recruit_refill> plan_recruit_refills(const world& w, const recipe_registry& reg);
 
 /// The Logistic Points @p r's plan asks: planned x `lp_per_recruit`.
 float recruit_refill_lp_need(const recipe_registry& reg, const recruit_refill& r);
 
+// ---- BL-1423: a refill draws EQUIPMENT as well as men -----------------------------
+// MILITARY.md § Land — equipment, refit and manpower: "a wounded unit regains HP by
+// drawing equipment off the shelf and men from its nation's recruit pool. A unit whose
+// kit cannot be bought, or whose pool is empty, stays wounded." HP is men (`count`
+// against `establishment`), so each man regained is one recruit AND one man's share of
+// what the unit was raised with: its recorded design's kit goods plus its row's gated
+// hire goods (each gated axis at the candidate a hire would take, `hire_axis_cost`), over the
+// `hire_batch_manpower` men a hire raises. Bought off the nation's shelves at the posted
+// price, from its purse room, as a hire buys. CONSERVATION: the men a unit regains equal
+// the recruits its pool gives, and the goods drawn equal those men x the per-man basket.
+
+/// The goods ONE man of @p u is refilled with (see above). All zero for an unknown row.
+std::array<float, resource_count> refill_goods_per_man(const world& w, const unit_component& u);
+
+/// The goods a refill drew this quarter, for the report and the conservation harness.
+struct refit_tally
+{
+    int men = 0;            ///< men regained world-wide (== recruits drawn from the land pools)
+    int short_of_goods = 0; ///< recruits granted that stayed in the pool for want of kit
+    std::array<float, resource_count> goods{}; ///< goods bought off the shelves, per resource
+};
+
 /// Deliver @p plan at the shares @p lp granted: each unit receives the WHOLE recruits the
 /// resolver granted it (`lp_supply_row::recruits_delivered`, floor(planned x share /
-/// 1000)), taken from its pool. Returns the recruits delivered world-wide.
-int apply_recruit_refills(world& w, const std::vector<recruit_refill>& plan, const lp_tick& lp);
+/// 1000)), taken from its pool, AS FAR AS ITS EQUIPMENT CAN BE BOUGHT (BL-1423): the men
+/// it regains are bounded by what its nation's shelves and purse room supply of
+/// `refill_goods_per_man`, and those goods are bought. A recruit with no kit stays in
+/// the pool. Returns the recruits delivered (men regained) world-wide; @p tally, when
+/// given, receives the men and goods.
+int apply_recruit_refills(world& w, const std::vector<recruit_refill>& plan, const lp_tick& lp,
+                          refit_tally* tally = nullptr);
 
 // ---- Wings refill too (Ben, 2026-10-31) ---------------------------------------
 // A wing below full HP draws AIR recruits from its nation's air pool, paid in Logistic

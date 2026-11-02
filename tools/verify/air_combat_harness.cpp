@@ -711,7 +711,8 @@ int main()
             std::string s = to_bytes(g.w);
             std::ostringstream o64(std::ios::binary);
             write_world_snapshot_pre_air(g.w, o64);
-            const std::size_t at = o64.str().size(); // where the air section starts
+            // where the air section starts; BL-1422: the v64 stream's arrays are 49 wide
+            const std::size_t at = o64.str().size() + world_save_kit_goods_bytes(g.w);
             // wing count u32, id, owner, airbase (u32 each), u16 row, 4 x i32, 3 x u8 kit, u8 mission
             const std::size_t mission_at = at + 4 + 4 + 4 + 4 + 2 + 16 + 3;
             bool refused_bad = false;

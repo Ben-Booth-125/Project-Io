@@ -481,7 +481,8 @@ int main()
         check(from_bytes(b67, old) && old.wars.empty() && old.truces.empty() && old.peace_offers.empty()
                   && old.war_history.empty() && old.province_cessions.empty()
                   && b67.size() == b.size() - world_save_war_section_bytes(w)
-                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w), // BL-1418 (v70)
+                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) // BL-1418 (v70)
+                                              - world_save_kit_goods_bytes(w), // BL-1422: arrays 49 wide before v74
               "R4l a v68 stream (today's less the war and embargo sections) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;

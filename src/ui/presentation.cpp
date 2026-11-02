@@ -163,6 +163,12 @@ constexpr resource_presentation resource_table[resource_count] = {
     // the player now buys every tick to keep reading as a gap.
     { "Power",              "Pwr", IM_COL32(240, 208,  80, 255) }, // live-wire yellow, no material shares it
     { "Construction Capacity", "Cap", IM_COL32(232, 148,  40, 255) }, // hazard orange — crews and plant, the sector's throughput
+    // BL-1422: the kit goods by kind, in the military family beside Ordnance's oxblood.
+    { "Small Arms",         "SmA", IM_COL32(150,  96,  70, 255) }, // gunmetal brown
+    { "Armoured Vehicles",  "AFV", IM_COL32(112, 120,  88, 255) }, // olive drab
+    { "Artillery Pieces",   "Art", IM_COL32(160,  82,  60, 255) }, // rust
+    { "Guided Weapons",     "GW",  IM_COL32(196, 104, 120, 255) }, // rose: electronics meets ordnance
+    { "Drones",             "Drn", IM_COL32(128, 140, 170, 255) }, // slate blue
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the

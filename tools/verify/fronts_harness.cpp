@@ -914,7 +914,7 @@ int main()
         // BL-1449 (v65): and then the air section, six empty counts (24 bytes).
         // BL-1452 (v66): and then the carried-supplies section, one empty count (4 bytes).
         // BL-1453 (v67): and then the battle-carry section.
-        check(none && v61.size() == bytes.size() - (4 + 2 * 8 + 4 + 9) - 4 - 12 - 24 - 4
+        check(none && v61.size() == bytes.size() - world_save_kit_goods_bytes(f.w) /* BL-1422 */ - (4 + 2 * 8 + 4 + 9) - 4 - 12 - 24 - 4
                                      - world_save_battle_carry_section_bytes(f.w)
                                      - world_save_alarm_section_bytes(f.w) // BL-1432 (v68)
                                      - world_save_war_section_bytes(f.w) // BL-1459 (v69)

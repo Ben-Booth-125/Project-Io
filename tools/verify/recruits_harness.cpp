@@ -238,7 +238,7 @@ struct refill_result
 refill_result refill_quarter(fixture& f, const recipe_registry& reg)
 {
     refill_result r;
-    r.plan = plan_recruit_refills(f.w);
+    r.plan = plan_recruit_refills(f.w, reg);
     r.lp = resolve_logistic_points(f.w, collect_supply_claims(f.w, reg, r.plan));
     r.delivered = apply_recruit_refills(f.w, r.plan, r.lp);
     return r;
@@ -471,7 +471,7 @@ int main()
         const entity_id u_full  = add_unit(f, 1, 50, 50);
         nat(f).land_recruits = 1000;
 
-        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w);
+        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w, reg);
         const recruit_refill* p_on = plan_row(plan, u_on);
         const recruit_refill* p_eight = plan_row(plan, u_eight);
         const recruit_refill* p_nine = plan_row(plan, u_nine);
@@ -586,7 +586,7 @@ int main()
         const auto wing_quarter = [&](fixture& f) {
             refill_result r;
             const std::vector<wing_refill> wp = plan_wing_refills(f.w, reg);
-            r.plan = plan_recruit_refills(f.w);
+            r.plan = plan_recruit_refills(f.w, reg);
             r.lp = resolve_logistic_points(f.w, collect_supply_claims(f.w, reg, r.plan, wp));
             r.delivered = apply_wing_refills(f.w, reg, wp, r.lp);
             return std::make_pair(wp, r);
@@ -674,7 +674,7 @@ int main()
             for (int k = 0; k < 4; ++k)
             {
                 const std::vector<wing_refill> p = plan_wing_refills(q.w, reg);
-                const std::vector<recruit_refill> lpn = plan_recruit_refills(q.w);
+                const std::vector<recruit_refill> lpn = plan_recruit_refills(q.w, reg);
                 const lp_tick t = resolve_logistic_points(q.w, collect_supply_claims(q.w, reg, lpn, p));
                 (void)apply_recruit_refills(q.w, lpn, t);
                 (void)apply_wing_refills(q.w, reg, p, t);
@@ -764,7 +764,7 @@ int main()
         check(old_ok && old.nations.at(f.nation).land_recruits == 0 && old.nations.at(f.nation).air_recruits == 0
                   && old.population_centres.at(c).recruit_heads_taken == 0,
               "R7d a v71 stream reads, its pools empty and its carries 0");
-        check(v67.size() + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) == bytes.size()
+        check(v67.size() + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_kit_goods_bytes(f.w) /* BL-1422 */ == bytes.size()
                   && world_save_recruits_section_bytes(f.w) == 4 + 12 + 4 + 8,
               "R7e a v71 stream is today's less exactly the recruits section (28 bytes here) and v73's sea section");
         {
@@ -776,7 +776,7 @@ int main()
             check(ok67 && w67.nations.at(f.nation).land_recruits == 0
                       && v67s.size() + world_save_alarm_section_bytes(f.w) + world_save_war_section_bytes(f.w)
                              + world_save_embargo_section_bytes(f.w) + world_save_gen_capital_section_bytes(f.w)
-                             + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w)
+                             + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_kit_goods_bytes(f.w) /* BL-1422 (v74) */
                              == bytes.size(),
                   "R7e2 a v67 stream reads with empty pools and is today's less the Alarm (v68), war (v69), embargo (v70), generation-capital (v71) recruits (v72) AND sea (v73) sections");
         }
@@ -1083,7 +1083,7 @@ int main()
         world old;
         const bool old_ok = from_bytes(v72, old);
         check(old_ok && old.nations.at(v.nation).sea_recruits == 0 && old.nations.at(v.nation).land_recruits == 50
-                  && v72.size() + world_save_sea_recruits_section_bytes(v.w) == bytes.size(),
+                  && v72.size() + world_save_sea_recruits_section_bytes(v.w) + world_save_kit_goods_bytes(v.w) /* BL-1422: v72 is 49 wide */ == bytes.size(),
               "R12u a v72 stream reads, its sea pool empty (land kept), and is today's less exactly the sea section");
         {
             std::ostringstream o(std::ios::binary);
