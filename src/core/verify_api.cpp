@@ -3279,7 +3279,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
-    // BL-1463 (MILITARY.md § Recruits): the player nation's two recruit pools as the
+    // BL-1463 (MILITARY.md § Recruits): the player nation's three recruit pools as the
     // WORLD holds them, for the header's readouts (BL-1472) to be checked against - the pool read off
     // the nation's own field, and the running bases counted here from its state assets
     // (complete, not decommissioned, not idled), with the authored rate. Nation-level
@@ -3290,9 +3290,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const entity_id nation = player_actor(m_world);
         const auto nit = m_world.nations.find(nation);
         const recruit_params& rp = m_registry.military().recruits;
-        for (int t = 0; t < 2; ++t)
+        for (int t = 0; t < 3; ++t)
         {
-            const building_type want = t == 0 ? building_type::military_base : building_type::airbase;
+            const building_type want = t == 0 ? building_type::military_base
+                                     : t == 1 ? building_type::airbase : building_type::port;
             int bases = 0;
             if (nit != m_world.nations.end())
             {
@@ -3310,11 +3311,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             }
             sol::table e = st.create_table();
             e["held"]  = nit == m_world.nations.end() ? 0
-                        : (t == 0 ? nit->second.land_recruits : nit->second.air_recruits);
+                        : (t == 0 ? nit->second.land_recruits
+                           : t == 1 ? nit->second.air_recruits : nit->second.sea_recruits);
             e["bases"] = bases;
-            e["rate"]  = t == 0 ? rp.land_per_base : rp.air_per_base;
+            e["rate"]  = t == 0 ? rp.land_per_base : t == 1 ? rp.air_per_base : rp.sea_per_port;
             e["cap_quarters"] = k_recruit_cap_quarters;
-            out[t == 0 ? "land" : "air"] = e;
+            out[t == 0 ? "land" : t == 1 ? "air" : "sea"] = e;
         }
         return out;
     });

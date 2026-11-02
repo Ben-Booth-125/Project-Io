@@ -44,15 +44,11 @@ recruit_readout read_recruit_pool(const world& w, const recipe_registry& reg, en
             recruit_quarter_output(w, reg, nation, t), std::max(0, rate)};
 }
 
-/// The SEA pool (MILITARY.md § Recruits, "Ports make sea recruits"). The world's
-/// `recruit_theatre::sea` is landing in a parallel lane; until it merges the sea
-/// readout stands at 0 / 0 with an empty bar, as HEADER.md says a theatre with no
-/// source reads. At merge this body becomes one line:
-///   return read_recruit_pool(w, reg, nation, recruit_theatre::sea, reg.military().recruits.sea_per_port);
+/// The SEA pool (MILITARY.md § Recruits, "Ports make sea recruits"): the nation's
+/// running ports x the authored rate. A nation with no port reads 0 / 0.
 recruit_readout sea_recruit_readout(const world& w, const recipe_registry& reg, entity_id nation)
 {
-    (void)w; (void)reg; (void)nation;
-    return {};
+    return read_recruit_pool(w, reg, nation, recruit_theatre::sea, reg.military().recruits.sea_per_port);
 }
 
 /// BL-1406 (HEADER.md § Contents): the player's money is its NATION's treasury

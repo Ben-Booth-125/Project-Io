@@ -154,7 +154,7 @@ end
 -- 3b. BL-1472 (HEADER.md § Contents, Recruits): the HEADER reads each theatre's pool -
 --     held, the cap, the quarter's output - and it reads what the world holds: the
 --     nation's pool, its running bases x the authored rate, fifteen quarters of it.
---     Sea has no world source yet (another lane adds it): it stands at 0 / 0.
+--     Sea reads the nation's running ports x the authored rate (MILITARY.md § Recruits).
 local function check_pool(theatre)
     local h = verify.header_recruits()
     local p = h.drawn and h[theatre] or nil
