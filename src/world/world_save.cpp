@@ -2237,7 +2237,23 @@ void write_world_snapshot_pre_road_edges(const world& w, std::ostream& out)
     write_world_snapshot_at(w, out, k_world_save_version_pre_road_edges);
 }
 
-bool read_world_snapshot(world& w, std::istream& in, const military_capability_params* mil)
+void reauthor_kit_goods_prices(world& w, const std::array<float, resource_count>& base_price)
+{
+    for (auto& [mid, mc] : w.markets) // each market reads only itself: walk order is moot
+        for (const resource_type g : k_kit_goods)
+        {
+            const std::size_t r = static_cast<std::size_t>(g);
+            if (!(mc.base_price[r] > 0.0f) && base_price[r] > 0.0f)
+            {
+                mc.base_price[r] = base_price[r];
+                if (!(mc.price[r] > 0.0f))
+                    mc.price[r] = base_price[r];
+            }
+        }
+}
+
+bool read_world_snapshot(world& w, std::istream& in, const military_capability_params* mil,
+                         const std::array<float, resource_count>* base_price)
 {
     uint32_t magic = 0;
     if (!r_u32(in, magic) || magic != world_save_magic)
@@ -3881,6 +3897,11 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // so save -> load -> save of the fixed world is byte-stable.
     if (version <= k_world_save_version_pre_tile)
         (void)resolve_shared_tiles(s, mil); // BL-1455: never onto a class wall
+
+    // BL-1422: a stream before v73 predates the kit goods - its markets hold them at base
+    // price 0 (unbuyable). Priced from the authored table, as generation prices them.
+    if (version < k_world_save_version_kit_goods && base_price != nullptr)
+        reauthor_kit_goods_prices(s, *base_price);
 
     clear_derived_state(s);
     w = std::move(s); // replace only on full success

@@ -1919,6 +1919,54 @@ int main()
         world sentinel;
         check(!from_bytes(bad, sentinel) && sentinel.tiles.empty(),
               "PK a 49-wide stream stamped v73 is REFUSED, destination untouched");
+
+        // A v72 world loaded WITH the authored base prices has its kit goods priced on
+        // every market - and a nation can buy one off a stocked shelf. Without the table
+        // they stay at base 0, unbuyable (the gap this re-author closes).
+        std::array<float, resource_count> table{};
+        table[sa] = 94.8f;
+        table[static_cast<std::size_t>(resource_type::armoured_vehicles)] = 358.0f;
+        table[static_cast<std::size_t>(resource_type::artillery_pieces)]  = 188.0f;
+        table[static_cast<std::size_t>(resource_type::guided_weapons)]    = 240.6f;
+        table[dr] = 169.8f;
+        world priced;
+        bool priced_ok = false;
+        {
+            std::istringstream in(b71, std::ios::binary);
+            priced_ok = read_world_snapshot(priced, in, nullptr, &table);
+        }
+        bool all_priced = priced_ok && !priced.markets.empty();
+        for (const auto& [id, m] : priced.markets)
+            for (const resource_type g : k_kit_goods)
+                all_priced = all_priced && m.base_price[static_cast<std::size_t>(g)] == table[static_cast<std::size_t>(g)]
+                                        && posted_price(m, static_cast<std::size_t>(g)) > 0.0f;
+        check(all_priced, "PK a v72 world loaded with the authored table prices all five kit goods on every market");
+        bool unpriced = old.markets.size() == k.markets.size();
+        for (const auto& [id, m] : old.markets)
+            unpriced = unpriced && m.base_price[sa] == 0.0f;
+        check(unpriced, "PK ...and loaded without it they stay at base 0 (the stream as written)");
+        // Buy one small arms as a nation that trades on a market.
+        entity_id buyer = null_entity, bmk = null_entity;
+        if (priced_ok)
+            for (const auto& [nid, nc] : priced.nations)
+            {
+                (void)nc;
+                const std::vector<entity_id> mids = corp_markets(priced, nid);
+                if (!mids.empty() && (buyer == null_entity || nid < buyer))
+                {
+                    buyer = nid;
+                    bmk   = mids.front();
+                }
+            }
+        float bought = 0.0f;
+        if (buyer != null_entity)
+        {
+            priced.markets.at(bmk).inventory[sa] = 5.0f;
+            priced.nations.at(buyer).treasury    = 1.0e6f;
+            bought = buy_from_corp_shelves(priced, buyer, sa, 1.0f, 0.0f);
+        }
+        check(buyer != null_entity && bought > 0.99f,
+              "PK and a nation on that world can buy a small arms off a stocked shelf");
     }
 
     std::printf("\n");

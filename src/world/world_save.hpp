@@ -647,13 +647,13 @@ inline constexpr uint32_t k_world_save_version_pre_alarm = 67;
 /// PREFIX of v72 and is read too (`k_world_save_version_pre_recruits`), as a world whose
 /// pools are empty and whose centres carry nothing; so is every older version the reader
 /// already accepted.
+
 /// BL-1463: the first version carrying the recruits section (see above).
 inline constexpr uint32_t k_world_save_version_recruits = 72;
 
 /// BL-1463: v71, a strict prefix of v72 (the recruits section is v72's only addition).
 inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 
-///
 /// Bumped to 73 (BL-1422, the kit goods by kind; MILITARY.md § Land — equipment, refit
 /// and manpower): `resource_type` gains `small_arms`, `armoured_vehicles`,
 /// `artillery_pieces`, `guided_weapons` and `drones` at the enum's tail, so
@@ -804,6 +804,7 @@ std::size_t world_save_battle_carry_section_bytes(const world& w);
 /// LAST section - four counts, then 12 an Alarm row, 13 a pending event, 12 a landed
 /// pair and 11 a trade streak. For harnesses that address a section from the tail.
 std::size_t world_save_alarm_section_bytes(const world& w);
+
 /// BL-1459: the byte length of the v69 war section `w` writes — 24 for six empty
 /// counts, plus each record's length. The LAST section of a v69 stream.
 std::size_t world_save_war_section_bytes(const world& w);
@@ -912,11 +913,11 @@ void write_world_snapshot_pre_war(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1418): @p w as a v69 stream — no embargo section.
 void write_world_snapshot_pre_embargo(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1460): @p w as a v70 stream — no generation-capital section.
+void write_world_snapshot_pre_gen_capital(const world& w, std::ostream& out);
+
 /// BL-1422, VERIFICATION ONLY (save_roundtrip): the v72 stream - every per-resource
 /// array 49 wide, the kit goods dropped - so the narrowed reader has a producer.
 void write_world_snapshot_pre_kit_goods(const world& w, std::ostream& out);
-
-void write_world_snapshot_pre_gen_capital(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1463): the v71 stream shape — no recruits section.
 void write_world_snapshot_pre_recruits(const world& w, std::ostream& out);
@@ -945,7 +946,26 @@ int32_t legacy_battle_recon_milli(const world& w, const active_battle& b);
 ///            off by the retreat rule (`resolve_shared_tiles`), and with the rows given
 ///            no unit steps onto a tile its class cannot enter. Null = no class walls.
 /// @return   True if the snapshot was read whole; false on any rejection.
-bool read_world_snapshot(world& w, std::istream& in, const military_capability_params* mil = nullptr);
+///
+/// @p base_price (BL-1422): the authored market base prices - world_gen.lua's
+/// `kepler_market.base_price`, the one table generation prices every market from. A
+/// stream before v73 predates the five kit goods, so its markets read them at base
+/// price 0, which is UNBUYABLE (MARKETS.md § What trades); given the table, every
+/// market of such a stream has the kit goods' base price (and its resolved price, 0 in
+/// the stream) set from it, exactly as generation would have. Null leaves them 0 - a
+/// caller with no authored table (a Lua-free harness) gets the stream as written.
+bool read_world_snapshot(world& w, std::istream& in, const military_capability_params* mil = nullptr,
+                         const std::array<float, resource_count>* base_price = nullptr);
+
+/// BL-1422: the five kit goods (small arms ... drones), in enum order.
+inline constexpr resource_type k_kit_goods[] = {
+    resource_type::small_arms, resource_type::armoured_vehicles, resource_type::artillery_pieces,
+    resource_type::guided_weapons, resource_type::drones,
+};
+
+/// BL-1422: set every market's kit-goods base price (and a zero resolved price) from
+/// @p base_price. What `read_world_snapshot` does for a pre-v73 stream.
+void reauthor_kit_goods_prices(world& w, const std::array<float, resource_count>& base_price);
 
 /// Drop every derived cache on @p w so the next read of each rebuilds.
 ///

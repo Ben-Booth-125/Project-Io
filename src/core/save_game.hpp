@@ -335,10 +335,12 @@ inline constexpr uint32_t save_game_magic =
 /// `exclave_ceded` precedent: no field moves, so no version bump; a build that
 /// predates it refuses such a stream on the kind range check. (The world
 /// snapshot inside the envelope carries its own version, world_save v56.)
-/// LAYOUT 24 (BL-1422, the kit goods by kind): `resource_count` moved 49 -> 54, so the
-/// market history's per-market block of one series per resource is five series longer.
-/// Nothing else moved. v23 and v22 stay readable: their market history is read 49
-/// series wide (`k_resource_count_pre_kit_goods`), the kit goods' series empty.
+/// LAYOUT 24 (BL-1422, the kit goods by kind): `resource_count` moved 49 -> 54, so EVERY
+/// resource_count-wide array in the envelope is five elements longer: each body's
+/// planetology endowment (`planetology_state::endowment`, written in the body record) and
+/// the market history's per-market block of one series per resource. v23 and v22 stay
+/// readable: the whole envelope read runs under `bio::scoped_array_width`, every such
+/// array read 49 wide (`k_resource_count_pre_kit_goods`), the kit goods zero / empty.
 inline constexpr uint32_t save_game_version = 24; // BL-1422: the market history 54 series wide
 /// The first layout whose market history is 54 series wide.
 inline constexpr uint32_t save_game_version_kit_goods = 24;
@@ -412,6 +414,13 @@ struct save_envelope
 /// @return     True if the file was opened and written without a stream error.
 bool write_save_game(const std::string& path, const world& w, const save_envelope& env);
 
+/// VERIFICATION ONLY (BL-1422): write @p env and @p w at an older envelope layout
+/// (`save_game_version_pre_kit_goods` or `save_game_version_prefix_compatible`): the
+/// world as a v72 snapshot and every resource_count-wide envelope array 49 wide, so the
+/// narrowed reader has a genuine producer. False for any other version.
+bool write_save_game_at(const std::string& path, const world& w, const save_envelope& env,
+                        uint32_t version);
+
 /// Read a save game from @p path into @p w and @p env.
 ///
 /// ATOMIC ON FAILURE, on both halves: `read_world_snapshot` already builds into
@@ -426,5 +435,9 @@ bool write_save_game(const std::string& path, const world& w, const save_envelop
 /// @return     True if the save was read whole; false on any rejection.
 /// @p mil (BL-1455): the class terrain rows, threaded to `read_world_snapshot` so a
 /// legacy stream's load-time step-off never lands a unit on a class wall.
+/// @p base_price (BL-1422): the authored market base prices (world_gen.lua's
+/// `kepler_market.base_price`, the table generation prices markets from), threaded to
+/// `read_world_snapshot` so a pre-v73 world's markets get the five kit goods priced.
 bool read_save_game(const std::string& path, world& w, save_envelope& env,
-                    const military_capability_params* mil = nullptr);
+                    const military_capability_params* mil = nullptr,
+                    const std::array<float, resource_count>* base_price = nullptr);

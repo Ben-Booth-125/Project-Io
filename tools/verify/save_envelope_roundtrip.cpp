@@ -935,15 +935,10 @@ int main()
         world w = make_world();
         seed_exchanges(w, 4);
         const save_envelope env = make_envelope();
-        write_save_game(k_path, w, env);
-        const auto full = std::filesystem::file_size(k_path);
-        std::filesystem::resize_file(k_path, full - 2 * sizeof(int32_t));
-        {
-            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
-            f.seekp(4, std::ios::beg);
-            const uint32_t v22 = 22;
-            f.write(reinterpret_cast<const char*>(&v22), sizeof(v22));
-        }
+        // BL-1422: a GENUINE v22 file - its world and every resource_count-wide envelope
+        // array 49 wide, no target tail - from the verification writer, not today's
+        // bytes truncated (today's arrays are 54 wide since save_game_version 24).
+        write_save_game_at(k_path, w, env, save_game_version_prefix_compatible);
         world         lw;
         save_envelope le;
         le.params.nation_total_target = 33; // must be overwritten with 0
@@ -965,6 +960,60 @@ int main()
         le.speed = 99;
         check(!read_save_game(k_path, lw, le) && le.speed == 99,
               "S9 a v21-versioned stream is still refused, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // S9b -- BL-1422 (save_game_version 24): a GENUINELY NARROW v23 envelope, its
+    // bodies' planetology endowments and its market history 49 wide, reads whole: the
+    // first 49 slots as written, the five kit goods 0 / empty, and every field after
+    // the bodies (the market history, the view floats, the targets) intact.
+    // -----------------------------------------------------------------------
+    {
+        world w = make_world();
+        save_envelope env = make_envelope();
+        check(!env.report.bodies.empty(), "S9b anchor: the fixture envelope carries a body");
+        if (!env.report.bodies.empty())
+        {
+            auto& st = env.report.bodies[0].state.endowment;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                st[r] = 1.0f + 0.125f * static_cast<float>(r);
+            env.report.bodies[0].undrawn.endowment = st;
+        }
+        check(write_save_game_at(k_path, w, env, save_game_version_pre_kit_goods),
+              "S9b the verification writer wrote a v23 file");
+        world         lw;
+        save_envelope le;
+        const bool ok = read_save_game(k_path, lw, le);
+        check(ok, "S9b a narrow v23 file with bodies is ACCEPTED");
+        bool endow = ok && !le.report.bodies.empty();
+        if (endow)
+        {
+            const auto& got = le.report.bodies[0].state.endowment;
+            const auto& und = le.report.bodies[0].undrawn.endowment;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float want = r < k_resource_count_pre_kit_goods ? 1.0f + 0.125f * static_cast<float>(r) : 0.0f;
+                endow = endow && got[r] == want && und[r] == want;
+            }
+        }
+        check(endow, "S9b each body's endowment (state and undrawn) reads its 49 slots as written, the kit goods 0");
+        check(ok && same_market_history(le.market_history, env.market_history)
+                  && le.planetary_pan_y == env.planetary_pan_y
+                  && le.params.nation_total_target == env.params.nation_total_target
+                  && le.params.major_target == env.params.major_target,
+              "S9b everything after the bodies reads whole: market history, the last view float, the targets");
+        // The same narrow bytes stamped v24 misread and are REFUSED (the width matters).
+        {
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(4, std::ios::beg);
+            const uint32_t v24 = save_game_version_kit_goods;
+            f.write(reinterpret_cast<const char*>(&v24), sizeof(v24));
+        }
+        world         bw;
+        save_envelope be;
+        be.speed = 77;
+        check(!read_save_game(k_path, bw, be) && be.speed == 77,
+              "S9b a narrow file stamped v24 is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------
