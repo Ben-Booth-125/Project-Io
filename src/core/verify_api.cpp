@@ -31,6 +31,7 @@
 #include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
 #include "ui/selection_panel.hpp"
 #include "ui/stat_grid.hpp"      // BL-1454: verify.stat_grids, the grids on screen
+#include "ui/header_panel.hpp"   // BL-1472: verify.header_recruits, the header's readouts
 #include "ui/corporation_dashboard.hpp"
 // BL-1406: ui/corporation_panel.hpp retired with the corporation stance table.
 #include "ui/detail_level.hpp"
@@ -3181,19 +3182,35 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             classes[++k] = e;
         }
         out["classes"] = classes;
-        // BL-1450 (grouped by theatre): each theatre header drawn (its press, fold
-        // and count), the Air picker's airbases, every air row's Raise press, the
-        // player's wing rows and the Design tab's air class rows. On screen already.
-        sol::table headers = st.create_table();
+        // BL-1472 (theatre tabs): each theatre tab drawn under Recruit / Design (its
+        // press, whether it is the active one, its count), and the theatre each tab
+        // shows; then the Air picker's airbases, every air row's Raise press, the
+        // player's wing rows, the Design tab's air class rows and the Sea stub's
+        // ports. On screen already.
+        static const char* const k_theatres[3] = {"land", "air", "sea"};
+        sol::table ttabs = st.create_table();
         k = 0;
-        for (const auto& h : m.headers)
+        for (const auto& h : m.theatre_tabs)
         {
             sol::table e = st.create_table();
-            e["tab"] = h.tab; e["theatre"] = std::string(h.theatre == 0 ? "land" : "air");
-            e["x"] = h.x; e["y"] = h.y; e["open"] = h.open; e["count"] = h.count;
-            headers[++k] = e;
+            e["tab"] = h.tab;
+            e["theatre"] = std::string(k_theatres[std::clamp(h.theatre, 0, 2)]);
+            e["x"] = h.x; e["y"] = h.y; e["active"] = h.active; e["count"] = h.count;
+            ttabs[++k] = e;
         }
-        out["headers"] = headers;
+        out["theatre_tabs"]   = ttabs;
+        out["recruit_theatre"] = std::string(k_theatres[std::clamp(m.theatre[0], 0, 2)]);
+        out["design_theatre"]  = std::string(k_theatres[std::clamp(m.theatre[1], 0, 2)]);
+        sol::table ports = st.create_table();
+        k = 0;
+        for (const auto& b : m.ports)
+        {
+            sol::table e = st.create_table();
+            e["id"] = static_cast<unsigned>(b.id); e["x"] = b.x; e["y"] = b.y;
+            ports[++k] = e;
+        }
+        out["ports"]    = ports;
+        out["sea_base"] = static_cast<unsigned>(m.sea_base);
         sol::table abases = st.create_table();
         k = 0;
         for (const auto& b : m.air_bases)
@@ -3236,22 +3253,34 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             aclasses[++k] = e;
         }
         out["air_classes"] = aclasses;
-        // BL-1463: the recruit pool strip heading each Recruit theatre - the numbers it
-        // drew (held, cap, the quarter's output) and its centre, keyed by theatre.
-        sol::table pools = st.create_table();
-        for (const auto& p : m.pools)
+        return out;
+    });
+
+    // BL-1472 (HEADER.md § Contents, Recruits): the header's three recruit readouts as
+    // they drew - land, air, sea - each one's numbers (held, cap, the quarter's output),
+    // its bar's fill, its centre (the hover), whether its tooltip shows; and the fit
+    // ladder's step (0 "held / cap", 1 held alone, 2 glyph and bar). `drawn` is false
+    // until the header has drawn. All of it is on screen.
+    v.set_function("header_recruits", [this]() {
+        sol::state& st = m_lua.state();
+        const ui::header_recruits_record& r = ui::header_recruits_drawn();
+        sol::table out = st.create_table();
+        out["drawn"] = r.frame >= 0;
+        out["fit"]   = r.fit;
+        static const char* const k_theatres[3] = {"land", "air", "sea"};
+        for (int t = 0; t < 3; ++t)
         {
+            const ui::header_recruit_drawn& d = r.theatre[t];
             sol::table e = st.create_table();
-            e["held"] = p.held; e["cap"] = p.cap; e["output"] = p.output;
-            e["x"] = p.x; e["y"] = p.y;
-            pools[p.theatre == 0 ? "land" : "air"] = e;
+            e["held"] = d.held; e["cap"] = d.cap; e["output"] = d.output;
+            e["bar"] = d.bar; e["x"] = d.x; e["y"] = d.y; e["hovered"] = d.hovered;
+            out[k_theatres[t]] = e;
         }
-        out["pools"] = pools;
         return out;
     });
 
     // BL-1463 (MILITARY.md § Recruits): the player nation's two recruit pools as the
-    // WORLD holds them, for the ledger strip to be checked against - the pool read off
+    // WORLD holds them, for the header's readouts (BL-1472) to be checked against - the pool read off
     // the nation's own field, and the running bases counted here from its state assets
     // (complete, not decommissioned, not idled), with the authored rate. Nation-level
     // counts only: nothing the strip and its tooltip do not already show.

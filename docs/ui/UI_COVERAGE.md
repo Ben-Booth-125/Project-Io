@@ -8,9 +8,9 @@
 
 ## Headline
 
-**115 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**116 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**54 of 115 elements can be changed without any check going red.**
+**55 of 116 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
@@ -19,7 +19,7 @@ and so is the safety net.
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
 | **ASSERTED** | 58 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 12 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
-| **CAPTURE-ONLY** | 34 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
+| **CAPTURE-ONLY** | 35 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
 
 ## GOLDEN (3)
@@ -110,7 +110,7 @@ and so is the safety net.
 | `UI-116` History Ledger (Story/Chain/Ages/Tectonics) > Ages view | view | `ages_replay` | 0 | 1 | 0 |
 | `UI-115` History Ledger (Story/Chain/Ages/Tectonics) > Tectonics view | view | `ledger_pass` | 0 | 1 | 0 |
 
-## CAPTURE-ONLY (34)
+## CAPTURE-ONLY (35)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -147,7 +147,8 @@ and so is the safety net.
 | `UI-129` Planetary Canvas > Front line | sub-element | `fronts` | 0 | 0 | 1 |
 | `UI-130` Selection band > Front card | sub-element | `fronts` | 0 | 0 | 1 |
 | `UI-131` Planetary Canvas > Right-click unit orders | control | `unit_orders` | 0 | 0 | 6 |
-| `UI-133` Diplomacy Ledger | ledger | `diplomacy_ledger`, `unit_orders` | 0 | 0 | 9 |
+| `UI-133` Diplomacy Ledger | ledger | `diplomacy_ledger`, `unit_orders` | 0 | 0 | 11 |
+| `UI-134` Header Panel > Recruit readouts | sub-element | `military_ledger`, `air_ui` | 0 | 0 | 34 |
 
 ## NONE (8)
 
@@ -167,7 +168,6 @@ and so is the safety net.
 Checks driving a surface no catalogue element claims. This is the catalogue's
 staleness detector — a non-empty list means the UI grew and the spine did not.
 
-- `air_ui` (16 captures, 0 expects) — Verify the air UI (BL-1450; docs/ui/ledgers/military.md § Grouped by theatre,
 - `border_hard_edges` (4 captures, 1 expects) — BL-1292 (borders hard edges) — the plain canvas at the three widest rungs, framed
 - `campaign_lapse` (4 captures, 1 expects) — campaign_lapse — BL-723's visual half: the spectated campaign as a film strip.
 - `canvas_vector_perf` (1 captures, 0 expects) — The Planetary canvas's vector layer at every rung (sprint 51; PLANETARY.md
@@ -190,7 +190,6 @@ staleness detector — a non-empty list means the UI grew and the spine did not.
 - `history_lapse_works` (8 captures, 8 expects) — THE WORKS AND THE RUNG ON ROUND 6 (BL-1099, BL-1100; Ben, 2026-09-24,
 - `lens_strip_glyphs` (7 captures, 3 expects) — BL-1225 (every lens on strip): every built lens sits in at least one rung row
 - `logistics_unpaint_perf` (0 captures, 0 expects) — What arming the Logistics lens costs the FRAME, on the play path (Ben, 2026-10-25:
-- `military_ledger` (6 captures, 0 expects) — Verify the Military ledger (rail slot 7; docs/ui/ledgers/military.md).
 - `names_and_voice` (6 captures, 10 expects) — BL-1106 -- THE TICKER AND BOARD SPEAK THE HISTORY'S WORDS.
 - `pan_perf` (0 captures, 0 expects) — Pan-cost measurement (the "stutter while panning" report, 2026-08-02).
 - `realm_identity` (11 captures, 20 expects) — A realm keeps its identity across the wizard's seams (BL-1087 colour,

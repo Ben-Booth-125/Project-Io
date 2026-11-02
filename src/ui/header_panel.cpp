@@ -5,15 +5,55 @@
 #include "presentation.hpp"
 #include "text_fit.hpp"
 
+#include "icons.hpp"                 // BL-1472: the theatre glyphs
+
 #include "world/economy_system.hpp" // BL-577: economy_report, for budgets[player].subsidies
+#include "world/recipe_registry.hpp"
+#include "world/recruit_params.hpp"
+#include "world/recruits.hpp"       // BL-1472: recruit_pool / recruit_cap / recruit_quarter_output
 
 #include <imgui.h>
 
+#include <algorithm>
+#include <cstdio>
 #include <unordered_map>
 
 namespace ui {
 
 namespace {
+
+header_recruits_record& recruits_record()
+{
+    static header_recruits_record r;
+    return r;
+}
+
+/// One theatre's pool as the header reads it (MILITARY.md § Recruits).
+struct recruit_readout
+{
+    int held   = 0; ///< recruits in the nation's pool
+    int cap    = 0; ///< 15 x the quarter's nominal output
+    int output = 0; ///< recruits its running sources make a quarter
+    int rate   = 0; ///< the authored rate per source (bases = output / rate)
+};
+
+recruit_readout read_recruit_pool(const world& w, const recipe_registry& reg, entity_id nation,
+                                  recruit_theatre t, int rate)
+{
+    return {recruit_pool(w, nation, t), recruit_cap(w, reg, nation, t),
+            recruit_quarter_output(w, reg, nation, t), std::max(0, rate)};
+}
+
+/// The SEA pool (MILITARY.md § Recruits, "Ports make sea recruits"). The world's
+/// `recruit_theatre::sea` is landing in a parallel lane; until it merges the sea
+/// readout stands at 0 / 0 with an empty bar, as HEADER.md says a theatre with no
+/// source reads. At merge this body becomes one line:
+///   return read_recruit_pool(w, reg, nation, recruit_theatre::sea, reg.military().recruits.sea_per_port);
+recruit_readout sea_recruit_readout(const world& w, const recipe_registry& reg, entity_id nation)
+{
+    (void)w; (void)reg; (void)nation;
+    return {};
+}
 
 /// BL-1406 (HEADER.md § Contents): the player's money is its NATION's treasury
 /// once the world is folded — `purse_of(player_actor)` answers either owner, so
@@ -56,7 +96,140 @@ bool ledger_burn(const world& w, float& movement)
     return true;
 }
 
+// ---- BL-1472: the recruit readouts (HEADER.md § Contents, Recruits) ----------------
+// Land, air, sea at the top right: each the theatre's glyph, held / cap, a thin bar of
+// held over cap beneath in the stat grid's idiom (stat_grid.cpp: a dark track, the
+// unit_hp fill). What a pool is, its quarter's output and that a full pool takes none
+// is the readout's tooltip.
+
+constexpr float k_recruit_glyph_r  = 8.0f;  ///< glyph half-extent
+constexpr float k_recruit_text_gap = 5.0f;  ///< glyph to its numbers
+constexpr float k_recruit_gap      = 16.0f; ///< between two readouts
+constexpr float k_recruit_lead     = 20.0f; ///< the least room left of the three
+constexpr float k_recruit_bar_h    = 3.0f;
+
+const char* const k_recruit_theatre_names[3] = {"Land", "Air", "Sea"};
+
+/// The readout's numbers at fit step @p fit: "120 / 750", "120", or nothing.
+std::string recruit_numbers(const recruit_readout& r, int fit)
+{
+    char buf[48];
+    if (fit == 0)      std::snprintf(buf, sizeof buf, "%d / %d", r.held, r.cap);
+    else if (fit == 1) std::snprintf(buf, sizeof buf, "%d", r.held);
+    else               buf[0] = '\0';
+    return buf;
+}
+
+float recruit_block_width(const recruit_readout& r, int fit)
+{
+    const float glyph = 2.0f * k_recruit_glyph_r;
+    if (fit >= 2)
+        return glyph;
+    return glyph + k_recruit_text_gap + ImGui::CalcTextSize(recruit_numbers(r, fit).c_str()).x;
+}
+
+float recruit_strip_width(const recruit_readout (&r)[3], int fit)
+{
+    return recruit_block_width(r[0], fit) + recruit_block_width(r[1], fit) +
+           recruit_block_width(r[2], fit) + 2.0f * k_recruit_gap;
+}
+
+void recruit_glyph(ImDrawList* dl, int theatre, ImVec2 c, ImU32 col)
+{
+    switch (theatre)
+    {
+    case 0: icons::unit_marker(dl, c, k_recruit_glyph_r, col, false); break; // the soldier
+    case 1: icons::aircraft(dl, c, k_recruit_glyph_r, col); break;
+    default: icons::anchor(dl, c, k_recruit_glyph_r, col); break;
+    }
+}
+
+void recruit_tooltip(int theatre, const recruit_readout& r)
+{
+    static const char* const k_what[3] = {
+        "The men every land unit is raised with and refills from. Each running military base "
+        "takes them from its province's people, every quarter.",
+        "The crews every wing is raised with and refills from. Each running airbase takes them "
+        "from its province's people, every quarter.",
+        "The crews ships will be raised with. Each port takes them from its province's people, "
+        "every quarter.",
+    };
+    static const char* const k_source[3][2] = {
+        {"running military base", "running military bases"},
+        {"running airbase", "running airbases"},
+        {"port", "ports"},
+    };
+    ImGui::BeginTooltip();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s recruits: %d / %d",
+                       k_recruit_theatre_names[theatre], r.held, r.cap);
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+    ImGui::TextUnformatted(k_what[theatre]);
+    const int sources = r.rate > 0 ? r.output / r.rate : 0;
+    if (r.rate > 0)
+        ImGui::TextDisabled("%d %s x %d = %d a quarter; the pool holds at most %d, fifteen quarters of it.",
+                            sources, k_source[theatre][sources == 1 ? 0 : 1], r.rate, r.output, r.cap);
+    else
+        ImGui::TextDisabled("%d a quarter; the pool holds at most %d, fifteen quarters of it.", r.output,
+                            r.cap);
+    ImGui::TextDisabled("A full pool takes none: its sources make no recruits that quarter.");
+    if (r.cap > 0 && r.held >= r.cap)
+        ImGui::TextDisabled("Full now: nothing is made until a hire spends from it.");
+    else if (r.cap == 0 && r.held == 0)
+        ImGui::TextDisabled("No %s: nothing fills it.", theatre == 0 ? "running military base"
+                                                        : theatre == 1 ? "running airbase" : "port");
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+}
+
+/// Draw the three readouts right-aligned to @p right, the row centred on @p cy.
+void draw_recruit_readouts(const recruit_readout (&r)[3], int fit, float right, float cy)
+{
+    header_recruits_record& rec = recruits_record();
+    rec.frame = ImGui::GetFrameCount();
+    rec.fit   = fit;
+
+    ImDrawList* dl   = ImGui::GetWindowDrawList();
+    const float line = ImGui::GetTextLineHeight();
+    const float gy   = cy - 2.0f;                                   // glyph and numbers
+    const float by   = gy + k_recruit_glyph_r + 2.0f;               // the bar beneath
+    const float top  = gy - k_recruit_glyph_r - 1.0f;
+    const float h    = by + k_recruit_bar_h + 1.0f - top;
+    float x = right - recruit_strip_width(r, fit);
+    for (int t = 0; t < 3; ++t)
+    {
+        const float bw = recruit_block_width(r[t], fit);
+        const float share = r[t].cap > 0
+                                ? std::clamp(static_cast<float>(r[t].held) / static_cast<float>(r[t].cap), 0.0f, 1.0f)
+                                : (r[t].held > 0 ? 1.0f : 0.0f);
+
+        ImGui::SetCursorScreenPos({x, top});
+        ImGui::PushID(t + 0x1472);
+        ImGui::InvisibleButton("##recruits", {bw, h});
+        const bool hot = ImGui::IsItemHovered();
+        ImGui::PopID();
+
+        const ImU32 ink = hot ? palette::selection : palette::text_secondary;
+        recruit_glyph(dl, t, {x + k_recruit_glyph_r, gy}, ink);
+        if (fit < 2)
+        {
+            const std::string nums = recruit_numbers(r[t], fit);
+            dl->AddText({x + 2.0f * k_recruit_glyph_r + k_recruit_text_gap, gy - line * 0.5f},
+                        r[t].held > 0 ? ImGui::GetColorU32(ImGuiCol_Text) : palette::neutral, nums.c_str());
+        }
+        dl->AddRectFilled({x, by}, {x + bw, by + k_recruit_bar_h}, IM_COL32(60, 64, 74, 255), 1.0f);
+        if (share > 0.0f)
+            dl->AddRectFilled({x, by}, {x + bw * share, by + k_recruit_bar_h}, palette::unit_hp, 1.0f);
+        if (hot)
+            recruit_tooltip(t, r[t]);
+
+        rec.theatre[t] = {r[t].held, r[t].cap, r[t].output, x + bw * 0.5f, top + h * 0.5f, share, hot};
+        x += bw + k_recruit_gap;
+    }
+}
+
 } // namespace
+
+const header_recruits_record& header_recruits_drawn() { return recruits_record(); }
 
 // Declared in header_panel.hpp; shared with the Budget ledger (BL-171) so both the
 // header strip's CARGO figure and the ledger's Cargo Value use one valuation.
@@ -85,6 +258,7 @@ float player_cargo_value(const world& w)
 }
 
 void draw_header_panel(const world& w,
+                       const recipe_registry& reg,
                        const std::vector<float>& balance_history,
                        const economy_report& report,
                        float left,
@@ -194,6 +368,20 @@ void draw_header_panel(const world& w,
     const float available  = ImGui::GetContentRegionAvail().x;
     bool        show_spark = balance_history.size() >= 2;
 
+    // BL-1472 — the recruit pools (HEADER.md § Contents, Recruits), read first: their
+    // glyph-and-bar floor is RESERVED before the runway is fitted, because the bars
+    // never drop (HEADER.md § Fit and degradation). The runway degrades into what is
+    // left; it never draws under the readouts.
+    const entity_id         nation = player_nation(w);
+    const recruit_params&   rp     = reg.military().recruits;
+    const recruit_readout   pools[3] = {
+        read_recruit_pool(w, reg, nation, recruit_theatre::land, rp.land_per_base),
+        read_recruit_pool(w, reg, nation, recruit_theatre::air, rp.air_per_base),
+        sea_recruit_readout(w, reg, nation),
+    };
+    const float recruit_floor = k_recruit_lead + recruit_strip_width(pools, 2);
+    const float money_room    = available - recruit_floor; // what the left run may take
+
     // BL-177 runway fit, resolved BEFORE the decorative drop because the runway
     // is load-bearing and the sparkline is not. Container 4 (LAYOUT.md) forbids
     // silently truncating a header figure, so this degrades in three honest steps:
@@ -207,12 +395,12 @@ void draw_header_panel(const world& w,
     bool show_runway_label = false;
     if (show_runway)
     {
-        if (used_width + runway_sep_w + runway_label_w + runway_val_w <= available)
+        if (used_width + runway_sep_w + runway_label_w + runway_val_w <= money_room)
         {
             show_runway_label = true;
             used_width += runway_sep_w + runway_label_w + runway_val_w;
         }
-        else if (used_width + runway_sep_w + runway_val_w <= available)
+        else if (used_width + runway_sep_w + runway_val_w <= money_room)
         {
             used_width += runway_sep_w + runway_val_w;
         }
@@ -221,6 +409,19 @@ void draw_header_panel(const world& w,
             show_runway = false; // no room at all — NET's tooltip carries it
         }
     }
+
+    // BL-1472 — the recruit readouts, step 2 of the ladder (HEADER.md § Fit and
+    // degradation): resolved after the runway and before the sparkline. "held / cap",
+    // then the held figure alone, then glyph and bar only (the numbers move into each
+    // readout's tooltip). The last step is the floor reserved above.
+    int recruit_fit = 2;
+    for (int f = 0; f < 2; ++f)
+        if (used_width + k_recruit_lead + recruit_strip_width(pools, f) <= available)
+        {
+            recruit_fit = f;
+            break;
+        }
+    used_width += k_recruit_lead + recruit_strip_width(pools, recruit_fit);
 
     if (show_spark && used_width + item_spacing.x + spark_width > available)
         show_spark = false; // the sparkline is the last decorative element to drop
@@ -288,6 +489,14 @@ void draw_header_panel(const world& w,
                          0, nullptr,
                          FLT_MAX, FLT_MAX,
                          {spark_width, ImGui::GetFrameHeight()});
+    }
+
+    // --- BL-1472: the recruit readouts, flush to the strip's right edge ---
+    {
+        const ImVec2 wp    = ImGui::GetWindowPos();
+        const float  right = wp.x + ImGui::GetWindowContentRegionMax().x;
+        const float  cy    = wp.y + header_panel_height * 0.5f;
+        draw_recruit_readouts(pools, recruit_fit, right, cy);
     }
 
     ImGui::End();

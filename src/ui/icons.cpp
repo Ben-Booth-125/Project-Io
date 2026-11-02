@@ -1318,6 +1318,28 @@ void aircraft(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     aircraft(dl, centre, r, colour, true);
 }
 
+void anchor(ImDrawList* dl, ImVec2 c, float r, ImU32 colour)
+{
+    // BL-1472: ring, shank, stock, then the arms - an arc through the shank's foot
+    // (ImGui angles run clockwise from +x, so 0.15 pi .. 0.85 pi passes the bottom).
+    const float t = std::max(1.2f, r * 0.16f);
+    dl->AddCircle({c.x, c.y - r * 0.72f}, r * 0.20f, colour, 12, t);
+    dl->AddLine({c.x, c.y - r * 0.52f}, {c.x, c.y + r * 0.86f}, colour, t);
+    dl->AddLine({c.x - r * 0.42f, c.y - r * 0.28f}, {c.x + r * 0.42f, c.y - r * 0.28f}, colour, t);
+    constexpr float k_pi = 3.14159265358979f;
+    const ImVec2 hub{c.x, c.y + r * 0.16f};
+    const float  ar = r * 0.70f;
+    dl->PathArcTo(hub, ar, k_pi * 0.12f, k_pi * 0.88f, 14);
+    dl->PathStroke(colour, 0, t);
+    // The flukes: a short barb at each arm's tip, pointing up and out.
+    for (const float a : {k_pi * 0.12f, k_pi * 0.88f})
+    {
+        const ImVec2 tip{hub.x + std::cos(a) * ar, hub.y + std::sin(a) * ar};
+        const float  side = std::cos(a) > 0.0f ? 1.0f : -1.0f;
+        dl->AddLine(tip, {tip.x + side * r * 0.10f, tip.y - r * 0.28f}, colour, t);
+    }
+}
+
 void wing_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count, bool hovered)
 {
     // A round dark plate — the land counter is square, so a wing never reads as a

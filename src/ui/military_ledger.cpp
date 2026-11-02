@@ -99,19 +99,40 @@ std::string missing_air_gate(const roster_gate& g, const campaign_roster_gate_in
     return missing_gate(probe, in);
 }
 
-/// A theatre's collapsible header (military.md § Grouped by theatre): its name and
-/// count; the press folds or unfolds its rows (a toggle by construction). Returns
-/// whether the rows draw.
-bool theatre_header(military_ledger_state& m, int tab, int theatre, const char* name, int count)
+/// The theatre tabs under Recruit / Design (military.md § Grouped by theatre; Ben,
+/// 2026-11-02): Land, Air, Sea, each its name and count. A theatre tab switches what
+/// the view lists, so it is a SELECTOR, not a toggle: `nav_button` without a close
+/// target leaves a re-press of the active tab a no-op (the Recruit / Design tabs keep
+/// the toggle rule). @p tab is 0 Recruit, 1 Design.
+void theatre_tabs(military_ledger_state& m, int tab, const int (&counts)[3])
 {
-    char label[80];
-    std::snprintf(label, sizeof label, "%s  (%d)###theatre_%d_%d", name, count, tab, theatre);
-    ImGui::SetNextItemOpen(m.theatre_open[tab][theatre], ImGuiCond_Always);
-    const bool open = ImGui::CollapsingHeader(label);
-    m.theatre_open[tab][theatre] = open;
-    m.headers.push_back({tab, theatre, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
-                         (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f, open, count});
-    return open;
+    static const char* const k_names[3] = {"Land", "Air", "Sea"};
+    if (m.theatre[tab] < 0 || m.theatre[tab] > 2)
+        m.theatre[tab] = 0;
+    for (int t = 0; t < 3; ++t)
+    {
+        if (t > 0)
+            ImGui::SameLine();
+        char label[64];
+        std::snprintf(label, sizeof label, "%s  %d###theatre_%d_%d", k_names[t], counts[t], tab, t);
+        ui::nav_button(label, t, m.theatre[tab]); // no close target: a selector
+        m.theatre_tabs.push_back({tab, t, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                                  (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f,
+                                  m.theatre[tab] == t, counts[t]});
+    }
+    ImGui::Spacing();
+}
+
+/// The nation's completed ports, ascending id: the Sea tab's picker.
+std::vector<entity_id> player_ports(const world& w, entity_id actor)
+{
+    std::vector<entity_id> out;
+    for (const auto& [bid, bc] : w.buildings)
+        if (bc.type == building_type::port && bc.ticks_remaining <= 0 && !bc.decommissioned
+            && owner_holds(w, actor, bid))
+            out.push_back(bid);
+    std::sort(out.begin(), out.end());
+    return out;
 }
 
 /// An air design's numbers on one line: the class's plus its live kit's.
@@ -161,84 +182,8 @@ struct base_row
     int       units = 0;
 };
 
-/// BL-1463 (MILITARY.md § Recruits; military.md § Open questions, "Manpower shows on
-/// Recruit"): the theatre's recruit pool, one strip at the head of its rows in the stat
-/// grid's idiom - a dark cell, its name at the left, "held / cap" and the quarter's
-/// output at the right, a thin bar of held over cap beneath. What a pool is and where it
-/// comes from is the strip's tooltip, never ledger text (Ben, 2026-10-30).
-void draw_recruit_pool(const world& w, const recipe_registry& reg, military_ledger_state& m,
-                       entity_id nation, recruit_theatre t)
-{
-    const bool  land   = t == recruit_theatre::land;
-    const int   held   = recruit_pool(w, nation, t);
-    const int   cap    = recruit_cap(w, reg, nation, t);
-    const int   output = recruit_quarter_output(w, reg, nation, t);
-    const recruit_params& rp = reg.military().recruits;
-    const int   rate   = std::max(0, land ? rp.land_per_base : rp.air_per_base);
-
-    constexpr float k_pad = 4.0f, k_bar_h = 3.0f;
-    ImDrawList*  dl   = ImGui::GetWindowDrawList();
-    const float  line = ImGui::GetTextLineHeight();
-    const ImVec2 p0   = ImGui::GetCursorScreenPos();
-    const float  wdt  = std::max(60.0f, ImGui::GetContentRegionAvail().x);
-    const float  h    = line + 2.0f * k_pad + k_bar_h + 2.0f;
-    const ImVec2 p1   = {p0.x + wdt, p0.y + h};
-
-    ImGui::PushID(land ? "pool_land" : "pool_air");
-    ImGui::InvisibleButton("##pool", {wdt, h});
-    const bool hot = ImGui::IsItemHovered();
-    ImGui::PopID();
-
-    dl->AddRectFilled(p0, p1, hot ? IM_COL32(40, 44, 56, 255) : IM_COL32(26, 28, 36, 255), 3.0f);
-    dl->PushClipRect(p0, p1, true);
-    dl->AddText({p0.x + k_pad, p0.y + k_pad}, palette::text_secondary, "Recruits");
-    char value[48], per[48];
-    std::snprintf(value, sizeof value, "%d / %d", held, cap);
-    std::snprintf(per, sizeof per, "+%d a quarter", output);
-    const float per_w = ImGui::CalcTextSize(per).x;
-    const float val_w = ImGui::CalcTextSize(value).x;
-    const float right = p1.x - k_pad;
-    dl->AddText({right - per_w, p0.y + k_pad}, palette::neutral, per);
-    dl->AddText({right - per_w - 10.0f - val_w, p0.y + k_pad}, held > 0 ? palette::selection : palette::neutral,
-                value);
-    const float by = p0.y + k_pad + line + 1.0f;
-    const float x0 = p0.x + k_pad, x1 = p1.x - k_pad;
-    dl->AddRectFilled({x0, by}, {x1, by + k_bar_h}, IM_COL32(60, 64, 74, 255), 1.0f);
-    const float share = cap > 0 ? std::clamp(static_cast<float>(held) / static_cast<float>(cap), 0.0f, 1.0f)
-                                : (held > 0 ? 1.0f : 0.0f);
-    if (share > 0.0f)
-        dl->AddRectFilled({x0, by}, {x0 + (x1 - x0) * share, by + k_bar_h}, palette::unit_hp, 1.0f);
-    dl->PopClipRect();
-
-    if (hot)
-    {
-        ImGui::BeginTooltip();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s recruits",
-                           land ? "Land" : "Air");
-        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
-        ImGui::TextUnformatted(land
-            ? "The men every land unit is raised with and refills from. Each running military base "
-              "takes them from its province's people, every quarter."
-            : "The crews every wing is raised with and refills from. Each running airbase takes them "
-              "from its province's people, every quarter.");
-        ImGui::TextUnformatted("The pool holds at most fifteen quarters of its bases' output.");
-        const int bases = rate > 0 ? output / rate : 0;
-        ImGui::TextDisabled("%d running %s%s x %d = %d a quarter; holds at most %d.", bases,
-                            land ? "military base" : "airbase", bases == 1 ? "" : "s", rate, output, cap);
-        if (cap > 0 && held >= cap)
-            ImGui::TextDisabled("Full: its bases make none until a hire spends from it.");
-        else if (cap == 0 && held == 0)
-            ImGui::TextDisabled(land ? "No running military base: nothing fills it."
-                                     : "No running airbase: nothing fills it.");
-        ImGui::PopTextWrapPos();
-        ImGui::EndTooltip();
-    }
-
-    m.pools.push_back({land ? 0 : 1, held, cap, output, (p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f});
-    ImGui::Spacing();
-}
-
 void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s);
+void draw_sea_stub(const world& w, ui_state& s, bool design);
 
 void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
 {
@@ -268,13 +213,20 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
     for (const std::uint16_t idx : order)
         if (m.show_obsolete || !roster_row_obsolete(w, actor, idx))
             ++land_rows;
-    if (!theatre_header(m, 0, 0, "Land", land_rows))
+    {
+        const int counts[3] = {land_rows, static_cast<int>(air_roster_table().size()), 0};
+        theatre_tabs(m, 0, counts);
+    }
+    if (m.theatre[0] == 1)
     {
         draw_recruit_air(w, reg, s);
         return;
     }
-    ImGui::Indent(4.0f);
-    draw_recruit_pool(w, reg, m, actor, recruit_theatre::land);
+    if (m.theatre[0] == 2)
+    {
+        draw_sea_stub(w, s, false);
+        return;
+    }
 
     // ── Bases ───────────────────────────────────────────────────────────────
     std::vector<base_row> bases;
@@ -474,9 +426,6 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
         ++m.queue_rows;
         ImGui::PopID();
     }
-    ImGui::Unindent(4.0f);
-
-    draw_recruit_air(w, reg, s);
 }
 
 /// Recruit's AIR theatre (military.md § Grouped by theatre; MILITARY.md § Air): the
@@ -487,10 +436,6 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
     military_ledger_state& m = s.military;
     const entity_id actor = player_actor(w);
     const std::vector<air_roster_row>& table = air_roster_table();
-    if (!theatre_header(m, 0, 1, "Air", static_cast<int>(table.size())))
-        return;
-    ImGui::Indent(4.0f);
-    draw_recruit_pool(w, reg, m, actor, recruit_theatre::air);
 
     // ── Airbases ── the one door a wing is hired at (a military base hosts none).
     std::vector<base_row> bases;
@@ -679,7 +624,44 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
     }
     if (shown == 0)
         ImGui::TextDisabled("No wings yet.");
-    ImGui::Unindent(4.0f);
+}
+
+/// The SEA theatre's stub (military.md § Grouped by theatre, Ben 2026-11-02): ships
+/// are not raised yet, and the nation's ports stand under a base picker - the sea
+/// pool itself is the header's (HEADER.md § Contents, Recruits). @p design names
+/// the tab it sits under, for its one line.
+void draw_sea_stub(const world& w, ui_state& s, bool design)
+{
+    military_ledger_state& m = s.military;
+    ImGui::TextDisabled(design ? "Ships are not designed yet." : "Ships are not raised yet.");
+    if (design)
+        return;
+    const std::vector<entity_id> ports = player_ports(w, player_actor(w));
+    if (ports.empty())
+    {
+        m.sea_base = null_entity;
+        ImGui::TextUnformatted("No port");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("A port makes sea recruits, and ships will be raised at one.");
+        return;
+    }
+    if (std::find(ports.begin(), ports.end(), m.sea_base) == ports.end())
+        m.sea_base = ports.front();
+    ImGui::TextDisabled("Ports");
+    for (const entity_id pid : ports)
+    {
+        ImGui::PushID(static_cast<int>(pid) + 0x70000);
+        const auto bit = w.buildings.find(pid);
+        const std::string where = bit != w.buildings.end() ? place_of(w, bit->second.tile) : "Unknown ground";
+        // A target selector, exempt from the toggle rule, as the base pickers are.
+        if (ImGui::Selectable(where.c_str(), m.sea_base == pid))
+            m.sea_base = pid;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("This port makes sea recruits every quarter. Ships are not raised yet.");
+        m.ports.push_back({pid, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                           (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f, 0});
+        ImGui::PopID();
+    }
 }
 
 void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
@@ -688,9 +670,17 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
     // (Ben, 2026-10-30): the ledger shows controls and data only.
     const entity_id nation = player_nation(w);
     military_ledger_state& m = s.military;
-    if (theatre_header(m, 1, 0, "Land", land_class_count - 1)) // every class but `none`
     {
-        ImGui::Indent(4.0f);
+        const int counts[3] = {land_class_count - 1, air_class_count, 0}; // every land class but `none`
+        theatre_tabs(m, 1, counts);
+    }
+    if (m.theatre[1] == 2)
+    {
+        draw_sea_stub(w, s, true);
+        return;
+    }
+    if (m.theatre[1] == 0)
+    {
         for (int c = 0; c < land_class_count; ++c)
         {
             const land_class lc = static_cast<land_class>(c);
@@ -752,14 +742,12 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
             ImGui::TextDisabled("%s", land_class_label(land_class_for(table[idx])));
             ImGui::PopID();
         }
-        ImGui::Unindent(4.0f);
+        return;
     }
 
     // ── AIR (BL-1450): the six air classes beside the land ones, each opening the
     //    same full-canvas designer on its own slots (airframe, armament, avionics).
-    if (theatre_header(m, 1, 1, "Air", air_class_count))
     {
-        ImGui::Indent(4.0f);
         for (int c = 0; c < air_class_count; ++c)
         {
             const air_class ac = static_cast<air_class>(c);
@@ -779,7 +767,6 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
             ImGui::PopTextWrapPos();
             ImGui::Spacing();
         }
-        ImGui::Unindent(4.0f);
     }
 }
 
@@ -808,12 +795,12 @@ void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& 
     m.bases.clear();
     m.raises.clear();
     m.class_rows.clear();
-    m.headers.clear();
+    m.theatre_tabs.clear();
+    m.ports.clear();
     m.air_bases.clear();
     m.air_raises.clear();
     m.wing_rows.clear();
     m.air_class_rows.clear();
-    m.pools.clear();
     m.queue_rows = 0;
 
     if (!open)

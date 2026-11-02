@@ -17,5 +17,15 @@ verify.econ_step(4)
 
 verify.capture("header_populated")
 
+-- BL-1472 (HEADER.md § Contents, Recruits): the three recruit readouts at the top
+-- right, land / air / sea, each held / cap with a bar.
+local h = verify.header_recruits()
+if h.drawn and h.land.x >= 0 and h.air.x > h.land.x and h.sea.x > h.air.x then
+    print(string.format("header: PASS recruit readouts land %d/%d air %d/%d sea %d/%d (fit %d)",
+                        h.land.held, h.land.cap, h.air.held, h.air.cap, h.sea.held, h.sea.cap, h.fit))
+else
+    print("header: FAIL the recruit readouts were not drawn land, air, sea")
+end
+
 -- Textual confirmation of the underlying figures the header summarises.
 verify.dump_economy()
