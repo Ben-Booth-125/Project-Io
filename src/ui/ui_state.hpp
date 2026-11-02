@@ -404,6 +404,12 @@ struct military_ledger_state
     struct drawn_wing { entity_id id = null_entity; float x = -1.0f, y = -1.0f; };
     std::vector<drawn_wing> wing_rows;     ///< Recruit's "Your wings" rows: each press selects the wing.
     std::vector<drawn_class> air_class_rows; ///< Design's Air rows (cls = air_class): each opens the designer.
+
+    // ── BL-1463: the recruit pool heading each Recruit theatre (MILITARY.md § Recruits) ──
+    /// What a theatre's pool strip drew: theatre 0 Land, 1 Air; the numbers as drawn
+    /// (held, the cap, the quarter's nominal output) and the strip's centre (its hover).
+    struct drawn_pool { int theatre = 0; int held = 0, cap = 0, output = 0; float x = -1.0f, y = -1.0f; };
+    std::vector<drawn_pool> pools;
 };
 
 /// The Diplomacy ledger's view state (rail slot 8; docs/ui/ledgers/diplomacy.md):

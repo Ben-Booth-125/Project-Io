@@ -39,6 +39,7 @@
 #include "world/air_combat.hpp"    // BL-1450: wings, the air roster — the air readouts and stage_wing
 #include "world/unit_designs.hpp"  // BL-1450: air_design_of
 #include "world/unit_roster.hpp"   // unit_roster_table — military_ledger() names its rows
+#include "world/recruits.hpp"      // BL-1463: recruit_pools() / grant_recruits()
 #include "world/unit_designs.hpp"  // set_kit_research_waived_for_harness — waive_kit_research()
 #include "ui/fonts.hpp"
 #include "ui/frame_stats.hpp"
@@ -3235,7 +3236,71 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             aclasses[++k] = e;
         }
         out["air_classes"] = aclasses;
+        // BL-1463: the recruit pool strip heading each Recruit theatre - the numbers it
+        // drew (held, cap, the quarter's output) and its centre, keyed by theatre.
+        sol::table pools = st.create_table();
+        for (const auto& p : m.pools)
+        {
+            sol::table e = st.create_table();
+            e["held"] = p.held; e["cap"] = p.cap; e["output"] = p.output;
+            e["x"] = p.x; e["y"] = p.y;
+            pools[p.theatre == 0 ? "land" : "air"] = e;
+        }
+        out["pools"] = pools;
         return out;
+    });
+
+    // BL-1463 (MILITARY.md § Recruits): the player nation's two recruit pools as the
+    // WORLD holds them, for the ledger strip to be checked against - the pool read off
+    // the nation's own field, and the running bases counted here from its state assets
+    // (complete, not decommissioned, not idled), with the authored rate. Nation-level
+    // counts only: nothing the strip and its tooltip do not already show.
+    v.set_function("recruit_pools", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        const entity_id nation = player_actor(m_world);
+        const auto nit = m_world.nations.find(nation);
+        const recruit_params& rp = m_registry.military().recruits;
+        for (int t = 0; t < 2; ++t)
+        {
+            const building_type want = t == 0 ? building_type::military_base : building_type::airbase;
+            int bases = 0;
+            if (nit != m_world.nations.end())
+            {
+                std::vector<entity_id> seen(nit->second.state_assets.begin(), nit->second.state_assets.end());
+                std::sort(seen.begin(), seen.end());
+                seen.erase(std::unique(seen.begin(), seen.end()), seen.end());
+                for (const entity_id bid : seen)
+                {
+                    const auto bit = m_world.buildings.find(bid);
+                    if (bit != m_world.buildings.end() && bit->second.type == want
+                        && bit->second.ticks_remaining <= 0 && !bit->second.decommissioned
+                        && !bit->second.state_idle)
+                        ++bases;
+                }
+            }
+            sol::table e = st.create_table();
+            e["held"]  = nit == m_world.nations.end() ? 0
+                        : (t == 0 ? nit->second.land_recruits : nit->second.air_recruits);
+            e["bases"] = bases;
+            e["rate"]  = t == 0 ? rp.land_per_base : rp.air_per_base;
+            e["cap_quarters"] = k_recruit_cap_quarters;
+            out[t == 0 ? "land" : "air"] = e;
+        }
+        return out;
+    });
+
+    // BL-1463: a verify STAGING write - put @p n recruits into the player nation's pool
+    // of @p theatre ("land" / "air"), so a Raise press can be made in a world whose bases
+    // have not run a quarter yet (pools open at zero). Not held to the cap, as a refund
+    // is not; clamped to the save's pool ceiling. Returns the pool after, -1 if refused.
+    v.set_function("grant_recruits", [this](const std::string& theatre, int n) -> int {
+        const auto nit = m_world.nations.find(player_actor(m_world));
+        if (nit == m_world.nations.end() || n < 0 || (theatre != "land" && theatre != "air"))
+            return -1;
+        int32_t& pool = theatre == "land" ? nit->second.land_recruits : nit->second.air_recruits;
+        pool = static_cast<int32_t>(std::min<int64_t>(static_cast<int64_t>(pool) + n, k_recruit_pool_max));
+        return pool;
     });
 
     // BL-1450: the wing card and the canvas's right-click assignment — the wing the

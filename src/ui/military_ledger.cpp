@@ -161,6 +161,83 @@ struct base_row
     int       units = 0;
 };
 
+/// BL-1463 (MILITARY.md § Recruits; military.md § Open questions, "Manpower shows on
+/// Recruit"): the theatre's recruit pool, one strip at the head of its rows in the stat
+/// grid's idiom - a dark cell, its name at the left, "held / cap" and the quarter's
+/// output at the right, a thin bar of held over cap beneath. What a pool is and where it
+/// comes from is the strip's tooltip, never ledger text (Ben, 2026-10-30).
+void draw_recruit_pool(const world& w, const recipe_registry& reg, military_ledger_state& m,
+                       entity_id nation, recruit_theatre t)
+{
+    const bool  land   = t == recruit_theatre::land;
+    const int   held   = recruit_pool(w, nation, t);
+    const int   cap    = recruit_cap(w, reg, nation, t);
+    const int   output = recruit_quarter_output(w, reg, nation, t);
+    const recruit_params& rp = reg.military().recruits;
+    const int   rate   = std::max(0, land ? rp.land_per_base : rp.air_per_base);
+
+    constexpr float k_pad = 4.0f, k_bar_h = 3.0f;
+    ImDrawList*  dl   = ImGui::GetWindowDrawList();
+    const float  line = ImGui::GetTextLineHeight();
+    const ImVec2 p0   = ImGui::GetCursorScreenPos();
+    const float  wdt  = std::max(60.0f, ImGui::GetContentRegionAvail().x);
+    const float  h    = line + 2.0f * k_pad + k_bar_h + 2.0f;
+    const ImVec2 p1   = {p0.x + wdt, p0.y + h};
+
+    ImGui::PushID(land ? "pool_land" : "pool_air");
+    ImGui::InvisibleButton("##pool", {wdt, h});
+    const bool hot = ImGui::IsItemHovered();
+    ImGui::PopID();
+
+    dl->AddRectFilled(p0, p1, hot ? IM_COL32(40, 44, 56, 255) : IM_COL32(26, 28, 36, 255), 3.0f);
+    dl->PushClipRect(p0, p1, true);
+    dl->AddText({p0.x + k_pad, p0.y + k_pad}, palette::text_secondary, "Recruits");
+    char value[48], per[48];
+    std::snprintf(value, sizeof value, "%d / %d", held, cap);
+    std::snprintf(per, sizeof per, "+%d a quarter", output);
+    const float per_w = ImGui::CalcTextSize(per).x;
+    const float val_w = ImGui::CalcTextSize(value).x;
+    const float right = p1.x - k_pad;
+    dl->AddText({right - per_w, p0.y + k_pad}, palette::neutral, per);
+    dl->AddText({right - per_w - 10.0f - val_w, p0.y + k_pad}, held > 0 ? palette::selection : palette::neutral,
+                value);
+    const float by = p0.y + k_pad + line + 1.0f;
+    const float x0 = p0.x + k_pad, x1 = p1.x - k_pad;
+    dl->AddRectFilled({x0, by}, {x1, by + k_bar_h}, IM_COL32(60, 64, 74, 255), 1.0f);
+    const float share = cap > 0 ? std::clamp(static_cast<float>(held) / static_cast<float>(cap), 0.0f, 1.0f)
+                                : (held > 0 ? 1.0f : 0.0f);
+    if (share > 0.0f)
+        dl->AddRectFilled({x0, by}, {x0 + (x1 - x0) * share, by + k_bar_h}, palette::unit_hp, 1.0f);
+    dl->PopClipRect();
+
+    if (hot)
+    {
+        ImGui::BeginTooltip();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s recruits",
+                           land ? "Land" : "Air");
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 24.0f);
+        ImGui::TextUnformatted(land
+            ? "The men every land unit is raised with and refills from. Each running military base "
+              "takes them from its province's people, every quarter."
+            : "The crews every wing is raised with and refills from. Each running airbase takes them "
+              "from its province's people, every quarter.");
+        ImGui::TextUnformatted("The pool holds at most fifteen quarters of its bases' output.");
+        const int bases = rate > 0 ? output / rate : 0;
+        ImGui::TextDisabled("%d running %s%s x %d = %d a quarter; holds at most %d.", bases,
+                            land ? "military base" : "airbase", bases == 1 ? "" : "s", rate, output, cap);
+        if (cap > 0 && held >= cap)
+            ImGui::TextDisabled("Full: its bases make none until a hire spends from it.");
+        else if (cap == 0 && held == 0)
+            ImGui::TextDisabled(land ? "No running military base: nothing fills it."
+                                     : "No running airbase: nothing fills it.");
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+
+    m.pools.push_back({land ? 0 : 1, held, cap, output, (p0.x + p1.x) * 0.5f, (p0.y + p1.y) * 0.5f});
+    ImGui::Spacing();
+}
+
 void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s);
 
 void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
@@ -197,6 +274,7 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
         return;
     }
     ImGui::Indent(4.0f);
+    draw_recruit_pool(w, reg, m, actor, recruit_theatre::land);
 
     // ── Bases ───────────────────────────────────────────────────────────────
     std::vector<base_row> bases;
@@ -412,6 +490,7 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
     if (!theatre_header(m, 0, 1, "Air", static_cast<int>(table.size())))
         return;
     ImGui::Indent(4.0f);
+    draw_recruit_pool(w, reg, m, actor, recruit_theatre::air);
 
     // ── Airbases ── the one door a wing is hired at (a military base hosts none).
     std::vector<base_row> bases;
@@ -734,6 +813,7 @@ void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& 
     m.air_raises.clear();
     m.wing_rows.clear();
     m.air_class_rows.clear();
+    m.pools.clear();
     m.queue_rows = 0;
 
     if (!open)
