@@ -1493,6 +1493,24 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
             r.tap_lost = tap.lost;
         }
         g5_track(w, g5, k_campaign_settle_ticks + (k - 1), true, r);
+        {
+            // BL-1463 (recruits): an information line, no verdict - the people the bases
+            // take, so the drain is on record per seed.
+            static thread_local long long rec_heads = 0, rec_refilled = 0;
+            if (k == 1) rec_heads = rec_refilled = 0;
+            rec_heads    += res.report.recruitment.heads_taken;
+            rec_refilled += res.report.recruits_refilled;
+            if (k == ticks)
+            {
+                long long pop_k = 0, land = 0, air = 0;
+                for (const auto& [cid, pc] : w.population_centres) pop_k += pc.population;
+                for (const auto& [nid, nc] : w.nations) { land += nc.land_recruits; air += nc.air_recruits; }
+                std::printf("    recruits seed %u: %lld heads taken over %d play quarters (%.1f a quarter), "
+                            "%lld refilled; pools land %lld air %lld; world population %lld thousand\n",
+                            seed, rec_heads, ticks, ticks > 0 ? static_cast<double>(rec_heads) / ticks : 0.0,
+                            rec_refilled, land, air, pop_k);
+            }
+        }
         if (k <= k_g1_g2_play_tick) remember_rows(w, res.report, reg, last_row);
         if (k <= k_g1_g2_play_tick) track_life(k_campaign_settle_ticks + k - 1);
         if (g_dump_t50 != nullptr && k <= k_g1_g2_play_tick)

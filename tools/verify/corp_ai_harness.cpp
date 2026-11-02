@@ -649,6 +649,7 @@ int main()
             bc.ticks_remaining = 0;
             s.w.buildings[b] = bc;
             s.w.nations[s.ai_corp].state_assets.push_back(b);
+            s.w.nations[s.ai_corp].land_recruits = 100000; // BL-1463: a full pool - the gate under test is the roster
         };
 
         // BL-1265: corporations hold no pools — goods on the SHELVES of the
@@ -754,6 +755,7 @@ int main()
             bc.ticks_remaining = 0;
             s.w.buildings[b] = bc;
             s.w.nations[s.ai_corp].state_assets.push_back(b);
+            s.w.nations[s.ai_corp].land_recruits = 100000; // BL-1463
         };
 
         // The axes are disjoint by construction; assert it, because the

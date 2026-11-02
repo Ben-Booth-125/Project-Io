@@ -10,6 +10,7 @@
 #include "wing_card.hpp"          // BL-1450: air class / mission names
 
 #include "world/air_combat.hpp"   // BL-1450: the air roster, hire_wing_check
+#include "world/recruits.hpp"     // BL-1463: the recruit pools a Raise spends
 #include "world/unit_designs.hpp" // design_stats — a class row shows its live design
 #include "world/unit_roster.hpp"
 
@@ -304,6 +305,10 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
         }
         else if (base_tile == null_entity)
             reason = "No military base to raise it at.";
+        else if (recruit_pool(w, actor, recruit_theatre::land) < hire_unit_recruits(idx))
+            // BL-1463 (MILITARY.md § Recruits): the seam's own refusal, in its words.
+            reason = recruit_shortfall_text(hire_unit_recruits(idx),
+                                            recruit_pool(w, actor, recruit_theatre::land)) + ".";
         else if (price > room)
             reason = "The treasury cannot cover it.";
         const bool enabled = reason.empty();
@@ -487,7 +492,12 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
         }
         else if (base_tile == null_entity)
             reason = "No airbase to raise it at.";
-        else if (hire_wing_check(w, actor, base_tile, idx) != corp_command_result::applied)
+        else if (const corp_command_result hc = hire_wing_check(w, reg, actor, base_tile, idx);
+                 hc == corp_command_result::rejected_no_recruits)
+            // BL-1463 (MILITARY.md § Recruits): the crew the air pool cannot fill.
+            reason = recruit_shortfall_text(wing_crew(reg, idx),
+                                            recruit_pool(w, actor, recruit_theatre::air)) + ".";
+        else if (hc != corp_command_result::applied)
             reason = "Cannot be raised at this airbase.";
         else if (price > room)
             reason = "The treasury cannot cover it.";

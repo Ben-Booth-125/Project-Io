@@ -14,6 +14,7 @@
 #include "logistic_points.hpp" // BL-1309: lp_tick
 #include "logistics.hpp"     // the network: traversal cost, reach, the anchor set
 #include "logistic_points.hpp" // BL-1352: lp_tick, lp_supply_claim — the one LP system
+#include "recruits.hpp"        // BL-1463: recruitment_tick, recruit_refill
 #include "world.hpp"
 
 #include <algorithm>
@@ -297,6 +298,12 @@ struct economy_report
     /// BL-1309: this tick's Logistic Points — every nation's pool, every
     /// producing building's need, coverage and grant (logistic_points.hpp).
     lp_tick logistic_points;
+
+    /// BL-1463 (MILITARY.md § Recruits): what the bases made this quarter, and the
+    /// recruits the refills delivered at their granted share.
+    recruitment_tick recruitment;
+    int              recruits_refilled = 0;
+    int              air_recruits_refilled = 0; ///< Ben, 2026-10-31: wings refill too
 
     /// BL-1266 (TRADE.md § The Planetary Marketplace): every building whose goods
     /// UPKEEP went unmet this tick (`run_building_upkeep`). A trade building in
@@ -924,7 +931,8 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
 /// BL-1445 (Ben, 2026-10-28; MILITARY.md § Upkeep, "Supply is drawn where the unit
 /// stands"): the QUANTITY of a unit's supplies this quarter - its upkeep goods draw
 /// (food rations + ordnance per head, `resolve_unit_upkeep`) plus the equipment and
-/// manpower its HP refill draws while wounded (zero: no refill mechanism exists yet).
+/// manpower its HP refill draws while wounded - the refill's recruits are added by
+/// `collect_supply_claims` from the quarter's plan (BL-1463, recruits.hpp), not here.
 /// 0 for a unit with no men. What its Logistic Point request asks.
 float unit_supply_need(const unit_component& u, const unit_upkeep_params& up);
 
@@ -933,7 +941,15 @@ float unit_supply_need(const unit_component& u, const unit_upkeep_params& up);
 /// nation's pool. Handed to `resolve_logistic_points`, which pays each at the closest
 /// road of the unit's network within 8 tiles (`unit_supply_draw_tile`, BL-1456) and
 /// serves it ahead of every producer (NR-917).
+///
+/// BL-1463 (MILITARY.md § Recruits): a unit refilling from its pool this quarter asks,
+/// beside its supplies, its planned recruits x `lp_per_recruit` - paid at the same road,
+/// at the same share. The form without @p plan computes the quarter's plan itself
+/// (`plan_recruit_refills`), so every caller sees the same request the step makes.
 std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_registry& reg);
+std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_registry& reg,
+                                                   const std::vector<recruit_refill>& plan,
+                                                   const std::vector<wing_refill>& wing_plan = {});
 
 /// BL-1445: the credit price of the quarter's supply draws - `active_lp_credit_per_
 /// unit_distance` x each unit's granted points, charged to its nation (capped at its

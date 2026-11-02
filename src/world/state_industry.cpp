@@ -1,4 +1,5 @@
 #include "state_industry.hpp"
+#include "recruits.hpp" // refund_muster_recruits
 
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability
 #include "construction.hpp"    // construct_state_building, construction_capex (the founding)
@@ -976,6 +977,30 @@ state_reserve_report reserve_state_first_tick(world& w, const recipe_registry& r
     return rep;
 }
 
+namespace {
+
+/// BASES ARE CUT AT THE OPENING AS THEY WERE (Ben, 2026-11-01; MILITARY.md § Recruits).
+/// A military base or airbase carries no upkeep in play, so its running bound is 0 and
+/// the opening cut would never prune one. The cut prices it at the upkeep a base carried
+/// before that ruling instead - the cut alone, never the running gate - so a nation the
+/// chest cannot sustain still opens with fewer bases. The price is the running bound
+/// (`state_building_cost_bound`'s maintenance and wages at a full grant) computed on the
+/// OLD economics, so the cut prunes exactly the bases it did: maintenance 15 and wage 10
+/// for a military base, 20 and 10 for an airbase. 0 for every other type.
+float opening_cut_base_bill(const world& w, const recipe_registry& reg, const building_component& b)
+{
+    building_economics e = reg.economics(b.type);
+    if (b.type == building_type::military_base)    { e.maintenance = 15.0f; e.base_wage = 10.0f; }
+    else if (b.type == building_type::airbase)     { e.maintenance = 20.0f; e.base_wage = 10.0f; }
+    else                                           return 0.0f;
+    const auto tit = w.tiles.find(b.tile);
+    const float hab = (tit != w.tiles.end()) ? body_mean_habitability(w, tit->second.body) : 1.0f;
+    const building_opex ox = compute_building_opex(b, e, 1.0f, hab, reg.idle_maintenance_floor());
+    return (ox.maintenance + ox.wages) * k_state_gate_headroom;
+}
+
+} // namespace
+
 opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_registry& reg)
 {
     opening_state_cut_report rep;
@@ -997,7 +1022,11 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
         const nation_component& nc = w.nations.at(nid);
         const float chest = std::max(0.0f, nc.treasury);
         const float pay   = wage.count(nid) ? wage.at(nid) : 0.0f;
-        const float bill  = state_first_tick_bill(w, reg, nid);
+        // The running bill, plus each standing base priced at its old upkeep (above).
+        float bill = state_first_tick_bill(w, reg, nid);
+        for (const entity_id a : nc.state_assets)
+            if (const auto ai = w.buildings.find(a); ai != w.buildings.end() && !capital_free_source(w, a))
+                bill += opening_cut_base_bill(w, reg, ai->second);
         const float ticks = static_cast<float>(k_state_founding_reserve_ticks);
         if (!(chest < ticks * (pay + bill)))
             continue;
@@ -1011,6 +1040,7 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
             [&](entity_id bid, const building_component& b, float bound, bool) {
                 if (capital_free_source(w, bid))
                     return;
+                bound += opening_cut_base_bill(w, reg, b); // a base at its old upkeep
                 if (std::isfinite(bound) && bound <= left)
                 {
                     left -= bound;
@@ -1053,6 +1083,9 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
                     ++rep.garrisons_unbased;
                 }
             const std::size_t before = w.musters.size();
+            for (const muster_order& m : w.musters) // Ben, 2026-10-31: a dropped muster refunds its men
+                if (m.base == bid)
+                    (void)refund_muster_recruits(w, m);
             w.musters.erase(std::remove_if(w.musters.begin(), w.musters.end(),
                                            [&](const muster_order& m) { return m.base == bid; }),
                             w.musters.end());

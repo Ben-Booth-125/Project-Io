@@ -262,7 +262,7 @@ enum class resource_type : uint8_t
     // kit goods, MILITARY.md § Land — equipment, refit and manpower). Named in
     // chain_depth's R1 exemption table beside ordnance rather than assumed.
     //
-    // world_save_version bumped 71 -> 72 for this append (world_save.hpp): every
+    // world_save_version bumped 72 -> 73 for this append (world_save.hpp): every
     // per-resource array widens 49 -> 54, and an older stream is read at its own
     // width (`k_resource_count_pre_kit_goods`), the new goods zero.
     small_arms             = 49, ///< Arms Works, from steel + machinery. Rifles and section weapons.
@@ -275,7 +275,7 @@ enum class resource_type : uint8_t
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);
 
-/// BL-1422: the roster's width before the kit goods were appended (v71 and older
+/// BL-1422: the roster's width before the kit goods were appended (v72 and older
 /// streams carry per-resource arrays this wide; world_save.cpp reads them so).
 static constexpr std::size_t k_resource_count_pre_kit_goods = 49;
 
@@ -1822,6 +1822,14 @@ struct population_centre_component
     /// (which must survive the raze), so folding it into either would
     /// conflate independent axes.
     bool razed = false;
+
+    /// BL-1463 (MILITARY.md § Recruits): heads a base has taken from this centre that
+    /// `population` (thousands) has not yet lost, in [0, 999]. A recruit is ONE head; at
+    /// a thousand the centre loses one from `population` and the carry falls by 1000, so
+    /// the headcount a province gives is exact however few recruits a quarter takes. The
+    /// heads a centre can still give are `population x 1000 - this` (0 once razed). Saved
+    /// (world_save_version 68, only where non-zero) and hashed only where non-zero.
+    int32_t recruit_heads_taken = 0;
 };
 
 /// Deployable unit stub. Faction AI and transport are deferred; the combat
@@ -2650,6 +2658,14 @@ struct nation_component
     /// of every non-base item fitted, at most one per (air class, slot), ascending.
     /// Written only by `set_air_design`. Saved (world_save_version 65).
     std::vector<uint16_t> air_design_kit;
+
+    /// BL-1463 (MILITARY.md § Recruits, Ben 2026-10-30): the nation's ONE land pool and
+    /// ONE air pool of recruits, in heads. Filled each quarter by its bases
+    /// (`run_recruitment`, recruits.hpp) up to 15 quarters of its theatre's output, spent
+    /// by a hire (a unit's men, a wing's crew) and by a land unit's refill. Never
+    /// negative. Saved (world_save_version 68) and hashed only when non-zero.
+    int32_t land_recruits = 0;
+    int32_t air_recruits  = 0;
 };
 
 /// BL-1460 fix round: the capital a nation's generated identity reads —

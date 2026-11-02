@@ -347,8 +347,8 @@
    "design": "Cold review of unit designs, 2026-10-28. (1) HIGH, latent until later kit unlocks (BL-1436): hire_goods_affordable counts shelf quantity only, while buy_from_corp_shelves charges the posted price capped by purse_room_of, and debit_kit_goods ignores how much it bought. A design refit (0 credits) with a committed treasury gets its kit free; a hire at exact room drops the treasury below its commitments. The row-goods leg had the flaw already. Fix: the affordability check sums qty x posted price plus the credit cost against purse_room_of, and apply asserts the bought amount. (2) LOW: hire_goods_affordable prices each row axis at its first candidate without the kit draw on the same resource, so an affordable hire can be refused. (3) LOW: png_decode.cpp inflate has no output cap; stop once out exceeds h x (stride+1). (4) LOW: the refit menu labels a design refit with the row gate (+ kit) and omits the changed slots goods; an obsolete own row moves the (live design) entry to the end."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 61,
    "version_goal": "v0.2.4",
    "written": "2026-10-29",
@@ -371,7 +371,8 @@
     "src/ui/military_ledger.cpp"
    ],
    "title": "Unit stat grid on the unit card and in the designer, with signed deltas while editing",
-   "design": "Written in docs/ui/ledgers/military.md § The stat grid and SELECTION.md § The unit element's layout (Ben, 2026-10-29). One shared grid: HP, readiness, morale, food, ammunition, equipment, soft, hard, defence, breakthrough, hardness, recon, stealth, speed. Unit card: class image left, grid fills the centre (Strength and Roster pages fold in). Designer: bottom right, design stats only, signed +/- deltas against the live design for the draft and the hovered item. Rival unit: design stats only once seen (battle or recon), internals hidden. Needs a live click."
+   "design": "Written in docs/ui/ledgers/military.md § The stat grid and SELECTION.md § The unit element's layout (Ben, 2026-10-29). One shared grid: HP, readiness, morale, food, ammunition, equipment, soft, hard, defence, breakthrough, hardness, recon, stealth, speed. Unit card: class image left, grid fills the centre (Strength and Roster pages fold in). Designer: bottom right, design stats only, signed +/- deltas against the live design for the draft and the hovered item. Rival unit: design stats only once seen (battle or recon), internals hidden. Needs a live click. 2026-11-01: DELIVERED at 9fc79bab (merge of the lane's banded grid; a competing build was reverted on main, Ben chose this one 2026-10-31). Unit, stack and wing cards and both designers; Strength and Upkeep lines kept under the grid. stat_grid, military_ledger, air_ui and unit_designer scripts 0 failures; Ben's live click passed 2026-11-01.",
+   "delivered": "2026-11-01"
   },
   {
    "status": "proposed",

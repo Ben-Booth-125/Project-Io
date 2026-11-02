@@ -471,7 +471,7 @@ int main()
                   && back.province_cessions.size() == 1 && back.war_exhaustion_residual.size() == 1,
               "R4i the wars, truces, cessions and residual round-trip the snapshot byte for byte");
         uint32_t ver = 0; std::memcpy(&ver, b.data() + 4, 4);
-        check(ver == world_save_version && world_save_version == 72, "R4j the stream is version 72 (BL-1418's embargo section, then BL-1460's generation capitals, follow the wars; BL-1422 widened the resource arrays)");
+        check(ver == world_save_version && world_save_version == 73, "R4j the stream is version 73 (BL-1418's embargo section, then BL-1460's generation capitals, follow the wars; BL-1463's recruits follow; BL-1422 widened the resource arrays)");
         check(b.size() >= world_save_war_section_bytes(w), "R4k the war section's measured length fits the stream");
         // An older stream loads with no wars.
         std::ostringstream o67(std::ios::binary);
@@ -482,11 +482,12 @@ int main()
                   && old.war_history.empty() && old.province_cessions.empty()
                   && b67.size() == b.size() - world_save_war_section_bytes(w)
                                               - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) // BL-1418 (v70)
+                                              - world_save_recruits_section_bytes(w) // BL-1463 (v72)
                                               - world_save_kit_goods_bytes(w), // BL-1422: v68 arrays are 49 wide
               "R4l a v68 stream (today's less the war and embargo sections) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;
-        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) // BL-1418 (v70), last
+        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) /* BL-1463 (v72) */ // BL-1418 (v70), last
                                - world_save_war_section_bytes(w) + 4; // past the war count
         bad[war0 + 8] = 2;
         world untouched;
@@ -997,7 +998,7 @@ int main()
         std::string bad2 = b2;
         // The offer sits after the war count + one war record + the truce table.
         const war_record& wr = w.wars.begin()->second;
-        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_war_section_bytes(w) + 4
+        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) /* BL-1463 (v72) */ - world_save_war_section_bytes(w) + 4
                               + (4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 + 4 + 4 * wr.declarer_goals.size() + 4 + 4 * wr.defender_goals.size())
                               + 4 + 12 * w.truces.size() + 4 + 4 + 4 + 4 + 4; // to the kind byte
         bad2[off] = 7;
