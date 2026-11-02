@@ -235,7 +235,7 @@ struct refill_result
 refill_result refill_quarter(fixture& f, const recipe_registry& reg)
 {
     refill_result r;
-    r.plan = plan_recruit_refills(f.w);
+    r.plan = plan_recruit_refills(f.w, reg);
     r.lp = resolve_logistic_points(f.w, collect_supply_claims(f.w, reg, r.plan));
     r.delivered = apply_recruit_refills(f.w, r.plan, r.lp);
     return r;
@@ -467,7 +467,7 @@ int main()
         const entity_id u_full  = add_unit(f, 1, 50, 50);
         nat(f).land_recruits = 1000;
 
-        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w);
+        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w, reg);
         const recruit_refill* p_on = plan_row(plan, u_on);
         const recruit_refill* p_eight = plan_row(plan, u_eight);
         const recruit_refill* p_nine = plan_row(plan, u_nine);
@@ -582,7 +582,7 @@ int main()
         const auto wing_quarter = [&](fixture& f) {
             refill_result r;
             const std::vector<wing_refill> wp = plan_wing_refills(f.w, reg);
-            r.plan = plan_recruit_refills(f.w);
+            r.plan = plan_recruit_refills(f.w, reg);
             r.lp = resolve_logistic_points(f.w, collect_supply_claims(f.w, reg, r.plan, wp));
             r.delivered = apply_wing_refills(f.w, reg, wp, r.lp);
             return std::make_pair(wp, r);
@@ -670,7 +670,7 @@ int main()
             for (int k = 0; k < 4; ++k)
             {
                 const std::vector<wing_refill> p = plan_wing_refills(q.w, reg);
-                const std::vector<recruit_refill> lpn = plan_recruit_refills(q.w);
+                const std::vector<recruit_refill> lpn = plan_recruit_refills(q.w, reg);
                 const lp_tick t = resolve_logistic_points(q.w, collect_supply_claims(q.w, reg, lpn, p));
                 (void)apply_recruit_refills(q.w, lpn, t);
                 (void)apply_wing_refills(q.w, reg, p, t);

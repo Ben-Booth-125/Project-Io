@@ -2796,7 +2796,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // same road; after the resolve each receives its plan at the share it was granted
     // (0 past the 8-tile draw).
     report.recruitment = run_recruitment(w, reg);
-    const std::vector<recruit_refill> refill_plan = plan_recruit_refills(w);
+    const std::vector<recruit_refill> refill_plan = plan_recruit_refills(w, reg);
     const std::vector<wing_refill> wing_plan = plan_wing_refills(w, reg); // Ben, 2026-10-31
     report.logistic_points =
         resolve_logistic_points(w, collect_supply_claims(w, reg, refill_plan, wing_plan));
@@ -4587,7 +4587,7 @@ float unit_supply_need(const unit_component& u, const unit_upkeep_params& up)
 
 std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_registry& reg)
 {
-    return collect_supply_claims(w, reg, plan_recruit_refills(w), plan_wing_refills(w, reg));
+    return collect_supply_claims(w, reg, plan_recruit_refills(w, reg), plan_wing_refills(w, reg));
 }
 
 std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_registry& reg,
@@ -4625,7 +4625,7 @@ std::vector<lp_supply_claim> collect_supply_claims(const world& w, const recipe_
             // recruit carries his share of the unit's kit, so a recruit's points are
             // the authored rate plus the quantity of that share.
             float kit_per_man = 0.0f;
-            for (const float q : refill_goods_per_man(u)) // resource order: a fixed sum
+            for (const float q : refill_goods_per_man(w, u)) // resource order: a fixed sum
                 kit_per_man += q;
             const float per_recruit = reg.military().recruits.lp_per_recruit + kit_per_man;
             c.need          += static_cast<float>(pit->planned) * per_recruit;

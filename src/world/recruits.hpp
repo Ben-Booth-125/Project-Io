@@ -111,7 +111,7 @@ struct recruit_refill
 /// ascending unit id, each planned min(what it lacks, what its nation's land pool has
 /// left after the units before it, and - BL-1423 - the men its nation's shelves hold the
 /// equipment for after the units before it). Units planning nothing are left out. Pure.
-std::vector<recruit_refill> plan_recruit_refills(const world& w);
+std::vector<recruit_refill> plan_recruit_refills(const world& w, const recipe_registry& reg);
 
 /// The Logistic Points @p r's plan asks: planned x `lp_per_recruit`.
 float recruit_refill_lp_need(const recipe_registry& reg, const recruit_refill& r);
@@ -122,13 +122,13 @@ float recruit_refill_lp_need(const recipe_registry& reg, const recruit_refill& r
 // kit cannot be bought, or whose pool is empty, stays wounded." HP is men (`count`
 // against `establishment`), so each man regained is one recruit AND one man's share of
 // what the unit was raised with: its recorded design's kit goods plus its row's gated
-// hire goods (each gated axis at its first candidate, `hire_axis_cost`), over the
+// hire goods (each gated axis at the candidate a hire would take, `hire_axis_cost`), over the
 // `hire_batch_manpower` men a hire raises. Bought off the nation's shelves at the posted
 // price, from its purse room, as a hire buys. CONSERVATION: the men a unit regains equal
 // the recruits its pool gives, and the goods drawn equal those men x the per-man basket.
 
 /// The goods ONE man of @p u is refilled with (see above). All zero for an unknown row.
-std::array<float, resource_count> refill_goods_per_man(const unit_component& u);
+std::array<float, resource_count> refill_goods_per_man(const world& w, const unit_component& u);
 
 /// The goods a refill drew this quarter, for the report and the conservation harness.
 struct refit_tally

@@ -1191,6 +1191,7 @@ std::array<float, resource_count> shelves(const fixture& f)
 void u14_refit_conserves()
 {
     std::printf("\n-- U14  refit: men from the pool, kit off the shelf, conserved (BL-1423) --\n");
+    const recipe_registry reg; // no supply-draw credit price: the money rows set their own
     const uint16_t row = modern_infantry_row();
     check(row != 0 && land_class_for(unit_roster_table()[row]) == land_class::infantry,
           "U14 anchor: a modern infantry row exists");
@@ -1213,10 +1214,13 @@ void u14_refit_conserves()
 
     // Per man: the kit (2 small arms) and each gated axis's 5 at its first candidate,
     // all over the 50 men a hire raises.
+    fixture pf = make_fixture();
+    stocked(pf, 100.0f);
     unit_component probe{};
-    probe.type = row;
-    probe.kit  = kit;
-    const std::array<float, resource_count> per = refill_goods_per_man(probe);
+    probe.type  = row;
+    probe.kit   = kit;
+    probe.owner = pf.corp;
+    const std::array<float, resource_count> per = refill_goods_per_man(pf.w, probe);
     const std::size_t SA = static_cast<std::size_t>(resource_type::small_arms);
     check(near(per[SA], 2.0f / 50.0f, 1e-6f), "U14a a man's kit share is the design's kit goods over 50 men (2 small arms -> 0.04)");
     float per_sum = 0.0f;
@@ -1234,7 +1238,7 @@ void u14_refit_conserves()
         const entity_id u = wounded(f, 30, 50);
         const std::array<float, resource_count> before = shelves(f);
         const float tre0 = f.w.nations.at(f.corp).treasury;
-        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w);
+        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w, reg);
         refit_tally t;
         const int n = apply_recruit_refills(f.w, plan, grant(plan, 1000), &t);
         const std::array<float, resource_count> after = shelves(f);
@@ -1259,7 +1263,7 @@ void u14_refit_conserves()
         f.w.nations.at(f.corp).land_recruits = 0;
         const entity_id u = wounded(f, 30, 50);
         const std::array<float, resource_count> before = shelves(f);
-        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w);
+        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w, reg);
         refit_tally t;
         apply_recruit_refills(f.w, plan, grant(plan, 1000), &t);
         check(plan.empty() && f.w.units.at(u).count == 30 && shelves(f) == before && t.men == 0,
@@ -1271,7 +1275,7 @@ void u14_refit_conserves()
         body_shelf(f)[SA] = 0.0f; // no small arms anywhere
         f.w.nations.at(f.corp).land_recruits = 100;
         const entity_id u = wounded(f, 30, 50);
-        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w);
+        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w, reg);
         refit_tally t;
         apply_recruit_refills(f.w, plan, grant(plan, 1000), &t);
         check(plan.empty() && f.w.units.at(u).count == 30 && f.w.nations.at(f.corp).land_recruits == 100,
@@ -1283,7 +1287,7 @@ void u14_refit_conserves()
         body_shelf(f)[SA] = per[SA] * 7.0f; // the small arms for seven men
         f.w.nations.at(f.corp).land_recruits = 100;
         const entity_id u = wounded(f, 30, 50);
-        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w);
+        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w, reg);
         refit_tally t;
         const int n = apply_recruit_refills(f.w, plan, grant(plan, 1000), &t);
         check(n == 7 && f.w.units.at(u).count == 37 && f.w.nations.at(f.corp).land_recruits == 93
@@ -1295,7 +1299,7 @@ void u14_refit_conserves()
         stocked(f, 100.0f);
         f.w.nations.at(f.corp).land_recruits = 100;
         const entity_id u = wounded(f, 30, 50);
-        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w);
+        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w, reg);
         const std::array<float, resource_count> before = shelves(f);
         refit_tally t;
         apply_recruit_refills(f.w, plan, grant(plan, 0), &t); // past the 8-tile draw: share 0
@@ -1305,7 +1309,7 @@ void u14_refit_conserves()
         stocked(g, 100.0f);
         g.w.nations.at(g.corp).land_recruits = 100;
         const entity_id v = wounded(g, 30, 50);
-        const std::vector<recruit_refill> gp = plan_recruit_refills(g.w);
+        const std::vector<recruit_refill> gp = plan_recruit_refills(g.w, reg);
         refit_tally gt;
         const int gn = apply_recruit_refills(g.w, gp, grant(gp, 500), &gt);
         check(gn == 10 && g.w.units.at(v).count == 40 && g.w.nations.at(g.corp).land_recruits == 90
@@ -1319,7 +1323,7 @@ void u14_refit_conserves()
         f.w.nations.at(f.corp).land_recruits = 25;
         const entity_id a = wounded(f, 30, 50);
         const entity_id b = wounded(f, 30, 50);
-        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w);
+        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w, reg);
         refit_tally t;
         apply_recruit_refills(f.w, plan, grant(plan, 1000), &t);
         check(a < b && f.w.units.at(a).count == 50 && f.w.units.at(b).count == 35
@@ -1342,6 +1346,76 @@ void u14_refit_conserves()
         }
         check(f.w.units.at(u).readiness_permille == f.w.units.at(u).morale_permille && peak <= 600,
               "U14l out of contact, readiness climbs to its morale and never past it");
+    }
+    {
+        // BL-1423 cold review: NO POINT AND NO CREDIT FOR A MAN NOBODY GETS. Two nations
+        // share ONE market whose small arms cover 25 men; nation A's treasury is tight.
+        // Through the step's own order - plan, the supply draw's credit bill
+        // (charge_supply_draws), apply - every recruit the plan asks points for is
+        // delivered: nothing is short of kit, the points billed are exactly the delivered
+        // men's, and each treasury pays exactly its men's kit and points.
+        recipe_registry creg;
+        military_capability_params mp = creg.military();
+        mp.active_lp_credit_per_unit_distance = 1.0f;
+        creg.set_military(mp);
+        const float lp_per = creg.military().recruits.lp_per_recruit;
+
+        fixture f = make_fixture();
+        stocked(f, 100.0f);
+        body_shelf(f)[SA] = per[SA] * 25.0f; // small arms for 25 men, for both nations
+        // Nation B: its own base on a second tile of the same body - the same market.
+        const entity_id nb = f.w.create_entity();
+        nation_component ncb{};
+        ncb.name = "Second";
+        ncb.treasury = 10000.0f;
+        f.w.nations[nb] = ncb;
+        const entity_id tb = add_tile(f.w, f.body);
+        const entity_id bb = f.w.create_entity();
+        building_component bcb{};
+        bcb.type = building_type::military_base;
+        bcb.tile = tb;
+        bcb.ticks_remaining = 0;
+        f.w.buildings[bb] = bcb;
+        f.w.nations[nb].state_assets.push_back(bb);
+        f.w.nations.at(f.corp).land_recruits = 100;
+        f.w.nations.at(nb).land_recruits     = 100;
+        const entity_id a = wounded(f, 30, 50); // nation A, the lower id
+        const entity_id b = wounded(f, 30, 50);
+        f.w.units.at(b).owner = nb;
+        f.w.units.at(b).position = tb;
+        f.w.units.at(b).muster_base = bb;
+
+        float per_sum = 0.0f;
+        for (const float q : per) per_sum += q;
+        const float per_man_money = per_sum * 1.0f + 1.0f * (lp_per + per_sum); // kit at 1 + points at 1
+        f.w.nations.at(f.corp).treasury = per_man_money * 8.5f; // room for eight men
+        const float ta0 = f.w.nations.at(f.corp).treasury, tb0 = f.w.nations.at(nb).treasury;
+
+        const std::vector<recruit_refill> plan = plan_recruit_refills(f.w, creg);
+        // The resolver's whole grant at full cover: points for the planned recruits.
+        lp_tick lp = grant(plan, 1000);
+        for (lp_supply_row& srow : lp.supplies)
+            for (const recruit_refill& rr : plan)
+                if (rr.unit == srow.unit)
+                    srow.granted = static_cast<float>(rr.planned) * (lp_per + per_sum);
+        charge_supply_draws(f.w, creg, lp);
+        refit_tally t;
+        const int n = apply_recruit_refills(f.w, plan, lp, &t);
+        const int got_a = f.w.units.at(a).count - 30, got_b = f.w.units.at(b).count - 30;
+        float billed = 0.0f;
+        for (const lp_supply_row& srow : lp.supplies) billed += srow.granted;
+        check(got_a == 8 && got_b == 17 && n == 25 && t.short_of_goods == 0,
+              "U14m two nations, one 25-man shelf, A's room for 8: A gets 8, B the shelf's other 17, none short of kit");
+        check(near(billed, static_cast<float>(n) * (lp_per + per_sum), 1e-3f),
+              "U14n the points billed are exactly the delivered men's (no point for a man nobody gets)");
+        check(near(ta0 - f.w.nations.at(f.corp).treasury, per_man_money * 8.0f, 1e-2f)
+                  && near(tb0 - f.w.nations.at(nb).treasury, per_man_money * 17.0f, 1e-2f)
+                  && f.w.nations.at(f.corp).land_recruits == 92 && f.w.nations.at(nb).land_recruits == 83,
+              "U14o each treasury pays exactly its delivered men's kit and points; each pool gives exactly its men");
+        bool goods_ok = true;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            goods_ok = goods_ok && near(t.goods[r], per[r] * 25.0f, 1e-3f);
+        check(goods_ok, "U14p the goods bought are exactly 25 x the per-man basket (clamped to what the shelf sold)");
     }
 }
 
