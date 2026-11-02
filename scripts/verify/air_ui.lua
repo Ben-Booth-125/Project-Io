@@ -15,6 +15,10 @@
 -- 6. Design lists the six air classes under Air; a row opens the designer on the
 --    air slots (airframe, armament, avionics).
 --
+-- 2a. BL-1463: Air is headed by its recruit pool strip, checked against the world
+--     with no airbase (no cap, no output) and with one; the air Raise first quotes
+--     the empty pool, then the most crew any class needs is staged (grant_recruits)
+--     and the Raise spends its crew off the strip.
 -- 2b. A REAL Raise through hire_wing: an air row's press, with a loan and
 --     the class's hire goods put on the home shelf (grant_stock), repaid after.
 -- 4b. The lit mission's press stands the wing down (the toggle rule).
@@ -80,10 +84,48 @@ for _, b in ipairs(verify.buildings()) do
 end
 assert(home, "no player building to stand an airbase beside")
 if #led.air_bases == 0 then ok("no airbase: the Air picker is empty") end
+
+-- BL-1463 (MILITARY.md § Recruits): Air is headed by its recruit pool strip, and it
+-- reads what the world holds - the nation's air pool, its running airbases x the
+-- authored rate, fifteen quarters of that.
+local function check_air_pool(label)
+    local p  = verify.military_ledger().pools
+    p = p and p.air
+    local wp = verify.recruit_pools().air
+    if not p then fail("the Air recruit pool strip was not drawn (" .. label .. ")"); return nil end
+    local want_out = wp.bases * wp.rate
+    local want_cap = wp.cap_quarters * want_out
+    print(string.format("air_ui: air pool strip (%s) %d / %d +%d a quarter; world held %d, %d airbase(s) x %d",
+                        label, p.held, p.cap, p.output, wp.held, wp.bases, wp.rate))
+    if p.held == wp.held and p.cap == want_cap and p.output == want_out then
+        ok("the air pool strip matches the world (" .. label .. ")") else
+        fail(string.format("air pool strip %d/%d +%d, world wants %d/%d +%d (%s)", p.held, p.cap, p.output,
+                           wp.held, want_cap, want_out, label)) end
+    return p
+end
+local pool0 = check_air_pool("no airbase")
+if pool0 and #led.air_bases == 0 then
+    if pool0.cap == 0 and pool0.output == 0 then ok("with no airbase the air pool reads no cap and no output") else
+        fail("no airbase, yet the air pool strip shows a cap or output") end
+end
+
 local airbase = verify.stage_building(home.x, home.y, "airbase")
 assert(airbase ~= 0, "could not stage an airbase")
 settle()
 led = verify.military_ledger()
+local pool1 = check_air_pool("one airbase")
+if pool1 and pool1.output > 0 and pool1.cap == 15 * pool1.output then
+    ok("the airbase feeds the air pool: cap is fifteen quarters of its output") else
+    fail("the staged airbase did not show in the air pool strip's output and cap") end
+-- Fold Land so the Air strip is on screen for the capture, then unfold it.
+do
+    local lh = header(led, 0, "land")
+    if lh and lh.open then verify.click(lh.x, lh.y); settle() end
+    verify.capture("air_ui_air_pool")
+    local l2 = header(verify.military_ledger(), 0, "land")
+    if l2 and not l2.open then verify.click(l2.x, l2.y); settle() end
+    led = verify.military_ledger()
+end
 if #led.air_bases == 1 and led.air_base == airbase then ok("the Air picker lists the airbase and chooses it") else
     fail("the Air picker did not list the staged airbase (" .. #led.air_bases .. " rows)") end
 for _, r in ipairs(led.air_raises) do
@@ -102,6 +144,28 @@ verify.grant_stock("refined_fuel", 10)
 verify.scroll_panel("military", 1.0) -- the air rows sit at the foot of Recruit
 settle()
 led = verify.military_ledger()
+-- The air pool opens empty: each fieldable row's Raise is off with the seam's words,
+-- quoting the strip's held figure. Note each row's crew, then stage the most any
+-- class needs (verify-only) so a Raise is live.
+local air_held = led.pools and led.pools.air and led.pools.air.held or -1
+local crew_of, quoted = {}, 0
+for _, r in ipairs(led.air_raises) do
+    local need, have = r.reason:match("Needs (%d+) recruits; the pool holds (%d+)%.")
+    if need then
+        crew_of[r.row] = tonumber(need)
+        if tonumber(have) == air_held then quoted = quoted + 1 end
+    end
+end
+if air_held == 0 then
+    if quoted > 0 then ok(quoted .. " air Raise(s) off for want of crew, quoting the strip's held 0") else
+        fail("no air Raise quotes the strip's empty pool") end
+end
+local most = 0
+for _, c in pairs(crew_of) do most = math.max(most, c) end
+if most > air_held then verify.grant_recruits("air", most - air_held) end
+settle()
+led = verify.military_ledger()
+air_held = led.pools.air.held
 -- The press must land on screen: the lowest live row (the column scrolled to its foot).
 local raise = nil
 for _, r in ipairs(led.air_raises) do if r.enabled then raise = r end end
@@ -113,6 +177,13 @@ if raise and raise.enabled then
     print("air_ui: air Raise -> '" .. led.air_message .. "', player wings " .. before .. " -> " .. after)
     if after == before + 1 and led.air_message == "Wing mustering." then ok("a Raise press raised a wing through hire_wing") else
         fail("the Raise press did not raise a wing ('" .. led.air_message .. "')") end
+    -- The wing spent its crew off the air pool, and the strip shows it.
+    local p = check_air_pool("after the Raise")
+    local crew = crew_of[raise.row]
+    if p and crew and p.held == air_held - crew then
+        ok("the Raise spent its " .. crew .. " crew off the air strip") else
+        fail("the air strip did not drop by the wing's crew (" .. air_held .. " -> " ..
+             tostring(p and p.held) .. ", crew " .. tostring(crew) .. ")") end
     verify.capture("air_ui_air_raised")
 else
     fail("no air row's Raise was live")
