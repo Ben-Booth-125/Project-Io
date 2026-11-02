@@ -1,0 +1,51 @@
+[
+ {
+  "ruling": "Every major opens on the same fixed kit; a minor opens on the walk (Ben, 2026-11-02)",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "## A major's opening kit \\(Ben, 2026-11-02\\)",
+  "stale": [
+   "Generation makes the player's industry exactly as it makes a rival's: the walk",
+   "start is asymmetric through its geography, its\nhistory, its population and its corporate web"
+  ],
+  "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "A slot the ground cannot hold is substituted, never dropped or paid (Ben, 2026-11-02)",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "A slot the ground cannot hold is substituted, never dropped or paid \\(Ben, 2026-11-02\\)",
+  "stale": [],
+  "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "A major opens on a flat treasury, 8,000 credits for the Standard kit (Ben, 2026-11-02)",
+  "doc": "docs/generation/NATION_GENERATION.md",
+  "anchor": "A major opens on a flat treasury \\(Ben, 2026-11-02\\)",
+  "stale": [],
+  "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "A major's opening army is fixed (Ben, 2026-11-02)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A major's opening army is fixed \\(Ben, 2026-11-02\\)",
+  "stale": [
+   "so a rich nation fields a bigger standing force and a poor one a\ntoken one"
+  ],
+  "owner": "BL-1474 (major opening army)"
+ },
+ {
+  "ruling": "The wizard suggests 30 nations and 4 majors; spacing is measured first (Ben, 2026-11-02)",
+  "doc": "docs/generation/NATION_GENERATION.md",
+  "anchor": "The wizard suggests 30 nations and 4 majors \\(Ben, 2026-11-02\\)",
+  "stale": [],
+  "owner": "BL-1476 (wizard default thirty)"
+ },
+ {
+  "ruling": "A major's plant, chest and army are the one generation-made exception to asymmetry (Ben, 2026-11-02)",
+  "doc": "docs/generation/GENERATION_STRATEGY.md",
+  "anchor": "One exception: a major's plant, chest and army \\(Ben, 2026-11-02\\)",
+  "stale": [
+   "counts are that section's one exception"
+  ],
+  "owner": "BL-1473 (major opening kit)"
+ }
+]

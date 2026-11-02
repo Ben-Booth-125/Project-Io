@@ -544,9 +544,9 @@
    "priority": "B",
    "difficulty": 2,
    "files": [
-     "src/world/state_industry.cpp",
-     "src/world/corporation_generation.cpp",
-     "src/world/spawn_seat.cpp"
+    "src/world/state_industry.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/spawn_seat.cpp"
    ],
    "title": "A seat whose capital base the state cut removed keeps its raised opening unit",
    "design": "The seated nation opens unarmed (MILITARY.md; move_seat_force -> disarm_corporation removes every unit unit_is_raised calls raised). Found by the sprint 61 re-bless bisect (2026-10-31), seed 13 at b3fc19a6: size_opening_state_to_chest cut nation 47736's capital military_base at (122,69); demolishing a base nulls its units' muster_base, so the 50-man opening unit (id 91961) raised there reads as a garrison (unit_is_raised needs a non-null muster_base) and the seated player kept it: 6x200 + 50 = 1250 men. On main the road steer (BL-1468) spares that base and the count is the intended 1200, so the leak is latent, not gone. THE WORK: either the cut never removes a capital base (it is the muster point the opening force needs), or a unit raised at a base keeps a raised mark when the base goes, so disarm still removes it. Check: a fixture where the cut takes the seat's capital base; the seat opens with garrisons only. Digest-moving only on seeds where the cut hits a base."
@@ -578,6 +578,124 @@
    ],
    "title": "Recruit pools in the header (land, air, sea), ports make sea recruits, theatre tabs in the military ledger",
    "design": "Written in docs/military/MILITARY.md § Recruits (ports make sea recruits; seen in the header), docs/ui/HEADER.md (Recruits readouts top right, fit ladder step 2) and docs/ui/ledgers/military.md § Grouped by theatre (Land / Air / Sea tabs, Sea a stub) (Ben, 2026-11-02). Work: a sea pool fed by completed ports, 15-quarter cap, saved and hashed; three header readouts (glyph, held / cap, fill bar) with the fit ladder; the Recruit tab pool strip retires; theatre tabs replace the collapsible headers on Recruit and Design; the Sea tab stub lists ports and says ships are not raised yet."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 62,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-02",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, starter-package form, 2026-11-02)",
+   "requires": [],
+   "id": "BL-1473",
+   "short_name": "MAJOR_OPENING_KIT",
+   "category": "Generation",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "priority": "A",
+   "difficulty": 4,
+   "files": [
+    "src/world/finish_campaign_world.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/nation_generation.cpp",
+    "scripts/world_gen.lua"
+   ],
+   "title": "Every major opens on the Standard kit and a flat 8,000-credit treasury",
+   "design": "Written in docs/generation/CORPORATION_GENERATION.md § A major's opening kit and docs/generation/NATION_GENERATION.md § Pass 7 (Ben, 2026-11-02). Work: the kit as one authored data table (slots, counts, treasury, army) so Lean/Rich are edits; after the fold and before the opening reserve, take up the walk's buildings on each major's ground and lay the kit under Pass 3's rules with the substitution ladder; logistics slots counted against standing nodes; opening stock per kit category; treasury set flat; the opening cut skips majors; unbuilt slots on the generation report. Digest re-bless expected; NR-1125 carries the calls taken in writing it."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 62,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-02",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, starter-package form, 2026-11-02)",
+   "requires": [
+    "BL-1473"
+   ],
+   "id": "BL-1474",
+   "short_name": "MAJOR_OPENING_ARMY",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "src/world/nation_generation.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/recruits.cpp"
+   ],
+   "title": "Every major opens with eight land units and 200 recruits",
+   "design": "Written in docs/military/MILITARY.md § Nation garrisons (Ben, 2026-11-02). Work: for a major, replace treasury-scaled garrison sizing with the kit's force (5 infantry, 1 motorised, 1 artillery, 1 light armour, base kit), four at the capital post and one each at border posts in grudge order, wrapping; seed_starting_military's unit counts among the eight; land pool opens at 200. Minors unchanged."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 62,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-02",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, starter-package form, 2026-11-02)",
+   "requires": [],
+   "id": "BL-1475",
+   "short_name": "OPENING_PARITY_CENSUS",
+   "category": "Verification",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "tools/verify/opening_parity.cpp"
+   ],
+   "title": "opening_parity: per-major treasury, buildings, men and five years of operating net",
+   "design": "The measurement for the kit ruling (Ben, 2026-11-02: test configurations over several years of play). A pure reader on the shipped start: per seed and per major, at the handoff, treasury, buildings by kit category, unbuilt slots, men and pool; then operating net per quarter for 20 quarters with every major run by its scorer; the max/min spread across majors; and how many major pairs share a border (the spacing question). Run before and after BL-1473 over the 16 library seeds with par-seeds, at 20 and 30 nations. Saving it as a skill needs Ben's permission."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 62,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-02",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, starter-package form, 2026-11-02)",
+   "requires": [],
+   "id": "BL-1476",
+   "short_name": "WIZARD_DEFAULT_THIRTY",
+   "category": "UI",
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "priority": "B",
+   "difficulty": 1,
+   "files": [
+    "src/core/app.hpp"
+   ],
+   "title": "The wizard suggests 30 nations and 4 majors",
+   "design": "Written in docs/generation/NATION_GENERATION.md § The nation count is a target (Ben, 2026-11-02). Work: wizard_default_nation_total 20 -> 30. Spacing is measured by BL-1475 (opening parity census) before any rule."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 62,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-02",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, starter-package form, 2026-11-02)",
+   "requires": [],
+   "id": "BL-1477",
+   "short_name": "UPKEEP_DOC_DRIFT",
+   "category": "Docs",
+   "authority_doc": "docs/military/MILITARY.md",
+   "priority": "C",
+   "difficulty": 1,
+   "files": [
+    "docs/military/MILITARY.md",
+    "scripts/economy.lua"
+   ],
+   "title": "MILITARY.md § Upkeep says every rate is zero; economy.lua charges them",
+   "design": "Doc and code disagree: § Upkeep's table and 'authored at zero, deliberately' against economy.military.unit_upkeep (credits_per_head 0.1041, ordnance 0.000875, food 0.00625, decay 50, recovery 100; BL-1191 stopgap). One of them is wrong; the opening army's wage (BL-1474) is priced off the code's figures."
   }
  ]
 }

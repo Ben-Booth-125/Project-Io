@@ -190,6 +190,12 @@ for the *distribution* of that number across the world — wide, with real tails
 answerable for nothing at all about any individual region's value. No start is clamped up to
 viability or down to fairness.
 
+**One exception: a major's plant, chest and army (Ben, 2026-11-02).** Every major opens on the same
+kit, treasury and army (`CORPORATION_GENERATION.md` § A major's opening kit). A major's start is
+asymmetric through its land, its population and the strength of the nations bordering it. The supply
+asymmetry this section asks for is untouched: deposits stay regional, the kit's slots substitute to
+what the ground holds, and every minor's industry is the walk's.
+
 That is the same discipline the rest of this document runs on: a stage is a **deterministic
 consequence of upstream scalars, not a roll**. The machinery to produce the spread already exists
 and is not yet being read as an economic instrument —
@@ -397,7 +403,8 @@ They get one, in the wizard's own idiom (`../ui/STARTUP.md` § Rounds):
 **Each round takes leans, per pass.** A lean names a *force*, is resolved against the seed like
 any `world_preference`, and targets no outcome — the tune-the-forces-never-the-outcome rule of
 § Asymmetry is the deliverable is not relaxed for being player-facing. The setup round's two nation
-counts are that section's one exception, and they are not leans. The wizard's standing
+counts are the player-set exception to it, and they are not leans; a major's opening kit is the
+other (Ben, 2026-11-02), and the player does not set it. The wizard's standing
 premise carries over unchanged: **you set conditions, you do not steer.**
 
 **Round 6 shows the selected landscape, not the search.** Phase 6 scores candidates statically in

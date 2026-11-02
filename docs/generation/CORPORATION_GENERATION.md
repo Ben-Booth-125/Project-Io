@@ -1,6 +1,7 @@
 # Project Io — Industry Generation
 
-> **Settles:** industry generation — what a nation's ground opens with · what a charter is and
+> **Settles:** industry generation — what a nation's ground opens with · the major's opening kit and
+> its substitution ladder (Ben, 2026-11-02) · what a charter is and
 > how a centre's charter budget is spent as buildings · how a charter's focus is read · where
 > buildings are placed, and the rules every placement passes (own ground, chain-feasible, sized
 > to its inputs, bounded by want) · what opening stock reaches the shelves · how the seat is
@@ -34,7 +35,8 @@ no behaviour below.
 eight corporations by weighted nation draw is retired. Every world's industry is the landscape
 search spending each population centre's **charter budget** (`INDUSTRIALISATION.md` § 1; § This
 phase sets budgets; the search spends them). What a centre's budget bought as firms it now buys as
-**buildings owned by the centre's nation**.
+**buildings owned by the centre's nation**. The walk's buildings stand on a minor's ground; a
+major's ground opens on the kit (§ A major's opening kit, Ben, 2026-11-02).
 
 **A charter is the unit the budget buys.** A charter is one priced set of buildings for one good,
 placed together around a centre — the holding set a firm used to stand on. It owns nothing and
@@ -49,8 +51,9 @@ nation's tiles — never another nation's, never ground no nation owns (`../poli
 extractor on a deposit, a processor where its inputs are within reach, a depot near traffic.
 Placement uses the same tile data as the economy.
 
-**Density follows the city.** Where industry accumulated, the ground opens thick with plant; where
-it was spent or never lit, thin (`INDUSTRIALISATION.md` § 1).
+**Density follows the city, on a minor's ground.** Where industry accumulated, the ground opens thick with plant; where
+it was spent or never lit, thin (`INDUSTRIALISATION.md` § 1). A major's ground opens on the kit
+instead (§ A major's opening kit).
 
 ---
 
@@ -370,11 +373,81 @@ Market-clearing consequences of its output are `docs/economy/MARKETS.md`'s.
 
 ---
 
+## A major's opening kit (Ben, 2026-11-02)
+
+**Every major opens on the same kit; a minor opens on the walk.** Ben: *"Asymmetrical starts are an
+intended aim, however this comes from who has more land, population, and who has stronger nations
+bordering them … we will collapse the initial treasury and buildings to be roughly equal for each
+major power."* A major's ground holds the kit below and nothing else from industry generation: what
+the walk placed there before the majors were known (`NATION_GENERATION.md` § The nation count is a
+target) is taken up, and the kit is laid in its place. Every minor keeps its walk. So a major's
+start differs from another's by its ground, its people and its neighbours, never by the size of its
+plant.
+
+**The kit is a fixed list of slots (Ben, 2026-11-02, option A).** A slot names a building and the
+good it is for. The Standard kit is the one in play:
+
+| Category | Slots | Count |
+|---|---|---|
+| Logistics | the capital's source (every capital's, § Pass 3), two `inland_logistics_hub`, one `railway_station`, one `port` | 4 + the source |
+| Extraction | agricultural produce ×2, water, coal, petroleum, iron ore, copper ore, and one **flex** slot: the raw the kit's own processors are shortest of at `t_idle` | 8 |
+| Processing | food rations (Food Processor), steel (Smelter), refined copper (Smelter), machinery (Fabricator), refined fuel (Refinery), power (the Power Generation plant its fuel allows) | 6 |
+| Civic | `planetary_marketplace`, `research_institute`, `schooling` | 3 |
+| Military | the capital's `military_base` (`../military/MILITARY.md` § Nation garrisons) | 1 |
+
+Twenty-two buildings and the source. Its running bill is about 250 credits a tick before inputs
+(maintenance and wage, `scripts/economy.lua`).
+
+**Why these processors.** Each one runs on day one, which the hard rules of § Pass 3 require. The
+steel, copper and machinery slots are one chain: iron ore and coal make steel, copper ore makes
+refined copper, and the two make machinery. Ordnance, which every unit draws, is machinery and steel,
+so a major can make it as its first build. **No Arms Works is in the kit:** each class opens on its base kit, which costs no
+goods (`../military/MILITARY.md` § Land — the classes), so nothing would buy its output until kit is
+researched, and an idle plant the player inherits reads as a broken economy (§ Pass 3).
+
+**Every kit placement passes § Pass 3's rules, unchanged.** Own ground, `can_place`, chain-feasible,
+sized to spare input and bounded by want all bind a kit building as they bind a charter. Extraction
+is laid first, ranked by richness × cover over the major's whole ground; processors anchor at the
+capital, then the market centres in chain-distance order, as a processing charter does.
+
+**A slot the ground cannot hold is substituted, never dropped or paid (Ben, 2026-11-02).** The
+ladder, in order:
+
+1. **The same good, farther.** Any of the major's covered ground that holds it.
+2. **The same slot class, another good.** Produce: a Farm, then a Fishing Wharf, then a Hydroponics
+   Bay. Water: a Well, then an ice deposit. Energy: coal and petroleum stand in for each other, and
+   the power slot takes the plant its fuel allows. Ore: iron ore and copper ore stand in for each
+   other. A processor takes the feasible recipe nearest its feed, by § Pass 3's bend rule.
+3. **The nearest category.** An extraction slot becomes another flex slot. A processing slot
+   becomes the feasible processor nearest its feed whose output is wanted. A `port` on coastless
+   ground becomes a second `railway_station`, and a station without track becomes a hub.
+
+A slot nothing on the ladder can place stays unbuilt and is recorded on the generation report, by
+slot and reason, as a measured fact of that ground. Nothing is minted for it.
+
+**Logistics slots count the standing nodes.** The ports, stations and hubs the history and the fold
+left on a major's ground fill its logistics slots first, in the order the Logistic Point seeding
+lays them out from the capital (`../economy/LOGISTICS.md` § Where generation puts the sources). The
+seeding lays any slot still open, and a node beyond the slot count is taken up. Roads and track
+stay as the history left them.
+
+**Opening stock follows the kit.** § Pass 4b's stock is generated once per kit category (extraction
+weights for the extraction slots, processing weights for the processing slots) and placed on the
+shelves of the markets the kit stands in.
+
+**The kit opens with its own treasury and army.** The flat treasury is `NATION_GENERATION.md`
+§ Pass 7's, and the fixed army is `../military/MILITARY.md` § Nation garrisons'. The settle then runs as
+it does for every nation, so the handoff, not generation, is where parity is measured.
+
+**The kit is data.** Its slots, counts, treasury and army are one authored table, so a configuration
+under test is an edit, not a code change. Lean (about 14 buildings) and Rich (about 32) are the
+proposed comparison points. The Standard kit is the one ruled.
+
 ## The player's nation
 
 **The player is a major nation and builds its own buildings (Ben, 2026-10-23; `docs/CONCEPT.md`
-§ Player identity).** Generation makes the player's industry exactly as it makes a rival's: the walk
-places charters on the player's ground from its centres' budgets, and nothing is placed, sized or
+§ Player identity).** Generation makes the player's industry exactly as it makes a rival major's:
+the player's ground opens on the kit (§ A major's opening kit), and nothing is placed, sized or
 favoured for the player. Which nations are majors is `NATION_GENERATION.md` § The nation count is a
 target. The seat is shaped for up to six humans, one major each, and the prototype seats one
 (`docs/ui/STARTUP.md` § The seat).

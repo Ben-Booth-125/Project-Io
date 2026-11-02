@@ -1361,9 +1361,20 @@ This joins the existing three unit writers (§ The unit model)
 as a fourth, generation-time source, alongside the hard-coded stub, `seed_starting_military`, and
 `hire_unit`.
 
-**Sizing is treasury-scaled against the value anchor.** BL-543's (value anchor) unit-equipment-
+**A major's opening army is fixed (Ben, 2026-11-02).** Every major opens with the same force,
+authored with its kit (`../generation/CORPORATION_GENERATION.md` § A major's opening kit). The
+Standard kit's force is **eight land units of 50 men**: five infantry, one motorised infantry, one
+artillery and one light armour, each on its class's base kit. Four stand at the capital post: two
+infantry, the artillery and the light armour. The other four are one unit each at the border posts,
+taken in descending grudge order and wrapping round when there are fewer than four posts. A major
+with no border post holds all eight at the capital. The opening unit `seed_starting_military`
+raises is one of the eight, not a ninth. Its land pool opens holding **200 recruits**, four quarters
+of one base. The army is equal; the threat each major faces is not, and that is the intended
+asymmetry.
+
+**A minor's sizing is treasury-scaled against the value anchor.** BL-543's (value anchor) unit-equipment-
 costs-twice-annual-salary anchor prices a garrison's count off the nation's own
-`nation_component::treasury`, so a rich nation fields a bigger standing force and a poor one a
+`nation_component::treasury`, so a rich minor fields a bigger standing force and a poor one a
 token one — no separate garrison-strength dial. A garrison holds its seeded tile until it is
 assigned to a front (§ Fronts). A rival assigns its border garrisons and keeps its capital's home.
 

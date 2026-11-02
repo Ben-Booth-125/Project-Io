@@ -772,6 +772,23 @@
     "docs/military/MILITARY.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-1125",
+   "title": "Major opening kit: five calls taken while writing the ruling",
+   "raised": "2026-11-02",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Sprint 62 design session, Ben's form 2026-11-02 (fixed kit, substitute, Standard, flat treasury, count only)",
+   "what": "(1) KIT MIX: the proposed construction-materials and Arms Works slots are replaced by refined copper and machinery. Arms Works output is wanted only once kit is researched (base kit costs no goods) and the industrial construction recipe is retired, so both would idle on day one against Pass 3's want rule. Steel, copper and machinery make one chain toward ordnance. (2) TAKE-UP: what the walk placed on a major's ground is taken up once majors are known, after the search scored it, and the kit laid in its place; a minor's processor whose feed stood on that ground may lose it. (3) LOGISTICS: history and fold nodes fill the kit's four logistics slots in seeding order; nodes beyond the count are taken up, roads and track stay. (4) ARMY POSTS: of the eight units, four at the capital (2 infantry, artillery, light armour) and four one each at border posts in grudge order, wrapping; land pool opens at 200 recruits. (5) LADDER END: a slot nothing on the substitution ladder places stays unbuilt and is reported, not paid in credits.",
+   "files": [
+    "docs/generation/CORPORATION_GENERATION.md",
+    "docs/military/MILITARY.md",
+    "docs/generation/NATION_GENERATION.md"
+   ],
+   "why_it_matters": "Each is a reading of the form Ben answered, not a choice he made. (2) and (3) can change what a minor opens with, and every seed digest moves with them.",
+   "recommendation": "Confirm all five; (2) and (3) are the ones most likely to move a minor's opening.",
+   "resolution": null
   }
  ]
 }

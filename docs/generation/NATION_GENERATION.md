@@ -51,6 +51,12 @@ and the "no nations slider" that went with it. The player sets two numbers on th
 | **Total** | nations alive on the homeworld when generation ends | at least the major target, **at most 40** |
 | **Major** | nations generation raises to a full actor when generation ends (`docs/GLOSSARY.md` § Major nation) | **1 to 6** |
 
+**The wizard suggests 30 nations and 4 majors (Ben, 2026-11-02).** That is 26 minors, so the ground
+between majors is broken up by more minor states, and each major's neighbours, not its kit, decide
+how hard its start is. The count alone does not keep majors apart: majors are chosen by industry
+points, and the richest regions may border each other. Whether a spacing rule is needed is measured
+first (Ben, 2026-11-02), as how many major pairs share a border.
+
 **Both targets are always hit (Ben, 2026-10-10).** A world that ends off either target is a defect,
 not a reported outcome — the reverse of NR-911's report-and-count rule, for these two numbers only.
 
@@ -611,6 +617,17 @@ exist — which is why `generate_population_centres` runs before `generate_natio
 
 ### Pass 7 — Starting treasury *(Ben, 2026-08-24; the source ruled BL-975, 2026-09-15)*
 
+**A major opens on a flat treasury (Ben, 2026-11-02).** Every major's treasury is set to its kit's
+authored figure, **8,000 credits** for the Standard kit (`CORPORATION_GENERATION.md` § A major's
+opening kit), in place of the chest its history folded. It is set once the kit stands and before the
+opening reserve, and it is the same for every major. It is about sixteen ticks of the kit's running
+bill and its army's wage, plus a build fund. Majors differ by ground, people and neighbours, not by
+their chests. **The opening cut does not run on a major**: its kit is sized to its chest by
+construction, so a major short of sixteen ticks of its bill is a defect in the kit table, not a nation
+to shrink. Everything below holds for every minor, and for every nation's chest *through* the
+history: the spans still bank, tribute and fight with the chests as below. Only a major's figure at
+the handoff is replaced.
+
 **Every nation opens with real credits, and none opens in debt (Ben, 2026-10-11).** The player is a
 nation and sees its starting credits, so a median nation opening on a fraction of a credit is a
 defect, not a skew to report. The lever is **the history banks more**: polities earn and keep more
@@ -735,8 +752,8 @@ summing 13,683, on the 2026-10-11 census), 22 of the 38 on under one,
   0.1 ‰ the treasuries alone would sum to ~317,000, an order of magnitude past a corporate field's
   opening cash.
 
-Garrison sizing (`seed_nation_garrisons`, MILITARY.md § Nation garrisons) reads the result and
-differentiates on it: the reference seed's poorest realms — the median among them — hold the
+Garrison sizing (`seed_nation_garrisons`, MILITARY.md § Nation garrisons) reads a minor's result and
+differentiates on it (a major's army is fixed by its kit, Ben, 2026-11-02): the reference seed's poorest realms — the median among them — hold the
 20-head floor, its richest the 200-head ceiling. The spread is log-heavy because the chests at the
 close are — a consequence of the spans' own endowment and trade income, not a distribution
 authored here.

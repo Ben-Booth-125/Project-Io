@@ -25,7 +25,9 @@ buildings may use: every building is the nation's (Ben, 2026-10-23).
 **Every nation starts the campaign at the same tech level, holding nothing (Ben, 2026-10-10).**
 Research is not part of generation: the pre-game history runs no tech trees and spends no research,
 so no nation opens ahead of another in technology. A start is asymmetric through its geography, its
-history, its population and its corporate web — never through its tech. Every nation is playable,
+history, its population and its neighbours — never through its tech, and, for a major, never
+through its opening kit (Ben, 2026-11-02; `../generation/CORPORATION_GENERATION.md` § A major's
+opening kit). Every nation is playable,
 and every nation opens on the industrial recipe band (`ERAS.md` § Where the ladder starts).
 
 ---

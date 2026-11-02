@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*40 entries — 34 open, 6 resolved.*
+*41 entries — 35 open, 6 resolved.*
 
 ---
 
@@ -456,6 +456,17 @@ MILITARY.md § Domains and traversal lets land classes onto coastal water only w
 > **Recommendation:** (1) A; (2) B - drop defence to +30% so a supplied 2:1 breaks it slowly and artillery shortens it; (3) B, posts on a hostile border count; (4) A.
 
 *Files: `src/world/battle_system.cpp`, `src/world/campaign_battle.cpp`, `src/world/corp_ai.cpp`, `scripts/economy.lua`, `docs/military/MILITARY.md`*
+
+### NR-1125 — Major opening kit: five calls taken while writing the ruling
+*decision taken on your behalf · raised 2026-11-02 · from Sprint 62 design session, Ben's form 2026-11-02 (fixed kit, substitute, Standard, flat treasury, count only)*
+
+(1) KIT MIX: the proposed construction-materials and Arms Works slots are replaced by refined copper and machinery. Arms Works output is wanted only once kit is researched (base kit costs no goods) and the industrial construction recipe is retired, so both would idle on day one against Pass 3's want rule. Steel, copper and machinery make one chain toward ordnance. (2) TAKE-UP: what the walk placed on a major's ground is taken up once majors are known, after the search scored it, and the kit laid in its place; a minor's processor whose feed stood on that ground may lose it. (3) LOGISTICS: history and fold nodes fill the kit's four logistics slots in seeding order; nodes beyond the count are taken up, roads and track stay. (4) ARMY POSTS: of the eight units, four at the capital (2 infantry, artillery, light armour) and four one each at border posts in grudge order, wrapping; land pool opens at 200 recruits. (5) LADDER END: a slot nothing on the substitution ladder places stays unbuilt and is reported, not paid in credits.
+
+**Why it matters.** Each is a reading of the form Ben answered, not a choice he made. (2) and (3) can change what a minor opens with, and every seed digest moves with them.
+
+> **Recommendation:** Confirm all five; (2) and (3) are the ones most likely to move a minor's opening.
+
+*Files: `docs/generation/CORPORATION_GENERATION.md`, `docs/military/MILITARY.md`, `docs/generation/NATION_GENERATION.md`*
 
 ---
 
