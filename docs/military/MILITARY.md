@@ -396,6 +396,16 @@ Ordnance stays every unit's per-tick draw. **Refit**: a wounded unit regains HP 
 recruit pool (§ Recruits). A unit whose kit cannot be bought, or whose pool is empty, stays
 wounded; the economy is the war's ceiling.
 
+- **Each man regained is one recruit and one man's equipment.** A man's equipment is his share
+  of what his unit was raised with: the kit goods of the design the unit records, and its type's
+  gated hire goods, over the men a hire raises. It is bought off the nation's shelves at the posted
+  price, from its uncommitted treasury, as a hire buys. HP is men, so the men a unit regains equal
+  the recruits its pool gives, and the goods drawn equal those men times the share.
+- **The refill rides the quarterly supply draw.** The recruits a unit plans to take, and their
+  equipment's quantity, join its Logistic Point request at its paying road (§ Upkeep); it receives
+  the whole recruits its granted share pays for, each with his equipment. Units are served in
+  ascending id, so when a pool or a shelf runs short the order decides who stays wounded.
+
 ### Recruits (Ben, 2026-10-30)
 
 **Soldiers are recruits, and bases make them.** A `military_base` makes **land recruits** and an
