@@ -53,6 +53,9 @@ struct seed_result
     int answers = 0, offers = 0, accepts = 0, refuses = 0, on_player = 0;
     int bunkers = 0, bunkers_done = 0, player_bunkers = 0; ///< BL-1426: rivals' bunkers (built or building), completed, the player's (ceded ones included)
     int built_for_player = 0; ///< BL-1426: a bunker that first appeared in the player's assets - a build for it
+    long long pair_ticks = 0, grievance_pair_ticks = 0; ///< BL-1479: ordered nation pairs x live ticks, and those whose Trust <= -25
+    int grievance_declares = 0; ///< BL-1479: declarations made with grievance holding
+    int imposed_on_player = 0;  ///< BL-1480: peaces a rival imposed on the player's nation
     std::uint64_t hash = 0;
     std::string war_bytes; ///< the war tables, for --replay
     std::vector<war_ai_trace_row> trace;
@@ -138,6 +141,16 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
         w.current_day_tick = k * k_days;
         (void)run_settle_tick(w, reg, step, k * k_days, /*spectating=*/false);
         r.at_war_max = std::max(r.at_war_max, nations_at_war(w));
+        // BL-1479 (NR-1104): how often grievance holds - every ordered pair of distinct
+        // nations, its observer's Trust toward the subject at or below the edge.
+        for (const auto& [a, na] : w.nations)
+            for (const auto& [b, nb] : w.nations)
+                if (a != b)
+                {
+                    ++r.pair_ticks;
+                    if (sentiment_toward(w.sentiment, a, b).trust <= k_war_grievance_trust)
+                        ++r.grievance_pair_ticks;
+                }
         // BL-1426 (cold review): a bunker CEDED to the player is legal; one BUILT for it
         // is not. A cession moves an existing building id, a build mints a new one, so a
         // bunker id the player holds that no rival held at an earlier step was built for
@@ -162,6 +175,8 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
     r.cessions   = static_cast<int>(w.province_cessions.size());
     for (const war_history_entry& h : w.war_history)
         r.imposes += (h.end == war_end::imposed_white || h.end == war_end::imposed_cession) ? 1 : 0;
+    for (const war_ai_trace_row& t : trace)
+        r.imposed_on_player += (t.applied && t.choice == war_ai_choice::impose && t.target == player) ? 1 : 0;
     for (const auto& [key, war] : w.wars) r.on_player += war.defender == player ? 1 : 0;
     for (const war_history_entry& h : w.war_history) r.on_player += h.defender == player ? 1 : 0;
     for (const war_ai_trace_row& t : trace)
@@ -171,6 +186,9 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
         r.offers  += t.choice == war_ai_choice::offer ? 1 : 0;
         r.accepts += t.choice == war_ai_choice::accept ? 1 : 0;
         r.refuses += t.choice == war_ai_choice::refuse ? 1 : 0;
+        // The trace's g is max(0, -Trust) / limit (limit 100): grievance held at g >= 0.25.
+        r.grievance_declares += (t.choice == war_ai_choice::declare
+                                 && t.grievance >= -k_war_grievance_trust / 100.0f - 1e-6f) ? 1 : 0;
     }
     // The player's nation is never acted for: no trace row names it as the actor.
     bool player_clean = true;

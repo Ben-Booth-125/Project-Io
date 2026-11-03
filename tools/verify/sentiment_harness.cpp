@@ -797,10 +797,12 @@ int main()
             const std::size_t folded = fold_pending_sentiment(w, reg);
             const sentiment_value ab = sentiment_toward(w.sentiment, A, B);
             const sentiment_value ba = sentiment_toward(w.sentiment, B, A);
-            check(folded == 2 && ab == sentiment_value{ 4.0f, 4.0f, -4.0f }
-                      && ba == sentiment_value{ 4.0f, 4.0f, -4.0f },
+            // Alarm's relief (-4) on a row with no Alarm stays at 0: Alarm floors at 0
+            // (Ben, 2026-11-03, NR-1115), so relief only cancels Alarm already raised.
+            check(folded == 2 && ab == sentiment_value{ 4.0f, 4.0f, 0.0f }
+                      && ba == sentiment_value{ 4.0f, 4.0f, 0.0f },
                   "E1b trade_conducted folds once a tick per party, magnitude the value "
-                  "landed: each -> the other, Access +, Trust +, Alarm -");
+                  "landed: each -> the other, Access +, Trust +, Alarm relieved (floored at 0)");
             check(w.sentiment_trade_landed.empty() && w.sentiment_trade_streaks.count({ A, B }) == 1,
                   "E1c the fold clears the accumulator and starts the pair's trade streak");
         }
@@ -864,10 +866,11 @@ int main()
                       && w.sentiment_pending.size() == 2,
                   "E2a accept_friendship queues its conduct (an offer alone queues none)");
             fold_pending_sentiment(w, reg);
-            check(sentiment_toward(w.sentiment, A, B) == sentiment_value{ 4.0f, 4.0f, -2.0f }
-                      && sentiment_toward(w.sentiment, B, A) == sentiment_value{ 4.0f, 4.0f, -2.0f }
+            check(sentiment_toward(w.sentiment, A, B) == sentiment_value{ 4.0f, 4.0f, 0.0f }
+                      && sentiment_toward(w.sentiment, B, A) == sentiment_value{ 4.0f, 4.0f, 0.0f }
                       && w.sentiment_pending.empty(),
-                  "E2b friendship_accepted: each party -> the other, Access +, Trust +, Alarm -");
+                  "E2b friendship_accepted: each party -> the other, Access +, Trust +, Alarm "
+                  "relieved (floored at 0, NR-1115)");
             check(w.corp_hostile_pairs == hostile_before && w.corp_friend_pairs.size() == 1,
                   "E2c the fold moved no stance table (the friendship row is accept's own)");
         }
@@ -956,12 +959,14 @@ int main()
         sentiment_table u;
         apply_sentiment_events(u, p, { ev(a, b, sentiment_factor_kind::trade_conducted, 2.0f),
                                        ev(a, b, sentiment_factor_kind::border_force) });
-        // 2 x (+1 access, -1 alarm) + 8 alarm = access 2, alarm 6.
+        // The batch folds trade first (canonical kind order): 2 x (+1 access, -1
+        // alarm) on a fresh row floors Alarm at 0 (NR-1115), then +8 = access 2,
+        // alarm 8.
         for (int i = 0; i < 9; ++i)
             decay_sentiment(u, p);
         const sentiment_value nine = sentiment_toward(u, a, b);
-        check(nine.access == 2.0f && nine.alarm > 2.99f && nine.alarm < 3.01f,
-              "A2 Alarm decays at alarm_decay_per_tick (6 halves to ~3 in nine ticks) "
+        check(nine.access == 2.0f && nine.alarm > 3.99f && nine.alarm < 4.01f,
+              "A2 Alarm decays at alarm_decay_per_tick (8 halves to ~4 in nine ticks) "
               "while an undecaying Access stays put");
 
         // A3 erased only when all three are neutral.
@@ -1036,6 +1041,25 @@ int main()
             check(read_sentiment(old, v1) && old.pairs.size() == 1
                       && sentiment_toward(old, a, b) == sentiment_value{ 1.5f, -2.5f, 0.0f },
                   "A6b a version-1 sentiment stream loads with Alarm 0");
+        }
+
+        // A8 ALARM FLOORS AT 0 (Ben, 2026-11-03, NR-1115; RELATIONS.md § 6): relief
+        // cancels raised Alarm and never takes it past neutral.
+        {
+            sentiment_table f;
+            apply_sentiment_events(f, p, { ev(a, b, sentiment_factor_kind::trade_conducted, 5.0f) });
+            const bool fresh = sentiment_toward(f, a, b) == sentiment_value{ 5.0f, 0.0f, 0.0f };
+            apply_sentiment_events(f, p, { ev(a, b, sentiment_factor_kind::border_force) });       // +8
+            apply_sentiment_events(f, p, { ev(a, b, sentiment_factor_kind::trade_conducted, 3.0f) }); // -3
+            const bool partly = sentiment_toward(f, a, b).alarm == 5.0f;
+            apply_sentiment_events(f, p, { ev(a, b, sentiment_factor_kind::trade_conducted, 20.0f) }); // -20
+            const bool floored = sentiment_toward(f, a, b).alarm == 0.0f;
+            apply_sentiment_events(f, p, { ev(a, b, sentiment_factor_kind::border_force) });
+            const bool no_reserve = sentiment_toward(f, a, b).alarm == 8.0f;
+            check(fresh && partly && floored && no_reserve,
+                  "A8 Alarm floors at 0: relief on a row with no Alarm leaves it 0, relief cancels "
+                  "raised Alarm (8 - 3 = 5), more relief stops at 0, and no reserve absorbs the next "
+                  "+8 (NR-1115)");
         }
 
         // A7 THE INVARIANT, for Alarm: driving Alarm to its limit moves no stance.

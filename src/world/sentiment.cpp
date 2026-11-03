@@ -203,7 +203,12 @@ void apply_sentiment_events(sentiment_table& t, const sentiment_params& p,
         sentiment_value&                      v = t.pairs[key];
         v.access = saturated(v.access + delta_access, p.limit);
         v.trust  = saturated(v.trust + delta_trust, p.limit);
-        v.alarm  = saturated(v.alarm + delta_alarm, p.limit);
+        // ALARM IS ONE-SIDED (Ben, 2026-11-03, NR-1115; RELATIONS.md § 6): its floor
+        // is 0. Relief cancels Alarm already raised and never takes it past neutral,
+        // so trade cannot bank a reserve against a later threat. Reassurance is what
+        // Trust measures. A stream from before the ruling may carry a negative
+        // Alarm; it decays toward 0 as before, and the next fold floors it.
+        v.alarm  = std::max(0.0f, saturated(v.alarm + delta_alarm, p.limit));
 
         // An event that cancels a row exactly back to neutral erases it, for
         // decay's reason: absent == neutral, with no second spelling.

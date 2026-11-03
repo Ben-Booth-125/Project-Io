@@ -215,14 +215,17 @@ enum class war_measure : uint8_t
     defender_wars_on_declarer_friends,  ///< Wars the defender DECLARED on a friend of the declarer.
 };
 
-/// Where a row's operand comes from: authored on the row, or the adverse band's
-/// edge of the sentiment params (`-band_edge_far x limit`), so Grievance follows
-/// the band if the band is ever re-authored.
+/// Where a row's operand comes from: authored on the row. (Grievance once read the
+/// adverse band's edge, -band_edge_far x limit = -50; Ben, 2026-11-03, NR-1104, moved
+/// it to the hostile-leaning band, `k_war_grievance_trust`, which is no band edge.)
 enum class war_operand : uint8_t
 {
     fixed = 0,
-    adverse_trust_edge,
 };
+
+/// The Trust at or below which GRIEVANCE holds - the declarer's Trust toward the
+/// defender in the hostile-leaning band (RELATIONS.md § 7; Ben, 2026-11-03, NR-1104).
+inline constexpr float k_war_grievance_trust = -25.0f;
 
 struct war_justification_row
 {

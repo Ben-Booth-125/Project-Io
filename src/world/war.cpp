@@ -201,8 +201,10 @@ war_record* find_war_mut(world& w, entity_id a, entity_id b)
 const std::array<war_justification_row, k_war_justification_count>& war_justification_rows()
 {
     static const std::array<war_justification_row, k_war_justification_count> rows = {{
+        // Grievance holds in the HOSTILE-LEANING band, Trust <= -25 (Ben, 2026-11-03,
+        // NR-1104): the adverse band (-50) was a rule conduct almost never met.
         { "grievance",        war_measure::declarer_trust_toward_defender,
-          condition_comparator::at_most,  war_operand::adverse_trust_edge, 0.0f },
+          condition_comparator::at_most,  war_operand::fixed,              k_war_grievance_trust },
         { "embargo",          war_measure::defender_embargoes_declarer,
           condition_comparator::at_least, war_operand::fixed,              1.0f },
         { "lost_ground",      war_measure::goals_ceded_by_declarer,
@@ -279,15 +281,13 @@ std::array<bool, k_war_justification_count>
 war_justifications(const world& w, const sentiment_params& p, entity_id declarer,
                    entity_id defender, const std::vector<uint32_t>& goals)
 {
+    (void)p; // every operand is authored on its row (NR-1104 retired the band read)
     std::array<bool, k_war_justification_count> out{};
     const auto& rows = war_justification_rows();
     for (std::size_t i = 0; i < rows.size(); ++i)
     {
         const war_justification_row& r = rows[i];
-        const float operand = r.operand_source == war_operand::adverse_trust_edge
-                                ? -(p.band_edge_far * p.limit)
-                                : r.operand;
-        out[i] = compare(measure(w, r.measure, declarer, defender, goals), r.comparator, operand);
+        out[i] = compare(measure(w, r.measure, declarer, defender, goals), r.comparator, r.operand);
     }
     return out;
 }

@@ -441,6 +441,11 @@ ties the subject severed, its military posture, and its domestic unrest. Where e
 relieves it** — decay toward neutral like every sentiment dimension, live trade between the pair, and
 the nodes that cut it.
 
+**Alarm is one-sided: its floor is 0** (Ben, 2026-11-03, NR-1115). Positive is alarmed and zero is
+neutral; there is no reassured side. Relief cancels Alarm already raised and never takes it past
+neutral, so live trade cannot bank a reserve that a later declaration or border force would first
+have to spend. Reassurance is what Trust measures, and a signed Alarm would count it twice.
+
 **What reads it.** A rival nation's scorer reads its own Alarm toward a nation when it weighs an
 embargo, a coalition or a declaration of war (`../ai/AI_OPPONENT.md`). **The invariant holds
 unchanged**: Alarm informs a declaration and never makes one; no Alarm threshold flips a stance
@@ -491,7 +496,7 @@ opening set:
 
 | Justification | Holds when |
 |---|---|
-| Grievance | the declarer's Trust toward the defender is in the adverse band |
+| Grievance | the declarer's Trust toward the defender is in the hostile-leaning band, **Trust ≤ −25** (Ben, 2026-11-03, NR-1104: the adverse band, −50, was a rule conduct almost never met) |
 | Embargo | the defender embargoes the declarer |
 | Lost ground | a goal is a province the declarer ceded to the defender at an earlier peace |
 | A friend attacked | the defender is the declarer in a war against the declarer's friend |
