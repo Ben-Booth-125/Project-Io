@@ -2068,6 +2068,9 @@ void app::step_economy()
         // through here (it runs inside the worker, BL-1085), so nothing
         // pre-game posts lines the player never saw.
         session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
+        // BL-1480 (NR-1120): a declaration or peace the player is party to - the rival's
+        // pass above, or the player's own press since the last step.
+        session_history::post_war_dispatches(m_world, m_war_log_cursor, m_chat, day);
         // Persona counsel: ~1.05 s/tick measured 2026-08-12 (NR-210 records
         // the open in-game hitch). It was suppressed through the old validation
         // run; the settle now has no presentation half at all.
@@ -2156,6 +2159,7 @@ void app::setup_presentation(const world_params& params)
     // BL-212: the channel is nation-voiced, so the epoch line counts nations,
     // not the corporations operating quietly beneath them.
     m_chat = ui::chat_state{};
+    m_war_log_cursor = m_world.history_log.size(); // BL-1480: no dispatch for what came before
     ui::chat_post(m_chat, 0, null_entity, 0,
                   std::to_string(m_world.nations.size()) +
                       " nations on the public channel.");
@@ -2548,6 +2552,8 @@ bool app::load_game_from(const std::string& path)
 
     ui::chat_post(m_chat, static_cast<int>(env.day_tick), null_entity,
                   ui::chat_state::k_field_channel, "Loaded " + path);
+    m_war_log_cursor = m_world.history_log.size(); // BL-1480: a loaded log's wars are past
+
     return true;
 }
 

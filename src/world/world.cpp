@@ -846,6 +846,16 @@ uint64_t world::state_hash(int tick) const
             for (const uint32_t p : o.terms.provinces) fnv1a_u32(h, p);
         }
     }
+    if (!peace_refusals.empty())
+    {
+        fnv1a_u32(h, 0x52454655u); // 'REFU' - BL-1480: the offer cooldowns
+        for (const auto& [key, tick] : peace_refusals)
+        {
+            fnv1a_u32(h, key.first);
+            fnv1a_u32(h, key.second);
+            fnv1a_i32(h, tick);
+        }
+    }
     // The cessions feed a declaration's price (lost ground) and the history is the
     // record a war closes into: both are state a divergence would show in.
     if (!province_cessions.empty())

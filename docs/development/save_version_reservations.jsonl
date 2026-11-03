@@ -48,3 +48,4 @@
 {"version":73,"kind":"world","owner":"BL-1472 ports make sea recruits (nation_component::sea_recruits, a trailing section after BL-1463 v72 recruits section)","ts":"2026-11-02T00:00:00.000Z","branch":"worktree-agent-a1e11f62517900b53"}
 {"version":74,"kind":"world","owner":"BL-1422 land classes and kit (the kit goods by kind; resource_count 49 -> 54, older streams read 49 wide)","ts":"2026-11-01T18:24:13.147Z","branch":"worktree-agent-a73fede026cfc1bff"}
 {"version":24,"kind":"envelope","owner":"BL-1422 land classes and kit (the market history 54 series wide; v23/v22 read 49 wide)","ts":"2026-11-01T18:34:39.490Z","branch":"worktree-agent-a73fede026cfc1bff"}
+{"version":75,"kind":"world","owner":"BL-1480 war loose ends (world::peace_refusals, the refused offerer and its refusal tick per war; a trailing section after BL-1422 v74; a v74 stream reads with no refusals)","ts":"2026-11-03T12:00:00.000Z","branch":"worktree-agent-ad17e82f029da87b9"}

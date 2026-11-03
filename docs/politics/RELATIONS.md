@@ -328,8 +328,8 @@ rival may score and declare it, never acquire it ambiently. **That grant covers 
 war (Ben, 2026-10-30)** — `declare_war` with its goals (§ 7), toward a rival or the player alike.
 Whether it also covers a rival answering, offering and accepting peace, and so ceding ground, is
 raised as its own question and granted on the same terms (Ben, 2026-10-30, NR-1100): a rival
-answers, offers, accepts or refuses peace, imposes at 100, and so may cede ground
-(`../ai/AI_OPPONENT.md` § 11).
+answers, offers, accepts or refuses peace, imposes at 100 — the player's nation included (NR-1119)
+— and so may cede ground (`../ai/AI_OPPONENT.md` § 11).
 
 **A declaration against the player is SIGNALLED** (Ben, 2026-08-22). This overturns NR-350, which
 had a declaration *"stay silent, discovered on contact rather than announced"*; newest-dated wins,
@@ -528,7 +528,14 @@ and lives in its own table as friendship offers do (§ 1). There is one pending 
 - **White peace** — nothing changes hands.
 - **Cession** — named goals the receiving side holds pass to it. Only goals, and only held ones.
 
-A side whose score stands at 100 in its favour may **impose** its terms without acceptance. At
+**A refused offer may not be repeated for four ticks** (Ben, 2026-11-03, NR-1120). Once the receiver
+refuses, the offerer may make no offer in that war for four ticks — one year; the side that refused
+may still offer. The refusal tick is world state and is saved. Without it a refused offer returns
+every evaluation, an endless offer-and-refuse.
+
+A side whose score stands at 100 in its favour may **impose** its terms without acceptance — against
+any nation, the player's included (Ben, 2026-11-03, NR-1119). Imposing is the war's one forcing
+outcome; a player immune to it could lose ground only by accepting. At
 peace, both hostility rows clear and the record closes into the nation's history. A **truce** then
 bars either party declaring on the other for **sixteen ticks — four years** (Ben, 2026-10-30). `peace_concluded` warms both rows;
 `province_ceded` lands hard on the loser's row toward the winner. Each ceded province becomes a
@@ -542,7 +549,16 @@ ground withdraw by the retreat rule. A white peace hands every occupied goal's h
 owner, and the occupying units withdraw the same way.
 
 **Who scores a war.** The player declares, answers and makes peace through the Diplomacy ledger. A
-rival declares, answers and makes peace under the stance grant (§ 1), on its standing terms.
+rival declares, answers and makes peace under the stance grant (§ 1), on its standing terms. "Only
+the player answers and ends" its wars means no rival answers, offers or accepts **for** the player;
+it does not stop a rival imposing on it at 100 (NR-1119). **While spectating**, nobody holds the seat,
+so the war pass scores the player's nation like any rival (Ben, 2026-11-03, NR-1120; BL-409's rule) —
+otherwise a war against it would never be answered and never end.
+
+**The public record** (Ben, 2026-11-03, NR-1120). Every declaration and every peace writes an entry
+in the world history log (`../ai/AI_OPPONENT.md` § 8a), one per party, tagged by its nation. When
+the player's nation is a party, the same event is raised as a dispatch on the chat's Field channel
+(`../ui/CHAT.md`), so the player learns of a war on them from the feed, not only the ledger.
 
 ## Open questions
 

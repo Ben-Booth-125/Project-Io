@@ -60,6 +60,24 @@ void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& 
     }
 }
 
+void post_war_dispatches(const world& w, std::size_t& cursor, ui::chat_state& chat, int day_tick)
+{
+    if (cursor > w.history_log.size())
+        cursor = w.history_log.size(); // a shorter log replaced the one the cursor read
+    const entity_id me = player_nation(w);
+    const int field = (static_cast<int>(chat.channels.size()) > ui::chat_state::k_field_channel)
+                          ? ui::chat_state::k_field_channel
+                          : ui::chat_state::k_public_channel;
+    for (; cursor < w.history_log.size(); ++cursor)
+    {
+        const world_history_entry& e = w.history_log[cursor];
+        if (e.topic != history_topic::war || me == null_entity || e.corp != me)
+            continue; // the player is not this entry's party
+        ui::chat_post(chat, day_tick, null_entity, field,
+                      e.consequence.empty() ? e.event + "." : e.event + ": " + e.consequence + ".");
+    }
+}
+
 void post_nation_agency_comms(const world& w, const economy_report& report,
                               ui::chat_state& chat, int day_tick)
 {

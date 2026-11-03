@@ -1149,7 +1149,7 @@ event) and would need a join with no shared ordering.
 **The shape**, in `src/world/world.hpp`:
 
 ```cpp
-enum class history_topic : uint8_t { genesis, checkpoint, decision, agency, trade_route };
+enum class history_topic : uint8_t { genesis, checkpoint, decision, agency, trade_route, war };
 
 struct world_history_entry {
     int64_t        timestamp;   // unit depends on topic — see below
@@ -1211,6 +1211,12 @@ and `trade_routes` keep their own readers unchanged):
   is duplicated narration: a reader rendering chronologically sees the same sentence twice with
   different body tags. Mitigation if that reads badly — keep the narration identical (it is) and
   let the renderer de-duplicate on `(tick, event)` when it is *not* filtering by body.
+- **war** — `war.cpp`'s `declare_war` and every concluded peace (accepted or imposed) log the
+  event (Ben, 2026-11-03, NR-1120; `../politics/RELATIONS.md` § 7, The public record). The same
+  two-entry shape as a route, for the same reason: a war has two parties and the entry one tag, so
+  one entry is pushed per party — declarer then defender — tagged by that party's nation in `corp`,
+  carrying the same narration. The chat's war dispatch to the player reads exactly the entries
+  tagged by the player's nation. Timestamp: the sim day tick.
 
 **Serialisation** (`write_history_log`/`read_history_log`): a leading 4-byte magic (`"IOHL"`) plus
 a `uint32_t` version (BL-107's magic-and-version rule), then an entry count, then each entry
@@ -2364,6 +2370,16 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   Diplomacy ledger issues. **Not admitted:** a war, offer or peace that is not its own; acting for
   the player's nation, whose wars only the player answers and ends; a war planned beyond the next
   verb. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **Read and bounded (Ben, 2026-11-03, NR-1119 and NR-1120).** "Whose wars only the player answers
+  and ends" means a rival never answers, offers or accepts **for** the player's nation; it does not
+  make the player immune, and a rival at a score of 100 may **impose** on the player's nation as on
+  any. Under spectate nobody holds the seat, so the war pass scores the player's nation like any
+  rival (BL-409's rule) — a new subject, granted on the standing terms. A rival whose offer was
+  refused may not offer again in that war for four ticks, the cooldown the world's own
+  `offer_peace` enforces for every offerer (`../politics/RELATIONS.md` § 7). Every declaration and
+  peace writes the history log, one entry per party (§ 8a). **Not admitted:** any verb for the
+  player's nation in a seated session. Pure, seeded, deterministic, replayable, legal verbs only,
+  never a planner.
   **Rival nations build bunkers on their own ground — granted (Ben, 2026-10-31;
   `../military/MILITARY.md` § Fortifications).** A new subject, fortification rather than force,
   granted on the standing terms. A rival nation's scorer may build a bunker on a tile of its own

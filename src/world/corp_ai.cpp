@@ -1834,9 +1834,15 @@ void score_nation_bunkers(world& w, const recipe_registry& reg, entity_id nation
 //     Diplomacy ledger issues (declare_war, answer_war, offer_peace, accept_peace,
 //     refuse_peace, impose_peace) via apply_corp_command. Never declare_hostile:
 //     a bare hostility is not a rival war path.
-//   * Never FOR the player's nation (refused outright, as score_nation_air does),
-//     and never an IMPOSE on the player's nation: "whose wars only the player
-//     answers and ends" - the player ends its wars by its own accept or offer.
+//   * Never FOR the player's nation (refused outright, as score_nation_air does):
+//     "whose wars only the player answers and ends" means a rival never answers or
+//     offers FOR the player. It does not make the player immune: a rival at a
+//     score of 100 IMPOSES on the player's nation as on any (Ben, 2026-11-03,
+//     NR-1119). Under spectate nobody holds the seat, so the pass scores the
+//     player's nation like any rival (BL-409's rule; Ben, 2026-11-03, NR-1120).
+//   * A refused offer is not repeated while it cools (`peace_offer_cooling`, four
+//     ticks; NR-1120): the offer branch skips the war rather than try a verb the
+//     world would refuse.
 //   * Never a planner: every choice is the next verb, scored on the world as it
 //     stands. Nothing models the other side's reply.
 //   * Reads only what the nation may read: ITS OWN sentiment row toward a target
@@ -2042,11 +2048,13 @@ std::vector<uint32_t> legal_cession(const world& w, const war_record& war, entit
 
 } // namespace
 
-void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick)
+void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick, bool spectating)
 {
     // Never the player's nation (AI_OPPONENT.md § 11: "Not admitted: ... acting for
-    // the player's nation"), never an unknown one, never in the settle.
-    const entity_id player = player_nation(w);
+    // the player's nation"), never an unknown one, never in the settle. Under
+    // spectate there is no seat to protect (BL-409; NR-1120), so no nation is the
+    // player's here.
+    const entity_id player = spectating ? null_entity : player_nation(w);
     if (nation == null_entity || nation == player || w.nations.find(nation) == w.nations.end())
         return;
     if (!sentiment_conduct_live(w))
@@ -2117,8 +2125,8 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         const float lasted  = std::min(1.0f, static_cast<float>(std::max(0, dur))
                                               / static_cast<float>(k_war_truce_ticks));
 
-        // IMPOSE at 100 - never on the player's nation, whose wars only it ends.
-        if (mine >= 100 && other != player)
+        // IMPOSE at 100 - on any nation, the player's included (Ben, 2026-11-03, NR-1119).
+        if (mine >= 100)
         {
             const std::vector<uint32_t> held = legal_cession(w, war, nation);
             const corp_command cmd = war_cmd(nation, tick, corp_verb::impose_peace, other, held,
@@ -2169,6 +2177,8 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
         // OFFER: weariness, a war going badly, or one going well enough to cash in.
         if (dur < k_war_ai_min_peace_ticks)
             continue;
+        if (peace_offer_cooling(w, nation, other))
+            continue; // its last offer was refused under four ticks ago (NR-1120)
         std::vector<uint32_t> provs;
         uint32_t order = 0; // white
         if (mine >= k_war_ai_demand_score)
@@ -2419,9 +2429,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // whole"): its own wars - answer, peace, at most one declaration - on the same
         // live-only gate as the fronts (no war begins in the settle), and BEFORE the
         // fronts, so a front reads the hostility as it stands after this evaluation's
-        // verbs. score_nation_war refuses the player's nation itself as well.
+        // verbs. score_nation_war refuses the player's nation itself as well, save under
+        // spectate (BL-409; Ben, 2026-11-03, NR-1120), where it is scored like any rival.
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
-            score_nation_war(w, reg, corp, tick);
+            score_nation_war(w, reg, corp, tick, p.spectating);
 
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_fronts(w, reg, corp, tick);

@@ -531,14 +531,16 @@ void score_nation_bunkers(world& w, const recipe_registry& reg, entity_id nation
 /// BL-1461 (AI_OPPONENT.md § 11: the stance grant covers a rival declaring war; "Rival
 /// nations wage war whole" covers the rest; RELATIONS.md § 7): a rival nation's war
 /// pass over its OWN wars - answer a declaration against it, impose at a score of 100
-/// (never on the player's nation), accept or refuse an offer made to it, or offer
-/// peace - then at most one declaration toward a neighbour it shares a front with,
+/// (on any nation, the player's included: NR-1119), accept or refuse an offer made to
+/// it, or offer peace (not while its last refused offer cools, NR-1120) - then at most one declaration toward a neighbour it shares a front with,
 /// scored from its own Trust and Alarm toward it, the front edge, the declaration's
 /// price and justifications, trade exposure, its own exhaustion and the wars it already
 /// fights. Legal verbs only (apply_corp_command), never a planner. Does nothing for the
-/// player's nation, an unknown one, or while the settle gate is up. Called by
-/// run_corp_strategic_step for each due nation on a live tick; exported for harnesses.
-void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick);
+/// player's nation (unless @p spectating: BL-409, NR-1120 - nobody holds the seat), an
+/// unknown one, or while the settle gate is up. Called by run_corp_strategic_step for
+/// each due nation on a live tick; exported for harnesses.
+void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick,
+                      bool spectating = false);
 
 /// What the war pass chose (`war_ai_trace_row::choice`).
 enum class war_ai_choice : uint8_t

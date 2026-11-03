@@ -78,7 +78,9 @@ centred bar, each side's exhaustion, and days since it opened. Every war is publ
 
 - **Offer peace** — white peace, or cession of named goals the receiving side holds. A goal that is
   the loser's last province is disabled with its reason (RELATIONS § 7). **Impose**
-  replaces Offer while the score is 100 in the player's favour.
+  replaces Offer while the score is 100 in the player's favour. For four quarters after the other
+  side refuses the player's offer, **Offer peace** is disabled, its tooltip naming the quarters left
+  (RELATIONS § 7, the offer cooldown).
 - **Answer** — on a war declared against the player that it has not yet answered: name goals among
   the declarer's provinces. Answering is free.
 - A pending offer from the other side shows its terms with **Accept** and **Refuse**.
@@ -127,5 +129,6 @@ while active lifts it. Cancel or Escape closes the declaration without effect.
 ## Open questions for Ben
 
 1. The trend window (four ticks) and the trade-exposure window (four ticks) are strawman.
-2. Should a pending peace offer *to* the player also raise a dispatch in the chat, as a declaration
-   does?
+2. A declaration and a peace the player is party to each raise a dispatch on the chat's Field
+   channel (Ben, 2026-11-03, NR-1120; RELATIONS § 7, The public record). Should a pending peace
+   offer *to* the player raise one too?

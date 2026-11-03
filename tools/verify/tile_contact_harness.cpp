@@ -689,7 +689,7 @@ int main()
                                - world_save_alarm_section_bytes(f.w)       // BL-1432: v68's Alarm
                                - world_save_war_section_bytes(f.w)          // BL-1459: v69's wars
                                - world_save_embargo_section_bytes(f.w) - world_save_gen_capital_section_bytes(f.w)     // BL-1418: v70's embargoes
-                               - world_save_recruits_section_bytes(f.w) - world_save_sea_recruits_section_bytes(f.w), // BL-1463: v72's recruits, last
+                               - world_save_recruits_section_bytes(f.w) - world_save_sea_recruits_section_bytes(f.w) - world_save_refusals_section_bytes(f.w) /* BL-1480 (v75), last */, // BL-1463: v72's recruits, last
               "T13d ...and the v62 stream is today's less exactly the stack section (one battle of one unit) and the empty designs section");
         // An attacking stack naming a unit not on the attacker's side is refused.
         std::string bad = bytes;

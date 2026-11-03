@@ -336,7 +336,7 @@ int main()
                                       + world_save_alarm_section_bytes(f.w)
                                       + world_save_war_section_bytes(f.w) // BL-1459 (v69)
                                       + world_save_embargo_section_bytes(f.w) + world_save_gen_capital_section_bytes(f.w) // BL-1418 (v70)
-                                      + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w); // BL-1463 (v72), last
+                                      + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_refusals_section_bytes(f.w) /* BL-1480 (v75), last */; // BL-1463 (v72), last
         check(ok60 && v60.size() == bytes.size() - (4 + 10) - fronts_tail - world_save_kit_goods_bytes(f.w) /* BL-1422 */ && !unit_refitting(old.units.at(b))
                   && old.units.at(b).type == levy,
               "R5b a v60 stream (14 bytes shorter) reads as no refit");

@@ -1317,6 +1317,7 @@ private:
     ui::chat_state  m_chat;              ///< Comms log state (BL-205): channels, messages, drafts.
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
     std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.
+    std::size_t m_war_log_cursor = 0; ///< BL-1480: history_log entries already read for war dispatches.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
     /// Count of economy ticks this campaign -- the settle's twelve (run inside
     /// the worker, so Begin sets this to `k_campaign_settle_ticks`) plus every

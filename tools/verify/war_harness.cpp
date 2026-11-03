@@ -484,12 +484,12 @@ int main()
         check(from_bytes(b67, old) && old.wars.empty() && old.truces.empty() && old.peace_offers.empty()
                   && old.war_history.empty() && old.province_cessions.empty()
                   && b67.size() == b.size() - world_save_war_section_bytes(w)
-                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) // BL-1418 (v70)
+                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75), last */ // BL-1418 (v70)
                                               - world_save_kit_goods_bytes(w), // BL-1422: arrays 49 wide before v74
               "R4l a v68 stream (today's less the war and embargo sections) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;
-        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) // BL-1418 (v70), last
+        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75), last */ // BL-1418 (v70), last
                                - world_save_war_section_bytes(w) + 4; // past the war count
         bad[war0 + 8] = 2;
         world untouched;
@@ -706,8 +706,10 @@ int main()
               "P3g the offerer cannot accept its own offer, mutating nothing");
         check(refuse_peace(w, f.B, f.A) == war_result::applied && w.peace_offers.empty() && at_war(w, f.A, f.B),
               "P3h refusing erases the offer; the war goes on");
-        // Cession accepted.
-        check(offer_peace(w, f.A, f.B, cede) == war_result::applied, "P3i (re-offer the cession)");
+        // Cession accepted. The refused offerer waits out the four-tick cooldown first
+        // (Ben, 2026-11-03, NR-1120; RW11 pins the cooldown itself).
+        w.current_econ_tick += k_war_offer_cooldown_ticks;
+        check(offer_peace(w, f.A, f.B, cede) == war_result::applied, "P3i (re-offer the cession, the cooldown served)");
         (void)fold_pending_sentiment(w, reg); // the declaration's own conduct, folded first
         const float trust_ab = trust_of(w, f.A, f.B), trust_ba = trust_of(w, f.B, f.A);
         const float acc_ba = access_of(w, f.B, f.A);
@@ -1002,7 +1004,7 @@ int main()
         std::string bad2 = b2;
         // The offer sits after the war count + one war record + the truce table.
         const war_record& wr = w.wars.begin()->second;
-        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_war_section_bytes(w) + 4
+        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75), last */ - world_save_war_section_bytes(w) + 4
                               + (4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 + 4 + 4 * wr.declarer_goals.size() + 4 + 4 * wr.defender_goals.size())
                               + 4 + 12 * w.truces.size() + 4 + 4 + 4 + 4 + 4; // to the kind byte
         bad2[off] = 7;
@@ -1232,7 +1234,9 @@ int main()
                       && w.war_history.back().ceded == dg && did(war_ai_choice::impose, f.A, f.B),
                   "RW3 at 100 a rival imposes through impose_peace: its held goals are ceded to it");
         }
-        // RW3b - never an impose on the player's nation: at 100 it offers instead.
+        // RW3b - a rival MAY impose on the player's nation at 100 (Ben, 2026-11-03,
+        // NR-1119: "only the player answers and ends" means no rival acts FOR it; the
+        // player is not immune).
         {
             fixture f; build(f);
             world& w = f.w;
@@ -1245,11 +1249,11 @@ int main()
             w.current_econ_tick = 20;
             trace.clear();
             score_nation_war(w, reg, f.A, 20);
-            const auto oit = w.peace_offers.find({ f.A, f.B });
-            check(at_war(w, f.A, f.B) && w.war_history.empty() && oit != w.peace_offers.end()
-                      && oit->second.offerer == f.A && oit->second.terms.kind == peace_kind::cession
-                      && !did(war_ai_choice::impose, f.A, f.B) && did(war_ai_choice::offer, f.A, f.B),
-                  "RW3b at 100 against the player's nation a rival does not impose: it offers, and the player ends it");
+            check(!at_war(w, f.A, f.B) && !w.war_history.empty()
+                      && w.war_history.back().end == war_end::imposed_cession && w.war_history.back().gainer == f.A
+                      && w.war_history.back().ceded == dg && did(war_ai_choice::impose, f.A, f.B)
+                      && !did(war_ai_choice::offer, f.A, f.B),
+                  "RW3b at 100 against the player's nation a rival imposes through impose_peace, its held goals ceded (NR-1119)");
         }
         // RW4 - accept: a weary rival accepts the other side's offer through accept_peace.
         {
@@ -1415,7 +1419,167 @@ int main()
             check(oit != w.peace_offers.end() && oit->second.offerer == f.B && did(war_ai_choice::offer, f.B, f.A),
                   std::string("RW10") + (from_player ? "b'" : "'") + " a new offer can follow: the weary rival now offers peace");
         }
+        // RW11 - a refused offer may not be repeated for four ticks (Ben, 2026-11-03,
+        // NR-1120): the VERB refuses it, for any offerer, mutating nothing; the other
+        // side may still offer; the fifth tick admits it.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 10;
+            (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+            (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+            w.current_econ_tick = 20;
+            const bool refused = offer_peace(w, f.A, f.B, peace_terms{}) == war_result::applied
+                              && refuse_peace(w, f.B, f.A) == war_result::applied
+                              && w.peace_refusals.count({ f.A, f.B }) == 1 && w.peace_refusals.at({ f.A, f.B }) == 20;
+            bool cooling = true;
+            for (int t = 20; t < 24; ++t)
+            {
+                w.current_econ_tick = t;
+                const snap s = take(w);
+                cooling = cooling && peace_offer_cooling(w, f.A, f.B)
+                       && offer_peace(w, f.A, f.B, peace_terms{}) == war_result::rejected_state && same(s, w);
+            }
+            check(refused && cooling,
+                  "RW11a a refused offer records its tick; for ticks 20..23 the offerer's next offer is refused, mutating nothing");
+            {
+                world other = w;
+                check(offer_peace(other, f.B, f.A, peace_terms{}) == war_result::applied,
+                      "RW11b the side that refused may still offer while the other's offer cools");
+            }
+            w.current_econ_tick = 24;
+            check(!peace_offer_cooling(w, f.A, f.B) && offer_peace(w, f.A, f.B, peace_terms{}) == war_result::applied,
+                  "RW11c four ticks on (tick 24) the offerer may offer again");
+            (void)accept_peace(w, sp, f.B, f.A);
+            check(!at_war(w, f.A, f.B) && w.peace_refusals.empty(), "RW11d a refusal's record ends with the war");
+        }
+        // RW12 - the rival pass does not churn: refused, a weary rival waits out the
+        // cooldown and then offers again.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 10;
+            (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+            (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+            w.wars.at({ f.A, f.B }).defender_exhaustion = 60.0f;
+            int offers = 0, refused_verbs = 0;
+            std::vector<int> offered_at;
+            for (int t = 18; t <= 26; ++t)
+            {
+                w.current_econ_tick = t;
+                trace.clear();
+                score_nation_war(w, reg, f.B, t);
+                for (const war_ai_trace_row& r : trace)
+                    if (r.choice == war_ai_choice::offer)
+                    {
+                        if (r.applied) { ++offers; offered_at.push_back(t); }
+                        else ++refused_verbs;
+                    }
+                if (w.peace_offers.count({ f.A, f.B }) != 0)
+                    (void)refuse_peace(w, f.A, f.B); // A refuses every one
+            }
+            check(at_war(w, f.A, f.B) && offers == 3 && refused_verbs == 0
+                      && offered_at == std::vector<int>({ 18, 22, 26 }),
+                  "RW12 a weary rival refused at every offer offers at ticks 18, 22, 26 - once per cooldown, never a refused verb (NR-1120)");
+        }
+        // RW13 - under spectate the pass scores the player's nation like any rival
+        // (BL-409's rule; Ben, 2026-11-03, NR-1120): it answers a war on it.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            w.current_econ_tick = 20;
+            (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+            w.player_entity = f.B;
+            world seated = w;
+            trace.clear();
+            score_nation_war(seated, reg, f.B, 20, /*spectating=*/false);
+            const bool seated_quiet = trace.empty() && !seated.wars.at({ f.A, f.B }).answered;
+            trace.clear();
+            score_nation_war(w, reg, f.B, 20, /*spectating=*/true);
+            check(seated_quiet && w.wars.at({ f.A, f.B }).answered && did(war_ai_choice::answer, f.B, f.A),
+                  "RW13 seated, the player's nation is never acted for; spectating, the pass answers for it like any rival");
+        }
+        // RW14 - the public record (Ben, 2026-11-03, NR-1120): a declaration and a peace
+        // each write the world history log, one `war` entry per party tagged by its nation.
+        {
+            fixture f; build(f);
+            world& w = f.w;
+            const std::size_t before = w.history_log.size();
+            (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+            const auto war_entries = [&w](std::size_t from) {
+                std::vector<const world_history_entry*> out;
+                for (std::size_t i = from; i < w.history_log.size(); ++i)
+                    if (w.history_log[i].topic == history_topic::war) out.push_back(&w.history_log[i]);
+                return out;
+            };
+            const auto d = war_entries(before);
+            const bool decl = d.size() == 2 && d[0]->corp == f.A && d[1]->corp == f.B
+                           && d[0]->event == d[1]->event && d[0]->event.find("declared war on") != std::string::npos;
+            const std::size_t mid = w.history_log.size();
+            (void)offer_peace(w, f.A, f.B, peace_terms{});
+            (void)accept_peace(w, sp, f.B, f.A);
+            const auto pz = war_entries(mid);
+            const bool peace = pz.size() == 2 && pz[0]->corp == f.A && pz[1]->corp == f.B
+                            && pz[0]->event.find("white peace") != std::string::npos;
+            check(decl && peace,
+                  "RW14 a declaration and a peace each write two `war` history entries, one tagged by each party");
+            const std::string b = to_bytes(w);
+            world back;
+            check(from_bytes(b, back) && back.history_log.size() == w.history_log.size()
+                      && back.history_log.back().topic == history_topic::war,
+                  "RW14b the `war` topic round-trips the history log");
+        }
         war_ai_trace_sink() = nullptr;
+    }
+
+    // =====================================================================
+    std::printf("\nW-RF - the refusal record is saved (BL-1480, world_save_version 75)\n");
+    {
+        fixture f; build(f);
+        world& w = f.w;
+        w.current_econ_tick = 10;
+        (void)declare_war(w, sp, f.A, f.B, { f.provs[f.B][0] });
+        (void)answer_war(w, f.B, f.A, { f.provs[f.A][0] });
+        (void)offer_peace(w, f.A, f.B, peace_terms{});
+        (void)refuse_peace(w, f.B, f.A);
+        const std::string b = to_bytes(w);
+        uint32_t ver = 0;
+        std::memcpy(&ver, b.data() + 4, 4);
+        world back;
+        check(ver == 75 && ver == world_save_version && from_bytes(b, back) && to_bytes(back) == b
+                  && back.peace_refusals == w.peace_refusals && back.state_hash(0) == w.state_hash(0),
+              "RF1 the stream is v75 and the refusal round-trips byte for byte, its hash equal");
+        check(w.state_hash(0) != [&] { world z = w; z.peace_refusals.clear(); return z.state_hash(0); }(),
+              "RF2 the refusal is in the state hash");
+        std::ostringstream o74(std::ios::binary);
+        write_world_snapshot_pre_refusals(w, o74);
+        const std::string b74 = o74.str();
+        world old;
+        check(world_save_refusals_section_bytes(w) == 4 + 12 && b74.size() + 16 == b.size()
+                  && from_bytes(b74, old) && old.peace_refusals.empty() && old.wars.size() == 1,
+              "RF3 a v74 stream (today's less the 16-byte refusals section) reads as a world with no refusals");
+        const auto refused = [&](std::string bad, const char* what) {
+            world untouched;
+            check(!from_bytes(bad, untouched) && untouched.nations.empty(), what);
+        };
+        const std::size_t sec = b.size() - world_save_refusals_section_bytes(w);
+        {
+            std::string bad = b;
+            std::memcpy(&bad[sec + 8], &bad[sec + 4], 4); // (A, A)
+            refused(bad, "RF4 a refusal naming one nation twice is refused whole, the destination untouched");
+        }
+        {
+            std::string bad = b;
+            const int32_t neg = -1;
+            std::memcpy(&bad[sec + 12], &neg, 4);
+            refused(bad, "RF5 a negative refusal tick is refused whole");
+        }
+        {
+            std::string bad = b;
+            const entity_id c = f.C;
+            std::memcpy(&bad[sec + 8], &c, 4); // (A, C): no war between them
+            refused(bad, "RF6 a refusal between nations at peace is refused whole");
+        }
     }
 
     // =====================================================================

@@ -83,6 +83,11 @@ inline constexpr float k_war_exhaustion_decay = 0.25f;
 /// A residual exhaustion below this snaps to zero and its row is erased.
 inline constexpr float k_war_exhaustion_epsilon = 0.5f;
 
+/// A refused peace offer may not be repeated by its offerer, in that war, for this
+/// many economy ticks (Ben, 2026-11-03, NR-1120: four ticks, one year). The refusal
+/// tick is saved (`world::peace_refusals`, world_save_version 75).
+inline constexpr int k_war_offer_cooldown_ticks = 4;
+
 /// Morale's ceiling falls by this many per-mille per point of exhaustion: at 100
 /// exhaustion no unit of the nation may stand above 500 morale.
 inline constexpr int k_war_morale_per_exhaustion = 5;
@@ -340,7 +345,12 @@ war_result answer_war(world& w, entity_id defender, entity_id declarer,
 /// Pure: whether @p terms are a legal peace for the war between @p a and @p b.
 war_result check_peace_terms(const world& w, const war_record& war, const peace_terms& terms);
 
-/// Files @p offerer's terms on the war with @p other. One pending offer per war.
+/// True iff @p offerer's last offer to @p other was refused fewer than
+/// `k_war_offer_cooldown_ticks` ticks ago, so `offer_peace` would refuse it (pure).
+bool peace_offer_cooling(const world& w, entity_id offerer, entity_id other);
+
+/// Files @p offerer's terms on the war with @p other. One pending offer per war, and
+/// none while the offerer's last refused offer in it is cooling (rejected_state).
 war_result offer_peace(world& w, entity_id offerer, entity_id other, const peace_terms& terms);
 
 /// @p receiver accepts the pending offer @p offerer made: the peace is concluded
@@ -350,7 +360,9 @@ war_result offer_peace(world& w, entity_id offerer, entity_id other, const peace
 /// withdraw by the retreat rule; a third nation's hold is never touched.
 war_result accept_peace(world& w, const sentiment_params& p, entity_id receiver, entity_id offerer);
 
-/// @p receiver refuses the pending offer @p offerer made; the offer is erased.
+/// @p receiver refuses the pending offer @p offerer made; the offer is erased and the
+/// refusal tick is recorded (`world::peace_refusals`, keyed (offerer, receiver)), so the
+/// offerer may not offer again in this war for `k_war_offer_cooldown_ticks`.
 war_result refuse_peace(world& w, entity_id receiver, entity_id offerer);
 
 /// @p imposer concludes the peace on its own terms, without acceptance — only

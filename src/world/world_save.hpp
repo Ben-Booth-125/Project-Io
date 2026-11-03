@@ -674,7 +674,21 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// a stream before v74 is read and written with every array of `resource_count`
 /// elements at `k_resource_count_pre_kit_goods` (49) wide (`bio::scoped_array_width`,
 /// binary_io.hpp), the five new goods reading as zero everywhere. Nothing else moved.
-inline constexpr uint32_t world_save_version = 74;
+///
+/// Bumped to 75 (BL-1480 war loose ends; Ben, 2026-11-03, NR-1120; RELATIONS.md § 7
+/// Peace): A TRAILING SECTION after v74's last section (the v73 sea pools) carries,
+/// after a u32 count, every refused peace offer still cooling - `world::peace_refusals`
+/// - ascending (offerer, receiver), as (offerer id, receiver id, i32 refusal tick >= 0),
+/// each pair two distinct nations with an open war between them. v74 is a STRICT PREFIX
+/// of v75 and is read too (`k_world_save_version_pre_refusals`), as a world with no
+/// refusals; so is every older version the reader already accepted.
+inline constexpr uint32_t world_save_version = 75;
+
+/// BL-1480: the first version carrying the peace-refusals section (see above).
+inline constexpr uint32_t k_world_save_version_refusals = 75;
+
+/// BL-1480: v74, a strict prefix of v75 (the refusals section is v75's only addition).
+inline constexpr uint32_t k_world_save_version_pre_refusals = 74;
 
 /// BL-1422: the first version whose per-resource arrays are 54 wide.
 inline constexpr uint32_t k_world_save_version_kit_goods = 74;
@@ -837,6 +851,10 @@ std::size_t world_save_recruits_section_bytes(const world& w);
 /// per nation holding sea recruits. The LAST section of a v73 stream.
 std::size_t world_save_sea_recruits_section_bytes(const world& w);
 
+/// BL-1480: the byte length of the v75 peace-refusals section `w` writes - 4 + 12 per
+/// refusal. The LAST section of a v75 stream.
+std::size_t world_save_refusals_section_bytes(const world& w);
+
 /// BL-1422: the bytes the kit goods' five extra elements add to every per-resource
 /// array of the stream `w` writes - the v74 stream less the v73 stream, which differ in
 /// nothing else. A harness comparing an older stream's length against today's adds it.
@@ -939,6 +957,9 @@ void write_world_snapshot_pre_recruits(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (Ben, 2026-11-02): the v72 stream shape — no sea-recruits section.
 void write_world_snapshot_pre_sea_recruits(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1480): the v74 stream shape - no peace-refusals section.
+void write_world_snapshot_pre_refusals(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in
