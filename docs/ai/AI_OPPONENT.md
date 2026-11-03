@@ -2368,7 +2368,11 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   `../military/MILITARY.md` § Fortifications).** A new subject, fortification rather than force,
   granted on the standing terms. A rival nation's scorer may build a bunker on a tile of its own
   ground, choosing the tile by scored utility over what it can see (its fronts, its own units, the
-  build price), through the same legal build verb the player uses. **Not admitted:** building on
+  build price), through the same legal build verb the player uses. **The tiles it may weigh
+  (Ben, 2026-11-03, NR-1124):** its front toward a hostile neighbour where its own units stand,
+  and a post on a hostile border — a tile of its own ground, in one of its provinces touching
+  such a front, where its own units stand. Both are its own ground; the second widens what it
+  weighs, not where it may build. **Not admitted:** building on
   another nation's ground, the player's included, or for the player; repairing or degrading another
   nation's bunker; a fortification line planned beyond the next build. Pure, seeded, deterministic,
   replayable, legal verbs only, never a planner.

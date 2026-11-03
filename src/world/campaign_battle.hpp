@@ -211,7 +211,9 @@ struct campaign_battle_params
     /// that carries their own nation's completed bunker fight from concrete, each
     /// term scaled by the bunker's condition (`fortify_combatant`):
     ///   bunker_defence_permille  — added to the unit's defence, per-mille of it: at
-    ///     500 and full condition a defence of 90 absorbs as 135.
+    ///     300 and full condition a defence of 90 absorbs as 117. Was 500 (first cut);
+    ///     Ben, 2026-11-03 (NR-1124): +30%, so a supplied 2:1 attack breaks a bunker
+    ///     slowly and artillery shortens it (the target: battle_engagement_harness B23i, B23j).
     ///   bunker_hardness_permille — the share of the unit's SOFT part the concrete
     ///     makes hard to soft attack (`land_combatant::cover`): (1000 - h) x this /
     ///     1000. At 400 base infantry (hardness 0) takes soft fire on 600 of itself,
@@ -225,8 +227,9 @@ struct campaign_battle_params
     ///     (`bunker_shelling_day`). At 12, three batteries strip a bunker in about a
     ///     month; the quarter's repair pass (air_params::repair_permille_per_day, 4)
     ///     mends it more slowly than one battery wears it.
-    /// First cuts, measured in campaign_battle_harness C8.
-    int bunker_defence_permille  = 500;
+    /// Hardness and shelling are first cuts kept (Ben, 2026-11-03); all three are
+    /// measured in campaign_battle_harness C8.
+    int bunker_defence_permille  = 300;
     int bunker_hardness_permille = 400;
     int bunker_shelling_permille = 12;
 };

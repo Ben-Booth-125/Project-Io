@@ -1749,10 +1749,14 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
 //   WHEN. Live play only (not the settle), on a front toward a nation it is hostile
 //   to, or that is hostile to it, with fewer than `k_rival_bunker_cap` bunkers of its
 //   own built or building, and its uncommitted treasury holding twice the capex.
-//   WHERE. Every tile of such a front's span on which its own units stand (men > 0)
-//   and the door admits a bunker (`can_place_in_world`: own ground, a road, one site
-//   and one bunker to a tile). Score = its men standing there x 1000 / the tile's
-//   capex: the most men covered per credit, ties to the lowest tile id.
+//   WHERE. Every tile on which its own units stand (men > 0) and the door admits a
+//   bunker (`can_place_in_world`: own ground, a road, one site and one bunker to a
+//   tile), that is EITHER a tile of such a front's span OR a POST ON A HOSTILE BORDER
+//   (Ben, 2026-11-03, NR-1124; MILITARY.md § Fortifications): a tile of its own
+//   ground in a province that holds a tile of such a span, so a garrison posted in a
+//   border province is a candidate where it stands. Score = its men standing there
+//   x 1000 / the tile's capex: the most men covered per credit, ties to the lowest
+//   tile id.
 // ---------------------------------------------------------------------------
 
 constexpr int k_rival_bunker_cap = 4;
@@ -1773,7 +1777,8 @@ void score_nation_bunkers(world& w, const recipe_registry& reg, entity_id nation
     if (owned >= k_rival_bunker_cap)
         return;
 
-    // Candidate tiles: its own spans toward a hostile neighbour, deduplicated, sorted.
+    // Candidate tiles: its own spans toward a hostile neighbour, deduplicated, sorted;
+    // and the provinces those spans touch (a post on a hostile border).
     std::vector<entity_id> cands;
     for (const front& f : nation_fronts(w, nation))
         if (f.neighbour != null_entity
@@ -1783,13 +1788,31 @@ void score_nation_bunkers(world& w, const recipe_registry& reg, entity_id nation
         return;
     std::sort(cands.begin(), cands.end());
     cands.erase(std::unique(cands.begin(), cands.end()), cands.end());
+    std::vector<uint32_t> border_provs;
+    for (const entity_id t : cands)
+        if (const uint32_t p = w.provinces.province_of(t); p != 0)
+            border_provs.push_back(p);
+    std::sort(border_provs.begin(), border_provs.end());
+    border_provs.erase(std::unique(border_provs.begin(), border_provs.end()), border_provs.end());
 
-    // Its own men standing on each candidate (a sum: walk order cannot reach it).
+    // Its own men standing on each candidate (a sum: walk order cannot reach it): on a
+    // span tile, or on its own ground in a border province.
     std::map<entity_id, int64_t> men;
     for (const auto& [uid, u] : w.units)
-        if (u.owner == nation && u.count > 0 && u.position != null_entity
-            && std::binary_search(cands.begin(), cands.end(), u.position))
+    {
+        if (u.owner != nation || u.count <= 0 || u.position == null_entity)
+            continue;
+        bool cand = std::binary_search(cands.begin(), cands.end(), u.position);
+        if (!cand)
+        {
+            const auto own = w.tile_to_nation.find(u.position);
+            const uint32_t p = w.provinces.province_of(u.position);
+            cand = own != w.tile_to_nation.end() && own->second == nation && p != 0
+                && std::binary_search(border_provs.begin(), border_provs.end(), p);
+        }
+        if (cand)
             men[u.position] += u.count;
+    }
     if (men.empty())
         return;
 
@@ -2433,8 +2456,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             score_nation_air(w, reg, corp, tick);
 
         // BL-1426 (AI_OPPONENT.md § 11, "Rival nations build bunkers on their own
-        // ground", Ben 2026-10-31): at most one bunker an evaluation, on its own front
-        // where its own units stand. score_nation_bunkers refuses the player's nation
+        // ground", Ben 2026-10-31): at most one bunker an evaluation, where its own
+        // units stand on its own front or a post on a hostile border (Ben, 2026-11-03). score_nation_bunkers refuses the player's nation
         // and the settle itself as well.
         if (actor.is_nation)
             score_nation_bunkers(w, reg, corp, tick);

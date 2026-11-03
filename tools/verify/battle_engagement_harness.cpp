@@ -996,6 +996,37 @@ int main()
         check(o.second && (!b.second || b.first > o.first),
               "B23b the defender fighting from its own bunker holds, or holds longer, against what takes it in the open");
         check(x == o, "B23c a bunker that is not the defender's own gives it nothing");
+        // Ben, 2026-11-03 (NR-1124): at +30% defence a supplied 2:1 attack breaks a
+        // bunker slowly - it takes the tile, later than in the open.
+        check(o.second && b.second && b.first > o.first,
+              "B23i TARGET a supplied 2:1 attack eventually takes the bunker, later than open ground");
+        // ...and artillery shortens it: the same 2:1 with one fully armed battery beside
+        // it. The battery adds force in the open too, so the reading is the DELAY the
+        // bunker costs (bunker day minus open day), with guns against without.
+        {
+            const auto fight_out_guns = [&reg](fixture& f) {
+                f.w.units.at(f.ua).count = 1000;
+                const entity_id g = add_unit(f.w, f.att, tile_at(f.w, f.body, 2, 2), 300);
+                f.w.units.at(g).type = static_cast<uint16_t>(modern_row_for(land_class::artillery));
+                open_tile_battle(f.w, 0, f.tile, f.att, f.def, { f.ua, g });
+                int day = 0;
+                for (; day < 400 && !f.w.battles.empty(); ++day)
+                    run_battles(f.w, reg, day);
+                return std::pair<int, bool>{ day, f.w.units.count(f.ua) != 0 && f.w.units.at(f.ua).position == f.tile };
+            };
+            fixture og, bg;
+            build_fixture(og);
+            build_fixture(bg);
+            add_bunker(bg, bg.def);
+            const auto go = fight_out_guns(og);
+            const auto gb = fight_out_guns(bg);
+            std::printf("        2:1 plus one battery: open ground day %d (%s); bunker day %d (%s); "
+                        "the bunker's delay %d days with guns, %d without\n", go.first,
+                        go.second ? "tile taken" : "held", gb.first, gb.second ? "tile taken" : "held",
+                        gb.first - go.first, b.first - o.first);
+            check(go.second && gb.second && gb.first - go.first < b.first - o.first,
+                  "B23j TARGET artillery shortens the bunker's delay to a supplied 2:1 attack");
+        }
 
         // Artillery wears it: one fully armed battery beside the attacking infantry.
         fixture art;

@@ -1084,6 +1084,28 @@ int main()
                   "RB7 not admitted: building for the player - its nation's pass changes nothing");
         }
         {
+            // RB9 (Ben, 2026-11-03, NR-1124; MILITARY.md § Fortifications): a POST ON A
+            // HOSTILE BORDER is a candidate - B's men on its own ground in strip 10 (its
+            // province on the front toward A), off the front column itself - while a
+            // bigger force in strip 11, a province touching no hostile front, is not.
+            fixture g;
+            entity_id c = null_entity;
+            rival_fixture(g, c);
+            add_unit(g, g.b, 42, 1, rifle, 60);  // strip 10, two columns behind the front
+            add_unit(g, g.b, 45, 1, rifle, 500); // strip 11: no hostile border
+            declare_hostile(g.w, g.b, g.a);
+            score_nation_bunkers(g.w, reg, g.b, 12);
+            const std::vector<entity_id> bk = bunkers_of(g, g.b);
+            const bool post_ok = bk.size() == 1 && g.w.buildings.at(bk[0]).tile == tile(g, 42, 1);
+            check(post_ok, "RB9 a post on a hostile border (own ground, a province on the hostile front) is a "
+                           "candidate; a province on no hostile front is not (" + std::to_string(bk.size()) + ")");
+            score_nation_bunkers(g.w, reg, g.b, 13);
+            bool none_inland = true;
+            for (const entity_id bid : bunkers_of(g, g.b))
+                none_inland = none_inland && g.w.provinces.province_of(g.w.buildings.at(bid).tile) == strip(g, 10);
+            check(none_inland, "RB9 with its border post fortified it builds nothing in the province behind it");
+        }
+        {
             // The treasury rule: twice the capex, uncommitted.
             recipe_registry priced = reg;
             building_economics be = priced.economics(building_type::bunker);

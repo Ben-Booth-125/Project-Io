@@ -583,9 +583,10 @@ int main()
                     inf.stats.defence, inf.stats.hardness, inf.cover, full.stats.defence, full.stats.hardness,
                     full.cover, half.stats.defence, half.stats.hardness, half.cover, none.stats.defence,
                     none.stats.hardness, none.cover);
-        check(full.stats.defence == inf.stats.defence * 3 / 2 && full.cover == 400
+        // Ben, 2026-11-03 (NR-1124): +30% defence (was +50%), the 40% screen kept.
+        check(full.stats.defence == inf.stats.defence + inf.stats.defence * 300 / 1000 && full.cover == 400
                   && full.stats.hardness == inf.stats.hardness,
-              "C8 a full bunker raises infantry's defence by half and makes two fifths of it hard to soft attack");
+              "C8 a full bunker raises infantry's defence by three tenths and makes two fifths of it hard to soft attack");
         check(half.stats.defence > inf.stats.defence && half.stats.defence < full.stats.defence
                   && half.cover == 200,
               "C8 the cover scales with the bunker's condition");
@@ -604,6 +605,7 @@ int main()
         std::printf("      ratio    open ground             bunker (full)           bunker (wrecked)\n");
         bool wrecked_same = true;
         int open_break = 0, bunker_break = 0; // lowest swept ratio (x100) at which the defender breaks
+        int bunker_2to1_day = 0;              // the day a full bunker's defenders break at 2:1 (0: never)
         for (const int pct : {100, 125, 150, 175, 200, 250, 300, 400})
         {
             const std::vector<land_combatant> a = side_of(land_class::infantry, 500 * pct / 100);
@@ -617,6 +619,7 @@ int main()
             wrecked_same = wrecked_same && same_outcome(o, x);
             if (o.end == campaign_battle_end::defender_broken && open_break == 0) open_break = pct;
             if (f.end == campaign_battle_end::defender_broken && bunker_break == 0) bunker_break = pct;
+            if (pct == 200 && f.end == campaign_battle_end::defender_broken) bunker_2to1_day = f.rounds_fought;
             std::printf("      %3d:100  %-17s d%-4d  %-17s d%-4d  %-17s d%d\n", pct,
                         end_name(o.end), o.rounds_fought, end_name(f.end), f.rounds_fought,
                         end_name(x.end), x.rounds_fought);
@@ -626,6 +629,9 @@ int main()
         check(wrecked_same, "C8 a defender in a wrecked bunker fights exactly the open-ground battle");
         check(open_break > 0 && (bunker_break == 0 || bunker_break > open_break),
               "C8 TARGET a full bunker raises the force ratio needed to break its defenders");
+        std::printf("      at 2:1 a full bunker's defenders break on day %d\n", bunker_2to1_day);
+        check(bunker_2to1_day > 0 && bunker_break > 0 && bunker_break <= 200,
+              "C8 TARGET a 2:1 attack eventually breaks a full bunker's defenders (Ben, 2026-11-03)");
 
         // Armour attacking: its hard attack meets the concrete, so the bunker cuts its
         // hits by a smaller share than infantry's (hardness turns SOFT attack away).
