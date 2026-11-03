@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**76 surfaces** — 4 settled, 72 awaiting Ben's wording.
+**77 surfaces** — 4 settled, 73 awaiting Ben's wording.
 
 ---
 
@@ -219,6 +219,14 @@ alphabetical order.
 **Because:** The canvas carries markers, glyphs and lens fills whose meaning is positional. Hover is the cheapest possible disclosure -- it answers without costing a click or displacing the current view, and glance-then-stick (BL-230) keeps it readable.
 
 *Demanded by BL-228, BL-230 · `src/ui/hover_card.cpp` · id `hover_card`*
+
+### Industry lens - the plant of nations other than the player's, as an amber province fill keyed 'Rival industry' (Planetary strip)
+
+**Answers:** Where is the industry I did not build?
+
+**Because:** Kept through the corporation's retirement and re-subjected (Ben, 2026-10-26): its subject is the plants of nations other than the player's, and the player's own plant never tints it. It is an OWNERSHIP question no other surface answers at a glance - the border band says whose ground an edge divides, the Nations lens says whose territory is whose, and neither says where a neighbour has actually built, which is what a player weighs before siting a works or leaning on a market. It reads only what the ground shows (DISCOVERY.md, competitor visibility): a rival plant counts for standing and counts again when it is running, because a working plant is observable and its rate is not, so the field never leaks how much a rival makes. Summed per province and filled flat, because the question is about the locality and density is additive. A strip lens on the Planetary rung (Ben, 2026-11-03): no lens is keyboard-only.
+
+*Demanded by BL-1419 · `src/ui/body_surface_canvas.cpp`, `src/ui/overlay.cpp`, `scripts/verify/industry_lens.lua` · id `industry_lens`*
 
 ### Lens chrome region (minimap header, top right) — the lens selector and the active lens's key
 

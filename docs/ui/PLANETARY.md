@@ -172,7 +172,7 @@ built to answer it:
 | *What kind of building is this?* (the silhouette) | The structure itself, authored per type; the hover card names it |
 | *Which kinds stand here, and which leads?* (the ring, the centre glyph) | A **cluster** of up to three structures, one per stack ([RENDERING.md](RENDERING.md) § Installations), and the tile Selection element's **tile card**, one button per stack ([SELECTION.md](SELECTION.md) § The tile element's layout) |
 | *How many in total?* (the `+N` badge) | The tile card's building grid, one button per stack with its count |
-| *Whose is it?* (the owner-tinted fill, the emblem tag) | **Its ground's nation** — a building is always owned by the nation whose ground it stands on (Ben, 2026-10-23; `../politics/NATIONS.md` § Own ground) — so the national border band, the **Nations** lens ([LENSES.md](LENSES.md)), the hover card, and — for the player alone — the always-on footprint outline |
+| *Whose is it?* (the owner-tinted fill, the emblem tag) | **Its ground's nation** — a building is always owned by the nation whose ground it stands on (Ben, 2026-10-23; `../politics/NATIONS.md` § Own ground) — so the national border band, the **Nations** lens ([LENSES.md](LENSES.md)), the hover card, and — for the player alone — the footprint outline, drawn under every lens and never on the plain canvas |
 | *Is it running?* | The Selection element only. **The art is static**: no smoke, light or state cue distinguishes a running plant from an idle one |
 
 **Ownership reads from the ground.** Since a building's owner is its ground's nation, the plain

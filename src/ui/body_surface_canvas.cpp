@@ -1282,7 +1282,7 @@ void draw_continent_key(ImDrawList* dl, const ui_state& state, const continent_s
     dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
-/// On-canvas legend for the Industry lens (BL-084; re-pointed BL-373): a low→high
+/// On-canvas legend for the Industry lens (BL-084; re-subjected BL-1419): a low→high
 /// amber gradient bar mapping the tile tint, so the field reads as "where the
 /// industry I did not build is densest". Same placement as the others. (This
 /// comment previously drifted onto plate_colour, which it does not describe.)
@@ -1296,7 +1296,8 @@ void draw_industry_key(ImDrawList* dl, const ui_state& state)
     float x, y, bar_w;
     begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Background industry"); // fit-exempt: legend box sized to its measured entries (container 2)
+    // BL-1419: the subject is other nations' plant; the background firm retired.
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Rival industry"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     // Gradient mirrors the tile tint lerp (terrain hue -> industrial amber at
@@ -3359,47 +3360,47 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             plates = nullptr;
     }
 
-    // Industry lens pre-pass (BL-084; re-pointed BL-373). The lens used to tint by
-    // tile.substrate_density — an abstract occupation scalar left over from the
-    // nation-substrate injection. BL-365 replaced that substrate with REAL background
-    // corporations that own real buildings, so the lens now reads the thing its name
-    // always promised: the background firms' plant standing on each tile. The question
-    // it answers is "where is the industry I did not build?" — deliberately distinct
-    // from the Production lens, which ranks output intensity INCLUDING the player's own
-    // holdings. substrate_density survives untouched; it just stops feeding this lens.
+    // Industry lens pre-pass (BL-084; re-subjected BL-1419). The question it
+    // answers is "where is the industry I did not build?": the plants of every
+    // nation other than the player's, standing on the active body. The player's
+    // own plant never tints it.
     //
-    // Per tile: Σ over background-owned buildings of (0.5 + 0.5 × output share). The
-    // 0.5 floor keeps an idle or still-building background plant visible — its presence
-    // is the fact the lens reports — while output separates a token works from a real
-    // one, and two buildings on a tile stack.
+    // Only what the screen may show (DISCOVERY.md § Competitor visibility,
+    // BL-068). A rival's plant is a physical structure, and that it is RUNNING
+    // is observable ("smoke from the chimney"); how much it makes is private.
+    // So the field reads presence and running state, never output: per tile,
+    // the sum over rival buildings of 0.5 for standing (idle, or still under
+    // construction) plus 0.5 more when it ran this tick. Two buildings on one
+    // tile stack. The survey mask still draws a locked tile flat, so a plant in
+    // an unrevealed region tints nothing.
     std::unordered_map<entity_id, float> industry_field;
     float industry_max = 0.0f;
     if (state.overlay == overlay_mode::industry)
     {
-        // BL-1407: "background" industry was a background firm's; every building
-        // is a nation's now, so nothing reads as a firm's.
-        const auto background_owned = [](entity_id) { return false; };
-
-        // Body-local output ceiling, so the share term is relative to this body's own
-        // background industry rather than a cross-body absolute.
-        float max_out = 0.0f;
+        // Running state from the economy report: the fact a working plant's
+        // chimney already shows, and nothing of its rate.
+        std::unordered_set<entity_id> running;
         for (const building_report& br : report.buildings)
-            if (br.body == state.active_body && background_owned(br.corp))
-                max_out = std::max(max_out, br.output_quantity);
+            if (br.active)
+                running.insert(br.building);
 
-        for (const building_report& br : report.buildings)
+        for (const auto& [nid, nation] : w.nations)
         {
-            if (br.body != state.active_body || !background_owned(br.corp))
-                continue;
-            const auto bld_it = w.buildings.find(br.building);
-            if (bld_it == w.buildings.end())
-                continue;
-            const float share = (max_out > 0.0f)
-                                    ? std::clamp(br.output_quantity / max_out, 0.0f, 1.0f)
-                                    : 0.0f;
-            float& thr = industry_field[bld_it->second.tile];
-            thr += 0.5f + 0.5f * share;
-            industry_max = std::max(industry_max, thr);
+            if (nid == player_owner || nid == w.player_entity)
+                continue; // the player's own plant never tints this lens
+            for (const entity_id bid : nation.state_assets)
+            {
+                const auto bld_it = w.buildings.find(bid);
+                if (bld_it == w.buildings.end() || bld_it->second.decommissioned)
+                    continue;
+                const auto tit = w.tiles.find(bld_it->second.tile);
+                if (tit == w.tiles.end() || tit->second.body != state.active_body)
+                    continue;
+                const bool ran = bld_it->second.ticks_remaining == 0 && running.count(bid) != 0;
+                float& thr = industry_field[bld_it->second.tile];
+                thr += ran ? 1.0f : 0.5f;
+                industry_max = std::max(industry_max, thr);
+            }
         }
 
         // BL-511's per-province reduction for this lens: a SUM, rendered
