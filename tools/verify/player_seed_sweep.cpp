@@ -827,24 +827,39 @@ struct world_digest_pin
 // recipes and save v74; the probe, 5af5af90 against 61aaa8e7, reads 15 seeds identical and
 // seed 12 one credit lower. The snapshot stream (v73, v74) moves D_land onward on every seed.
 // The first 2026-11-02 values are one commit back in git history.
+// RE-PINNED 2026-11-03 (Ben, 2026-11-03: "Merge, Rich-core", the merge and its re-bless).
+// player_seed_sweep --digest over the sixteen library seeds on main bbf6f80c (the world of
+// 8dfe4985; the two later commits are docs), same toolchain. D_search is unmoved on all 16;
+// D_land, D_settle and D_seat moved on all 16. Two movers. 8dfe4985 (grievance reachable:
+// Trust weights doubled, half-life 18 ticks, NR-1129) acts in the settle's ticks: seed 0 at
+// 3a241c53 reads the same D_land and a different D_settle and D_seat (0x60122CD685FFE2E0,
+// 0x5E50E6CEECFDEB5A). BL-1473 (major opening kit) with Rich-core active - every major takes up its walk-placed
+// plant, lays the fixed kit, caps its logistics and opens on 12,000 credits; the opening cut
+// skips majors. rebless_shape_probe, 103efdb4 against 3a241c53 (sums over 16 seeds): extraction
+// 3941 -> 4848, processing 1175 -> 1524, civic (bld_other) 0 -> 237, military 297 -> 343, ports
+// 449 -> 365, logistics hubs 1505 -> 1483, decommissioned 34 -> 283 (the settle idles kit
+// buildings); nation treasury sum +10.0%, p50 48063 -> 74196, player balance +41.5%; roads
+// +0.7%; centres re-tier on most seeds (cities -163, towns +128). Every history count is
+// unmoved. The probe is the kit alone; the Trust mover has no shape probe here (its own
+// commit measured it on war_census). The 2026-11-02 values are one commit back in git history.
 const std::vector<world_digest_pin> k_shipped_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-{ 46u, 0xA585DDC747DE6D2Aull, 0xF532F60A747F5CA7ull, 0x7FA0118F7DB08C04ull, 0x23C73A2B17040DA0ull },
-    { 28u, 0xB2AE7A6AF754647Full, 0xD1CEB34069E31D20ull, 0x8EA5DC832B354FE1ull, 0x7C92DF95196760CCull },
-    { 11u, 0xA669B0CC03B4AA54ull, 0x6C78C4AA33E40BB6ull, 0xE2109EEDE851590Eull, 0xB15839AFD0D1B651ull },
-    { 31u, 0x1DEE03DF5A81076Bull, 0x820593C8C477B5AAull, 0x4BEFB259CCC3F1B6ull, 0xDDE52478AD236B5Eull },
-    { 40u, 0x3241116FA766486Bull, 0x127C6F7A7D7E471Eull, 0x3FE0943DDEF1735Full, 0xE1AE2437CD8932A5ull },
-    { 12u, 0xA5A73CC503F90984ull, 0xD25214ADFD431580ull, 0xEA166696093643A1ull, 0x6B90F09691A22D0Dull },
-    { 37u, 0x016D627B05418451ull, 0x90B55B063933FF5Dull, 0x7FF86CC83CDF38F6ull, 0x4CF93B1BC7CBAFF4ull },
-    { 13u, 0x232849F69D92B741ull, 0x6248867BC5C80623ull, 0x389B1C1394D86053ull, 0xABF44E34537BBBB1ull },
-    { 41u, 0x362176B18C2998EDull, 0xE0B987BC9551656Dull, 0xAC5FC55E6585E813ull, 0xC39742DFE1DAA1F7ull },
-    { 43u, 0x2C93A66345EAC03Full, 0x6492E921A64F0895ull, 0xB39107AA6E5B1E86ull, 0x7CE24D66CF158F52ull },
-    { 32u, 0xED75D54DFF2C54A1ull, 0x6F497FFFB9AD1022ull, 0x520768529CFAC616ull, 0x4EF2CF3841DB5FEAull },
-    { 10u, 0xDBC2B053506AF615ull, 0xB544C4DA95B64D3Bull, 0x8A02424EB65190BBull, 0x0AC542B4C4465177ull },
-    { 25u, 0x6D37A5451C760779ull, 0x19CFFC2481C22FF9ull, 0x63366BC6F91E53B2ull, 0xA357EF5ECCFE9841ull },
-    { 38u, 0xE3DE46E1C4E07205ull, 0x5DFBA4C1D1A84653ull, 0x8CE82E69FE7E8B29ull, 0x9DC5A658C1DFD555ull },
-    {  9u, 0xF8FED3C4DA6E604Eull, 0x5C3B16294DDDAFE4ull, 0x3713F0E4074CDF47ull, 0x973AB615C40D652Full },
-    {  0u, 0xE86877E6B4008EBFull, 0x2E5C42197553CE30ull, 0x343509A545145949ull, 0x0F6B95E7B82F9255ull },
+    { 46u, 0xA585DDC747DE6D2Aull, 0x21FFD5DAEF11EBCCull, 0xAFE2873313A6193Eull, 0x12C838782AB24DB7ull },
+    { 28u, 0xB2AE7A6AF754647Full, 0x33B6C7D50950F2D4ull, 0x1DAF29902062A5FCull, 0x69AF818C86CF0CD6ull },
+    { 11u, 0xA669B0CC03B4AA54ull, 0x8FAD8D7D617EC32Aull, 0xEC40CF4C25DDD4DFull, 0xB1DE5997700DF78Eull },
+    { 31u, 0x1DEE03DF5A81076Bull, 0x1DFFA35057FFFE76ull, 0xF72FC7F679156AE1ull, 0x86F1BAD26D3D9B81ull },
+    { 40u, 0x3241116FA766486Bull, 0xE6F130A3001FBBADull, 0x5900AA10319636E5ull, 0xCDB40F60A121B387ull },
+    { 12u, 0xA5A73CC503F90984ull, 0xD4DABBD62012DCE1ull, 0x46067C9C00B6810Full, 0x8E1DE45B15C5A4F3ull },
+    { 37u, 0x016D627B05418451ull, 0x8C126A352D41C128ull, 0x2E9A64F6CD7B1309ull, 0x6DC9102E89A33D91ull },
+    { 13u, 0x232849F69D92B741ull, 0x2208C06F648150F0ull, 0xF85F71255405AFB5ull, 0xBCEE698C65B131CDull },
+    { 41u, 0x362176B18C2998EDull, 0x65AF545FFEB9C513ull, 0xA8B50BB2E595547Dull, 0x2FE5ADC3F668DDE0ull },
+    { 43u, 0x2C93A66345EAC03Full, 0xB920126DC44728FEull, 0x3500DD4DEF83F496ull, 0x9EBE2614C23F350Aull },
+    { 32u, 0xED75D54DFF2C54A1ull, 0x7EEC191E51EF4C40ull, 0xF1DABAD2998496FFull, 0x221AE77F350589EAull },
+    { 10u, 0xDBC2B053506AF615ull, 0x4BC839DEC639E755ull, 0x85221694B388E30Dull, 0x7E42596525AD1383ull },
+    { 25u, 0x6D37A5451C760779ull, 0x43D9A6FC945F16FAull, 0x87A0CB6E1197AB90ull, 0x77EF7BF4811C9E55ull },
+    { 38u, 0xE3DE46E1C4E07205ull, 0xB3B57F7E67371293ull, 0x570F44FC45E4CB4Bull, 0x8DC65A09915AFCD3ull },
+    {  9u, 0xF8FED3C4DA6E604Eull, 0xF0FDA93CC7FE3857ull, 0xA000D666A2816D30ull, 0xE8F2AF00B33C5FA2ull },
+    {  0u, 0xE86877E6B4008EBFull, 0xD75A61CDD6B7CB5Full, 0x0EEBBCBFB84D3693ull, 0xDF3877A0A5932921ull },
 };
 
 const std::vector<world_digest_pin>& digest_pins()

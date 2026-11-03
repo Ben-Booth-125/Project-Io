@@ -19,6 +19,8 @@ majors under 100 credits by year 5.
   - T3 flat treasury after the fold; the opening cut skips majors.
   - T4 `opening_parity --kit`; census on Standard and Rich-core against the baseline.
   - T5 determinism, save round-trip, fold and capital-base harnesses; pins reported, not re-blessed.
+  - Merged to main with Rich-core active (Ben, 2026-11-03); digests re-pinned the same day. T1-T5
+    done; requirement R4 stays pending (the settle idles kit buildings; which are processors is unread).
 - BL-1474 (major opening army): next, after the kit's census.
 - BL-1476 (wizard default thirty): one constant, after the census settles the count.
 
