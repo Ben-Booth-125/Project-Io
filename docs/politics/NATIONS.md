@@ -91,7 +91,10 @@ a nation owns tiles and never buildings.
 - **Rail and stations** are a nation's like everything else (`../economy/LOGISTICS.md` § 4c). Laying
   track costs the treasury per tile, plus steel per tile, with upkeep per tile.
 - **What generation leaves it.** Every building generation places is the nation's whose ground it
-  stands on (`../generation/CORPORATION_GENERATION.md`).
+  stands on (`../generation/CORPORATION_GENERATION.md`). That includes the world builder's own
+  authored installations, which no charter holds: at the close of generation every building no
+  nation lists joins its ground nation's list, or is demolished on ground no nation owns. No
+  building stands into play without an owner.
 
 ### Own ground — a nation builds only on its own tiles (Ben, 2026-10-23)
 

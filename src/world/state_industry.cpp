@@ -1637,6 +1637,10 @@ void print_rail_handover(const rail_handover_report& r)
 // ---------------------------------------------------------------------------
 // BL-1402 -- THE FOLD TO GROUND (Ben, 2026-10-23; see the header)
 // ---------------------------------------------------------------------------
+namespace {
+void erase_unowned_building(world& w, entity_id bid); // below
+} // namespace
+
 fold_report fold_to_ground(world& w)
 {
     fold_report out;
@@ -1753,6 +1757,55 @@ fold_report fold_to_ground(world& w)
                 out.debt_forgiven -= ch.balance;
         }
         w.gen_charters.clear();
+        if (touched)
+            invalidate_logistics_caches(w);
+    }
+
+    // BL-1442 (post-capacity starvation; NATIONS.md § What a nation owns, § Own
+    // ground): A BUILDING NO NATION LISTS IS ITS GROUND NATION'S. The world builder
+    // authors its installations (`make_hard_coded_world`'s extraction site and
+    // processor, `world::authored_processor`) with no owner, and no charter holds
+    // them, so the close above never reached them: they stood into play unowned,
+    // listed by no economic owner, and never ran a tick (16 library seeds, tick
+    // 50, 2026-11-03: 13 such steel plants among the processors, every one with
+    // no report row since the build). The one rule every other building
+    // generation places obeys applies to them too: the nation whose ground it
+    // stands on owns it, appended to that nation's list; on ground no nation
+    // owns it is demolished. Ascending building id; a no-op when every building
+    // is listed.
+    {
+        std::unordered_set<entity_id> listed;
+        for (const auto& [nid, nc] : w.nations)
+        {
+            (void)nid;
+            for (const entity_id bid : nc.state_assets)
+                listed.insert(bid);
+        }
+        std::vector<entity_id> unlisted;
+        for (const auto& [bid, b] : w.buildings)
+        {
+            (void)b;
+            if (listed.count(bid) == 0)
+                unlisted.push_back(bid);
+        }
+        std::sort(unlisted.begin(), unlisted.end());
+        bool touched = false;
+        for (const entity_id bid : unlisted)
+        {
+            const building_component& b = w.buildings.at(bid);
+            const auto tn = w.tile_to_nation.find(b.tile);
+            if (tn != w.tile_to_nation.end() && w.nations.count(tn->second) != 0)
+            {
+                w.nations.at(tn->second).state_assets.push_back(bid);
+                ++out.unlisted_owned;
+                continue;
+            }
+            if (building_affects_logistics(b.type))
+                touched = true;
+            erase_unowned_building(w, bid);
+            ++out.on_unowned;
+            ++out.unlisted_unowned;
+        }
         if (touched)
             invalidate_logistics_caches(w);
     }
@@ -2013,10 +2066,11 @@ void print_fold(const fold_report& r)
 {
     std::printf("[fold] %d charters closed, %d corporations: %d buildings to their ground nation, %d re-homed to their ground, %d on unowned ground "
                 "demolished; %.1f moved to treasuries, %.1f debt forgiven, %.1f stranded; units %d, "
-                "track %d, trades %d, convoys %d, routes %d re-owned; %d procurement records cleared\n",
+                "track %d, trades %d, convoys %d, routes %d re-owned; %d procurement records cleared; "
+                "%d unlisted to their ground nation, %d unlisted demolished\n",
                 r.charters_closed, r.corporations, r.buildings_folded, r.rehomed, r.on_unowned, static_cast<double>(r.balance_moved),
                 static_cast<double>(r.debt_forgiven), static_cast<double>(r.balance_stranded),
                 r.units_reowned, r.rail_reowned, r.trades_reowned, r.convoys_reowned, r.routes_reowned,
-                r.contracts_cleared);
+                r.contracts_cleared, r.unlisted_owned, r.unlisted_unowned);
     std::fflush(stdout);
 }
