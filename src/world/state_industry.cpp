@@ -1065,6 +1065,7 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
         for (const entity_id bid : cut)
         {
             const bool base = w.buildings.at(bid).type == building_type::military_base;
+            const entity_id base_tile = w.buildings.at(bid).tile;
             if (!demolish_building(w, nid, bid))
                 continue;
             ++rep.unbuilt;
@@ -1076,6 +1077,7 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
             // orphaned, § Upkeep), and an opening hire queued there is dropped unraised,
             // as any muster whose base is gone (`advance_musters`).
             ++rep.bases_unbuilt;
+            rep.bases_cut.push_back({ nid, bid, base_tile });
             for (auto& [uid, u] : w.units)
                 if (u.muster_base == bid)
                 {

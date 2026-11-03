@@ -291,6 +291,11 @@ struct opening_state_cut_report
     int   still_short   = 0;    ///< nations still under 16 ticks of their kept bill with something kept (0 by construction)
     float bill_cut      = 0.0f; ///< their summed bounds: the running bill removed, a tick
     std::map<entity_id, int> per_nation; ///< nation -> buildings left unbuilt
+    /// One military base the cut removed: whose, which, and where it stood. A record
+    /// for the census, which must tell a capital base the chest cut (MILITARY.md
+    /// § Nation garrisons: the cut may remove one) from one lost any other way.
+    struct cut_base { entity_id nation = null_entity, base = null_entity, tile = null_entity; };
+    std::vector<cut_base> bases_cut; ///< in cut order: ascending nation, then the cut list's order
 };
 opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_registry& reg);
 

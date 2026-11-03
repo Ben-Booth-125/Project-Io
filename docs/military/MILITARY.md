@@ -1361,6 +1361,14 @@ This joins the existing three unit writers (§ The unit model)
 as a fourth, generation-time source, alongside the hard-coded stub, `seed_starting_military`, and
 `hire_unit`.
 
+**The one exception: a poor nation's chest may cut its capital base (Ben, 2026-11-03).** A nation
+whose chest cannot run its opening state opens with only what that chest can carry
+(`../generation/NATION_GENERATION.md`, "A poor nation opens with fewer state buildings"), and the
+capital base is cut like any other building it cannot carry. Such a nation opens with no base. Its
+capital garrison keeps its post with no base recorded, so it is never orphaned (§ Upkeep), and any
+opening muster queued at the cut base is dropped. To recruit or refill it builds a base again. A
+capital opens without a base for this reason or for want of any legal tile, and for no other.
+
 **A major's opening army is fixed (Ben, 2026-11-02).** Every major opens with the same force,
 authored with its kit (`../generation/CORPORATION_GENERATION.md` § A major's opening kit). The
 Standard kit's force is **eight land units of 50 men**: five infantry, one motorised infantry, one

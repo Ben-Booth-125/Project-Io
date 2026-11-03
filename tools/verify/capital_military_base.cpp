@@ -13,6 +13,13 @@
 //      every border garrison still records none;
 //   C4 the nation's base list and the capital-province fallback are reported:
 //      a nation whose capital province had no legal tile is NAMED, not excused.
+//   C6 THE CHEST CUT (Ben, 2026-11-03, NR-1122 A; MILITARY.md § Nation garrisons):
+//      a poor nation's opening state is sized to its chest
+//      (`size_opening_state_to_chest`), which may remove the capital base like any
+//      building. A nation with no base is accepted ONLY when the cut's own record
+//      names exactly one base of it, that base is gone from the world, and its
+//      capital garrison records no base; each is NAMED. A capital that lost its base
+//      any other way still fails C1.
 // Once, on the first seed:
 //   C5 a picked seat (corp_verb::take_seat) keeps its capital base and its
 //      capital garrison, and loses only the force RAISED at the base; the seat it
@@ -27,12 +34,14 @@
 #include "world/corp_command.hpp"
 #include "world/corporation_generation.hpp" // unit_is_raised
 #include "world/placement_rules.hpp"
+#include "world/state_industry.hpp" // opening_state_cut_report (C6)
 #include "world/world.hpp"
 
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -123,12 +132,23 @@ int raised_units(const world& w, entity_id nid)
 struct seed_row
 {
     int nations = 0, ok = 0, outside = 0, none = 0, extra = 0, unroaded = 0,
-        garrison_ok = 0, garrisonless = 0, border_bad = 0, none_justified = 0;
+        garrison_ok = 0, garrisonless = 0, border_bad = 0, none_justified = 0,
+        cut = 0, cut_garrison_ok = 0, cut_bad = 0;
 };
 
-seed_row check_world(const world& w, uint32_t seed)
+seed_row check_world(const world& w, uint32_t seed, const opening_state_cut_report& cut_rep)
 {
     seed_row r;
+    // C6: the bases the chest cut removed, by nation, from the cut's own record.
+    std::map<entity_id, std::vector<opening_state_cut_report::cut_base>> cut_by_nation;
+    for (const opening_state_cut_report::cut_base& c : cut_rep.bases_cut)
+        cut_by_nation[c.nation].push_back(c);
+    if (static_cast<int>(cut_rep.bases_cut.size()) != cut_rep.bases_unbuilt)
+    {
+        ++r.cut_bad;
+        std::printf("  seed %u: the cut counts %d base(s) unbuilt but records %zu\n", seed,
+                    cut_rep.bases_unbuilt, cut_rep.bases_cut.size());
+    }
     std::vector<entity_id> ids;
     for (const auto& kv : w.nations) ids.push_back(kv.first);
     std::sort(ids.begin(), ids.end());
@@ -160,8 +180,39 @@ seed_row check_world(const world& w, uint32_t seed)
             }
         }
         if (bases.size() > 1) ++r.extra;
+        const auto cut_it = cut_by_nation.find(nid);
+        const std::size_t n_cut = cut_it != cut_by_nation.end() ? cut_it->second.size() : 0u;
+        bool cut_capital = false;
         if (in_capital == 1 && bases.size() == 1 && legal)
             ++r.ok;
+        else if (bases.empty() && n_cut > 0)
+        {
+            // C6: the chest cut removed its base. Accepted only as the record says: one
+            // base (a nation opens with one), and it is gone from the world.
+            bool all_gone = true;
+            for (const opening_state_cut_report::cut_base& c : cut_it->second)
+            {
+                const bool gone = w.buildings.find(c.base) == w.buildings.end();
+                const bool in_cap = cp != 0 && w.provinces.province_of(c.tile) == cp;
+                std::printf("  seed %u nation %u \"%s\": capital base %u (tile %u, %s) CUT by the chest "
+                            "(MILITARY.md § Nation garrisons)%s\n", seed, static_cast<unsigned>(nid),
+                            nc.name.c_str(), static_cast<unsigned>(c.base), static_cast<unsigned>(c.tile),
+                            in_cap ? "capital province" : "outside the capital province",
+                            gone ? "" : " - but the building still exists");
+                all_gone = all_gone && gone;
+            }
+            if (n_cut == 1 && all_gone)
+            {
+                ++r.cut;
+                cut_capital = true;
+            }
+            else
+            {
+                ++r.cut_bad;
+                std::printf("  seed %u nation %u: %zu base(s) cut, all gone %d - a nation opens with one\n",
+                            seed, static_cast<unsigned>(nid), n_cut, all_gone ? 1 : 0);
+            }
+        }
         else if (bases.empty())
         {
             ++r.none;
@@ -223,6 +274,8 @@ seed_row check_world(const world& w, uint32_t seed)
             ++r.garrisonless;
         else if (cap_base != null_entity && w.units.at(g).muster_base == cap_base)
             ++r.garrison_ok;
+        else if (cut_capital && w.units.at(g).muster_base == null_entity)
+            ++r.cut_garrison_ok; // C6: a cut base's garrison keeps its post with no base
         else
             std::printf("  seed %u nation %u: capital garrison %u records muster_base %u (base %u)\n",
                         seed, static_cast<unsigned>(nid), static_cast<unsigned>(g),
@@ -260,18 +313,20 @@ int main(int argc, char** argv)
         app_start_world out;
         build_app_start_world(lua, params, out);
         world& w = out.w;
-        const seed_row r = check_world(w, seed);
+        const seed_row r = check_world(w, seed, out.land.cut);
         std::printf("[capital_military_base] seed %u: %d nations, %d one-capital-base, %d outside, "
                     "%d none, %d with >1 base, %d unroaded; garrisons %d recorded, %d nations "
-                    "without one, %d border garrison(s) with a base\n",
+                    "without one, %d border garrison(s) with a base; chest cut %d capital base(s) "
+                    "(%d garrison(s) left unbased, %d anomalies)\n",
                     seed, r.nations, r.ok, r.outside, r.none, r.extra, r.unroaded, r.garrison_ok,
-                    r.garrisonless, r.border_bad);
+                    r.garrisonless, r.border_bad, r.cut, r.cut_garrison_ok, r.cut_bad);
         std::fflush(stdout);
         total.nations += r.nations; total.ok += r.ok; total.outside += r.outside;
         total.none += r.none; total.extra += r.extra; total.unroaded += r.unroaded;
         total.garrison_ok += r.garrison_ok; total.garrisonless += r.garrisonless;
         total.border_bad += r.border_bad;
         total.none_justified += r.none_justified;
+        total.cut += r.cut; total.cut_garrison_ok += r.cut_garrison_ok; total.cut_bad += r.cut_bad;
 
         if (first)
         {
@@ -318,18 +373,23 @@ int main(int argc, char** argv)
                 "%d outside the capital province, %d with none (%d with no legal tile at all), "
                 "%d with >1 base, %d unroaded; "
                 "%d capital garrisons recorded, %d nations without a capital garrison, %d border "
-                "garrison(s) with a base\n",
+                "garrison(s) with a base; the chest cut %d capital base(s) (named above), %d of their "
+                "garrisons left with no base, %d cut anomalies\n",
                 seeds.size(), total.nations, total.ok, total.outside, total.none,
                 total.none_justified, total.extra,
-                total.unroaded, total.garrison_ok, total.garrisonless, total.border_bad);
-    check(total.nations > 0 && total.ok + total.none_justified == total.nations
+                total.unroaded, total.garrison_ok, total.garrisonless, total.border_bad,
+                total.cut, total.cut_garrison_ok, total.cut_bad);
+    check(total.nations > 0 && total.ok + total.none_justified + total.cut == total.nations
               && total.none == total.none_justified,
           "C1 every nation owns exactly one completed military base, in its capital province, on its own "
-          "ground, on a legal tile - or has no legal tile at all (named above)");
+          "ground, on a legal tile - or has no legal tile at all, or the chest cut it (named above)");
+    check(total.cut_bad == 0,
+          "C6 every base the chest cut is in its record, gone from the world, and its nation's only base");
     check(total.unroaded == 0, "C2 every capital base stands on the road network");
-    check(total.garrison_ok + total.garrisonless + total.none_justified == total.nations
+    check(total.garrison_ok + total.garrisonless + total.none_justified + total.cut_garrison_ok == total.nations
               && total.garrison_ok > 0,
-          "C3 every capital garrison of a nation with a base records it as muster_base");
+          "C3 every capital garrison of a nation with a base records it as muster_base, and one whose "
+          "base the chest cut records none");
     check(total.border_bad == 0, "C3 no border garrison records a muster base");
     std::printf("\n%s (%d failures)\n", g_failures == 0 ? "ALL PASS" : "FAILURES", g_failures);
     return g_failures == 0 ? 0 : 1;
