@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*44 entries — 11 open, 33 resolved.*
+*47 entries — 14 open, 33 resolved.*
 
 ---
 
@@ -172,6 +172,39 @@ The cap counts every node on the capital tile as the capital's source, outside t
 > **Recommendation:** Keep; revisit if the census shows capital stacks driving a major's bill.
 
 *Files: `src/world/opening_kit.cpp`, `src/world/logistic_points.cpp`*
+
+### NR-1129 — Grievance never holds: no pair's Trust reaches -25
+*question · raised 2026-11-03 · from BL-1479 (grievance and Alarm floor), war_census 16 seeds*
+
+Grievance now holds at Trust -25 as ruled. Over 16 seeds the lowest Trust any pair reached was about -11.8, so grievance held on 0 of 652,094 live pair-ticks and carried no declaration.
+
+**Why it matters.** A declared casus belli that nothing meets is a dead rule. The conduct weights and the nine-tick decay cap Trust well above the edge.
+
+> **Recommendation:** Either raise the conduct weights (or slow the decay) so a sustained offence reaches -25, or move the edge toward the observed floor (about -10). Measure with war_census either way.
+
+*Files: `src/world/war.hpp`, `src/world/sentiment.cpp`, `docs/politics/RELATIONS.md`*
+
+### NR-1130 — Rival embargo bars and the offer cooldown: calls taken in the relations lane
+*decision taken on your behalf · raised 2026-11-03 · from BL-1480 (war loose ends), BL-1481 (rival embargo)*
+
+(1) Embargo enacts above utility 0.20 and repeals below 0.10 - no range was ruled; at 0.30 no rival ever embargoed (0.10: 713 pair-ticks, 0.20: 38, 0.30: 4). Census: 3 enacted, 3 repealed, none on the player. (2) The 4-tick peace-offer cooldown sits in offer_peace itself, so it binds the player too; the ledger disables Offer peace and names the quarters left. (3) War dispatches post to Field with no speaker.
+
+**Why it matters.** An embargo can prop itself up: it cuts the target's cargo, which removes the author's trade-exposure cost and raises its own Alarm through trade_severed, until decay lifts it. All three census embargoes still lifted.
+
+> **Recommendation:** Keep all three; revisit the bars if embargoes stop lifting once Trust can fall further (NR-1129).
+
+*Files: `src/world/corp_ai.cpp`, `src/world/war.cpp`, `src/core/session_history.cpp`*
+
+### NR-1131 — Rivals fortify any border-province tile their units stand on
+*decision taken on your behalf · raised 2026-11-03 · from BL-1478 (bunker retune)*
+
+'Widen to border posts' was read as any of the rival's own tiles with its units on them, in a province that holds a tile of a hostile front - so a garrison posted inside a border province is fortified where it stands. Written into AI_OPPONENT.md § 11's bunker entry as the ruling's widening. Rival bunkers over 16 seeds: 1 -> 15 (13 completed); none for the player.
+
+**Why it matters.** Narrower reading (garrison post tiles only) would build fewer. The roughly 15x bunker spend moved seed 46's G1t50 85.7 -> 83.1.
+
+> **Recommendation:** Keep.
+
+*Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
 
 ---
 
