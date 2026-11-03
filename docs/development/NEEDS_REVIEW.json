@@ -792,6 +792,43 @@
    "why_it_matters": "Each is a reading of the form Ben answered, not a choice he made. (2) and (3) can change what a minor opens with, and every seed digest moves with them.",
    "recommendation": "Confirm all five; (2) and (3) are the ones most likely to move a minor's opening.",
    "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+  },
+  {
+   "id": "NR-1126",
+   "title": "Major opening kit: most processor slots fail Pass 3, and majors run near break-even",
+   "raised": "2026-11-03",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1473 lane, branch worktree-agent-a1fb67f8f6d2e0152 at 14aefef5; quick-tier census 2026-11-03",
+   "what": "Quick tier (seeds 0, 28, 46, 12; 20:4; 20 quarters). Parity improves: treasury spread median 21x -> 2.0x (Standard) / 1.7x (Rich-core); buildings 13x -> 2.3x. Workability falls: Standard median net +1 per quarter, 8 of 16 majors losing money (baseline median +910, about a quarter losing); Rich-core median +255, 6 of 16 losing, none broke. Cause: kit processors fail Pass 3. Steel, refined fuel and power fail the want bound, which is body-wide, so the minors' walk already covers them; food rations, refined copper and machinery fail spare input, since one extractor per raw does not cover a plant at t_idle. Standard places a median of about 2-3 of its 6 processors. Also unbuilt: the logistics slots, so majors keep 2-47 nodes and their bills.",
+   "why_it_matters": "The doc says each kit processor runs on day one; on these seeds it mostly does not stand. The kit is not merged to main until this is decided.",
+   "options": [
+    "Exempt kit processors from the want bound (keep chain-feasible and sized)",
+    "Read want at the major's own markets rather than the body",
+    "Size kit extraction to its processors (enough feed for each slot)",
+    "Build the logistics slot cap as the doc says"
+   ],
+   "recommendation": "The first and third together, then the fourth; re-run the census on both kits.",
+   "files": [
+    "docs/generation/CORPORATION_GENERATION.md",
+    "src/world/opening_kit.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1127",
+   "title": "Novel seam: generation helpers exposed through corporation_generation_detail.hpp",
+   "raised": "2026-11-03",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "BL-1473 lane",
+   "what": "The kit reuses Pass 3 helpers, so they moved from an anonymous namespace into namespace corpgen behind a new detail header. No doc owns that seam.",
+   "why_it_matters": "It lets other TUs call generation internals directly.",
+   "recommendation": "Accept as the kit's seam; note it in CORPORATION_GENERATION.md if kept.",
+   "files": [
+    "src/world/corporation_generation_detail.hpp"
+   ],
+   "resolution": null
   }
  ]
 }

@@ -7892,6 +7892,66 @@
      "notes": "question_log diplomacy_ledger, ui_elements UI-133, ACTIONS.json ledger.diplomacy_* entries (212), mirrors regenerated."
     }
    ]
+  },
+  {
+   "brief": "major-opening-kit",
+   "title": "BL-1473 - Every major opens on the same kit and treasury",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in-flight",
+   "promoted_from": "backlog.json BL-1473 - sprint 62 (Ben, 2026-11-02)",
+   "batch": "sprint-62",
+   "resolved": null,
+   "resolution": null,
+   "rows": [
+    {
+     "id": "R1",
+     "status": "pending",
+     "verification": [
+      "harness: opening_parity --kit standard / rich_core, 16 library seeds"
+     ],
+     "requirement": "Every major opens with the configured kit: its extraction, processing and civic buildings are the kit slots placed, substituted or reported unbuilt, and nothing the walk placed on its ground survives in those categories. Every minor opens as before.",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "status": "pending",
+     "verification": [
+      "harness: opening_parity"
+     ],
+     "requirement": "Every major opens on the configured flat treasury, and the opening cut removes nothing from a major.",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "status": "pending",
+     "verification": [
+      "harness: world_determinism",
+      "harness: save_roundtrip"
+     ],
+     "requirement": "Generation stays deterministic and the opened world saves and loads to an equal state hash.",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "status": "pending",
+     "verification": [
+      "harness: opening_parity"
+     ],
+     "requirement": "Every kit processor passes Pass 3: chain-feasible and sized to spare input; the census reports the kit's processors running at the handoff.",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "status": "pending",
+     "verification": [
+      "harness: opening_parity, market_viability"
+     ],
+     "requirement": "Reported, not gated: the within-seed spread and workability of Standard and Rich-core against the 9e11146f baseline, and market_viability gates before and after.",
+     "notes": ""
+    }
+   ]
   }
  ]
 }

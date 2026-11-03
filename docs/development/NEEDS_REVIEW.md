@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*41 entries — 8 open, 33 resolved.*
+*43 entries — 10 open, 33 resolved.*
 
 ---
 
@@ -134,6 +134,33 @@ To make Alarm's RELATIONS § 6 causes emit, the lane added five sentiment factor
 > **Recommendation:** Accept; write the five factors into RELATIONS § Who emits and the three subjects into META_LAYER at merge.
 
 *Files: `src/world/sentiment_emitters.cpp`, `src/world/modifier_set.hpp`, `tools/session/tech_tree_store.js`*
+
+### NR-1126 — Major opening kit: most processor slots fail Pass 3, and majors run near break-even
+*question · raised 2026-11-03 · from BL-1473 lane, branch worktree-agent-a1fb67f8f6d2e0152 at 14aefef5; quick-tier census 2026-11-03*
+
+Quick tier (seeds 0, 28, 46, 12; 20:4; 20 quarters). Parity improves: treasury spread median 21x -> 2.0x (Standard) / 1.7x (Rich-core); buildings 13x -> 2.3x. Workability falls: Standard median net +1 per quarter, 8 of 16 majors losing money (baseline median +910, about a quarter losing); Rich-core median +255, 6 of 16 losing, none broke. Cause: kit processors fail Pass 3. Steel, refined fuel and power fail the want bound, which is body-wide, so the minors' walk already covers them; food rations, refined copper and machinery fail spare input, since one extractor per raw does not cover a plant at t_idle. Standard places a median of about 2-3 of its 6 processors. Also unbuilt: the logistics slots, so majors keep 2-47 nodes and their bills.
+
+**Why it matters.** The doc says each kit processor runs on day one; on these seeds it mostly does not stand. The kit is not merged to main until this is decided.
+
+- Exempt kit processors from the want bound (keep chain-feasible and sized)
+- Read want at the major's own markets rather than the body
+- Size kit extraction to its processors (enough feed for each slot)
+- Build the logistics slot cap as the doc says
+
+> **Recommendation:** The first and third together, then the fourth; re-run the census on both kits.
+
+*Files: `docs/generation/CORPORATION_GENERATION.md`, `src/world/opening_kit.cpp`*
+
+### NR-1127 — Novel seam: generation helpers exposed through corporation_generation_detail.hpp
+*novel-work · raised 2026-11-03 · from BL-1473 lane*
+
+The kit reuses Pass 3 helpers, so they moved from an anonymous namespace into namespace corpgen behind a new detail header. No doc owns that seam.
+
+**Why it matters.** It lets other TUs call generation internals directly.
+
+> **Recommendation:** Accept as the kit's seam; note it in CORPORATION_GENERATION.md if kept.
+
+*Files: `src/world/corporation_generation_detail.hpp`*
 
 ---
 
