@@ -8,6 +8,8 @@
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
+#include "world/road_generation.hpp" // lay_port_lanes -- a port the cap lays lanes as the seeding's does
+#include "world/state_industry.hpp"  // state_handover_report -- the flat treasury's foundings
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -296,7 +298,7 @@ std::array<float, resource_count> planned_inputs(const recipe_registry& reg, con
     std::array<float, resource_count> out{};
     if (rc == nullptr)
         return out;
-    building_component fresh;
+    building_component fresh{}; // value-initialised: workforce_assigned has no default (judged at the authored staffing)
     fresh.type = building_type::processing_facility;
     const float batches = judged_batches(reg, fresh);
     for (std::size_t r = 0; r < resource_count; ++r)
@@ -317,7 +319,12 @@ void own_it(world& w, major_kit& mk, entity_id bid)
 /// Well or Wharf site, then the richer, then the lower tile id. Null if none.
 entity_id place_extractor(kit_layer& L, major_kit& mk, const dig_rung& r)
 {
-    struct cand { int stacked; float key; float rich; entity_id tid; };
+    // RUNG 1 IS COVERED GROUND (cold review): a tile the cover at placement reaches
+    // ranks ahead of every tile it does not, so spreading never sends a site onto
+    // uncovered ground while covered ground with room holds the good. Within each,
+    // spread before stack, then richness x cover (a deposit) or habitability (a Well
+    // or Wharf site), then the richer, then the lower tile id.
+    struct cand { int uncovered; int stacked; float key; float rich; entity_id tid; };
     std::vector<cand> cs;
     for (const entity_id tid : mk.g.tiles)
     {
@@ -325,13 +332,16 @@ entity_id place_extractor(kit_layer& L, major_kit& mk, const dig_rung& r)
         if (dig_site_of(L.w, tid, tc, r.good) != r.tier
             || !L.occ.has_room(tc, tid, building_type::extraction_site, r.good))
             continue;
-        const float rich = tc.resource_deposit[static_cast<std::size_t>(r.good)];
-        const float key  = r.tier == dig_site::deposit ? rich * L.cover.cover(L.w, tid) : tc.habitability;
-        cs.push_back({ L.occ.extraction_on(tid, r.good) > 0 ? 1 : 0, key, rich, tid });
+        const float rich  = tc.resource_deposit[static_cast<std::size_t>(r.good)];
+        const float cover = L.cover.cover(L.w, tid);
+        const float key   = r.tier == dig_site::deposit ? rich * cover : tc.habitability;
+        cs.push_back({ cover > 0.0f ? 0 : 1, L.occ.extraction_on(tid, r.good) > 0 ? 1 : 0, key, rich,
+                       tid });
     }
     if (cs.empty())
         return null_entity;
     std::sort(cs.begin(), cs.end(), [](const cand& a, const cand& b) {
+        if (a.uncovered != b.uncovered) return a.uncovered < b.uncovered;
         if (a.stacked != b.stacked) return a.stacked < b.stacked;
         if (a.key != b.key)         return a.key > b.key;
         if (a.rich != b.rich)       return a.rich > b.rich;
@@ -378,7 +388,7 @@ std::vector<const recipe*> planned_recipes(const recipe_registry& reg, const ope
 /// fallback where no drawn raw can be placed.
 std::vector<resource_type> flex_order(kit_layer& L, major_kit& mk, const std::vector<const recipe*>& procs)
 {
-    building_component fresh;
+    building_component fresh{}; // value-initialised: workforce_assigned has no default (judged at the authored staffing)
     fresh.type = building_type::processing_facility;
     const float batches = judged_batches(L.reg, fresh) * L.reg.t_idle();
     std::array<float, resource_count> draw{}, supply{};
@@ -708,6 +718,11 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
 {
     opening_kit_report rep;
     rep.kit = kit.name;
+    // Every recipe name resolves BEFORE anything is taken up (cold review): an unknown
+    // name throws here, with the world as it was handed in.
+    for (const opening_kit_slot& s : kit.slots)
+        for (const std::string& n : s.recipes)
+            (void)browse_index_of(reg, n, kit.name);
 
     // The majors, ascending id, each with homeworld ground and a capital on it.
     std::vector<entity_id> majors;
@@ -1051,6 +1066,24 @@ constexpr building_type k_node_type[3] = { building_type::port, building_type::r
 
 } // namespace
 
+void release_kit_foundings(world& w, state_handover_report& handover)
+{
+    const auto release = [&](entity_id nation, entity_id& building, float& paid) {
+        if (building != null_entity && w.buildings.count(building) == 0)
+        {
+            building = null_entity; // taken up by the kit or the cap
+            paid     = 0.0f;
+            return;
+        }
+        if (const auto nit = w.nations.find(nation); nit != w.nations.end() && nit->second.is_major)
+            paid = 0.0f; // paid from the chest the flat treasury replaced
+    };
+    for (state_founding& f : handover.founded)
+        release(f.nation, f.building, f.paid);
+    for (state_port_founding& p : handover.ports)
+        release(p.nation, p.building, p.paid);
+}
+
 int count_uncovered_buildings(world& w, entity_id nation)
 {
     const auto nit = w.nations.find(nation);
@@ -1104,30 +1137,56 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
             if (a.tile != b.tile) return a.tile < b.tile;
             return a.bid < b.bid;
         });
-        int kept[3] = { 0, 0, 0 };
-        std::vector<entity_id> gone;
-        for (const node& n : nodes)
+        // FILL THE SLOTS FROM THE STANDING NODES, DOWN EACH SLOT'S LADDER, BEFORE ANY IS
+        // TAKEN UP (cold review): first each node into its own type's slot, in the
+        // seeding's order; then a slot still open takes a standing node from further
+        // down its ladder (a port slot a station, then a hub; a station slot a hub), so
+        // a standing station is never taken up only for the port slot to lay a fresh one.
+        int filled[3] = { 0, 0, 0 };
+        std::vector<char> used(nodes.size(), 0);
+        for (std::size_t i = 0; i < nodes.size(); ++i)
         {
+            const node& n = nodes[i];
             if (n.tile == g.capital)
             {
                 ++m.nodes_source; // the capital's source: kept, outside the slots
+                used[i] = 1;
                 continue;
             }
-            if (kept[n.slot] < count[n.slot])
+            if (filled[n.slot] < count[n.slot])
             {
-                ++kept[n.slot];
+                ++filled[n.slot];
                 ++m.nodes_kept;
+                used[i] = 1;
             }
-            else
-                gone.push_back(n.bid);
         }
+        for (int s = 0; s < 3; ++s)
+            for (int rung = s + 1; rung < 3 && filled[s] < count[s]; ++rung)
+                for (std::size_t i = 0; i < nodes.size() && filled[s] < count[s]; ++i)
+                    if (!used[i] && nodes[i].slot == rung)
+                    {
+                        used[i] = 1;
+                        ++filled[s];
+                        ++m.nodes_kept;
+                        m.logistics_note += std::string(" ") + node_name(s) + "<-standing "
+                                          + node_name(rung);
+                    }
+        std::vector<entity_id> gone;
+        for (std::size_t i = 0; i < nodes.size(); ++i)
+            if (!used[i])
+                gone.push_back(nodes[i].bid);
         std::sort(gone.begin(), gone.end());
         for (const entity_id bid : gone)
             take_up_node(w, bid);
         m.nodes_taken = static_cast<int>(gone.size());
+        if (!gone.empty())
+            invalidate_logistics_caches(w);
 
         // A slot still open: laid nearest the capital where placement allows, down the
-        // ladder (port -> station -> hub; station -> hub).
+        // ladder (port -> station -> hub; station -> hub), and built as the Logistic
+        // Point seeding builds a node it lands (`seed_logistics_sources`' place_source):
+        // zero staff, standing complete, one network node to a hub's tile, and a port
+        // laying its lanes as it stands.
         const std::vector<entity_id> near = tiles_nearest(w, g, g.capital);
         const auto lay = [&](building_type type) -> bool {
             if (!reg.building_available(type))
@@ -1144,6 +1203,17 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
                 if (!placement_rules::can_place_in_world(w, tid, type, k_no_target, -1.0f,
                                                          null_entity, gate))
                     continue;
+                bool node_here = false, station_here = false;
+                for (const auto& [obid, ob] : w.buildings)
+                {
+                    (void)obid;
+                    if (ob.tile != tid)
+                        continue;
+                    node_here    = node_here || node_slot(ob.type) >= 0;
+                    station_here = station_here || ob.type == building_type::railway_station;
+                }
+                if (type == building_type::inland_logistics_hub && node_here)
+                    continue; // the seeding's one network node to a hub's tile
                 if (type == building_type::railway_station)
                 {
                     // The build door's station rule (construction.cpp, BL-1255): a city
@@ -1151,24 +1221,29 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
                     bool city = false;
                     for (const auto& [centre, ctile] : w.population_centre_tile)
                         if (ctile == tid) { (void)centre; city = true; break; }
-                    if (!city || !tile_touches_track(w, tid))
-                        continue;
-                    bool has_station = false;
-                    for (const auto& [obid, ob] : w.buildings)
-                        if (ob.type == building_type::railway_station && ob.tile == tid)
-                        { (void)obid; has_station = true; break; }
-                    if (has_station)
+                    if (!city || station_here || !tile_touches_track(w, tid))
                         continue;
                 }
-                gen_occupancy scratch;
-                const entity_id bid = author_building(w, tid, type, scratch);
+                const entity_id bid = w.create_entity();
+                building_component bc{};
+                bc.tile               = tid;
+                bc.type               = type;
+                bc.workforce_assigned = 0.0f; // zero staff, as every network node
+                bc.workforce_target   = default_workforce_target(type);
+                bc.ticks_remaining    = 0;    // stands complete, as every generated holding
+                w.buildings[bid]  = bc;
+                w.stockpiles[bid] = stockpile_component{};
                 w.nations.at(m.nation).state_assets.push_back(bid);
+                if (type == building_type::port)
+                    (void)lay_port_lanes(w, bid); // as a port the seeding lands
+                else
+                    invalidate_logistics_caches(w);
                 return true;
             }
             return false;
         };
         for (int s = 0; s < 3; ++s)
-            for (int k = kept[s]; k < count[s]; ++k)
+            for (int k = filled[s]; k < count[s]; ++k)
             {
                 bool laid = false;
                 for (int rung = s; rung < 3 && !laid; ++rung)

@@ -103,6 +103,17 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
 /// Print one `[opening_kit] logistics` line per major.
 void print_opening_kit_logistics(const opening_kit_report& r);
 
+/// THE FLAT TREASURY'S FOUNDINGS (cold review, BL-1473). The state handover's
+/// foundings (a plant, a coastal port) record what each major PAID from its history's
+/// chest, and the opening reserve refunds that payment. Once the kit stands and the
+/// flat treasury replaces that chest, neither holds: a founding whose building the
+/// take-up or the cap removed is gone (building nulled, nothing paid), and a major's
+/// remaining foundings were paid from a chest that no longer exists (nothing paid). So
+/// the reserve neither refunds into the flat figure nor annotates a building that is
+/// gone. Call right after the flat treasury is set.
+struct state_handover_report;
+void release_kit_foundings(world& w, state_handover_report& handover);
+
 /// A nation's buildings standing without Logistic Point cover: every Logistic
 /// Point consumer it owns whose tile reads coverage 0 from its running sources.
 int count_uncovered_buildings(world& w, entity_id nation);

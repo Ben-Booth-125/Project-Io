@@ -261,6 +261,24 @@ inline landscape_search_params shipped_search_params(
 /// `m_worldgen_cfg.corporation_count`). It defaults to `world_gen_config`'s own
 /// default — 8, the value scripts/world_gen.lua also authors — so every caller
 /// that omits it gets exactly what it got when this was a hard-coded 8 (BL-1030).
+/// BL-1473 (cold review): THE SHIPPED CONFIG, parsed once from scripts/world_gen.lua
+/// exactly as the app parses it, so every caller of `apply_shipped_landscape` lays the
+/// app's opening kit by default -- not only the ones that go through
+/// `apply_app_start_landscape`. A caller opts out with `no_opening_kit`. Read from the
+/// working directory (every Lua harness runs from the repo root); a missing script
+/// throws, as the app's own load does.
+inline const world_gen_config& shipped_world_gen_config()
+{
+    static const world_gen_config cfg = [] {
+        lua_state lua;
+        lua.load("scripts/world_gen.lua");
+        world_gen_config c{};
+        c.load_from_lua(lua);
+        return c;
+    }();
+    return cfg;
+}
+
 inline shipped_landscape apply_shipped_landscape(
     world& w, const recipe_registry& reg, std::uint32_t world_seed, bool search = true,
     int corporation_count = world_gen_config{}.corporation_count,
@@ -268,6 +286,12 @@ inline shipped_landscape apply_shipped_landscape(
 {
     shipped_landscape out;
     out.searched = search;
+    // BL-1473: the kit the app lays (the shipped config's active one) unless the
+    // caller named its own or opted out.
+    const opening_kit_config* const kit =
+        charter.opening_kit != nullptr ? charter.opening_kit
+        : charter.no_opening_kit       ? nullptr
+                                       : shipped_world_gen_config().opening_kit.active_config();
 
     // load_economy's pass. Idempotent, so a caller that already ran it pays one
     // map walk and nothing else.
@@ -370,17 +394,17 @@ inline shipped_landscape apply_shipped_landscape(
         // finish_campaign_world's ports in history, verbatim, before the site roads.
         print_colonial_ports(place_colonial_ports(w));
         // BL-1473: finish_campaign_world's major opening kit, verbatim, after the ports.
-        if (charter.opening_kit != nullptr)
+        if (kit != nullptr)
         {
-            out.kit = lay_major_opening_kits(w, reg, *charter.opening_kit);
+            out.kit = lay_major_opening_kits(w, reg, *kit);
             print_opening_kit(out.kit);
         }
         lay_site_roads_every_body(w);
         out.lp = seed_logistics_sources(w);
         // BL-1473: finish_campaign_world's logistics cap, verbatim, right after the seeding.
-        if (charter.opening_kit != nullptr && charter.opening_kit->logistics_capped())
+        if (kit != nullptr && kit->logistics_capped())
         {
-            cap_major_logistics(w, reg, *charter.opening_kit, out.kit);
+            cap_major_logistics(w, reg, *kit, out.kit);
             print_opening_kit_logistics(out.kit);
         }
         // BL-1402: finish_campaign_world's fold to ground, verbatim, right after it.
@@ -407,10 +431,15 @@ inline shipped_landscape apply_shipped_landscape(
             }
         }
         // BL-1473: finish_campaign_world's flat treasury, verbatim, right after the fold.
-        if (charter.opening_kit != nullptr)
+        // finish_campaign_world has no skip_fold path: it always folds, then flattens. So
+        // the flat treasury follows the fold here and is held back with it.
+        if (kit != nullptr && !charter.skip_fold)
+        {
             for (auto& [nid, nc] : w.nations)
                 if (nc.is_major)
-                    nc.treasury = charter.opening_kit->treasury;
+                    nc.treasury = kit->treasury;
+            release_kit_foundings(w, out.state); // finish_campaign_world's, verbatim
+        }
         // BL-1439: finish_campaign_world's capital military bases, verbatim, right
         // after the fold and before the reserve.
         print_capital_bases(seed_capital_military_bases(w));
@@ -418,9 +447,9 @@ inline shipped_landscape apply_shipped_landscape(
         // the seeding's reading at the gate, verbatim, right after it.
         out.reserve = reserve_state_first_tick(w, reg, out.state);
         print_state_reserve(out.reserve);
-        stack_logistics_hubs(w, reg, out.lp, /*cap_majors=*/charter.opening_kit != nullptr
-                                                  && charter.opening_kit->logistics_capped()); // finish_campaign_world's, verbatim
-        out.cut = size_opening_state_to_chest(w, reg, /*skip_majors=*/charter.opening_kit != nullptr); // BL-1452 / BL-1473: finish_campaign_world's, verbatim
+        stack_logistics_hubs(w, reg, out.lp, /*cap_majors=*/kit != nullptr
+                                                  && kit->logistics_capped()); // finish_campaign_world's, verbatim
+        out.cut = size_opening_state_to_chest(w, reg, /*skip_majors=*/kit != nullptr); // BL-1452 / BL-1473: finish_campaign_world's, verbatim
         print_opening_state_cut(out.cut);
         // BL-1398's firm top-up retired with the fold (finish_campaign_world).
         if (charter.skip_fold)

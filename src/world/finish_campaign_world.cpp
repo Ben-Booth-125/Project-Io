@@ -463,6 +463,9 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
                 nc.treasury = kit->treasury;
                 ++flattened;
             }
+        // The reserve below refunds nothing into the flat figure, and nothing for a
+        // founding the take-up or the cap removed (release_kit_foundings).
+        release_kit_foundings(w, out.state);
         std::printf("[opening_kit] %d major treasury(ies) set to %.0f credits\n", flattened,
                     static_cast<double>(kit->treasury));
         std::fflush(stdout);
