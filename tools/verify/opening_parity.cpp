@@ -28,6 +28,10 @@
 // so a par_seeds sweep can be pooled from its shards.
 //
 // Usage: build_gen/verify/opening_parity.exe [--seeds a,b] [--pairs 20:4,30:4] [--quarters N]
+//                                            [--kit <name>|none]
+// --kit (BL-1473) overrides world_gen.opening_kit.active before generation: a named
+// configuration, or `none` for the walk's old opening. Each major line then carries
+// the kit report's totals (placed / substituted / unbuilt), as do its ROW fields.
 // Build: bash tools/verify/build_lua_harness.sh opening_parity
 // ---------------------------------------------------------------------------
 
@@ -106,6 +110,7 @@ struct snapshot
     double treasury = 0.0;
     int    built[k_category_count] = {};
     int    built_all = 0, constructing = 0;
+    int    idled = 0; ///< BL-1473 census: decommissioned (idled) state buildings, counted apart
     int    units = 0;
     long   men = 0;
     int    land_pool = 0;
@@ -121,7 +126,8 @@ snapshot read_nation(const world& w, entity_id nid, const nation_component& n,
     for (const entity_id a : n.state_assets)
     {
         const auto it = w.buildings.find(a);
-        if (it == w.buildings.end() || it->second.decommissioned) continue;
+        if (it == w.buildings.end()) continue;
+        if (it->second.decommissioned) { ++s.idled; continue; }
         if (it->second.ticks_remaining > 0) { ++s.constructing; continue; }
         ++s.built[category_of(it->second.type)];
         ++s.built_all;
@@ -185,10 +191,12 @@ int main(int argc, char** argv)
     std::vector<int> seeds{ 0 };
     std::vector<std::pair<int, int>> pairs{ { 20, 4 } };
     int quarters = 20;
+    const char* kit_override = nullptr;
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) seeds = parse_ints(argv[++i], ',');
         else if (!std::strcmp(argv[i], "--quarters") && i + 1 < argc) quarters = std::atoi(argv[++i]);
+        else if (!std::strcmp(argv[i], "--kit") && i + 1 < argc) kit_override = argv[++i];
         else if (!std::strcmp(argv[i], "--pairs") && i + 1 < argc)
         {
             pairs.clear();
@@ -207,7 +215,7 @@ int main(int argc, char** argv)
         }
         else
         {
-            std::fprintf(stderr, "usage: opening_parity [--seeds a,b] [--pairs 20:4,30:4] [--quarters N]\n");
+            std::fprintf(stderr, "usage: opening_parity [--seeds a,b] [--pairs 20:4,30:4] [--quarters N] [--kit <name>|none]\n");
             return 2;
         }
     }
@@ -218,13 +226,24 @@ int main(int argc, char** argv)
     recipe_registry  reg;
     lua.load("scripts/world_gen.lua");
     cfg.load_from_lua(lua);
+    if (kit_override != nullptr)
+    {
+        cfg.opening_kit.active = kit_override;
+        if (std::strcmp(kit_override, "none") != 0 && cfg.opening_kit.active_config() == nullptr)
+        {
+            std::fprintf(stderr, "opening_parity: no opening kit named '%s' in scripts/world_gen.lua\n",
+                         kit_override);
+            return 2;
+        }
+    }
     lua.load("scripts/works.lua");
     works.load_from_lua(lua);
     lua.load("scripts/recipes.lua");
     lua.load("scripts/economy.lua");
     reg.load_from_lua(lua);
 
-    std::printf("opening_parity - BL-1475: majors at the handoff and over %d play quarters (spectating)\n", quarters);
+    std::printf("opening_parity - BL-1475: majors at the handoff and over %d play quarters (spectating); kit %s\n",
+                quarters, cfg.opening_kit.active_config() ? cfg.opening_kit.active.c_str() : "none");
     for (const int seed : seeds)
         for (const auto& [tt, mt] : pairs)
         {
@@ -235,7 +254,7 @@ int main(int argc, char** argv)
             generation_report rep{};
             world w = make_hard_coded_world(p, &rep, cfg, nullptr, &works);
             recipe_registry seed_reg = reg;
-            (void)finish_campaign_world(w, rep, seed_reg, p, cfg, nullptr);
+            const finish_campaign_result fin = finish_campaign_world(w, rep, seed_reg, p, cfg, nullptr);
 
             entity_id home = null_entity;
             for (const generation_report::body_entry& b : rep.bodies)
@@ -255,6 +274,9 @@ int main(int argc, char** argv)
             auto force = force_by_owner(w);
             std::map<entity_id, snapshot> at_handoff;
             for (const entity_id nid : majors) at_handoff[nid] = read_nation(w, nid, w.nations.at(nid), force);
+            // BL-1473: the major's Logistic Point consumers without cover at the handoff.
+            std::map<entity_id, int> uncovered;
+            for (const entity_id nid : majors) uncovered[nid] = count_uncovered_buildings(w, nid);
             std::vector<double> minor_treasury;
             std::vector<int>    minor_built;
             std::vector<long>   minor_men;
@@ -304,17 +326,21 @@ int main(int argc, char** argv)
                 std::printf("  major %llu  tiles %5d  treasury %9.0f  built %3d [", static_cast<unsigned long long>(nid),
                             h.tiles, h.treasury, h.built_all);
                 for (int c = 0; c < k_category_count; ++c) std::printf("%s%s %d", c ? " " : "", k_category_names[c], h.built[c]);
-                std::printf("] constr %d  units %d men %ld pool %d | play: net mean %8.1f min %8.1f red %2d/%zu"
-                            "  end treasury %9.0f built %3d men %ld\n",
-                            h.constructing, h.units, h.men, h.land_pool, mean, mn, red, q.size(),
+                const opening_kit_major* km = fin.kit.of(nid);
+                const int kp = km ? km->placed : 0, ks = km ? km->substituted : 0, ku = km ? km->unbuilt : 0;
+                const int kpb = km ? km->proc_built : 0, unc = uncovered[nid];
+                std::printf("] constr %d  units %d men %ld pool %d | kit %d/%d/%d proc %d uncovered %d idled %d | play:"
+                            " net mean %8.1f min %8.1f red %2d/%zu  end treasury %9.0f built %3d men %ld\n",
+                            h.constructing, h.units, h.men, h.land_pool, kp, ks, ku, kpb, unc, h.idled, mean, mn, red, q.size(),
                             e.treasury, e.built_all, e.men);
                 std::printf("ROW seed=%d pair=%d:%d nation=%llu tiles=%d treasury=%.1f built=%d ext=%d proc=%d logi=%d"
                             " civic=%d mil=%d other=%d constr=%d units=%d men=%ld pool=%d net_mean=%.2f net_min=%.2f"
-                            " red=%d quarters=%zu end_treasury=%.1f end_built=%d end_men=%ld\n",
+                            " red=%d quarters=%zu end_treasury=%.1f end_built=%d end_men=%ld"
+                            " kit_placed=%d kit_sub=%d kit_unbuilt=%d proc_built=%d uncovered=%d idled=%d\n",
                             seed, tt, mt, static_cast<unsigned long long>(nid), h.tiles, h.treasury, h.built_all,
                             h.built[k_extraction], h.built[k_processing], h.built[k_logistics], h.built[k_civic],
                             h.built[k_military], h.built[k_other], h.constructing, h.units, h.men, h.land_pool,
-                            mean, mn, red, q.size(), e.treasury, e.built_all, e.men);
+                            mean, mn, red, q.size(), e.treasury, e.built_all, e.men, kp, ks, ku, kpb, unc, h.idled);
                 t_hi = std::max(t_hi, h.treasury); t_lo = std::min(t_lo, h.treasury);
                 b_hi = std::max(b_hi, h.built_all); b_lo = std::min(b_lo, h.built_all);
                 m_hi = std::max(m_hi, static_cast<long long>(h.men)); m_lo = std::min(m_lo, static_cast<long long>(h.men));

@@ -1001,7 +1001,8 @@ float opening_cut_base_bill(const world& w, const recipe_registry& reg, const bu
 
 } // namespace
 
-opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_registry& reg)
+opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_registry& reg,
+                                                     bool skip_majors)
 {
     opening_state_cut_report rep;
     const unit_upkeep_params& up = reg.military().upkeep;
@@ -1020,6 +1021,8 @@ opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_regi
     for (const entity_id nid : gate_nations(w, gate_rail_tiles(w)))
     {
         const nation_component& nc = w.nations.at(nid);
+        if (skip_majors && nc.is_major)
+            continue; // BL-1473: a kit major is not cut
         const float chest = std::max(0.0f, nc.treasury);
         const float pay   = wage.count(nid) ? wage.at(nid) : 0.0f;
         // The running bill, plus each standing base priced at its old upkeep (above).

@@ -1,6 +1,7 @@
 #include "corporation_generation.hpp"
 
 #include "province.hpp"
+#include "corporation_generation_detail.hpp" // the helpers the opening kit shares (BL-1473)
 
 #include "world/hard_coded_world.hpp" // generation_progress — the BL-305 tap
 
@@ -43,87 +44,13 @@
 #include <utility>
 #include <vector>
 
+using namespace corpgen; // BL-1473: the Pass 3 helpers opening_kit.cpp shares
+
 // ---------------------------------------------------------------------------
 // Internal helpers — all in anonymous namespace
 // ---------------------------------------------------------------------------
 
-namespace {
-
-/// GENERATION'S OCCUPANCY, BY STACK (Ben, 2026-10-26; CORPORATION_GENERATION.md
-/// § Pass 3, "Buildings stack on every tile"): a charter may place buildings on
-/// any tile up to that tile's stack cap. Each tile carries two counts, read the
-/// way placement_rules reads a stack: extraction sites per target, against the
-/// deposit's richness-bound `stack_capacity`, and every other building together,
-/// against `non_extraction_stack_cap`. `count` keeps the old reading (does the
-/// tile hold any building at all) for the passes that are not a charter's — the
-/// muster base and the Marketplace retrofit keep one building per empty tile.
-class gen_occupancy
-{
-public:
-    void reserve(std::size_t n) { m_tiles.reserve(n); }
-
-    void add(const building_component& b)
-    {
-        tile_stack& s = m_tiles[b.tile];
-        ++s.total;
-        if (b.type == building_type::extraction_site)
-            ++s.extraction[static_cast<std::size_t>(b.target_resource)];
-        else
-            ++s.non_extraction;
-    }
-
-    void remove(const building_component& b)
-    {
-        const auto it = m_tiles.find(b.tile);
-        if (it == m_tiles.end())
-            return;
-        tile_stack& s = it->second;
-        if (b.type == building_type::extraction_site)
-        {
-            auto& e = s.extraction[static_cast<std::size_t>(b.target_resource)];
-            if (e > 0) --e;
-        }
-        else if (s.non_extraction > 0)
-            --s.non_extraction;
-        if (--s.total <= 0)
-            m_tiles.erase(it);
-    }
-
-    /// 1 when the tile holds any building, else 0 (the pre-stacking reading).
-    std::size_t count(entity_id tile) const { return m_tiles.count(tile); }
-
-    /// Extraction sites of @p target standing on @p tile.
-    int extraction_on(entity_id tile, resource_type target) const
-    {
-        const auto it = m_tiles.find(tile);
-        return it == m_tiles.end() ? 0 : it->second.extraction[static_cast<std::size_t>(target)];
-    }
-
-    /// May one more building of @p type (extracting @p target) stand on @p tile?
-    /// Validity (terrain, deposit) is `placement_rules::can_place`'s; this is the
-    /// stack's room alone.
-    bool has_room(const tile_component& tc, entity_id tile, building_type type,
-                  resource_type target) const
-    {
-        const auto it = m_tiles.find(tile);
-        if (it == m_tiles.end())
-            return true;
-        const tile_stack& s = it->second;
-        if (type == building_type::extraction_site)
-            return s.extraction[static_cast<std::size_t>(target)]
-                 < placement_rules::stack_capacity(tc, type, target);
-        return s.non_extraction < placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover);
-    }
-
-private:
-    struct tile_stack
-    {
-        int total = 0;
-        int non_extraction = 0;
-        std::array<int, resource_count> extraction{};
-    };
-    std::unordered_map<entity_id, tile_stack> m_tiles;
-};
+namespace corpgen {
 
 // ---------------------------------------------------------------------------
 // THE COVER AT PLACEMENT (Ben, 2026-10-26; CORPORATION_GENERATION.md § Pass 3,
@@ -220,6 +147,10 @@ std::unordered_map<entity_id, float> gen_road_walk(world& w, entity_id body,
     return dist;
 }
 
+} // namespace corpgen
+
+namespace {
+
 // ---------------------------------------------------------------------------
 // BL-1407 — the generation's PROVISIONAL seat
 // ---------------------------------------------------------------------------
@@ -280,6 +211,10 @@ void attach_charter(world& w, entity_id cid)
         own_by_ground(w, bid);
 }
 
+} // namespace
+
+namespace corpgen {
+
 /// BL-1407: drop @p bid from whichever nation lists it (a building generation
 /// unplaces leaves its owner's list with it).
 void release_from_owner(world& w, entity_id bid)
@@ -295,6 +230,11 @@ void release_from_owner(world& w, entity_id bid)
         }
     }
 }
+
+} // namespace corpgen
+
+namespace {
+
 
 /// BL-1407: a charter's home market on @p body — `corp_home_market`'s rule over
 /// the charter's own index (its anchor's market, else its lowest-id building's
@@ -759,6 +699,10 @@ float tile_score_for(const tile_component& tc, building_type btype,
     return std::max(score, 0.001f);
 }
 
+} // namespace
+
+namespace corpgen {
+
 /// Author a building of `btype` onto `tid` for the world, including the extraction
 /// target (richest extractable resource on the tile) for extraction sites. Marks
 /// the tile occupied. Assumes the tile already passed `placement_rules::can_place`.
@@ -775,7 +719,7 @@ entity_id author_building(world& w,
                           entity_id tid,
                           building_type btype,
                           gen_occupancy& occupied_tiles,
-                          const resource_type* target = nullptr)
+                          const resource_type* target)
 {
     const entity_id bld_id = w.create_entity();
 
@@ -818,7 +762,6 @@ entity_id author_building(world& w,
 /// produce only — a coastal tile with no produce deposit,
 /// `placement_rules::is_wharf_site`; BL-1208), or a `deposit` of @p dig. All
 /// pass `can_place` (never water ground, never urban). Read-only, draws nothing.
-enum class dig_site { none, well, wharf, deposit };
 dig_site dig_site_of(const world& w, entity_id tid, const tile_component& tc,
                      resource_type dig)
 {
@@ -849,10 +792,7 @@ std::array<dig_site, 2> dig_ladder(resource_type dig)
 /// `gen_road_walk`'s header block): the road reach at a tile's distance from the
 /// points the seeding is bound to lay first — the nation's capital and its market
 /// centres. A tile on nobody's ground, or out of every such point's reach, reads 0.
-class gen_lp_cover
-{
-public:
-    float cover(world& w, entity_id tile)
+float gen_lp_cover::cover(world& w, entity_id tile)
     {
         const auto tn = w.tile_to_nation.find(tile);
         const auto tit = w.tiles.find(tile);
@@ -882,9 +822,10 @@ public:
         return d != it->second.end() ? lp_reach(lp_network::road, d->second) : 0.0f;
     }
 
-private:
-    std::map<std::pair<entity_id, entity_id>, std::unordered_map<entity_id, float>> m_fields;
-};
+} // namespace corpgen
+
+namespace {
+
 
 /// Place a clustered set of starting buildings for one corporation inside its home
 /// nation's territory. An *anchor* tile is chosen first; the remaining assets are
@@ -1342,24 +1283,35 @@ float compute_capital(float base_capital,
 /// starting capital; a seeded per-resource jitter varies it without disturbing
 /// the focus ordering. Deterministic: draws from `rng` once per prototype
 /// resource in a fixed order (every corp advances the stream identically).
+/// Pass 4b's per-focus weights (`generate_starting_stockpile`): four raws (iron
+/// ore, petroleum, water, agricultural produce) then three refined (steel,
+/// refined fuel, food rations). Columns: extraction / processing / trade
+/// weights; weight 1.0 → ~base_units before scaling. Shared with the major
+/// opening kit's stock (`kit_opening_stock`, BL-1473).
+struct focus_stock { resource_type res; float extraction, processing, trade; };
+constexpr focus_stock k_focus_stock_table[] = {
+    { resource_type::iron_ore,             2.0f, 1.0f, 0.5f },
+    { resource_type::petroleum,            1.5f, 0.8f, 0.5f },
+    { resource_type::water,                1.5f, 0.5f, 0.5f },
+    { resource_type::agricultural_produce, 1.5f, 0.8f, 0.5f },
+    { resource_type::steel,                0.3f, 1.2f, 1.2f },
+    { resource_type::refined_fuel,         0.3f, 1.0f, 1.2f },
+    { resource_type::food_rations,         0.3f, 0.8f, 1.0f },
+};
+constexpr float k_focus_stock_base_units = 100.0f;
+
+float focus_stock_weight(const focus_stock& fs, industrial_focus focus)
+{
+    return (focus == industrial_focus::extraction) ? fs.extraction
+         : (focus == industrial_focus::processing) ? fs.processing
+         :                                            fs.trade;
+}
+
 std::array<float, resource_count> generate_starting_stockpile(
     industrial_focus focus, float capital, float base_capital, std::mt19937& rng)
 {
-    // Four raws (iron ore, petroleum, water, agricultural produce) then three
-    // refined (steel, refined fuel, food rations). Columns: extraction /
-    // processing / trade weights; weight 1.0 → ~base_units before scaling.
-    struct focus_stock { resource_type res; float extraction, processing, trade; };
-    static const focus_stock table[] = {
-        { resource_type::iron_ore,             2.0f, 1.0f, 0.5f },
-        { resource_type::petroleum,            1.5f, 0.8f, 0.5f },
-        { resource_type::water,                1.5f, 0.5f, 0.5f },
-        { resource_type::agricultural_produce, 1.5f, 0.8f, 0.5f },
-        { resource_type::steel,                0.3f, 1.2f, 1.2f },
-        { resource_type::refined_fuel,         0.3f, 1.0f, 1.2f },
-        { resource_type::food_rations,         0.3f, 0.8f, 1.0f },
-    };
-
-    constexpr float base_units = 100.0f;
+    const auto& table = k_focus_stock_table;
+    constexpr float base_units = k_focus_stock_base_units;
     float cap_scalar = (base_capital > 0.0f) ? capital / base_capital : 1.0f;
     if (cap_scalar < 0.5f) cap_scalar = 0.5f;   // clamp the wealth spread so a
     if (cap_scalar > 2.0f) cap_scalar = 2.0f;   // poor/rich corp stays sane
@@ -1369,14 +1321,32 @@ std::array<float, resource_count> generate_starting_stockpile(
     std::array<float, resource_count> s = {};
     for (const focus_stock& fs : table)         // fixed order → deterministic draws
     {
-        const float w = (focus == industrial_focus::extraction) ? fs.extraction
-                      : (focus == industrial_focus::processing) ? fs.processing
-                      :                                            fs.trade;
+        const float w = focus_stock_weight(fs, focus);
         const float j = jitter(rng);            // drawn for every resource, in order
         s[static_cast<std::size_t>(fs.res)] = base_units * w * cap_scalar * j;
     }
     return s;
 }
+
+} // namespace
+
+namespace corpgen {
+
+/// BL-1473 (CORPORATION_GENERATION.md § A major's opening kit, "Opening stock
+/// follows the kit"): Pass 4b's stock for one kit category — the same focus
+/// weights at the base magnitude, with NO jitter, so the kit draws nothing and
+/// every major's stock is the same.
+std::array<float, resource_count> kit_opening_stock(industrial_focus focus)
+{
+    std::array<float, resource_count> s = {};
+    for (const focus_stock& fs : k_focus_stock_table)
+        s[static_cast<std::size_t>(fs.res)] = k_focus_stock_base_units * focus_stock_weight(fs, focus);
+    return s;
+}
+
+} // namespace corpgen
+
+namespace {
 
 /// The body a corporation opens on: the body of its first placed asset. Holdings
 /// cluster to one nation's territory (a single body in the prototype), so any
@@ -1649,7 +1619,8 @@ float nominal_processing_batches(const recipe_registry& reg)
 /// processing building it itself authors before the next measurement.
 void accumulate_body_production(const world& w, const recipe_registry& reg,
                                 entity_id body_id,
-                                std::array<float, resource_count>& production)
+                                std::array<float, resource_count>& production,
+                                const std::set<entity_id>* at_markets = nullptr)
 {
     // ASCENDING BUILDING ID (BL-1050). `production[r] +=` is a cross-building
     // float sum and float addition does not associate, so walked in
@@ -1668,6 +1639,9 @@ void accumulate_body_production(const world& w, const recipe_registry& reg,
         if (tit == w.tiles.end() || tit->second.body != body_id)
             continue;
         if (b.decommissioned)
+            continue;
+        // BL-1473: a market-scoped reading counts only what stands in those markets.
+        if (at_markets != nullptr && at_markets->count(market_for_tile(w, b.tile)) == 0)
             continue;
         bids.push_back(bid);
     }
@@ -1714,7 +1688,8 @@ void accumulate_body_production(const world& w, const recipe_registry& reg,
 /// firms after it.
 std::array<float, resource_count> body_processor_input_demand(const world& w,
                                                               const recipe_registry& reg,
-                                                              entity_id body_id)
+                                                              entity_id body_id,
+                                                              const std::set<entity_id>* at_markets = nullptr)
 {
     std::array<float, resource_count> out = {};
     std::vector<entity_id> bids;
@@ -1726,6 +1701,8 @@ std::array<float, resource_count> body_processor_input_demand(const world& w,
         const auto tit = w.tiles.find(b.tile);
         if (tit == w.tiles.end() || tit->second.body != body_id)
             continue;
+        if (at_markets != nullptr && at_markets->count(market_for_tile(w, b.tile)) == 0)
+            continue; // BL-1473: market-scoped
         bids.push_back(bid);
     }
     std::sort(bids.begin(), bids.end());
@@ -1823,7 +1800,8 @@ std::array<bool, resource_count> body_producible(const world& w, const recipe_re
 /// Zero while no rate is authored, so every pre-BL-708 world generates
 /// byte-identically — including the whole ancient band, which has no power.
 std::array<float, resource_count> body_upkeep_demand(const world& w, const recipe_registry& reg,
-                                                     entity_id body_id)
+                                                     entity_id body_id,
+                                                     const std::set<entity_id>* at_markets = nullptr)
 {
     std::array<float, resource_count> demand = {};
     const building_upkeep_params& up = reg.building_upkeep();
@@ -1858,6 +1836,8 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
             continue;
         if (static_cast<std::size_t>(b.type) >= building_type_count)
             continue;
+        if (at_markets != nullptr && at_markets->count(market_for_tile(w, b.tile)) == 0)
+            continue; // BL-1473: market-scoped
         bids.push_back(bid);
     }
     std::sort(bids.begin(), bids.end());
@@ -2022,7 +2002,7 @@ bool power_sized_per_grid(const recipe_registry& reg)
     return false;
 }
 
-namespace {
+namespace corpgen {
 
 /// `body_id`'s aggregate demand: population_demand_params + BL-340's
 /// background_demand_params baskets, weighted by every population centre's
@@ -2035,7 +2015,8 @@ namespace {
 /// folded in here — it grows as the seeder places firms, so it has to be
 /// re-measured rather than captured once. See the loop below.
 std::array<float, resource_count> body_demand(const world& w, const recipe_registry& reg,
-                                              entity_id body_id)
+                                              entity_id body_id,
+                                              const std::set<entity_id>* at_markets)
 {
     // ASCENDING CENTRE ID (BL-1050). `total_scale` is a float sum — today over
     // integer scales small enough that every partial stays exact, so no shipped
@@ -2056,6 +2037,8 @@ std::array<float, resource_count> body_demand(const world& w, const recipe_regis
         const auto tit = w.tiles.find(tile_it->second);
         if (tit == w.tiles.end() || tit->second.body != body_id)
             continue;
+        if (at_markets != nullptr && at_markets->count(market_for_tile(w, tile_it->second)) == 0)
+            continue; // BL-1473: market-scoped
         centre_ids.push_back(cid);
     }
     std::sort(centre_ids.begin(), centre_ids.end());
@@ -2078,6 +2061,11 @@ std::array<float, resource_count> body_demand(const world& w, const recipe_regis
                                   + bd.demand_scale * bb[r]);
     return demand;
 }
+
+} // namespace corpgen
+
+namespace {
+
 
 /// Basket-weighted mean production/demand ratio over the body's tradeable set —
 /// the measured 90% stop condition reads this. Mirrors the met_ratio calculation
@@ -2194,14 +2182,11 @@ chain_reach make_chain_reach(const world& w, const recipe_registry& reg)
     return make_input_reach(w, reg);
 }
 
+} // namespace
+
+namespace corpgen {
+
 /// How near an input's nearest producer stands, best first.
-enum chain_tier : int
-{
-    chain_tier_own    = 0, ///< one of the consumer corporation's own holdings, same market
-    chain_tier_market = 1, ///< any producer in the consumer's market
-    chain_tier_reach  = 2, ///< a producer in another market within reach
-    chain_tier_none   = 3, ///< no producer within reach: infeasible
-};
 
 /// True when @p b produces resource @p r — the one producer test
 /// (`building_produces`, input_reach.hpp: nominal, generation reading).
@@ -2320,6 +2305,11 @@ int chain_recipe_placeable(world& w, const recipe_registry& reg, chain_reach& cr
         return chain_tier_none;
     return chain_recipe_tier(w, reg, cr, self, consumer_market, rc, own);
 }
+
+} // namespace corpgen
+
+namespace {
+
 
 /// BL-1298 / BL-1283 (Ben, 2026-10-13; CORPORATION_GENERATION.md § Pass 1, "A
 /// champion is chartered where it can process") — CAN THE MARKET AT @p tile
@@ -2455,6 +2445,10 @@ bool chain_firm_feeds_good(const world& w, const recipe_registry& reg,
     return false;
 }
 
+} // namespace
+
+namespace corpgen {
+
 /// Undo one authored building: `author_building` writes the building, its
 /// stockpile and the occupancy, and all three go.
 void chain_unplace(world& w, entity_id bid, gen_occupancy& occupied)
@@ -2480,17 +2474,9 @@ void chain_unplace(world& w, entity_id bid, gen_occupancy& occupied)
 /// the walk's gap exactly. POWER is sized per grid where the band sizes it so
 /// (`power_sized_per_grid`), as the walk does: a power recipe is short only
 /// on a processor that feeds a short grid.
-struct output_want
-{
-    entity_id                         body = null_entity;
-    std::array<float, resource_count> want{};
-    std::array<float, resource_count> production{};
-    bool                              power_by_grid = false;
-    std::set<std::uint32_t>           short_grids; ///< power: the grids still short
-
     /// Is @p rc's primary output still short for a processor on @p tile? A
     /// good no consumer wants is never short, so it gets no maker for its sake.
-    bool short_for(world& w, const recipe& rc, entity_id tile) const
+    bool output_want::short_for(world& w, const recipe& rc, entity_id tile) const
     {
         const std::size_t p = static_cast<std::size_t>(primary_output_resource(rc));
         if (power_by_grid && p == static_cast<std::size_t>(resource_type::power))
@@ -2507,7 +2493,7 @@ struct output_want
     /// the caller writes the world first: booking in, the processor's recipe
     /// is already set; taking out, it is already cleared (`make_chain_feasible`
     /// clears it around the take-out and restores it for the re-decision).
-    void book(world& w, const recipe_registry& reg, const recipe& rc, float sign = 1.0f)
+    void output_want::book(world& w, const recipe_registry& reg, const recipe& rc, float sign)
     {
         const float batches = nominal_processing_batches(reg);
         for (std::size_t r = 0; r < resource_count; ++r)
@@ -2524,7 +2510,6 @@ struct output_want
             (void)body_power_grid_gap(w, reg, body, one_power_plant_output(reg), short_grids);
         }
     }
-};
 
 /// Fill @p o's power half off the world: per grid where the band sizes power
 /// per grid, the grids `body_power_grid_gap` counts short.
@@ -2554,6 +2539,32 @@ output_want measure_output_want(world& w, const recipe_registry& reg, entity_id 
     measure_power_grids(w, reg, o);
     return o;
 }
+
+/// BL-1473 (CORPORATION_GENERATION.md § A major's opening kit, "with want read at the
+/// major's own markets", Ben 2026-11-03): the want test's arrays read at @p markets
+/// only -- final demand of the centres those markets serve, plus the upkeep and the
+/// processor inputs of what stands in them, against what stands in them makes. The
+/// kit's processors read this; every charter and the walk keep the body's reading.
+/// Power keeps its per-grid reading (a grid is already local).
+output_want measure_output_want_at(world& w, const recipe_registry& reg, entity_id body,
+                                   const std::set<entity_id>& markets)
+{
+    output_want o;
+    o.body = body;
+    o.want = body_demand(w, reg, body, &markets);
+    const std::array<float, resource_count> upkeep = body_upkeep_demand(w, reg, body, &markets);
+    const std::array<float, resource_count> inputs = body_processor_input_demand(w, reg, body, &markets);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        o.want[r] += upkeep[r] + inputs[r];
+    accumulate_body_production(w, reg, body, o.production, &markets);
+    measure_power_grids(w, reg, o);
+    return o;
+}
+
+} // namespace corpgen
+
+namespace {
+
 
 /// Make one corporation's freshly placed holdings chain-feasible, in place.
 ///

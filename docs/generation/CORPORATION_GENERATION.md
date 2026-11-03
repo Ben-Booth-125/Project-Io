@@ -390,13 +390,22 @@ good it is for. The Standard kit is the one in play:
 | Category | Slots | Count |
 |---|---|---|
 | Logistics | the capital's source (every capital's, § Pass 3), two `inland_logistics_hub`, one `railway_station`, one `port` | 4 + the source |
-| Extraction | agricultural produce ×2, water, coal, petroleum, iron ore, copper ore, and one **flex** slot: the raw the kit's own processors are shortest of at `t_idle` | 8 |
+| Extraction | agricultural produce ×5, water, coal, petroleum, iron ore, copper ore ×3, and one **flex** slot: the raw the kit's own processors are shortest of at `t_idle` | 13 |
 | Processing | food rations (Food Processor), steel (Smelter), refined copper (Smelter), machinery (Fabricator), refined fuel (Refinery), power (the Power Generation plant its fuel allows) | 6 |
 | Civic | `planetary_marketplace`, `research_institute`, `schooling` | 3 |
 | Military | the capital's `military_base` (`../military/MILITARY.md` § Nation garrisons) | 1 |
 
-Twenty-two buildings and the source. Its running bill is about 250 credits a tick before inputs
-(maintenance and wage, `scripts/economy.lua`).
+Twenty-seven buildings and the source. Its running bill is about 280 credits a tick before inputs
+(maintenance and wage, `scripts/economy.lua`). The produce and copper counts are the spread the food
+and copper slots need to pass the spare-input rule after households and neighbours (measured on the
+quick tier of the seed library, 2026-11-03): two Farms leave a Food Processor no spare produce, one
+copper site leaves a copper Smelter short by up to fourteen units at `t_idle`.
+
+The Rich comparison point (`rich_core`) carries agricultural produce ×9, water, coal, petroleum,
+iron ore ×2, copper ore ×3, silica ×5 and two flex slots (24); the Standard processors plus ordnance,
+a second food and steel line and silicon (10); `planetary_marketplace`, `research_institute` ×2,
+`schooling` and `university` (5); the same logistics and military slots: forty-four buildings and
+the source, about 460 credits a tick.
 
 **Why these processors.** Each one runs on day one, which the hard rules of § Pass 3 require. The
 steel, copper and machinery slots are one chain: iron ore and coal make steel, copper ore makes
@@ -450,7 +459,7 @@ shelves of the markets the kit stands in.
 it does for every nation, so the handoff, not generation, is where parity is measured.
 
 **The kit is data.** Its slots, counts, treasury and army are one authored table, so a configuration
-under test is an edit, not a code change. Lean (about 14 buildings) and Rich (about 32) are the
+under test is an edit, not a code change. Lean (about 14 buildings) and Rich (about 44) are the
 proposed comparison points. The Standard kit is the one ruled.
 
 ## The player's nation

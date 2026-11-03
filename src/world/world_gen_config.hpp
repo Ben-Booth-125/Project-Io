@@ -4,6 +4,9 @@
 
 #include <array>
 #include <cstdint>
+#include <map>
+#include <string>
+#include <vector>
 
 // Forward-declared so this header carries no sol2/Lua dependency — hard_coded_world.cpp
 // (world/*, SDL- and Lua-free) includes it and stays headlessly buildable. Only
@@ -93,6 +96,60 @@ struct trade_retrofit_params
     std::int64_t points_per_marketplace = 40000;
     /// The most Marketplaces one market's record may buy.
     int          max_per_market = 3;
+};
+
+/// BL-1473 — A MAJOR'S OPENING KIT, as data (CORPORATION_GENERATION.md § A major's
+/// opening kit, "The kit is data"; Ben, 2026-11-02). Authored in
+/// `world_gen.opening_kit`; laid by `lay_major_opening_kits` (opening_kit.hpp).
+/// A slot names a building and the good it is for, in one of three categories.
+enum class kit_slot_category : std::uint8_t { extraction, processing, civic };
+
+struct opening_kit_slot
+{
+    kit_slot_category category = kit_slot_category::extraction;
+    /// The slot as authored ("agricultural_produce", "flex", "steel",
+    /// "schooling"): the report's name for it.
+    std::string label;
+    /// Extraction: the raw dug (unused when `flex`). Processing: the good made.
+    resource_type good = resource_type::iron_ore;
+    /// Extraction only: the flex slot, the raw the kit's own processors are
+    /// shortest of at `t_idle`, decided after every fixed slot.
+    bool flex = false;
+    /// Processing only: the recipes the slot names, in preference order, by
+    /// their scripts/recipes.lua `name`. Resolved against the registry when the
+    /// kit is laid (the registry is not loaded when world_gen.lua is parsed); an
+    /// unknown name throws there. Empty: every in-band recipe making `good`.
+    std::vector<std::string> recipes;
+    /// Civic only: the building.
+    building_type building = building_type::none;
+};
+
+struct opening_kit_config
+{
+    std::string                   name;
+    float                         treasury = 0.0f; ///< every major's opening treasury (credits)
+    std::vector<opening_kit_slot> slots;           ///< extraction, then processing, then civic
+    /// The logistics slots (Ben, 2026-11-03: "the count is a cap"), beside the
+    /// capital's source: the nodes a major keeps after the Logistic Point seeding.
+    /// All three -1 (no `logistics` table authored): no cap.
+    int hubs = -1, stations = -1, ports = -1;
+    bool logistics_capped() const { return hubs >= 0 && stations >= 0 && ports >= 0; }
+};
+
+struct opening_kit_table
+{
+    /// The configuration in play; empty means NO KIT (the walk's old opening).
+    std::string                               active;
+    std::map<std::string, opening_kit_config> configs;
+
+    /// The active configuration, or null for no kit ("" / "none" / absent).
+    const opening_kit_config* active_config() const
+    {
+        if (active.empty() || active == "none")
+            return nullptr;
+        const auto it = configs.find(active);
+        return it != configs.end() ? &it->second : nullptr;
+    }
 };
 
 /// World-generation balance values, authored in scripts/world_gen.lua. Pure data
@@ -245,6 +302,10 @@ struct world_gen_config
     /// full reasoning. Kept as a knob rather than deleted so the seeding stays
     /// exercisable - `rival_military_seeding_harness` sets it true.
     bool seed_starting_force = false;
+
+    /// BL-1473: the major opening kit (`world_gen.opening_kit`). Empty by default:
+    /// a harness that builds without the script lays no kit and opens as before.
+    opening_kit_table opening_kit;
 
     /// Populate from scripts/world_gen.lua via the embedded Lua state (protected
     /// calls only). Any table/key missing in the script leaves the matching field

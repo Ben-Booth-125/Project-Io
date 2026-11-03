@@ -648,7 +648,10 @@ void lp_seed_read_at_gate(world& w, const recipe_registry& reg, lp_seed_report& 
 /// so the funding gate funds the hub and everything it funded before. Nation-owned,
 /// complete, staffed full.
 /// One flow reading per nation, taken before any stacking: RNG-free and order-free.
-void stack_logistics_hubs(world& w, const recipe_registry& reg, lp_seed_report& rep);
+/// BL-1473: with @p cap_majors (a major opening kit caps their logistics), a major stacks
+/// only at its capital -- its source -- never at a market centre, so the cap holds.
+void stack_logistics_hubs(world& w, const recipe_registry& reg, lp_seed_report& rep,
+                          bool cap_majors = false);
 #define LP_HAS_STACK_HUBS 1 // lp_coverage_census reads it to build against an older tree
 
 void print_lp_seed_report(const lp_seed_report& r);

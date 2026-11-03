@@ -2544,7 +2544,8 @@ void lp_seed_read_at_gate(world& w, const recipe_registry& reg, lp_seed_report& 
         w.rail_networks.clear();
 }
 
-void stack_logistics_hubs(world& w, const recipe_registry& reg, lp_seed_report& rep)
+void stack_logistics_hubs(world& w, const recipe_registry& reg, lp_seed_report& rep,
+                          bool cap_majors)
 {
     const lp_tick t = resolve_logistic_points(w);
     lp_reach_memo memo;
@@ -2583,12 +2584,14 @@ void stack_logistics_hubs(world& w, const recipe_registry& reg, lp_seed_report& 
         const entity_id cap = w.nations.at(nid).capital_tile;
         if (cap != null_entity && w.tiles.count(cap) != 0)
             targets.push_back({cap, true});
-        for (const entity_id mid : mids)
-        {
-            const entity_id ct = w.markets.at(mid).centre_tile;
-            if (ct != null_entity && ct != cap)
-                targets.push_back({ct, false});
-        }
+        // BL-1473: a capped major stacks at its capital (its source) only.
+        if (!(cap_majors && w.nations.at(nid).is_major))
+            for (const entity_id mid : mids)
+            {
+                const entity_id ct = w.markets.at(mid).centre_tile;
+                if (ct != null_entity && ct != cap)
+                    targets.push_back({ct, false});
+            }
         float bill = -1.0f; // read once, when the first hub is asked for
         for (const auto& [tile, is_cap] : targets)
         {

@@ -297,7 +297,10 @@ struct opening_state_cut_report
     struct cut_base { entity_id nation = null_entity, base = null_entity, tile = null_entity; };
     std::vector<cut_base> bases_cut; ///< in cut order: ascending nation, then the cut list's order
 };
-opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_registry& reg);
+/// BL-1473: with @p skip_majors (a major opening kit is laid) no major is cut -- its kit
+/// is sized to its chest by construction (NATION_GENERATION.md § Pass 7).
+opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_registry& reg,
+                                                     bool skip_majors = false);
 
 /// Print the cut's one `[state_cut]` log line.
 void print_opening_state_cut(const opening_state_cut_report& r);
