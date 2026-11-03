@@ -357,6 +357,11 @@ struct fold_report
     /// charter's capital to its home treasury (counted in `balance_moved` etc.).
     int   charters_closed    = 0;    ///< charter records closed (ascending id)
     int   charter_unowned    = 0;    ///< of on_unowned, those a charter placed
+    /// BL-1442: buildings NO nation listed at the close (the world builder's
+    /// authored installations), to their ground nation / demolished on unowned
+    /// ground (the latter also counted in on_unowned).
+    int   unlisted_owned     = 0;
+    int   unlisted_unowned   = 0;
 };
 
 /// BL-1402 THE FOLD TO GROUND (Ben, 2026-10-23; NATIONS.md § What a nation owns,
