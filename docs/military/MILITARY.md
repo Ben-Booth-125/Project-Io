@@ -468,8 +468,8 @@ A **bunker** is a building. Units on its tile gain defence, and the tile's defen
 time.
 
 - **What it gives.** A nation's units defending a tile that carries its own completed bunker fight
-  from it: each unit's defence gains three tenths of itself, and two fifths of its soft share is
-  made hard to **soft** attack: soft fire lands on `(1000 − hardness) × 0.6` of it, while hard fire
+  from it: each unit's defence gains three tenths of itself, and three tenths of its soft share is
+  made hard to **soft** attack: soft fire lands on `(1000 − hardness) × 0.7` of it, while hard fire
   still meets only the unit's own hardness, so hardness and cover together stay inside 0..1000.
   Concrete never lets a tank hit infantry harder than in the open, as plain hardness would
   (armour's hard attack exceeds its soft). Both scale with the bunker's **condition**, 0..1000,

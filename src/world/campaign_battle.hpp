@@ -216,8 +216,9 @@ struct campaign_battle_params
     ///     slowly and artillery shortens it (the target: battle_engagement_harness B23i, B23j).
     ///   bunker_hardness_permille — the share of the unit's SOFT part the concrete
     ///     makes hard to soft attack (`land_combatant::cover`): (1000 - h) x this /
-    ///     1000. At 400 base infantry (hardness 0) takes soft fire on 600 of itself,
-    ///     so an infantry attacker's hits land at about 0.7 of the open-ground rate.
+    ///     1000. At 300 base infantry (hardness 0) takes soft fire on 700 of itself. Was
+    ///     400 (first cut), which alone held a supplied 2:1 past day 400; Ben,
+    ///     2026-11-03, chose 300 so the B23i target holds (taken on day 96).
     ///     Hardness plus cover stays inside 0..1000. It screens soft fire only: read
     ///     as plain hardness it would open the unit to hard fire, and armour (hard
     ///     140 over soft 100) would land 1.8x its open-ground hits on a bunker
@@ -227,10 +228,10 @@ struct campaign_battle_params
     ///     (`bunker_shelling_day`). At 12, three batteries strip a bunker in about a
     ///     month; the quarter's repair pass (air_params::repair_permille_per_day, 4)
     ///     mends it more slowly than one battery wears it.
-    /// Hardness and shelling are first cuts kept (Ben, 2026-11-03); all three are
+    /// Shelling is the first cut kept (Ben, 2026-11-03); all three are
     /// measured in campaign_battle_harness C8.
     int bunker_defence_permille  = 300;
-    int bunker_hardness_permille = 400;
+    int bunker_hardness_permille = 300;
     int bunker_shelling_permille = 12;
 };
 

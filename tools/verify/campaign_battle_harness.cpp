@@ -583,12 +583,13 @@ int main()
                     inf.stats.defence, inf.stats.hardness, inf.cover, full.stats.defence, full.stats.hardness,
                     full.cover, half.stats.defence, half.stats.hardness, half.cover, none.stats.defence,
                     none.stats.hardness, none.cover);
-        // Ben, 2026-11-03 (NR-1124): +30% defence (was +50%), the 40% screen kept.
-        check(full.stats.defence == inf.stats.defence + inf.stats.defence * 300 / 1000 && full.cover == 400
+        // Ben, 2026-11-03 (NR-1124): +30% defence (was +50%); the screen 30% (was 40%), so a
+        // supplied 2:1 takes the bunker (battle_engagement_harness B23i).
+        check(full.stats.defence == inf.stats.defence + inf.stats.defence * 300 / 1000 && full.cover == 300
                   && full.stats.hardness == inf.stats.hardness,
-              "C8 a full bunker raises infantry's defence by three tenths and makes two fifths of it hard to soft attack");
+              "C8 a full bunker raises infantry's defence by three tenths and makes three tenths of it hard to soft attack");
         check(half.stats.defence > inf.stats.defence && half.stats.defence < full.stats.defence
-                  && half.cover == 200,
+                  && half.cover == 150,
               "C8 the cover scales with the bunker's condition");
         check(none.stats.defence == inf.stats.defence && none.cover == 0
                   && none.stats.soft == inf.stats.soft,
