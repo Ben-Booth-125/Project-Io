@@ -405,10 +405,20 @@ so a major can make it as its first build. **No Arms Works is in the kit:** each
 goods (`../military/MILITARY.md` § Land — the classes), so nothing would buy its output until kit is
 researched, and an idle plant the player inherits reads as a broken economy (§ Pass 3).
 
-**Every kit placement passes § Pass 3's rules, unchanged.** Own ground, `can_place`, chain-feasible,
-sized to spare input and bounded by want all bind a kit building as they bind a charter. Extraction
-is laid first, ranked by richness × cover over the major's whole ground; processors anchor at the
-capital, then the market centres in chain-distance order, as a processing charter does.
+**Every kit placement passes § Pass 3's rules, with want read at the major's own markets (Ben,
+2026-11-03).** Own ground, `can_place`, chain-feasible and sized to spare input bind a kit building
+as they bind a charter. The want bound is read at the markets on the major's own ground, not across
+the body. A minor's plant next door does not make a major's own steel unwanted; the major's
+households and its own processors are what want it. Extraction is laid first, ranked by
+richness × cover over the major's whole ground. Processors anchor at the capital, then the market
+centres in chain-distance order, as a processing charter does.
+
+**A kit is curated so its industries are fed (Ben, 2026-11-03).** Extraction counts are fixed and
+authored, never sized at placement. They are chosen per industry so each processing slot has the
+spare input § Pass 3 asks of it, after the households and every neighbour's draw within reach. An
+industry short of input gets a wider spread (more sites of its raw) or a larger kit, not a looser
+rule. The counts in the table are set by measurement on the seed library (the `opening-parity`
+skill), and an industry still short there is a kit to widen, not a slot to drop.
 
 **A slot the ground cannot hold is substituted, never dropped or paid (Ben, 2026-11-02).** The
 ladder, in order:
@@ -425,7 +435,7 @@ ladder, in order:
 A slot nothing on the ladder can place stays unbuilt and is recorded on the generation report, by
 slot and reason, as a measured fact of that ground. Nothing is minted for it.
 
-**Logistics slots count the standing nodes.** The ports, stations and hubs the history and the fold
+**Logistics slots count the standing nodes, and the count is a cap (Ben, 2026-11-03).** The ports, stations and hubs the history and the fold
 left on a major's ground fill its logistics slots first, in the order the Logistic Point seeding
 lays them out from the capital (`../economy/LOGISTICS.md` § Where generation puts the sources). The
 seeding lays any slot still open, and a node beyond the slot count is taken up. Roads and track
