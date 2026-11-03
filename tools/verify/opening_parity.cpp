@@ -39,11 +39,14 @@
 #include "scripting/lua_state.hpp"
 #include "world/campaign_settle.hpp"
 #include "world/components.hpp"
+#include "world/building_profit.hpp"
 #include "world/economy_system.hpp"
 #include "world/finish_campaign_world.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistic_points.hpp"
 #include "world/orbital_system.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/resource_names.hpp"
 #include "world/survey_system.hpp"
 #include "world/world.hpp"
 #include "world/world_gen_config.hpp"
@@ -184,6 +187,8 @@ template <class T> T median_of(std::vector<T> v)
     return v[v.size() / 2];
 }
 
+constexpr int k_econ_tick_days_diag = 90; ///< --diagnose-idle: the first play quarter's day
+
 double ratio(double hi, double lo) { return lo > 0.0 ? hi / lo : (hi > 0.0 ? 999.0 : 1.0); }
 } // namespace
 
@@ -193,11 +198,13 @@ int main(int argc, char** argv)
     std::vector<std::pair<int, int>> pairs{ { 20, 4 } };
     int quarters = 20;
     const char* kit_override = nullptr;
+    bool diagnose_idle = false;
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) seeds = parse_ints(argv[++i], ',');
         else if (!std::strcmp(argv[i], "--quarters") && i + 1 < argc) quarters = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--kit") && i + 1 < argc) kit_override = argv[++i];
+        else if (!std::strcmp(argv[i], "--diagnose-idle")) diagnose_idle = true;
         else if (!std::strcmp(argv[i], "--pairs") && i + 1 < argc)
         {
             pairs.clear();
@@ -325,6 +332,104 @@ int main(int argc, char** argv)
                 minor_men.push_back(s.men);
             }
             const int touching = touching_major_pairs(w, major_set);
+
+            // BL-1473 R4 --diagnose-idle: why the settle idled kit buildings. On a COPY of
+            // the handoff world every idled kit building is switched back on (streak 0) and
+            // one tick runs; each kit building's estimate is then read from that tick's
+            // report - revenue, input cost, maintenance, wages - with its market's price,
+            // supply and demand for its output good. Buildings that never idled are the
+            // control. Reported only; the census below runs on the untouched world.
+            if (diagnose_idle)
+            {
+                world c = w;
+                std::set<entity_id> was_idled;
+                for (const entity_id nid : majors)
+                    if (const opening_kit_major* km = fin.kit.of(nid))
+                        for (const opening_kit_slot_record& r : km->slots)
+                        {
+                            const auto b = c.buildings.find(r.building);
+                            if (b == c.buildings.end() || !b->second.decommissioned) continue;
+                            b->second.decommissioned = false;
+                            b->second.loss_streak    = 0;
+                            was_idled.insert(r.building);
+                        }
+                // Three ticks, the last one read, so labour and feed can reach a building
+                // that was off; a building the reflex idles again inside them reads as such.
+                settle_tick_result t;
+                for (int k = 0; k < 3; ++k)
+                    t = run_settle_tick(c, seed_reg, k_campaign_settle_ticks + k,
+                                        k_econ_tick_days_diag * (k + 1), true);
+                static const char* k_cat[] = {"extraction", "processing", "civic"};
+                // The labour pool's aggregate, min(1, supply / demand), per (nation, body).
+                for (const lp_nation_row& n : t.report.logistic_points.nations)
+                    if (major_set.count(n.nation))
+                    {
+                        float claim = 0.0f, granted = 0.0f;
+                        for (const float v : n.claim) claim += v;
+                        for (const float v : n.granted) granted += v;
+                        std::printf("LPPOOL seed=%d nation=%llu pool=%.1f supply_granted=%.1f claim=%.1f granted=%.1f\n",
+                                    seed, static_cast<unsigned long long>(n.nation), n.pool, n.supply_granted,
+                                    claim, granted);
+                    }
+                for (const auto& [key, scalar] : t.report.workforce_contention)
+                    if (major_set.count(key.first))
+                        std::printf("CONTENTION seed=%d nation=%llu body=%llu scalar=%.3f\n", seed,
+                                    static_cast<unsigned long long>(key.first),
+                                    static_cast<unsigned long long>(key.second), scalar);
+                for (const entity_id nid : majors)
+                    if (const opening_kit_major* km = fin.kit.of(nid))
+                        for (const opening_kit_slot_record& r : km->slots)
+                        {
+                            if (r.building == null_entity || r.category == kit_slot_category::civic) continue;
+                            const auto b = c.buildings.find(r.building);
+                            if (b == c.buildings.end()) continue;
+                            const building_profit bp = estimate_building_profit(c, seed_reg, t.report, r.building);
+                            const building_report* br = nullptr;
+                            if (const auto ri = t.report.building_row.find(r.building);
+                                ri != t.report.building_row.end() && ri->second < t.report.buildings.size())
+                                br = &t.report.buildings[ri->second];
+                            // The output good: the extracted resource, or the recipe's largest output.
+                            resource_type good = b->second.type == building_type::extraction_site
+                                                     ? (br ? br->target_resource : resource_type::iron_ore)
+                                                     : resource_type::iron_ore;
+                            if (b->second.type == building_type::processing_facility)
+                                if (const recipe* rec = seed_reg.get_recipe(b->second.recipe))
+                                {
+                                    float best = 0.0f;
+                                    for (std::size_t g = 0; g < resource_count; ++g)
+                                        if (rec->outputs[g] > best) { best = rec->outputs[g]; good = static_cast<resource_type>(g); }
+                                }
+                            const lp_building_row* lp = nullptr;
+                            for (const lp_building_row& lr : t.report.logistic_points.buildings)
+                                if (lr.building == r.building) { lp = &lr; break; }
+                            float price = 0.0f, supply = 0.0f, demand = 0.0f, deposit = 0.0f;
+                            if (const auto tl = c.tiles.find(b->second.tile); tl != c.tiles.end())
+                                deposit = tl->second.resource_remaining[static_cast<std::size_t>(good)];
+                            if (const entity_id mid = market_for_tile(c, b->second.tile); mid != null_entity)
+                                if (const auto m = c.markets.find(mid); m != c.markets.end())
+                                {
+                                    const std::size_t g = static_cast<std::size_t>(good);
+                                    price = m->second.price[g]; supply = m->second.supply[g]; demand = m->second.demand[g];
+                                }
+                            std::printf("LOSS seed=%d nation=%llu cat=%s slot=%s good=%s idled=%d data=%d"
+                                        " out=%.2f run=%.2f limiting=%s revenue=%.2f input=%.2f maint=%.2f wages=%.2f"
+                                        " net=%.2f price=%.3f supply=%.1f demand=%.1f wf=%.2f eff_wf=%.2f idle=%d"
+                                        " exhausted=%d deposit=%.1f off=%d state_idle=%d grant=%.3f share=%.3f"
+                                        " lp_need=%.2f lp_cover=%.3f lp_frac=%.3f\n",
+                                        seed, static_cast<unsigned long long>(nid), k_cat[static_cast<int>(r.category)],
+                                        r.slot.c_str(), resource_names::name_of(good).c_str(), was_idled.count(r.building) ? 1 : 0,
+                                        bp.has_data ? 1 : 0, br ? br->output_quantity : 0.0f, br ? br->run : 0.0f,
+                                        br && br->has_limiting ? resource_names::name_of(br->limiting_input).c_str() : "-",
+                                        bp.revenue, bp.input_cost, bp.maintenance, bp.wages, bp.net(), price, supply, demand,
+                                        b->second.workforce_assigned, br ? br->effective_workforce : 0.0f,
+                                        br && br->idle ? 1 : 0, br && br->exhausted ? 1 : 0, deposit,
+                                        b->second.decommissioned ? 1 : 0, b->second.state_idle ? 1 : 0,
+                                        t.report.building_labour.count(r.building)
+                                            ? t.report.building_labour.at(r.building) : -1.0f,
+                                        building_output_share(b->second), lp ? lp->need : -1.0f,
+                                        lp ? lp->coverage : -1.0f, lp ? lp->fraction : -1.0f);
+                        }
+            }
 
             // Play: N quarters, nobody seated (every nation's scorer acts).
             constexpr int k_econ_tick_days = 90;
