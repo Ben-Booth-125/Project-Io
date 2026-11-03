@@ -347,34 +347,6 @@
    "design": "Cold review of unit designs, 2026-10-28. (1) HIGH, latent until later kit unlocks (BL-1436): hire_goods_affordable counts shelf quantity only, while buy_from_corp_shelves charges the posted price capped by purse_room_of, and debit_kit_goods ignores how much it bought. A design refit (0 credits) with a committed treasury gets its kit free; a hire at exact room drops the treasury below its commitments. The row-goods leg had the flaw already. Fix: the affordability check sums qty x posted price plus the credit cost against purse_room_of, and apply asserts the bought amount. (2) LOW: hire_goods_affordable prices each row axis at its first candidate without the kit draw on the same resource, so an affordable hire can be refused. (3) LOW: png_decode.cpp inflate has no output cap; stop once out exceeds h x (stride+1). (4) LOW: the refit menu labels a design refit with the row gate (+ kit) and omits the changed slots goods; an obsolete own row moves the (live design) entry to the end."
   },
   {
-   "status": "complete",
-   "glyph": "●",
-   "sprint": 61,
-   "version_goal": "v0.2.4",
-   "written": "2026-10-29",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben land battle form 2026-10-29)",
-   "category": "Military",
-   "authority_doc": "docs/ui/ledgers/military.md",
-   "id": "BL-1454",
-   "short_name": "UNIT_STAT_GRID",
-   "priority": "B",
-   "difficulty": 2,
-   "requires": [
-    "BL-1452",
-    "BL-1453",
-    "BL-1448"
-   ],
-   "files": [
-    "src/ui/selection_panel.cpp",
-    "src/ui/military_ledger.cpp"
-   ],
-   "title": "Unit stat grid on the unit card and in the designer, with signed deltas while editing",
-   "design": "Written in docs/ui/ledgers/military.md § The stat grid and SELECTION.md § The unit element's layout (Ben, 2026-10-29). One shared grid: HP, readiness, morale, food, ammunition, equipment, soft, hard, defence, breakthrough, hardness, recon, stealth, speed. Unit card: class image left, grid fills the centre (Strength and Roster pages fold in). Designer: bottom right, design stats only, signed +/- deltas against the live design for the draft and the hovered item. Rival unit: design stats only once seen (battle or recon), internals hidden. Needs a live click. 2026-11-01: DELIVERED at 9fc79bab (merge of the lane's banded grid; a competing build was reverted on main, Ben chose this one 2026-10-31). Unit, stack and wing cards and both designers; Strength and Upkeep lines kept under the grid. stat_grid, military_ledger, air_ui and unit_designer scripts 0 failures; Ben's live click passed 2026-11-01.",
-   "delivered": "2026-11-01"
-  },
-  {
    "status": "proposed",
    "glyph": "○",
    "sprint": 61,
@@ -406,35 +378,6 @@
    ],
    "title": "Slot 9: the Diplomacy ledger — Nations and Wars, the declaration and peace flows",
    "design": "docs/ui/ledgers/diplomacy.md (Ben, 2026-10-30). Light slot 9. Nations view: folded rows with stance chips and Access/Trust/Alarm toward the player; expanded rows with the reverse sentiment, power comparison and front strength, trade exposure, friendship offer/withdraw/accept, the embargo toggle (a door onto the law verb) and Declare war. The declaration in place: goal picking on the canvas, justifications, the live price. Wars view: every war (public), score bar, exhaustion, answer, offer/impose peace, accept/refuse, truces. Peace presses land with BL-1428. Live click required."
-  },
-  {
-   "status": "complete",
-   "glyph": "●",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-30",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-10-30)",
-   "category": "Military",
-   "authority_doc": "docs/military/MILITARY.md",
-   "id": "BL-1463",
-   "short_name": "RECRUITS",
-   "priority": "A",
-   "difficulty": 4,
-   "requires": [],
-   "files": [
-    "src/world/unit_roster.cpp",
-    "src/world/air_combat.cpp",
-    "src/world/corp_command.cpp",
-    "src/world/economy_system.cpp",
-    "src/world/world_save.cpp",
-    "src/ui/military_ledger.cpp",
-    "scripts/economy.lua"
-   ],
-   "title": "Recruits: bases make land and air recruits from their province's people; hires and refills spend them",
-   "design": "Written in MILITARY.md § Recruits (Ben, 2026-10-30). A military base makes land recruits and an airbase air recruits, a fixed number per quarter (economy.military.recruits), each taken from the population centres of the base's province, largest first. One national land pool and one air pool, capped at 15x the theatre's quarterly output. A hire spends its men (a wing its crew) and is refused when the pool cannot fill it; a unit below full men refills from the pool at a Logistic Point cost per recruit paid at its paying road, as supply is. Bases carry no upkeep. The Recruit tab heads each theatre with its pool. Supersedes BL-1424 (soldiers from labour). Save bump (the two pools). Measure the population drain and G1t50 before tuning the rate; rivals hire through the same gate. Delivered 2026-11-02: world half merged at bc56c31e, the Recruit tab strip at 4355ae09 (since replaced by the header readouts of BL-1472 (recruit header and tabs)); save v72; digests re-pinned on Ben's go; live click passed with BL-1472's.",
-   "delivered": "2026-11-02"
   },
   {
    "status": "proposed",
@@ -551,35 +494,6 @@
    ],
    "title": "A seat whose capital base the state cut removed keeps its raised opening unit",
    "design": "The seated nation opens unarmed (MILITARY.md; move_seat_force -> disarm_corporation removes every unit unit_is_raised calls raised). Found by the sprint 61 re-bless bisect (2026-10-31), seed 13 at b3fc19a6: size_opening_state_to_chest cut nation 47736's capital military_base at (122,69); demolishing a base nulls its units' muster_base, so the 50-man opening unit (id 91961) raised there reads as a garrison (unit_is_raised needs a non-null muster_base) and the seated player kept it: 6x200 + 50 = 1250 men. On main the road steer (BL-1468) spares that base and the count is the intended 1200, so the leak is latent, not gone. THE WORK: either the cut never removes a capital base (it is the muster point the opening force needs), or a unit raised at a base keeps a raised mark when the base goes, so disarm still removes it. Check: a fixture where the cut takes the seat's capital base; the seat opens with garrisons only. Digest-moving only on seeds where the cut hits a base."
-  },
-  {
-   "status": "complete",
-   "glyph": "●",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-02",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, recruits follow-up, 2026-11-02)",
-   "requires": [
-    "BL-1463"
-   ],
-   "id": "BL-1472",
-   "short_name": "RECRUIT_HEADER_TABS",
-   "category": "Military",
-   "authority_doc": "docs/ui/HEADER.md",
-   "priority": "B",
-   "difficulty": 3,
-   "files": [
-    "src/world/recruits.cpp",
-    "src/world/world_save.cpp",
-    "scripts/economy.lua",
-    "src/ui/header_panel.cpp",
-    "src/ui/military_ledger.cpp"
-   ],
-   "title": "Recruit pools in the header (land, air, sea), ports make sea recruits, theatre tabs in the military ledger",
-   "design": "Written in docs/military/MILITARY.md § Recruits (ports make sea recruits; seen in the header), docs/ui/HEADER.md (Recruits readouts top right, fit ladder step 2) and docs/ui/ledgers/military.md § Grouped by theatre (Land / Air / Sea tabs, Sea a stub) (Ben, 2026-11-02). Work: a sea pool fed by completed ports, 15-quarter cap, saved and hashed; three header readouts (glyph, held / cap, fill bar) with the fit ladder; the Recruit tab pool strip retires; theatre tabs replace the collapsible headers on Recruit and Design; the Sea tab stub lists ports and says ships are not raised yet. Delivered 2026-11-02: design 96348843, UI half 4963b313, world half 0ae5d486 (ports make sea recruits, save v73), wiring 5af5af90; Ben's live click passed; digests re-pinned with the kit lane's movers on main 9e11146f.",
-   "delivered": "2026-11-02"
   },
   {
    "status": "proposed",
