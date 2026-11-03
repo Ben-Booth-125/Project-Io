@@ -351,14 +351,15 @@ tab (`../ui/ledgers/military.md`).
   never reaches play. Its item names come from `../research/MILITARY_KIT.md` § 2.
 - **The lock rule (Ben, 2026-10-28).** A slot offers only researched kit. Base kit is always open;
   a later item opens when the nation holds its research node. A class with nothing researched
-  fields its base kit. The kit's nodes are placed in the age tree by BL-1436 (kit in the age
-  tree); a node the tree does not hold is held by no nation, so its item stays locked.
+  fields its base kit. The kit's nodes are the age tree's kit nodes, one per technology, opening
+  its item in every class it fits (`../economy/tech/DIGITISATION_TREE.md` § Kit).
 - **Kit is goods (Ben, 2026-10-27).** A hire buys the kit goods of its design's later items beside
   its row's gated goods, both checked before either is taken; a hire whose kit the shelves cannot
   supply is refused. An item names the kit goods by kind it takes (§ Land — equipment, refit and
   manpower): body armour and rifles small arms; every vehicle, hull and plate armoured vehicles;
   every gun, launcher and tow artillery pieces; every missile, guided shell and submunition guided
-  weapons; every drone drones. A later item in its slot takes more of them, and the second
+  weapons; every drone drones; every manned airframe airframes. A later item in its slot takes more
+  of them, and the second
   generation and later add electronics.
 - **A unit records its design (Ben, 2026-10-28).** A hire is raised to its class's live design as
   it stood when the hire was paid, and the unit keeps that design: changing the live design leaves
@@ -386,12 +387,14 @@ whose weapon slot has room for it (motorised and mechanised infantry).
 ### Land — equipment, refit and manpower
 
 **Equipment is goods on the shelf**, bought as muster already buys (§ The muster interface).
-**Six goods, by kind, not by generation (Ben, 2026-10-27):** small arms, armoured vehicles,
-artillery pieces, guided weapons and drones, with the existing electronics; later kit needs more of
+**Goods by kind, not by generation (Ben, 2026-10-27):** small arms, armoured vehicles,
+artillery pieces, guided weapons and drones, with the existing electronics — and a sixth made kit
+good, **airframes**, for every manned aircraft's hull (Ben, 2026-11-03); later kit needs more of
 them and adds electronics, so the economy feels each generation without a good for every rung.
 Each is made in an Arms Works from the goods below it: small arms and artillery pieces from steel
 and machinery, armoured vehicles from steel, machinery and alloys, guided weapons from electronics
-and ordnance, drones from electronics and alloys (`../economy/RESOURCES.md` § The kit goods).
+and ordnance, drones from electronics and alloys, airframes from alloys, machinery and electronics
+(`../economy/RESOURCES.md` § The kit goods).
 Ordnance stays every unit's per-tick draw. **Refit**: a wounded unit regains HP by drawing equipment off the shelf and men from its nation's
 recruit pool (§ Recruits). A unit whose kit cannot be bought, or whose pool is empty, stays
 wounded; the economy is the war's ceiling.
@@ -592,7 +595,9 @@ torn down. A military base hosts no wings. A wing's quarterly supply is drawn at
 
 Each class has an authored **range in tiles**, and its slots in the designer are **airframe,
 armament and avionics** (Ben, 2026-10-28), on the same one-live-design rule as the land classes
-(§ The kit).
+(§ The kit). **Air kit is kit goods (Ben, 2026-11-03):** a manned airframe draws airframes, armament
+draws guided weapons, a drone's airframe and its loitering munitions draw drones, and avionics draw
+electronics.
 
 **Assignment is to provinces in range, straight line (Ben, 2026-10-28).** A wing is assigned a
 mission and a set of provinces; a province is in range when the straight-line tile distance from

@@ -698,7 +698,7 @@
    "branch": "PR-PC",
    "requires": [
     [
-     "DG-PR-PC-T3"
+     "DG-PR-PC-D"
     ]
    ],
    "advantage": "+1% output per batch at every processing building",
@@ -746,7 +746,7 @@
    "branch": "PR-PC",
    "requires": [
     [
-     "DG-PR-PC-T5"
+     "DG-PR-PC-E"
     ]
    ],
    "advantage": "+1% output per batch at every processing building",
@@ -851,7 +851,7 @@
      "DG-PR-PC-T6"
     ]
    ],
-   "advantage": "Fabricators +5% output per batch",
+   "advantage": "Fabricators +5% output per batch; opens lightweight composite tracks (armour)",
    "effects": [
     {
      "kind": "modifier",
@@ -859,6 +859,12 @@
      "scope": "group:Advanced Fabrication",
      "op": "multiply",
      "value": 1.05
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "arm.tracks.composite_tracks"
+     ]
     }
    ],
    "cost_units": 6
@@ -1533,7 +1539,7 @@
    "branch": "NE-SO",
    "requires": [
     [
-     "DG-NE-SO-T3"
+     "DG-NE-SO-D"
     ]
    ],
    "advantage": "+1% national research",
@@ -1581,7 +1587,7 @@
    "branch": "NE-SO",
    "requires": [
     [
-     "DG-NE-SO-T5"
+     "DG-NE-SO-E"
     ]
    ],
    "advantage": "+1% national research",
@@ -1669,12 +1675,12 @@
    "id": "DG-NE-SO-C1",
    "name": "Reserved minor",
    "tier": "minor",
-   "ring": 3,
+   "ring": 4,
    "tree": "NE",
    "branch": "NE-SO",
    "requires": [
     [
-     "DG-NE-SO-T6"
+     "DG-NE-SO-F"
     ]
    ],
    "placeholder": "espionage",
@@ -1686,18 +1692,18 @@
      "waits_on": "espionage"
     }
    ],
-   "cost_units": 6
+   "cost_units": 8
   },
   {
    "id": "DG-NE-SO-C2",
    "name": "Reserved minor",
    "tier": "minor",
-   "ring": 3,
+   "ring": 4,
    "tree": "NE",
    "branch": "NE-SO",
    "requires": [
     [
-     "DG-NE-SO-T6"
+     "DG-NE-SO-F"
     ]
    ],
    "placeholder": "espionage",
@@ -1709,7 +1715,7 @@
      "waits_on": "espionage"
     }
    ],
-   "cost_units": 6
+   "cost_units": 8
   },
   {
    "id": "DG-NE-SO-C",
@@ -2663,12 +2669,20 @@
      "DG-ST-FO-T2"
     ]
    ],
-   "advantage": "land unit upkeep -5%",
+   "advantage": "land unit upkeep -5%; opens protected trucks, the truck-mounted air-defence carrier and spaced light armour",
    "effects": [
     {
      "kind": "unread",
      "what": "land unit upkeep -5%",
      "waits_on": "unit_upkeep"
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "mot.vehicle.protected_trucks",
+      "ad.vehicle.truck_mounted",
+      "lt.armour.spaced"
+     ]
     }
    ],
    "cost_units": 2
@@ -2685,12 +2699,18 @@
      "DG-ST-FO-T2"
     ]
    ],
-   "advantage": "home-province defence +10%",
+   "advantage": "home-province defence +10%; opens search radar (air-defence fire control)",
    "effects": [
     {
      "kind": "unread",
      "what": "home-province defence +10%",
      "waits_on": "battle resolution"
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ad.fire_control.search_radar"
+     ]
     }
    ],
    "cost_units": 2
@@ -2710,7 +2730,7 @@
      "DG-ST-FO-A2"
     ]
    ],
-   "advantage": "unlocks mechanised infantry; every land unit +20% strength",
+   "advantage": "unlocks mechanised infantry; every land unit +20% strength; opens the autocannon fighting vehicle and the light-armour autocannon",
    "effects": [
     {
      "kind": "unread",
@@ -2721,6 +2741,13 @@
      "kind": "unread",
      "what": "every land unit +20% strength",
      "waits_on": "unit strength"
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "mech.vehicle.ifv_autocannon",
+      "lt.armament.autocannon"
+     ]
     }
    ],
    "cost_units": 12
@@ -2756,7 +2783,7 @@
    "branch": "ST-FO",
    "requires": [
     [
-     "DG-ST-FO-T3"
+     "DG-ST-FO-E"
     ]
    ],
    "advantage": "+1% strength for every unit",
@@ -2800,7 +2827,7 @@
    "branch": "ST-FO",
    "requires": [
     [
-     "DG-ST-FO-T5"
+     "DG-ST-FO-G"
     ]
    ],
    "advantage": "+1% strength for every unit",
@@ -2847,12 +2874,21 @@
      "DG-ST-FO-T4"
     ]
    ],
-   "advantage": "units +10% strength when attacking",
+   "advantage": "units +10% strength when attacking; opens guided shells, laser-guided and guided bombs, and drone guided missiles",
    "effects": [
     {
      "kind": "unread",
      "what": "units +10% strength when attacking",
      "waits_on": "unit strength"
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.munitions.guided_shells",
+      "mr.armament.laser_guided",
+      "bmr.armament.guided_bombs",
+      "drn.armament.guided_missiles"
+     ]
     }
    ],
    "cost_units": 6
@@ -2872,12 +2908,18 @@
      "DG-ST-FO-B2"
     ]
    ],
-   "advantage": "unit movement +50% along reach",
+   "advantage": "unit movement +50% along reach; opens the dedicated attack helicopter (helicopter airframe)",
    "effects": [
     {
      "kind": "unread",
      "what": "unit movement +50% along reach",
      "waits_on": "unit movement"
+    },
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "hel.airframe.attack"
+     ]
     }
    ],
    "cost_units": 24
@@ -2886,12 +2928,12 @@
    "id": "DG-ST-FO-C1",
    "name": "Reserved minor",
    "tier": "minor",
-   "ring": 3,
+   "ring": 4,
    "tree": "ST",
    "branch": "ST-FO",
    "requires": [
     [
-     "DG-ST-FO-T6"
+     "DG-ST-FO-H"
     ]
    ],
    "placeholder": "espionage",
@@ -2903,18 +2945,18 @@
      "waits_on": "espionage"
     }
    ],
-   "cost_units": 6
+   "cost_units": 8
   },
   {
    "id": "DG-ST-FO-C2",
    "name": "Reserved minor",
    "tier": "minor",
-   "ring": 3,
+   "ring": 4,
    "tree": "ST",
    "branch": "ST-FO",
    "requires": [
     [
-     "DG-ST-FO-T6"
+     "DG-ST-FO-H"
     ]
    ],
    "placeholder": "espionage",
@@ -2926,7 +2968,7 @@
      "waits_on": "espionage"
     }
    ],
-   "cost_units": 6
+   "cost_units": 8
   },
   {
    "id": "DG-ST-FO-C",
@@ -4108,6 +4150,842 @@
     }
    ],
    "cost_units": 3
+  },
+  {
+   "id": "DG-ST-FO-D1",
+   "name": "Assault Rifles",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T3"
+    ]
+   ],
+   "advantage": "opens the assault rifle (infantry, motorised and mechanised weapon)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "inf.weapon.assault_rifle",
+      "mot.weapon.assault_rifle",
+      "mech.weapon.assault_rifle"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-FO-D2",
+   "name": "Body Armour",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T3"
+    ]
+   ],
+   "advantage": "opens the flak vest (infantry, motorised and mechanised armour)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "inf.armour.flak_vest",
+      "mot.armour.flak_vest",
+      "mech.armour.flak_vest"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-FO-D",
+   "name": "Anti-Tank Missiles",
+   "tier": "major",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-D1"
+    ],
+    [
+     "DG-ST-FO-D2"
+    ]
+   ],
+   "advantage": "opens the wire-guided anti-tank missile (infantry and motorised weapon, helicopter armament)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "inf.weapon.wire_guided_atgm",
+      "mot.weapon.wire_guided_atgm",
+      "hel.armament.wire_guided"
+     ]
+    }
+   ],
+   "cost_units": 12
+  },
+  {
+   "id": "DG-ST-FO-E1",
+   "name": "Light Mortars",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-D"
+    ]
+   ],
+   "advantage": "opens the light mortar (infantry weapon)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "inf.weapon.light_mortar"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-FO-E2",
+   "name": "Short-Range Missiles",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-D"
+    ]
+   ],
+   "advantage": "opens short-range missiles (air defence launcher, fighter radar-guided armament, recon self-defence)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ad.launcher.short_range",
+      "ftr.armament.radar_guided",
+      "rcn.armament.self_defence"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-FO-E",
+   "name": "Fire-and-Forget Missiles",
+   "tier": "major",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-E1"
+    ],
+    [
+     "DG-ST-FO-E2"
+    ]
+   ],
+   "advantage": "opens the fire-and-forget anti-tank missile (infantry and mechanised weapon, the missile IFV, the light-armour mount, helicopter armament)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "inf.weapon.fire_and_forget_atgm",
+      "mech.weapon.fire_and_forget_atgm",
+      "mech.vehicle.ifv_missiles",
+      "lt.armament.atgm_mount",
+      "hel.armament.fire_and_forget"
+     ]
+    }
+   ],
+   "cost_units": 18
+  },
+  {
+   "id": "DG-ST-FO-G1",
+   "name": "Modern Gun Barrels",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T5"
+    ]
+   ],
+   "advantage": "opens the smoothbore tank gun and the long-barrel howitzer",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "arm.armament.smoothbore_gun",
+      "art.gun.long_barrel"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-FO-G2",
+   "name": "Tracked Chassis",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T5"
+    ]
+   ],
+   "advantage": "opens tracked chassis (self-propelled artillery, the air-defence carrier, the tracked scout, hydropneumatic suspension)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.tow.self_propelled",
+      "ad.vehicle.tracked_carrier",
+      "lt.wheels.tracked_scout",
+      "arm.tracks.hydropneumatic"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-ST-FO-G",
+   "name": "Rocket Artillery",
+   "tier": "major",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-G1"
+    ],
+    [
+     "DG-ST-FO-G2"
+    ]
+   ],
+   "advantage": "opens the multiple rocket launcher (artillery gun)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.gun.rocket_launcher"
+     ]
+    }
+   ],
+   "cost_units": 18
+  },
+  {
+   "id": "DG-ST-FO-F1",
+   "name": "Medium-Range Missiles",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T6"
+    ]
+   ],
+   "advantage": "opens medium-range missiles (air defence launcher, fighter beyond-visual-range armament)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ad.launcher.medium_range",
+      "ftr.armament.beyond_visual"
+     ]
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-FO-F2",
+   "name": "Submunitions",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-T6"
+    ]
+   ],
+   "advantage": "opens anti-armour submunitions (artillery munitions)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.munitions.submunitions"
+     ]
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "DG-ST-FO-F",
+   "name": "Long-Range Precision Strike",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-F1"
+    ],
+    [
+     "DG-ST-FO-F2"
+    ]
+   ],
+   "advantage": "opens guided long-range rockets, precision stand-off weapons and air-launched cruise missiles",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.gun.guided_rockets",
+      "mr.armament.standoff",
+      "bmr.armament.cruise_missiles"
+     ]
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "DG-ST-FO-H1",
+   "name": "Wheeled Carriers",
+   "tier": "minor",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-F"
+    ]
+   ],
+   "advantage": "opens wheeled carriers (motorised vehicle, the run-flat six-wheeler)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "mot.vehicle.wheeled_carriers",
+      "lt.wheels.six_wheeler"
+     ]
+    }
+   ],
+   "cost_units": 8
+  },
+  {
+   "id": "DG-ST-FO-H2",
+   "name": "Armoured Self-Propelled Guns",
+   "tier": "minor",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-F"
+    ]
+   ],
+   "advantage": "opens the armoured self-propelled chassis (artillery tow)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.tow.armoured_sp"
+     ]
+    }
+   ],
+   "cost_units": 8
+  },
+  {
+   "id": "DG-ST-FO-H",
+   "name": "Active Protection",
+   "tier": "major",
+   "ring": 4,
+   "tree": "ST",
+   "branch": "ST-FO",
+   "requires": [
+    [
+     "DG-ST-FO-H1"
+    ],
+    [
+     "DG-ST-FO-H2"
+    ]
+   ],
+   "advantage": "opens active protection (armour, the heavy fighting vehicle)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "arm.armour.active_protection",
+      "mech.vehicle.heavy_ifv"
+     ]
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "DG-PR-PC-D1",
+   "name": "Composite Armour",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T3"
+    ]
+   ],
+   "advantage": "opens composite armour (armour, the light-armour applique)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "arm.armour.composite",
+      "lt.armour.composite_applique"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-PR-PC-D2",
+   "name": "Ceramic Plates",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T3"
+    ]
+   ],
+   "advantage": "opens the ceramic plate carrier (infantry, motorised and mechanised armour)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "inf.armour.ceramic_plates",
+      "mot.armour.ceramic_plates",
+      "mech.armour.ceramic_plates"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-PR-PC-D",
+   "name": "Reactive Armour",
+   "tier": "major",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-D1"
+    ],
+    [
+     "DG-PR-PC-D2"
+    ]
+   ],
+   "advantage": "opens reactive armour (armour)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "arm.armour.reactive"
+     ]
+    }
+   ],
+   "cost_units": 18
+  },
+  {
+   "id": "DG-PR-PC-E1",
+   "name": "Jet Airframes",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T5"
+    ]
+   ],
+   "advantage": "opens jet airframes (the twin-engine fighter, the multirole, the supersonic bomber, the high-altitude recon aircraft)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ftr.airframe.twin_engine",
+      "mr.airframe.multirole",
+      "bmr.airframe.supersonic",
+      "rcn.airframe.high_altitude"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-PR-PC-E2",
+   "name": "Armoured Helicopters",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-T5"
+    ]
+   ],
+   "advantage": "opens the armoured tandem-seat helicopter (helicopter airframe)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "hel.airframe.armoured"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-PR-PC-E",
+   "name": "Low-Observable Airframes",
+   "tier": "major",
+   "ring": 3,
+   "tree": "PR",
+   "branch": "PR-PC",
+   "requires": [
+    [
+     "DG-PR-PC-E1"
+    ],
+    [
+     "DG-PR-PC-E2"
+    ]
+   ],
+   "advantage": "opens low-observable airframes (fighter, strike, bomber)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ftr.airframe.low_observable",
+      "mr.airframe.stealth_strike",
+      "bmr.airframe.low_observable"
+     ]
+    }
+   ],
+   "cost_units": 18
+  },
+  {
+   "id": "DG-NE-SO-D1",
+   "name": "Airborne Radar",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T3"
+    ]
+   ],
+   "advantage": "opens airborne radar (pulse-doppler, terrain-following, side-looking)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ftr.avionics.pulse_doppler",
+      "bmr.avionics.terrain_follow",
+      "rcn.avionics.side_looking"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-NE-SO-D2",
+   "name": "Long-Endurance Drones",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T3"
+    ]
+   ],
+   "advantage": "opens the long-endurance drone and its satellite datalink",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "drn.airframe.long_endurance",
+      "drn.avionics.satellite_link"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-NE-SO-D",
+   "name": "Thermal Imaging",
+   "tier": "major",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-D1"
+    ],
+    [
+     "DG-NE-SO-D2"
+    ]
+   ],
+   "advantage": "opens thermal sights (armour and light-armour armament, helicopter night vision, the targeting pod)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "arm.armament.penetrators_thermal",
+      "lt.armament.thermal_autocannon",
+      "hel.avionics.night_vision",
+      "mr.avionics.targeting_pod"
+     ]
+    }
+   ],
+   "cost_units": 18
+  },
+  {
+   "id": "DG-NE-SO-E1",
+   "name": "Scanned-Array Radar",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T5"
+    ]
+   ],
+   "advantage": "opens scanned-array radar (fighter, multirole sensor fusion, helicopter mast radar)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ftr.avionics.scanned_array",
+      "mr.avionics.sensor_fusion",
+      "hel.avionics.mast_radar"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-NE-SO-E2",
+   "name": "Jet Combat Drones",
+   "tier": "minor",
+   "ring": 2,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T5"
+    ]
+   ],
+   "advantage": "opens the jet-powered combat drone (drone airframe)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "drn.airframe.jet_combat"
+     ]
+    }
+   ],
+   "cost_units": 4
+  },
+  {
+   "id": "DG-NE-SO-E",
+   "name": "Integrated Air Defence",
+   "tier": "major",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-E1"
+    ],
+    [
+     "DG-NE-SO-E2"
+    ]
+   ],
+   "advantage": "opens the integrated air-defence network and the airborne early-warning aircraft",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ad.fire_control.integrated",
+      "rcn.airframe.early_warning"
+     ]
+    }
+   ],
+   "cost_units": 18
+  },
+  {
+   "id": "DG-NE-SO-G1",
+   "name": "Autonomous Targeting",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T6"
+    ]
+   ],
+   "advantage": "opens autonomous targeting (drone avionics)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "drn.avionics.autonomous"
+     ]
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-SO-G2",
+   "name": "Electronic Warfare",
+   "tier": "minor",
+   "ring": 3,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-T6"
+    ]
+   ],
+   "advantage": "opens electronic warfare (air-defence fire control, bomber countermeasures, towed decoys, the signals-intelligence suite)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ad.fire_control.electronic_warfare",
+      "bmr.avionics.countermeasures",
+      "rcn.armament.towed_decoys",
+      "rcn.avionics.signals_intel"
+     ]
+    }
+   ],
+   "cost_units": 6
+  },
+  {
+   "id": "DG-NE-SO-G",
+   "name": "Networked Warfare",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-G1"
+    ],
+    [
+     "DG-NE-SO-G2"
+    ]
+   ],
+   "advantage": "opens networked soldier kit and gun-launched missiles with networked fire control",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "inf.armour.networked_kit",
+      "arm.armament.gun_missiles"
+     ]
+    }
+   ],
+   "cost_units": 24
+  },
+  {
+   "id": "DG-NE-SO-F1",
+   "name": "FPV Drones",
+   "tier": "minor",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-G"
+    ]
+   ],
+   "advantage": "opens FPV attack drones (motorised and mechanised weapon)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "mot.weapon.fpv_drones",
+      "mech.weapon.fpv_drones"
+     ]
+    }
+   ],
+   "cost_units": 8
+  },
+  {
+   "id": "DG-NE-SO-F2",
+   "name": "Counter-Drone Defence",
+   "tier": "minor",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-G"
+    ]
+   ],
+   "advantage": "opens layered defence with counter-drone (air defence launcher)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "ad.launcher.layered"
+     ]
+    }
+   ],
+   "cost_units": 8
+  },
+  {
+   "id": "DG-NE-SO-F",
+   "name": "Loitering Munitions",
+   "tier": "major",
+   "ring": 4,
+   "tree": "NE",
+   "branch": "NE-SO",
+   "requires": [
+    [
+     "DG-NE-SO-F1"
+    ],
+    [
+     "DG-NE-SO-F2"
+    ]
+   ],
+   "advantage": "opens loitering drones (artillery munitions, drone armament)",
+   "effects": [
+    {
+     "kind": "unlock_kit",
+     "items": [
+      "art.munitions.loitering_drones",
+      "drn.armament.loitering"
+     ]
+    }
+   ],
+   "cost_units": 24
   }
  ]
 }

@@ -20,9 +20,9 @@
 //
 // THE LOCK RULE: a slot offers only researched kit. Base kit is always open. Every
 // later item names the age-tree node that opens it (`kit_item::research_node`);
-// the item is open for a nation that holds that node. The kit nodes are BL-1436's
-// (kit in the age tree) to place, so today no named node is in the tree and every
-// non-base item reads LOCKED.
+// the item is open for a nation that holds that node. The nodes are the age tree's
+// kit nodes (BL-1436; docs/economy/tech/DIGITISATION_TREE.md), one per technology,
+// so one node may open an item in several classes.
 // ---------------------------------------------------------------------------
 
 #include "components.hpp"

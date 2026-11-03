@@ -1852,8 +1852,11 @@ int main()
     {
         static_assert(k_world_save_version_kit_goods == 74 && world_save_version >= k_world_save_version_kit_goods,
                       "PK pins v74 as the kit goods' version (BL-1480's v75 follows it)");
-        static_assert(resource_count == k_resource_count_pre_kit_goods + 5,
-                      "PK: the kit goods are five appended values");
+        // BL-1436 (Ben, 2026-11-03, kit tree form ruling 6): a sixth kit good, airframes,
+        // follows the five at v76 - the five stay five values past 49, airframes one more.
+        static_assert(k_resource_count_pre_airframes == k_resource_count_pre_kit_goods + 5
+                          && resource_count == k_resource_count_pre_airframes + 1,
+                      "PK: the kit goods are five appended values, then airframes (BL-1436)");
         world k = w;
         entity_id mid = null_entity;
         for (const auto& [id, m] : k.markets)
@@ -1931,6 +1934,7 @@ int main()
         table[static_cast<std::size_t>(resource_type::artillery_pieces)]  = 188.0f;
         table[static_cast<std::size_t>(resource_type::guided_weapons)]    = 240.6f;
         table[dr] = 169.8f;
+        table[static_cast<std::size_t>(resource_type::airframes)] = 274.2f; // BL-1436: the sixth
         world priced;
         bool priced_ok = false;
         {
@@ -1969,6 +1973,75 @@ int main()
         }
         check(buyer != null_entity && bought > 0.99f,
               "PK and a nation on that world can buy a small arms off a stocked shelf");
+    }
+
+    // -----------------------------------------------------------------------
+    // PA (BL-1436, airframes, the sixth kit good) -- v76 widens every per-resource
+    // array 54 -> 55. Airframes round-trips by value; a v75 stream (54 wide) still
+    // reads, airframes zero and everything else as written; restamped v76 it is refused.
+    // -----------------------------------------------------------------------
+    {
+        static_assert(k_world_save_version_airframes == 76 && world_save_version >= k_world_save_version_airframes,
+                      "PA pins v76 as airframes' version");
+        world k = w;
+        entity_id mid = null_entity;
+        for (const auto& [id, m] : k.markets)
+            if (mid == null_entity || id < mid)
+                mid = id;
+        const std::size_t af = static_cast<std::size_t>(resource_type::airframes);
+        const std::size_t st = static_cast<std::size_t>(resource_type::steel);
+        if (mid != null_entity)
+        {
+            k.markets.at(mid).inventory[af] = 7.5f;
+            k.markets.at(mid).price[af]     = 280.5f;
+        }
+        const std::string b76 = to_bytes(k);
+        world back;
+        check(mid != null_entity && from_bytes(b76, back) && back.markets.at(mid).inventory[af] == 7.5f
+                  && back.markets.at(mid).price[af] == 280.5f && to_bytes(back) == b76,
+              "PA v76: airframes' market and shelf slots round-trip by value (bytes equal)");
+        std::string b75;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_airframes(k, o);
+            b75 = o.str();
+        }
+        uint32_t stamped = 0;
+        if (b75.size() >= 8)
+            std::memcpy(&stamped, b75.data() + 4, sizeof stamped);
+        world old;
+        bool ok75 = stamped == k_world_save_version_pre_airframes && from_bytes(b75, old) && mid != null_entity;
+        if (ok75)
+        {
+            const market_component& m0 = old.markets.at(mid);
+            const market_component& mk = k.markets.at(mid);
+            ok75 = m0.inventory[af] == 0.0f && m0.price[af] == 0.0f
+                && m0.price[st] == mk.price[st] && m0.inventory[st] == mk.inventory[st]
+                && old.tiles.size() == k.tiles.size() && b76.size() > b75.size()
+                && b76.size() - b75.size() == world_save_airframes_bytes(k);
+        }
+        check(ok75, "PA a v75 stream (arrays 54 wide) reads, airframes zero and the rest as written");
+        std::string bad = b75;
+        if (bad.size() >= 8)
+        {
+            const uint32_t v76 = k_world_save_version_airframes;
+            std::memcpy(&bad[4], &v76, sizeof v76);
+        }
+        world sentinel;
+        check(!from_bytes(bad, sentinel) && sentinel.tiles.empty(),
+              "PA a 54-wide stream stamped v76 is REFUSED, destination untouched");
+        std::array<float, resource_count> table{};
+        table[af] = 274.2f;
+        world priced;
+        bool priced_ok = false;
+        {
+            std::istringstream in(b75, std::ios::binary);
+            priced_ok = read_world_snapshot(priced, in, nullptr, &table);
+        }
+        bool all_priced = priced_ok && !priced.markets.empty();
+        for (const auto& [id, m] : priced.markets)
+            all_priced = all_priced && m.base_price[af] == 274.2f && posted_price(m, af) > 0.0f;
+        check(all_priced, "PA a v75 world loaded with the authored table prices airframes on every market");
     }
 
     std::printf("\n");

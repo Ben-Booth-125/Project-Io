@@ -70,7 +70,7 @@ const POINT_SUBJECTS = new Set(['alarm_tell']); // added in points, not percent 
 const SCOPE_RE = /^(all|resource:[a-z_]+|group:[A-Za-z &]+|recipe:[a-z_]+|building:[a-z_]+|site:[a-z_]+)$/;
 const str = v => typeof v === 'string' && v.length > 0;
 // An effect has two states (RESEARCH.md): read, or unread. No third.
-const STATES_ONLY = new Set(['kind', 'subject', 'scope', 'op', 'value', 'recipe', 'structure', 'key', 'what', 'waits_on']);
+const STATES_ONLY = new Set(['kind', 'subject', 'scope', 'op', 'value', 'recipe', 'structure', 'key', 'what', 'waits_on', 'items']);
 
 // THE DIRECTION AUDIT (BL-1274 review #3): a modifier's sign and size must be the prose's. Every
 // percentage in `advantage` is read as signed ("+5%", "-10%"; an unsigned one is unparseable
@@ -102,6 +102,12 @@ for (const n of nodes) {
       case 'unlock_recipe': if (!str(e.recipe)) err(`${at}: needs recipe`); break;
       case 'unlock_structure': if (!str(e.structure)) err(`${at}: needs structure`); break;
       case 'mechanic': if (!str(e.key)) err(`${at}: needs key`); break;
+      // BL-1436 (Ben, 2026-11-03, ruling 7): the kit a node opens, by catalogue item id. The
+      // catalogue's research_node is the read path; the cross-check below holds the two equal.
+      case 'unlock_kit':
+        if (!Array.isArray(e.items) || !e.items.length || !e.items.every(str)) err(`${at}: unlock_kit needs a list of item ids`);
+        else if (new Set(e.items).size !== e.items.length) err(`${at}: duplicate kit item`);
+        break;
       case 'unread':
         if (!str(e.what) || !str(e.waits_on)) err(`${at}: unread needs what and waits_on`);
         break;
@@ -149,6 +155,33 @@ for (const n of nodes) {
   } else if (n.deed_effect !== undefined) err(`${n.id}: only a quest carries a deed_effect`);
 }
 for (const u of unparsed) err(`direction audit cannot parse — ${u}`);
+
+// ---- the kit link (BL-1436; Ben, 2026-11-03, ruling 7) -------------------------------------
+// The kit catalogue (src/world/unit_designs.cpp, the land `later(...)` and air `alater(...)`
+// rows) names each later item's research node; the store's unlock_kit effects name each node's
+// items. Both directions must agree: every catalogue item's node is in the store and carries an
+// unlock_kit naming it, and every unlock_kit item is a catalogue item naming that node.
+if (age === 'digitisation') {
+  const cat = fs.readFileSync(path.join(root, 'src', 'world', 'unit_designs.cpp'), 'utf8');
+  const itemNode = new Map();
+  for (const m of cat.matchAll(/\ba?later\(\s*"([a-z0-9_.]+)"[^\n]*?"(DG-[A-Z0-9-]+)"/g)) {
+    if (itemNode.has(m[1])) err(`catalogue: item ${m[1]} listed twice`);
+    itemNode.set(m[1], m[2]);
+  }
+  if (!itemNode.size) err('catalogue: no later items parsed from unit_designs.cpp');
+  const opened = new Map();
+  for (const n of nodes) for (const e of n.effects || []) if (e.kind === 'unlock_kit' && Array.isArray(e.items))
+    for (const it of e.items) {
+      if (opened.has(it)) err(`${n.id}: kit item ${it} is also opened by ${opened.get(it)}`);
+      opened.set(it, n.id);
+    }
+  for (const [it, node] of itemNode) {
+    if (!byId.has(node)) err(`catalogue: ${it} names ${node}, not in the tree`);
+    else if (opened.get(it) !== node) err(`catalogue: ${it} names ${node}, whose unlock_kit does not list it`);
+  }
+  for (const [it, node] of opened) if (itemNode.get(it) !== node)
+    err(`${node}: unlock_kit lists ${it}, which the catalogue ${itemNode.has(it) ? 'puts on ' + itemNode.get(it) : 'does not hold'}`);
+}
 
 // Reachability from the roots (placeholders count as reachable; they can be researched).
 const held = new Set(nodes.filter(n => !n.requires.length).map(n => n.id));

@@ -5,7 +5,7 @@
 -- 2. A class press opens the designer on the full canvas: infantry (two slot
 --    boxes) and armour (three), each box joined to an anchor on the image.
 -- 3. A box press opens the slot's item list: base first, each later item LOCKED
---    with its research node named (no kit node is in the age tree yet).
+--    with its research node named (the verify nation holds no kit node).
 -- 4. A locked item is refused: its pick is disabled with the seam's reason, and
 --    pressing it changes nothing.
 -- 5. Toggles: the box press closes its list; the class press that opened the

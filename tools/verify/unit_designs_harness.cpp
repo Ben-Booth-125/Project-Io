@@ -2,15 +2,16 @@
 // Unit designs (BL-1434; MILITARY.md § The kit). No SDL/Lua.
 // ---------------------------------------------------------------------------
 // One live design per land class per nation: a kit item per class slot. The base
-// kit opens every slot; later kit is locked until researched (its nodes are
-// BL-1436's, not yet in the tree, so this harness waives the lock to exercise an
-// open slot — `set_kit_research_waived_for_harness`). A design's stats are its
+// kit opens every slot; later kit is locked until its kit node of the age tree is
+// held (BL-1436). Most rows waive the lock to exercise an open slot
+// (`set_kit_research_waived_for_harness`); U1e/U1g hold the lock to the tree. A design's stats are its
 // class's plus its kit's; a hire is raised to the live design and a refit brings an
 // existing unit to it.
 //
 //   U1  THE CATALOGUE is well-formed: every land class has its slots, every slot a
 //       base item first and two to four later items; every later item names a
-//       research node that is not in the tree, so it reads locked.
+//       kit node of the age tree, reads locked until that node is held, and opens
+//       when it is; the tree's unlock_kit rows name exactly the catalogue's items.
 //   U2  DEFAULTS ARE BASE KIT: every nation's design of every class is base, its
 //       stats the class's own, and nothing is stored.
 //   U3  SET AND REFUSALS: a locked item, a rival nation, an unknown class / slot /
@@ -253,8 +254,51 @@ int main()
         check(slots_ok, "U1b slots per class: infantry 2, the six others 3, none 0");
         check(shape_ok, "U1c every slot: a named slot, base item first, 2..4 later items");
         check(hard_ok, "U1d base kit leaves every class's stats as authored");
-        check(later > 0 && locked == later && in_tree == 0,
-              "U1e every one of the " + std::to_string(later) + " later items is locked behind a node not yet in the tree");
+        // BL-1436 (Ben, 2026-11-03, kit tree form ruling 1): the kit nodes are in the
+        // Digitisation tree now, so every later item's node is FOUND (this row pinned
+        // in_tree == 0 while the nodes were unplaced) and still locked for a nation
+        // holding nothing.
+        check(later > 0 && locked == later && in_tree == later,
+              "U1e every one of the " + std::to_string(later) + " later items names a node of the tree, and is locked until it is held");
+        // U1g: holding an item's node opens it (and only items of that node).
+        {
+            const uint16_t rifle = kit_item_by_id("inf.weapon.assault_rifle");
+            const int node = io::dg::find_node(cat[rifle].research_node);
+            nation_tech_state st;
+            if (node >= 0) st.held.set(static_cast<std::size_t>(node));
+            f.w.nation_tech[f.nation] = st;
+            bool only = node >= 0;
+            for (std::size_t i = 0; i < cat.size(); ++i)
+                if (cat[i].research_node != nullptr)
+                    only = only && kit_item_researched(f.w, f.nation, static_cast<uint16_t>(i))
+                                       == (io::dg::find_node(cat[i].research_node) == node);
+            check(only && kit_item_researched(f.w, f.nation, rifle)
+                      && kit_item_researched(f.w, f.nation, kit_item_by_id("mech.weapon.assault_rifle"))
+                      && !kit_item_researched(f.w, f.other, rifle),
+                  "U1g holding Assault Rifles opens the assault rifle in every class it fits, and nothing else; a nation without it stays locked");
+            f.w.nation_tech.erase(f.nation);
+        }
+        // U1h: the store's unlock_kit rows (via the generated header) and the catalogue's
+        // research nodes agree both ways (ruling 7; tech_tree_store.js --check is the same
+        // cross-check over the source text).
+        {
+            int rows = 0, bad = 0;
+            for (const io::dg::effect& e : io::dg::effects)
+            {
+                if (e.kind != io::dg::effect_kind::unlock_kit) continue;
+                ++rows;
+                const char* nid = io::dg::nodes[static_cast<std::size_t>(e.node)].id;
+                const uint16_t li = kit_item_by_id(e.target);
+                const uint16_t ai = air_kit_item_by_id(e.target);
+                const char* named = li != k_no_kit_item ? cat[li].research_node
+                                  : ai != k_no_kit_item ? air_kit_catalogue()[ai].research_node : nullptr;
+                if (named == nullptr || std::strcmp(named, nid) != 0) ++bad;
+            }
+            int air_later = 0;
+            for (const air_kit_item& it : air_kit_catalogue()) if (it.research_node != nullptr) ++air_later;
+            check(bad == 0 && rows == later + air_later,
+                  "U1h the tree's " + std::to_string(rows) + " unlock_kit rows are exactly the catalogue's later items, each on its own node");
+        }
         check(cat.size() < k_no_kit_item && kit_item_by_id("inf.weapon.assault_rifle") != k_no_kit_item
                   && kit_item_by_id("no.such.item") == k_no_kit_item,
               "U1f items resolve by id; an unknown id does not (" + std::to_string(cat.size()) + " items)");

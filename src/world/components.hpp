@@ -270,7 +270,17 @@ enum class resource_type : uint8_t
     artillery_pieces       = 51, ///< Arms Works, from steel + machinery. Guns and launchers.
     guided_weapons         = 52, ///< Arms Works, from electronics + ordnance. Missiles, guided rockets, submunitions.
     drones                 = 53, ///< Arms Works, from electronics + alloys. Every drone item.
-    count                  = 54
+
+    // --- The sixth kit good (BL-1436; Ben, 2026-11-03, kit tree form ruling 6) ---
+    //
+    // Airframes: every manned aircraft's hull (fighter, multirole, bomber, helicopter
+    // and recon airframes; a drone's airframe is drones'). Made from alloys,
+    // machinery and electronics at the Arms Works; consumed by the air kit draw.
+    // world_save_version bumped 75 -> 76 for this append: every per-resource array
+    // widens 54 -> 55, and a v74/v75 stream is read 54 wide
+    // (`k_resource_count_pre_airframes`), an older one 49 wide, the new good zero.
+    airframes              = 54, ///< Arms Works, from alloys + machinery + electronics. Manned airframes.
+    count                  = 55
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);
@@ -278,6 +288,10 @@ static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_
 /// BL-1422: the roster's width before the kit goods were appended (v73 and older
 /// streams carry per-resource arrays this wide; world_save.cpp reads them so).
 static constexpr std::size_t k_resource_count_pre_kit_goods = 49;
+
+/// BL-1436: the roster's width before airframes was appended (v74 and v75 streams carry
+/// per-resource arrays this wide).
+static constexpr std::size_t k_resource_count_pre_airframes = 54;
 
 // ===========================================================================
 // BL-762 — where a resource CAME FROM
@@ -392,6 +406,7 @@ constexpr resource_origin resource_origin_of(resource_type r)
         case resource_type::artillery_pieces:
         case resource_type::guided_weapons:
         case resource_type::drones:
+        case resource_type::airframes:
             return resource_origin::manufactured;
 
         case resource_type::count:

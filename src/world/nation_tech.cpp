@@ -686,6 +686,13 @@ effect_reading classify_effect(const io::dg::effect& e, const recipe_registry* r
         }
         case io::dg::effect_kind::mechanic:
             return in(k_read_mechanics, target) ? effect_reading::read : effect_reading::invalid;
+        case io::dg::effect_kind::unlock_kit:
+            // BL-1436 (Ben, 2026-11-03, ruling 7): READ - by the kit catalogue, whose
+            // research_node is the read path (unit_designs.cpp, kit_item_researched); this
+            // row names the item for display. That the two agree is tech_tree_store.js
+            // --check's and unit_designs_harness U1's, not this file's (it stays free of
+            // the catalogue so every harness that links it need not link that).
+            return target.empty() ? effect_reading::invalid : effect_reading::read;
         case io::dg::effect_kind::unread:
             if (e.what[0] == '\0' || !in(k_unread_systems, e.waits_on))
                 return effect_reading::invalid;

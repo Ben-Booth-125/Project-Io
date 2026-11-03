@@ -895,6 +895,19 @@ recipes = {
         outputs      = { drones = 1.0 },
         qualified_workforce = 0.25,
     },
+    -- BL-1436 (Ben, 2026-11-03, kit tree form ruling 6): THE SIXTH KIT GOOD,
+    -- airframes - every manned aircraft's hull (a drone's airframe is drones').
+    -- From alloys, machinery and electronics (MILITARY_KIT.md § 8.5, Q6 A).
+    -- APPENDED, as the five before it; same Arms Works group and tier.
+    {
+        name         = "airframes",
+        display_name = "Arms Works (airframes)",
+        era          = "industrial",
+        group        = "Arms Works",
+        inputs       = { alloys = 1.0, machinery = 0.5, electronics = 0.5 },
+        outputs      = { airframes = 1.0 },
+        qualified_workforce = 0.25,
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

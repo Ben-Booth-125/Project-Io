@@ -1087,10 +1087,9 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
 {
     w_u32(out, world_save_magic);
     w_u32(out, version);
-    // BL-1422: a stream before the kit goods carries every per-resource array 49 wide.
-    const bio::scoped_array_width kit_width(
-        resource_count, version < k_world_save_version_kit_goods ? k_resource_count_pre_kit_goods
-                                                                 : resource_count);
+    // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
+    // BL-1436: a v74/v75 stream, before airframes, 54 wide.
+    const bio::scoped_array_width kit_width(resource_count, world_stream_resource_width(version));
 
     // --- well-known entities, the belt, and the allocator cursor -------------
     w_id(out, w.player_entity);
@@ -2092,7 +2091,23 @@ std::size_t world_save_kit_goods_bytes(const world& w)
     std::ostringstream wide(std::ios::binary), narrow(std::ios::binary);
     write_world_snapshot_pre_refusals(w, wide); // BL-1480: v74 against v73, nothing else between
     write_world_snapshot_pre_kit_goods(w, narrow);
+    // BL-1436: plus airframes' column, so the figure is the whole widening 49 -> today.
+    return wide.str().size() - narrow.str().size() + world_save_airframes_bytes(w);
+}
+
+std::size_t world_save_airframes_bytes(const world& w)
+{
+    std::ostringstream wide(std::ios::binary), narrow(std::ios::binary);
+    write_world_snapshot(w, wide);                 // v76
+    write_world_snapshot_pre_airframes(w, narrow); // v75: one column narrower, nothing else
     return wide.str().size() - narrow.str().size();
+}
+
+void write_world_snapshot_pre_airframes(const world& w, std::ostream& out)
+{
+    // BL-1436, VERIFICATION ONLY: the v75 shape - arrays 54 wide. The game never writes
+    // an old version.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_airframes);
 }
 
 void write_world_snapshot_pre_embargo(const world& w, std::ostream& out)
@@ -2354,14 +2369,13 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_recruits     // BL-1463: v71, no recruits
             && version != k_world_save_version_pre_sea_recruits // 2026-11-02: v72, no sea pools
             && version != k_world_save_version_pre_kit_goods    // BL-1422: v73, arrays 49 wide
-            && version != k_world_save_version_pre_refusals))   // BL-1480: v74, no peace refusals
+            && version != k_world_save_version_pre_refusals     // BL-1480: v74, no peace refusals
+            && version != k_world_save_version_pre_airframes))  // BL-1436: v75, arrays 54 wide
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
-    // the five kit goods read as zero.
-    const bio::scoped_array_width kit_width(
-        resource_count, version < k_world_save_version_kit_goods ? k_resource_count_pre_kit_goods
-                                                                 : resource_count);
+    // the five kit goods read as zero. BL-1436: a v74/v75 stream 54 wide, airframes zero.
+    const bio::scoped_array_width kit_width(resource_count, world_stream_resource_width(version));
 
     // BL-1407: a PRE-v56 stream's corporation records, read into SCRATCH (never
     // world state) and folded away once every section has been read.
@@ -4010,7 +4024,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
 
     // BL-1422: a stream before v74 predates the kit goods - its markets hold them at base
     // price 0 (unbuyable). Priced from the authored table, as generation prices them.
-    if (version < k_world_save_version_kit_goods && base_price != nullptr)
+    // BL-1436: a v74/v75 stream lacks airframes alike; the reauthor touches only a 0 price.
+    if (version < k_world_save_version_airframes && base_price != nullptr)
         reauthor_kit_goods_prices(s, *base_price);
 
     clear_derived_state(s);

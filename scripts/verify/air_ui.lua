@@ -404,7 +404,7 @@ if ac then
         fail("the air designer drew " .. #d.boxes .. " boxes") end
     for _, b in ipairs(d.boxes) do print("  slot " .. b.slot .. " " .. b.name .. ": " .. b.fitted) end
     verify.capture("air_ui_air_designer")
-    -- 6b. Draft and Save. The air kit's research nodes are not in the tree yet, so
+    -- 6b. Draft and Save. The verify nation holds no air kit node, so
     --     the lock is waived for the pick (staging), and turned back off.
     verify.waive_kit_research(true)
     settle()

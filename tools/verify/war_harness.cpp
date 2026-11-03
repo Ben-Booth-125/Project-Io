@@ -1546,16 +1546,18 @@ int main()
         uint32_t ver = 0;
         std::memcpy(&ver, b.data() + 4, 4);
         world back;
-        check(ver == 75 && ver == world_save_version && from_bytes(b, back) && to_bytes(back) == b
+        // BL-1436 (Ben, 2026-11-03, ruling 6): v76 widens the resource arrays for airframes;
+        // the refusals section rides on unchanged.
+        check(ver == 76 && ver == world_save_version && from_bytes(b, back) && to_bytes(back) == b
                   && back.peace_refusals == w.peace_refusals && back.state_hash(0) == w.state_hash(0),
-              "RF1 the stream is v75 and the refusal round-trips byte for byte, its hash equal");
+              "RF1 the stream is v76 and the refusal round-trips byte for byte, its hash equal");
         check(w.state_hash(0) != [&] { world z = w; z.peace_refusals.clear(); return z.state_hash(0); }(),
               "RF2 the refusal is in the state hash");
         std::ostringstream o74(std::ios::binary);
         write_world_snapshot_pre_refusals(w, o74);
         const std::string b74 = o74.str();
         world old;
-        check(world_save_refusals_section_bytes(w) == 4 + 12 && b74.size() + 16 == b.size()
+        check(world_save_refusals_section_bytes(w) == 4 + 12 && b74.size() + 16 + world_save_airframes_bytes(w) /* BL-1436: v74 is 54 wide */ == b.size()
                   && from_bytes(b74, old) && old.peace_refusals.empty() && old.wars.size() == 1,
               "RF3 a v74 stream (today's less the 16-byte refusals section) reads as a world with no refusals");
         const auto refused = [&](std::string bad, const char* what) {

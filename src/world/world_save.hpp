@@ -682,7 +682,28 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// each pair two distinct nations with an open war between them. v74 is a STRICT PREFIX
 /// of v75 and is read too (`k_world_save_version_pre_refusals`), as a world with no
 /// refusals; so is every older version the reader already accepted.
-inline constexpr uint32_t world_save_version = 75;
+///
+/// Bumped to 76 (BL-1436 kit in the age tree; Ben, 2026-11-03, kit tree form ruling 6):
+/// `resource_type` gains `airframes` at the enum's tail, so `resource_count` moves
+/// 54 -> 55 and EVERY per-resource array in the stream is one element longer. The older
+/// streams stay readable as v74 made them: a v74 or v75 stream is read with every array
+/// of `resource_count` elements 54 wide (`k_resource_count_pre_airframes`), an older one
+/// 49 wide, airframes reading as zero. Nothing else moved: v75 is v76 one column narrower.
+inline constexpr uint32_t world_save_version = 76;
+
+/// BL-1436: the first version whose per-resource arrays are 55 wide.
+inline constexpr uint32_t k_world_save_version_airframes = 76;
+
+/// BL-1436: v75, every per-resource array 54 wide; otherwise the v76 layout.
+inline constexpr uint32_t k_world_save_version_pre_airframes = 75;
+
+/// The per-resource array width a world stream of @p version carries.
+inline constexpr std::size_t world_stream_resource_width(uint32_t version)
+{
+    return version < 74 ? k_resource_count_pre_kit_goods
+         : version < 76 ? k_resource_count_pre_airframes
+                        : resource_count;
+}
 
 /// BL-1480: the first version carrying the peace-refusals section (see above).
 inline constexpr uint32_t k_world_save_version_refusals = 75;
@@ -855,10 +876,17 @@ std::size_t world_save_sea_recruits_section_bytes(const world& w);
 /// refusal. The LAST section of a v75 stream.
 std::size_t world_save_refusals_section_bytes(const world& w);
 
-/// BL-1422: the bytes the kit goods' five extra elements add to every per-resource
-/// array of the stream `w` writes - the v74 stream less the v73 stream, which differ in
-/// nothing else. A harness comparing an older stream's length against today's adds it.
+/// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
+/// every per-resource array of the stream `w` writes - the widening from 49 to today's
+/// width: (the v74 stream less the v73 stream, the five goods) plus
+/// `world_save_airframes_bytes` (airframes). A harness comparing a pre-v74 stream's
+/// length against today's adds it.
 std::size_t world_save_kit_goods_bytes(const world& w);
+
+/// BL-1436: the bytes airframes' one extra element adds to every per-resource array of
+/// the stream `w` writes - the v76 stream less the v75 stream, which differ in nothing
+/// else. A harness comparing a v74 or v75 stream's length against today's adds it.
+std::size_t world_save_airframes_bytes(const world& w);
 
 /// BL-1407 — ONE CORPORATION RECORD OF A PRE-v56 STREAM, field for field in the
 /// order the retired `w_corp` wrote it. The loader reads them into scratch and
@@ -961,6 +989,10 @@ void write_world_snapshot_pre_sea_recruits(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1480): the v74 stream shape - no peace-refusals section.
 void write_world_snapshot_pre_refusals(const world& w, std::ostream& out);
 
+/// VERIFICATION ONLY (BL-1436): the v75 stream shape - every per-resource array 54 wide,
+/// airframes dropped - so the narrowed reader has a producer.
+void write_world_snapshot_pre_airframes(const world& w, std::ostream& out);
+
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in
 /// milli-points: headroom over any terrain multiplier), so a fight already in progress
@@ -996,14 +1028,16 @@ int32_t legacy_battle_recon_milli(const world& w, const active_battle& b);
 bool read_world_snapshot(world& w, std::istream& in, const military_capability_params* mil = nullptr,
                          const std::array<float, resource_count>* base_price = nullptr);
 
-/// BL-1422: the five kit goods (small arms ... drones), in enum order.
+/// BL-1422: the kit goods (small arms ... drones), in enum order; BL-1436 appends the
+/// sixth, airframes.
 inline constexpr resource_type k_kit_goods[] = {
     resource_type::small_arms, resource_type::armoured_vehicles, resource_type::artillery_pieces,
-    resource_type::guided_weapons, resource_type::drones,
+    resource_type::guided_weapons, resource_type::drones, resource_type::airframes,
 };
 
 /// BL-1422: set every market's kit-goods base price (and a zero resolved price) from
-/// @p base_price. What `read_world_snapshot` does for a pre-v74 stream.
+/// @p base_price, where the stream left it 0. What `read_world_snapshot` does for a
+/// pre-v76 stream (a pre-v74 stream lacks all six; a v74/v75 one lacks airframes).
 void reauthor_kit_goods_prices(world& w, const std::array<float, resource_count>& base_price);
 
 /// Drop every derived cache on @p w so the next read of each rebuilds.

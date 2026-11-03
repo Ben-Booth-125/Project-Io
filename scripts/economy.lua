@@ -674,6 +674,7 @@ economy = {
             -- vehicle is the bulkiest of them, a rifle crate the lightest.
             small_arms = 0.4, armoured_vehicles = 0.1, artillery_pieces = 0.15,
             guided_weapons = 0.2, drones = 0.3,
+            airframes = 0.1, -- BL-1436: a hull is as bulky as a vehicle
         },
     },
 
@@ -1921,6 +1922,7 @@ economy = {
         artillery_pieces      = 0.02,
         guided_weapons        = 0.02,
         drones                = 0.02,
+        airframes             = 0.02, -- BL-1436
     },
 
     -- ===================================================================

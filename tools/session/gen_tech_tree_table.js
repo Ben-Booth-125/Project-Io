@@ -44,7 +44,7 @@ for (const n of nodes) {
 }
 
 // The flat effect table (BL-1274). Field validation is tech_tree_store.js --check's; this only shapes.
-const KINDS = { modifier: 1, unlock_recipe: 1, unlock_structure: 1, mechanic: 1, unread: 1 };
+const KINDS = { modifier: 1, unlock_recipe: 1, unlock_structure: 1, mechanic: 1, unread: 1, unlock_kit: 1 };
 const OPS = { multiply: 1, add: 1 };
 const flt = v => { const s = String(v); return (/[.e]/.test(s) ? s : s + '.0') + 'f'; };
 const effects = [];
@@ -53,12 +53,15 @@ nodes.forEach((n, i) => {
   const begin = effects.length;
   for (const e of n.effects) {
     if (!KINDS[e.kind]) { console.error(`${n.id}: unknown effect kind ${e.kind}`); process.exit(1); }
-    const scopes = e.kind === 'modifier' ? (Array.isArray(e.scope) ? e.scope : [e.scope]) : [''];
+    // BL-1436: an unlock_kit becomes one row per catalogue item, the item id its target.
+    const scopes = e.kind === 'modifier' ? (Array.isArray(e.scope) ? e.scope : [e.scope])
+                 : e.kind === 'unlock_kit' ? e.items : [''];
     for (const sc of scopes) {
       if (e.kind === 'modifier' && !OPS[e.op]) { console.error(`${n.id}: unknown op ${e.op}`); process.exit(1); }
-      effects.push({ node: i, kind: e.kind, subject: e.subject || '', scope: sc || '',
+      effects.push({ node: i, kind: e.kind, subject: e.subject || '', scope: e.kind === 'unlock_kit' ? '' : (sc || ''),
         op: e.kind === 'modifier' ? e.op : 'multiply', value: e.kind === 'modifier' ? e.value : 1,
-        target: e.recipe || e.structure || e.key || '', what: e.what || '', waits_on: e.waits_on || '' });
+        target: e.kind === 'unlock_kit' ? sc : (e.recipe || e.structure || e.key || ''),
+        what: e.what || '', waits_on: e.waits_on || '' });
     }
   }
   effectRange.push([begin, effects.length]);
@@ -97,7 +100,9 @@ lines.push('enum class tier : std::uint8_t { travel = 0, minor = 1, major = 2, q
 lines.push('');
 lines.push('/// What a node\'s effect does (docs/economy/RESEARCH.md, section "Effects no system reads yet").');
 lines.push('/// Whether code READS a row is nation_tech.cpp\'s declaration (`classify_effect`), not this table\'s.');
-lines.push('enum class effect_kind : std::uint8_t { modifier = 0, unlock_recipe = 1, unlock_structure = 2, mechanic = 3, unread = 4 };');
+lines.push('/// `unlock_kit` (BL-1436): one row per kit item a node opens, the catalogue item id in `target`;');
+lines.push('/// the kit catalogue (unit_designs.cpp) is the read path, this row its display.');
+lines.push('enum class effect_kind : std::uint8_t { modifier = 0, unlock_recipe = 1, unlock_structure = 2, mechanic = 3, unread = 4, unlock_kit = 5 };');
 lines.push('enum class effect_op : std::uint8_t { multiply = 0, add = 1 };');
 lines.push('');
 lines.push(`inline constexpr int node_count        = ${nodes.length};`);
@@ -203,7 +208,7 @@ lines.push('inline constexpr std::array<const char*, node_count> keys_next_branc
 nodes.forEach((n, i) => lines.push(`    /* ${String(i).padStart(3)} */ ${cstr(n.keys_next_branch || '')},`));
 lines.push('}};');
 lines.push('');
-lines.push('/// The index of the node with store id @p id, or -1. Linear over 160 nodes: a lookup, not a hot path.');
+lines.push(`/// The index of the node with store id @p id, or -1. Linear over ${nodes.length} nodes: a lookup, not a hot path.`);
 lines.push('constexpr int find_node(std::string_view id)');
 lines.push('{');
 lines.push('    for (int i = 0; i < node_count; ++i)');

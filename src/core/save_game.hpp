@@ -341,7 +341,15 @@ inline constexpr uint32_t save_game_magic =
 /// the market history's per-market block of one series per resource. v23 and v22 stay
 /// readable: the whole envelope read runs under `bio::scoped_array_width`, every such
 /// array read 49 wide (`k_resource_count_pre_kit_goods`), the kit goods zero / empty.
-inline constexpr uint32_t save_game_version = 24; // BL-1422: the market history 54 series wide
+/// LAYOUT 25 (BL-1436, the sixth kit good, airframes): `resource_count` moved 54 -> 55,
+/// so every resource_count-wide envelope array is one element longer. v24 stays readable
+/// with every such array read 54 wide (`k_resource_count_pre_airframes`), airframes empty;
+/// v23 and v22 still 49 wide.
+inline constexpr uint32_t save_game_version = 25; // BL-1436: the market history 55 series wide
+/// BL-1436: the first layout whose market history is 55 series wide.
+inline constexpr uint32_t save_game_version_airframes = 25;
+/// BL-1436: v24, the v25 layout with the market history 54 series wide.
+inline constexpr uint32_t save_game_version_pre_airframes = 24;
 /// The first layout whose market history is 54 series wide.
 inline constexpr uint32_t save_game_version_kit_goods = 24;
 /// v23: the v24 layout with the market history 49 series wide.
@@ -417,7 +425,8 @@ bool write_save_game(const std::string& path, const world& w, const save_envelop
 /// VERIFICATION ONLY (BL-1422): write @p env and @p w at an older envelope layout
 /// (`save_game_version_pre_kit_goods` or `save_game_version_prefix_compatible`): the
 /// world as a v73 snapshot and every resource_count-wide envelope array 49 wide, so the
-/// narrowed reader has a genuine producer. False for any other version.
+/// narrowed reader has a genuine producer. BL-1436: `save_game_version_pre_airframes`
+/// writes a v75 world and 54-wide arrays. False for any other version.
 bool write_save_game_at(const std::string& path, const world& w, const save_envelope& env,
                         uint32_t version);
 
