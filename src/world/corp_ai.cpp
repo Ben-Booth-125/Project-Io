@@ -459,7 +459,7 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::accept_peace:    return "peace acceptance"; // BL-1428
         case corp_verb::refuse_peace:    return "peace refusal";   // BL-1428
         case corp_verb::impose_peace:    return "imposed peace";   // BL-1428
-        case corp_verb::set_embargo:     return "embargo";         // BL-1418: never issued by a rival
+        case corp_verb::set_embargo:     return "embargo";         // BL-1418; a rival's under BL-1481
         case corp_verb::survey:        return "survey";
         case corp_verb::hire_unit:     return "hire unit";
         case corp_verb::place_sell_order:   return "sell order";
@@ -2281,6 +2281,96 @@ void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, in
     }
 }
 
+// ---------------------------------------------------------------------------
+// BL-1481 - a rival nation enacts and repeals embargoes (AI_OPPONENT.md § 11, "Rival
+// nations embargo", Ben 2026-11-03, NR-1117; RELATIONS.md § 3). The grant and nothing
+// wider:
+//
+//   * Only the nation's OWN embargo, through the one legal verb the player's
+//     Diplomacy ledger issues (`set_embargo`, via apply_corp_command): enact against
+//     a nation, or repeal one it holds. Toward any nation, the player's included
+//     (the NR-1026 grant: the same verbs toward a human-played nation).
+//   * Never FOR the player's nation in a seated session; under spectate nobody holds
+//     the seat, so it is scored like any rival (BL-409's rule).
+//   * Scored over what the grant names and nothing else: ITS OWN sentiment row
+//     toward the target (Access and Trust below neutral - the hostility), its own
+//     Alarm toward it, and the trade exposure an embargo would cut (the target's cargo
+//     landing in its markets, and its own in theirs). Sentiment informs; no single
+//     value enacts (RELATIONS.md § The invariant): enactment needs the summed utility
+//     past a bar, and repeal waits until it falls under a lower one, so a pair
+//     hovering at the bar does not flip every evaluation.
+//   * Never a planner: one verb at most an evaluation, on the world as it stands.
+//     Nothing models the target's reply.
+//   * No embargo in the settle: refused while `sentiment_conduct_live` is false,
+//     and the caller runs it only on a live tick.
+// Pure arithmetic over sorted ids.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Calibration (BL-1481, first cut). Measured by war_census over the 16 library seeds to
+// econ tick 40 (2026-11-03): no pair's Trust fell below -9.6, so the utility is mostly
+// Alarm; it passed 0.10 on 718 rival pair-ticks, 0.20 on 28, 0.30 on 1. The enact bar
+// sits at 0.20 so an embargo is rare and answers a real threat; repeal waits for 0.10.
+constexpr float k_embargo_ai_w_hostility = 1.0f; ///< x (max(0, -Access) + max(0, -Trust)) / limit
+constexpr float k_embargo_ai_w_alarm     = 1.0f; ///< x max(0, Alarm) / limit
+constexpr float k_embargo_ai_w_trade     = 0.3f; ///< x trade exposure in [0, 1]
+constexpr float k_embargo_ai_enact_bar   = 0.20f; ///< enact when the sum clears it
+constexpr float k_embargo_ai_repeal_bar  = 0.10f; ///< repeal when the sum falls below it
+
+} // namespace
+
+float rival_embargo_utility(const world& w, const recipe_registry& reg, entity_id nation, entity_id target)
+{
+    const sentiment_params& sp = reg.sentiment();
+    const float limit = sp.limit > 0.0f ? sp.limit : 100.0f;
+    const sentiment_value sv = sentiment_toward(w.sentiment, nation, target); // its OWN row
+    const float h = (std::max(0.0f, -sv.access) + std::max(0.0f, -sv.trust)) / limit;
+    const float a = std::max(0.0f, sv.alarm) / limit;
+    const float x = trade_exposure(w, nation, target);
+    return k_embargo_ai_w_hostility * h + k_embargo_ai_w_alarm * a - k_embargo_ai_w_trade * x;
+}
+
+void score_nation_embargo(world& w, const recipe_registry& reg, entity_id nation, int tick, bool spectating)
+{
+    const entity_id player = spectating ? null_entity : player_nation(w);
+    if (nation == null_entity || nation == player || w.nations.find(nation) == w.nations.end())
+        return;
+    if (!sentiment_conduct_live(w))
+        return;
+
+    std::vector<entity_id> others; // the nations map is unordered: walk sorted ids
+    others.reserve(w.nations.size());
+    for (const auto& [n, nc] : w.nations)
+        if (n != nation)
+            others.push_back(n);
+    std::sort(others.begin(), others.end());
+
+    // The one verb: the candidate furthest past its bar (enact: u - enact bar; repeal:
+    // repeal bar - u). Strict '>' over ascending ids: a tie keeps the lower target.
+    entity_id best = null_entity;
+    bool best_on = false;
+    float best_margin = 0.0f;
+    for (const entity_id t : others)
+    {
+        const float u = rival_embargo_utility(w, reg, nation, t);
+        const bool holds = embargoes(w, nation, t);
+        const float margin = holds ? k_embargo_ai_repeal_bar - u : u - k_embargo_ai_enact_bar;
+        if (margin > best_margin)
+        {
+            best        = t;
+            best_on     = !holds;
+            best_margin = margin;
+        }
+    }
+    if (best == null_entity)
+        return;
+    corp_command cmd;
+    cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+    cmd.verb = corp_verb::set_embargo; cmd.counterparty = best; cmd.order = best_on ? 1u : 0u;
+    (void)apply_corp_command(w, reg, cmd);
+}
+
 bool corp_strategic_eval_due(const world& w, entity_id corp, int tick, const corp_ai_params& p)
 {
     // The player-corp skip, and the ONE condition that removes it (BL-409).
@@ -2433,6 +2523,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // spectate (BL-409; Ben, 2026-11-03, NR-1120), where it is scored like any rival.
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_war(w, reg, corp, tick, p.spectating);
+
+        // BL-1481 (AI_OPPONENT.md § 11, "Rival nations embargo", Ben 2026-11-03,
+        // NR-1117): at most one enactment or repeal of its own embargo, on the same
+        // live-only gate as the war pass. Past the player guard above (lifted only by
+        // spectate), and score_nation_embargo refuses the seated player's nation itself.
+        if (actor.is_nation && tick >= k_campaign_settle_ticks)
+            score_nation_embargo(w, reg, corp, tick, p.spectating);
 
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_fronts(w, reg, corp, tick);

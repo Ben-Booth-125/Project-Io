@@ -743,7 +743,7 @@
   ],
   [
    "gameplay.set_embargo",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117)."
   ],
   [
    "ledger.military_theatre_tab",

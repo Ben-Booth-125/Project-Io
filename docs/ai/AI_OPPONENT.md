@@ -2380,6 +2380,20 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   peace writes the history log, one entry per party (§ 8a). **Not admitted:** any verb for the
   player's nation in a seated session. Pure, seeded, deterministic, replayable, legal verbs only,
   never a planner.
+  **Rival nations embargo — granted (Ben, 2026-11-03, resolving NR-1117; `../politics/RELATIONS.md`
+  § 3).** A new subject — a relation a nation authors toward another, not an action on its own
+  ground — so it was raised, not read into the war or stance grants. A rival nation's scorer may
+  **enact or repeal its own embargo** against a nation through `set_embargo`, the legal verb the
+  player's Diplomacy ledger issues, scored over **its own sentiment** toward that nation (Access and
+  Trust below neutral), **its own Alarm** toward it, and the **trade exposure** an embargo would cut
+  (cargo landing between the pair). Enactment needs the summed score past a bar and repeal waits
+  until it falls under a lower one, so no single value enacts and a pair at the bar does not flip.
+  At most one enactment or repeal an evaluation, in live play only. The target may be any nation,
+  the player's included (the NR-1026 grant above); under spectate the seat's nation is scored like
+  any rival (BL-409's rule). **Not admitted:** an embargo authored for another nation, the player's
+  included in a seated session; any embargo in the settle; reading another nation's private state;
+  an embargo planned beyond the next verb, or coordinated between nations. Pure, seeded,
+  deterministic, replayable, legal verbs only, never a planner.
   **Rival nations build bunkers on their own ground — granted (Ben, 2026-10-31;
   `../military/MILITARY.md` § Fortifications).** A new subject, fortification rather than force,
   granted on the standing terms. A rival nation's scorer may build a bunker on a tile of its own

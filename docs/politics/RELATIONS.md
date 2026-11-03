@@ -374,6 +374,10 @@ snapshot. The author refuses the embargoed nation outright, and the refusal is c
 the corporations (Ben, 2026-10-23).
 
 A nation enacts and repeals its own embargo through one verb, `set_embargo` (`../ai/ACTIONS.json`).
+**A rival nation embargoes too** (Ben, 2026-11-03, NR-1117; `../ai/AI_OPPONENT.md` § 11): its scorer
+enacts an embargo when its own hostility (Access and Trust below neutral) and Alarm toward a nation,
+less the trade the embargo would cut, clear a bar, and repeals it once they fall under a lower one.
+So the embargo justification for war (§ 7) can name a rival author, not only the player.
 Cargo the bar refuses is never bought at dispatch; cargo already in flight when the embargo is
 enacted is refused at the border and destroyed, as an intercepted cargo with nowhere to land is.
 
@@ -602,4 +606,7 @@ needs a surface) is the UI half; BL-390 (the seam has no read-back) owns making 
 BL-549 (friendship permits two things) owns passage and immunity. The war (§ 7) is owned by BL-1459
 (war record and declaration), BL-1428 (war goals and peace) and BL-1460 (cession moves territory);
 BL-1458 (sentiment emitters) owns § Who emits each factor; BL-1432 (Alarm as sentiment) owns § 6;
-BL-1461 (rivals declare war) the rival's war; BL-1462 (diplomacy ledger) the surface.
+BL-1461 (rivals declare war) the rival's war; BL-1462 (diplomacy ledger) the surface. BL-1479
+(grievance and Alarm floor) owns the grievance edge and Alarm's floor; BL-1480 (war loose ends) the
+imposition on the player, spectate, the offer cooldown and the public record; BL-1481 (rival
+embargo) the rival's embargo.

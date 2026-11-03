@@ -1000,7 +1000,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** The war is won outright: dictate the terms.
 
-### `gameplay.set_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam.
+### `gameplay.set_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117).
 
 **Press.** UI: expand a nation's row and press 'Embargo' (or 'Lift' while one stands). Over the seam: COMMAND corp=<nation> nation=<nation> verb=53 counterparty=<nation> order=<0|1>.
 

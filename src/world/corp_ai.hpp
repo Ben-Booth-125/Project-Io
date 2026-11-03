@@ -542,6 +542,22 @@ void score_nation_bunkers(world& w, const recipe_registry& reg, entity_id nation
 void score_nation_war(world& w, const recipe_registry& reg, entity_id nation, int tick,
                       bool spectating = false);
 
+/// BL-1481 (AI_OPPONENT.md § 11, "Rival nations embargo", Ben 2026-11-03, NR-1117;
+/// RELATIONS.md § 3): a rival nation's embargo utility toward @p target - its own
+/// hostility (Access and Trust below neutral) and Alarm toward it, over the sentiment
+/// limit, less the trade exposure an embargo would cut. Pure; exported for harnesses.
+float rival_embargo_utility(const world& w, const recipe_registry& reg, entity_id nation, entity_id target);
+
+/// BL-1481: a rival nation's embargo pass - at most ONE `set_embargo` an evaluation:
+/// enact against the nation whose utility clears the enact bar by the most, or repeal
+/// a standing embargo of its own whose utility has fallen below the lower repeal bar,
+/// whichever is further past its bar (ties to the lower target id). Legal verb only,
+/// never a planner. Does nothing for the player's nation (unless @p spectating), an
+/// unknown one, or while the settle gate is up. Called by run_corp_strategic_step for
+/// each due nation on a live tick; exported for harnesses.
+void score_nation_embargo(world& w, const recipe_registry& reg, entity_id nation, int tick,
+                          bool spectating = false);
+
 /// What the war pass chose (`war_ai_trace_row::choice`).
 enum class war_ai_choice : uint8_t
 {
