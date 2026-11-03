@@ -253,10 +253,13 @@ scenario make_scenario(float stock = 100.0f, float balance = 1000.0f)
     dm.price         = dm.base_price;
     s.w.markets[s.dst_market] = dm;
     // BL-1361: a shipment draws points at its source market's centre from a nation's
-    // pool, and a city makes none - so the anchor's source is road hubs on the same
-    // off-route tile as the city above, on a capital-less nation's ground. This
-    // harness's subject is the command, not the cap, so the cap must never bind.
-    lp_fixture::stage(s.w, s.body, {tile_at(s.w, s.body, 1, 0)}, 10);
+    // pool, and a city makes none - so the anchor's source is road hubs on a
+    // capital-less nation's ground. The hub stands ON the source centre (BL-1469): a
+    // road source reaches along the road network, and this bare grid has none, so a
+    // hub a tile away covers nothing. The node discount reads the city above, not the
+    // hub, so R0's exact cost is untouched. This harness's subject is the command, not
+    // the cap, so the cap must never bind.
+    lp_fixture::stage(s.w, s.body, {tile_at(s.w, s.body, 0, 0)}, 10);
     return s;
 }
 
@@ -357,6 +360,12 @@ int main()
         tp.capacity[r_iron]   = k_cap;
         tp.marketplace_points = 1.0f;
         reg.set_trade(tp);
+        // BL-1469: the lp_fixture hub stands on the source centre, so it sits on every
+        // route out of it. Its node discount is BL-148/149's subject, not this file's;
+        // zero it so R0.11's exact undiscounted cost still holds.
+        logistics_node_params np = reg.logistics_nodes();
+        np.hub_discount = 0.0f;
+        reg.set_logistics_nodes(np);
     }
 
     // -----------------------------------------------------------------------
