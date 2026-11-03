@@ -47,5 +47,28 @@
    "counts are that section's one exception"
   ],
   "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "A kit placement reads want at the major's own markets (Ben, 2026-11-03)",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "with want read at the major's own markets \\(Ben,\\s+2026-11-03\\)",
+  "stale": [
+   "Every kit placement passes § Pass 3's rules, unchanged"
+  ],
+  "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "A kit is curated so its industries are fed: fixed authored extraction counts (Ben, 2026-11-03)",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "A kit is curated so its industries are fed \\(Ben, 2026-11-03\\)",
+  "stale": [],
+  "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "The kit's logistics slot count is a cap (Ben, 2026-11-03)",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "and the count is a cap \\(Ben, 2026-11-03\\)",
+  "stale": [],
+  "owner": "BL-1473 (major opening kit)"
  }
 ]

@@ -27,5 +27,22 @@ else
     print("header: FAIL the recruit readouts were not drawn land, air, sea")
 end
 
+-- The fit at the 1280 floor (Ben, 2026-11-02: squeeze the recruit floor to 52 px so the
+-- runway's value keeps its place). The runway is resolved before the readouts' numbers;
+-- at 1280x720 the money run plus "   |   12q" must fit in what the readouts' floor leaves.
+-- The widths are measured whether or not the treasury is burning, so the check is never
+-- vacuous; the label ("   |   RUNWAY  12q") is reported, not asserted.
+verify.window(1280, 720)
+verify.capture("header_1280")
+local n = verify.header_recruits()
+local spare = n.room - n.money_used - n.runway_value
+print(string.format("header: 1280 room %.0f money %.0f runway value %.0f label %.0f spare %.0f (runway step %d, recruit fit %d)",
+                    n.room, n.money_used, n.runway_value, n.runway_full, spare, n.runway, n.fit))
+if spare >= 0 and n.runway ~= 0 then
+    print("header: PASS the runway keeps its value at 1280")
+else
+    print(string.format("header: FAIL the runway is %.0f px short of its value at 1280 (step %d)", -spare, n.runway))
+end
+
 -- Textual confirmation of the underlying figures the header summarises.
 verify.dump_economy()

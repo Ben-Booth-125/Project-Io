@@ -39,7 +39,7 @@
    "glyph": "○",
    "sprint": 61,
    "written": "2026-10-26",
-   "parked": false,
+   "parked": true,
    "blocked_on": null,
    "author": "main session (sprint 57 close review, 2026-10-26)",
    "requires": [],
@@ -55,7 +55,7 @@
     "docs/ui/DISCOVERY.md"
    ],
    "title": "The Trade-flow lens computes no-room without rivals' cargo in flight",
-   "design": "Ben, 2026-10-26 (NR-980 B): the lens computes a market's room without other nations' cargo in flight to it, so no-room never reveals a rival's shipments. The dispatcher keeps its own room figure; write in LENSES.md that the lens figure is the player's own view and may differ."
+   "design": "Ben, 2026-10-26 (NR-980 B): the lens computes a market's room without other nations' cargo in flight to it, so no-room never reveals a rival's shipments. The dispatcher keeps its own room figure; write in LENSES.md that the lens figure is the player's own view and may differ.  PARKED (Ben, 2026-11-03, NR-1108 C): until trade capacity is next touched."
   },
   {
    "status": "proposed",
@@ -144,7 +144,7 @@
     "docs/ui/LENSES.md"
    ],
    "title": "The Industry lens shows other nations' plants; it is always empty today",
-   "design": "Ben, 2026-10-26 (NR-1066 (6)): keep the Industry lens, its subject the plants of nations other than the player's. body_surface_canvas.cpp L3142 sets background_owned to always false, so the field never fills. Also LENSES.md L110 says keyboard-cycle only while L466/L679 put it on the Planetary strip - settle which.",
+   "design": "Ben, 2026-10-26 (NR-1066 (6)): keep the Industry lens, its subject the plants of nations other than the player's. body_surface_canvas.cpp L3142 sets background_owned to always false, so the field never fills. Also LENSES.md L110 says keyboard-cycle only while L466/L679 put it on the Planetary strip - settle which. Ben, 2026-11-03: the Industry lens is ON the Planetary strip (amend LENSES.md L110). Fold in NR-1109 A: the player outline draws under every lens and never on the plain canvas - amend PLANETARY.md's 'always-on footprint outline' wording to 'under every lens'.",
    "difficulty": 2
   },
   {
@@ -295,7 +295,7 @@
     "docs/research/MILITARY_KIT.md"
    ],
    "title": "Fold the military kit into the Digitisation tree: about forty kit items as nodes",
-   "design": "Ben, 2026-10-27: kit is researched in the age tree, not a ladder of its own (RESEARCH.md § What technology is for; MILITARY.md § Land — the classes). research/MILITARY_KIT.md § 2 lists the items (two slots a class, gens 1-3). DESIGN PASS FIRST: the tree's grammar holds about fifteen nodes a branch (RESEARCH.md § The shape of an age's tree), so place the kit by subject across branches — small arms, section weapons, guns and protection in Force; armour materials in Processing; sensors, fire control, drones and networked kit in Signal & Orbit — as minors and majors in clusters, keeping each major's two-minors rule; say where the grammar must widen and put that to Ben. Then the store edit (tech_tree_store.js --check, gen_tech_tree_table.js), each node naming its kit as an unlock effect (unread until BL-1434, unit designs)."
+   "design": "Ben, 2026-10-27: kit is researched in the age tree, not a ladder of its own (RESEARCH.md § What technology is for; MILITARY.md § Land — the classes). research/MILITARY_KIT.md § 2 lists the items (two slots a class, gens 1-3). DESIGN PASS FIRST: the tree's grammar holds about fifteen nodes a branch (RESEARCH.md § The shape of an age's tree), so place the kit by subject across branches — small arms, section weapons, guns and protection in Force; armour materials in Processing; sensors, fire control, drones and networked kit in Signal & Orbit — as minors and majors in clusters, keeping each major's two-minors rule; say where the grammar must widen and put that to Ben. Then the store edit (tech_tree_store.js --check, gen_tech_tree_table.js), each node naming its kit as an unlock effect (unread until BL-1434, unit designs). Ben, 2026-11-03: air units' kit moves onto the new kit goods too; FPV drones sit inside the drones good, not a good of their own."
   },
   {
    "status": "proposed",
@@ -347,34 +347,6 @@
    "design": "Cold review of unit designs, 2026-10-28. (1) HIGH, latent until later kit unlocks (BL-1436): hire_goods_affordable counts shelf quantity only, while buy_from_corp_shelves charges the posted price capped by purse_room_of, and debit_kit_goods ignores how much it bought. A design refit (0 credits) with a committed treasury gets its kit free; a hire at exact room drops the treasury below its commitments. The row-goods leg had the flaw already. Fix: the affordability check sums qty x posted price plus the credit cost against purse_room_of, and apply asserts the bought amount. (2) LOW: hire_goods_affordable prices each row axis at its first candidate without the kit draw on the same resource, so an affordable hire can be refused. (3) LOW: png_decode.cpp inflate has no output cap; stop once out exceeds h x (stride+1). (4) LOW: the refit menu labels a design refit with the row gate (+ kit) and omits the changed slots goods; an obsolete own row moves the (live design) entry to the end."
   },
   {
-   "status": "complete",
-   "glyph": "●",
-   "sprint": 61,
-   "version_goal": "v0.2.4",
-   "written": "2026-10-29",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben land battle form 2026-10-29)",
-   "category": "Military",
-   "authority_doc": "docs/ui/ledgers/military.md",
-   "id": "BL-1454",
-   "short_name": "UNIT_STAT_GRID",
-   "priority": "B",
-   "difficulty": 2,
-   "requires": [
-    "BL-1452",
-    "BL-1453",
-    "BL-1448"
-   ],
-   "files": [
-    "src/ui/selection_panel.cpp",
-    "src/ui/military_ledger.cpp"
-   ],
-   "title": "Unit stat grid on the unit card and in the designer, with signed deltas while editing",
-   "design": "Written in docs/ui/ledgers/military.md § The stat grid and SELECTION.md § The unit element's layout (Ben, 2026-10-29). One shared grid: HP, readiness, morale, food, ammunition, equipment, soft, hard, defence, breakthrough, hardness, recon, stealth, speed. Unit card: class image left, grid fills the centre (Strength and Roster pages fold in). Designer: bottom right, design stats only, signed +/- deltas against the live design for the draft and the hovered item. Rival unit: design stats only once seen (battle or recon), internals hidden. Needs a live click. 2026-11-01: DELIVERED at 9fc79bab (merge of the lane's banded grid; a competing build was reverted on main, Ben chose this one 2026-10-31). Unit, stack and wing cards and both designers; Strength and Upkeep lines kept under the grid. stat_grid, military_ledger, air_ui and unit_designer scripts 0 failures; Ben's live click passed 2026-11-01.",
-   "delivered": "2026-11-01"
-  },
-  {
    "status": "proposed",
    "glyph": "○",
    "sprint": 61,
@@ -412,34 +384,6 @@
    "glyph": "○",
    "sprint": 61,
    "version_goal": "v0.3.0",
-   "written": "2026-10-30",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-10-30)",
-   "category": "Military",
-   "authority_doc": "docs/military/MILITARY.md",
-   "id": "BL-1463",
-   "short_name": "RECRUITS",
-   "priority": "A",
-   "difficulty": 4,
-   "requires": [],
-   "files": [
-    "src/world/unit_roster.cpp",
-    "src/world/air_combat.cpp",
-    "src/world/corp_command.cpp",
-    "src/world/economy_system.cpp",
-    "src/world/world_save.cpp",
-    "src/ui/military_ledger.cpp",
-    "scripts/economy.lua"
-   ],
-   "title": "Recruits: bases make land and air recruits from their province's people; hires and refills spend them",
-   "design": "Written in MILITARY.md § Recruits (Ben, 2026-10-30). A military base makes land recruits and an airbase air recruits, a fixed number per quarter (economy.military.recruits), each taken from the population centres of the base's province, largest first. One national land pool and one air pool, capped at 15x the theatre's quarterly output. A hire spends its men (a wing its crew) and is refused when the pool cannot fill it; a unit below full men refills from the pool at a Logistic Point cost per recruit paid at its paying road, as supply is. Bases carry no upkeep. The Recruit tab heads each theatre with its pool. Supersedes BL-1424 (soldiers from labour). Save bump (the two pools). Measure the population drain and G1t50 before tuning the rate; rivals hire through the same gate."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
    "written": "2026-10-31",
    "parked": false,
    "blocked_on": null,
@@ -455,7 +399,7 @@
     "tools/verify/capital_military_base.cpp"
    ],
    "title": "A quarter of nations open with no capital military base",
-   "design": "Found by Lane F, sprint 61 (2026-10-31), on main: capital_military_base --seeds 46 fails C1 and C3. 15 of 40 nations end with no capital base, though the run log says 36 laid and 4 adopted. Either the laying is lost after it is logged (a fold or a later pass erases it) or the census counts something else. Diagnose first; check: capital_military_base on seed 46 and two more library seeds."
+   "design": "Found by Lane F, sprint 61 (2026-10-31), on main: capital_military_base --seeds 46 fails C1 and C3. 15 of 40 nations end with no capital base, though the run log says 36 laid and 4 adopted. Either the laying is lost after it is logged (a fold or a later pass erases it) or the census counts something else. Diagnose first; check: capital_military_base on seed 46 and two more library seeds. RULED (Ben, 2026-11-03, NR-1122 A): the newer ruling stands - the chest cut may remove a capital base like any building. Work is now: capital_military_base accepts and names each cut base (it must still fail a capital that lost its base any OTHER way), and MILITARY.md § Nation garrisons states the exception. No generation change."
   },
   {
    "status": "proposed",
@@ -550,34 +494,6 @@
    ],
    "title": "A seat whose capital base the state cut removed keeps its raised opening unit",
    "design": "The seated nation opens unarmed (MILITARY.md; move_seat_force -> disarm_corporation removes every unit unit_is_raised calls raised). Found by the sprint 61 re-bless bisect (2026-10-31), seed 13 at b3fc19a6: size_opening_state_to_chest cut nation 47736's capital military_base at (122,69); demolishing a base nulls its units' muster_base, so the 50-man opening unit (id 91961) raised there reads as a garrison (unit_is_raised needs a non-null muster_base) and the seated player kept it: 6x200 + 50 = 1250 men. On main the road steer (BL-1468) spares that base and the count is the intended 1200, so the leak is latent, not gone. THE WORK: either the cut never removes a capital base (it is the muster point the opening force needs), or a unit raised at a base keeps a raised mark when the base goes, so disarm still removes it. Check: a fixture where the cut takes the seat's capital base; the seat opens with garrisons only. Digest-moving only on seeds where the cut hits a base."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-02",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, recruits follow-up, 2026-11-02)",
-   "requires": [
-    "BL-1463"
-   ],
-   "id": "BL-1472",
-   "short_name": "RECRUIT_HEADER_TABS",
-   "category": "Military",
-   "authority_doc": "docs/ui/HEADER.md",
-   "priority": "B",
-   "difficulty": 3,
-   "files": [
-    "src/world/recruits.cpp",
-    "src/world/world_save.cpp",
-    "scripts/economy.lua",
-    "src/ui/header_panel.cpp",
-    "src/ui/military_ledger.cpp"
-   ],
-   "title": "Recruit pools in the header (land, air, sea), ports make sea recruits, theatre tabs in the military ledger",
-   "design": "Written in docs/military/MILITARY.md § Recruits (ports make sea recruits; seen in the header), docs/ui/HEADER.md (Recruits readouts top right, fit ladder step 2) and docs/ui/ledgers/military.md § Grouped by theatre (Land / Air / Sea tabs, Sea a stub) (Ben, 2026-11-02). Work: a sea pool fed by completed ports, 15-quarter cap, saved and hashed; three header readouts (glyph, held / cap, fill bar) with the fit ladder; the Recruit tab pool strip retires; theatre tabs replace the collapsible headers on Recruit and Design; the Sea tab stub lists ports and says ships are not raised yet."
   },
   {
    "status": "proposed",
@@ -696,6 +612,104 @@
    ],
    "title": "MILITARY.md § Upkeep says every rate is zero; economy.lua charges them",
    "design": "Doc and code disagree: § Upkeep's table and 'authored at zero, deliberately' against economy.military.unit_upkeep (credits_per_head 0.1041, ordnance 0.000875, food 0.00625, decay 50, recovery 100; BL-1191 stopgap). One of them is wrong; the opening army's wage (BL-1474) is priced off the code's figures."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-03",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, sprint 61 calls form, 2026-11-03)",
+   "requires": [],
+   "id": "BL-1478",
+   "short_name": "BUNKER_RETUNE",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "priority": "B",
+   "difficulty": 2,
+   "files": [
+    "src/world/campaign_battle.cpp",
+    "src/world/corp_ai.cpp",
+    "docs/military/MILITARY.md",
+    "tools/verify/campaign_battle_harness.cpp",
+    "tools/verify/war_census.cpp"
+   ],
+   "title": "Bunkers: defence +30%, and rivals fortify posts on a hostile border",
+   "design": "Ben, 2026-11-03 (NR-1124): keep the soft-fire screen and the first-cut numbers; defence drops from +50% to +30% so a supplied 2:1 breaks a bunker slowly and artillery shortens it; rival candidates widen to posts on a hostile border. Write both into MILITARY.md § Fortifications. Check: campaign_battle C8 re-measured (2:1 supplied eventually takes the bunker), war_census rival bunker count over 16 seeds reported before and after."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-03",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, sprint 61 calls form, 2026-11-03)",
+   "requires": [],
+   "id": "BL-1479",
+   "short_name": "GRIEVANCE_AND_ALARM_FLOOR",
+   "category": "Relations",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "priority": "B",
+   "difficulty": 2,
+   "files": [
+    "src/world/relations.cpp",
+    "docs/politics/RELATIONS.md"
+   ],
+   "title": "Grievance holds at Trust -25; Alarm floors at 0",
+   "design": "Ben, 2026-11-03: (NR-1104) the grievance justification reads the hostile-leaning band, Trust <= -25, not -50. (NR-1115) Alarm is one-sided: relief cancels raised Alarm and never takes it below 0. Write both into RELATIONS.md. Check: a harness row each; war_census reports how often grievance now holds."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-03",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, sprint 61 calls form, 2026-11-03)",
+   "requires": [],
+   "id": "BL-1480",
+   "short_name": "WAR_LOOSE_ENDS",
+   "category": "Relations",
+   "authority_doc": "docs/politics/RELATIONS.md",
+   "priority": "B",
+   "difficulty": 3,
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/world_save.cpp",
+    "docs/politics/RELATIONS.md",
+    "docs/ai/AI_OPPONENT.md"
+   ],
+   "title": "Wars: rivals may impose on the player at 100; spectate scores the player; a 4-tick offer cooldown; declarations and peaces are recorded",
+   "design": "Ben, 2026-11-03: (NR-1119) a rival may impose peace on the player at war score 100 - the grant's 'only the player answers and ends' means no rival answers or offers FOR the player. (NR-1120) 1: while spectating, the war pass scores the player's nation like any rival (BL-409's rule); 2: a refused offer may not be repeated for 4 ticks, the refusal tick saved (save bump); 3: declarations and peaces write a history entry and raise a chat dispatch to the player when it is party. Write into RELATIONS.md and AI_OPPONENT.md § 11's war grant."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-03",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, sprint 61 calls form, 2026-11-03)",
+   "requires": [],
+   "id": "BL-1481",
+   "short_name": "RIVAL_EMBARGO",
+   "category": "AI",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "priority": "B",
+   "difficulty": 3,
+   "files": [
+    "src/world/corp_ai.cpp",
+    "docs/ai/AI_OPPONENT.md",
+    "docs/politics/RELATIONS.md"
+   ],
+   "title": "Rival nations enact and repeal embargoes",
+   "design": "Ben, 2026-11-03 (NR-1117): grant - a rival may enact or repeal an embargo against a nation through set_embargo, scored over its own sentiment, Alarm and trade exposure, on the standing terms (pure, seeded, deterministic, replayable, legal verbs only, never a planner). Write the dated grant into AI_OPPONENT.md § 11. Check: an embargo census over 16 seeds; determinism."
   }
  ]
 }

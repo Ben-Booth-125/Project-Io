@@ -1,5 +1,27 @@
 # REFINED — active worklist
 
+## Sprint 62 — equal starts for majors (opened 2026-11-02)
+
+**Design.** `docs/generation/CORPORATION_GENERATION.md` § A major's opening kit;
+`docs/generation/NATION_GENERATION.md` § Pass 7 (flat treasury) and § The nation count is a target;
+`docs/military/MILITARY.md` § Nation garrisons. Ruling register `tools/session/rulings/sprint-62.json`.
+Calls taken in writing it: NR-1125.
+
+**Baseline.** `opening-parity` skill, main 9e11146f: treasury spread median 21x at 20:4, 13 of 64
+majors under 100 credits by year 5.
+
+**Items, in build order.**
+- BL-1475 (opening parity census): built 9e11146f. The measurement for every item below.
+- BL-1473 (major opening kit), requirement group `major-opening-kit`. Tasks:
+  - T1 kit table in `world_gen.lua`, Standard and Rich-core rows, parsed into `world_gen_config`.
+  - T2 `opening_kit.cpp`: take-up on majors' ground, lay the kit with the substitution ladder,
+    opening stock per category, a report. Called before the site roads and the seeding.
+  - T3 flat treasury after the fold; the opening cut skips majors.
+  - T4 `opening_parity --kit`; census on Standard and Rich-core against the baseline.
+  - T5 determinism, save round-trip, fold and capital-base harnesses; pins reported, not re-blessed.
+- BL-1474 (major opening army): next, after the kit's census.
+- BL-1476 (wizard default thirty): one constant, after the census settles the count.
+
 ## Sprint 61 — diplomacy and war (designed 2026-10-30, beside sprint 60)
 
 **Target.** v0.3.0. Opens once sprint 60 closes, or beside it on disjoint files. `sprints.json`

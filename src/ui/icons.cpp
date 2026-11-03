@@ -1318,6 +1318,28 @@ void aircraft(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     aircraft(dl, centre, r, colour, true);
 }
 
+void helmet(ImDrawList* dl, ImVec2 c, float r, ImU32 colour)
+{
+    // The dome: the upper half of an ellipse taller than a circle's (ImGui angles run
+    // clockwise from +x, so pi .. 2 pi passes the top), filled, its flat edge the brim
+    // line. A round dome over a wide brim read as a saucer.
+    constexpr float k_pi = 3.14159265358979f;
+    const ImVec2 base{c.x, c.y + r * 0.22f};
+    for (int i = 0; i <= 16; ++i)
+    {
+        const float a = k_pi + k_pi * static_cast<float>(i) / 16.0f;
+        dl->PathLineTo({base.x + std::cos(a) * r * 0.62f, base.y + std::sin(a) * r * 0.78f});
+    }
+    dl->PathFillConvex(colour);
+    // The brim, a little wider than the dome.
+    dl->AddRectFilled({c.x - r * 0.86f, base.y - r * 0.02f}, {c.x + r * 0.86f, base.y + r * 0.16f},
+                      colour, r * 0.06f);
+    // The chin strap: a thin open curve hanging from the brim, inside the dome's width.
+    const float t = std::max(1.0f, r * 0.12f);
+    dl->PathArcTo({c.x, base.y + r * 0.16f}, r * 0.32f, 0.0f, k_pi, 10);
+    dl->PathStroke(colour, 0, t);
+}
+
 void anchor(ImDrawList* dl, ImVec2 c, float r, ImU32 colour)
 {
     // BL-1472: ring, shank, stock, then the arms - an arc through the shank's foot

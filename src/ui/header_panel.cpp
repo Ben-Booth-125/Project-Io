@@ -98,10 +98,12 @@ bool ledger_burn(const world& w, float& movement)
 // unit_hp fill). What a pool is, its quarter's output and that a full pool takes none
 // is the readout's tooltip.
 
-constexpr float k_recruit_glyph_r  = 8.0f;  ///< glyph half-extent
-constexpr float k_recruit_text_gap = 5.0f;  ///< glyph to its numbers
-constexpr float k_recruit_gap      = 16.0f; ///< between two readouts
-constexpr float k_recruit_lead     = 20.0f; ///< the least room left of the three
+// Squeezed (Ben, 2026-11-02) to a 52 px floor, so the runway's value keeps its place
+// at the 1280 floor: there the strip is 521 px and the money run 388 of it.
+constexpr float k_recruit_glyph_r  = 6.0f; ///< glyph half-extent
+constexpr float k_recruit_text_gap = 3.0f; ///< glyph to its numbers
+constexpr float k_recruit_gap      = 6.0f; ///< between two readouts
+constexpr float k_recruit_lead     = 4.0f; ///< the least room left of the three
 constexpr float k_recruit_bar_h    = 3.0f;
 
 const char* const k_recruit_theatre_names[3] = {"Land", "Air", "Sea"};
@@ -134,7 +136,7 @@ void recruit_glyph(ImDrawList* dl, int theatre, ImVec2 c, ImU32 col)
 {
     switch (theatre)
     {
-    case 0: icons::unit_marker(dl, c, k_recruit_glyph_r, col, false); break; // the soldier
+    case 0: icons::helmet(dl, c, k_recruit_glyph_r, col); break;
     case 1: icons::aircraft(dl, c, k_recruit_glyph_r, col); break;
     default: icons::anchor(dl, c, k_recruit_glyph_r, col); break;
     }
@@ -386,7 +388,14 @@ void draw_header_panel(const world& w,
     //   none                          - folded into the NET tooltip instead
     const float runway_sep_w   = ImGui::CalcTextSize("   |   ").x;
     const float runway_label_w = ImGui::CalcTextSize("RUNWAY").x + item_spacing.x;
-    const float runway_val_w   = ImGui::CalcTextSize(runway_text.c_str()).x;
+    const float runway_val_w   = ImGui::CalcTextSize(runway_meaningful ? runway_text.c_str() : "12q").x;
+    {
+        header_recruits_record& rec = recruits_record();
+        rec.room        = money_room;
+        rec.money_used  = used_width;
+        rec.runway_full  = runway_sep_w + runway_label_w + runway_val_w;
+        rec.runway_value = runway_sep_w + runway_val_w;
+    }
     bool show_runway       = runway_meaningful;
     bool show_runway_label = false;
     if (show_runway)
@@ -405,6 +414,7 @@ void draw_header_panel(const world& w,
             show_runway = false; // no room at all — NET's tooltip carries it
         }
     }
+    recruits_record().runway = !runway_meaningful ? -1 : !show_runway ? 0 : show_runway_label ? 2 : 1;
 
     // BL-1472 — the recruit readouts, step 2 of the ladder (HEADER.md § Fit and
     // degradation): resolved after the runway and before the sparkline. "held / cap",

@@ -65,6 +65,14 @@ struct header_recruits_record
     /// 1 = held alone, 2 = glyph and bar only (the numbers in the tooltip).
     int fit = 0;
     header_recruit_drawn theatre[3]; ///< 0 land, 1 air, 2 sea.
+    /// The runway's fit, resolved before the readouts (HEADER.md § Fit and degradation):
+    /// -1 not shown because the treasury is not burning, 0 folded into NET's tooltip,
+    /// 1 its value alone, 2 label and value.
+    int   runway = -1;
+    float room = 0.0f;        ///< Width the money run may take: the strip less the readouts' floor.
+    float money_used = 0.0f;  ///< Width the treasury, cargo and NET took before the runway.
+    float runway_full = 0.0f; ///< Width "   |   RUNWAY  12q" needs (a nominal 12q when not burning).
+    float runway_value = 0.0f; ///< Width "   |   12q" needs, the value alone.
 };
 const header_recruits_record& header_recruits_drawn();
 
