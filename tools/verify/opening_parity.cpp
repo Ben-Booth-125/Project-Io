@@ -50,6 +50,7 @@
 #include "world/works_roster.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -277,6 +278,42 @@ int main(int argc, char** argv)
             // BL-1473: the major's Logistic Point consumers without cover at the handoff.
             std::map<entity_id, int> uncovered;
             for (const entity_id nid : majors) uncovered[nid] = count_uncovered_buildings(w, nid);
+            // BL-1473 R4: which idled buildings at the handoff are kit slots, by kit category,
+            // and the rest (logistics nodes, military, anything the kit did not lay).
+            auto kit_idled = [&](entity_id nid, int out[4]) {
+                out[0] = out[1] = out[2] = out[3] = 0;
+                const opening_kit_major* km = fin.kit.of(nid);
+                std::set<entity_id> kit_ids;
+                if (km)
+                    for (const opening_kit_slot_record& r : km->slots)
+                    {
+                        if (r.building == null_entity) continue;
+                        kit_ids.insert(r.building);
+                        const auto b = w.buildings.find(r.building);
+                        if (b != w.buildings.end() && b->second.decommissioned)
+                            ++out[static_cast<int>(r.category)];
+                    }
+                for (const entity_id a : w.nations.at(nid).state_assets)
+                {
+                    const auto b = w.buildings.find(a);
+                    if (b != w.buildings.end() && b->second.decommissioned && !kit_ids.count(a)) ++out[3];
+                }
+            };
+            std::map<entity_id, std::array<int, 4>> idled_at_handoff;
+            for (const entity_id nid : majors)
+            {
+                kit_idled(nid, idled_at_handoff[nid].data());
+                if (const opening_kit_major* km = fin.kit.of(nid))
+                    for (const opening_kit_slot_record& r : km->slots)
+                    {
+                        const auto b = w.buildings.find(r.building);
+                        if (r.building == null_entity || b == w.buildings.end() || !b->second.decommissioned) continue;
+                        static const char* k_cat[] = {"extraction", "processing", "civic"};
+                        std::printf("IDLEKIT seed=%d pair=%d:%d nation=%llu cat=%s slot=%s as=%s\n", seed, tt, mt,
+                                    static_cast<unsigned long long>(nid), k_cat[static_cast<int>(r.category)],
+                                    r.slot.c_str(), r.placed_as.empty() ? r.slot.c_str() : r.placed_as.c_str());
+                    }
+            }
             std::vector<double> minor_treasury;
             std::vector<int>    minor_built;
             std::vector<long>   minor_men;
@@ -329,6 +366,9 @@ int main(int argc, char** argv)
                 const opening_kit_major* km = fin.kit.of(nid);
                 const int kp = km ? km->placed : 0, ks = km ? km->substituted : 0, ku = km ? km->unbuilt : 0;
                 const int kpb = km ? km->proc_built : 0, unc = uncovered[nid];
+                const std::array<int, 4>& ih = idled_at_handoff[nid];
+                int ie[4] = {0, 0, 0, 0};
+                if (e_it != w.nations.end()) kit_idled(nid, ie);
                 std::printf("] constr %d  units %d men %ld pool %d | kit %d/%d/%d proc %d uncovered %d idled %d | play:"
                             " net mean %8.1f min %8.1f red %2d/%zu  end treasury %9.0f built %3d men %ld\n",
                             h.constructing, h.units, h.men, h.land_pool, kp, ks, ku, kpb, unc, h.idled, mean, mn, red, q.size(),
@@ -336,11 +376,14 @@ int main(int argc, char** argv)
                 std::printf("ROW seed=%d pair=%d:%d nation=%llu tiles=%d treasury=%.1f built=%d ext=%d proc=%d logi=%d"
                             " civic=%d mil=%d other=%d constr=%d units=%d men=%ld pool=%d net_mean=%.2f net_min=%.2f"
                             " red=%d quarters=%zu end_treasury=%.1f end_built=%d end_men=%ld"
-                            " kit_placed=%d kit_sub=%d kit_unbuilt=%d proc_built=%d uncovered=%d idled=%d\n",
+                            " kit_placed=%d kit_sub=%d kit_unbuilt=%d proc_built=%d uncovered=%d idled=%d"
+                            " idled_kit_ext=%d idled_kit_proc=%d idled_kit_civic=%d idled_other=%d proc_running=%d"
+                            " end_idled_kit_ext=%d end_idled_kit_proc=%d end_idled_kit_civic=%d end_idled_other=%d\n",
                             seed, tt, mt, static_cast<unsigned long long>(nid), h.tiles, h.treasury, h.built_all,
                             h.built[k_extraction], h.built[k_processing], h.built[k_logistics], h.built[k_civic],
                             h.built[k_military], h.built[k_other], h.constructing, h.units, h.men, h.land_pool,
-                            mean, mn, red, q.size(), e.treasury, e.built_all, e.men, kp, ks, ku, kpb, unc, h.idled);
+                            mean, mn, red, q.size(), e.treasury, e.built_all, e.men, kp, ks, ku, kpb, unc, h.idled,
+                            ih[0], ih[1], ih[2], ih[3], kpb - ih[1], ie[0], ie[1], ie[2], ie[3]);
                 t_hi = std::max(t_hi, h.treasury); t_lo = std::min(t_lo, h.treasury);
                 b_hi = std::max(b_hi, h.built_all); b_lo = std::min(b_lo, h.built_all);
                 m_hi = std::max(m_hi, static_cast<long long>(h.men)); m_lo = std::min(m_lo, static_cast<long long>(h.men));

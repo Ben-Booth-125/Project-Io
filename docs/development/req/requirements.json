@@ -7938,12 +7938,13 @@
     },
     {
      "id": "R4",
-     "status": "pending",
+     "status": "failed",
      "verification": [
       "harness: opening_parity"
      ],
      "requirement": "Every kit processor passes Pass 3: chain-feasible and sized to spare input; the census reports the kit's processors running at the handoff.",
-     "notes": "2026-11-03: placement half met - every standing kit processor was placed through Pass 3 (chain-feasible, sized to spare input, want at own markets), median 10 of 10 standing. \"Running at the handoff\" is NOT shown: the settle's idle-a-loser reflex decommissions kit buildings (idled 0-31 per major, quick tier) and the census does not yet say which are processors. Left pending on that."
+     "notes": "",
+     "evidence": "FAILED, measured 2026-11-03 on main 80334ad6 (Rich-core). opening_parity --pairs 20:4, 16 library seeds, 64 majors, with the idled split by kit category (IDLEKIT lines). Placement half met: every standing kit processor was placed through Pass 3. Running half not met: at the handoff 511 of 578 kit processors run and 67 are idled by the settle's idle-a-loser reflex (8 loss ticks), on 26 of 64 majors - most often food_rations (14) and refined_copper (11) as named. Kit extraction idles more: 307 of the 374 idled buildings, led by agricultural_produce (73), silica (73), copper_ore (45) and coal flex slots (30). Nothing outside the kit idles at the handoff. After 20 play quarters 288 extraction and 47 processors are still idled: the reflex is not undone."
     },
     {
      "id": "R5",
