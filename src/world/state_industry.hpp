@@ -292,7 +292,10 @@ struct opening_state_cut_report
     float bill_cut      = 0.0f; ///< their summed bounds: the running bill removed, a tick
     std::map<entity_id, int> per_nation; ///< nation -> buildings left unbuilt
 };
-opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_registry& reg);
+/// BL-1473: with @p skip_majors (a major opening kit is laid) no major is cut -- its kit
+/// is sized to its chest by construction (NATION_GENERATION.md § Pass 7).
+opening_state_cut_report size_opening_state_to_chest(world& w, const recipe_registry& reg,
+                                                     bool skip_majors = false);
 
 /// Print the cut's one `[state_cut]` log line.
 void print_opening_state_cut(const opening_state_cut_report& r);

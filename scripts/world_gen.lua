@@ -245,4 +245,65 @@ world_gen = {
         points_per_marketplace   = 40000, -- points one Marketplace costs
         max_per_market           = 3,     -- the most one market's record may buy
     },
+
+    -- BL-1473 — A MAJOR'S OPENING KIT (docs/generation/CORPORATION_GENERATION.md
+    -- § A major's opening kit, Ben 2026-11-02): every major's ground is cleared of
+    -- the walk's extraction, processing and civic buildings and laid with the
+    -- active kit below, and its treasury set to the kit's (NATION_GENERATION.md
+    -- § Pass 7). Minors keep the walk. "The kit is data": a configuration under
+    -- test is an edit here. `active = "none"` (or no table) lays no kit.
+    --
+    -- Slots name raws and goods by their resource names, recipes by their
+    -- scripts/recipes.lua `name`, civic buildings by type. An unknown name is an
+    -- error. Extraction "flex" is the raw the kit's own processors are shortest
+    -- of, decided after the fixed slots. A processing slot's `recipes` are its
+    -- preference; with none feasible it bends to another recipe making the good.
+    opening_kit = {
+        active = "standard",
+        configs = {
+            standard = {
+                treasury = 8000,
+                extraction = {
+                    "agricultural_produce", "agricultural_produce", "water", "coal",
+                    "petroleum", "iron_ore", "copper_ore", "flex",
+                },
+                processing = {
+                    { good = "food_rations",   recipes = { "food_rations" } },      -- Food Processor
+                    { good = "steel",          recipes = { "steel" } },             -- Smelter
+                    { good = "refined_copper", recipes = { "refined_copper" } },    -- Smelter
+                    { good = "machinery",      recipes = { "machinery" } },         -- Fabricator
+                    { good = "refined_fuel",   recipes = { "refined_fuel" } },      -- Refinery
+                    { good = "power",          recipes = { "coal_power_plant", "oil_power_plant" } },
+                },
+                civic = { "planetary_marketplace", "research_institute", "schooling" },
+            },
+            -- The Rich comparison point (about 32 buildings with the logistics
+            -- and military slots): Standard plus a second produce, iron and
+            -- flex, silica, ordnance, silicon and a second food and steel line.
+            rich_core = {
+                treasury = 12000,
+                extraction = {
+                    "agricultural_produce", "agricultural_produce", "water", "coal",
+                    "petroleum", "iron_ore", "copper_ore", "flex",
+                    "agricultural_produce", "iron_ore", "silica", "flex",
+                },
+                processing = {
+                    { good = "food_rations",   recipes = { "food_rations" } },
+                    { good = "steel",          recipes = { "steel" } },
+                    { good = "refined_copper", recipes = { "refined_copper" } },
+                    { good = "machinery",      recipes = { "machinery" } },
+                    { good = "refined_fuel",   recipes = { "refined_fuel" } },
+                    { good = "power",          recipes = { "coal_power_plant", "oil_power_plant" } },
+                    { good = "ordnance",       recipes = { "ordnance" } },          -- Fabricator: steel + machinery
+                    { good = "food_rations",   recipes = { "food_rations" } },
+                    { good = "silicon",        recipes = { "silicon" } },           -- Refinery, from silica
+                    { good = "steel",          recipes = { "steel" } },
+                },
+                civic = {
+                    "planetary_marketplace", "research_institute", "research_institute",
+                    "schooling", "university",
+                },
+            },
+        },
+    },
 }

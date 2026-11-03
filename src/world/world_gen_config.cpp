@@ -1,5 +1,6 @@
 #include "world_gen_config.hpp"
 
+#include "placement_rules.hpp" // is_extractable -- the opening kit's slots (BL-1473)
 #include "resource_names.hpp"
 #include "scripting/lua_state.hpp"
 
@@ -96,4 +97,98 @@ void world_gen_config::load_from_lua(lua_state& lua)
 
     if (sol::optional<sol::table> corp = (*wg)["corporations"])
         corporation_count = corp->get_or("count", corporation_count);
+
+    // BL-1473: the major opening kit (CORPORATION_GENERATION.md § A major's opening
+    // kit). Every name is resolved HERE and an unknown one throws -- a typo must not
+    // silently drop a slot. Recipe names are the one exception: the registry is not
+    // loaded yet, so they are kept as strings and resolved, as loudly, when the kit
+    // is laid (opening_kit.cpp). An absent table is "no kit".
+    opening_kit = opening_kit_table{};
+    if (sol::optional<sol::table> ok = (*wg)["opening_kit"])
+    {
+        opening_kit.active = ok->get<sol::optional<std::string>>("active").value_or(std::string{});
+        if (sol::optional<sol::table> cfgs = (*ok)["configs"])
+        {
+            const auto resource_of = [](const std::string& kit, const std::string& n) {
+                bool found = false;
+                const resource_type r = resource_names::resource_from_name(n, found);
+                if (!found)
+                    throw std::runtime_error("world_gen.opening_kit." + kit + ": unknown resource '"
+                                             + n + "'");
+                return r;
+            };
+            for (const auto& kv : *cfgs)
+            {
+                const std::string kit = kv.first.as<std::string>();
+                if (kv.second.get_type() != sol::type::table)
+                    throw std::runtime_error("world_gen.opening_kit.configs." + kit + " must be a table");
+                const sol::table t = kv.second.as<sol::table>();
+                opening_kit_config c;
+                c.name     = kit;
+                c.treasury = t.get_or("treasury", 0.0f);
+                if (!(c.treasury >= 0.0f))
+                    throw std::runtime_error("world_gen.opening_kit." + kit + ".treasury must be >= 0");
+                // Arrays read by index 1..n: authored order is the slot order.
+                if (sol::optional<sol::table> ex = t["extraction"])
+                    for (std::size_t i = 1; i <= ex->size(); ++i)
+                    {
+                        opening_kit_slot s;
+                        s.category = kit_slot_category::extraction;
+                        s.label    = (*ex)[i].get<std::string>();
+                        if (s.label == "flex")
+                            s.flex = true;
+                        else
+                        {
+                            s.good = resource_of(kit, s.label);
+                            if (!placement_rules::is_extractable(s.good))
+                                throw std::runtime_error("world_gen.opening_kit." + kit
+                                                         + ": extraction slot '" + s.label
+                                                         + "' is not an extractable raw");
+                        }
+                        c.slots.push_back(std::move(s));
+                    }
+                if (sol::optional<sol::table> pr = t["processing"])
+                    for (std::size_t i = 1; i <= pr->size(); ++i)
+                    {
+                        const sol::object o = (*pr)[i];
+                        if (o.get_type() != sol::type::table)
+                            throw std::runtime_error("world_gen.opening_kit." + kit
+                                                     + ".processing entries are { good = ..., recipes = {...} }");
+                        const sol::table e = o.as<sol::table>();
+                        opening_kit_slot s;
+                        s.category = kit_slot_category::processing;
+                        s.label    = e.get<sol::optional<std::string>>("good").value_or(std::string{});
+                        s.good     = resource_of(kit, s.label);
+                        if (sol::optional<sol::table> rs = e["recipes"])
+                            for (std::size_t j = 1; j <= rs->size(); ++j)
+                                s.recipes.push_back((*rs)[j].get<std::string>());
+                        c.slots.push_back(std::move(s));
+                    }
+                if (sol::optional<sol::table> cv = t["civic"])
+                    for (std::size_t i = 1; i <= cv->size(); ++i)
+                    {
+                        opening_kit_slot s;
+                        s.category = kit_slot_category::civic;
+                        s.label    = (*cv)[i].get<std::string>();
+                        if (s.label == "planetary_marketplace")
+                            s.building = building_type::planetary_marketplace;
+                        else if (s.label == "research_institute")
+                            s.building = building_type::research_institute;
+                        else if (s.label == "schooling")
+                            s.building = building_type::schooling;
+                        else if (s.label == "university")
+                            s.building = building_type::university;
+                        else
+                            throw std::runtime_error("world_gen.opening_kit." + kit
+                                                     + ": unknown civic building '" + s.label + "'");
+                        c.slots.push_back(std::move(s));
+                    }
+                opening_kit.configs.emplace(kit, std::move(c));
+            }
+        }
+        if (!opening_kit.active.empty() && opening_kit.active != "none"
+            && opening_kit.configs.count(opening_kit.active) == 0)
+            throw std::runtime_error("world_gen.opening_kit.active names no configuration: '"
+                                     + opening_kit.active + "'");
+    }
 }

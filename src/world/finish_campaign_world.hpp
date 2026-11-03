@@ -50,6 +50,7 @@
 #include "world/state_industry.hpp"         // state_handover_report (BL-1296)
 #include "world/logistic_points.hpp"        // lp_seed_report (BL-1309)
 #include "world/road_generation.hpp"        // site_road_stats (BL-1347)
+#include "world/opening_kit.hpp"            // opening_kit_report (BL-1473)
 
 #include <cstdint>
 #include <vector>
@@ -115,6 +116,8 @@ struct finish_campaign_result
     state_reserve_report    reserve;
     rail_handover_report    rail;  ///< BL-1255: the rail handover at the fold
     colonial_port_report    colonial_ports; ///< ports in history (Ben, 2026-10-26)
+    /// BL-1473: what the major opening kit took up and laid (empty: no kit configured).
+    opening_kit_report      kit;
     lp_seed_report          lp;    ///< BL-1309: the Logistic Point sources seeded at the fold
     capital_base_report     capital_bases; ///< BL-1439: every capital's military base
     /// BL-1347: the crossings laid to the sites the WINNER's charters, the state handover

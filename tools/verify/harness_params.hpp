@@ -187,6 +187,12 @@ struct harness_charter_input
     /// corporations' holdings and money just before it, every treasury just
     /// after it, and its report - so fold_census checks the sequence that ships.
     struct fold_probe* probe = nullptr;
+    /// BL-1473: the major opening kit the mirror lays (finish_campaign_world's, at the
+    /// same points: after the ports, the flat treasury after the fold, no cut on a
+    /// major). Null lays none. `apply_app_start_landscape` fills it from the PARSED
+    /// config's active kit unless `no_opening_kit` holds it back.
+    const opening_kit_config* opening_kit = nullptr;
+    bool no_opening_kit = false;
 };
 
 /// BL-1402 -- what fold_census reads of the shipped fold (see harness_charter_input).
@@ -362,6 +368,9 @@ inline shipped_landscape apply_shipped_landscape(
         // what a road reaches) -- every site joined to its nation's capital network.
         // finish_campaign_world's ports in history, verbatim, before the site roads.
         print_colonial_ports(place_colonial_ports(w));
+        // BL-1473: finish_campaign_world's major opening kit, verbatim, after the ports.
+        if (charter.opening_kit != nullptr)
+            print_opening_kit(lay_major_opening_kits(w, reg, *charter.opening_kit));
         lay_site_roads_every_body(w);
         out.lp = seed_logistics_sources(w);
         // BL-1402: finish_campaign_world's fold to ground, verbatim, right after it.
@@ -387,6 +396,11 @@ inline shipped_landscape apply_shipped_landscape(
                 std::sort(fp->treasury_after.begin(), fp->treasury_after.end());
             }
         }
+        // BL-1473: finish_campaign_world's flat treasury, verbatim, right after the fold.
+        if (charter.opening_kit != nullptr)
+            for (auto& [nid, nc] : w.nations)
+                if (nc.is_major)
+                    nc.treasury = charter.opening_kit->treasury;
         // BL-1439: finish_campaign_world's capital military bases, verbatim, right
         // after the fold and before the reserve.
         print_capital_bases(seed_capital_military_bases(w));
@@ -395,7 +409,7 @@ inline shipped_landscape apply_shipped_landscape(
         out.reserve = reserve_state_first_tick(w, reg, out.state);
         print_state_reserve(out.reserve);
         stack_logistics_hubs(w, reg, out.lp); // finish_campaign_world's, verbatim (Ben, 2026-10-26)
-        out.cut = size_opening_state_to_chest(w, reg); // BL-1452: finish_campaign_world's, verbatim
+        out.cut = size_opening_state_to_chest(w, reg, /*skip_majors=*/charter.opening_kit != nullptr); // BL-1452 / BL-1473: finish_campaign_world's, verbatim
         print_opening_state_cut(out.cut);
         // BL-1398's firm top-up retired with the fold (finish_campaign_world).
         if (charter.skip_fold)
@@ -602,8 +616,12 @@ inline void apply_app_start_landscape(app_start_world& out,
     // BL-1042: with no budget handed in, the mirror builds the world's own
     // stockpile budget and passes it to the search and the apply, as the app
     // does; an instrument's budget replaces it.
+    // BL-1473: the app lays the parsed config's active opening kit (finish_campaign_world).
+    harness_charter_input in = charter;
+    if (in.opening_kit == nullptr && !in.no_opening_kit)
+        in.opening_kit = out.cfg.opening_kit.active_config();
     out.land = apply_shipped_landscape(out.w, out.reg, out.params.seed, /*search=*/true,
-                                       out.cfg.corporation_count, charter);
+                                       out.cfg.corporation_count, in);
 }
 
 /// Build @p out as the app builds a campaign start from @p params, stopping

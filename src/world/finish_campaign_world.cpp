@@ -402,6 +402,16 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // the seeding's opening `lay_all_port_lanes` lanes it and the chain may carry it.
     out.colonial_ports = place_colonial_ports(w);
     print_colonial_ports(out.colonial_ports);
+    // BL-1473 -- A MAJOR'S OPENING KIT (CORPORATION_GENERATION.md § A major's opening kit,
+    // Ben 2026-11-02): every major's ground is cleared of what the walk placed there and
+    // laid with the active kit, owned by the nation. After the ports (kept) and BEFORE the
+    // site roads and the seeding, so both road and cover the kit. No kit configured: nothing.
+    const opening_kit_config* const kit = cfg.opening_kit.active_config();
+    if (kit != nullptr)
+    {
+        out.kit = lay_major_opening_kits(w, reg, *kit);
+        print_opening_kit(out.kit);
+    }
     // BL-1347 -- A CROSSING TO EVERY SITE STAMPED SINCE GENERATION'S OWN PASS
     // (PRODUCTION.md § A building needs a road; LOGISTICS.md § 4, "Generation roads every
     // building site"). Generation roaded the sites it had laid by its tail; everything
@@ -432,6 +442,22 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // and before the opening reserve, so the bill and the settle read a world in which
     // every building is a nation's.
     print_fold(fold_to_ground(w));
+    // BL-1473 (NATION_GENERATION.md § Pass 7, "A major opens on a flat treasury"): once the
+    // kit stands and the fold has moved every balance home, each major's treasury is the
+    // kit's authored figure, in place of the chest its history folded. Before the reserve.
+    if (kit != nullptr)
+    {
+        int flattened = 0;
+        for (auto& [nid, nc] : w.nations) // keyed writes: order-free
+            if (nc.is_major)
+            {
+                nc.treasury = kit->treasury;
+                ++flattened;
+            }
+        std::printf("[opening_kit] %d major treasury(ies) set to %.0f credits\n", flattened,
+                    static_cast<double>(kit->treasury));
+        std::fflush(stdout);
+    }
     // BL-1439 (Ben, 2026-10-27; MILITARY.md § Nation garrisons) -- EVERY CAPITAL HAS A
     // MILITARY BASE: one completed base per nation in its capital province, the capital
     // garrison's muster base. After the fold (every building is a nation's, so the
@@ -455,7 +481,25 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // state buildings"): after the reserve and the stacked hubs, before the gate's
     // reading - a nation short of 16 ticks of its running bill opens with what its chest
     // can run, its capital's source first, so no capital starts dark.
-    print_opening_state_cut(size_opening_state_to_chest(w, reg));
+    // BL-1473: the cut does not run on a major when a kit is laid -- its kit is sized to
+    // its chest by construction (NATION_GENERATION.md § Pass 7).
+    print_opening_state_cut(size_opening_state_to_chest(w, reg, /*skip_majors=*/kit != nullptr));
+    if (kit != nullptr)
+    {
+        // What each major carries into the settle: the flat figure, less what the reserve
+        // and the stacked hubs moved since. Reported only.
+        std::vector<entity_id> majors;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.is_major)
+                majors.push_back(nid);
+        std::sort(majors.begin(), majors.end());
+        std::printf("[opening_kit] major treasuries entering the settle:");
+        for (const entity_id nid : majors)
+            std::printf(" %llu=%.1f", static_cast<unsigned long long>(nid),
+                        static_cast<double>(w.nations.at(nid).treasury));
+        std::printf("\n");
+        std::fflush(stdout);
+    }
     // BL-1398's firm top-up (fund_state_nodes_from_firms) RETIRED with BL-1402: the
     // fold above moved every firm's balance into its home treasury, so the opening node
     // bill is paid from the nation's whole treasury and "no capital starts dark" stands
