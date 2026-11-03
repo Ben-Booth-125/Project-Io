@@ -182,6 +182,7 @@ enum class history_topic : uint8_t
     decision,    ///< A BL-202 strategic corp_decision (the AI's command + rationale).
     agency,      ///< A BL-079/BL-202 agency_event (reflex or strategic tier).
     trade_route, ///< A trade_route's FIRST establishment (not repeat traffic on an existing lane).
+    war,         ///< BL-1480: a declaration or a peace - one entry per party, `corp` = that party's nation.
 };
 
 /// One entry in `world::history_log`. `timestamp`'s UNIT DEPENDS ON TOPIC —
@@ -1225,6 +1226,12 @@ struct world
     /// (declarer, defender). A pending offer is not a peace (the friendship-offer
     /// precedent, § 1). Saved (v69).
     std::map<std::pair<entity_id, entity_id>, peace_offer> peace_offers;
+
+    /// BL-1480 (Ben, 2026-11-03, NR-1120): the last REFUSED peace offer per
+    /// (offerer, receiver) of an open war -> the econ tick it was refused. The
+    /// offerer may not offer again in that war while `current_econ_tick - tick <
+    /// k_war_offer_cooldown_ticks`. Erased when the war closes. Saved (v75).
+    std::map<std::pair<entity_id, entity_id>, int32_t> peace_refusals;
 
     /// Closed wars, in close order — the record a peace closes into. Saved (v69).
     std::vector<war_history_entry> war_history;

@@ -37,7 +37,15 @@
 //   R15 world::state_hash folds the embargoes (direction included) and is untouched
 //       when there are none.
 //
-// NOT HERE: a rival scorer pass. corp_ai's trade candidates are gated on
+//   R16 A RIVAL EMBARGOES (BL-1481; AI_OPPONENT.md § 11 "Rival nations embargo", Ben
+//       2026-11-03, NR-1117): `score_nation_embargo` enacts through set_embargo when
+//       its own hostility and Alarm toward a nation, less the trade exposure, clear the
+//       enact bar; repeals when the sum falls below the lower repeal bar, and holds in
+//       between; one verb an evaluation, the furthest past its bar (ties to the lower
+//       id); never for the seated player's nation, which may still be its target;
+//       scored under spectate; nothing under the settle gate; replayable.
+//
+// NOT HERE: a rival TRADE pass. corp_ai's trade candidates are gated on
 // `!actor.is_nation`, and every actor is a nation (BL-1407), so no rival pins,
 // unpins or reserves a manual trade today. The scorer's UNPIN and reserve read the
 // embargo anyway, so the gate re-opening finds them right.
@@ -47,6 +55,7 @@
 #include "world/binary_io.hpp" // R14: hand-writes a legacy embargo record
 #include "world/components.hpp"
 #include "world/condition_set.hpp"
+#include "world/corp_ai.hpp"      // R16: score_nation_embargo (BL-1481)
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/embargo.hpp"
@@ -446,13 +455,13 @@ int main()
         const std::string b69 = o69.str();
         world old;
         check(from_bytes(b69, old) && old.nation_embargoes.empty()
-                  && b69.size() == b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w)
+                  && b69.size() == b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w) - world_save_refusals_section_bytes(s.w) /* BL-1480 (v75), last */
                                   - world_save_kit_goods_bytes(s.w) // BL-1422: arrays 49 wide before v74
                   && world_save_embargo_section_bytes(s.w) == 4 + 8 * 3,
               "R9c a v69 stream (today's less the 28-byte embargo section) loads with no embargo");
 
         // The section is last: count, then (author, embargoed) pairs ascending.
-        const std::size_t sec = b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w);
+        const std::size_t sec = b.size() - world_save_embargo_section_bytes(s.w) - world_save_gen_capital_section_bytes(s.w) - world_save_recruits_section_bytes(s.w) - world_save_sea_recruits_section_bytes(s.w) - world_save_refusals_section_bytes(s.w) /* BL-1480 (v75), last */;
         const auto refused = [&](std::string bad, const char* what) {
             world untouched;
             check(!from_bytes(bad, untouched) && untouched.nations.empty() && untouched.nation_embargoes.empty(), what);
@@ -669,6 +678,129 @@ int main()
         h.nation_embargoes.clear();
         check(ab != none && ba != none && ab != ba && h.state_hash(0) == none,
               "R15 an embargo moves state_hash, its direction matters, and lifting it restores the hash");
+    }
+
+    // R16: a rival embargoes (BL-1481).
+    std::printf("\n-- R16 a rival enacts and repeals its own embargo (BL-1481) --\n");
+    {
+        recipe_registry rr; // default sentiment params: limit 100
+        const auto nation = [](world& w, const char* name) {
+            const entity_id n = w.create_entity();
+            nation_component nc{};
+            nc.name = name;
+            w.nations[n] = nc;
+            return n;
+        };
+        struct mini { world w; entity_id a = null_entity, b = null_entity, c = null_entity; };
+        const auto make = [&]() {
+            mini m;
+            m.a = nation(m.w, "Ra");
+            m.b = nation(m.w, "Rb");
+            m.c = nation(m.w, "Rc");
+            m.w.current_econ_tick = 20;
+            return m;
+        };
+        const auto row = [](world& w, entity_id o, entity_id s, float access, float trust, float alarm) {
+            w.sentiment.pairs[{ o, s }] = sentiment_value{ access, trust, alarm };
+        };
+        {
+            mini m = make();
+            row(m.w, m.a, m.b, -20.0f, -20.0f, 0.0f); // hostility 0.4: past the 0.2 enact bar
+            row(m.w, m.a, m.c, 0.0f, -10.0f, 0.0f);   // 0.1: short of it (and of the repeal bar's 0.1 too)
+            score_nation_embargo(m.w, rr, m.a, 20);
+            check(embargoes(m.w, m.a, m.b) && !embargoes(m.w, m.a, m.c) && m.w.nation_embargoes.size() == 1
+                      && m.w.sentiment_pending.size() == 1
+                      && m.w.sentiment_pending[0].kind == sentiment_factor_kind::embargo_imposed,
+                  "R16a a rival hostile past the bar (Access -20, Trust -20) enacts through set_embargo; a milder row (Trust -10) does not");
+        }
+        {
+            mini m = make();
+            row(m.w, m.a, m.b, 0.0f, 0.0f, 40.0f); // Alarm 0.4 alone
+            score_nation_embargo(m.w, rr, m.a, 20);
+            check(embargoes(m.w, m.a, m.b), "R16b Alarm counts: a rival alarmed by a nation (Alarm 40) enacts");
+        }
+        {
+            mini m = make();
+            row(m.w, m.a, m.b, -20.0f, -20.0f, 0.0f);
+            m.w.sentiment_trade_streaks[{ m.b, m.a }] = sentiment_trade_streak{ 2, 0, true }; // B's cargo lands in A
+            m.w.sentiment_trade_streaks[{ m.a, m.b }] = sentiment_trade_streak{ 2, 0, true }; // and A's in B
+            const float u = rival_embargo_utility(m.w, rr, m.a, m.b);
+            score_nation_embargo(m.w, rr, m.a, 20);
+            check(!embargoes(m.w, m.a, m.b) && std::fabs(u - 0.1f) < 1e-5f,
+                  "R16c trade exposure weighs against it: the same hostility with live trade both ways (0.4 - 0.3 = 0.1, short of 0.2) does not enact");
+        }
+        {
+            mini m = make();
+            m.w.nation_embargoes.insert({ m.a, m.b });
+            row(m.w, m.a, m.b, 0.0f, -15.0f, 0.0f); // 0.15: between the bars (0.10 .. 0.20)
+            const std::string s0 = fingerprint(m.w);
+            score_nation_embargo(m.w, rr, m.a, 20);
+            const bool held = embargoes(m.w, m.a, m.b) && fingerprint(m.w) == s0;
+            m.w.sentiment.pairs.clear(); // 0: below the repeal bar
+            score_nation_embargo(m.w, rr, m.a, 21);
+            check(held && !embargoes(m.w, m.a, m.b) && m.w.sentiment_pending.empty(),
+                  "R16d between the bars a standing embargo holds (no flip); below the repeal bar it is repealed, queuing nothing");
+        }
+        {
+            mini m = make();
+            row(m.w, m.a, m.b, -20.0f, -20.0f, 0.0f); // 0.4
+            row(m.w, m.a, m.c, -30.0f, -30.0f, 0.0f); // 0.6
+            score_nation_embargo(m.w, rr, m.a, 20);
+            const bool one = m.w.nation_embargoes.size() == 1 && embargoes(m.w, m.a, m.c);
+            score_nation_embargo(m.w, rr, m.a, 21);
+            const bool next = m.w.nation_embargoes.size() == 2 && embargoes(m.w, m.a, m.b);
+            mini t = make();
+            row(t.w, t.a, t.b, -20.0f, -20.0f, 0.0f);
+            row(t.w, t.a, t.c, -20.0f, -20.0f, 0.0f);
+            score_nation_embargo(t.w, rr, t.a, 20);
+            check(one && next && t.w.nation_embargoes.size() == 1 && embargoes(t.w, t.a, std::min(t.b, t.c)),
+                  "R16e one verb an evaluation, the furthest past its bar first (C at 0.6, then B at 0.4); a tie goes to the lower id");
+        }
+        {
+            mini m = make();
+            row(m.w, m.a, m.b, -20.0f, -20.0f, 0.0f);
+            m.w.player_entity = m.a;
+            const std::string s0 = fingerprint(m.w);
+            score_nation_embargo(m.w, rr, m.a, 20);
+            const bool seated = fingerprint(m.w) == s0 && m.w.nation_embargoes.empty();
+            score_nation_embargo(m.w, rr, m.a, 20, /*spectating=*/true);
+            check(seated && embargoes(m.w, m.a, m.b),
+                  "R16f the seated player's nation is never acted for; under spectate it is scored like any rival");
+        }
+        {
+            mini m = make();
+            row(m.w, m.a, m.b, -20.0f, -20.0f, 0.0f);
+            m.w.player_entity = m.b;
+            score_nation_embargo(m.w, rr, m.a, 20);
+            check(embargoes(m.w, m.a, m.b), "R16g the player's nation may be a rival's target (the NR-1026 grant)");
+        }
+        {
+            mini m = make();
+            row(m.w, m.a, m.b, -20.0f, -20.0f, 0.0f);
+            m.w.settle_build_gate = true;
+            const std::string s0 = fingerprint(m.w);
+            score_nation_embargo(m.w, rr, m.a, 5);
+            check(fingerprint(m.w) == s0 && m.w.nation_embargoes.empty(), "R16h under the settle gate the pass does nothing");
+        }
+        {
+            std::string runs[2];
+            for (std::string& r : runs)
+            {
+                mini m = make();
+                row(m.w, m.a, m.b, -20.0f, -20.0f, 10.0f);
+                row(m.w, m.b, m.c, -25.0f, -15.0f, 0.0f);
+                row(m.w, m.c, m.a, 0.0f, -5.0f, 35.0f);
+                for (int tk = 20; tk < 30; ++tk)
+                {
+                    m.w.current_econ_tick = tk;
+                    for (const entity_id n : { m.a, m.b, m.c })
+                        score_nation_embargo(m.w, rr, n, tk);
+                    decay_sentiment(m.w.sentiment, rr.sentiment());
+                }
+                r = to_bytes(m.w);
+            }
+            check(runs[0] == runs[1], "R16i the pass replays: two built worlds, ten ticks of every nation's pass, byte-identical");
+        }
     }
 
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);

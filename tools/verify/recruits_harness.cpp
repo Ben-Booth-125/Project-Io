@@ -764,7 +764,7 @@ int main()
         check(old_ok && old.nations.at(f.nation).land_recruits == 0 && old.nations.at(f.nation).air_recruits == 0
                   && old.population_centres.at(c).recruit_heads_taken == 0,
               "R7d a v71 stream reads, its pools empty and its carries 0");
-        check(v67.size() + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_kit_goods_bytes(f.w) /* BL-1422 */ == bytes.size()
+        check(v67.size() + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_refusals_section_bytes(f.w) /* BL-1480 (v75), last */ + world_save_kit_goods_bytes(f.w) /* BL-1422 */ == bytes.size()
                   && world_save_recruits_section_bytes(f.w) == 4 + 12 + 4 + 8,
               "R7e a v71 stream is today's less exactly the recruits section (28 bytes here) and v73's sea section");
         {
@@ -776,14 +776,14 @@ int main()
             check(ok67 && w67.nations.at(f.nation).land_recruits == 0
                       && v67s.size() + world_save_alarm_section_bytes(f.w) + world_save_war_section_bytes(f.w)
                              + world_save_embargo_section_bytes(f.w) + world_save_gen_capital_section_bytes(f.w)
-                             + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_kit_goods_bytes(f.w) /* BL-1422 (v74) */
+                             + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_refusals_section_bytes(f.w) /* BL-1480 (v75), last */ + world_save_kit_goods_bytes(f.w) /* BL-1422 (v74) */
                              == bytes.size(),
                   "R7e2 a v67 stream reads with empty pools and is today's less the Alarm (v68), war (v69), embargo (v70), generation-capital (v71) recruits (v72) AND sea (v73) sections");
         }
 
         // Corrupt rows. The section ends where v73's sea section (empty here: its count) begins:
         // [n=1][id][land][air][m=1][cid][carry][sea n=0].
-        const std::size_t rtail = bytes.size() - world_save_sea_recruits_section_bytes(f.w);
+        const std::size_t rtail = bytes.size() - world_save_sea_recruits_section_bytes(f.w) - world_save_refusals_section_bytes(f.w) /* BL-1480 (v75), last */;
         const std::size_t land_at = rtail - 8 - 4 - 8; // land is 8 bytes into the nation row
         {
             std::string bad = bytes;
@@ -1083,7 +1083,7 @@ int main()
         world old;
         const bool old_ok = from_bytes(v72, old);
         check(old_ok && old.nations.at(v.nation).sea_recruits == 0 && old.nations.at(v.nation).land_recruits == 50
-                  && v72.size() + world_save_sea_recruits_section_bytes(v.w) + world_save_kit_goods_bytes(v.w) /* BL-1422: v72 is 49 wide */ == bytes.size(),
+                  && v72.size() + world_save_sea_recruits_section_bytes(v.w) + world_save_refusals_section_bytes(v.w) /* BL-1480 (v75), last */ + world_save_kit_goods_bytes(v.w) /* BL-1422: v72 is 49 wide */ == bytes.size(),
               "R12u a v72 stream reads, its sea pool empty (land kept), and is today's less exactly the sea section");
         {
             std::ostringstream o(std::ios::binary);
@@ -1093,7 +1093,8 @@ int main()
                       && w71.nations.at(v.nation).land_recruits == 0,
                   "R12v a v71 stream reads with every pool empty, sea included");
         }
-        const std::size_t sea_at = bytes.size() - 4; // the tail: [n=1][id][sea]
+        // The sea section's tail: [n=1][id][sea], then BL-1480's v75 refusals section.
+        const std::size_t sea_at = bytes.size() - world_save_refusals_section_bytes(v.w) - 4;
         const auto refused = [&](std::size_t at, int32_t v32) {
             std::string bad = bytes;
             std::memcpy(&bad[at], &v32, sizeof v32);

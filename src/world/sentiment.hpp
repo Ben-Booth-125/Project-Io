@@ -140,7 +140,9 @@ struct sentiment_value
 
     /// How THREATENED the observer feels by the subject (RELATIONS.md § 6, Ben
     /// 2026-10-26; BL-1432). Positive is alarmed; it decays toward neutral like
-    /// the other two and is relieved by live trade. It informs a declaration and
+    /// the other two and is relieved by live trade. ONE-SIDED (Ben, 2026-11-03,
+    /// NR-1115): the fold floors it at 0, so relief cancels raised Alarm and never
+    /// banks a reserve below neutral. It informs a declaration and
     /// never makes one: no Alarm threshold writes a stance table (THE INVARIANT).
     float alarm = 0.0f;
 

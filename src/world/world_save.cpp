@@ -2016,6 +2016,31 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, w.nations.at(nid).sea_recruits);
         }
     }
+
+    // world_save_version 75 (BL-1480, NR-1120): THE PEACE REFUSALS, the last section,
+    // after the sea pools (v73). Every refused offer still on record, ascending
+    // (offerer, receiver), as (offerer, receiver, refusal tick).
+    if (version >= k_world_save_version_refusals)
+    {
+        w_u32(out, static_cast<uint32_t>(w.peace_refusals.size()));
+        for (const auto& [key, tick] : w.peace_refusals)
+        {
+            w_id(out, key.first);
+            w_id(out, key.second);
+            w_i32(out, tick);
+        }
+    }
+}
+
+void write_world_snapshot_pre_refusals(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1480): the v74 stream shape - no peace-refusals section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_refusals);
+}
+
+std::size_t world_save_refusals_section_bytes(const world& w)
+{
+    return 4 + 12 * w.peace_refusals.size();
 }
 
 void write_world_snapshot_pre_sea_recruits(const world& w, std::ostream& out)
@@ -2065,7 +2090,7 @@ std::size_t world_save_gen_capital_section_bytes(const world& w)
 std::size_t world_save_kit_goods_bytes(const world& w)
 {
     std::ostringstream wide(std::ios::binary), narrow(std::ios::binary);
-    write_world_snapshot(w, wide);
+    write_world_snapshot_pre_refusals(w, wide); // BL-1480: v74 against v73, nothing else between
     write_world_snapshot_pre_kit_goods(w, narrow);
     return wide.str().size() - narrow.str().size();
 }
@@ -2328,7 +2353,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_gen_capital  // BL-1460: v70, generation capital = capital
             && version != k_world_save_version_pre_recruits     // BL-1463: v71, no recruits
             && version != k_world_save_version_pre_sea_recruits // 2026-11-02: v72, no sea pools
-            && version != k_world_save_version_pre_kit_goods))  // BL-1422: v73, arrays 49 wide
+            && version != k_world_save_version_pre_kit_goods    // BL-1422: v73, arrays 49 wide
+            && version != k_world_save_version_pre_refusals))   // BL-1480: v74, no peace refusals
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -3905,6 +3931,31 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             if (nit == s.nations.end())
                 return false;
             nit->second.sea_recruits = sea;
+        }
+    }
+
+    // v75 (BL-1480, NR-1120): the peace refusals. Untrusted: rows strictly ascending
+    // (offerer, receiver), two distinct nations of the stream with an open war between
+    // them, the tick >= 0. Refused whole otherwise. A v74 (and older) stream ends before
+    // it: no refusals.
+    if (version >= k_world_save_version_refusals)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > 2 * s.wars.size())
+            return false;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id a = null_entity, b = null_entity;
+            int32_t tick = 0;
+            if (!r_id(in, a) || !r_id(in, b) || !r_i32(in, tick))
+                return false;
+            const std::pair<entity_id, entity_id> key{ a, b };
+            if (a == null_entity || b == null_entity || a == b || tick < 0
+                || s.nations.count(a) == 0 || s.nations.count(b) == 0
+                || (s.wars.count({ a, b }) == 0 && s.wars.count({ b, a }) == 0)
+                || (!s.peace_refusals.empty() && !(s.peace_refusals.rbegin()->first < key)))
+                return false;
+            s.peace_refusals.emplace(key, tick);
         }
     }
 

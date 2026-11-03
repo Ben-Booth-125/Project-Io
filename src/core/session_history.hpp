@@ -66,6 +66,15 @@ void post_battle_dispatches(const world& w, const economy_report& report,
 void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& dispatches,
                             ui::chat_state& chat, int day_tick);
 
+/// War dispatches (BL-1480; Ben, 2026-11-03, NR-1120; RELATIONS.md § 7): every
+/// declaration and peace the player's nation is party to, raised as one line on the
+/// Field channel. Read from the world history log's `war` entries - one per party,
+/// tagged by its nation - appended since @p cursor, which then advances to the log's
+/// end. Presentation only: it reads the log and touches no simulation state. The app
+/// sets @p cursor to the log's length when a world is set up or loaded, so a loaded
+/// campaign never re-announces its past wars.
+void post_war_dispatches(const world& w, std::size_t& cursor, ui::chat_state& chat, int day_tick);
+
 /// Persona counsel (BL-207 slice 1): every corp due at this strategic-eval
 /// boundary gets its seated bench's read of its own blackboard, posted to a
 /// per-corp Counsel channel (lazily created on first use). Advisory only.

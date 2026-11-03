@@ -16,8 +16,9 @@ struct world;
 //
 // THE AUTHOR IS A NATION, ACTING FOR ITSELF (NATIONS.md § 4 Law authorship:
 // "Enactment is the author nation's act"). It is enacted and repealed through
-// one verb on the command seam (`corp_verb::set_embargo`); no scorer issues it,
-// so no rival nation embargoes anyone (no grant in AI_OPPONENT.md § 11 covers it).
+// one verb on the command seam (`corp_verb::set_embargo`) - by the player's press, a
+// wire agent, or a rival nation's scorer under its grant (BL-1481, AI_OPPONENT.md
+// § 11 "Rival nations embargo", Ben 2026-11-03: `score_nation_embargo`, corp_ai.cpp).
 //
 // Enactment is conduct: `embargo_imposed` is queued from the embargoed nation
 // toward the author (RELATIONS.md § Who emits each factor), through

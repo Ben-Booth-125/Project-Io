@@ -240,7 +240,7 @@ bool read_history_log(world& w, std::istream& in)
             return false;
         if (!read_u8(in, topic_id))
             return false;
-        if (topic_id > static_cast<uint8_t>(history_topic::trade_route))
+        if (topic_id > static_cast<uint8_t>(history_topic::war)) // BL-1480 appended `war`
             return false; // unknown topic id — a corrupt or newer-format record
         if (!read_u32(in, body))
             return false;

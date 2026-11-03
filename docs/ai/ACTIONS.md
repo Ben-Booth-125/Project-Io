@@ -939,7 +939,8 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - White peace names no province; a cession names 1 to 3 distinct provinces, a contiguous list (rejected_invalid otherwise, the whole command, before anything is read).
 - A cession's provinces are each a goal of the GAINING side, held by it now (world::province_holder) and owned by the losing side (rejected_state otherwise).
 - A cession never takes the loser's last province (NR-1102: no nation leaves the map by war) (rejected_state).
-- A war stands between the pair and carries no pending offer (one per war) (rejected_state). A refusal mutates nothing.
+- A war stands between the pair and carries no pending offer (one per war) (rejected_state).
+- The actor's last offer in this war was not refused within the last 4 economy ticks (k_war_offer_cooldown_ticks; Ben, 2026-11-03, NR-1120) (rejected_state). A refusal mutates nothing.
 
 **Expected output.** The offer is filed (world::peace_offers, keyed by the war); a pending offer is not a peace. The counterparty accepts (gameplay.accept_peace) or refuses (gameplay.refuse_peace). Saved (world_save_version 69).
 
@@ -974,7 +975,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner (BL-1406).
 - The counterparty has a pending offer on its war with the actor (rejected_state). A refusal mutates nothing.
 
-**Expected output.** The offer is erased; the war goes on, and either side may offer again.
+**Expected output.** The offer is erased and the refusal tick recorded (world::peace_refusals, keyed (offerer, receiver); saved, world_save_version 75); the war goes on. The refusing side may offer at once; the refused offerer may not offer again in this war for 4 economy ticks (NR-1120).
 
 **Reason to select.** The terms are not good enough.
 
@@ -999,7 +1000,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** The war is won outright: dictate the terms.
 
-### `gameplay.set_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam.
+### `gameplay.set_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117).
 
 **Press.** UI: expand a nation's row and press 'Embargo' (or 'Lift' while one stands). Over the seam: COMMAND corp=<nation> nation=<nation> verb=53 counterparty=<nation> order=<0|1>.
 
@@ -2747,6 +2748,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - A province that would be the loser's last is disabled ('It would be the loser's last province: a last province is never ceded.').
 - Offer cession is disabled until the ticked terms are legal (check_peace_terms; 'Tick the provinces to be ceded.' / 'Those terms are not legal now.').
+- For 4 quarters after the other side refuses the player's offer, 'Offer peace' is disabled ('Your last offer was refused: you may offer again in N quarters.'; NR-1120).
 
 **Expected output.** Issues gameplay.offer_peace (order 0 white, 1 cession to you, 2 cession to them). The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head. The war then shows 'Your offer stands: <terms>.'.
 

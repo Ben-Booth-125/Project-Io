@@ -1035,9 +1035,19 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
         return;
     }
 
+    // A refused offer may not be repeated for four quarters (RELATIONS.md § 7, NR-1120).
+    std::string cooling;
+    if (!impose && peace_offer_cooling(w, me, other))
+    {
+        const auto rit = w.peace_refusals.find({ me, other });
+        const int left = rit == w.peace_refusals.end() ? 0
+                       : rit->second + k_war_offer_cooldown_ticks - w.current_econ_tick;
+        cooling = "Your last offer was refused: you may offer again in " + std::to_string(left)
+                + (left == 1 ? " quarter." : " quarters.");
+    }
     if (d.peace_with != other)
     {
-        if (press(d, impose ? "Impose peace" : "Offer peace", "peace_open", other, true, {},
+        if (press(d, impose ? "Impose peace" : "Offer peace", "peace_open", other, cooling.empty(), cooling,
                   impose ? "The score stands at 100 in your favour: name the terms, no acceptance needed."
                          : "White peace, or a cession of goals the receiving side holds."))
         {

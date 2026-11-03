@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <string>
 #include <unordered_map>
 
 namespace
@@ -30,6 +31,32 @@ namespace
 bool is_nation(const world& w, entity_id n)
 {
     return n != null_entity && w.nations.find(n) != w.nations.end();
+}
+
+std::string nation_label(const world& w, entity_id n)
+{
+    const auto it = w.nations.find(n);
+    return it != w.nations.end() && !it->second.name.empty() ? it->second.name
+                                                             : "Nation " + std::to_string(n);
+}
+
+/// BL-1480 (Ben, 2026-11-03, NR-1120; RELATIONS.md § 7, "The public record"): a
+/// declaration or a peace writes the world history log, ONE ENTRY PER PARTY tagged by
+/// that party's nation in `corp` - the trade-route precedent (one event, two tags), so
+/// a nation-scoped read of the log, and the player's dispatch, finds every war it is in.
+void log_war_event(world& w, entity_id a, entity_id b, const std::string& event,
+                   const std::string& consequence)
+{
+    for (const entity_id party : { a, b })
+    {
+        world_history_entry e;
+        e.timestamp   = w.current_day_tick;
+        e.topic       = history_topic::war;
+        e.corp        = party;
+        e.event       = event;
+        e.consequence = consequence;
+        w.history_log.push_back(std::move(e));
+    }
 }
 
 /// Sorted, de-duplicated copy of @p goals; `ok` false on a repeat.
@@ -201,8 +228,10 @@ war_record* find_war_mut(world& w, entity_id a, entity_id b)
 const std::array<war_justification_row, k_war_justification_count>& war_justification_rows()
 {
     static const std::array<war_justification_row, k_war_justification_count> rows = {{
+        // Grievance holds in the HOSTILE-LEANING band, Trust <= -25 (Ben, 2026-11-03,
+        // NR-1104): the adverse band (-50) was a rule conduct almost never met.
         { "grievance",        war_measure::declarer_trust_toward_defender,
-          condition_comparator::at_most,  war_operand::adverse_trust_edge, 0.0f },
+          condition_comparator::at_most,  war_operand::fixed,              k_war_grievance_trust },
         { "embargo",          war_measure::defender_embargoes_declarer,
           condition_comparator::at_least, war_operand::fixed,              1.0f },
         { "lost_ground",      war_measure::goals_ceded_by_declarer,
@@ -279,15 +308,13 @@ std::array<bool, k_war_justification_count>
 war_justifications(const world& w, const sentiment_params& p, entity_id declarer,
                    entity_id defender, const std::vector<uint32_t>& goals)
 {
+    (void)p; // every operand is authored on its row (NR-1104 retired the band read)
     std::array<bool, k_war_justification_count> out{};
     const auto& rows = war_justification_rows();
     for (std::size_t i = 0; i < rows.size(); ++i)
     {
         const war_justification_row& r = rows[i];
-        const float operand = r.operand_source == war_operand::adverse_trust_edge
-                                ? -(p.band_edge_far * p.limit)
-                                : r.operand;
-        out[i] = compare(measure(w, r.measure, declarer, defender, goals), r.comparator, operand);
+        out[i] = compare(measure(w, r.measure, declarer, defender, goals), r.comparator, r.operand);
     }
     return out;
 }
@@ -410,6 +437,15 @@ war_result declare_war(world& w, const sentiment_params& p, entity_id declarer,
     // Gathered, not written: the tick's one fold canonicalises it with the rest.
     for (const war_price_row& r : price.rows)
         queue_conduct(w, r.observer, declarer, r.kind, r.magnitude);
+
+    // The public record (BL-1480, NR-1120).
+    {
+        const std::size_t n = w.wars.at({declarer, defender}).declarer_goals.size();
+        log_war_event(w, declarer, defender,
+                      nation_label(w, declarer) + " declared war on " + nation_label(w, defender),
+                      std::to_string(n) + (n == 1 ? " province named as a goal" : " provinces named as goals")
+                          + (price.justified ? "; justified" : ""));
+    }
     return war_result::applied;
 }
 
@@ -811,8 +847,26 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
             float& r = w.war_exhaustion_residual[n];
             r = std::max(r, e);
         }
+    // The public record (BL-1480, NR-1120), before the history entry moves out.
+    {
+        const char* how = h.end == war_end::white_peace   ? "ended in a white peace"
+                        : h.end == war_end::cession       ? "ended in a peace by cession"
+                        : h.end == war_end::imposed_white ? "ended in an imposed white peace"
+                                                          : "ended in an imposed cession";
+        std::string consequence;
+        if (!h.ceded.empty())
+            consequence = std::to_string(h.ceded.size())
+                        + (h.ceded.size() == 1 ? " province ceded to " : " provinces ceded to ")
+                        + nation_label(w, h.gainer);
+        log_war_event(w, war.declarer, war.defender,
+                      "The war of " + nation_label(w, war.declarer) + " on " + nation_label(w, war.defender)
+                          + " " + how,
+                      consequence);
+    }
     w.war_history.push_back(std::move(h));
     w.peace_offers.erase(key);
+    w.peace_refusals.erase({ war.declarer, war.defender }); // cooldowns end with the war
+    w.peace_refusals.erase({ war.defender, war.declarer });
     w.wars.erase(key);
     w.truces[canonical_pair(war.declarer, war.defender)] = w.current_econ_tick + k_war_truce_ticks;
     for (const sentiment_event& e : events)
@@ -862,6 +916,13 @@ war_result check_peace_terms(const world& w, const war_record& war, const peace_
     return war_result::applied;
 }
 
+bool peace_offer_cooling(const world& w, entity_id offerer, entity_id other)
+{
+    const auto it = w.peace_refusals.find({ offerer, other });
+    return it != w.peace_refusals.end()
+        && w.current_econ_tick - it->second < k_war_offer_cooldown_ticks;
+}
+
 war_result offer_peace(world& w, entity_id offerer, entity_id other, const peace_terms& terms)
 {
     if (const war_result r = pair_check(w, offerer, other); r != war_result::applied)
@@ -870,6 +931,9 @@ war_result offer_peace(world& w, entity_id offerer, entity_id other, const peace
     const auto key = war_key(war);
     if (w.peace_offers.count(key) != 0)
         return war_result::rejected_state; // one pending offer per war
+    // A refused offer may not be repeated for four ticks (Ben, 2026-11-03, NR-1120).
+    if (peace_offer_cooling(w, offerer, other))
+        return war_result::rejected_state;
     if (const war_result r = check_peace_terms(w, war, terms); r != war_result::applied)
         return r;
     peace_offer o;
@@ -904,6 +968,7 @@ war_result refuse_peace(world& w, entity_id receiver, entity_id offerer)
     if (oit == w.peace_offers.end() || oit->second.offerer != offerer)
         return war_result::rejected_state;
     w.peace_offers.erase(oit);
+    w.peace_refusals[{ offerer, receiver }] = w.current_econ_tick; // NR-1120: the cooldown starts
     return war_result::applied;
 }
 

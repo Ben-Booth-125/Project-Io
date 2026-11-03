@@ -328,8 +328,8 @@ rival may score and declare it, never acquire it ambiently. **That grant covers 
 war (Ben, 2026-10-30)** — `declare_war` with its goals (§ 7), toward a rival or the player alike.
 Whether it also covers a rival answering, offering and accepting peace, and so ceding ground, is
 raised as its own question and granted on the same terms (Ben, 2026-10-30, NR-1100): a rival
-answers, offers, accepts or refuses peace, imposes at 100, and so may cede ground
-(`../ai/AI_OPPONENT.md` § 11).
+answers, offers, accepts or refuses peace, imposes at 100 — the player's nation included (NR-1119)
+— and so may cede ground (`../ai/AI_OPPONENT.md` § 11).
 
 **A declaration against the player is SIGNALLED** (Ben, 2026-08-22). This overturns NR-350, which
 had a declaration *"stay silent, discovered on contact rather than announced"*; newest-dated wins,
@@ -374,6 +374,10 @@ snapshot. The author refuses the embargoed nation outright, and the refusal is c
 the corporations (Ben, 2026-10-23).
 
 A nation enacts and repeals its own embargo through one verb, `set_embargo` (`../ai/ACTIONS.json`).
+**A rival nation embargoes too** (Ben, 2026-11-03, NR-1117; `../ai/AI_OPPONENT.md` § 11): its scorer
+enacts an embargo when its own hostility (Access and Trust below neutral) and Alarm toward a nation,
+less the trade the embargo would cut, clear a bar, and repeals it once they fall under a lower one.
+So the embargo justification for war (§ 7) can name a rival author, not only the player.
 Cargo the bar refuses is never bought at dispatch; cargo already in flight when the embargo is
 enacted is refused at the border and destroyed, as an intercepted cargo with nowhere to land is.
 
@@ -441,6 +445,11 @@ ties the subject severed, its military posture, and its domestic unrest. Where e
 relieves it** — decay toward neutral like every sentiment dimension, live trade between the pair, and
 the nodes that cut it.
 
+**Alarm is one-sided: its floor is 0** (Ben, 2026-11-03, NR-1115). Positive is alarmed and zero is
+neutral; there is no reassured side. Relief cancels Alarm already raised and never takes it past
+neutral, so live trade cannot bank a reserve that a later declaration or border force would first
+have to spend. Reassurance is what Trust measures, and a signed Alarm would count it twice.
+
 **What reads it.** A rival nation's scorer reads its own Alarm toward a nation when it weighs an
 embargo, a coalition or a declaration of war (`../ai/AI_OPPONENT.md`). **The invariant holds
 unchanged**: Alarm informs a declaration and never makes one; no Alarm threshold flips a stance
@@ -491,7 +500,7 @@ opening set:
 
 | Justification | Holds when |
 |---|---|
-| Grievance | the declarer's Trust toward the defender is in the adverse band |
+| Grievance | the declarer's Trust toward the defender is in the hostile-leaning band, **Trust ≤ −25** (Ben, 2026-11-03, NR-1104: the adverse band, −50, was a rule conduct almost never met) |
 | Embargo | the defender embargoes the declarer |
 | Lost ground | a goal is a province the declarer ceded to the defender at an earlier peace |
 | A friend attacked | the defender is the declarer in a war against the declarer's friend |
@@ -523,7 +532,14 @@ and lives in its own table as friendship offers do (§ 1). There is one pending 
 - **White peace** — nothing changes hands.
 - **Cession** — named goals the receiving side holds pass to it. Only goals, and only held ones.
 
-A side whose score stands at 100 in its favour may **impose** its terms without acceptance. At
+**A refused offer may not be repeated for four ticks** (Ben, 2026-11-03, NR-1120). Once the receiver
+refuses, the offerer may make no offer in that war for four ticks — one year; the side that refused
+may still offer. The refusal tick is world state and is saved. Without it a refused offer returns
+every evaluation, an endless offer-and-refuse.
+
+A side whose score stands at 100 in its favour may **impose** its terms without acceptance — against
+any nation, the player's included (Ben, 2026-11-03, NR-1119). Imposing is the war's one forcing
+outcome; a player immune to it could lose ground only by accepting. At
 peace, both hostility rows clear and the record closes into the nation's history. A **truce** then
 bars either party declaring on the other for **sixteen ticks — four years** (Ben, 2026-10-30). `peace_concluded` warms both rows;
 `province_ceded` lands hard on the loser's row toward the winner. Each ceded province becomes a
@@ -537,7 +553,16 @@ ground withdraw by the retreat rule. A white peace hands every occupied goal's h
 owner, and the occupying units withdraw the same way.
 
 **Who scores a war.** The player declares, answers and makes peace through the Diplomacy ledger. A
-rival declares, answers and makes peace under the stance grant (§ 1), on its standing terms.
+rival declares, answers and makes peace under the stance grant (§ 1), on its standing terms. "Only
+the player answers and ends" its wars means no rival answers, offers or accepts **for** the player;
+it does not stop a rival imposing on it at 100 (NR-1119). **While spectating**, nobody holds the seat,
+so the war pass scores the player's nation like any rival (Ben, 2026-11-03, NR-1120; BL-409's rule) —
+otherwise a war against it would never be answered and never end.
+
+**The public record** (Ben, 2026-11-03, NR-1120). Every declaration and every peace writes an entry
+in the world history log (`../ai/AI_OPPONENT.md` § 8a), one per party, tagged by its nation. When
+the player's nation is a party, the same event is raised as a dispatch on the chat's Field channel
+(`../ui/CHAT.md`), so the player learns of a war on them from the feed, not only the ledger.
 
 ## Open questions
 
@@ -581,4 +606,7 @@ needs a surface) is the UI half; BL-390 (the seam has no read-back) owns making 
 BL-549 (friendship permits two things) owns passage and immunity. The war (§ 7) is owned by BL-1459
 (war record and declaration), BL-1428 (war goals and peace) and BL-1460 (cession moves territory);
 BL-1458 (sentiment emitters) owns § Who emits each factor; BL-1432 (Alarm as sentiment) owns § 6;
-BL-1461 (rivals declare war) the rival's war; BL-1462 (diplomacy ledger) the surface.
+BL-1461 (rivals declare war) the rival's war; BL-1462 (diplomacy ledger) the surface. BL-1479
+(grievance and Alarm floor) owns the grievance edge and Alarm's floor; BL-1480 (war loose ends) the
+imposition on the player, spectate, the offer cooldown and the public record; BL-1481 (rival
+embargo) the rival's embargo.

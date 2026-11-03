@@ -53,6 +53,13 @@ struct seed_result
     int answers = 0, offers = 0, accepts = 0, refuses = 0, on_player = 0;
     int bunkers = 0, bunkers_done = 0, player_bunkers = 0; ///< BL-1426: rivals' bunkers (built or building), completed, the player's (ceded ones included)
     int built_for_player = 0; ///< BL-1426: a bunker that first appeared in the player's assets - a build for it
+    long long pair_ticks = 0, grievance_pair_ticks = 0; ///< BL-1479: ordered nation pairs x live ticks, and those whose Trust <= -25
+    int grievance_declares = 0; ///< BL-1479: declarations made with grievance holding
+    int imposed_on_player = 0;  ///< BL-1480: peaces a rival imposed on the player's nation
+    int embargo_enacted = 0, embargo_repealed = 0, embargo_standing = 0, embargo_on_player = 0; ///< BL-1481: rival embargoes
+    float max_trust_low = 0.0f, max_embargo_u = -1.0f; ///< the lowest Trust any pair reached; the highest rival embargo utility
+    long long embargo_u_over[4] = {0, 0, 0, 0};       ///< rival pair-ticks with the embargo utility past 0.05, 0.10, 0.20, 0.30
+    int embargo_by_player = 0; ///< BL-1481: embargoes authored by the player's nation - nothing here presses one, so must be 0
     std::uint64_t hash = 0;
     std::string war_bytes; ///< the war tables, for --replay
     std::vector<war_ai_trace_row> trace;
@@ -130,6 +137,7 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
     r.nations = static_cast<int>(w.nations.size());
 
     constexpr int k_days = 90;
+    std::set<std::pair<entity_id, entity_id>> embargo_prev = w.nation_embargoes; // BL-1481
     std::set<entity_id> rival_bunkers_seen, player_bunkers_flagged; // BL-1426
     for (int step = k_campaign_settle_ticks, k = 1; step <= last_tick; ++step, ++k)
     {
@@ -138,6 +146,36 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
         w.current_day_tick = k * k_days;
         (void)run_settle_tick(w, reg, step, k * k_days, /*spectating=*/false);
         r.at_war_max = std::max(r.at_war_max, nations_at_war(w));
+        // BL-1481 (NR-1117): the rivals' embargoes, step by step - enactments and repeals.
+        for (const auto& e : w.nation_embargoes)
+            if (embargo_prev.count(e) == 0)
+            {
+                ++r.embargo_enacted;
+                r.embargo_on_player += e.second == player ? 1 : 0;
+                r.embargo_by_player += e.first == player ? 1 : 0;
+            }
+        for (const auto& e : embargo_prev)
+            if (w.nation_embargoes.count(e) == 0)
+                ++r.embargo_repealed;
+        embargo_prev = w.nation_embargoes;
+        // BL-1479 (NR-1104): how often grievance holds - every ordered pair of distinct
+        // nations, its observer's Trust toward the subject at or below the edge.
+        for (const auto& [a, na] : w.nations)
+            for (const auto& [b, nb] : w.nations)
+                if (a != b)
+                {
+                    ++r.pair_ticks;
+                    if (sentiment_toward(w.sentiment, a, b).trust <= k_war_grievance_trust)
+                        ++r.grievance_pair_ticks;
+                    r.max_trust_low = std::min(r.max_trust_low, sentiment_toward(w.sentiment, a, b).trust);
+                    if (a != player)
+                    {
+                        const float u = rival_embargo_utility(w, reg, a, b);
+                        r.max_embargo_u = std::max(r.max_embargo_u, u);
+                        const float edges[4] = { 0.05f, 0.10f, 0.20f, 0.30f };
+                        for (int q = 0; q < 4; ++q) r.embargo_u_over[q] += u > edges[q] ? 1 : 0;
+                    }
+                }
         // BL-1426 (cold review): a bunker CEDED to the player is legal; one BUILT for it
         // is not. A cession moves an existing building id, a build mints a new one, so a
         // bunker id the player holds that no rival held at an earlier step was built for
@@ -157,11 +195,14 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
     war_ai_trace_sink() = nullptr;
 
     r.at_war_end = nations_at_war(w);
+    r.embargo_standing = static_cast<int>(w.nation_embargoes.size());
     r.at_peace   = static_cast<int>(w.war_history.size());
     r.declared   = static_cast<int>(w.wars.size() + w.war_history.size());
     r.cessions   = static_cast<int>(w.province_cessions.size());
     for (const war_history_entry& h : w.war_history)
         r.imposes += (h.end == war_end::imposed_white || h.end == war_end::imposed_cession) ? 1 : 0;
+    for (const war_ai_trace_row& t : trace)
+        r.imposed_on_player += (t.applied && t.choice == war_ai_choice::impose && t.target == player) ? 1 : 0;
     for (const auto& [key, war] : w.wars) r.on_player += war.defender == player ? 1 : 0;
     for (const war_history_entry& h : w.war_history) r.on_player += h.defender == player ? 1 : 0;
     for (const war_ai_trace_row& t : trace)
@@ -171,6 +212,9 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
         r.offers  += t.choice == war_ai_choice::offer ? 1 : 0;
         r.accepts += t.choice == war_ai_choice::accept ? 1 : 0;
         r.refuses += t.choice == war_ai_choice::refuse ? 1 : 0;
+        // The trace's g is max(0, -Trust) / limit (limit 100): grievance held at g >= 0.25.
+        r.grievance_declares += (t.choice == war_ai_choice::declare
+                                 && t.grievance >= -k_war_grievance_trust / 100.0f - 1e-6f) ? 1 : 0;
     }
     // The player's nation is never acted for: no trace row names it as the actor.
     bool player_clean = true;
@@ -178,6 +222,11 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
         if (t.nation == player) player_clean = false;
     if (!player_clean)
         std::printf("  FAIL  seed %u: the war pass acted for the player's nation\n", seed);
+    if (r.embargo_by_player != 0)
+    {
+        std::printf("  FAIL  seed %u: %d embargo(es) enacted for the player's nation\n", seed, r.embargo_by_player);
+        player_clean = false;
+    }
     for (const war_ai_trace_row& t : trace)
         if (print_trace || t.choice != war_ai_choice::candidate)
             std::printf("    t%-3d %-9s %4u -> %4u u %+.3f g %.3f a %.3f s %+.3f p %.2f x %.1f goals %d%s\n",
@@ -279,6 +328,30 @@ int main(int argc, char** argv)
         int tb = 0, td = 0;
         for (const seed_result& r : rows) { tb += r.bunkers; td += r.bunkers_done; }
         std::printf("  TOTAL rival bunkers %d (%d completed) across %zu seed(s)\n", tb, td, rows.size());
+    }
+    {
+        // BL-1479 (NR-1104): how often grievance holds (Trust <= -25), and on how many
+        // declarations; BL-1480 (NR-1119): impositions on the player; BL-1481 (NR-1117):
+        // the rivals' embargoes.
+        long long pt = 0, gt = 0;
+        int gd = 0, imp_player = 0, en = 0, rp = 0, st = 0, ep = 0;
+        std::printf("  seed grievance_pair_ticks pair_ticks grievance_declares imposed_on_player embargo_enacted repealed standing on_player lowest_trust max_embargo_u u>.05 u>.10 u>.20 u>.30\n");
+        for (const seed_result& r : rows)
+        {
+            std::printf("  %4u %20lld %10lld %18d %17d %15d %8d %8d %9d %12.2f %13.3f %5lld %5lld %5lld %5lld\n", r.seed,
+                        r.grievance_pair_ticks, r.pair_ticks, r.grievance_declares, r.imposed_on_player,
+                        r.embargo_enacted, r.embargo_repealed, r.embargo_standing, r.embargo_on_player,
+                        static_cast<double>(r.max_trust_low), static_cast<double>(r.max_embargo_u),
+                        r.embargo_u_over[0], r.embargo_u_over[1], r.embargo_u_over[2], r.embargo_u_over[3]);
+            pt += r.pair_ticks; gt += r.grievance_pair_ticks; gd += r.grievance_declares;
+            imp_player += r.imposed_on_player; en += r.embargo_enacted; rp += r.embargo_repealed;
+            st += r.embargo_standing; ep += r.embargo_on_player;
+        }
+        std::printf("  GRIEVANCE holds on %lld of %lld live pair-ticks (%.3f%%); %d of %d declarations carried it\n",
+                    gt, pt, pt > 0 ? 100.0 * static_cast<double>(gt) / static_cast<double>(pt) : 0.0, gd, total_declared);
+        std::printf("  IMPOSED on the player's nation: %d across %zu seed(s)\n", imp_player, rows.size());
+        std::printf("  EMBARGOES by rivals: %d enacted, %d repealed, %d standing at the end, %d against the player, across %zu seed(s)\n",
+                    en, rp, st, ep, rows.size());
     }
     // A shard (fewer seeds than the library) only reports: the pooled table settles R2.
     const bool full = seeds.size() >= k_library.size();
