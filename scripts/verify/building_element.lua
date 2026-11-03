@@ -61,41 +61,64 @@ verify.show_panel("build", false)
 verify.frames(2)
 
 verify.place_mode("extraction", "iron_ore")
-local placed = nil
+
+-- BL-1467: a site builds only while its local market's shelf can supply its build
+-- materials; short of one, it pauses owing nothing (economy_system's site rate,
+-- the BL-095 reason the old fixed tile was chosen). The top site-finder row's market
+-- could not, so a fixed 40 steps captured a site still under construction - the
+-- element's SITE shape, not its producing one. So: place on each accepting row in
+-- drawn order, step up to 8 quarters, and keep the first site that completes. A
+-- stalled site is left standing; the capture is refused rather than taken of the
+-- wrong shape.
+local placed, built = nil, nil
 local refusals = "" -- in row order (the verify state opens no `table` library)
+local stalled = ""
+local k_tries, k_quarters = 6, 8
+local tries = 0
+
+local function find_at(row)
+    for _, b in ipairs(verify.buildings()) do
+        if b.player and b.type == "Extraction Site" and b.x == row.x and b.y == row.y then
+            return b
+        end
+    end
+    return nil
+end
+
 for i = 1, sites.n_rows do
+    if tries >= k_tries then break end
     local row = sites.rows[i]
     local r = verify.build_at(row.x, row.y)
-    if r == "placed" then
-        placed = row
-        break
+    if r ~= "placed" then
+        refusals = refusals .. string.format("%s(%d,%d)=%s", refusals == "" and "" or ", ", row.x, row.y, r)
+    else
+        tries = tries + 1
+        print(string.format("building_element: placed an Iron Mine at (%d,%d)", row.x, row.y))
+        local b = nil
+        for q = 1, k_quarters do
+            verify.econ_step(1)
+            b = find_at(row)
+            if b == nil then
+                error(string.format("building_element.lua: the extraction site placed at (%d,%d) did not register",
+                                    row.x, row.y))
+            end
+            if b.complete then break end
+        end
+        if b.complete then
+            placed, built = row, b
+            break
+        end
+        stalled = stalled .. string.format("%s(%d,%d)", stalled == "" and "" or ", ", row.x, row.y)
     end
-    refusals = refusals .. string.format("%s(%d,%d)=%s", refusals == "" and "" or ", ", row.x, row.y, r)
 end
 if not placed then
-    error("building_element.lua: no site-finder row accepted the placement: " .. refusals)
+    error("building_element.lua: no Iron Mine site completed within " .. k_quarters ..
+          " quarters; stalled: " .. stalled .. "; refused: " .. refusals)
 end
-print(string.format("building_element: placed an Iron Mine at (%d,%d)", placed.x, placed.y))
-
-verify.econ_step(40) -- finish the build, then produce for a few ticks
-
--- The building WE placed: the player's Extraction Site on the placed tile, not
--- whichever player Extraction Site the list happens to end on.
-local built = nil
-for _, b in ipairs(verify.buildings()) do
-    if b.player and b.type == "Extraction Site" and b.x == placed.x and b.y == placed.y then
-        built = b
-        break
-    end
-end
-if built == nil then
-    error(string.format("building_element.lua: the extraction site placed at (%d,%d) did not register",
-                        placed.x, placed.y))
-end
--- A site still under construction after 40 economy steps (its local market dry of build
--- materials, BL-095) captures as a site, not as a producing building: say so.
-print(string.format("building_element: the site at (%d,%d) is %s after 40 economy steps", placed.x, placed.y,
-                    built.complete and "complete" or "STILL UNDER CONSTRUCTION"))
+print(string.format("building_element: the site at (%d,%d) is complete (stalled first: %s)",
+                    placed.x, placed.y, stalled == "" and "none" or stalled))
+verify.econ_step(5) -- produce for a few ticks, so the output & rate line reads a real rate
+built = find_at(placed)
 
 -- Producing building: the primary shape of the element.
 verify.center_tile(built.x, built.y)
