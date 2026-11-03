@@ -385,7 +385,8 @@ start differs from another's by its ground, its people and its neighbours, never
 plant.
 
 **The kit is a fixed list of slots (Ben, 2026-11-02, option A).** A slot names a building and the
-good it is for. The Standard kit is the one in play:
+good it is for. **The Rich-core kit is the one in play (Ben, 2026-11-03)**; the Standard kit below
+is its smaller comparison point, and Rich-core is Standard with a larger economic core:
 
 | Category | Slots | Count |
 |---|---|---|
@@ -401,11 +402,11 @@ and copper slots need to pass the spare-input rule after households and neighbou
 quick tier of the seed library, 2026-11-03): two Farms leave a Food Processor no spare produce, one
 copper site leaves a copper Smelter short by up to fourteen units at `t_idle`.
 
-The Rich comparison point (`rich_core`) carries agricultural produce ×9, water, coal, petroleum,
+The kit in play (`rich_core`) carries agricultural produce ×9, water, coal, petroleum,
 iron ore ×2, copper ore ×3, silica ×5 and two flex slots (24); the Standard processors plus ordnance,
 a second food and steel line and silicon (10); `planetary_marketplace`, `research_institute` ×2,
 `schooling` and `university` (5); the same logistics and military slots: forty-four buildings and
-the source, about 460 credits a tick.
+the source, about 460 credits a tick, and a treasury of 12,000 credits.
 
 **Why these processors.** Each one runs on day one, which the hard rules of § Pass 3 require. The
 steel, copper and machinery slots are one chain: iron ore and coal make steel, copper ore makes
@@ -459,8 +460,8 @@ shelves of the markets the kit stands in.
 it does for every nation, so the handoff, not generation, is where parity is measured.
 
 **The kit is data.** Its slots, counts, treasury and army are one authored table, so a configuration
-under test is an edit, not a code change. Lean (about 14 buildings) and Rich (about 44) are the
-proposed comparison points. The Standard kit is the one ruled.
+under test is an edit, not a code change. Standard (27 buildings) is the comparison point Rich-core
+was chosen over (Ben, 2026-11-03).
 
 ## The player's nation
 

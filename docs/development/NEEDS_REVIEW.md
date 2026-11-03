@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*47 entries — 14 open, 33 resolved.*
+*49 entries — 16 open, 33 resolved.*
 
 ---
 
@@ -205,6 +205,32 @@ Grievance now holds at Trust -25 as ruled. Over 16 seeds the lowest Trust any pa
 > **Recommendation:** Keep.
 
 *Files: `src/world/corp_ai.cpp`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-1132 — Kit: a major's kept foundings no longer refund into the flat treasury
+*decision taken on your behalf · raised 2026-11-03 · from BL-1473 fix round, release_kit_foundings*
+
+The opening reserve refunded founding payments (state plants, ports) a major made from its history chest. With the flat treasury replacing that chest, every founding of a major is zeroed, kept or removed, so the reserve refunds nothing and every major enters the settle at exactly the kit treasury (seed 0: 1,442 credits of refunds gone on Rich-core). The brief named only removed foundings.
+
+**Why it matters.** Without it a major that founded a kept port opens above the flat figure.
+
+> **Recommendation:** Keep.
+
+*Files: `src/world/opening_kit.cpp`*
+
+### NR-1133 — Kit: refined fuel, power and ordnance slots are never wanted, so they substitute
+*question · raised 2026-11-03 · from BL-1473 calibration, quick tier*
+
+On every major the refined fuel, power and (Rich-core) ordnance slots fail the want bound and fall down the ladder to another processor. Nothing generation reads draws refined fuel; power want is per grid and grids read as fed; units' ordnance draw is not in the want reading. The doc says each kit processor runs on day one; these three never stand as named.
+
+**Why it matters.** The kit's named energy and military-supply lines are absent from every major's opening; the slots become other plants.
+
+- Count those real draws in the want reading (building fuel upkeep, unit ordnance, grid need)
+- Replace the three slots in the kit with goods that are wanted
+- Accept the substitution
+
+> **Recommendation:** Count the real draws: the goods are wanted in play, and generation is blind to it.
+
+*Files: `docs/generation/CORPORATION_GENERATION.md`, `src/world/opening_kit.cpp`*
 
 ---
 

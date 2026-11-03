@@ -70,5 +70,16 @@
   "anchor": "and the count is a cap \\(Ben, 2026-11-03\\)",
   "stale": [],
   "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "The Rich-core kit is the one in play (Ben, 2026-11-03)",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "The Rich-core kit is the one in play \\(Ben, 2026-11-03\\)",
+  "stale": [
+   "The Standard kit is the one in play",
+   "The Standard kit is the one ruled",
+   "8,000 credits\\*\\* for the Standard kit"
+  ],
+  "owner": "BL-1473 (major opening kit)"
  }
 ]

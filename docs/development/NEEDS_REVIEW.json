@@ -895,6 +895,42 @@
     "src/world/corp_ai.cpp",
     "docs/ai/AI_OPPONENT.md"
    ]
+  },
+  {
+   "id": "NR-1132",
+   "title": "Kit: a major's kept foundings no longer refund into the flat treasury",
+   "raised": "2026-11-03",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-1473 fix round, release_kit_foundings",
+   "what": "The opening reserve refunded founding payments (state plants, ports) a major made from its history chest. With the flat treasury replacing that chest, every founding of a major is zeroed, kept or removed, so the reserve refunds nothing and every major enters the settle at exactly the kit treasury (seed 0: 1,442 credits of refunds gone on Rich-core). The brief named only removed foundings.",
+   "why_it_matters": "Without it a major that founded a kept port opens above the flat figure.",
+   "recommendation": "Keep.",
+   "files": [
+    "src/world/opening_kit.cpp"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-1133",
+   "title": "Kit: refined fuel, power and ordnance slots are never wanted, so they substitute",
+   "raised": "2026-11-03",
+   "kind": "question",
+   "status": "open",
+   "source": "BL-1473 calibration, quick tier",
+   "what": "On every major the refined fuel, power and (Rich-core) ordnance slots fail the want bound and fall down the ladder to another processor. Nothing generation reads draws refined fuel; power want is per grid and grids read as fed; units' ordnance draw is not in the want reading. The doc says each kit processor runs on day one; these three never stand as named.",
+   "why_it_matters": "The kit's named energy and military-supply lines are absent from every major's opening; the slots become other plants.",
+   "options": [
+    "Count those real draws in the want reading (building fuel upkeep, unit ordnance, grid need)",
+    "Replace the three slots in the kit with goods that are wanted",
+    "Accept the substitution"
+   ],
+   "recommendation": "Count the real draws: the goods are wanted in play, and generation is blind to it.",
+   "files": [
+    "docs/generation/CORPORATION_GENERATION.md",
+    "src/world/opening_kit.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

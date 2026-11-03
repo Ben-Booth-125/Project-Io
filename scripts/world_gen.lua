@@ -259,7 +259,7 @@ world_gen = {
     -- of, decided after the fixed slots. A processing slot's `recipes` are its
     -- preference; with none feasible it bends to another recipe making the good.
     opening_kit = {
-        active = "standard",
+        active = "rich_core",
         configs = {
             standard = {
                 treasury = 8000,

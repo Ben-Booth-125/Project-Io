@@ -618,7 +618,7 @@ exist — which is why `generate_population_centres` runs before `generate_natio
 ### Pass 7 — Starting treasury *(Ben, 2026-08-24; the source ruled BL-975, 2026-09-15)*
 
 **A major opens on a flat treasury (Ben, 2026-11-02).** Every major's treasury is set to its kit's
-authored figure, **8,000 credits** for the Standard kit (`CORPORATION_GENERATION.md` § A major's
+authored figure, **12,000 credits** for the Rich-core kit in play (8,000 for Standard) (`CORPORATION_GENERATION.md` § A major's
 opening kit), in place of the chest its history folded. It is set once the kit stands and before the
 opening reserve, and it is the same for every major. It is about sixteen ticks of the kit's running
 bill and its army's wage, plus a build fund. Majors differ by ground, people and neighbours, not by
