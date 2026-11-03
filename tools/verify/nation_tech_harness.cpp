@@ -712,6 +712,7 @@ const char* kind_name(io::dg::effect_kind k)
         case io::dg::effect_kind::unlock_structure: return "unlock_structure";
         case io::dg::effect_kind::mechanic:         return "mechanic";
         case io::dg::effect_kind::unread:           return "unread";
+        case io::dg::effect_kind::unlock_kit:       return "unlock_kit"; // BL-1436
     }
     return "?";
 }

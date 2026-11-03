@@ -11,8 +11,9 @@
 
 The Digitisation tree is the tech tree of the age the campaign opens in, 1960 onward (`../ERAS.md`
 § Era 1). Every nation starts holding none of it (`../RESEARCH.md` § Who holds technology). It is the
-first tree cut to the grammar in `../RESEARCH.md` § The shape of an age's tree: 160 nodes in three
-trees of three branches, on four rings.
+first tree cut to the grammar in `../RESEARCH.md` § The shape of an age's tree: 193 nodes in three
+trees of three branches, on four rings — 160 in the branches' common shape and 33 kit nodes that
+lengthen the arms of Force, Processing and Signal & Orbit (§ Kit).
 
 The store is `digitisation_tree.json`, canonical for every node; this document owns the prose and
 carries the store's tables, rendered by `node tools/session/tech_tree_store.js digitisation`, which
@@ -36,7 +37,8 @@ branches beside it — including the branch across a tree boundary.
 
 ## One branch, node by node
 
-Every branch has the same seventeen-node shape (`../RESEARCH.md` § Links require):
+Every branch has the same seventeen-node spine (`../RESEARCH.md` § Links require); the three
+kit-bearing branches lengthen its arms with kit clusters (§ Kit):
 
 | Ring | Nodes |
 |---|---|
@@ -107,6 +109,46 @@ sketched by what the quests open:
 | Order | Broad Consensus | Settlement Charters — governing off-world population |
 | Accord | Quiet Borders | Planetary Accords — shared limits on climate Load |
 
+## Kit
+
+**Military kit is researched here (Ben, 2026-10-27), one node per technology (Ben, 2026-11-03).**
+A kit node opens its technology's item in every class it fits — the assault rifle for infantry,
+motorised and mechanised alike — so 39 nodes open the catalogue's 89 later items
+(`../../military/MILITARY.md` § The kit). Thirty-three are kit nodes of their own; six existing
+nodes also open kit beside their own advantage: *Armoured Carriers*, *Early Warning Radar*,
+*Mechanised Divisions*, *Precision Munitions* and *Airmobile Forces* in Force, *Numerical Control*
+in Processing.
+
+**Kit lives by subject in three branches**: small arms, section weapons, missiles, guns and
+vehicles in **Force**; armour materials and airframes in **Processing**; sensors, fire control,
+drones and networked kit in **Signal & Orbit**. No kit node requires a node of another branch
+(Ben, 2026-11-03); the tie between them is the goods — later kit draws electronics off the shelf.
+
+**Kit clusters lengthen the existing arms (Ben, 2026-11-03).** Each is two minors feeding a major,
+laid in line along an arm: its minors hang off the arm node before them, and the arm's next node
+hangs off its major, so the arm's rim cluster sits later. Each major keeps its two minors; no
+cluster is a pair. Minors open gen-1 and gen-2 items; a cluster's surge item sits on its major.
+
+| Branch | Left arm (to its rim major) | Right arm (to its rim major) | Nodes |
+|---|---|---|---|
+| Force | Travel III → *Anti-Tank Missiles* → *Fire-and-Forget Missiles* → Travel IV → *Airmobile Forces* | Travel V → *Rocket Artillery* → Travel VI → *Long-Range Precision Strike* → *Active Protection* → the espionage cluster | 32 |
+| Processing | Travel III → *Reactive Armour* → Travel IV → *Semiconductor Foundry* | Travel V → *Low-Observable Airframes* → Travel VI → *Industrial Robotics* | 23 |
+| Signal & Orbit | Travel III → *Thermal Imaging* → Travel IV → *Rocketry* | Travel V → *Integrated Air Defence* → Travel VI → *Networked Warfare* → *Loitering Munitions* → the espionage cluster | 29 |
+
+Where a branch carries a placeholder arm, the longer kit runs go down it, so the arm a mastery
+needs today is the shorter: Force's mastery waits on two kit clusters, Signal & Orbit's — and
+the space gate, *Rocketry* — on one.
+
+**An item may open before the earlier rung of its slot**: a slot offers whatever is researched
+(`../../military/MILITARY.md` § The lock rule), so a slot's order is not a research order.
+
+**The link lives in two places.** A kit node's store entry carries an `unlock_kit` effect naming
+its catalogue items, for display; the catalogue's `research_node` (`src/world/unit_designs.cpp`) is
+what the lock rule reads. `tools/session/tech_tree_store.js --check` holds the two equal both ways.
+
+**The age runs slower with its kit (Ben, 2026-11-03).** The kit raises the whole age from 1087 to
+1423 cost units, about 31% more, and the RP unit is not re-tuned to absorb it.
+
 ## Effects
 
 A node's **advantage** is the player-facing prose; its **effects** in the store are the same
@@ -118,6 +160,7 @@ advantage in machine form, one entry per lever (`../RESEARCH.md` § Effects no s
 | `unlock_recipe` | `recipe` | Closes a registry recipe until the nation holds the node |
 | `unlock_structure` | `structure` | The same, for a building type |
 | `mechanic` | `key` | A named rule a system switches on |
+| `unlock_kit` | `items` | The kit catalogue items the node opens (§ Kit); the catalogue reads the node |
 | `unread` | `what`, `waits_on` | Nothing: the lever is a system the game does not carry; `waits_on` names it |
 
 An effect has two states and no third: a system reads it, or it is `unread`. A modifier's sign and
@@ -130,7 +173,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 
 <!-- BEGIN GENERATED NODES (tools/session/tech_tree_store.js) -->
 
-**160 nodes** — 70 travel (7 joints, 9 masteries), 51 minor, 30 major, 9 quest; 12 placeholder nodes. Whole age: 1087 cost units.
+**193 nodes** — 70 travel (7 joints, 9 masteries), 73 minor, 41 major, 9 quest; 12 placeholder nodes. Whole age: 1423 cost units.
 
 ### Production — what the nation can extract and make
 
@@ -166,17 +209,23 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-PC-A2` | Polymer Chemistry | minor | 1 | plastics recipe inputs -10% | Shop-Floor Practice II |
 | `DG-PR-PC-A` | Bulk Petrochemicals | major | 2 | Chemical Plants unlock the plastics recipe; Refineries +20% output per batch | Catalysts + Polymer Chemistry |
 | `DG-PR-PC-T3` | Shop-Floor Practice III | travel | 2 | +1% output per batch at every processing building | Bulk Petrochemicals |
-| `DG-PR-PC-T4` | Shop-Floor Practice IV | travel | 3 | +1% output per batch at every processing building | Shop-Floor Practice III |
+| `DG-PR-PC-T4` | Shop-Floor Practice IV | travel | 3 | +1% output per batch at every processing building | Reactive Armour |
 | `DG-PR-PC-T5` | Shop-Floor Practice V | travel | 2 | +1% output per batch at every processing building | Bulk Petrochemicals |
-| `DG-PR-PC-T6` | Shop-Floor Practice VI | travel | 3 | +1% output per batch at every processing building | Shop-Floor Practice V |
+| `DG-PR-PC-T6` | Shop-Floor Practice VI | travel | 3 | +1% output per batch at every processing building | Low-Observable Airframes |
 | `DG-PR-PC-B1` | Clean Rooms | minor | 3 | microchip recipe +10% yield | Shop-Floor Practice IV |
 | `DG-PR-PC-B2` | Photolithography | minor | 3 | Electronics Labs +5% output per batch | Shop-Floor Practice IV |
 | `DG-PR-PC-B` | Semiconductor Foundry | major | 4 | Electronics Labs unlock the microchip recipe; Electronics Labs +10% output per batch | Clean Rooms + Photolithography |
-| `DG-PR-PC-C1` | Numerical Control | minor | 3 | Fabricators +5% output per batch | Shop-Floor Practice VI |
+| `DG-PR-PC-C1` | Numerical Control | minor | 3 | Fabricators +5% output per batch; opens lightweight composite tracks (armour) | Shop-Floor Practice VI |
 | `DG-PR-PC-C2` | Process Automation | minor | 3 | wages in processing buildings -5% | Shop-Floor Practice VI |
 | `DG-PR-PC-C` | Industrial Robotics | major | 4 | every processing building +20% output per batch and wages -10% | Numerical Control + Process Automation |
 | `DG-PR-PC-M` | Industrial Depth | mastery | 4 | +3% output per batch at every processing building | Semiconductor Foundry + Industrial Robotics |
 | `DG-PR-PC-Q` | Domestic Chips | quest | 4 | Electronics Labs +10% output per batch. **Deed:** your microchip output covers your own electronics demand for 4 quarters. **Keys next age:** Orbital Assembly | Semiconductor Foundry |
+| `DG-PR-PC-D1` | Composite Armour | minor | 2 | opens composite armour (armour, the light-armour applique) | Shop-Floor Practice III |
+| `DG-PR-PC-D2` | Ceramic Plates | minor | 2 | opens the ceramic plate carrier (infantry, motorised and mechanised armour) | Shop-Floor Practice III |
+| `DG-PR-PC-D` | Reactive Armour | major | 3 | opens reactive armour (armour) | Composite Armour + Ceramic Plates |
+| `DG-PR-PC-E1` | Jet Airframes | minor | 2 | opens jet airframes (the twin-engine fighter, the multirole, the supersonic bomber, the high-altitude recon aircraft) | Shop-Floor Practice V |
+| `DG-PR-PC-E2` | Armoured Helicopters | minor | 2 | opens the armoured tandem-seat helicopter (helicopter airframe) | Shop-Floor Practice V |
+| `DG-PR-PC-E` | Low-Observable Airframes | major | 3 | opens low-observable airframes (fighter, strike, bomber) | Jet Airframes + Armoured Helicopters |
 
 #### Energy (`PR-EN`)
 
@@ -212,17 +261,29 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-NE-SO-A2` | Mass Higher Education | minor | 1 | universities +20% research | Research Grant II |
 | `DG-NE-SO-A` | Mainframe Computing | major | 2 | national research +15% | Telex Network + Mass Higher Education |
 | `DG-NE-SO-T3` | Research Grant III | travel | 2 | +1% national research | Mainframe Computing |
-| `DG-NE-SO-T4` | Research Grant IV | travel | 3 | +1% national research | Research Grant III |
+| `DG-NE-SO-T4` | Research Grant IV | travel | 3 | +1% national research | Thermal Imaging |
 | `DG-NE-SO-T5` | Research Grant V | travel | 2 | +1% national research | Mainframe Computing |
-| `DG-NE-SO-T6` | Research Grant VI | travel | 3 | +1% national research | Research Grant V |
+| `DG-NE-SO-T6` | Research Grant VI | travel | 3 | +1% national research | Integrated Air Defence |
 | `DG-NE-SO-B1` | Pad Ground Support | minor | 3 | Launchpad build cost -25% | Research Grant IV |
 | `DG-NE-SO-B2` | Guidance Systems | minor | 3 | launch propellant -5% | Research Grant IV |
 | `DG-NE-SO-B` | Rocketry | major | 4 | the Launchpad may operate (with the staffed pad and propellant reserve); convoys may dispatch to other bodies | Pad Ground Support + Guidance Systems |
-| `DG-NE-SO-C1` | Reserved minor | minor (placeholder) | 3 | reserved for espionage: signals intelligence | Research Grant VI |
-| `DG-NE-SO-C2` | Reserved minor | minor (placeholder) | 3 | reserved for espionage: signals intelligence | Research Grant VI |
+| `DG-NE-SO-C1` | Reserved minor | minor (placeholder) | 4 | reserved for espionage: signals intelligence | Loitering Munitions |
+| `DG-NE-SO-C2` | Reserved minor | minor (placeholder) | 4 | reserved for espionage: signals intelligence | Loitering Munitions |
 | `DG-NE-SO-C` | [Espionage] | major (placeholder) | 4 | placeholder cluster: signals intelligence; effects authored when the espionage system exists | Reserved minor + Reserved minor |
 | `DG-NE-SO-M` | Research Culture | mastery | 4 | +3% national research | Rocketry |
 | `DG-NE-SO-Q` | First Cargo to Orbit | quest | 4 | launch propellant -5%. **Deed:** one convoy completed to another body. **Keys next age:** Interplanetary Convoys | Rocketry |
+| `DG-NE-SO-D1` | Airborne Radar | minor | 2 | opens airborne radar (pulse-doppler, terrain-following, side-looking) | Research Grant III |
+| `DG-NE-SO-D2` | Long-Endurance Drones | minor | 2 | opens the long-endurance drone and its satellite datalink | Research Grant III |
+| `DG-NE-SO-D` | Thermal Imaging | major | 3 | opens thermal sights (armour and light-armour armament, helicopter night vision, the targeting pod) | Airborne Radar + Long-Endurance Drones |
+| `DG-NE-SO-E1` | Scanned-Array Radar | minor | 2 | opens scanned-array radar (fighter, multirole sensor fusion, helicopter mast radar) | Research Grant V |
+| `DG-NE-SO-E2` | Jet Combat Drones | minor | 2 | opens the jet-powered combat drone (drone airframe) | Research Grant V |
+| `DG-NE-SO-E` | Integrated Air Defence | major | 3 | opens the integrated air-defence network and the airborne early-warning aircraft | Scanned-Array Radar + Jet Combat Drones |
+| `DG-NE-SO-G1` | Autonomous Targeting | minor | 3 | opens autonomous targeting (drone avionics) | Research Grant VI |
+| `DG-NE-SO-G2` | Electronic Warfare | minor | 3 | opens electronic warfare (air-defence fire control, bomber countermeasures, towed decoys, the signals-intelligence suite) | Research Grant VI |
+| `DG-NE-SO-G` | Networked Warfare | major | 4 | opens networked soldier kit and gun-launched missiles with networked fire control | Autonomous Targeting + Electronic Warfare |
+| `DG-NE-SO-F1` | FPV Drones | minor | 4 | opens FPV attack drones (motorised and mechanised weapon) | Networked Warfare |
+| `DG-NE-SO-F2` | Counter-Drone Defence | minor | 4 | opens layered defence with counter-drone (air defence launcher) | Networked Warfare |
+| `DG-NE-SO-F` | Loitering Munitions | major | 4 | opens loitering drones (artillery munitions, drone armament) | FPV Drones + Counter-Drone Defence |
 
 #### Markets (`NE-MK`)
 
@@ -276,21 +337,36 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 |---|---|---|---|---|---|
 | `DG-ST-FO-T1` | Drill & Training I | travel | 1 | +1% strength for every unit | — (open) |
 | `DG-ST-FO-T2` | Drill & Training II | travel | 1 | +1% strength for every unit | Drill & Training I |
-| `DG-ST-FO-A1` | Armoured Carriers | minor | 1 | land unit upkeep -5% | Drill & Training II |
-| `DG-ST-FO-A2` | Early Warning Radar | minor | 1 | home-province defence +10% | Drill & Training II |
-| `DG-ST-FO-A` | Mechanised Divisions | major | 2 | unlocks mechanised infantry; every land unit +20% strength | Armoured Carriers + Early Warning Radar |
+| `DG-ST-FO-A1` | Armoured Carriers | minor | 1 | land unit upkeep -5%; opens protected trucks, the truck-mounted air-defence carrier and spaced light armour | Drill & Training II |
+| `DG-ST-FO-A2` | Early Warning Radar | minor | 1 | home-province defence +10%; opens search radar (air-defence fire control) | Drill & Training II |
+| `DG-ST-FO-A` | Mechanised Divisions | major | 2 | unlocks mechanised infantry; every land unit +20% strength; opens the autocannon fighting vehicle and the light-armour autocannon | Armoured Carriers + Early Warning Radar |
 | `DG-ST-FO-T3` | Drill & Training III | travel | 2 | +1% strength for every unit | Mechanised Divisions |
-| `DG-ST-FO-T4` | Drill & Training IV | travel | 3 | +1% strength for every unit | Drill & Training III |
+| `DG-ST-FO-T4` | Drill & Training IV | travel | 3 | +1% strength for every unit | Fire-and-Forget Missiles |
 | `DG-ST-FO-T5` | Drill & Training V | travel | 2 | +1% strength for every unit | Mechanised Divisions |
-| `DG-ST-FO-T6` | Drill & Training VI | travel | 3 | +1% strength for every unit | Drill & Training V |
+| `DG-ST-FO-T6` | Drill & Training VI | travel | 3 | +1% strength for every unit | Rocket Artillery |
 | `DG-ST-FO-B1` | Helicopter Lift | minor | 3 | muster time -10% | Drill & Training IV |
-| `DG-ST-FO-B2` | Precision Munitions | minor | 3 | units +10% strength when attacking | Drill & Training IV |
-| `DG-ST-FO-B` | Airmobile Forces | major | 4 | unit movement +50% along reach | Helicopter Lift + Precision Munitions |
-| `DG-ST-FO-C1` | Reserved minor | minor (placeholder) | 3 | reserved for espionage: covert operations | Drill & Training VI |
-| `DG-ST-FO-C2` | Reserved minor | minor (placeholder) | 3 | reserved for espionage: covert operations | Drill & Training VI |
+| `DG-ST-FO-B2` | Precision Munitions | minor | 3 | units +10% strength when attacking; opens guided shells, laser-guided and guided bombs, and drone guided missiles | Drill & Training IV |
+| `DG-ST-FO-B` | Airmobile Forces | major | 4 | unit movement +50% along reach; opens the dedicated attack helicopter (helicopter airframe) | Helicopter Lift + Precision Munitions |
+| `DG-ST-FO-C1` | Reserved minor | minor (placeholder) | 4 | reserved for espionage: covert operations | Active Protection |
+| `DG-ST-FO-C2` | Reserved minor | minor (placeholder) | 4 | reserved for espionage: covert operations | Active Protection |
 | `DG-ST-FO-C` | [Espionage] | major (placeholder) | 4 | placeholder cluster: covert operations; effects authored when the espionage system exists | Reserved minor + Reserved minor |
 | `DG-ST-FO-M` | Combined Arms | mastery | 4 | +3% strength for every unit | Airmobile Forces |
 | `DG-ST-FO-Q` | Proven Readiness | quest | 2 | muster time -20%. **Deed:** every home province held through a war, or a war won. **Keys next age:** Space Force | Mechanised Divisions |
+| `DG-ST-FO-D1` | Assault Rifles | minor | 2 | opens the assault rifle (infantry, motorised and mechanised weapon) | Drill & Training III |
+| `DG-ST-FO-D2` | Body Armour | minor | 2 | opens the flak vest (infantry, motorised and mechanised armour) | Drill & Training III |
+| `DG-ST-FO-D` | Anti-Tank Missiles | major | 2 | opens the wire-guided anti-tank missile (infantry and motorised weapon, helicopter armament) | Assault Rifles + Body Armour |
+| `DG-ST-FO-E1` | Light Mortars | minor | 2 | opens the light mortar (infantry weapon) | Anti-Tank Missiles |
+| `DG-ST-FO-E2` | Short-Range Missiles | minor | 2 | opens short-range missiles (air defence launcher, fighter radar-guided armament, recon self-defence) | Anti-Tank Missiles |
+| `DG-ST-FO-E` | Fire-and-Forget Missiles | major | 3 | opens the fire-and-forget anti-tank missile (infantry and mechanised weapon, the missile IFV, the light-armour mount, helicopter armament) | Light Mortars + Short-Range Missiles |
+| `DG-ST-FO-G1` | Modern Gun Barrels | minor | 2 | opens the smoothbore tank gun and the long-barrel howitzer | Drill & Training V |
+| `DG-ST-FO-G2` | Tracked Chassis | minor | 2 | opens tracked chassis (self-propelled artillery, the air-defence carrier, the tracked scout, hydropneumatic suspension) | Drill & Training V |
+| `DG-ST-FO-G` | Rocket Artillery | major | 3 | opens the multiple rocket launcher (artillery gun) | Modern Gun Barrels + Tracked Chassis |
+| `DG-ST-FO-F1` | Medium-Range Missiles | minor | 3 | opens medium-range missiles (air defence launcher, fighter beyond-visual-range armament) | Drill & Training VI |
+| `DG-ST-FO-F2` | Submunitions | minor | 3 | opens anti-armour submunitions (artillery munitions) | Drill & Training VI |
+| `DG-ST-FO-F` | Long-Range Precision Strike | major | 4 | opens guided long-range rockets, precision stand-off weapons and air-launched cruise missiles | Medium-Range Missiles + Submunitions |
+| `DG-ST-FO-H1` | Wheeled Carriers | minor | 4 | opens wheeled carriers (motorised vehicle, the run-flat six-wheeler) | Long-Range Precision Strike |
+| `DG-ST-FO-H2` | Armoured Self-Propelled Guns | minor | 4 | opens the armoured self-propelled chassis (artillery tow) | Long-Range Precision Strike |
+| `DG-ST-FO-H` | Active Protection | major | 4 | opens active protection (armour, the heavy fighting vehicle) | Wheeled Carriers + Armoured Self-Propelled Guns |
 
 #### Order (`ST-OR`)
 

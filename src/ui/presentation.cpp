@@ -169,6 +169,7 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Artillery Pieces",   "Art", IM_COL32(160,  82,  60, 255) }, // rust
     { "Guided Weapons",     "GW",  IM_COL32(196, 104, 120, 255) }, // rose: electronics meets ordnance
     { "Drones",             "Drn", IM_COL32(128, 140, 170, 255) }, // slate blue
+    { "Airframes",          "Afr", IM_COL32(150, 160, 176, 255) }, // BL-1436: aluminium grey, a hull's skin
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the

@@ -109,6 +109,8 @@ constexpr resource_type k_goods[] = {
     resource_type::steel, resource_type::coal, resource_type::machinery, resource_type::alloys,
     resource_type::electronics, resource_type::ordnance, resource_type::refined_fuel,
     resource_type::iron_ore, resource_type::petroleum,
+    // BL-1436: the air kit draws the kit goods (airframes, guided weapons, drones).
+    resource_type::airframes, resource_type::guided_weapons, resource_type::drones,
 };
 
 struct fixture

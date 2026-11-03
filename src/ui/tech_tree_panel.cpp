@@ -37,8 +37,14 @@ constexpr float kDeg = kPi / 180.0f;
 // angle `a`, in BASE radius units (scaled to the canvas):
 //
 //   Travel I 48 -> Travel II 74 -> cluster A minors 102 (a +-6) -> major A 134
-//   -> two arms at a-10 / a+10: Travel III / V 164 -> Travel IV / VI 194
-//   -> arm minors 226 (arm +-5) -> majors B (a-10) / C (a+10) 264 -> mastery 318.
+//   -> two arms at a-10 / a+10: Travel III / V 164 -> ... -> the rim majors 264
+//   -> mastery 318.
+//
+// An arm is laid by DEPTH (BL-1436: kit clusters lengthen the arms, DIGITISATION_TREE.md
+// § Kit): Travel III / V is depth 0, each node one past its deepest requirement in the
+// arm, a cluster's minors (arm +-5) sharing a depth; the arm's steps divide 164 -> 264
+// evenly, so an arm of travel, travel, minors, major reads as before (164, 197, 231, 264)
+// and a longer arm packs its clusters closer.
 //
 // Pair majors sit +-6 degrees off their slot; a quest diamond beside its major;
 // a joint on the boundary between the two arms it joins, at 214.
@@ -127,39 +133,114 @@ std::array<node_place, dg::node_count> compute_layout()
         node_place p;
         const char c0 = slot[0];
         const char c1 = slot[0] != '\0' ? slot[1] : '\0';
-        if (c0 == 'T')
-        {
-            switch (c1)
-            {
-                case '1': p = {a, 48.0f}; break;
-                case '2': p = {a, 74.0f}; break;
-                case '3': p = {a - 10.0f, 164.0f}; break;
-                case '4': p = {a - 10.0f, 194.0f}; break;
-                case '5': p = {a + 10.0f, 164.0f}; break;
-                default:  p = {a + 10.0f, 194.0f}; break; // T6
-            }
-        }
+        if (c0 == 'T' && (c1 == '1' || c1 == '2'))
+            p = {a, c1 == '1' ? 48.0f : 74.0f};
         else if (c0 == 'M')
             p = {a, kRimRadius};
-        else if (c0 == 'A' || c0 == 'B' || c0 == 'C')
+        else if (c0 == 'A')
         {
-            const float arm = c0 == 'A' ? a : (c0 == 'B' ? a - 10.0f : a + 10.0f);
-            const bool  minor = (c1 == '1' || c1 == '2');
+            const bool minor = (c1 == '1' || c1 == '2');
             if (minor)
             {
                 const char other[3] = {c0, c1 == '1' ? '2' : '1', '\0'};
-                const float off = c0 == 'A' ? 6.0f : 5.0f;
-                const float d = has_slot(n.id, other) ? (c1 == '1' ? -off : off) : 0.0f;
-                p = {arm + d, c0 == 'A' ? 102.0f : 226.0f};
+                const float d = has_slot(n.id, other) ? (c1 == '1' ? -6.0f : 6.0f) : 0.0f;
+                p = {a + d, 102.0f};
             }
             else
             {
                 // The cluster's major, or one side of a pick-one pair ('a' / 'b').
                 const float d = c1 == 'a' ? -6.0f : (c1 == 'b' ? 6.0f : 0.0f);
-                p = {arm + d, c0 == 'A' ? 134.0f : 264.0f};
+                p = {a + d, 134.0f};
             }
         }
+        else
+            continue; // an arm node: laid by depth below
         L[static_cast<std::size_t>(i)] = p;
+        placed[static_cast<std::size_t>(i)] = true;
+    }
+
+    // The arms, by depth (see the header): Travel III (arm -1) and Travel V (arm +1) are
+    // depth 0; every other arm node is one past its deepest requirement, and takes its
+    // first requirement's arm. Requirements may sit later in the store (the kit nodes are
+    // appended), so relax until nothing moves.
+    std::array<int, dg::node_count> depth{}, side{};
+    depth.fill(-1);
+    const auto arm_node = [&](int i) {
+        const dg::node& n = dg::nodes[static_cast<std::size_t>(i)];
+        return !n.is_joint && !n.is_quest && !placed[static_cast<std::size_t>(i)]
+            && branch_index(n.branch) >= 0;
+    };
+    for (int i = 0; i < dg::node_count; ++i)
+    {
+        if (!arm_node(i))
+            continue;
+        const char* slot = slot_of(dg::nodes[static_cast<std::size_t>(i)].id);
+        if (slot[0] == 'T' && (slot[1] == '3' || slot[1] == '5'))
+        {
+            depth[static_cast<std::size_t>(i)] = 0;
+            side[static_cast<std::size_t>(i)]  = slot[1] == '3' ? -1 : 1;
+        }
+    }
+    for (bool moved = true; moved;)
+    {
+        moved = false;
+        for (int i = 0; i < dg::node_count; ++i)
+        {
+            const dg::node& n = dg::nodes[static_cast<std::size_t>(i)];
+            if (!arm_node(i) || depth[static_cast<std::size_t>(i)] >= 0 || n.group_count == 0)
+                continue;
+            int d = -1, s = 0;
+            bool ready = true;
+            for (int g = 0; g < n.group_count && ready; ++g)
+            {
+                const int m = n.groups[static_cast<std::size_t>(g)][0];
+                if (m < 0 || !arm_node(m))
+                    continue; // a requirement outside the arm (none today)
+                if (depth[static_cast<std::size_t>(m)] < 0)
+                    ready = false;
+                else if (depth[static_cast<std::size_t>(m)] > d)
+                {
+                    d = depth[static_cast<std::size_t>(m)];
+                    if (s == 0) s = side[static_cast<std::size_t>(m)];
+                }
+            }
+            if (!ready || d < 0)
+                continue;
+            depth[static_cast<std::size_t>(i)] = d + 1;
+            side[static_cast<std::size_t>(i)]  = s;
+            moved = true;
+        }
+    }
+    // Each (branch, arm)'s deepest step, so its steps divide 164 -> 264.
+    std::array<int, dg::branch_count * 2> deepest{};
+    for (int i = 0; i < dg::node_count; ++i)
+        if (depth[static_cast<std::size_t>(i)] >= 0)
+        {
+            const int k = branch_index(dg::nodes[static_cast<std::size_t>(i)].branch) * 2
+                        + (side[static_cast<std::size_t>(i)] > 0 ? 1 : 0);
+            deepest[static_cast<std::size_t>(k)] = std::max(deepest[static_cast<std::size_t>(k)],
+                                                            depth[static_cast<std::size_t>(i)]);
+        }
+    for (int i = 0; i < dg::node_count; ++i)
+    {
+        const int dep = depth[static_cast<std::size_t>(i)];
+        if (dep < 0)
+            continue;
+        const dg::node& n = dg::nodes[static_cast<std::size_t>(i)];
+        const int b = branch_index(n.branch);
+        const int s = side[static_cast<std::size_t>(i)];
+        const int top = std::max(1, deepest[static_cast<std::size_t>(b * 2 + (s > 0 ? 1 : 0))]);
+        const float arm = branch_angle(b) + (s > 0 ? 10.0f : -10.0f);
+        const char* slot = slot_of(n.id);
+        float d = 0.0f;
+        if (slot[0] != 'T' && (slot[1] == '1' || slot[1] == '2'))
+        {
+            const char other[3] = {slot[0], slot[1] == '1' ? '2' : '1', '\0'};
+            d = has_slot(n.id, other) ? (slot[1] == '1' ? -5.0f : 5.0f) : 0.0f;
+        }
+        else if (slot[1] == 'a' || slot[1] == 'b')
+            d = slot[1] == 'a' ? -6.0f : 6.0f;
+        L[static_cast<std::size_t>(i)] = {arm + d, 164.0f + 100.0f * static_cast<float>(dep) / static_cast<float>(top)};
         placed[static_cast<std::size_t>(i)] = true;
     }
 

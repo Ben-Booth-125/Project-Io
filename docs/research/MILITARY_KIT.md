@@ -212,8 +212,11 @@ outdated unit types."*
 
 ## 8. Placement in the Digitisation tree — proposal (design pass, 2026-11-03)
 
-Written for the ruling that kit is folded into the age tree (above). Nothing here is in
-`tech/DIGITISATION_TREE.md` or its store yet; Ben answers § 8.5 first.
+Written for the ruling that kit is folded into the age tree (above). **Ruled (Ben, 2026-11-03):**
+A on Q1, Q2, Q4, Q5, Q6 and Q7; **C on Q3** (no kit spur: kit clusters lengthen the existing arms,
+so § 8.1's spurs and § 8.2's "Requires" column are superseded by the layout in
+`../economy/tech/DIGITISATION_TREE.md` § Kit); **B on Q8** (the age runs slower). The node set and
+the items each opens are as § 8.2 placed them.
 
 **The list placed is the authored catalogue, not § 2.** § 2's two-slot table was overturned
 (Ben, 2026-10-28: each class has its own slots, `military/MILITARY.md` § Land — the classes). The

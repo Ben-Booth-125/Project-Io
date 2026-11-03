@@ -338,6 +338,7 @@ Products are the highest-value goods and the primary driver of market price dive
 | Artillery pieces | Steel + machinery | Arms Works | 188.0 |
 | Guided weapons | Electronics + ordnance | Arms Works | 240.6 |
 | Drones | Electronics + alloys | Arms Works | 169.8 |
+| Airframes | Alloys + machinery + electronics | Arms Works | 274.2 |
 
 The margin ladder widens up the tiers — spacecraft components sits 123× iron ore — which is the
 value gradient the space-equipment premise rests on. Propellant and spacecraft components are the
@@ -380,7 +381,8 @@ consumer can also be made wherever it is drawn.
 
 A unit's equipment is goods on the shelf, **by kind, not by generation** (Ben, 2026-10-27;
 `docs/military/MILITARY.md` § Land — equipment, refit and manpower): **small arms, armoured
-vehicles, artillery pieces, guided weapons and drones**, with the existing electronics. A kit
+vehicles, artillery pieces, guided weapons, drones and airframes**, with the existing electronics
+(airframes, Ben, 2026-11-03: every manned aircraft's hull; a drone's airframe is drones'). A kit
 item names how many of each it takes; a later item takes more and adds electronics, so the
 economy feels each generation without a good for every rung. A hire, a refit and a wounded
 unit's refill buy them off the shelf. They are terminal: no recipe takes them in.
@@ -434,7 +436,7 @@ A representative subset of **seven resources** is the hand-calibrated core the e
 The `resource_type` enum holds **38 values**: 7 Earth-sourced raws, 4 space-sourced raws, 5
 ambient raws, 4 endemic goods, 3 prototype refined goods, 3 ancient intermediates, propellant,
 7 processing-chain goods, 3 habitability goods, and ordnance — and, appended since, the ancient
-roster's slices, power, the retired construction-capacity slot and the five kit goods. Adding a resource changes
+roster's slices, power, the retired construction-capacity slot and the six kit goods. Adding a resource changes
 `resource_count` and with it the width of every serialised `std::array<float, resource_count>` —
 tile deposits and reserves, market supply/demand/price/base-price and shelf inventory, nation abundance
 and substrate capacity. **Extending the enum IS a save-format retrofit**, but every one of those

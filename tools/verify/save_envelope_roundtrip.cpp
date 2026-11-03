@@ -937,7 +937,7 @@ int main()
         const save_envelope env = make_envelope();
         // BL-1422: a GENUINE v22 file - its world and every resource_count-wide envelope
         // array 49 wide, no target tail - from the verification writer, not today's
-        // bytes truncated (today's arrays are 54 wide since save_game_version 24).
+        // bytes truncated (today's arrays are 55 wide since save_game_version 25).
         write_save_game_at(k_path, w, env, save_game_version_prefix_compatible);
         world         lw;
         save_envelope le;
@@ -1014,6 +1014,54 @@ int main()
         be.speed = 77;
         check(!read_save_game(k_path, bw, be) && be.speed == 77,
               "S9b a narrow file stamped v24 is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // S9c -- BL-1436 (save_game_version 25): a v24 envelope, its arrays 54 wide and its
+    // world a v75 snapshot, reads whole: the first 54 slots as written, airframes 0.
+    // -----------------------------------------------------------------------
+    {
+        static_assert(save_game_version == 25 && save_game_version_pre_airframes == 24,
+                      "S9c pins v25 as airframes' envelope layout");
+        world w = make_world();
+        save_envelope env = make_envelope();
+        if (!env.report.bodies.empty())
+        {
+            auto& st = env.report.bodies[0].state.endowment;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                st[r] = 1.0f + 0.125f * static_cast<float>(r);
+            env.report.bodies[0].undrawn.endowment = st;
+        }
+        check(write_save_game_at(k_path, w, env, save_game_version_pre_airframes),
+              "S9c the verification writer wrote a v24 file");
+        world         lw;
+        save_envelope le;
+        const bool ok = read_save_game(k_path, lw, le);
+        bool endow = ok && !le.report.bodies.empty();
+        if (endow)
+        {
+            const auto& got = le.report.bodies[0].state.endowment;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float want = r < k_resource_count_pre_airframes ? 1.0f + 0.125f * static_cast<float>(r) : 0.0f;
+                endow = endow && got[r] == want;
+            }
+        }
+        check(endow && same_market_history(le.market_history, env.market_history)
+                  && le.planetary_pan_y == env.planetary_pan_y
+                  && le.params.major_target == env.params.major_target,
+              "S9c a v24 file reads whole: its 54 endowment slots as written, airframes 0, everything after intact");
+        {
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(4, std::ios::beg);
+            const uint32_t v25 = save_game_version_airframes;
+            f.write(reinterpret_cast<const char*>(&v25), sizeof(v25));
+        }
+        world         bw;
+        save_envelope be;
+        be.speed = 77;
+        check(!read_save_game(k_path, bw, be) && be.speed == 77,
+              "S9c a 54-wide file stamped v25 is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------

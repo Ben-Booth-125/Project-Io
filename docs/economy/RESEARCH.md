@@ -83,8 +83,8 @@ branch's first travel node is open from the start.
 | Tier | What it is | Base cost |
 |---|---|---|
 | **Travel** | A small stacking buff themed to its branch — *+1% extraction rate at every extraction building* — that lengthens the paths between clusters. Joints and masteries are travel nodes too | 1 |
-| **Minor** | A narrower buff or a small utility, beside a major | 2 |
-| **Major** | A named technology: unlocks a building, a recipe, a unit or a mechanic. The power surge | 6 |
+| **Minor** | A narrower buff or a small utility, beside a major — or a kit item (Ben, 2026-11-03) | 2 |
+| **Major** | A named technology: unlocks a building, a recipe, a unit, a mechanic or a cluster's surge kit item. The power surge | 6 |
 | **Quest** | A deed-gated node: a small bonus now, and the key to the same branch in the next age | 3 |
 
 **Many nodes are small on purpose.** Travel is the bulk of the tree, and a branch's travel nodes
@@ -106,6 +106,14 @@ members, and every group must be satisfied. So:
 **Branches fan out.** A branch runs travel → its first **cluster** (two minors feeding a major) →
 two arms → a cluster at the end of each arm → its mastery. The outer rings hold twice the majors of
 the inner, so the tree is widest at the rim.
+
+**Kit clusters lengthen the arms (Ben, 2026-11-03).** A branch that carries military kit is wider
+than the seventeen-node spine — the Digitisation tree's Force holds 32 nodes, Signal & Orbit 29,
+Processing 23. Each kit cluster is two minors feeding a major, laid in line along an existing arm:
+its minors hang off the arm node before them, and the arm's next node hangs off its major, so the
+arm's rim cluster sits later. A kit cluster keeps the two-minors rule and is never a pair. **No kit
+node requires a node of another branch**: the tie between kit branches is economic, later kit
+drawing electronics off the shelf. A kit node opens one technology's item in every class it fits.
 
 ### Pairs
 
@@ -139,7 +147,8 @@ reaches its first ring-2 major in about five years.
 spending a typical research share reaches a power surge — a major — at steady intervals through the
 age. That pacing is the property the price is tuned to and the sweep measures (Ben, 2026-10-10:
 *"surges in player perceived power levels at similar intervals"*); the node count is never changed
-to meet it.
+to meet it. **Kit makes an age slower, and is not priced away (Ben, 2026-11-03):** the RP unit is
+not re-tuned to absorb the cost the kit clusters add.
 
 **Prices rise through the age; research points rise to meet them (Ben, 2026-10-15).** A node's
 cost climbs with its date in the age, not only its ring. A nation's RP grows with its economy, so
@@ -159,7 +168,8 @@ building ceiling (`../generation/PROVINCES.md` § The building ceiling).
 **Military kit is researched in the age tree (Ben, 2026-10-27)** — rifles, launchers, guns, armour,
 sensors and drones are nodes of the tree like any other technology, not a ladder of their own
 (`../military/MILITARY.md` § Land — the classes). A kit item is what a unit's design may take; a
-node that opens one names it as its unlock.
+node that opens one names it as its unlock (`unlock_kit`), and the kit catalogue names the node —
+two records of one link, held equal by the tree's check (Ben, 2026-11-03).
 
 ---
 

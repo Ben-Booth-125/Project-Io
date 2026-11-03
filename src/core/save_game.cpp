@@ -875,13 +875,21 @@ bool r_rank_snapshot(std::istream& i, std::unordered_map<entity_id, int>& snap)
 // The envelope
 // ---------------------------------------------------------------------------
 
+/// The resource_count-wide array width an envelope of @p version carries: 49 before
+/// v24 (BL-1422), 54 at v24 (BL-1436: before airframes), resource_count from v25.
+std::size_t envelope_resource_width(uint32_t version)
+{
+    return version < save_game_version_kit_goods    ? k_resource_count_pre_kit_goods
+         : version < save_game_version_airframes    ? k_resource_count_pre_airframes
+                                                    : resource_count;
+}
+
 void w_envelope(std::ostream& o, const save_envelope& e, uint32_t version = save_game_version)
 {
     // BL-1422: an envelope before v24 carries every resource_count-wide array (the body
-    // endowments, the market history) 49 wide - the verification writer's old shapes.
-    const bio::scoped_array_width kit_width(
-        resource_count, version < save_game_version_kit_goods ? k_resource_count_pre_kit_goods
-                                                              : resource_count);
+    // endowments, the market history) 49 wide - the verification writer's old shapes;
+    // BL-1436: v24 54 wide.
+    const bio::scoped_array_width kit_width(resource_count, envelope_resource_width(version));
     w_u64(o, e.sim_tick);
     w_u64(o, e.day_tick);
     w_u64(o, e.econ_tick);
@@ -930,10 +938,8 @@ bool r_envelope(std::istream& i, save_envelope& e, uint32_t version)
 {
     // BL-1422: an envelope before v24 carries EVERY resource_count-wide array - each
     // body's planetology endowment (read twice a body) and the market history's series -
-    // 49 wide; the kit goods read as zero. Set for the whole read.
-    const bio::scoped_array_width kit_width(
-        resource_count, version < save_game_version_kit_goods ? k_resource_count_pre_kit_goods
-                                                              : resource_count);
+    // 49 wide; the kit goods read as zero. Set for the whole read. BL-1436: v24 54 wide.
+    const bio::scoped_array_width kit_width(resource_count, envelope_resource_width(version));
     if (!r_envelope_v22(i, e))
         return false;
     if (version == save_game_version_prefix_compatible)
@@ -995,7 +1001,8 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
     // the matching shape - for v23/v22, a v73 world snapshot (every per-resource array 49
     // wide) and an envelope whose endowments and market history are 49 wide (and, for
     // v22, no nation targets). The game writes only `write_save_game`.
-    if (version != save_game_version && version != save_game_version_pre_kit_goods
+    if (version != save_game_version && version != save_game_version_pre_airframes
+        && version != save_game_version_pre_kit_goods
         && version != save_game_version_prefix_compatible)
         return false;
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
@@ -1005,6 +1012,8 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
     w_u32(out, version);
     if (version < save_game_version_kit_goods)
         write_world_snapshot_pre_kit_goods(w, out);
+    else if (version < save_game_version_airframes)
+        write_world_snapshot_pre_airframes(w, out); // BL-1436: v24 carries a v75 world
     else
         write_world_snapshot(w, out);
     w_envelope(out, env, version);
@@ -1026,9 +1035,10 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
 
     uint32_t version = 0;
     if (!r_u32(in, version)
-        || (version != save_game_version && version != save_game_version_pre_kit_goods
+        || (version != save_game_version && version != save_game_version_pre_airframes
+            && version != save_game_version_pre_kit_goods
             && version != save_game_version_prefix_compatible))
-        return false; // LAYOUT 24: v23 and v22 read with a 49-wide market history (BL-1422)
+        return false; // LAYOUT 25: v24 reads 54 wide (BL-1436); v23 and v22 49 wide (BL-1422)
 
     // Both halves build into scratch. `read_world_snapshot` already guarantees
     // this for the world; doing the same for the envelope is what lets a caller
