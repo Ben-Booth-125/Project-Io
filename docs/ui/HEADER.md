@@ -43,7 +43,8 @@ fixed order:
      cannot draw it.
 2. **Recruit readouts** — next, in two steps: the numbers drop to the held figure alone (`120`),
    then the three readouts fold to glyph and bar only, their numbers moving into each glyph's
-   tooltip. The bars never drop.
+   tooltip. The bars never drop. The readouts are drawn compact (Ben, 2026-11-02): their glyph-and-bar floor is
+   52 px, so at the 1280 × 720 floor the runway keeps its value (`   |   12q`).
 3. **Sparkline** — the last decorative element to drop.
 The three money figures (Treasury / Cargo / Net) are bounded-length (`fmt::credits` /
 `fmt::rate` abbreviate) and always drawn in full.

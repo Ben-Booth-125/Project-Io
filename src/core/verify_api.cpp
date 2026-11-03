@@ -3272,6 +3272,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         sol::table out = st.create_table();
         out["drawn"] = r.frame >= 0;
         out["fit"]   = r.fit;
+        out["runway"] = r.runway; out["room"] = r.room; out["money_used"] = r.money_used;
+        out["runway_full"] = r.runway_full; out["runway_value"] = r.runway_value;
         static const char* const k_theatres[3] = {"land", "air", "sea"};
         for (int t = 0; t < 3; ++t)
         {
