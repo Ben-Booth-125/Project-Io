@@ -215,7 +215,7 @@
   ],
   [
    "lens.industry",
-   "Minimap lens strip, Planetary rung, slot 6 — the factory-silhouette glyph (icons::industry)."
+   "Minimap lens strip, Planetary rung, slot 4 (after Resource, Market, Scarcity) — the factory-silhouette glyph (icons::industry)."
   ],
   [
    "lens.key_toggle",

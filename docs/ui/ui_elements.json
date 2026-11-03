@@ -631,9 +631,9 @@
    "source": [
     "docs/ui/LENSES.md § Industry lens"
    ],
-   "summary": "Sequential dark→amber tint of substrate_density weighted by terrain deposit richness — the nation-owned background economy's throughput field, deliberately decoupled from the Population lens's ripple pattern.",
-   "interesting_question": "Rendering raw substrate_density would read visually collinear with the Population lens (both ripple from population centres) — how was that collision avoided without changing the underlying substrate model?",
-   "resolution": "Solved by a pure-rendering reweighting: LENSES.md states the lens instead 'renders a throughput field: each tile's substrate_density weighted by its terrain deposit richness... Pure rendering: no change to substrate_density or the market arithmetic' — decoupling achieved entirely at the render layer.",
+   "summary": "Sequential dark→amber tint of the plant standing on each province that belongs to nations other than the player's — 'where is the industry I did not build?'. A strip lens on the Planetary rung, keyed 'Rival industry'.",
+   "interesting_question": "A rival's production rate is private (DISCOVERY.md § Competitor visibility) — how does a density lens over rival plant avoid leaking how much each plant makes?",
+   "resolution": "It reads only what the ground shows: each rival building counts 0.5 for standing and 0.5 more when it ran this tick (a working plant is observable; its rate is not), summed per province. Output never enters the field (LENSES.md § Industry lens, BL-1419 (Industry lens fills)).",
    "checks": [
     "industry_lens",
     "province_render",

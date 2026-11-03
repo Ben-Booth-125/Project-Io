@@ -93,7 +93,7 @@ no tint saying they are the player's. Ownership on the plain canvas is the natio
 band's (`PLANETARY.md` § Ownership reads from the ground); a lens the player picks may still
 mark the player's footprint (§ Corporation and Company lenses — retired, the outline).
 
-The per-rung representation of every lens, on-bar or keyboard-only. "—" = no
+The per-rung representation of every lens. "—" = no
 representation intended. **This table is the only place a lens's rungs are
 stated.** The rung docs ([SOLAR.md](SOLAR.md), [CIRCUMPLANETARY.md](CIRCUMPLANETARY.md),
 [PLANETARY.md](PLANETARY.md)) point here rather than carrying a column of it: a
@@ -102,16 +102,16 @@ ladder while the rest do not, and a copy drifts from the original silently.
 
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
-| Supply *(keyboard-cycle only)* | per-convoy route lines | per-body convoy-count badge | per-tile convoy glyph |
+| **Supply** | per-convoy route lines | per-body convoy-count badge | per-tile convoy glyph |
 | **Resource** | — | — | contiguous-deposit flat fill + key |
 | **Market** | — | per-body price strip | catchment tint + city-name key |
 | **Population** | — | — | per-tile workforce-efficiency **heatmap** |
-| **Scarcity** *(keyboard-cycle only)* | — | per-body shortfall badge | per-market shortfall blocks + key |
-| **Industry** *(keyboard-cycle only)* | — | — | rival-plant amber tint + key |
+| **Scarcity** | — | per-body shortfall badge | per-market shortfall blocks + key |
+| **Industry** | — | — | rival-plant amber tint + key |
 | **Continent** | — | — | plate tint + boundary lift + key |
 | **Nations** | — | — | each nation's whole territory in its identity colour + nation key |
-| **Reach** *(keyboard-cycle only)* | connected-body glow | — | connection-list key |
-| **Supply-routes** *(keyboard-cycle only)* | aggregated graph edges | — | lane-list key, log-scaled thickness |
+| **Reach** | connected-body glow | — | connection-list key |
+| **Supply-routes** | aggregated graph edges | — | lane-list key, log-scaled thickness |
 | **Logistics** | — | — | every chain link (road, rail, sea) coloured by traffic or reach + source ring + numbers on links + key |
 
 **Per-lens rung notes.** Resource, Population, Industry and Continent
@@ -480,7 +480,7 @@ keyboard-only. Adding a lens means adding it to a rung row and giving it a glyph
 `src/ui/icons.*`, catalogued in ICONS.md.
 
 **Three lenses draw a value field, not a region**, and are therefore read-only surfaces: Population
-(per-tile habitability), Industry (per-tile substrate throughput) and Logistics (the points
+(per-tile habitability), Industry (the rival plant standing on each tile) and Logistics (the points
 supplied and requested on every tile, and the flow along every road). Their subject is a number spread across the map rather than a thing standing on it, so
 there is nothing for a selection to be *of*. SELECTION.md carries the reasoning.
 
@@ -689,14 +689,19 @@ subject is the plants of nations other than the player's, and nothing else: the 
 plant never tints it.
 
 **Data definition (re-subjected, Ben, 2026-10-23).** The lens reads the **buildings owned by
-nations other than the player's** standing on each tile of the active body, taken from the
-economy report's `building_report` rows. A building's owner is always its ground's nation
-(`../politics/NATIONS.md` § Own ground), so these are the rivals' plants on their own ground. Per
-tile the field is `Σ (0.5 + 0.5 · output_share)` over those buildings, where `output_share` is the
-building's `output_quantity` normalised to the largest such output on that body. The `0.5` floor
-keeps an idle or under-construction plant visible — its *presence* is the fact the lens reports —
-while the output term separates a token works from a real one, and two buildings on one tile
-stack. **Pure rendering**: nothing is written back. `tile.substrate_density` does not feed this
+nations other than the player's** standing on each tile of the active body: every rival nation's
+`state_assets`, less anything decommissioned. A building's owner is always its ground's nation
+(`../politics/NATIONS.md` § Own ground), so these are the rivals' plants on their own ground.
+
+**Only what the screen may show** (`DISCOVERY.md` § Competitor visibility). A rival's plant is a
+physical structure, and that it is *running* is observable; how much it makes is private. So the
+field reads presence and running state, never output. Per tile it is `Σ (0.5 + 0.5 · running)`
+over those buildings, where `running` is 1 when the plant is finished and produced this tick (the
+economy report's `building_report.active`) and 0 otherwise. The `0.5` floor keeps an idle or
+under-construction plant visible — its *presence* is the fact the lens reports — while the running
+term separates a working plant from a dormant one, and two buildings on one tile stack. The tile
+values are then **summed per province and filled flat over it**: the question is about the
+locality, and density is additive. **Pure rendering**: nothing is written back. `tile.substrate_density` does not feed this
 lens (it is retained on the tile only because removing it would be a save-format touch for no
 gain — Ben, 2026-08-12).
 
@@ -723,8 +728,10 @@ on-canvas **low→high amber gradient key** (`draw_industry_key` in
 [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp)) — a bar running the terrain-hue
 base to full industrial amber, in the shared lens chrome region (§ Legend placement).
 
-**Interaction notes.** Planetary-only, single-select; the verify script's `verify.econ_step(4)` is
-load-bearing — the field is read from the economy report, so it needs a tick to exist at all.
+**Interaction notes.** Planetary-only, single-select. The key is titled **Rival industry**. The
+running half of the field is read from the economy report, so a working plant reads as working
+only after a tick; the verify script folds its world to ground first, since an unfolded verify
+world has no nation-owned buildings for the lens to read.
 Verified by `scripts/verify/industry_lens.lua` (`industry_lens_full`, `industry_lens_zoom`).
 
 ## Continent lens

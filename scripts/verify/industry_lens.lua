@@ -1,45 +1,69 @@
--- Visual verification for the Industry lens (BL-084; re-pointed BL-373).
--- Confirms requirements.json § industry-lens R1 (item-spanning):
---   overlay_mode::industry tints the Planetary surface by the BACKGROUND FIRMS'
---   plant standing on each tile — "where is the industry I did not build?" —
---   distinct from Production, which ranks output including the player's own
---   holdings. Pure rendering; no economy change.
+-- Visual verification for the Industry lens (BL-084; re-subjected BL-1419).
+--
+-- The lens's subject is the plants of nations other than the player's — "where
+-- is the industry I did not build?" (LENSES.md § Industry lens). It reads only
+-- what the screen may show: a rival plant's presence and whether it is running,
+-- never its output (DISCOVERY.md § Competitor visibility).
+--
+--   I1  after the fold, the home body carries rival nations' buildings, so the
+--       lens has a subject (an empty map would still capture and bless clean)
+--   I2  the lens is up, and it is a strip lens at the Planetary rung (capture:
+--       the factory glyph highlighted on the minimap strip)
+--   I3  framed on the densest rival tile, the amber fill sits on rival ground
+--       (capture, looked at)
 --
 -- Run with: ProjectIo --verify scripts/verify/industry_lens.lua
 
--- LOAD-BEARING, and it stopped being vestigial when BL-373 landed (NR-214): the
--- field is read off the economy report, so with zero ticks the lens renders an
--- EMPTY map — and an empty map still captures a PNG and still blesses clean.
-verify.econ_step(4)
-
 verify.goto_surface("home")
 
-verify.set_overlay("industry")
-verify.capture("industry_lens_full")
+-- The --verify world is laid unfolded: every building is still the seat
+-- corporation's until fold_to_ground runs, as every campaign start runs it.
+local f = verify.fold_world()
+verify.expect(f.folded, "I1 the verify world folds to ground")
 
--- Frame the busiest background-industry tile rather than a hard-coded pair.
--- The old (66, 6) framed empty terrain after generation moved the world under it
--- — the same trap settlement_labels.lua documents. Find the subject, then look at it.
-local busiest_x, busiest_y, busiest_n = nil, nil, 0
-local per_tile = {}
+-- LOAD-BEARING: running state is read off the economy report, so the lens
+-- needs ticks for a working plant to read as working.
+verify.econ_step(4)
+
+-- The home body is where the player's own buildings stand.
+local home_body = nil
 for _, b in ipairs(verify.buildings()) do
-  if not b.player then
-    local key = b.x .. "," .. b.y
-    per_tile[key] = (per_tile[key] or 0) + 1
-    if per_tile[key] > busiest_n then
-      busiest_n, busiest_x, busiest_y = per_tile[key], b.x, b.y
+  if b.player then home_body = b.body break end
+end
+verify.expect(home_body ~= nil, "I1 the player holds a building on the home body")
+
+-- Rival plant on the home body, counted per tile; frame the densest tile.
+local busiest_x, busiest_y, busiest_n = nil, nil, 0
+local per_tile, rivals, mine = {}, 0, 0
+for _, b in ipairs(verify.buildings()) do
+  if b.body == home_body then
+    if b.player then
+      mine = mine + 1
+    else
+      rivals = rivals + 1
+      local key = b.x .. "," .. b.y
+      per_tile[key] = (per_tile[key] or 0) + 1
+      if per_tile[key] > busiest_n then
+        busiest_n, busiest_x, busiest_y = per_tile[key], b.x, b.y
+      end
     end
   end
 end
+print(string.format("[industry_lens] home body: %d rival buildings, %d the player's",
+                    rivals, mine))
+verify.expect(rivals > 0,
+  "I1 the home body holds rival nations' buildings (the lens has a subject)")
+
+verify.set_overlay("industry")
+verify.frames(2)
+verify.expect(verify.overlay_name() == "industry" or verify.overlay_name() == "Industry",
+  "I2 the Industry lens is up (got '" .. tostring(verify.overlay_name()) .. "')")
+verify.capture("industry_lens_full")
 
 if busiest_x then
   print("[industry_lens] framing " .. busiest_x .. "," .. busiest_y
-        .. " (" .. busiest_n .. " background buildings)")
+        .. " (" .. busiest_n .. " rival buildings)")
   frame_tile(busiest_x, busiest_y, 9)
-else
-  -- No background industry at all is a FINDING, not a scene to photograph.
-  error("industry_lens: the world holds no background-corp buildings — "
-        .. "the lens has nothing to draw and this check would bless an empty map")
+  verify.frames(2)
+  verify.capture("industry_lens_zoom")
 end
-
-verify.capture("industry_lens_zoom")
