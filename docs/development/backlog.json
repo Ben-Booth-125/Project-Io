@@ -710,6 +710,75 @@
    ],
    "title": "Rival nations enact and repeal embargoes",
    "design": "Ben, 2026-11-03 (NR-1117): grant - a rival may enact or repeal an embargo against a nation through set_embargo, scored over its own sentiment, Alarm and trade exposure, on the standing terms (pure, seeded, deterministic, replayable, legal verbs only, never a planner). Write the dated grant into AI_OPPONENT.md § 11. Check: an embargo census over 16 seeds; determinism."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-03",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61, Lane S hand-back, 2026-11-03)",
+   "requires": [],
+   "id": "BL-1482",
+   "short_name": "BROKE_NATION_SPIRAL",
+   "category": "Economy",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "src/world/economy_system.cpp",
+    "src/world/corp_ai.cpp",
+    "docs/economy/FINANCE.md"
+   ],
+   "title": "A nation whose treasury reaches 0 never recovers",
+   "design": "Found by BL-1442 (post-capacity starvation), 2026-11-03: mostly minors build a steel plant in play ticks 1-10, the treasury reaches 0, the funding gate idles every building, income is 0 for good. Nothing runs so nothing earns. About 25 of the plants behind G1t50's gap. The fix is a design question first (FINANCE.md owns it): a floor that keeps the cheapest earners running, debt, or a solvency reserve in the scorer (measured -0.6 pp G1t50 alone, patch scratchpad bl1442_scorer_measured_not_landed.patch). Check: market_viability full tier, count of nations at treasury 0 for 20+ ticks."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-03",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61, Lane S hand-back, 2026-11-03)",
+   "requires": [],
+   "id": "BL-1483",
+   "short_name": "HISTORY_LOG_R3",
+   "category": "Verification",
+   "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+   "priority": "B",
+   "difficulty": 2,
+   "files": [
+    "tools/verify/history_log_harness.cpp"
+   ],
+   "title": "history_log_harness R3 fails: no decision/agency entry over 40 ticks of bot play",
+   "design": "Pre-existing on 4c24b3f7 (checked in a temp worktree, 2026-11-03). R3 expects at least one decision-topic and one agency-topic history entry in a 40-tick bot-vs-bot loop. Either the loop no longer produces those entries since corporations were retired, or the source stopped writing them. Read which before changing the check; never weaken it to pass."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-03",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 61, Lane S hand-back, 2026-11-03)",
+   "requires": [],
+   "id": "BL-1484",
+   "short_name": "UNIT_STRENGTH_SUPPLY",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "priority": "B",
+   "difficulty": 2,
+   "files": [
+    "tools/verify/unit_upkeep.cpp",
+    "src/world/campaign_battle.cpp"
+   ],
+   "title": "unit_upkeep U6d/U6e fail: unit strength no longer reads supply",
+   "design": "Found in sprint 61 gating, 2026-11-03: U6d (half supply halves strength) and U6e (an unsupplied unit is strictly weaker) fail; unit_strength no longer reads supply. MILITARY.md decides which is right: if supply still scales strength, restore the read; if the rule moved, the doc and the check move together on Ben's call."
   }
  ]
 }
