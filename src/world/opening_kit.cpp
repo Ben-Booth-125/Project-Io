@@ -2,6 +2,7 @@
 
 #include "world/corporation_generation_detail.hpp" // the Pass 3 helpers, shared not copied
 #include "world/input_reach.hpp"
+#include "world/logistic_points.hpp" // lp_coverage_at, lp_consumer -- the logistics cap's cover read
 #include "world/logistics.hpp"       // invalidate_logistics_caches
 #include "world/market_clearing.hpp" // market_for_tile
 #include "world/placement_rules.hpp"
@@ -283,7 +284,26 @@ struct major_kit
     std::map<entity_id, std::vector<entity_id>> nearest; ///< place -> tiles_nearest, read lazily
     output_want            want;
     bool                   want_ready = false;
+    /// The kit's prospective draw (BL-1473 round 2): every processing slot's planned
+    /// inputs and every not-yet-laid kit building's upkeep, folded into `want` when
+    /// it is first measured.
+    std::array<float, resource_count> prospective{};
 };
+
+/// One processing slot's planned recipe inputs at the nominal rate.
+std::array<float, resource_count> planned_inputs(const recipe_registry& reg, const recipe* rc)
+{
+    std::array<float, resource_count> out{};
+    if (rc == nullptr)
+        return out;
+    building_component fresh;
+    fresh.type = building_type::processing_facility;
+    const float batches = judged_batches(reg, fresh);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (rc->inputs[r] > 0.0f)
+            out[r] = batches * rc->inputs[r];
+    return out;
+}
 
 void own_it(world& w, major_kit& mk, entity_id bid)
 {
@@ -344,8 +364,8 @@ std::vector<const recipe*> planned_recipes(const recipe_registry& reg, const ope
             if (!any.empty())
                 idx = any.front();
         }
-        if (idx >= 0)
-            out.push_back(&reg.recipe_at(building_type::processing_facility, idx));
+        // One entry per processing slot, in slot order; null where none is in band.
+        out.push_back(idx >= 0 ? &reg.recipe_at(building_type::processing_facility, idx) : nullptr);
     }
     return out;
 }
@@ -363,7 +383,7 @@ std::vector<resource_type> flex_order(kit_layer& L, major_kit& mk, const std::ve
     const float batches = judged_batches(L.reg, fresh) * L.reg.t_idle();
     std::array<float, resource_count> draw{}, supply{};
     for (const recipe* rc : procs)
-        for (std::size_t r = 0; r < resource_count; ++r)
+        for (std::size_t r = 0; rc != nullptr && r < resource_count; ++r)
             if (rc->inputs[r] > 0.0f)
                 draw[r] += batches * rc->inputs[r];
     for (const entity_id bid : mk.extractors)
@@ -462,6 +482,9 @@ struct proc_refusals
     int not_wanted = 0; ///< the output is not short (BL-1217 D6)
     int no_feed    = 0; ///< an input has no producer within reach (chain-feasible)
     int not_sized  = 0; ///< a producer within reach, but not the spare (BL-1233)
+    /// For a sized refusal: per input, the smallest deficit over the places read —
+    /// need x t_idle less the reachable spare (the sized rule's own terms).
+    std::map<std::size_t, float> short_by;
 
     std::string text() const
     {
@@ -469,7 +492,16 @@ struct proc_refusals
         std::snprintf(buf, sizeof buf, "refused: %d place(s) without a site, %d not wanted, "
                       "%d no feed in reach, %d short of spare input",
                       no_site, not_wanted, no_feed, not_sized);
-        return buf;
+        std::string out = buf;
+        for (const auto& [r, d] : short_by)
+        {
+            char b2[96];
+            std::snprintf(b2, sizeof b2, " [short %s by %.2f]",
+                          resource_names::name_of(static_cast<resource_type>(r)).c_str(),
+                          static_cast<double>(d));
+            out += b2;
+        }
+        return out;
     }
 };
 
@@ -481,8 +513,25 @@ entity_id place_processor(kit_layer& L, major_kit& mk, const std::vector<int>& c
         return null_entity;
     if (!mk.want_ready)
     {
-        mk.want       = measure_output_want(L.w, L.reg, mk.g.body, body_demand(L.w, L.reg, mk.g.body));
+        // WANT AT THE MAJOR'S OWN MARKETS (Ben, 2026-11-03): the markets centred on its
+        // ground, and the capital's market whatever its centre. Reach and spare still
+        // read every neighbour (chain_recipe_placeable, unchanged).
+        std::set<entity_id> own_markets;
+        for (const auto& [mid, mc] : L.w.markets)
+            if (mk.g.tile_set.count(mc.centre_tile) != 0)
+                own_markets.insert(mid);
+        if (const entity_id cm = market_for_tile(L.w, mk.g.capital); cm != null_entity)
+            own_markets.insert(cm);
+        mk.want       = measure_output_want_at(L.w, L.reg, mk.g.body, own_markets);
         mk.want_ready = true;
+        // ITS OWN PROCESSORS WANT IT (the ruling's own words): the kit is one curated
+        // chain, so what the kit's not-yet-laid processors and civic buildings will
+        // draw is wanted at its markets before they stand -- steel by the machinery
+        // slot, fuel by the Marketplace's upkeep. Each processing slot's inputs are
+        // taken out again as that slot is decided (`book` then adds what it runs);
+        // the upkeep stays, as the building it is for will draw it.
+        for (std::size_t r = 0; r < resource_count; ++r)
+            mk.want.want[r] += mk.prospective[r];
     }
     for (const entity_id place : mk.places)
     {
@@ -532,8 +581,29 @@ entity_id place_processor(kit_layer& L, major_kit& mk, const std::vector<int>& c
             }
             const int t = chain_recipe_placeable(L.w, L.reg, L.cr, bid, market, rc, &mk.own);
             if (t == chain_tier_none && why)
-                ++(chain_recipe_tier(L.w, L.reg, L.cr, bid, market, rc, &mk.own) == chain_tier_none
-                       ? why->no_feed : why->not_sized);
+            {
+                if (chain_recipe_tier(L.w, L.reg, L.cr, bid, market, rc, &mk.own) == chain_tier_none)
+                    ++why->no_feed;
+                else
+                {
+                    ++why->not_sized;
+                    const float need = judged_batches(L.reg, L.w.buildings.at(bid)) * L.reg.t_idle();
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                    {
+                        if (!(rc.inputs[r] > 0.0f))
+                            continue;
+                        const reachable_spare sp = reachable_supply(L.w, L.reg, L.cr, market, r, bid);
+                        const float deficit = need * rc.inputs[r] - sp.spare;
+                        if (deficit > 0.0f || sp.landed < 0.0f)
+                        {
+                            const float d = std::max(deficit, 0.0f);
+                            const auto it = why->short_by.find(r);
+                            if (it == why->short_by.end() || d < it->second)
+                                why->short_by[r] = d;
+                        }
+                    }
+                }
+            }
             if (t < best_tier)
             {
                 best_tier = t;
@@ -768,12 +838,44 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
                            "no deposit, Well or Wharf ground for any raw", null_entity);
         }
 
-        // c. The processors.
+        // c. The processors. First the kit's prospective draw (see place_processor):
+        //    each processing slot's planned inputs and every processor and civic
+        //    building's upkeep basket, at the major's markets.
+        {
+            const building_upkeep_params& up = reg.building_upkeep();
+            std::size_t pj = 0;
+            for (const opening_kit_slot& s : kit.slots)
+            {
+                building_type bt = building_type::none;
+                if (s.category == kit_slot_category::processing)
+                {
+                    const std::array<float, resource_count> in = planned_inputs(reg, planned[pj++]);
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                        mk.prospective[r] += in[r];
+                    bt = building_type::processing_facility;
+                }
+                else if (s.category == kit_slot_category::civic)
+                    bt = s.building;
+                if (bt == building_type::none)
+                    continue;
+                const std::array<float, resource_count> u = building_upkeep_goods(up, bt, reg.era());
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    mk.prospective[r] += u[r];
+            }
+        }
+        std::size_t proc_j = 0;
         for (std::size_t i = 0; i < kit.slots.size(); ++i)
         {
             const opening_kit_slot& s = kit.slots[i];
             if (s.category != kit_slot_category::processing)
                 continue;
+            {
+                // This slot's planned inputs leave the prospective draw now it is decided.
+                const std::array<float, resource_count> in = planned_inputs(reg, planned[proc_j++]);
+                auto& tgt = mk.want_ready ? mk.want.want : mk.prospective;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    tgt[r] -= in[r];
+            }
             std::vector<int> named;
             for (const std::string& n : s.recipes)
                 if (const int idx = browse_index_of(reg, n, kit.name); idx >= 0)
@@ -792,6 +894,10 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
             int chosen = -1;
             proc_refusals as_named;
             entity_id bid = place_processor(L, mk, named, chosen, &as_named);
+            rm.refused_no_site    += as_named.no_site;
+            rm.refused_not_wanted += as_named.not_wanted;
+            rm.refused_no_feed    += as_named.no_feed;
+            rm.refused_not_sized  += as_named.not_sized;
             if (bid != null_entity)
             {
                 set_record(rm.slots[i], rec_outcome::placed,
@@ -859,6 +965,7 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
         shelve_stock(w, mk.extractors, industrial_focus::extraction);
         shelve_stock(w, mk.processors, industrial_focus::processing);
 
+        rm.proc_built = static_cast<int>(mk.processors.size());
         for (const opening_kit_slot_record& r : rm.slots)
         {
             rm.placed      += r.result == rec_outcome::placed;
@@ -882,9 +989,12 @@ void print_opening_kit(const opening_kit_report& r)
                 r.unbuilt);
     for (const opening_kit_major& m : r.per_major)
     {
-        std::printf("[opening_kit]   major %llu: took up %d; placed %d, substituted %d, unbuilt %d",
+        std::printf("[opening_kit]   major %llu: took up %d; placed %d, substituted %d, unbuilt %d; "
+                    "%d processor(s) standing; as-named refusals: no site %d, not wanted %d, "
+                    "no feed %d, short of spare %d",
                     static_cast<unsigned long long>(m.nation), m.taken_up, m.placed, m.substituted,
-                    m.unbuilt);
+                    m.unbuilt, m.proc_built, m.refused_no_site, m.refused_not_wanted,
+                    m.refused_no_feed, m.refused_not_sized);
         for (const opening_kit_slot_record& s : m.slots)
         {
             if (s.result == opening_kit_slot_record::outcome::substituted)
@@ -894,5 +1004,201 @@ void print_opening_kit(const opening_kit_report& r)
         }
         std::printf("\n");
     }
+    std::fflush(stdout);
+}
+
+// ---------------------------------------------------------------------------
+// THE LOGISTICS CAP (Ben, 2026-11-03; see opening_kit.hpp)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Remove one building generation stood: its owner's list, every charter's
+/// index (and anchor), the building and its stockpile.
+void take_up_node(world& w, entity_id bid)
+{
+    for (auto& [cid, ch] : w.gen_charters) // keyed edits: order-free
+    {
+        (void)cid;
+        ch.assets.erase(std::remove(ch.assets.begin(), ch.assets.end(), bid), ch.assets.end());
+        if (ch.hq_building == bid)
+            ch.hq_building = null_entity;
+    }
+    release_from_owner(w, bid);
+    w.buildings.erase(bid);
+    w.stockpiles.erase(bid);
+}
+
+int node_slot(building_type t)
+{
+    switch (t)
+    {
+    case building_type::port:                 return 0;
+    case building_type::railway_station:      return 1;
+    case building_type::inland_logistics_hub: return 2;
+    default:                                  return -1;
+    }
+}
+
+const char* node_name(int slot)
+{
+    static const char* const names[3] = { "port", "railway_station", "inland_logistics_hub" };
+    return names[slot];
+}
+
+constexpr building_type k_node_type[3] = { building_type::port, building_type::railway_station,
+                                           building_type::inland_logistics_hub };
+
+} // namespace
+
+int count_uncovered_buildings(world& w, entity_id nation)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return 0;
+    std::vector<entity_id> bids = nit->second.state_assets;
+    std::sort(bids.begin(), bids.end());
+    lp_reach_memo memo;
+    int n = 0;
+    for (const entity_id bid : bids)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end() || !lp_consumer(bit->second))
+            continue;
+        if (!(lp_coverage_at(w, memo, bit->second.tile) > 0.0f))
+            ++n;
+    }
+    return n;
+}
+
+void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit_config& kit,
+                         opening_kit_report& rep)
+{
+    if (!kit.logistics_capped())
+        return;
+    const int count[3] = { kit.ports, kit.stations, kit.hubs };
+    for (opening_kit_major& m : rep.per_major)
+    {
+        const auto nit = w.nations.find(m.nation);
+        if (nit == w.nations.end())
+            continue;
+        const major_ground g = ground_of(w, m.nation, nit->second);
+        if (g.body == null_entity)
+            continue;
+
+        // The standing nodes on the major's ground, in the seeding's order from the capital.
+        const auto chain = gen_road_walk(w, g.body, { g.capital }, null_entity, 0.0f);
+        struct node { float d; entity_id tile; entity_id bid; int slot; };
+        std::vector<node> nodes;
+        for (const auto& [bid, b] : w.buildings)
+        {
+            const int s = node_slot(b.type);
+            if (s < 0 || g.tile_set.count(b.tile) == 0)
+                continue;
+            const auto d = chain.find(b.tile);
+            nodes.push_back({ d != chain.end() ? d->second : std::numeric_limits<float>::infinity(),
+                              b.tile, bid, s });
+        }
+        std::sort(nodes.begin(), nodes.end(), [](const node& a, const node& b) {
+            if (a.d != b.d)       return a.d < b.d;
+            if (a.tile != b.tile) return a.tile < b.tile;
+            return a.bid < b.bid;
+        });
+        int kept[3] = { 0, 0, 0 };
+        std::vector<entity_id> gone;
+        for (const node& n : nodes)
+        {
+            if (n.tile == g.capital)
+            {
+                ++m.nodes_source; // the capital's source: kept, outside the slots
+                continue;
+            }
+            if (kept[n.slot] < count[n.slot])
+            {
+                ++kept[n.slot];
+                ++m.nodes_kept;
+            }
+            else
+                gone.push_back(n.bid);
+        }
+        std::sort(gone.begin(), gone.end());
+        for (const entity_id bid : gone)
+            take_up_node(w, bid);
+        m.nodes_taken = static_cast<int>(gone.size());
+
+        // A slot still open: laid nearest the capital where placement allows, down the
+        // ladder (port -> station -> hub; station -> hub).
+        const std::vector<entity_id> near = tiles_nearest(w, g, g.capital);
+        const auto lay = [&](building_type type) -> bool {
+            if (!reg.building_available(type))
+                return false;
+            const placement_gate gate = reg.placement_gate_for(type, no_recipe);
+            for (const entity_id tid : near)
+            {
+                if (tid == g.capital)
+                    continue; // the capital's source is not a slot
+                const tile_component& tc = w.tiles.at(tid);
+                if (placement_rules::non_extraction_buildings_on_tile(w, tid)
+                    >= placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover))
+                    continue;
+                if (!placement_rules::can_place_in_world(w, tid, type, k_no_target, -1.0f,
+                                                         null_entity, gate))
+                    continue;
+                if (type == building_type::railway_station)
+                {
+                    // The build door's station rule (construction.cpp, BL-1255): a city
+                    // tile touching a rail line, one station to a tile.
+                    bool city = false;
+                    for (const auto& [centre, ctile] : w.population_centre_tile)
+                        if (ctile == tid) { (void)centre; city = true; break; }
+                    if (!city || !tile_touches_track(w, tid))
+                        continue;
+                    bool has_station = false;
+                    for (const auto& [obid, ob] : w.buildings)
+                        if (ob.type == building_type::railway_station && ob.tile == tid)
+                        { (void)obid; has_station = true; break; }
+                    if (has_station)
+                        continue;
+                }
+                gen_occupancy scratch;
+                const entity_id bid = author_building(w, tid, type, scratch);
+                w.nations.at(m.nation).state_assets.push_back(bid);
+                return true;
+            }
+            return false;
+        };
+        for (int s = 0; s < 3; ++s)
+            for (int k = kept[s]; k < count[s]; ++k)
+            {
+                bool laid = false;
+                for (int rung = s; rung < 3 && !laid; ++rung)
+                    if (lay(k_node_type[rung]))
+                    {
+                        laid = true;
+                        ++m.nodes_laid;
+                        if (rung != s)
+                            m.logistics_note += std::string(" ") + node_name(s) + "->" + node_name(rung);
+                    }
+                if (!laid)
+                {
+                    ++m.nodes_open;
+                    m.logistics_note += std::string(" ") + node_name(s) + " OPEN";
+                }
+            }
+    }
+    invalidate_logistics_caches(w);
+    for (opening_kit_major& m : rep.per_major)
+        m.uncovered = count_uncovered_buildings(w, m.nation);
+    invalidate_logistics_caches(w);
+}
+
+void print_opening_kit_logistics(const opening_kit_report& r)
+{
+    for (const opening_kit_major& m : r.per_major)
+        std::printf("[opening_kit] logistics major %llu: capital source %d node(s); kept %d, "
+                    "taken up %d, laid %d, open %d;%s %d building(s) without cover after the cap\n",
+                    static_cast<unsigned long long>(m.nation), m.nodes_source, m.nodes_kept,
+                    m.nodes_taken, m.nodes_laid, m.nodes_open,
+                    m.logistics_note.empty() ? "" : m.logistics_note.c_str(), m.uncovered);
     std::fflush(stdout);
 }

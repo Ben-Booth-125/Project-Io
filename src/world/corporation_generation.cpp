@@ -1619,7 +1619,8 @@ float nominal_processing_batches(const recipe_registry& reg)
 /// processing building it itself authors before the next measurement.
 void accumulate_body_production(const world& w, const recipe_registry& reg,
                                 entity_id body_id,
-                                std::array<float, resource_count>& production)
+                                std::array<float, resource_count>& production,
+                                const std::set<entity_id>* at_markets = nullptr)
 {
     // ASCENDING BUILDING ID (BL-1050). `production[r] +=` is a cross-building
     // float sum and float addition does not associate, so walked in
@@ -1638,6 +1639,9 @@ void accumulate_body_production(const world& w, const recipe_registry& reg,
         if (tit == w.tiles.end() || tit->second.body != body_id)
             continue;
         if (b.decommissioned)
+            continue;
+        // BL-1473: a market-scoped reading counts only what stands in those markets.
+        if (at_markets != nullptr && at_markets->count(market_for_tile(w, b.tile)) == 0)
             continue;
         bids.push_back(bid);
     }
@@ -1684,7 +1688,8 @@ void accumulate_body_production(const world& w, const recipe_registry& reg,
 /// firms after it.
 std::array<float, resource_count> body_processor_input_demand(const world& w,
                                                               const recipe_registry& reg,
-                                                              entity_id body_id)
+                                                              entity_id body_id,
+                                                              const std::set<entity_id>* at_markets = nullptr)
 {
     std::array<float, resource_count> out = {};
     std::vector<entity_id> bids;
@@ -1696,6 +1701,8 @@ std::array<float, resource_count> body_processor_input_demand(const world& w,
         const auto tit = w.tiles.find(b.tile);
         if (tit == w.tiles.end() || tit->second.body != body_id)
             continue;
+        if (at_markets != nullptr && at_markets->count(market_for_tile(w, b.tile)) == 0)
+            continue; // BL-1473: market-scoped
         bids.push_back(bid);
     }
     std::sort(bids.begin(), bids.end());
@@ -1793,7 +1800,8 @@ std::array<bool, resource_count> body_producible(const world& w, const recipe_re
 /// Zero while no rate is authored, so every pre-BL-708 world generates
 /// byte-identically — including the whole ancient band, which has no power.
 std::array<float, resource_count> body_upkeep_demand(const world& w, const recipe_registry& reg,
-                                                     entity_id body_id)
+                                                     entity_id body_id,
+                                                     const std::set<entity_id>* at_markets = nullptr)
 {
     std::array<float, resource_count> demand = {};
     const building_upkeep_params& up = reg.building_upkeep();
@@ -1828,6 +1836,8 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
             continue;
         if (static_cast<std::size_t>(b.type) >= building_type_count)
             continue;
+        if (at_markets != nullptr && at_markets->count(market_for_tile(w, b.tile)) == 0)
+            continue; // BL-1473: market-scoped
         bids.push_back(bid);
     }
     std::sort(bids.begin(), bids.end());
@@ -2005,7 +2015,8 @@ namespace corpgen {
 /// folded in here — it grows as the seeder places firms, so it has to be
 /// re-measured rather than captured once. See the loop below.
 std::array<float, resource_count> body_demand(const world& w, const recipe_registry& reg,
-                                              entity_id body_id)
+                                              entity_id body_id,
+                                              const std::set<entity_id>* at_markets)
 {
     // ASCENDING CENTRE ID (BL-1050). `total_scale` is a float sum — today over
     // integer scales small enough that every partial stays exact, so no shipped
@@ -2026,6 +2037,8 @@ std::array<float, resource_count> body_demand(const world& w, const recipe_regis
         const auto tit = w.tiles.find(tile_it->second);
         if (tit == w.tiles.end() || tit->second.body != body_id)
             continue;
+        if (at_markets != nullptr && at_markets->count(market_for_tile(w, tile_it->second)) == 0)
+            continue; // BL-1473: market-scoped
         centre_ids.push_back(cid);
     }
     std::sort(centre_ids.begin(), centre_ids.end());
@@ -2523,6 +2536,27 @@ output_want measure_output_want(world& w, const recipe_registry& reg, entity_id 
     for (std::size_t r = 0; r < resource_count; ++r)
         o.want[r] += upkeep[r] + inputs[r];
     accumulate_body_production(w, reg, body, o.production);
+    measure_power_grids(w, reg, o);
+    return o;
+}
+
+/// BL-1473 (CORPORATION_GENERATION.md § A major's opening kit, "with want read at the
+/// major's own markets", Ben 2026-11-03): the want test's arrays read at @p markets
+/// only -- final demand of the centres those markets serve, plus the upkeep and the
+/// processor inputs of what stands in them, against what stands in them makes. The
+/// kit's processors read this; every charter and the walk keep the body's reading.
+/// Power keeps its per-grid reading (a grid is already local).
+output_want measure_output_want_at(world& w, const recipe_registry& reg, entity_id body,
+                                   const std::set<entity_id>& markets)
+{
+    output_want o;
+    o.body = body;
+    o.want = body_demand(w, reg, body, &markets);
+    const std::array<float, resource_count> upkeep = body_upkeep_demand(w, reg, body, &markets);
+    const std::array<float, resource_count> inputs = body_processor_input_demand(w, reg, body, &markets);
+    for (std::size_t r = 0; r < resource_count; ++r)
+        o.want[r] += upkeep[r] + inputs[r];
+    accumulate_body_production(w, reg, body, o.production, &markets);
     measure_power_grids(w, reg, o);
     return o;
 }

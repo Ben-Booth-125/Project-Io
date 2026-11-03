@@ -234,6 +234,7 @@ struct shipped_landscape
     rail_handover_report    rail; ///< BL-1255
     lp_seed_report          lp;   ///< BL-1309
     opening_state_cut_report cut; ///< BL-1452: the poor nations' opening state, sized to the chest
+    opening_kit_report      kit;  ///< BL-1473: the major opening kit and its logistics cap
 };
 
 /// The search params app.cpp passes, keyed from the world seed exactly as it
@@ -370,9 +371,18 @@ inline shipped_landscape apply_shipped_landscape(
         print_colonial_ports(place_colonial_ports(w));
         // BL-1473: finish_campaign_world's major opening kit, verbatim, after the ports.
         if (charter.opening_kit != nullptr)
-            print_opening_kit(lay_major_opening_kits(w, reg, *charter.opening_kit));
+        {
+            out.kit = lay_major_opening_kits(w, reg, *charter.opening_kit);
+            print_opening_kit(out.kit);
+        }
         lay_site_roads_every_body(w);
         out.lp = seed_logistics_sources(w);
+        // BL-1473: finish_campaign_world's logistics cap, verbatim, right after the seeding.
+        if (charter.opening_kit != nullptr && charter.opening_kit->logistics_capped())
+        {
+            cap_major_logistics(w, reg, *charter.opening_kit, out.kit);
+            print_opening_kit_logistics(out.kit);
+        }
         // BL-1402: finish_campaign_world's fold to ground, verbatim, right after it.
         if (!charter.skip_fold)
         {
@@ -408,7 +418,8 @@ inline shipped_landscape apply_shipped_landscape(
         // the seeding's reading at the gate, verbatim, right after it.
         out.reserve = reserve_state_first_tick(w, reg, out.state);
         print_state_reserve(out.reserve);
-        stack_logistics_hubs(w, reg, out.lp); // finish_campaign_world's, verbatim (Ben, 2026-10-26)
+        stack_logistics_hubs(w, reg, out.lp, /*cap_majors=*/charter.opening_kit != nullptr
+                                                  && charter.opening_kit->logistics_capped()); // finish_campaign_world's, verbatim
         out.cut = size_opening_state_to_chest(w, reg, /*skip_majors=*/charter.opening_kit != nullptr); // BL-1452 / BL-1473: finish_campaign_world's, verbatim
         print_opening_state_cut(out.cut);
         // BL-1398's firm top-up retired with the fold (finish_campaign_world).

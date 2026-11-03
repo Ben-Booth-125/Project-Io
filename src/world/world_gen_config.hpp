@@ -129,6 +129,11 @@ struct opening_kit_config
     std::string                   name;
     float                         treasury = 0.0f; ///< every major's opening treasury (credits)
     std::vector<opening_kit_slot> slots;           ///< extraction, then processing, then civic
+    /// The logistics slots (Ben, 2026-11-03: "the count is a cap"), beside the
+    /// capital's source: the nodes a major keeps after the Logistic Point seeding.
+    /// All three -1 (no `logistics` table authored): no cap.
+    int hubs = -1, stations = -1, ports = -1;
+    bool logistics_capped() const { return hubs >= 0 && stations >= 0 && ports >= 0; }
 };
 
 struct opening_kit_table

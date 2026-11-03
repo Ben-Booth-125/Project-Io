@@ -435,6 +435,15 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // stands enough logistics hubs that every producing building is reached and
     // every pool meets its need. After the rail handover (stations are sources).
     out.lp = seed_logistics_sources(w);
+    // BL-1473 -- THE LOGISTICS CAP (CORPORATION_GENERATION.md § A major's opening kit, "the
+    // count is a cap", Ben 2026-11-03): on a major's ground the capital's source stays and
+    // the other nodes fill the kit's logistics slots in the seeding's order; the rest are
+    // taken up. The cover it costs is counted and reported, never re-added.
+    if (kit != nullptr && kit->logistics_capped())
+    {
+        cap_major_logistics(w, reg, *kit, out.kit);
+        print_opening_kit_logistics(out.kit);
+    }
     // BL-1402 -- THE FOLD TO GROUND (Ben, 2026-10-23; NATIONS.md § What a nation owns):
     // every corporation's buildings pass to the nation whose ground they stand on,
     // balances to home treasuries, units, track, trades and convoys with them. After
@@ -476,7 +485,7 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     print_state_reserve(out.reserve);
     // STACKED HUBS (Ben, 2026-10-26; LOGISTICS.md § Where generation puts the sources):
     // after the reserve, so a stacked hub is one the treasury funds with its year kept.
-    stack_logistics_hubs(w, reg, out.lp);
+    stack_logistics_hubs(w, reg, out.lp, /*cap_majors=*/kit != nullptr && kit->logistics_capped());
     // BL-1452 (Ben, 2026-10-29; NATION_GENERATION.md, "A poor nation opens with fewer
     // state buildings"): after the reserve and the stacked hubs, before the gate's
     // reading - a nation short of 16 ticks of its running bill opens with what its chest

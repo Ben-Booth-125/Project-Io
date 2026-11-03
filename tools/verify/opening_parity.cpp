@@ -272,6 +272,9 @@ int main(int argc, char** argv)
             auto force = force_by_owner(w);
             std::map<entity_id, snapshot> at_handoff;
             for (const entity_id nid : majors) at_handoff[nid] = read_nation(w, nid, w.nations.at(nid), force);
+            // BL-1473: the major's Logistic Point consumers without cover at the handoff.
+            std::map<entity_id, int> uncovered;
+            for (const entity_id nid : majors) uncovered[nid] = count_uncovered_buildings(w, nid);
             std::vector<double> minor_treasury;
             std::vector<int>    minor_built;
             std::vector<long>   minor_men;
@@ -323,18 +326,19 @@ int main(int argc, char** argv)
                 for (int c = 0; c < k_category_count; ++c) std::printf("%s%s %d", c ? " " : "", k_category_names[c], h.built[c]);
                 const opening_kit_major* km = fin.kit.of(nid);
                 const int kp = km ? km->placed : 0, ks = km ? km->substituted : 0, ku = km ? km->unbuilt : 0;
-                std::printf("] constr %d  units %d men %ld pool %d | kit %d/%d/%d | play: net mean %8.1f"
-                            " min %8.1f red %2d/%zu  end treasury %9.0f built %3d men %ld\n",
-                            h.constructing, h.units, h.men, h.land_pool, kp, ks, ku, mean, mn, red, q.size(),
+                const int kpb = km ? km->proc_built : 0, unc = uncovered[nid];
+                std::printf("] constr %d  units %d men %ld pool %d | kit %d/%d/%d proc %d uncovered %d | play:"
+                            " net mean %8.1f min %8.1f red %2d/%zu  end treasury %9.0f built %3d men %ld\n",
+                            h.constructing, h.units, h.men, h.land_pool, kp, ks, ku, kpb, unc, mean, mn, red, q.size(),
                             e.treasury, e.built_all, e.men);
                 std::printf("ROW seed=%d pair=%d:%d nation=%llu tiles=%d treasury=%.1f built=%d ext=%d proc=%d logi=%d"
                             " civic=%d mil=%d other=%d constr=%d units=%d men=%ld pool=%d net_mean=%.2f net_min=%.2f"
                             " red=%d quarters=%zu end_treasury=%.1f end_built=%d end_men=%ld"
-                            " kit_placed=%d kit_sub=%d kit_unbuilt=%d\n",
+                            " kit_placed=%d kit_sub=%d kit_unbuilt=%d proc_built=%d uncovered=%d\n",
                             seed, tt, mt, static_cast<unsigned long long>(nid), h.tiles, h.treasury, h.built_all,
                             h.built[k_extraction], h.built[k_processing], h.built[k_logistics], h.built[k_civic],
                             h.built[k_military], h.built[k_other], h.constructing, h.units, h.men, h.land_pool,
-                            mean, mn, red, q.size(), e.treasury, e.built_all, e.men, kp, ks, ku);
+                            mean, mn, red, q.size(), e.treasury, e.built_all, e.men, kp, ks, ku, kpb, unc);
                 t_hi = std::max(t_hi, h.treasury); t_lo = std::min(t_lo, h.treasury);
                 b_hi = std::max(b_hi, h.built_all); b_lo = std::min(b_lo, h.built_all);
                 m_hi = std::max(m_hi, static_cast<long long>(h.men)); m_lo = std::min(m_lo, static_cast<long long>(h.men));

@@ -42,7 +42,20 @@ struct opening_kit_major
     entity_id nation   = null_entity;
     int       taken_up = 0;     ///< buildings the take-up removed from its ground
     int       placed = 0, substituted = 0, unbuilt = 0;
+    int       proc_built = 0; ///< kit processors standing once the kit is laid
+    /// What refused the processing slots as named, summed over every slot and
+    /// place read (`proc_refusals`): the diagnostic the kit's counts are tuned on.
+    int       refused_no_site = 0, refused_not_wanted = 0, refused_no_feed = 0, refused_not_sized = 0;
     std::vector<opening_kit_slot_record> slots; ///< in slot order (flex slots after the fixed extraction)
+
+    // THE LOGISTICS CAP (`cap_major_logistics`), after the Logistic Point seeding.
+    int nodes_source  = 0; ///< nodes on the capital tile, kept as the capital's source
+    int nodes_kept    = 0; ///< hubs, stations and ports kept in slot
+    int nodes_taken   = 0; ///< taken up beyond the count
+    int nodes_laid    = 0; ///< laid into a slot the seeding left open
+    int nodes_open    = 0; ///< slots left open (nothing on the ladder places)
+    int uncovered     = 0; ///< the nation's buildings without Logistic Point cover after the cap
+    std::string logistics_note;
 };
 
 /// What `lay_major_opening_kits` did.
@@ -73,3 +86,23 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
 
 /// Print the `[opening_kit]` summary line and one line per major.
 void print_opening_kit(const opening_kit_report& r);
+
+/// THE LOGISTICS CAP (CORPORATION_GENERATION.md § A major's opening kit, "the count is
+/// a cap", Ben 2026-11-03). Run after `seed_logistics_sources`. On each major's ground
+/// the nodes on the capital tile stay as its source; the other ports, stations and
+/// hubs are walked in the order the seeding lays out from the capital (road chain
+/// distance from the capital, unreached last, then tile id, then building id) and
+/// each kept while its type's count has room, the rest taken up. A slot still open
+/// is laid nearest the capital where placement allows, down its ladder (a port on
+/// coastless ground a second station, a station without track a hub). Then counts
+/// each major's buildings left without Logistic Point cover (the risk the cap
+/// carries; nothing is re-added for it). No-op when @p kit has no logistics counts.
+void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit_config& kit,
+                         opening_kit_report& rep);
+
+/// Print one `[opening_kit] logistics` line per major.
+void print_opening_kit_logistics(const opening_kit_report& r);
+
+/// A nation's buildings standing without Logistic Point cover: every Logistic
+/// Point consumer it owns whose tile reads coverage 0 from its running sources.
+int count_uncovered_buildings(world& w, entity_id nation);

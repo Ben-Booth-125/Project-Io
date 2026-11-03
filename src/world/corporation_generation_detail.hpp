@@ -140,8 +140,10 @@ private:
 };
 
 /// `body_id`'s final household + background demand, generation's reading.
+/// With @p at_markets, only the centres those markets serve (BL-1473).
 std::array<float, resource_count> body_demand(const world& w, const recipe_registry& reg,
-                                              entity_id body_id);
+                                              entity_id body_id,
+                                              const std::set<entity_id>* at_markets = nullptr);
 
 /// How near an input's nearest producer stands, best first (BL-1185).
 enum chain_tier : int
@@ -188,6 +190,10 @@ struct output_want
 /// final demand.
 output_want measure_output_want(world& w, const recipe_registry& reg, entity_id body,
                                 const std::array<float, resource_count>& final_demand);
+
+/// The want test read at @p markets only (BL-1473: a kit major's own markets).
+output_want measure_output_want_at(world& w, const recipe_registry& reg, entity_id body,
+                                   const std::set<entity_id>& markets);
 
 /// Pass 4b's stock for one kit category: the focus weights at the base
 /// magnitude, unjittered (BL-1473).

@@ -183,6 +183,30 @@ void world_gen_config::load_from_lua(lua_state& lua)
                                                      + ": unknown civic building '" + s.label + "'");
                         c.slots.push_back(std::move(s));
                     }
+                if (sol::optional<sol::table> lg = t["logistics"])
+                {
+                    for (const auto& lkv : *lg)
+                    {
+                        const std::string n = lkv.first.as<std::string>();
+                        if (lkv.second.get_type() != sol::type::number)
+                            throw std::runtime_error("world_gen.opening_kit." + kit + ".logistics."
+                                                     + n + " must be a count");
+                        const double v = lkv.second.as<double>();
+                        if (!(v >= 0.0 && v <= 64.0) || v != static_cast<double>(static_cast<int>(v)))
+                            throw std::runtime_error("world_gen.opening_kit." + kit + ".logistics."
+                                                     + n + " must be an integer in [0, 64]");
+                        if (n == "inland_logistics_hub")  c.hubs     = static_cast<int>(v);
+                        else if (n == "railway_station")  c.stations = static_cast<int>(v);
+                        else if (n == "port")             c.ports    = static_cast<int>(v);
+                        else
+                            throw std::runtime_error("world_gen.opening_kit." + kit
+                                                     + ": unknown logistics node '" + n + "'");
+                    }
+                    if (!c.logistics_capped())
+                        throw std::runtime_error("world_gen.opening_kit." + kit
+                                                 + ".logistics must name inland_logistics_hub, "
+                                                   "railway_station and port");
+                }
                 opening_kit.configs.emplace(kit, std::move(c));
             }
         }

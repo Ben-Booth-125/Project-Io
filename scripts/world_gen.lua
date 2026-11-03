@@ -263,9 +263,12 @@ world_gen = {
         configs = {
             standard = {
                 treasury = 8000,
+                -- The logistics slots beside the capital's source: a cap (Ben, 2026-11-03).
+                logistics = { inland_logistics_hub = 2, railway_station = 1, port = 1 },
                 extraction = {
+                    "agricultural_produce", "agricultural_produce", "agricultural_produce",
                     "agricultural_produce", "agricultural_produce", "water", "coal",
-                    "petroleum", "iron_ore", "copper_ore", "flex",
+                    "petroleum", "iron_ore", "copper_ore", "copper_ore", "copper_ore", "flex",
                 },
                 processing = {
                     { good = "food_rations",   recipes = { "food_rations" } },      -- Food Processor
@@ -277,15 +280,22 @@ world_gen = {
                 },
                 civic = { "planetary_marketplace", "research_institute", "schooling" },
             },
-            -- The Rich comparison point (about 32 buildings with the logistics
-            -- and military slots): Standard plus a second produce, iron and
-            -- flex, silica, ordnance, silicon and a second food and steel line.
+            -- The Rich comparison point (44 buildings with the logistics and
+            -- military slots): Standard plus ordnance, silicon and a second food
+            -- and steel line, with the extraction spread they need to be fed.
+            -- Extraction counts are CALIBRATED, not sized at placement (Ben,
+            -- 2026-11-03): the spread each processing slot needs to pass the
+            -- spare-input rule on the quick tier (opening_parity seeds 0/28/46/12).
             rich_core = {
                 treasury = 12000,
+                logistics = { inland_logistics_hub = 2, railway_station = 1, port = 1 },
                 extraction = {
-                    "agricultural_produce", "agricultural_produce", "water", "coal",
-                    "petroleum", "iron_ore", "copper_ore", "flex",
-                    "agricultural_produce", "iron_ore", "silica", "flex",
+                    "agricultural_produce", "agricultural_produce", "agricultural_produce",
+                    "agricultural_produce", "agricultural_produce", "agricultural_produce",
+                    "agricultural_produce", "agricultural_produce", "agricultural_produce",
+                    "water", "coal", "petroleum", "iron_ore", "iron_ore", "copper_ore",
+                    "copper_ore", "copper_ore", "silica", "silica", "silica", "silica",
+                    "silica", "flex", "flex",
                 },
                 processing = {
                     { good = "food_rations",   recipes = { "food_rations" } },
