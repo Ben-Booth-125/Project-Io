@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*43 entries — 10 open, 33 resolved.*
+*44 entries — 11 open, 33 resolved.*
 
 ---
 
@@ -161,6 +161,17 @@ The kit reuses Pass 3 helpers, so they moved from an anonymous namespace into na
 > **Recommendation:** Accept as the kit's seam; note it in CORPORATION_GENERATION.md if kept.
 
 *Files: `src/world/corporation_generation_detail.hpp`*
+
+### NR-1128 — Kit logistics cap: hubs stacked at the capital stay outside the two hub slots
+*decision taken on your behalf · raised 2026-11-03 · from BL-1473 cold review, finding 6*
+
+The cap counts every node on the capital tile as the capital's source, outside the slots, and stack_logistics_hubs may still stack hubs at a capped major's capital. Kept that way: stacked capital hubs are read as the source's capacity (the doc's "4 + the source"), so the cap bounds the network's reach, not the capital's throughput.
+
+**Why it matters.** A major can carry more than two hubs' bill if its capital stacks. Counting them against the slots would bound the bill but could starve the capital's Logistic Points.
+
+> **Recommendation:** Keep; revisit if the census shows capital stacks driving a major's bill.
+
+*Files: `src/world/opening_kit.cpp`, `src/world/logistic_points.cpp`*
 
 ---
 
