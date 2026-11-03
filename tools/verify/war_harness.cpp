@@ -358,8 +358,8 @@ int main()
             check(only && mf == k_war_justified_multiplier,
                   std::string("R2j ") + label + " is detected by its row, alone, and halves the third-party price");
         };
-        jtest(0, "grievance (declarer's Trust toward the defender in the hostile-leaning band, <= -25)", [&](fixture& g) {
-            g.w.sentiment.pairs[{ g.A, g.C }] = sentiment_value{ 0.0f, -25.0f };
+        jtest(0, "grievance (declarer's Trust toward the defender in the hostile-leaning band, <= -15)", [&](fixture& g) {
+            g.w.sentiment.pairs[{ g.A, g.C }] = sentiment_value{ 0.0f, -15.0f };
         });
         jtest(1, "embargo (the defender embargoes the declarer, BL-1418)", [&](fixture& g) {
             g.w.nation_embargoes.insert({ g.C, g.A });
@@ -372,14 +372,14 @@ int main()
             (void)declare_war(g.w, sp, g.C, g.D, { g.provs[g.D][0] });
         });
         {
-            // Grievance holds at Trust <= -25 (Ben, 2026-11-03, NR-1104): -49, once short
-            // of the adverse band, now holds; -24.9, just short of -25, does not.
+            // Grievance holds at Trust <= -15 (Ben, 2026-11-03, NR-1104, NR-1129): -49, once
+            // short of the adverse band, holds; -14.9, just short of -15, does not.
             fixture g; build(g);
             g.w.sentiment.pairs[{ g.A, g.C }] = sentiment_value{ 0.0f, -49.0f };
             const auto j49 = war_justifications(g.w, sp, g.A, g.C, { g.provs[g.C][1] });
-            g.w.sentiment.pairs[{ g.A, g.C }] = sentiment_value{ 0.0f, -24.9f };
+            g.w.sentiment.pairs[{ g.A, g.C }] = sentiment_value{ 0.0f, -14.9f };
             const auto j = war_justifications(g.w, sp, g.A, g.C, { g.provs[g.C][1] });
-            check(j49[0] && !j[0], "R2k grievance holds at Trust -49 (hostile-leaning) and not at -24.9 (NR-1104: the edge is -25)");
+            check(j49[0] && !j[0], "R2k grievance holds at Trust -49 (hostile-leaning) and not at -14.9 (NR-1129: the edge is -15)");
             // The lost ground must be THIS goal ceded by THIS declarer to THIS defender.
             g.w.province_cessions.push_back(province_cession{ g.B, g.C, g.provs[g.C][1], 0 });
             g.w.province_cessions.push_back(province_cession{ g.A, g.C, g.provs[g.C][2], 0 });

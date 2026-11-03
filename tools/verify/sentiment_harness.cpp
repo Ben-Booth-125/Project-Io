@@ -16,8 +16,8 @@
 //       neutral within the authored window, and its row is erased — so there is
 //       no value it cannot leave. This dissolves BL-391's reputation deadlock by
 //       construction rather than by a special case. R3h-R3m (Sprint N3, NR-568)
-//       pin the AUTHORED rate: a -2 cancellation halves in nine ticks, is erased
-//       inside ~130, and a pair with no event never grows a row.
+//       pin the AUTHORED rate: a -2 cancellation halves in eighteen ticks (Trust's
+//       half-life, Ben 2026-11-03, NR-1129), is erased inside ~260, and a pair with no event never grows a row.
 //   R4  TWO DIMENSIONS stored and moving independently, at every grain
 //       (corp->corp, nation->corp, nation->nation).
 //   R5  INERTNESS. All factor weights and decay at zero => nothing is stored and
@@ -378,27 +378,28 @@ int main()
     }
 
     // --- R3h-R3m: THE AUTHORED RATE (Sprint N3 T10, NR-568) --------------------
-    std::printf("\n-- R3  the authored rate: a cancellation is forgotten in nine quarters --\n");
+    std::printf("\n-- R3  the authored rate: Trust halves in eighteen quarters --\n");
     {
-        // Ben's ruling (NR-568, 2026-08-23): a cancellation is forgotten in NINE
-        // QUARTERS, i.e. a nine-tick half-life, so scripts/economy.lua authors
-        //     trust_decay_per_tick = 1 - 2^(-1/9) = 0.074125   (six sig. figs)
+        // Ben's ruling (NR-568, 2026-08-23) set a NINE-tick half-life; Trust's is
+        // EIGHTEEN since Ben, 2026-11-03 (NR-1129), so scripts/economy.lua authors
+        //     trust_decay_per_tick = 1 - 2^(-1/18) = 0.037776  (six sig. figs)
+        // Access keeps the nine-tick 0.074125.
         // This fixture does not load Lua, so the SAME LITERAL is hand-set here;
         // if economy.lua's number moves, this one must move with it.
         //
         // REPRESENTATION. `sentiment_value::trust` is an IEEE-754 binary32 and
         // decay is the multiplicative step `v -= v * r` (sentiment.cpp,
-        // `decayed`). Nine of those from -2 give -2 * (1 - r)^9, which is -1.0
-        // exactly only if r were the irrational 1 - 2^(-1/9). The authored
-        // decimal is six significant figures, so (1 - r)^9 is off by about
-        // 9 * |dr| / (1 - r) ~ 3e-6 relative, plus nine float roundings of
+        // `decayed`). Eighteen of those from -2 give -2 * (1 - r)^18, which is -1.0
+        // exactly only if r were the irrational 1 - 2^(-1/18). The authored
+        // decimal is six significant figures, so (1 - r)^18 is off by about
+        // 18 * |dr| / (1 - r) ~ 3e-6 relative, plus eighteen float roundings of
         // ~6e-8 each. The tolerance below is 1e-5 — about 80 ulps at 1.0 —
         // which is that decimal rounding and nothing looser; "+-1 fixed-point
         // step" has no meaning for a float, so this is the honest equivalent.
-        const float authored_rate = 0.074125f;
+        const float authored_rate = 0.037776f;
         sentiment_params p = authored_params();
         p.trust_decay_per_tick  = authored_rate;
-        p.access_decay_per_tick = authored_rate;
+        p.access_decay_per_tick = 0.074125f;
         // The fold uses this harness's small-integer weights, where
         // contract_cancelled is pure ACCESS; the ruling is about Trust, so the
         // -2 is driven through the seeded procurement weight instead, exactly
@@ -418,27 +419,27 @@ int main()
             return d <= tol && d >= -tol;
         };
 
-        for (int i = 0; i < 9; ++i)
+        for (int i = 0; i < 18; ++i)
             decay_sentiment(t, p);
-        const float after_nine = sentiment_toward(t, buyer, supplier).trust;
-        check(within(after_nine, -1.0f, 1e-5f),
-              "R3i ...nine ticks later it has HALVED (-1.0 within 1e-5: the "
+        const float after_half = sentiment_toward(t, buyer, supplier).trust;
+        check(within(after_half, -1.0f, 1e-5f),
+              "R3i ...eighteen ticks later it has HALVED (-1.0 within 1e-5: the "
               "authored decimal's rounding, binary32 multiplicative decay)");
 
-        for (int i = 0; i < 9; ++i)
+        for (int i = 0; i < 18; ++i)
             decay_sentiment(t, p);
         check(within(sentiment_toward(t, buyer, supplier).trust, -0.5f, 1e-5f),
-              "R3j ...and QUARTERED at eighteen: the half-life is a half-life, "
+              "R3j ...and QUARTERED at thirty-six: the half-life is a half-life, "
               "not a one-off");
 
         // No floor: keep going until the row is gone. Magnitude must fall
         // STRICTLY every tick until the epsilon snap erases it - a tick on
         // which it did not move would be a floor by another name. From -2 at
-        // this rate the snap lands at tick 129; 200 is a generous ceiling.
+        // this rate the snap lands at tick 258; 400 is a generous ceiling.
         bool strictly_shrinking = true;
         int  erased_at = -1;
         float prev = sentiment_toward(t, buyer, supplier).trust;
-        for (int tick = 19; tick <= 200 && erased_at < 0; ++tick)
+        for (int tick = 37; tick <= 400 && erased_at < 0; ++tick)
         {
             decay_sentiment(t, p);
             const auto row = t.pairs.find({buyer, supplier});

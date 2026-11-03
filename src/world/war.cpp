@@ -228,8 +228,8 @@ war_record* find_war_mut(world& w, entity_id a, entity_id b)
 const std::array<war_justification_row, k_war_justification_count>& war_justification_rows()
 {
     static const std::array<war_justification_row, k_war_justification_count> rows = {{
-        // Grievance holds in the HOSTILE-LEANING band, Trust <= -25 (Ben, 2026-11-03,
-        // NR-1104): the adverse band (-50) was a rule conduct almost never met.
+        // Grievance holds in the HOSTILE-LEANING band, Trust <= -15 (Ben, 2026-11-03,
+        // NR-1104, NR-1129): the adverse band (-50), then -25, were rules conduct never met.
         { "grievance",        war_measure::declarer_trust_toward_defender,
           condition_comparator::at_most,  war_operand::fixed,              k_war_grievance_trust },
         { "embargo",          war_measure::defender_embargoes_declarer,

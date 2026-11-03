@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*49 entries — 16 open, 33 resolved.*
+*49 entries — 15 open, 34 resolved.*
 
 ---
 
@@ -172,17 +172,6 @@ The cap counts every node on the capital tile as the capital's source, outside t
 > **Recommendation:** Keep; revisit if the census shows capital stacks driving a major's bill.
 
 *Files: `src/world/opening_kit.cpp`, `src/world/logistic_points.cpp`*
-
-### NR-1129 — Grievance never holds: no pair's Trust reaches -25
-*question · raised 2026-11-03 · from BL-1479 (grievance and Alarm floor), war_census 16 seeds*
-
-Grievance now holds at Trust -25 as ruled. Over 16 seeds the lowest Trust any pair reached was about -11.8, so grievance held on 0 of 652,094 live pair-ticks and carried no declaration.
-
-**Why it matters.** A declared casus belli that nothing meets is a dead rule. The conduct weights and the nine-tick decay cap Trust well above the edge.
-
-> **Recommendation:** Either raise the conduct weights (or slow the decay) so a sustained offence reaches -25, or move the edge toward the observed floor (about -10). Measure with war_census either way.
-
-*Files: `src/world/war.hpp`, `src/world/sentiment.cpp`, `docs/politics/RELATIONS.md`*
 
 ### NR-1130 — Rival embargo bars and the offer cooldown: calls taken in the relations lane
 *decision taken on your behalf · raised 2026-11-03 · from BL-1480 (war loose ends), BL-1481 (rival embargo)*
@@ -710,4 +699,17 @@ MILITARY.md § Domains and traversal lets land classes onto coastal water only w
 > **RESOLVED.** Ben, 2026-11-03 (sprint 61 calls form): ratified as taken.
 
 *Files: `docs/generation/CORPORATION_GENERATION.md`, `docs/military/MILITARY.md`, `docs/generation/NATION_GENERATION.md`*
+
+### NR-1129 — Grievance never holds: no pair's Trust reaches -25
+*question · raised 2026-11-03 · from BL-1479 (grievance and Alarm floor), war_census 16 seeds*
+
+Grievance now holds at Trust -25 as ruled. Over 16 seeds the lowest Trust any pair reached was about -11.8, so grievance held on 0 of 652,094 live pair-ticks and carried no declaration.
+
+**Why it matters.** A declared casus belli that nothing meets is a dead rule. The conduct weights and the nine-tick decay cap Trust well above the edge.
+
+> **Recommendation:** Either raise the conduct weights (or slow the decay) so a sustained offence reaches -25, or move the edge toward the observed floor (about -10). Measure with war_census either way.
+
+> **RESOLVED.** Ben, 2026-11-03: steeper Trust, then (after measurement showed weights or decay alone reach only -11 / -9) both together with the edge at -15. Trust-negative weights doubled, Trust half-life 18 ticks (Access and Alarm keep 9), k_war_grievance_trust -15; RELATIONS.md § The authored numbers and § 7. war_census 16 seeds: grievance holds on 100 pair-ticks (was 0) and carried 2 declarations; wars declared 95 (was 36), 47 still at war at tick 40; rival embargoes 48 enacted, 31 repealed, 17 standing (was 3/3/0); none on the player.
+
+*Files: `src/world/war.hpp`, `src/world/sentiment.cpp`, `docs/politics/RELATIONS.md`*
 

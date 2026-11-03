@@ -1330,9 +1330,13 @@ economy = {
     --
     -- Authored as the RATE, not the half-life, because deriving it in-engine
     -- would put a std::pow on the tick (sentiment.hpp says why that is refused).
-    -- Re-derive it from the line above if the ruling ever changes. Six
-    -- significant figures: a -2 Trust event is -1.000003 after nine ticks in
-    -- float32, which the sentiment harness asserts.
+    -- Re-derive it from the line above if the ruling ever changes.
+    --
+    -- TRUST takes its own, slower half-life (Ben, 2026-11-03, NR-1129): 18
+    -- ticks, 1 - 2^(-1/18) = 0.037776. At nine ticks no conduct between two
+    -- nations reached the grievance edge; a betrayal is remembered longer than
+    -- it is feared. Six significant figures: a -2 Trust event is -1.000003
+    -- after eighteen ticks in float32, which the sentiment harness asserts.
     --
     -- Access decays at the SAME rate until something emits into it (BL-540 is
     -- the first nation->corp emitter); there is no separate ruling for it yet.
@@ -1378,7 +1382,7 @@ economy = {
     },
 
     sentiment = {
-        trust_decay_per_tick  = 0.074125,
+        trust_decay_per_tick  = 0.037776, -- 18-tick half-life (NR-1129)
         access_decay_per_tick = 0.074125,
         -- BL-1432 (RELATIONS.md § 6): Alarm, the third dimension, decays at the
         -- same nine-quarter half-life (1 - 2^(-1/9)); there is no separate ruling
@@ -1391,23 +1395,28 @@ economy = {
         alarm_large_facility_cost = 450.0,
         -- Every weight below is a FIRST CUT (BL-1458 / BL-1432, 2026-10-30): small,
         -- signed per RELATIONS.md § Who emits each factor, and calibration only.
-        -- At a 0.074 decay a factor emitted EVERY tick at weight w and magnitude m
-        -- settles at w*m/0.074; a one-off of weight w is half gone in nine ticks.
+        -- At a decay r a factor emitted EVERY tick at weight w and magnitude m
+        -- settles at w*m/r; a one-off of weight w on Trust is half gone in eighteen
+        -- ticks, on Access and Alarm in nine.
+        -- The Trust-negative weights are DOUBLED from the first cut (Ben, 2026-11-03,
+        -- NR-1129): with them and the 18-tick Trust decay a sustained offence
+        -- reaches the grievance edge (-15); at the first cut nothing passed -6.
         factors = {
-            contract_failed = { trust = -4.0 },
+            contract_failed = { trust = -8.0 },
             -- Magnitude: credits of cargo landed this tick between the pair, each
-            -- way. 0.002 a credit: a pair landing 500 a tick settles near +13.5.
+            -- way. 0.002 a credit: a pair landing 500 a tick settles near +13.5 Access
+            -- and, at Trust's slower decay, near +26.5 Trust.
             trade_conducted     = { access = 0.002, trust = 0.002, alarm = -0.002 },
             -- Lane W emits these from declare_war and the peace (BL-1459, BL-1428).
-            hostility_declared  = { access = -5.0, trust = -5.0, alarm = 5.0 },
-            war_declared        = { trust = -2.0, alarm = 3.0 },
+            hostility_declared  = { access = -5.0, trust = -10.0, alarm = 5.0 },
+            war_declared        = { trust = -4.0, alarm = 3.0 },
             peace_concluded     = { trust = 3.0, alarm = -3.0 },
-            province_ceded      = { access = -3.0, trust = -3.0, alarm = 3.0 }, -- per province
+            province_ceded      = { access = -3.0, trust = -6.0, alarm = 3.0 }, -- per province
             friendship_accepted = { access = 5.0, trust = 5.0, alarm = -3.0 },
-            -- No emitter: the campaign has no embargo law to enact (RELATIONS.md § 3).
-            embargo_imposed     = { access = -5.0, trust = -3.0 },
-            -- Magnitude: men the observer lost. 1000 men lost is -2 Trust, +2 Alarm.
-            force_used          = { trust = -0.002, alarm = 0.002 },
+            -- Emitted when a nation enacts an embargo (embargo.cpp; RELATIONS.md § 3).
+            embargo_imposed     = { access = -5.0, trust = -6.0 },
+            -- Magnitude: men the observer lost. 1000 men lost is -4 Trust, +2 Alarm.
+            force_used          = { trust = -0.004, alarm = 0.002 },
             -- Alarm's capability factors (§ 6) are emitted EVERY TICK, so each is
             -- authored as the Alarm it SETTLES AT per unit of magnitude
             -- (alarm_settles_at); the loader derives the per-tick weight as that

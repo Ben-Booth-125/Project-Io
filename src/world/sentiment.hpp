@@ -341,7 +341,9 @@ struct sentiment_params
     /// would put a `std::pow` in the engine, and pow is not guaranteed
     /// identically rounded across libms. The value that crosses the save seam
     /// and the tick is the RATE. The authored value (scripts/economy.lua,
-    /// NR-568) is a NINE-tick half-life: 1 - 2^(-1/9) = 0.074125.
+    /// NR-568) is a NINE-tick half-life: 1 - 2^(-1/9) = 0.074125, for Access and
+    /// Alarm. Trust's is EIGHTEEN ticks, 1 - 2^(-1/18) = 0.037776 (Ben, 2026-11-03,
+    /// NR-1129).
     ///
     /// Zero = this dimension does not decay AND IS NOT TOUCHED AT ALL (not even
     /// by the epsilon snap). Values above 1 are clamped to 1 (full decay in one

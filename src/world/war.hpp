@@ -230,7 +230,9 @@ enum class war_operand : uint8_t
 
 /// The Trust at or below which GRIEVANCE holds - the declarer's Trust toward the
 /// defender in the hostile-leaning band (RELATIONS.md § 7; Ben, 2026-11-03, NR-1104).
-inline constexpr float k_war_grievance_trust = -25.0f;
+/// -15, not -25 (Ben, 2026-11-03, NR-1129): with the doubled Trust weights and the
+/// 18-tick Trust decay a sustained offence reaches -15; nothing reached -25.
+inline constexpr float k_war_grievance_trust = -15.0f;
 
 struct war_justification_row
 {

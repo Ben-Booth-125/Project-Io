@@ -157,7 +157,7 @@ conduct retired with the corporations keeps its enumerator and moves nothing (Be
 ### Who emits each factor (Ben, 2026-10-30)
 
 **Every live factor has an emitter, and each emitter is one call site.** Until now only the opening
-grudge wrote a row, and it fades within about three campaign years; past that, every pair read
+grudge wrote a row, and its Trust fades within about fourteen campaign years; past that, every pair read
 neutral. A factor's direction on each dimension is fixed below; its size is an authored weight in
 `economy.sentiment.factors`, and an occurrence with a natural size passes it as the magnitude.
 
@@ -228,7 +228,7 @@ event — what was done, in which region, in which year — so the opening senti
 nations can be read back to the war that produced it rather than presented as a bare number. That
 is the condition on which an inherited grudge is admissible at all.
 
-**A seeded grudge FADES, and that is correct (Ben, 2026-09-16, NR-829).** `historical_grudge` takes no exemption from the authored trust decay, so a nine-tick half-life (§ economy.sentiment, NR-568) puts an opening grudge of −8.8 under −1 within roughly three campaign years. Ben ruled that shape correct rather than defective: **a starting condition should fade, because a history the player did not live through should not bind them forever.** The grudge is what the world hands the player on the first tick, not a standing fact they must play around for a campaign. It decays like any other sentiment because, once the campaign opens, conduct is what moves a relationship.
+**A seeded grudge FADES, and that is correct (Ben, 2026-09-16, NR-829).** `historical_grudge` takes no exemption from the authored trust decay, so Trust's eighteen-tick half-life (§ The authored numbers) puts an opening grudge of −8.8 under −1 within about 56 ticks, fourteen campaign years. Ben ruled that shape correct rather than defective: **a starting condition should fade, because a history the player did not live through should not bind them forever.** The grudge is what the world hands the player on the first tick, not a standing fact they must play around for a campaign. It decays like any other sentiment because, once the campaign opens, conduct is what moves a relationship.
 
 **What that ruling does NOT weaken, and the distinction was being blurred here until 2026-09-16.** `docs/generation/CIVILISATION.md` § What the dark age must leave asks that who colonises whom not be a fresh roll. That requirement is discharged **inside generation**, by `pass_one_output::grudges` being carried across the span boundary and read by the Exploration and Industrialisation spans while they run — not by this row. Campaign sentiment is seeded once, at the END of generation, for the player's opening map; it is a consequence of the quarrel, never the mechanism that carried it. A decay on the campaign row therefore says nothing about whether the dark age's quarrels shaped the colonial map, because by then they already have.
 
@@ -243,8 +243,13 @@ nine ticks, and
 
     rate = 1 − 2^(−1 / 9) = 0.074125
 
-is `trust_decay_per_tick`. `access_decay_per_tick` and `alarm_decay_per_tick` are the same value —
-there is no separate ruling for Access or Alarm. What counts as a *large* single-site facility for
+is `access_decay_per_tick` and `alarm_decay_per_tick`. **Trust decays on its own, slower
+half-life of eighteen ticks** (Ben, 2026-11-03, NR-1129):
+
+    rate = 1 − 2^(−1 / 18) = 0.037776
+
+is `trust_decay_per_tick`. A betrayal is remembered longer than it is feared: at nine ticks no
+conduct between two nations ever reached the grievance edge (§ 7). What counts as a *large* single-site facility for
 § 6 is authored beside them, as `alarm_large_facility_cost`: a building whose authored build cost
 reaches it. The loader (`recipe_registry.cpp`) rejects either rate unless it is a finite number in
 [0, 1]; an authored rate is never clamped silently.
@@ -253,7 +258,8 @@ The factor weights for `contract_completed` and `contract_cancelled` are **seede
 procurement rates** (`seed_procurement_sentiment`, `recipe_registry.hpp`: `reputation_on_complete`
 1.0, `reputation_on_cancel` −2.0 on Trust) and may be overridden by `economy.sentiment.factors`.
 Every other factor's weight is authored per § Who emits each factor; a factor with no emitter is
-authored at zero and moves nothing.
+authored at zero and moves nothing. The Trust-negative weights are **double the first cut**
+(Ben, 2026-11-03, NR-1129), so that a sustained offence reaches the grievance edge.
 
 **`historical_grudge` is the one factor with no Lua row, and that is its definition rather than a
 gap.** It fires exactly once, at world setup, before the first tick, and nothing in the campaign
@@ -356,8 +362,8 @@ occurrence of authored conduct folded into the substrate — `contract_completed
 
 **The floor is a temporary state, and every consumer must read it that way.** `request_quote`
 declines a buyer below `reputation_floor` (−5.0), and treats "below the floor" as a condition of
-today rather than a verdict: a −2 cancellation halves in nine ticks and its row is erased inside
-~130, with no new verb, no reparations mechanic, no special case (`sentiment_harness` R3h–R3m;
+today rather than a verdict: a −2 cancellation halves in eighteen ticks and its row is erased inside
+~260, with no new verb, no reparations mechanic, no special case (`sentiment_harness` R3h–R3m;
 `procurement_harness` R2 asserts both halves). That reading must hold for every later consumer of
 the axis — BL-377's contract seam reads the same one.
 
@@ -500,7 +506,7 @@ opening set:
 
 | Justification | Holds when |
 |---|---|
-| Grievance | the declarer's Trust toward the defender is in the hostile-leaning band, **Trust ≤ −25** (Ben, 2026-11-03, NR-1104: the adverse band, −50, was a rule conduct almost never met) |
+| Grievance | the declarer's Trust toward the defender is in the hostile-leaning band, **Trust ≤ −15** (Ben, 2026-11-03, NR-1104: the adverse band, −50, was a rule conduct almost never met; NR-1129: −25 was never met either, so the edge is −15, with the Trust weights doubled and Trust's half-life eighteen ticks) |
 | Embargo | the defender embargoes the declarer |
 | Lost ground | a goal is a province the declarer ceded to the defender at an earlier peace |
 | A friend attacked | the defender is the declarer in a war against the declarer's friend |
