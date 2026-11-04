@@ -54,6 +54,9 @@
 #include "world/planetology.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
+#include "world/state_industry.hpp"         // BL-1483: fold_to_ground
+#include "world/corporation_generation.hpp" // assign_default_recipes
+#include "world/survey_system.hpp"          // init_survey_states
 #include "world/world.hpp"
 
 #include <cstdio>
@@ -288,6 +291,15 @@ int main()
     // =========================================================================
     {
         const recipe_registry reg = make_registry();
+        // BL-1483: the startup passes the app runs (finish_campaign_world /
+        // app::load_economy) and ai_skill_harness mirrors, in its order. Without
+        // the BL-1407 fold every nation's buildings sit unfunded in the
+        // generation-transient charter records, the scorer evaluates ~15 actors
+        // a tick and applies nothing, and no decision or agency entry is ever
+        // written - a startup the game never performs, not a silent writer.
+        init_survey_states(w);
+        assign_default_recipes(w, reg);
+        (void)fold_to_ground(w);
         for (int t = 1; t <= 40; ++t)
             run_tick(w, reg, t);
 
