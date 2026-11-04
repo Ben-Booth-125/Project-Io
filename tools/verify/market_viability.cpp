@@ -1777,7 +1777,9 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         {
             int n20 = 0;
             for (const auto& [nid, mx] : broke_max) { (void)nid; if (mx >= 20) ++n20; }
-            (k == k_g1_g2_play_tick ? r.pw_broke20_t50 : r.pw_broke20_end) = n20;
+            // Both readings when --ticks ends at tick 50 (cold review).
+            if (k == k_g1_g2_play_tick) r.pw_broke20_t50 = n20;
+            if (k == ticks)             r.pw_broke20_end = n20;
             r.pw_nations = static_cast<int>(w.nations.size());
             int na = 0, nb = 0, nc_ = 0, na_rec = 0;
             std::map<std::string, int> what;
@@ -1789,10 +1791,15 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
             }
             std::string ws;
             for (const auto& [name, n] : what) ws += " " + name + "=" + std::to_string(n);
-            std::printf("BR seed %u %s: nations broke 20+ ticks %d: a broke-at-handoff %d (recovered later %d)"
-                        " b build-then-zero %d c other %d | b builds:%s\n",
-                        seed, k == ticks ? "end" : "t50", na + nb + nc_, na, na_rec, nb, nc_,
-                        ws.empty() ? " -" : ws.c_str());
+            for (const char* when : { "t50", "end" })
+            {
+                if ((when[0] == 't' && k != k_g1_g2_play_tick) || (when[0] == 'e' && k != ticks))
+                    continue;
+                std::printf("BR seed %u %s: nations broke 20+ ticks %d: a broke-at-handoff %d (recovered later %d)"
+                            " b build-then-zero %d c other %d | b builds:%s\n",
+                            seed, when, na + nb + nc_, na, na_rec, nb, nc_,
+                            ws.empty() ? " -" : ws.c_str());
+            }
         }
         if (k == k_g1_g2_play_tick)
             for (const auto& [bid, b] : w.buildings)

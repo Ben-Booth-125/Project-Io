@@ -741,16 +741,16 @@ So power is:
 
 **Generation is sized per grid, not per body (Ben, 2026-10-07; BL-1232, power plants per grid).**
 Power moves only within a grid (`LOGISTICS.md` § 3a), so the world's generation is measured where
-it can be used: a body's power gap is the sum over its wired grids of `max(0, need − live output)`,
+it can be used: a body's power gap is the sum over its wired grids of `max(0, need − output)`,
 and a power plant is placed in a short grid's provinces. **A nation reads its own buildings live
 and every other building nominally (Ben, 2026-11-04; BL-1485, power grid measure).** Its own
 buildings count as the grid runs them: the need is their actual draw — upkeep at their output
-share, none for a building its funding gate idled — and the output is each of its generators at
-its own staffing and supply factor, one under construction at the staffing construction gives it.
-Every other nation's buildings on the grid count only as what is public of them — that they exist,
-their type and their recipe: a type's upkeep once complete, a recipe's output at the nominal run,
-built or building. At generation every building stands as authored, so there the two readings are
-one. A surplus on the core grid never cancels a
+share, none for a building its funding gate idled or for the capital's free hub — and the output
+is each of its generators at its own staffing and supply factor, one under construction at the
+staffing construction gives it. Every other nation's buildings on the grid count only as what is
+public of them — that they exist, their type and their recipe: a type's upkeep once complete, a
+recipe's output at the nominal run, built or building. Where no nation is measuring — generation
+sizing its walk — every building is read nominally. A surplus on the core grid never cancels a
 deficit on another. A grid needing less than half of one plant's output is left to a road that
 joins it to a bigger one rather than given a plant of its own. **Unpowered grids first (Ben,
 2026-10-08):** the body's power plants — a capped number — go first to short grids with no

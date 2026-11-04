@@ -999,8 +999,7 @@ void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir
 /// charter walk sizes power on it. Exported so harnesses read the walk's own
 /// figure; the play-time scorer's power-plant candidate (corp_ai.cpp, BL-1485;
 /// AI_OPPONENT.md, "A power-plant candidate is priced against its grid's
-/// shortfall") and the loss reflex's recipe rescue (economy_system.cpp,
-/// BL-1492) read the same gap.
+/// shortfall") reads the same gap.
 ///
 /// `body_power_grid_gap`: @p body_id's power gap, the sum over its wired grids
 /// of max(0, draw - output). Draw is keyed by each building's own tile grid;

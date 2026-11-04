@@ -609,7 +609,8 @@ and were decommissioned. Like the stack rank above, this is a corrected estimate
 existing scorer grant (§ 11), not a new behaviour.
 **Own buildings live, every other building nominal (Ben, 2026-11-04; BL-1485, power grid
 measure).** The nation reads its own buildings as the grid runs them: their need is their actual
-draw, each at its output share, none for a building its funding gate idled, and their output is each
+draw, each at its output share, none for a building its funding gate idled or for the capital's
+free hub (`../economy/LOGISTICS.md`, "The capital's source runs free"), and their output is each
 of its generators at the rate its own staffing and supply run it, one under construction at the
 staffing construction gives it. Every other nation's buildings on the grid are read only as what is
 public of them — that they exist, their type and their recipe — at the nominal reading: a type's

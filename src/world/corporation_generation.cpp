@@ -1887,7 +1887,7 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
 ///    a generator UNDER CONSTRUCTION at the staffing construction gave it,
 ///    read as if complete, so a plant already started is the supply it will be.
 /// With no viewer (generation, harnesses) every building is read nominally,
-/// and at generation every building stands as authored, so the walk's reading
+/// term for term the measure's reading before BL-1485, so the walk's reading
 /// is unchanged. A building in a dark province (grid 0) draws no power
 /// (economy_system.cpp, "no wire, no draw") and a generator whose market
 /// centre is dark feeds nothing, so neither counts. @p unpowered_short, when given, receives the short grids
