@@ -10,6 +10,35 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-04 — Sprint 62: equal starts for majors
+
+**Runtime:** three days; Design from Ben's starter-package form, Delivery Full in a worktree lane with
+a cold review, then the R4 diagnosis and fix in the main session. No version cut: sprint 61 targets v0.3.0.
+
+**What was built.**
+- **Census:** BL-1475 (opening parity census). `opening_parity` reads every major at the handoff and over five years of play; `--kit`, `--diagnose-idle` and `--no-logistics-cap`; the `opening-parity` skill.
+- **Kit:** BL-1473 (major opening kit). Every major takes up its walk-placed plant and lays the Rich-core kit with the substitution ladder, on a flat 12,000-credit treasury.
+  - Want is read at the major's own markets; feed counts are curated; the logistics count is a cap.
+  - The cap keeps the nodes that cover the kit first, then re-sites each kit building it strands.
+
+**Decisions.** Every ruling is in its owning doc; the register (`tools/session/rulings/sprint-62.json`)
+passes 12 of 12. Rich-core is the kit in play over Standard (Ben, 2026-11-03).
+
+**R4 diagnosis.** The settle idled 374 kit buildings. `--diagnose-idle` ruled out price, funding, labour,
+deposits and pool size: 285 of the 287 tested had no Logistic Point cover after the cap. The census had
+missed them, because its uncovered count skipped idled buildings. Cover-first alone reached 273; the
+cap-off control reached 38, so the slot counts were the limit. The re-site brought it to 100.
+
+**Parity at close (20:4, 16 seeds).** Treasury spread median 21x -> 1.77x; majors losing money 17 -> 0;
+kit processors running 540 of 578.
+
+**Re-bless.** Two. 2026-11-03 for the kit and the Trust rates; 2026-11-04 for BL-1436 (kit in the age
+tree, save v76, merged without a re-pin) and the kit re-site. D_search unmoved both times; 16 of 16 PASS.
+
+**Left open.** BL-1474 (major opening army), BL-1476 (wizard default thirty) and BL-1487 (kit
+processors idle) carry to sprint 61. NR-1133 (fuel, power and ordnance never wanted) is open; most
+majors' university slot goes unbuilt.
+
 ## 2026-10-30 — Sprint 60: war in time and on the ground — version 0.2.4
 
 **Runtime:** three days; Design on Ben's rulings, Delivery Full in worktree lanes with a cold review

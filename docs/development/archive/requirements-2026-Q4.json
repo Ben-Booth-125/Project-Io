@@ -1064,6 +1064,62 @@
         }
       ]
     },
+    "major-opening-kit": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "harness: opening_parity --kit standard / rich_core, 16 library seeds"
+          ],
+          "requirement": "Every major opens with the configured kit: its extraction, processing and civic buildings are the kit slots placed, substituted or reported unbuilt, and nothing the walk placed on its ground survives in those categories. Every minor opens as before.",
+          "notes": "",
+          "evidence": "COMPLETE, verified 2026-11-03 on merged main (3a241c53, Rich-core). opening_parity --kit rich_core at 20:4, quick tier (seeds 0, 28, 46, 12): every major reports placed + substituted + unbuilt = 39 kit slots, median 33 placed, 5 substituted, 1 unbuilt (the university, which needs a larger centre than most capitals hold). The take-up removes the walk-placed buildings in the kit categories (took up 2-115 per major). Minors open on the walk, unchanged: median 7 buildings. The full 16-seed census ran on the lane tip before the merge (median 42 buildings per major)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "harness: opening_parity"
+          ],
+          "requirement": "Every major opens on the configured flat treasury, and the opening cut removes nothing from a major.",
+          "notes": "",
+          "evidence": "COMPLETE, verified 2026-11-03 on merged main. The census log prints \"[opening_kit] 4 major treasury(ies) set to 12000 credits\" and \"major treasuries entering the settle: ...=12000.0\" for every major on all four quick-tier seeds: the reserve and founding releases refund nothing into the flat figure. size_opening_state_to_chest runs with skip_majors when a kit is laid (finish_campaign_world.cpp:498)."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "harness: world_determinism",
+            "harness: save_roundtrip"
+          ],
+          "requirement": "Generation stays deterministic and the opened world saves and loads to an equal state hash.",
+          "notes": "",
+          "evidence": "COMPLETE, verified 2026-11-03 on merged main. world_determinism ALL PASS (0 failures); save_roundtrip \"SAVE ROUND TRIP OK\"; world_copy_determinism --seed 0 --copy-at base PASS (D_settle 587CB868A5BDD696 both sides). Digests re-pinned the same day; D_search unmoved."
+        },
+        {
+          "id": "R4",
+          "status": "failed",
+          "verification": [
+            "harness: opening_parity"
+          ],
+          "requirement": "Every kit processor passes Pass 3: chain-feasible and sized to spare input; the census reports the kit's processors running at the handoff.",
+          "notes": "Cause, diagnosed 2026-11-03 (opening_parity --diagnose-idle, 16 seeds at 20:4): the logistics cap. Re-enabled on a copy of the handoff world, 287 idled kit buildings run at zero workforce while funded (state_idle 0), with a full labour grant, a full output share, deposits intact and an uncontended labour pool on 60 of 64 majors; 285 of them have Logistic Point coverage 0, so their run fraction is 0 and they lose maintenance and wages for 8 ticks. The pool is not short (granted = claim on 63 of 64 majors). cap_major_logistics took up 687 nodes over the 64 majors and its own log reports 402 buildings without cover after the cap (median 3, max 31), against 374 idled. Most idled processors are starved of silica, copper or coal from those uncovered extractors. Not run: the cap switched off, to show the same buildings were covered before it. Census blind spot: count_uncovered_buildings skips decommissioned buildings (lp_consumer), so the handoff \"uncovered\" read 0 on the very buildings the cap stranded. 2026-11-04: the census uncovered count now includes idled buildings (count_uncovered_buildings include_idled): 42 at the handoff after the fix.",
+          "evidence": "FAILED, narrowed 2026-11-04 on main 879ebbf7 + the cover-first cap and the kit re-site (Ben, 2026-11-04: \"Keep covering nodes\", \"Place within reach too\"). opening_parity --pairs 20:4 --diagnose-idle, 16 library seeds, 64 majors. Kit processors running at the handoff 540 of 578 (baseline at 879ebbf7: 511); idled kit buildings 100 (baseline 374: 62 extraction, 38 processing). The cap kept 120 of its 241 slots for kit cover; the re-site laid 246 kit buildings again on covered ground and 38 found no covered tile. Control with the cap lifted (--no-logistics-cap): 558 of 578 running, 38 idled. Of the 100 still idled, 28 have no labour, 22 are starved of copper ore, silica or coal, 3 have no deposit. Workability (R5's terms): 0 of 64 majors losing money (baseline 6), treasury spread median 1.77x (baseline 2.05x), median treasury 21,980 (baseline 19,265). Remaining failure: 38 kit processors idled, against 20 with the cap lifted."
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "verification": [
+            "harness: opening_parity, market_viability"
+          ],
+          "requirement": "Reported, not gated: the within-seed spread and workability of Standard and Rich-core against the 9e11146f baseline, and market_viability gates before and after.",
+          "notes": "",
+          "evidence": "COMPLETE (reported, not gated), 2026-11-03. Baseline 9e11146f at 20:4: treasury spread median 21x (worst 107x), 17 of 64 majors losing money, 13 broke. Standard: spread 2.0x, 11 of 64 losing, 4 broke. Rich-core: spread 2.1x (worst 2.7x), median treasury 19,387, 7 of 64 losing, 0 broke; 2 of 64 losing at 30:4. Merged main quick tier: spread median 1.68x, 2 of 16 losing, 0 broke. market_viability lane vs main: G1 92.6 vs 93.4, G1t50 82.6 vs 82.4 (the G1t50 fail exists on main, carried as its own item)."
+        }
+      ],
+      "resolution": "Closed at the sprint 62 close (Ben, 2026-11-04: mark this sprint as complete). R1, R2, R3 and R5 complete; R4 failed and stays failed: 540 of 578 kit processors run at the handoff (511 at the start of the R4 work), 558 with the logistics cap lifted. The residue is BL-1487 (kit processors idle)."
+    },
     "markets-can-die": {
       "rows": [
         {

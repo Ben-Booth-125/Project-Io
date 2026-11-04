@@ -81,5 +81,21 @@
    "8,000 credits\\*\\* for the Standard kit"
   ],
   "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "The logistics cap keeps the nodes that cover the kit first (Ben, 2026-11-04)",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "The nodes that cover the kit come first\\s+\\(Ben, 2026-11-04\\)",
+  "stale": [
+   "fill its logistics slots first, in the order the Logistic Point seeding"
+  ],
+  "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "The kit stands within the capped network's reach (Ben, 2026-11-04)",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "The kit stands within the capped network's reach \\(Ben, 2026-11-04\\)",
+  "stale": [],
+  "owner": "BL-1473 (major opening kit)"
  }
 ]

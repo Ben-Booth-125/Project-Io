@@ -498,32 +498,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 62,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-02",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, starter-package form, 2026-11-02)",
-   "requires": [],
-   "id": "BL-1473",
-   "short_name": "MAJOR_OPENING_KIT",
-   "category": "Generation",
-   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
-   "priority": "A",
-   "difficulty": 4,
-   "files": [
-    "src/world/finish_campaign_world.cpp",
-    "src/world/corporation_generation.cpp",
-    "src/world/nation_generation.cpp",
-    "scripts/world_gen.lua"
-   ],
-   "title": "Every major opens on the Standard kit and a flat 8,000-credit treasury",
-   "design": "Written in docs/generation/CORPORATION_GENERATION.md § A major's opening kit and docs/generation/NATION_GENERATION.md § Pass 7 (Ben, 2026-11-02). Work: the kit as one authored data table (slots, counts, treasury, army) so Lean/Rich are edits; after the fold and before the opening reserve, take up the walk's buildings on each major's ground and lay the kit under Pass 3's rules with the substitution ladder; logistics slots counted against standing nodes; opening stock per kit category; treasury set flat; the opening cut skips majors; unbuilt slots on the generation report. Digest re-bless expected; NR-1125 carries the calls taken in writing it."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 62,
+   "sprint": 61,
    "version_goal": "v0.3.0",
    "written": "2026-11-02",
    "parked": false,
@@ -549,29 +524,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 62,
-   "version_goal": "v0.3.0",
-   "written": "2026-11-02",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, starter-package form, 2026-11-02)",
-   "requires": [],
-   "id": "BL-1475",
-   "short_name": "OPENING_PARITY_CENSUS",
-   "category": "Verification",
-   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
-   "priority": "A",
-   "difficulty": 3,
-   "files": [
-    "tools/verify/opening_parity.cpp"
-   ],
-   "title": "opening_parity: per-major treasury, buildings, men and five years of operating net",
-   "design": "The measurement for the kit ruling (Ben, 2026-11-02: test configurations over several years of play). A pure reader on the shipped start: per seed and per major, at the handoff, treasury, buildings by kit category, unbuilt slots, men and pool; then operating net per quarter for 20 quarters with every major run by its scorer; the max/min spread across majors; and how many major pairs share a border (the spacing question). Run before and after BL-1473 over the 16 library seeds with par-seeds, at 20 and 30 nations. Saving it as a skill needs Ben's permission."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 62,
+   "sprint": 61,
    "version_goal": "v0.3.0",
    "written": "2026-11-02",
    "parked": false,
@@ -827,6 +780,31 @@
    ],
    "title": "A rival's research scorer counts the kit a node opens",
    "design": "Ben, 2026-11-04 (starvation form): granted, written into AI_OPPONENT.md § 11 (\"A node that opens kit is worth that kit\"). Today the scorer gives unlock_kit effects no worth, so rivals reach kit only on the way to other nodes (BL-1436, kit in the age tree). Weight the opened items by the nation's own military_research budget line and the units it fields. Check: nation_tech_harness (a kit node outranks an equal-cost node with no effect for a nation fielding units), research medians, determinism."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-04",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (sprint 62 close, Ben, 2026-11-04)",
+   "requires": [
+    "BL-1473"
+   ],
+   "id": "BL-1487",
+   "short_name": "KIT_PROCESSORS_IDLE",
+   "category": "Generation",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "priority": "B",
+   "difficulty": 3,
+   "files": [
+    "src/world/opening_kit.cpp",
+    "tools/verify/opening_parity.cpp"
+   ],
+   "title": "38 of 578 kit processors are idled at the handoff, against 20 with the logistics cap lifted",
+   "design": "The residue of BL-1473 (major opening kit) R4, measured 2026-11-04 on eba4f3dc with opening_parity --pairs 20:4 --diagnose-idle (16 seeds, 64 majors). After the cover-first cap and the kit re-site (CORPORATION_GENERATION.md § A major's opening kit, Ben 2026-11-04), 100 kit buildings idle at the handoff (62 extraction, 38 processing); with the cap lifted (--no-logistics-cap) 38 idle (18, 20). Of the 100: 28 have no labour, 22 are starved of copper ore, silica or coal, 3 have no deposit; 38 found no covered tile to re-site to. Work: read the 28 no-labour cases (the pool is per nation and body; contention allocates by wage), then the starved processors' feeds, and decide whether the gap to the control is the cap's or the kit's. The requirement is R4's own: every kit processor passes Pass 3 and runs at the handoff."
   }
  ]
 }

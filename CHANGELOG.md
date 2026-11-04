@@ -12,6 +12,15 @@ release.
 
 ## [Unreleased]
 
+### Added
+
+- **Every major opens on the same kit** (BL-1473 (major opening kit)): its walk-placed plant is
+  taken up and the Rich-core kit laid in its place, with a substitution ladder for slots the ground
+  cannot hold, on a flat 12,000-credit treasury. Asymmetry now comes from land, population and
+  neighbours. The kit stands within reach of the capped logistics network.
+- **Opening parity census** (BL-1475 (opening parity census)): `opening_parity` and the
+  `opening-parity` skill measure the majors' spread and workability over five years of play.
+
 ## [0.2.4] — 2026-10-30
 
 *War in time and on the ground. Units march by the day at their class speed, and battles run for
