@@ -3256,7 +3256,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // (corp_ids, sorted above) and their assets in stored order for determinism;
     // composes with the deposit-depletion throttle already live in run_extraction.
     {
-        constexpr int   loss_streak_to_idle = 8;     // consecutive loss ticks before idling.
+        constexpr int   loss_streak_to_idle = k_loss_streak_to_idle; // consecutive loss ticks before idling.
         constexpr float floored_frac        = 0.30f; // output within ~30% of the price floor reads as "floored".
         // BL-1206: the reach context the recipe rescue asks "is this input
         // obtainable here?" of — built on first use, shared by every corp this

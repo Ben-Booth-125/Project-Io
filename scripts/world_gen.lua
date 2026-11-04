@@ -268,6 +268,14 @@ world_gen = {
                 treasury = 8000,
                 -- The logistics slots beside the capital's source: a cap (Ben, 2026-11-03).
                 logistics = { inland_logistics_hub = 2, railway_station = 1, port = 1 },
+                -- The fixed army (Ben, 2026-11-02; MILITARY.md § Nation garrisons): eight units
+                -- of 50 men, four at the capital post, the rest one each at the border posts in
+                -- descending grudge order, wrapping; the land pool opens on 200 recruits.
+                army = {
+                    capital = { "infantry", "infantry", "artillery", "light_armour" },
+                    border  = { "motorised", "infantry", "infantry", "infantry" },
+                    men = 50, land_recruits = 200,
+                },
                 extraction = {
                     "agricultural_produce", "agricultural_produce", "agricultural_produce",
                     "agricultural_produce", "agricultural_produce", "water", "coal",
@@ -292,6 +300,14 @@ world_gen = {
             rich_core = {
                 treasury = 12000,
                 logistics = { inland_logistics_hub = 2, railway_station = 1, port = 1 },
+                -- The fixed army (Ben, 2026-11-02; MILITARY.md § Nation garrisons): eight units
+                -- of 50 men, four at the capital post, the rest one each at the border posts in
+                -- descending grudge order, wrapping; the land pool opens on 200 recruits.
+                army = {
+                    capital = { "infantry", "infantry", "artillery", "light_armour" },
+                    border  = { "motorised", "infantry", "infantry", "infantry" },
+                    men = 50, land_recruits = 200,
+                },
                 extraction = {
                     "agricultural_produce", "agricultural_produce", "agricultural_produce",
                     "agricultural_produce", "agricultural_produce", "agricultural_produce",

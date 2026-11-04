@@ -4,6 +4,7 @@
 #include "world/input_reach.hpp"
 #include "world/logistic_points.hpp" // lp_coverage_at, lp_consumer -- the logistics cap's cover read
 #include "world/logistics.hpp"       // invalidate_logistics_caches
+#include "world/economy_system.hpp"  // k_loss_streak_to_idle -- the kit input stock (BL-1487)
 #include "world/market_clearing.hpp" // market_for_tile
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
@@ -701,6 +702,31 @@ void shelve_stock(world& w, const std::vector<entity_id>& bids, industrial_focus
     }
 }
 
+/// THE KIT STOCKS ITS INPUTS (Ben, 2026-11-04, BL-1487). Each kit processor's recipe
+/// inputs, at its judged staffing, for `k_loss_streak_to_idle` ticks, on the shelf of
+/// the market it stands in: a fresh chain is fed through the idle reflex's window
+/// before its own feeders deliver, so neither end idles for an empty shelf. Ascending
+/// building id; nothing is minted beyond generation's opening stock, as § Pass 4b's.
+void shelve_kit_inputs(world& w, const recipe_registry& reg, std::vector<entity_id> bids)
+{
+    std::sort(bids.begin(), bids.end());
+    for (const entity_id bid : bids)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const recipe* rc = reg.get_recipe(bit->second.recipe);
+        const entity_id mid = market_for_tile(w, bit->second.tile);
+        if (rc == nullptr || mid == null_entity)
+            continue;
+        const float span = judged_batches(reg, bit->second) * static_cast<float>(k_loss_streak_to_idle);
+        market_component& mc = w.markets.at(mid);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (rc->inputs[r] > 0.0f)
+                mc.inventory[r] += span * rc->inputs[r];
+    }
+}
+
 using rec_outcome = opening_kit_slot_record::outcome;
 
 void set_record(opening_kit_slot_record& rec, rec_outcome o, std::string as, std::string note,
@@ -980,6 +1006,7 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
         // f. The opening stock.
         shelve_stock(w, mk.extractors, industrial_focus::extraction);
         shelve_stock(w, mk.processors, industrial_focus::processing);
+        shelve_kit_inputs(w, reg, mk.processors);
 
         rm.proc_built = static_cast<int>(mk.processors.size());
         for (const opening_kit_slot_record& r : rm.slots)

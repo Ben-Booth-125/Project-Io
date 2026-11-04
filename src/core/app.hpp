@@ -617,7 +617,7 @@ private:
     static constexpr int wizard_chain_round(int r) { return r == wizard_life_round ? 1 : 0; }
     /// BL-1279: the nation targets the wizard writes when the player has not
     /// set them (STARTUP.md § Rounds: "the wizard always sets both targets").
-    static constexpr int wizard_default_nation_total = 20;
+    static constexpr int wizard_default_nation_total = 30; // Ben, 2026-11-02 (NATION_GENERATION.md)
     static constexpr int wizard_default_major_target = 4;
     /// The pass rounds that play a TIME-LAPSE, and so own a record of their own:
     /// round 3 (Culture, the migration), round 4 (Empires, the history), round 5

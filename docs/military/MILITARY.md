@@ -1393,6 +1393,11 @@ raises is one of the eight, not a ninth. Its land pool opens holding **200 recru
 of one base. The army is equal; the threat each major faces is not, and that is the intended
 asymmetry.
 
+**Taking a seat keeps the army (Ben, 2026-11-04).** A major's eight are posted as garrisons are,
+never raised at a base. So the player's major opens on the same eight as every rival, and moving the
+seat neither takes a major's units nor arms the nation it leaves. A seat move takes a force only
+from a nation holding one raised at a base, and only then arms the nation it leaves.
+
 **A minor's sizing is treasury-scaled against the value anchor.** BL-543's (value anchor) unit-equipment-
 costs-twice-annual-salary anchor prices a garrison's count off the nation's own
 `nation_component::treasury`, so a rich minor fields a bigger standing force and a poor one a

@@ -134,6 +134,15 @@ struct opening_kit_config
     /// All three -1 (no `logistics` table authored): no cap.
     int hubs = -1, stations = -1, ports = -1;
     bool logistics_capped() const { return hubs >= 0 && stations >= 0 && ports >= 0; }
+    /// THE FIXED ARMY (MILITARY.md § Nation garrisons, "A major's opening army is
+    /// fixed", Ben 2026-11-02), authored with the kit. Each entry a `land_class`
+    /// (unit_roster.hpp) as its integer: the capital post's units, then the units
+    /// dealt one each to the border posts in descending grudge order, wrapping.
+    /// Both empty (no `army` table authored): garrisons are treasury-scaled.
+    std::vector<std::uint8_t> army_capital, army_border;
+    int army_men      = 50; ///< men in each unit (`hire_batch_manpower`'s figure)
+    int land_recruits = 0;  ///< the major's land pool at the opening
+    bool has_army() const { return !army_capital.empty() || !army_border.empty(); }
 };
 
 struct opening_kit_table

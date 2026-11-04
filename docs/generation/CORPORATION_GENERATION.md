@@ -464,7 +464,11 @@ stay as the history left them.
 
 **Opening stock follows the kit.** § Pass 4b's stock is generated once per kit category (extraction
 weights for the extraction slots, processing weights for the processing slots) and placed on the
-shelves of the markets the kit stands in.
+shelves of the markets the kit stands in. **The kit also stocks its processors' inputs (Ben,
+2026-11-04).** Each kit processor's recipe inputs, enough for the idle reflex's window of loss ticks,
+go on the shelf of its own market. A fresh chain otherwise starts empty-shelved and loses money
+before its feeders deliver; the reflex then idles the processor, and with it the feeder that had no
+buyer.
 
 **The kit opens with its own treasury and army.** The flat treasury is `NATION_GENERATION.md`
 § Pass 7's, and the fixed army is `../military/MILITARY.md` § Nation garrisons'. The settle then runs as

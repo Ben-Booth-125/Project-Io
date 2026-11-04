@@ -6,6 +6,7 @@
 #include "world/era_timelapse.hpp"          // lapse_event_kind (BL-1278 lane C)
 #include "world/hard_coded_world.hpp"       // generation_progress, generation_step_cost_ms
 #include "world/history_log.hpp"            // seed_genesis_history
+#include "world/nation_generation.hpp"      // BL-1474: seed_major_opening_armies
 #include "world/recipe_registry.hpp"
 #include "world/road_generation.hpp"        // BL-1347: lay_site_roads, after the stampers
 #include "world/survey_system.hpp"          // init_survey_states
@@ -475,6 +476,12 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
     // garrison's muster base. After the fold (every building is a nation's, so the
     // opening force's base is adopted rather than doubled) and BEFORE the reserve, which
     // bills its maintenance, and the second site-road call below, which roads it.
+    // BL-1474 (MILITARY.md § Nation garrisons, "A major's opening army is fixed", Ben
+    // 2026-11-02): every major's force is the kit's eight, posted as garrisons, before
+    // the capital bases, which adopt the capital's first unit as they adopt a garrison.
+    if (kit != nullptr && kit->has_army())
+        print_major_armies(seed_major_opening_armies(w, kit->army_capital, kit->army_border,
+                                                     kit->army_men, kit->land_recruits));
     out.capital_bases = seed_capital_military_bases(w);
     print_capital_bases(out.capital_bases);
     // BL-1382 economy follow-up (NATION_GENERATION.md § Pass 7, Ben 2026-10-19:

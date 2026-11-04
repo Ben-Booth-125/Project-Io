@@ -154,7 +154,7 @@ void world_gen_config::load_from_lua(lua_state& lua)
                     }
                 };
                 const std::string where = "world_gen.opening_kit.configs." + kit;
-                keys_in(t, { "treasury", "logistics", "extraction", "processing", "civic" }, where);
+                keys_in(t, { "treasury", "logistics", "extraction", "processing", "civic", "army" }, where);
                 opening_kit_config c;
                 c.name = kit;
                 {
@@ -249,6 +249,45 @@ void world_gen_config::load_from_lua(lua_state& lua)
                         throw std::runtime_error("world_gen.opening_kit." + kit
                                                  + ".logistics must name inland_logistics_hub, "
                                                    "railway_station and port");
+                }
+                if (sol::optional<sol::table> ar = t["army"])
+                {
+                    // BL-1474 (MILITARY.md § Nation garrisons): the fixed army.
+                    keys_in(*ar, { "capital", "border", "men", "land_recruits" }, where + ".army");
+                    const auto classes = [&](const char* key, std::vector<std::uint8_t>& out) {
+                        sol::optional<sol::table> ls = (*ar)[key];
+                        if (!ls)
+                            return;
+                        list_only(*ls, where + ".army." + key);
+                        static const char* const names[] = { "infantry", "motorised", "mechanised",
+                                                             "armour", "light_armour", "artillery",
+                                                             "air_defence" };
+                        for (std::size_t i = 1; i <= ls->size(); ++i)
+                        {
+                            const std::string n = (*ls)[i].get<std::string>();
+                            std::uint8_t k = 0;
+                            while (k < 7 && n != names[k])
+                                ++k;
+                            if (k == 7)
+                                throw std::runtime_error(where + ".army." + key
+                                                         + ": unknown land class '" + n + "'");
+                            out.push_back(k); // the land_class enumerator's value
+                        }
+                    };
+                    classes("capital", c.army_capital);
+                    classes("border", c.army_border);
+                    const auto count = [&](const char* key, int lo, int hi, int& out) {
+                        const sol::object o = (*ar)[key];
+                        if (!o.valid())
+                            return;
+                        const double v = o.get_type() == sol::type::number ? o.as<double>() : -1.0;
+                        if (!(v >= lo && v <= hi) || v != static_cast<double>(static_cast<int>(v)))
+                            throw std::runtime_error(where + ".army." + key + " must be an integer in ["
+                                                     + std::to_string(lo) + ", " + std::to_string(hi) + "]");
+                        out = static_cast<int>(v);
+                    };
+                    count("men", 1, 10000, c.army_men);
+                    count("land_recruits", 0, 1000000, c.land_recruits);
                 }
                 opening_kit.configs.emplace(kit, std::move(c));
             }

@@ -3173,8 +3173,13 @@ void move_seat_force(world& w, entity_id previous, entity_id nation)
     // garrisons (never raised at a base, BL-1439) are not the opening force and stay. The same
     // nation re-seated is still disarmed: generation armed every rival before
     // the pick, so the seat's own opening force goes.
+    // THE FORCE MOVES ONLY WHEN THERE IS ONE (Ben, 2026-11-04): the nation left is
+    // armed only when the pick held a force raised at a base to take. A major's
+    // fixed army (BL-1474, seed_major_opening_armies) is posted, never raised, so
+    // taking a major takes nothing and arms nobody: every major keeps its eight.
+    const bool had_force = corporation_has_opening_force(w, nation);
     disarm_corporation(w, nation);
-    if (previous != null_entity && previous != nation && w.nations.count(previous) != 0)
+    if (had_force && previous != null_entity && previous != nation && w.nations.count(previous) != 0)
         arm_corporation(w, previous);
 }
 

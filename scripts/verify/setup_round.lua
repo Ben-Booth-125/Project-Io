@@ -14,7 +14,7 @@
 --   S2. New Game opens round 1 (System); Next lands on round 2, Setup, and the
 --       counter reads "Round 2 of 7" (capture).
 --   S3. The wizard always sets both targets: on arrival they are the defaults
---       (20 nations, 4 majors), never unset.
+--       (30 nations, 4 majors; Ben, 2026-11-02), never unset.
 --   S4. An illegal pair is refused whole (total > 40, majors > 6, majors >
 --       total, zero) and moves nothing; a legal one lands.
 --   S5. Next from Setup lands on Life (round 3); Back from Life lands on Setup;
@@ -74,15 +74,15 @@ note_footer("Setup")
 
 -- S3 -- the defaults.
 local total, majors = verify.wizard_targets()
-verify.expect(total == 20 and majors == 4,
-              "the wizard always sets both targets: defaults 20 / 4 (got "
+verify.expect(total == 30 and majors == 4,
+              "the wizard always sets both targets: defaults 30 / 4 (got "
               .. total .. " / " .. majors .. ")")
 
 -- S4 -- the pair is constrained, never clamped.
 for _, bad in ipairs({ { 41, 4 }, { 20, 7 }, { 3, 4 }, { 0, 4 }, { 20, 0 } }) do
     local ok = verify.wizard_set_targets(bad[1], bad[2])
     local t, m = verify.wizard_targets()
-    verify.expect(not ok and t == 20 and m == 4,
+    verify.expect(not ok and t == 30 and m == 4,
                   "an illegal pair " .. bad[1] .. " / " .. bad[2]
                   .. " is refused whole and moves nothing (now " .. t .. " / " .. m .. ")")
 end
@@ -92,7 +92,7 @@ verify.capture("setup_03_targets_6_6")
 verify.expect(verify.wizard_set_targets(40, 1), "a legal pair 40 / 1 lands")
 verify.frames(3)
 verify.capture("setup_04_targets_40_1")
-verify.wizard_set_targets(20, 4)
+verify.wizard_set_targets(30, 4)
 verify.frames(3)
 
 -- S5 -- causal order, walked both ways.

@@ -2326,6 +2326,174 @@ void seed_nation_garrisons(world& w, const nation_garrison_params& params)
     }
 }
 
+major_army_report seed_major_opening_armies(world& w, const std::vector<std::uint8_t>& capital,
+                                            const std::vector<std::uint8_t>& border, int men,
+                                            int land_recruits)
+{
+    major_army_report rep;
+    if (w.provinces.provinces.empty() || (capital.empty() && border.empty()))
+        return rep;
+    const std::map<uint32_t, province_anchor> anchors = province_anchors(w);
+    const nation_ai_params grudge_params{}; // seed_nation_garrisons' own reading
+
+    std::vector<entity_id> majors;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.is_major)
+            majors.push_back(nid);
+    std::sort(majors.begin(), majors.end());
+
+    for (const entity_id nid : majors)
+    {
+        nation_component& nc = w.nations.at(nid);
+        const uint32_t cap_prov = nc.capital_tile != null_entity
+                                ? w.provinces.province_of(nc.capital_tile) : 0u;
+        const province* cap_pr = cap_prov != 0 ? w.provinces.find(cap_prov) : nullptr;
+        if (cap_pr == nullptr)
+            continue;
+        ++rep.majors;
+
+        // The capital post: where its capital garrison stands (the anchor centre,
+        // seed_nation_garrisons' capital rule), else that rule read again.
+        entity_id cap_post = null_entity;
+        for (const world::generated_garrison& g : w.gen_garrisons)
+            if (g.nation == nid && g.guarded == null_entity && g.province == cap_prov)
+                if (const auto uit = w.units.find(g.unit); uit != w.units.end())
+                {
+                    cap_post = uit->second.position;
+                    break;
+                }
+        if (cap_post == null_entity)
+            cap_post = province_anchor_tile(anchors, *cap_pr);
+
+        // THE BORDER POSTS, in descending grudge order (ties to the lower nation id):
+        // for each neighbour, the lowest-id province of the major's that touches it,
+        // outside the capital province, at the tile facing it (garrison_border_post).
+        std::set<entity_id> neighbours;
+        for (const entity_id tile : nc.tiles)
+            for (int side = 0; side < 6; ++side)
+            {
+                const entity_id nb = garrison_neighbour_tile(w, tile, side);
+                if (nb == null_entity)
+                    continue;
+                const auto tnit = w.tile_to_nation.find(nb);
+                if (tnit != w.tile_to_nation.end() && tnit->second != nid)
+                    neighbours.insert(tnit->second);
+            }
+        std::vector<std::pair<float, entity_id>> ranked;
+        for (const entity_id other : neighbours)
+            ranked.push_back({ nation_grudge(w, nid, other, grudge_params), other });
+        std::stable_sort(ranked.begin(), ranked.end(), [](const auto& a, const auto& b) {
+            return a.first > b.first; // the set's ascending id breaks ties
+        });
+        struct post { entity_id tile; uint32_t province; entity_id guarded; };
+        std::vector<post> posts;
+        std::set<entity_id> post_tiles;
+        for (const auto& [g, other] : ranked)
+        {
+            (void)g;
+            for (const province& pr : w.provinces.provinces) // ascending id
+            {
+                if (pr.id == cap_prov || province_holder_for(w, pr.id) != nid)
+                    continue;
+                const entity_id t = garrison_border_post(w, pr, other);
+                if (t == null_entity)
+                    continue;
+                if (post_tiles.insert(t).second)
+                    posts.push_back({ t, pr.id, other });
+                break;
+            }
+        }
+
+        // The force it replaces: every unit the major owns, and their records.
+        std::vector<entity_id> gone;
+        for (const auto& [uid, u] : w.units)
+            if (u.owner == nid)
+                gone.push_back(uid);
+        std::sort(gone.begin(), gone.end());
+        for (const entity_id uid : gone)
+        {
+            w.units.erase(uid);
+            w.forget_air_unit(uid); // BL-1449
+        }
+        rep.units_removed += static_cast<int>(gone.size());
+        // ...and its military bases, so the capital base `seed_capital_military_bases`
+        // lays next is the kit's military slot and stands younger than the army it
+        // adopts: none of the eight reads as raised (`unit_is_raised` orders by id),
+        // and a seat move takes none of them. A history base older than the army
+        // would make the capital unit read as raised at it.
+        std::vector<entity_id> bases;
+        for (const entity_id bid : nc.state_assets)
+            if (const auto bit = w.buildings.find(bid);
+                bit != w.buildings.end() && bit->second.type == building_type::military_base)
+                bases.push_back(bid);
+        std::sort(bases.begin(), bases.end());
+        bases.erase(std::unique(bases.begin(), bases.end()), bases.end());
+        for (const entity_id bid : bases)
+        {
+            for (auto& [cid, ch] : w.gen_charters) // keyed edits: order-free
+            {
+                (void)cid;
+                ch.assets.erase(std::remove(ch.assets.begin(), ch.assets.end(), bid), ch.assets.end());
+                if (ch.hq_building == bid)
+                    ch.hq_building = null_entity;
+            }
+            nc.state_assets.erase(std::remove(nc.state_assets.begin(), nc.state_assets.end(), bid),
+                                  nc.state_assets.end());
+            w.buildings.erase(bid);
+            w.stockpiles.erase(bid);
+        }
+        rep.bases_taken += static_cast<int>(bases.size());
+        if (!bases.empty())
+            invalidate_logistics_caches(w);
+        w.gen_garrisons.erase(std::remove_if(w.gen_garrisons.begin(), w.gen_garrisons.end(),
+                                             [&](const world::generated_garrison& g) {
+                                                 return g.nation == nid;
+                                             }),
+                              w.gen_garrisons.end());
+
+        // The army, posted as garrisons are: not raised at a base, so a seat move
+        // neither takes it nor arms another nation for it (move_seat_force).
+        const auto raise = [&](std::uint8_t cls, entity_id tile, uint32_t prov, entity_id guarded) {
+            const int row = modern_row_for(static_cast<land_class>(cls));
+            if (row < 0)
+            {
+                ++rep.no_row;
+                return;
+            }
+            const entity_id u = place_garrison(w, nid, prov, tile, men, static_cast<uint16_t>(row));
+            if (u == null_entity)
+                return;
+            w.gen_garrisons.push_back({ u, nid, prov, guarded });
+            ++rep.units;
+        };
+        for (const std::uint8_t cls : capital)
+            raise(cls, cap_post, cap_prov, null_entity);
+        if (posts.empty())
+            ++rep.all_at_capital;
+        for (std::size_t i = 0; i < border.size(); ++i)
+        {
+            if (posts.empty())
+                raise(border[i], cap_post, cap_prov, null_entity);
+            else
+            {
+                const post& p = posts[i % posts.size()];
+                raise(border[i], p.tile, p.province, p.guarded);
+            }
+        }
+        rep.border_posts += static_cast<int>(std::min(posts.size(), border.size()));
+        nc.land_recruits = land_recruits;
+    }
+    return rep;
+}
+
+void print_major_armies(const major_army_report& r)
+{
+    std::printf("[opening_kit] army: %d major(s), %d unit(s) raised in place of %d (%d base(s) taken up); %d border "
+                "post(s) manned; %d major(s) with no border post; %d unit(s) with no roster row\n",
+                r.majors, r.units, r.units_removed, r.bases_taken, r.border_posts, r.all_at_capital, r.no_row);
+    std::fflush(stdout);
+}
+
 bool unit_tile_drawable(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile)
 {
     const auto memo_hit = memo.drawable.find({nation, tile});

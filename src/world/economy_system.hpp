@@ -43,6 +43,11 @@
 constexpr float deposit_taper_ticks = 8.0f;  ///< Output tapers over the last ~8 ticks of nominal yield.
 constexpr float deposit_min_taper   = 0.05f; ///< Below 5% of nominal the reserve reads as exhausted.
 
+/// The idle-a-loser reflex's window: consecutive loss ticks before a building idles.
+/// One constant, read by the reflex and by the opening kit's input stock (BL-1487),
+/// which shelves each kit processor's draw for this many ticks.
+inline constexpr int k_loss_streak_to_idle = 8;
+
 struct building_report
 {
     entity_id     building = null_entity;

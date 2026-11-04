@@ -22,8 +22,8 @@
 //      any other way still fails C1.
 // Once, on the first seed:
 //   C5 a picked seat (corp_verb::take_seat) keeps its capital base and its
-//      capital garrison, and loses only the force RAISED at the base; the seat it
-//      left is armed at its own capital base (one base, not two).
+//      capital garrison, and a picked major keeps its whole fixed army; the seat
+//      it left is not re-armed (Ben, 2026-11-04, BL-1474).
 //
 // Run from the repo root: capital_military_base [--seeds a,b,c]
 // Seeds default to docs/generation/seed_library.json. Needs a live Lua state
@@ -331,13 +331,24 @@ int main(int argc, char** argv)
         if (first)
         {
             first = false;
-            // C5: a picked seat keeps its capital base and garrison.
+            // C5 (Ben, 2026-11-04: a seat move keeps every major's fixed army, BL-1474): a
+            // picked major keeps its one capital base, its capital garrison's muster_base
+            // and every unit it owns; nothing is raised for the seat it left, which keeps
+            // exactly the units it held.
+            const auto units_of = [&](entity_id nid) {
+                std::vector<entity_id> v;
+                for (const auto& [uid, u] : w.units)
+                    if (u.owner == nid)
+                        v.push_back(uid);
+                std::sort(v.begin(), v.end());
+                return v;
+            };
             entity_id pick = null_entity;
             std::vector<entity_id> ids;
             for (const auto& kv : w.nations) ids.push_back(kv.first);
             std::sort(ids.begin(), ids.end());
             for (const entity_id nid : ids)
-                if (nid != w.player_entity && w.nations.at(nid).is_major && raised_units(w, nid) > 0)
+                if (nid != w.player_entity && w.nations.at(nid).is_major)
                 {
                     pick = nid;
                     break;
@@ -346,6 +357,8 @@ int main(int argc, char** argv)
             const std::vector<entity_id> pick_bases = pick != null_entity ? bases_of(w, pick)
                                                                            : std::vector<entity_id>{};
             const entity_id pick_garrison = pick != null_entity ? capital_garrison(w, pick) : null_entity;
+            const std::vector<entity_id> pick_units = units_of(pick);
+            const std::vector<entity_id> old_units  = units_of(old_seat);
             corp_command cmd;
             cmd.corp = pick;
             cmd.verb = corp_verb::take_seat;
@@ -354,19 +367,19 @@ int main(int argc, char** argv)
             const bool kept = applied && bases_of(w, pick) == pick_bases && pick_bases.size() == 1
                 && w.units.count(pick_garrison) != 0
                 && w.units.at(pick_garrison).muster_base == pick_bases.front();
-            const bool unarmed = applied && raised_units(w, pick) == 0;
-            const bool old_armed = old_seat != null_entity && w.nations.count(old_seat) != 0
-                && bases_of(w, old_seat).size() == 1 && raised_units(w, old_seat) == 1;
-            std::printf("  C5 seed %u: picked %u over seat %u -> applied %d, bases %zu, raised %d; "
-                        "the seat left holds %zu base(s), %d raised\n",
+            const bool army = applied && !pick_units.empty() && units_of(pick) == pick_units;
+            const bool old_same = old_seat != null_entity && w.nations.count(old_seat) != 0
+                && units_of(old_seat) == old_units && raised_units(w, old_seat) == 0;
+            std::printf("  C5 seed %u: picked %u over seat %u -> applied %d, bases %zu, units %zu -> %zu; "
+                        "the seat left holds %zu -> %zu unit(s), %d raised\n",
                         seed, static_cast<unsigned>(pick), static_cast<unsigned>(old_seat),
                         applied ? 1 : 0, pick != null_entity ? bases_of(w, pick).size() : 0u,
-                        pick != null_entity ? raised_units(w, pick) : -1,
-                        old_seat != null_entity && w.nations.count(old_seat) ? bases_of(w, old_seat).size() : 0u,
+                        pick_units.size(), units_of(pick).size(), old_units.size(),
+                        units_of(old_seat).size(),
                         old_seat != null_entity ? raised_units(w, old_seat) : -1);
             check(kept, "C5 a picked seat keeps its one capital base and its capital garrison's muster_base");
-            check(unarmed, "C5 a picked seat loses the force raised at the base");
-            check(old_armed, "C5 the seat it left is armed at its one capital base");
+            check(army, "C5 a picked major keeps every unit of its fixed army");
+            check(old_same, "C5 the seat it left is not re-armed: it keeps exactly the units it held");
         }
     }
     std::printf("\n[capital_military_base] TOTAL %zu seeds: %d nations, %d with one capital base, "

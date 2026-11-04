@@ -531,6 +531,38 @@ struct nation_garrison_params
 /// @param params Sizing and roster tuning.
 void seed_nation_garrisons(world& w, const nation_garrison_params& params = {});
 
+/// What `seed_major_opening_armies` did.
+struct major_army_report
+{
+    int majors         = 0; ///< majors given the army
+    int units          = 0; ///< units raised, all majors
+    int units_removed  = 0; ///< the garrisons and opening units they replace
+    int bases_taken    = 0; ///< military bases taken up (the capital base is laid fresh after)
+    int border_posts   = 0; ///< border posts manned, all majors
+    int all_at_capital = 0; ///< majors with no border post (the whole army at the capital)
+    int no_row         = 0; ///< units skipped: no modern roster row fights as the class
+};
+
+/// BL-1474 — A MAJOR'S OPENING ARMY IS FIXED (MILITARY.md § Nation garrisons, Ben
+/// 2026-11-02). On each major (ascending id) every unit and military base it owns is
+/// taken up (the capital base is laid again by `seed_capital_military_bases`) and the
+/// kit's army posted in its place, each unit @p men strong on its class's first modern
+/// roster row: @p capital at the capital post (the capital garrison's post), then
+/// @p border one each at the border posts, taken in descending grudge order and
+/// wrapping (a neighbour's post is the facing tile of the lowest-id province of the
+/// major's touching it, outside the capital province); a major with no border post
+/// holds the whole army at the capital. The units are posted as garrisons are, never
+/// raised at a base, and recorded in `gen_garrisons` for the handoff's repost. The
+/// major's land pool opens at @p land_recruits. Minors are untouched. Run after the
+/// kit and the flat treasury, BEFORE `seed_capital_military_bases` (the capital base
+/// adopts the capital's first unit as it adopts a garrison).
+major_army_report seed_major_opening_armies(world& w, const std::vector<std::uint8_t>& capital,
+                                            const std::vector<std::uint8_t>& border, int men,
+                                            int land_recruits);
+
+/// Print the `[opening_kit] army` line.
+void print_major_armies(const major_army_report& r);
+
 /// THE CAPITAL STANDS ON ITS SEAT'S CITY (Ben, 2026-10-26; NATION_GENERATION.md
 /// § Pass 2e). Pass 5 seats a nation on a seed or core tile, which mostly holds
 /// no centre. Once the partition and its anchor foundings exist, each nation's

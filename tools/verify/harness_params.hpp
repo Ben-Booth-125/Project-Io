@@ -124,6 +124,7 @@ inline world_gen_config parsed_gen_config(lua_state& lua)
 #include "world/corporation_generation.hpp" // assign_default_recipes
 #include "world/finish_campaign_world.hpp"  // BL-1085: the band, the search params
 #include "world/landscape_search.hpp"
+#include "world/nation_generation.hpp"    // BL-1474: seed_major_opening_armies
 #include "world/stockpile_budget.hpp"     // BL-1042: the shipped path's charter budget
 #include "world/state_industry.hpp"       // BL-1402: fold_to_ground, fold_report (the probe)
 #include "world/world.hpp"
@@ -442,6 +443,10 @@ inline shipped_landscape apply_shipped_landscape(
         }
         // BL-1439: finish_campaign_world's capital military bases, verbatim, right
         // after the fold and before the reserve.
+        // BL-1474: finish_campaign_world's major opening army, verbatim, right before it.
+        if (kit != nullptr && kit->has_army())
+            print_major_armies(seed_major_opening_armies(w, kit->army_capital, kit->army_border,
+                                                         kit->army_men, kit->land_recruits));
         print_capital_bases(seed_capital_military_bases(w));
         // BL-1382 economy follow-up: finish_campaign_world's state reserve and
         // the seeding's reading at the gate, verbatim, right after it.
