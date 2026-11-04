@@ -214,6 +214,16 @@ struct nation_ai_params
     /// Relief units per cost unit of a major itself: a major is the cluster it
     /// closes, so a ring-4 major is worth about twice a ring-2.
     float research_major_relief = 0.04f;
+    /// BL-1486 (Ben, 2026-11-04, AI_OPPONENT.md § 11, "A node that opens kit is
+    /// worth that kit"): relief units per kit item a node opens (one `unlock_kit`
+    /// row), at a kit weight of 1. The weight is the nation's OWN
+    /// 0.5 x military_research share x priority_count (an average line 1, an
+    /// unfunded line 0) + 0.5 x fielded / (fielded + research_kit_units_half),
+    /// fielded = its own unit groups standing. Zero for a nation that funds no
+    /// military research and fields nothing: kit no one will carry is worth nothing.
+    float research_kit_relief = 0.25f;
+    /// Unit groups at which the fielded half of the kit weight reaches 0.5 of its 1.
+    float research_kit_units_half = 8.0f;
     /// The most nodes one nation may pick in one quarter AFTER the research
     /// pass (Ben, 2026-10-15: re-pick within the quarter while the pool covers
     /// the next node; a bounded loop, one node queued at a time).

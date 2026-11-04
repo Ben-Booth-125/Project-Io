@@ -406,6 +406,74 @@ void rows_r6(const recipe_registry& reg)
         check(!f.w.nation_tech.count(f.other) || f.w.nation_tech.at(f.other).held.none(),
               "R6q ...never for the player's nation");
     }
+
+    {
+        // BL-1486 (Ben, 2026-11-04, AI_OPPONENT.md § 11, "A node that opens kit
+        // is worth that kit"): DG-ST-FO-D1 (Assault Rifles: three kit rows, nothing
+        // else) against DG-PR-EN-M (one unread row) — both cost 4 units. Every
+        // other node is held, so the two are the only candidates and no open major
+        // lends either a route share: what separates them is the kit alone.
+        const int kit = node("DG-ST-FO-D1"), plain = node("DG-PR-EN-M");
+        check(kit >= 0 && plain >= 0 && plain < kit
+                  && io::dg::nodes[static_cast<std::size_t>(kit)].cost_units
+                         == io::dg::nodes[static_cast<std::size_t>(plain)].cost_units,
+              "R6r0 the kit row's pair: equal cost units, the effectless node at the lower index (a tie takes it)");
+        struct kit_case { research_ai_pick both, kit_only, plain_only; };
+        const auto run_case = [&](int unit_groups, float milres_weight) {
+            const auto build = [&](bool keep_kit, bool keep_plain) {
+                fixture f = make();
+                nation_budget nb = f.w.nation_budgets.at(f.nation); // academic 0.1, schooling 0.9
+                nb.weights[static_cast<std::size_t>(budget_priority::military_research)] = milres_weight;
+                f.w.nation_budgets[f.nation] = nb;
+                nation_tech_state& st = f.w.nation_tech[f.nation];
+                for (int n = 0; n < io::dg::node_count; ++n)
+                    if (!((n == kit && keep_kit) || (n == plain && keep_plain)))
+                        st.held.set(static_cast<std::size_t>(n));
+                for (int i = 0; i < unit_groups; ++i)
+                {
+                    unit_component u{};
+                    u.position = add_tile(f.w, f.body, f.nation);
+                    u.owner    = f.nation;
+                    u.count    = 100;
+                    f.w.units[f.w.create_entity()] = u;
+                }
+                // The other nation's army is not this nation's to count.
+                for (int i = 0; i < 6; ++i)
+                {
+                    unit_component u{};
+                    u.position = add_tile(f.w, f.body, f.other);
+                    u.owner    = f.other;
+                    u.count    = 100;
+                    f.w.units[f.w.create_entity()] = u;
+                }
+                return choose_research_node(f.w, reg, f.nation, reg.nation_ai());
+            };
+            return kit_case{ build(true, true), build(true, false), build(false, true) };
+        };
+        const kit_case fielding = run_case(/*unit_groups=*/6, /*milres=*/0.0f);
+        const kit_case funded   = run_case(0, 0.5f);
+        const kit_case neither  = run_case(0, 0.0f);
+        const auto line = [](const char* tag, const kit_case& k) {
+            std::printf("     kit worth, %s: picks %s; relief kit %lld vs plain %lld milli-RP (cost %lld each)\n",
+                        tag, pick_id(k.both.node).c_str(), static_cast<long long>(k.kit_only.relief_milli),
+                        static_cast<long long>(k.plain_only.relief_milli), static_cast<long long>(k.kit_only.cost_milli));
+        };
+        line("6 groups fielded, no military research", fielding);
+        line("military research funded, nothing fielded", funded);
+        line("neither", neither);
+        check(fielding.both.candidates == 2 && fielding.both.node == kit
+                  && fielding.kit_only.relief_milli > fielding.plain_only.relief_milli
+                  && fielding.kit_only.cost_milli == fielding.plain_only.cost_milli,
+              "R6r a nation fielding units ranks the kit node above an equal-cost node with no effect");
+        check(funded.both.node == kit && funded.kit_only.relief_milli > funded.plain_only.relief_milli,
+              "R6u ...and so does one funding military research with nothing fielded");
+        check(neither.both.candidates == 2 && neither.both.node == plain
+                  && neither.kit_only.relief_milli == neither.plain_only.relief_milli,
+              "R6v a nation with zero military_research and no units of its own gives kit no worth (the other nation's six groups count for nothing): it does not prefer the kit node");
+        check(fielding.kit_only.relief_milli > neither.kit_only.relief_milli
+                  && run_case(6, 0.0f).kit_only.relief_milli == fielding.kit_only.relief_milli,
+              "R6w ...fielded units raise the kit worth over fielding none, and the reading repeats");
+    }
 }
 
 // ---------------------------------------------------------------------------
