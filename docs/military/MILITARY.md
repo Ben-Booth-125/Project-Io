@@ -801,8 +801,10 @@ quantities, defined in § The campaign force model. They are the fight's state; 
 the one derived figure the condition subjects and cards read.
 
 **There is no stored strength.** Strength is derived — `unit_strength(w, u)` in
-`src/world/unit_roster.hpp` returns `count × roster_type_quality × supply_factor` at ×100 fixed
-point, so at quality 1.0 and full supply `strength == count * 100` exactly. It returns an
+`src/world/unit_roster.hpp` returns `count × roster_type_quality × carried stocks` at ×100 fixed
+point — the carried stocks as the land round reads them (`carried_attack_permille`, § Carried
+supplies); the supply factor only refills them — so at quality 1.0 and full stocks
+`strength == count * 100` exactly. It returns an
 **integer** on purpose, so a sum over the unordered `w.units` stays order-independent. Quality is
 derived from the row's `power_mod` rather than authored as a second number, so there is one
 per-type figure and it cannot drift from the one combat reads: Levy Spear (power_mod 0) is 1000,
@@ -1620,7 +1622,7 @@ good. U2: an empty pool decays at the authored scalar and stock never goes negat
 the muster base leaves no orphan unit. U4: replay determinism across balances, pools and strengths.
 U5: at the zero table nothing moves at all — no balance, no pool, no supply factor, no pool even
 created — which is what lets the economy goldens stand while the rates are unauthored. U6:
-strength derivation, including `strength == count * 100` at quality 1.0 and full supply. U7: the
+strength derivation, including `strength == count * 100` at quality 1.0 and full stocks. U7: the
 combat adapter round-trips a live unit into an `army_stack_entry` the resolver accepts.
 
 **`unit_upkeep_rates.cpp`** — a report, not a gate: the rate sweep described in § Upkeep. Its four

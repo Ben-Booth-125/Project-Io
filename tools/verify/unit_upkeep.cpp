@@ -527,12 +527,16 @@ void u5_inert_at_zero()
 
 void u6_derived_strength()
 {
-    std::printf("\n-- U6  strength = count x quality x supply (x100 fixed point) --\n");
+    std::printf("\n-- U6  strength = count x quality x carried stocks (x100 fixed point) --\n");
 
     fixture f = make_fixture();
     const entity_id levy  = add_unit(f, ROW_LEVY,  100, f.base);
     const entity_id rifle = add_unit(f, ROW_RIFLE, 100, f.base);
-    const entity_id starved = add_unit(f, ROW_RIFLE, 100, f.base, /*supply=*/500);
+    // BL-1484 (unit strength supply): strength reads the CARRIED STOCKS (BL-1452, MILITARY.md
+    // § Carried supplies), not the supply factor, which only refills them. Half ammunition
+    // (above its 20% floor) is the half-strength case.
+    const entity_id starved = add_unit(f, ROW_RIFLE, 100, f.base);
+    f.w.units.at(starved).ammo_permille = 500;
 
     const int64_t s_levy    = unit_strength(f.w, f.w.units.at(levy));
     const int64_t s_rifle   = unit_strength(f.w, f.w.units.at(rifle));
@@ -543,9 +547,9 @@ void u6_derived_strength()
     check(s_rifle == 13800, "U6b a Rifle Regiment at quality 1.380 -> 13800");
     check(s_rifle > s_levy,
           "U6c equal headcount, different roster type -> different strength, heavy higher");
-    check(s_starved == 6900, "U6d half supply halves it exactly");
+    check(s_starved == 6900, "U6d half the carried ammunition halves it exactly");
     check(s_starved < s_rifle,
-          "U6e an unsupplied unit is STRICTLY weaker than a supplied one of identical composition");
+          "U6e an under-stocked unit is STRICTLY weaker than a supplied one of identical composition");
 
     // The duplicate BL-459 exists to kill: strength must not equal count.
     check(s_levy != f.w.units.at(levy).count,

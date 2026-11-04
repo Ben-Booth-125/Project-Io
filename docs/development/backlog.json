@@ -493,7 +493,7 @@
     "src/world/spawn_seat.cpp"
    ],
    "title": "A seat whose capital base the state cut removed keeps its raised opening unit",
-   "design": "The seated nation opens unarmed (MILITARY.md; move_seat_force -> disarm_corporation removes every unit unit_is_raised calls raised). Found by the sprint 61 re-bless bisect (2026-10-31), seed 13 at b3fc19a6: size_opening_state_to_chest cut nation 47736's capital military_base at (122,69); demolishing a base nulls its units' muster_base, so the 50-man opening unit (id 91961) raised there reads as a garrison (unit_is_raised needs a non-null muster_base) and the seated player kept it: 6x200 + 50 = 1250 men. On main the road steer (BL-1468) spares that base and the count is the intended 1200, so the leak is latent, not gone. THE WORK: either the cut never removes a capital base (it is the muster point the opening force needs), or a unit raised at a base keeps a raised mark when the base goes, so disarm still removes it. Check: a fixture where the cut takes the seat's capital base; the seat opens with garrisons only. Digest-moving only on seeds where the cut hits a base."
+   "design": "The seated nation opens unarmed (MILITARY.md; move_seat_force -> disarm_corporation removes every unit unit_is_raised calls raised). Found by the sprint 61 re-bless bisect (2026-10-31), seed 13 at b3fc19a6: size_opening_state_to_chest cut nation 47736's capital military_base at (122,69); demolishing a base nulls its units' muster_base, so the 50-man opening unit (id 91961) raised there reads as a garrison (unit_is_raised needs a non-null muster_base) and the seated player kept it: 6x200 + 50 = 1250 men. On main the road steer (BL-1468) spares that base and the count is the intended 1200, so the leak is latent, not gone. THE WORK: either the cut never removes a capital base (it is the muster point the opening force needs), or a unit raised at a base keeps a raised mark when the base goes, so disarm still removes it. Check: a fixture where the cut takes the seat's capital base; the seat opens with garrisons only. Digest-moving only on seeds where the cut hits a base. SUPERSEDED 2026-11-04 (main session, duplicate check): BL-1474 (major opening army) posts every major's eight as garrisons, never raised at a base, and lays the capital base fresh after; MILITARY.md § Nation garrisons: \"Taking a seat keeps the army\". The leak needed a unit raised at a cut capital base on the seat; no major holds one. Close as cancelled at the sprint close."
   },
   {
    "status": "proposed",
@@ -638,7 +638,7 @@
     "docs/economy/FINANCE.md"
    ],
    "title": "A nation whose treasury reaches 0 never recovers",
-   "design": "Found by BL-1442 (post-capacity starvation), 2026-11-03: mostly minors build a steel plant in play ticks 1-10, the treasury reaches 0, the funding gate idles every building, income is 0 for good. Nothing runs so nothing earns. About 25 of the plants behind G1t50's gap. The fix is a design question first (FINANCE.md owns it): a floor that keeps the cheapest earners running, debt, or a solvency reserve in the scorer (measured -0.6 pp G1t50 alone, patch scratchpad bl1442_scorer_measured_not_landed.patch). Check: market_viability full tier, count of nations at treasury 0 for 20+ ticks."
+   "design": "Found by BL-1442 (post-capacity starvation), 2026-11-03: mostly minors build a steel plant in play ticks 1-10, the treasury reaches 0, the funding gate idles every building, income is 0 for good. Nothing runs so nothing earns. About 25 of the plants behind G1t50's gap. The fix is a design question first (FINANCE.md owns it): a floor that keeps the cheapest earners running, debt, or a solvency reserve in the scorer (measured -0.6 pp G1t50 alone, patch scratchpad bl1442_scorer_measured_not_landed.patch). Check: market_viability full tier, count of nations at treasury 0 for 20+ ticks. RULED (Ben, 2026-11-04): a scorer solvency reserve - the scorer does not commit a build that would leave its own nation unable to stay solvent. Built in the same lane as BL-1485 (power grid measure)."
   },
   {
    "status": "proposed",
@@ -683,7 +683,7 @@
     "src/world/campaign_battle.cpp"
    ],
    "title": "unit_upkeep U6d/U6e fail: unit strength no longer reads supply",
-   "design": "Found in sprint 61 gating, 2026-11-03: U6d (half supply halves strength) and U6e (an unsupplied unit is strictly weaker) fail; unit_strength no longer reads supply. MILITARY.md decides which is right: if supply still scales strength, restore the read; if the rule moved, the doc and the check move together on Ben's call."
+   "design": "Found in sprint 61 gating, 2026-11-03: U6d (half supply halves strength) and U6e (an unsupplied unit is strictly weaker) fail; unit_strength no longer reads supply. MILITARY.md decides which is right: if supply still scales strength, restore the read; if the rule moved, the doc and the check move together on Ben's call. RESOLVED 2026-11-04 (main session): the rule moved with BL-1452 (carried supplies, Ben 2026-10-29: \"the round reads the stocks, not supply_factor\"); unit_strength is right. U6d/U6e now starve carried ammunition instead of the supply factor; MILITARY.md's strength line and U6 summary say carried stocks. unit_upkeep 60/0."
   },
   {
    "status": "proposed",
@@ -780,7 +780,7 @@
     "scripts/verify/lens_one_tier.lua"
    ],
    "title": "With no lens, the first press on a built tile gives the tile, not the building",
-   "design": "Found 2026-11-04 merging BL-1488 (Industry lens retired); fails identically on b2b2502b without it. lens_one_tier.lua's no-lens block: the first press on a built tile returns n1=tile, n2=building - the click cycle lands one step late. SELECTION.md's click model owns the order. Check: lens_one_tier passes; selection_go_to and the click scripts stay green."
+   "design": "Found 2026-11-04 merging BL-1488 (Industry lens retired); fails identically on b2b2502b without it. lens_one_tier.lua's no-lens block: the first press on a built tile returns n1=tile, n2=building - the click cycle lands one step late. SELECTION.md's click model owns the order. Check: lens_one_tier passes; selection_go_to and the click scripts stay green. DELIVERED 2026-11-04 (31f28760): script-only; the code was right."
   },
   {
    "status": "proposed",
