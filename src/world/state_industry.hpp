@@ -172,7 +172,11 @@ float state_building_cost_bound(const world& w, const recipe_registry& reg,
 /// THE FUNDING GATE. Each nation holding state industry, ascending id, walks
 /// its `state_assets` in stored order: a building whose cost bound fits in what
 /// is left of the treasury is FUNDED (its bound comes off what is left); one
-/// that does not fit IDLES this tick (`building_component::state_idle`). Opens
+/// that does not fit IDLES this tick (`building_component::state_idle`).
+/// EARNERS KEEP RUNNING (BL-1482; FINANCE.md, Ben 2026-11-04): a nation whose
+/// treasury is under one credit still funds the buildings that would idle and
+/// earn more than their bound at posted prices, cheapest bound first (ties by
+/// id), while the admitted set's bounds stay within its earnings. Opens
 /// this tick's `world::state_ledger` rows. Called at the top of
 /// `run_economy_step`, before anything this tick charges an owner.
 void plan_state_funding(world& w, const recipe_registry& reg);
