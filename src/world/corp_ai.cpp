@@ -3082,7 +3082,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 if (it == short_grids_of.end())
                 {
                     std::set<std::uint32_t> grids;
-                    (void)body_power_grid_gap(w, reg, gbody, power_plant_output, grids);
+                    (void)body_power_grid_gap(w, reg, gbody, power_plant_output, grids, nullptr, nullptr,
+                                              actor.is_nation ? actor.id : null_entity); // own buildings live
                     it = short_grids_of.emplace(gbody, std::move(grids)).first;
                 }
                 const std::uint32_t g = tile_feed_power_grid(w, gtile); // the grid its listings feed
