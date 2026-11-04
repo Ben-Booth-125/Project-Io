@@ -102,6 +102,7 @@
 #include <cstring>
 #include <exception>
 #include <fstream>
+#include <initializer_list>
 #include <limits>
 #include <map>
 #include <memory>
@@ -405,6 +406,147 @@ void rows_r6(const recipe_registry& reg)
               "R6p ...and a pool that cannot cover the next pick re-picks nothing");
         check(!f.w.nation_tech.count(f.other) || f.w.nation_tech.at(f.other).held.none(),
               "R6q ...never for the player's nation");
+    }
+
+    {
+        // BL-1486 (Ben, 2026-11-04, AI_OPPONENT.md § 11, "A node that opens kit
+        // is worth that kit"): DG-ST-FO-D1 (Assault Rifles: three kit rows, nothing
+        // else) against DG-PR-EN-M (one unread row) — both cost 4 units. Every
+        // other node is held, so the two are the only candidates and no open major
+        // lends either a route share: what separates them is the kit alone.
+        const int kit = node("DG-ST-FO-D1"), plain = node("DG-PR-EN-M");
+        const int kit_major = node("DG-ST-FO-D");
+        const nation_ai_params& np = reg.nation_ai();
+        const auto rows_of = [](int n, io::dg::effect_kind k) {
+            int c = 0;
+            const auto& nd = io::dg::nodes[static_cast<std::size_t>(n)];
+            for (std::uint16_t i = nd.effect_begin; i < nd.effect_end; ++i)
+                c += io::dg::effects[i].kind == k ? 1 : 0;
+            return c;
+        };
+        const auto rows_total = [](int n) {
+            const auto& nd = io::dg::nodes[static_cast<std::size_t>(n)];
+            return static_cast<int>(nd.effect_end) - static_cast<int>(nd.effect_begin);
+        };
+        const int kit_items = kit >= 0 ? rows_of(kit, io::dg::effect_kind::unlock_kit) : 0;
+
+        // The world: every node held but those in @p keep; @p groups of the
+        // nation's own units at @p men each; the budget @p nb (null = the
+        // fixture's: academic 0.1, schooling 0.9, military_research 0). The other
+        // nation fields six full groups in every case — not this nation's to count.
+        const auto pick_with = [&](std::initializer_list<int> keep, int groups, int men,
+                                   const nation_budget* nb) {
+            fixture f = make();
+            if (nb != nullptr) f.w.nation_budgets[f.nation] = *nb;
+            nation_tech_state& st = f.w.nation_tech[f.nation];
+            for (int n = 0; n < io::dg::node_count; ++n)
+                if (std::find(keep.begin(), keep.end(), n) == keep.end())
+                    st.held.set(static_cast<std::size_t>(n));
+            const auto field = [&](entity_id owner, int count, int men_each) {
+                for (int i = 0; i < count; ++i)
+                {
+                    unit_component u{};
+                    u.position = add_tile(f.w, f.body, owner);
+                    u.owner    = owner;
+                    u.count    = men_each;
+                    f.w.units[f.w.create_entity()] = u;
+                }
+            };
+            field(f.nation, groups, men);
+            field(f.other, 6, 100);
+            return choose_research_node(f.w, reg, f.nation, np);
+        };
+        struct kit_case { research_ai_pick both, kit_only, plain_only; };
+        const auto run_case = [&](int groups, int men, const nation_budget* nb) {
+            return kit_case{ pick_with({ kit, plain }, groups, men, nb), pick_with({ kit }, groups, men, nb),
+                             pick_with({ plain }, groups, men, nb) };
+        };
+        nation_budget funded_nb;
+        funded_nb.weights[static_cast<std::size_t>(budget_priority::academic_research)] = 0.1f;
+        funded_nb.weights[static_cast<std::size_t>(budget_priority::schooling)]         = 0.9f;
+        funded_nb.weights[static_cast<std::size_t>(budget_priority::military_research)] = 0.5f;
+        // A typical line: the live dials give military_research base_weight 0.02 +
+        // threat_milres 0.6 x threat; at threat 0.25 that is 0.17, and with the nine
+        // other lines at 0.17 too it is a tenth of the budget — the average line,
+        // which the kit weight reads as M = 1 (share x priority_count).
+        nation_budget typical_nb;
+        for (std::size_t i = 0; i < priority_count; ++i) typical_nb.weights[i] = 0.17f;
+
+        const kit_case fielding = run_case(/*groups=*/6, /*men=*/100, nullptr);
+        const kit_case funded   = run_case(0, 0, &funded_nb);
+        const kit_case typical  = run_case(0, 0, &typical_nb);
+        const kit_case neither  = run_case(0, 0, nullptr);
+        const kit_case empties  = run_case(/*groups=*/6, /*men=*/0, nullptr); // six groups of nobody
+        const auto line = [](const char* tag, const kit_case& k) {
+            std::printf("     kit worth, %s: picks %s (%d candidates); relief kit %lld vs plain %lld milli-RP (cost %lld each)\n",
+                        tag, pick_id(k.both.node).c_str(), k.both.candidates,
+                        static_cast<long long>(k.kit_only.relief_milli),
+                        static_cast<long long>(k.plain_only.relief_milli), static_cast<long long>(k.kit_only.cost_milli));
+        };
+        line("6 groups fielded, no military research", fielding);
+        line("military research 0.5 of 1.5, nothing fielded", funded);
+        line("military research a tenth (typical), nothing fielded", typical);
+        line("neither", neither);
+        line("6 groups of 0 men, no military research", empties);
+
+        bool plain_zero = true;
+        for (const kit_case* k : { &fielding, &funded, &typical, &neither, &empties })
+            plain_zero &= k->plain_only.node == plain && k->plain_only.relief_milli == 0;
+        check(kit >= 0 && plain >= 0 && plain < kit
+                  && io::dg::nodes[static_cast<std::size_t>(kit)].cost_units
+                         == io::dg::nodes[static_cast<std::size_t>(plain)].cost_units
+                  && kit_items == 3 && rows_total(kit) == kit_items
+                  && rows_total(plain) > 0 && rows_of(plain, io::dg::effect_kind::unread) == rows_total(plain)
+                  && plain_zero,
+              "R6r0 the kit row's pair: equal cost units, the plain node at the lower index (a tie takes it); "
+              "DG-ST-FO-D1 carries only unlock_kit rows (3), DG-PR-EN-M only unread rows, and its relief is 0 in every case");
+        check(fielding.both.candidates == 2 && fielding.both.node == kit
+                  && fielding.kit_only.relief_milli > fielding.plain_only.relief_milli
+                  && fielding.kit_only.cost_milli == fielding.plain_only.cost_milli,
+              "R6r a nation fielding units ranks the kit node above an equal-cost node with no effect");
+        check(funded.both.candidates == 2 && funded.both.node == kit
+                  && funded.kit_only.relief_milli > funded.plain_only.relief_milli,
+              "R6u ...and so does one funding military research with nothing fielded");
+        // The average line: kit weight 0.5 x 1 + 0.5 x 0 = 0.5, so the node is worth
+        // research_kit_relief x 3 x 0.5 relief units, at research_relief_rp each.
+        const double typical_expect = static_cast<double>(np.research_kit_relief) * kit_items * 0.5
+                                    * static_cast<double>(np.research_relief_rp) * 1000.0;
+        std::printf("     typical line: kit relief %lld, expected %.0f milli-RP (M = 1, nothing fielded)\n",
+                    static_cast<long long>(typical.kit_only.relief_milli), typical_expect);
+        check(typical.both.candidates == 2 && typical.both.node == kit
+                  && std::fabs(static_cast<double>(typical.kit_only.relief_milli) - typical_expect) <= 2.0,
+              "R6u2 at a typical tenth of the budget the line weighs 1: the kit node is worth research_kit_relief x 3 x 0.5");
+        check(neither.both.candidates == 2 && neither.both.node == plain
+                  && neither.kit_only.relief_milli == neither.plain_only.relief_milli,
+              "R6v a nation with zero military_research and no units of its own gives kit no worth (the other nation's six groups count for nothing): it does not prefer the kit node");
+        check(fielding.kit_only.relief_milli > neither.kit_only.relief_milli
+                  && run_case(6, 100, nullptr).kit_only.relief_milli == fielding.kit_only.relief_milli,
+              "R6w ...fielded units raise the kit worth over fielding none, and the reading repeats");
+        check(empties.both.candidates == 2 && empties.both.node == plain
+                  && empties.kit_only.relief_milli == 0,
+              "R6x a unit group of 0 men is not fielded: six empty groups give kit no worth");
+
+        // Through reach: hold everything but DG-ST-FO-D1 and its major DG-ST-FO-D
+        // (whose other requirement, D2, is held), so D1 is the only candidate and
+        // the major's route is [D1, D]. D1's relief is its own kit plus a share of
+        // the major's worth — and the major opens kit too (three rows), so the
+        // share must grow with the kit weight. Measured as D1's relief with the
+        // major OPEN less D1's relief with it HELD, for a fielding nation and for
+        // one whose kit weight is 0: the difference is the kit flowing through reach.
+        const int major_kit = kit_major >= 0 ? rows_of(kit_major, io::dg::effect_kind::unlock_kit) : 0;
+        const research_ai_pick open_f = pick_with({ kit, kit_major }, 6, 100, nullptr);
+        const research_ai_pick held_f = pick_with({ kit }, 6, 100, nullptr);
+        const research_ai_pick open_n = pick_with({ kit, kit_major }, 0, 0, nullptr);
+        const research_ai_pick held_n = pick_with({ kit }, 0, 0, nullptr);
+        const std::int64_t share_f = open_f.relief_milli - held_f.relief_milli;
+        const std::int64_t share_n = open_n.relief_milli - held_n.relief_milli;
+        std::printf("     reach: D1 with DG-ST-FO-D open gains %lld milli-RP fielding 6 groups, %lld fielding none "
+                    "(the major opens %d kit items)\n",
+                    static_cast<long long>(share_f), static_cast<long long>(share_n), major_kit);
+        check(major_kit > 0 && open_f.node == kit && open_f.candidates == 1 && open_n.node == kit
+                  && share_n > 0 && share_f > share_n,
+              "R6y an OPEN kit major lends its kit worth through reach: the route's trunk node DG-ST-FO-D1 gains more "
+              "from it for a nation fielding units than for one with no kit weight");
     }
 }
 
@@ -2152,7 +2294,14 @@ void rows_r7(const std::vector<std::uint32_t>& seeds, int years, const dial_over
     }
     check(fails == 0, "R7a every seed builds, settles, seats and runs the age with the AI");
     check(det, "R7b the AI age run is byte-identical twice (first seed)");
-    check(taken_pairs == 0 || split > 0, "R7c nations diverge on the pick-one pairs (some pair taken both ways)");
+    // BL-1486 cold review: no pair taken by the horizon is a FAILURE, not a pass —
+    // "nations diverge" cannot be read off pairs nobody reached. The message says which.
+    std::printf("  pick-one pairs: %d of %zu taken by the horizon, %d taken both ways\n",
+                taken_pairs, pairs.size(), split);
+    check(taken_pairs > 0 && split > 0,
+          taken_pairs == 0 ? "R7c nations diverge on the pick-one pairs (none diverge: NO pair was taken by the horizon)"
+          : split == 0     ? "R7c nations diverge on the pick-one pairs (none diverge: every pair taken went one way)"
+                           : "R7c nations diverge on the pick-one pairs (some pair taken both ways)");
     // RESEARCH.md § Cost: the median nation's first ring-2 major in about five
     // years. Reported against a 4-6 year band; never weakened.
     check(med_first >= 4.0 && med_first <= 6.0, "R7d PACING: the median nation's first major lands in about five years (4-6)");

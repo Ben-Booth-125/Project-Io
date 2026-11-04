@@ -750,6 +750,15 @@ std::map<entity_id, nation_budget> score_national_budgets(const world& w,
 //                       (x E(proc)), a building or a placement (x E(works)), the space
 //                       gate (x E(space)) — read from the node's effects, read or
 //                       declared unread (an unlock is worth its promise to the scorer)
+//     kit               research_kit_relief per kit item the node opens (one
+//                       `unlock_kit` row each) x the KIT WEIGHT — BL-1486 (Ben,
+//                       2026-11-04): 0.5 x M + 0.5 x U, M = the nation's own
+//                       military_research share x priority_count (average 1,
+//                       unfunded 0), U = its own unit groups standing / (that +
+//                       research_kit_units_half). No floor: a nation that funds no
+//                       force research and fields nothing gives kit no worth. Read
+//                       from the node's own rows, never the catalogue, and never
+//                       another nation's kit, units or queue
 //     the next cluster  (a major) research_cluster_relief x E(res) x the cost units of
 //                       the nodes it brings within reach (a node needing two groups
 //                       counts half per group it completes), plus
@@ -815,6 +824,7 @@ struct home_profile
     std::map<std::uint16_t, int>        proc;  ///< recipe id -> facilities
     int universities = 0; ///< Staffed Universities on its ground (advance_research's count).
     int total        = 0;
+    int fielded      = 0; ///< BL-1486: its OWN unit groups standing (count > 0), for the kit weight.
 };
 
 home_profile build_home_profile(const world& w, entity_id nation)
@@ -848,12 +858,21 @@ home_profile build_home_profile(const world& w, entity_id nation)
                 ++hp.proc[b.recipe];
         }
     }
+    // BL-1486: the units it fields — its own groups only (the grant admits no
+    // read of another nation's units). An integer count, so the map's walk
+    // order cannot reach it.
+    for (const auto& [uid, u] : w.units)
+        if (u.count > 0 && owner_home_nation(w, u.owner) == nation)
+            ++hp.fielded;
     return hp;
 }
 
 struct line_emphasis
 {
     double ext = 1.0, proc = 1.0, log = 1.0, res = 1.0, works = 1.0, space = 1.0;
+    /// BL-1486: military_research's share x priority_count, with NO 0.5 floor
+    /// (an average line 1, an unfunded line 0). Unscored: 1, as every line.
+    double milres = 1.0;
 };
 
 line_emphasis emphasis_for(const world& w, entity_id nation)
@@ -878,6 +897,8 @@ line_emphasis emphasis_for(const world& w, entity_id nation)
     e.res   = W(budget_priority::academic_research);
     e.works = W(budget_priority::public_works);
     e.space = W(budget_priority::space_programme);
+    e.milres = static_cast<double>(std::max(0.0f, it->second.weights[static_cast<std::size_t>(budget_priority::military_research)]))
+             / total * static_cast<double>(priority_count);
     return e;
 }
 
@@ -992,6 +1013,20 @@ double direct_relief(const scorer_ctx& c, int n)
             case 3: relief += c.p.research_unlock_relief * e.space; break;
             default: break;
         }
+
+    // BL-1486: the kit the node opens, one catalogue item per `unlock_kit` row
+    // (tech_tree_store.js --check holds the rows and the catalogue equal), so
+    // the scorer needs no link to the catalogue.
+    int kit_items = 0;
+    for (std::uint16_t i = nd.effect_begin; i < nd.effect_end; ++i)
+        kit_items += io::dg::effects[i].kind == io::dg::effect_kind::unlock_kit ? 1 : 0;
+    if (kit_items > 0)
+    {
+        const double half = c.p.research_kit_units_half > 0.0f ? static_cast<double>(c.p.research_kit_units_half) : 1.0;
+        const double u    = static_cast<double>(c.hp.fielded);
+        const double kit_weight = 0.5 * e.milres + 0.5 * (u / (u + half));
+        relief += static_cast<double>(c.p.research_kit_relief) * kit_items * kit_weight;
+    }
 
     if (nd.t == io::dg::tier::major)
     {
