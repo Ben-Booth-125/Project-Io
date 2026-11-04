@@ -7858,11 +7858,11 @@
    "difficulty": 4,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "in-flight",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1462 - sprint 61 (Ben, 2026-10-30)",
    "batch": "sprint-61",
-   "resolved": null,
-   "resolution": null,
+   "resolved": "2026-11-04",
+   "resolution": "All three rows complete; R2 by Ben's live click 2026-11-04.",
    "rows": [
     {
      "id": "R1",
@@ -7875,12 +7875,13 @@
     },
     {
      "id": "R2",
-     "status": "pending",
+     "status": "complete",
      "verification": [
       "live"
      ],
      "requirement": "In the running game: open slot 9, expand a row, declare war choosing a goal on the canvas with the price shown, answer and offer peace from Wars, offer friendship, toggle the embargo; each press does what it says and the toggle rule holds.",
-     "notes": "Owed: Ben's live click (the ten-step list in the Lane L report)."
+     "notes": "Owed: Ben's live click (the ten-step list in the Lane L report).",
+     "evidence": "COMPLETE, live click by Ben 2026-11-04 in the release build at 56ecddde: the diplomacy ledger, war declaration and peace flows, the peace-offer cooldown and the embargo toggle all behave as stated (Ben: \"All of the live clicks look good\")."
     },
     {
      "id": "R3",
