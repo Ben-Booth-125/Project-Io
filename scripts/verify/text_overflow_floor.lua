@@ -51,7 +51,7 @@ verify.show_panel("tile", false)
 
 -- Every lens (the on-canvas legend boxes).
 local lenses = { "nations", "resource", "market", "population", -- BL-1406: owner lenses retired
-                 "continent", "scarcity", "industry", "reach", "supply_routes" }
+                 "continent", "scarcity", "reach", "supply_routes" }
 for _, l in ipairs(lenses) do
     verify.set_overlay(l)
     verify.capture("overflow_lens_" .. l)

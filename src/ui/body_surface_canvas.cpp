@@ -336,10 +336,10 @@ inline ImU32 washed_resource_ground(ImU32 c, bool water)
 //   hue says WHICH, and a hue reads at a lower alpha than a value does, because the
 //   eye separates hues even over textured ground; the structures, forms and rivers
 //   beneath must still read through, so the wash stays under half.
-//   SEQUENTIAL (Population, Throughput, Scarcity, Industry) — a ramp says HOW MUCH,
+//   SEQUENTIAL (Population, Throughput, Scarcity) — a ramp says HOW MUCH,
 //   and a value read needs more of the ramp colour over the ground's own light and
 //   dark: a little stronger. Where a sequential lens's old blend already scaled with
-//   its value (Scarcity, Industry), the value scales this alpha the same way.
+//   its value (Scarcity), the value scales this alpha the same way.
 constexpr float k_lens_wash_categorical = 0.46f;
 constexpr float k_lens_wash_sequential  = 0.54f;
 /// The Resource lens's no-deposit ground: its ruled white wash (Ben, 2026-10-04,
@@ -459,7 +459,7 @@ ImU32 mean_colour(const ImU32* c, int n)
 ///     a real fact the lens exists to show.
 ///   - CATCHMENT fields (market, scarcity) are already coarser than a province;
 ///     blending would soften the catchment boundary the lens is about.
-///   - SPARSE fields (corporation, industry) are attributes of one
+///   - SPARSE fields (the retired corporation and industry lenses) were attributes of one
 ///     building on one tile. Smearing a point value over the empty ground beside
 ///     it is exactly the "one tile's value standing for the whole province"
 ///     defect — so these reduce per PROVINCE instead (see the uniform pass), not
@@ -481,9 +481,9 @@ bool lens_blend_mode(overlay_mode m)
     // rather than being quietly reinstated here.
     //
     // The SPARSE lenses are deliberately still absent, and that is not a partial
-    // application of the ruling. Industry, Corporation and Production already
-    // reduce per province and fill it flat (see the uniform pass), so they
-    // ALREADY keep the province view that the ruling asks for — vertex-blending
+    // application of the ruling. Corporation and Production (both since retired)
+    // reduced per province and filled it flat (see the uniform pass), so they
+    // ALREADY kept the province view that the ruling asks for — vertex-blending
     // them on top would spread one works' value onto the empty ground beside it,
     // which is the one defect the province grain exists to remove. Population,
     // Opportunity, Reach and Supply-routes paint no tile fill to blend at all.
@@ -640,7 +640,7 @@ ui::shell_rect open_lens_chrome(ImDrawList* dl, const ui_state& state, float wan
 }
 
 /// Shared chrome for a FIXED-HEIGHT lens key — the gradient bars (Resource, Scarcity,
-/// Population, Industry) and the Continent swatch list. Opens the one lens chrome
+/// Population) and the Continent swatch list. Opens the one lens chrome
 /// region at exactly the height the caller measured and returns the inner top-left and
 /// content width via @p out_x / @p out_y / @p out_w.
 ///
@@ -1282,41 +1282,6 @@ void draw_continent_key(ImDrawList* dl, const ui_state& state, const continent_s
     dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
-/// On-canvas legend for the Industry lens (BL-084; re-subjected BL-1419): a low→high
-/// amber gradient bar mapping the tile tint, so the field reads as "where the
-/// industry I did not build is densest". Same placement as the others. (This
-/// comment previously drifted onto plate_colour, which it does not describe.)
-void draw_industry_key(ImDrawList* dl, const ui_state& state)
-{
-    const float pad    = 8.0f;
-    const float line_h = ImGui::GetTextLineHeight();
-    const float bar_h  = 10.0f;
-
-    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
-    float x, y, bar_w;
-    begin_lens_key(dl, state, body_h, pad, x, y, bar_w);
-
-    // BL-1419: the subject is other nations' plant; the background firm retired.
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Rival industry"); // fit-exempt: legend box sized to its measured entries (container 2)
-    y += line_h + 4.0f;
-
-    // Gradient mirrors the tile tint lerp (terrain hue -> industrial amber at
-    // 0.15 + 0.6t), anchored on a neutral dark base so the bar reads standalone.
-    constexpr ImU32 ind  = IM_COL32(210, 150, 70, 255); // industrial amber (tile pass)
-    constexpr int   segs = 24;
-    for (int i = 0; i < segs; ++i)
-    {
-        const float t0 = static_cast<float>(i) / segs;
-        const ImU32 c  = lerp_colour(IM_COL32(40, 40, 48, 255), ind, 0.15f + 0.6f * t0);
-        dl->AddRectFilled({ x + bar_w * t0, y },
-                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
-    }
-    y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
-    const ImVec2 hts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
-}
-
 /// THE LOGISTICS LENS'S ROAD RAMP (Ben, 2026-10-24; LENSES.md § Logistics lens). A
 /// road of the player's nation is coloured by SUPPLIED over REQUESTED - the points
 /// granted to the requests routed through it over those requests - on a log2 scale:
@@ -1831,7 +1796,7 @@ entity_id resolve_marker_hit(const std::vector<marker_hit_zone>& zones, float mx
 /// LENSES.md's routing table has said since 2026-06-15 that "the active lens does
 /// not only re-skin the canvas: it DEFINES what the pointer resolves to". This is
 /// that rule at the grain the lens actually DRAWS. A lens whose subject is the
-/// tile itself (Population, Industry) returns none and keeps tile grain — the
+/// tile itself (Population) returns none and keeps tile grain — the
 /// selection grain follows the drawing, which is the whole rule.
 ///
 /// A structure USED TO have to be an entity here, because that is what a selection
@@ -3360,80 +3325,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             plates = nullptr;
     }
 
-    // Industry lens pre-pass (BL-084; re-subjected BL-1419). The question it
-    // answers is "where is the industry I did not build?": the plants of every
-    // nation other than the player's, standing on the active body. The player's
-    // own plant never tints it.
-    //
-    // Only what the screen may show (DISCOVERY.md § Competitor visibility,
-    // BL-068). A rival's plant is a physical structure, and that it is RUNNING
-    // is observable ("smoke from the chimney"); how much it makes is private.
-    // So the field reads presence and running state, never output: per tile,
-    // the sum over rival buildings of 0.5 for standing (idle, or still under
-    // construction) plus 0.5 more when it ran this tick. Two buildings on one
-    // tile stack. The survey mask still draws a locked tile flat, so a plant in
-    // an unrevealed region tints nothing.
-    std::unordered_map<entity_id, float> industry_field;
-    float industry_max = 0.0f;
-    if (state.overlay == overlay_mode::industry)
-    {
-        // Running state from the economy report: the fact a working plant's
-        // chimney already shows, and nothing of its rate.
-        std::unordered_set<entity_id> running;
-        for (const building_report& br : report.buildings)
-            if (br.active)
-                running.insert(br.building);
-
-        for (const auto& [nid, nation] : w.nations)
-        {
-            if (nid == player_owner || nid == w.player_entity)
-                continue; // the player's own plant never tints this lens
-            for (const entity_id bid : nation.state_assets)
-            {
-                const auto bld_it = w.buildings.find(bid);
-                if (bld_it == w.buildings.end() || bld_it->second.decommissioned)
-                    continue;
-                const auto tit = w.tiles.find(bld_it->second.tile);
-                if (tit == w.tiles.end() || tit->second.body != state.active_body)
-                    continue;
-                const bool ran = bld_it->second.ticks_remaining == 0 && running.count(bid) != 0;
-                float& thr = industry_field[bld_it->second.tile];
-                thr += ran ? 1.0f : 0.5f;
-                industry_max = std::max(industry_max, thr);
-            }
-        }
-
-        // BL-511's per-province reduction for this lens: a SUM, rendered
-        // uniformly over the province. Industry is the one sparse field whose
-        // question — "how much plant I did not build stands here?" — is genuinely
-        // about the locality rather than about the individual works, and density
-        // is additive, so summing the member tiles and filling the whole province
-        // flat is the honest answer. It is also the reason this lens is NOT in
-        // lens_blend_mode: blending would spread one works' amber over the empty
-        // ground beside it, which reads as industry that is not there.
-        if (!industry_field.empty())
-        {
-            std::unordered_map<uint32_t, float> prov_total;
-            for (const auto& [tid, v] : industry_field)
-                if (const uint32_t pid = w.provinces.province_of(tid); pid != 0)
-                    prov_total[pid] += v;
-
-            // Driven from the totals, not from the whole partition: only the
-            // provinces that actually hold background plant are touched, so this
-            // costs the number of industrial localities on one body rather than
-            // the world's ~8,300 provinces per frame.
-            for (const auto& [pid, total] : prov_total)
-            {
-                const province* pv = w.provinces.find(pid);
-                if (!pv)
-                    continue;
-                for (entity_id tid : pv->tiles)
-                    industry_field[tid] = total;
-                industry_max = std::max(industry_max, total);
-            }
-        }
-    }
-
     // Reach lens pre-pass (BL-011): `trade_route` is body-level, not per-tile, and
     // this canvas only ever shows the *active* body's tile grid (never other
     // bodies), so the "body-to-body highlight" the design calls for reads here as
@@ -4186,20 +4077,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 fill = lerp_colour(fill, hot, 0.6f * scar);
             }
         }
-        // Industry lens (BL-084/BL-373): tint a tile by the background-firm plant
-        // standing on it (pre-pass above), normalised to the body max — brightest amber
-        // where the industry the player did not build is densest. Tiles carrying no
-        // background building keep their terrain hue.
-        else if (state.overlay == overlay_mode::industry)
-        {
-            const auto it = industry_field.find(id);
-            if (it != industry_field.end() && industry_max > 0.0f)
-            {
-                const float t = std::clamp(it->second / industry_max, 0.0f, 1.0f);
-                constexpr ImU32 ind = IM_COL32(210, 150, 70, 255); // industrial amber
-                fill = lerp_colour(fill, ind, 0.15f + 0.6f * t);
-            }
-        }
         // The Logistics lens (overlay_mode::throughput) tints NO ground (Ben, 2026-10-24:
         // "remove the colour gradient from tiles"). It shaded the points reaching each
         // tile until then; its read is now the ROAD colour (supplied over requested, in
@@ -4374,16 +4251,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const float scar = std::clamp(sf_it->second / scar_max_shortfall, 0.0f, 1.0f);
             return scar > 0.0f
                 ? with_alpha(IM_COL32(220, 70, 55, 255), k_lens_wash_sequential * scar) : 0u;
-        }
-        if (ov == overlay_mode::industry)
-        {
-            const auto it = industry_field.find(id);
-            if (it == industry_field.end() || industry_max <= 0.0f)
-                return 0u;
-            const float t = std::clamp(it->second / industry_max, 0.0f, 1.0f);
-            // The fill path's 0.15 + 0.6t ramp, rescaled so its top is the family strength.
-            return with_alpha(IM_COL32(210, 150, 70, 255),
-                              k_lens_wash_sequential * (0.15f + 0.6f * t) / 0.75f);
         }
         // The Logistics lens tints NO ground (Ben, 2026-10-24: "remove the colour
         // gradient from tiles"): its read is the road colour and the two numbers.
@@ -7741,8 +7608,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_population_key(dl, state);
     else if (state.overlay == overlay_mode::scarcity)
         draw_scarcity_key(dl, state);
-    else if (state.overlay == overlay_mode::industry)
-        draw_industry_key(dl, state);
     else if (state.overlay == overlay_mode::continent)
         draw_continent_key(dl, state, plates);
     else if (state.overlay == overlay_mode::nations)
@@ -7912,9 +7777,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             //    asking about ("markers do not outrank lenses", Ben 2026-08-28).
             //  - where the lens has NO STRUCTURE for this ground there is NO CARD
             //    AT ALL ("for lenses which return none, just don't surface a
-            //    hover"). Two lenses — Population, Industry — draw a value field
+            //    hover"). Population draws a value field
             //    with no structure grain, so the card is absent across the whole
-            //    body while one of them is active. Throughput resolves its own
+            //    body while it is active. Throughput resolves its own
             //    nation's ground to `structure_kind::ground` and so shows a card,
             //    but takes no click (BL-1353; Ben, 2026-10-20).
             //

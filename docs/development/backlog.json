@@ -805,6 +805,32 @@
    ],
    "title": "38 of 578 kit processors are idled at the handoff, against 20 with the logistics cap lifted",
    "design": "The residue of BL-1473 (major opening kit) R4, measured 2026-11-04 on eba4f3dc with opening_parity --pairs 20:4 --diagnose-idle (16 seeds, 64 majors). After the cover-first cap and the kit re-site (CORPORATION_GENERATION.md § A major's opening kit, Ben 2026-11-04), 100 kit buildings idle at the handoff (62 extraction, 38 processing); with the cap lifted (--no-logistics-cap) 38 idle (18, 20). Of the 100: 28 have no labour, 22 are starved of copper ore, silica or coal, 3 have no deposit; 38 found no covered tile to re-site to. Work: read the 28 no-labour cases (the pool is per nation and body; contention allocates by wage), then the starved processors' feeds, and decide whether the gap to the control is the cap's or the kit's. The requirement is R4's own: every kit processor passes Pass 3 and runs at the handoff."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-04",
+   "parked": false,
+   "blocked_on": null,
+   "author": "ui-dev lane (Ben, live click, 2026-11-04)",
+   "requires": [],
+   "id": "BL-1488",
+   "short_name": "INDUSTRY_LENS_RETIRED",
+   "category": "UI",
+   "authority_doc": "docs/ui/LENSES.md",
+   "priority": "B",
+   "difficulty": 1,
+   "files": [
+    "src/ui/ui_state.hpp",
+    "src/ui/overlay.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/verify_api.cpp",
+    "docs/ui/LENSES.md"
+   ],
+   "title": "Retire the Industry lens",
+   "design": "Ben, 2026-11-04, after a live click: \"we can remove the industry lens, it's not that informative.\" The Rival industry amber tint, its key and its strip slot go; the overlay_mode slot is kept as retired_industry_ (never drawn, skipped by the cycle, loads as none) because the save's view bindings hold the enum's integer. The factory glyph stays: rail slot 3 (Construction) wears it. Check: lens_modes, lens_one_tier, logistics_lens, province_render, text_overflow_floor pass; a live click shows no Industry slot on the Planetary strip."
   }
  ]
 }

@@ -125,7 +125,8 @@ overlay_mode overlay_from_name(const std::string& s)
     // lenses. They now take the unknown-name fallback below, so a stale script
     // captures the plain canvas rather than failing to build.
     if (s == "scarcity")    return overlay_mode::scarcity;
-    if (s == "industry")    return overlay_mode::industry;
+    // "industry" is GONE (BL-1488, Ben 2026-11-04) by the same rule: the lens
+    // retired, so the name takes the unknown-name fallback.
     if (s == "reach")       return overlay_mode::reach;
     if (s == "continent")   return overlay_mode::continent;
     if (s == "supply_routes") return overlay_mode::supply_routes;
@@ -152,7 +153,6 @@ const char* overlay_script_name(overlay_mode m)
         case overlay_mode::resource:      return "resource";
         case overlay_mode::population:    return "population";
         case overlay_mode::scarcity:      return "scarcity";
-        case overlay_mode::industry:      return "industry";
         case overlay_mode::reach:         return "reach";
         case overlay_mode::continent:     return "continent";
         case overlay_mode::supply_routes: return "supply_routes";

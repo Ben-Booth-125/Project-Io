@@ -984,18 +984,6 @@
    ],
    "status": "drafted"
   },
-  "industry_lens": {
-   "surface": "Industry lens - the plant of nations other than the player's, as an amber province fill keyed 'Rival industry' (Planetary strip)",
-   "answers": "Where is the industry I did not build?",
-   "because": "Kept through the corporation's retirement and re-subjected (Ben, 2026-10-26): its subject is the plants of nations other than the player's, and the player's own plant never tints it. It is an OWNERSHIP question no other surface answers at a glance - the border band says whose ground an edge divides, the Nations lens says whose territory is whose, and neither says where a neighbour has actually built, which is what a player weighs before siting a works or leaning on a market. It reads only what the ground shows (DISCOVERY.md, competitor visibility): a rival plant counts for standing and counts again when it is running, because a working plant is observable and its rate is not, so the field never leaks how much a rival makes. Summed per province and filled flat, because the question is about the locality and density is additive. A strip lens on the Planetary rung (Ben, 2026-11-03): no lens is keyboard-only.",
-   "status": "drafted",
-   "backlog_item": "BL-1419",
-   "files": [
-    "src/ui/body_surface_canvas.cpp",
-    "src/ui/overlay.cpp",
-    "scripts/verify/industry_lens.lua"
-   ]
-  },
   "nations_lens": {
    "surface": "Nations lens — every nation-owned tile filled in its identity colour (Planetary strip)",
    "answers": "Whose ground is this — every nation's whole territory, at once?",

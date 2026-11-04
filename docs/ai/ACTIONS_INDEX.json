@@ -214,10 +214,6 @@
    "The lens chrome region — the minimap's header, top right (BL-602). One region hosts the selector and whichever key the active lens draws; the selector sits directly above that key while the Market or Scarcity lens is active. One shared combo bound to a single shared lens_resource value, not two separate controls. The Resource lens does NOT use it: it has its own toggled checklist (lens.resource_toggle). It is NOT on the minimap's lens bar, which carries glyphs only."
   ],
   [
-   "lens.industry",
-   "Minimap lens strip, Planetary rung, slot 4 (after Resource, Market, Scarcity) — the factory-silhouette glyph (icons::industry)."
-  ],
-  [
    "lens.key_toggle",
    "The lens chrome region's header bar — the minimap's header, top right (BL-602). The bar carries a caret, the key's title, and its row count, e.g. '^ Countries (44)'. Its foot rests on the minimap's top edge and stays there whether the list is open or shut."
   ],
@@ -243,7 +239,7 @@
   ],
   [
    "lens.scarcity",
-   "Minimap lens strip — Planetary rung slot 5 and Circumplanetary rung slot 2 — the hollow downward-triangle glyph (icons::scarcity)."
+   "Minimap lens strip — Planetary rung slot 3 and Circumplanetary rung slot 2 — the hollow downward-triangle glyph (icons::scarcity)."
   ],
   [
    "lens.supply",
@@ -255,11 +251,11 @@
   ],
   [
    "lens.throughput",
-   "Minimap lens strip, Planetary rung, slot 9 (draw_overlay_controls, src/ui/overlay.cpp): the LOGISTICS lens (named Logistics, Ben 2026-10-24; the action id and overlay_mode::throughput keep the old name, and a verify script arms it as \"logistics\" or \"throughput\"). Its glyph is a TRUCK in profile (icons::throughput)."
+   "Minimap lens strip, Planetary rung, slot 6 (draw_overlay_controls, src/ui/overlay.cpp): the LOGISTICS lens (named Logistics, Ben 2026-10-24; the action id and overlay_mode::throughput keep the old name, and a verify script arms it as \"logistics\" or \"throughput\"). Its glyph is a TRUCK in profile (icons::throughput)."
   ],
   [
    "lens.trade_flow",
-   "Minimap lens strip, Planetary rung, slot 10 — the exchange glyph (icons::trade_flow, ⇄). LENSES.md § Trade-flow lens."
+   "Minimap lens strip, Planetary rung, slot 7 — the exchange glyph (icons::trade_flow, ⇄). LENSES.md § Trade-flow lens."
   ],
   [
    "ledger.budget_tax_tier",

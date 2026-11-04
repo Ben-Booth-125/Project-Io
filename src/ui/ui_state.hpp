@@ -57,11 +57,14 @@ enum class overlay_mode
     // 2026-08-24: "retire the opportunity lens and the production intensity
     // lens"). Every lens costs a bar slot, a key, three doc rows and a
     // selection-routing rule permanently; these two were per-tile value
-    // surfaces whose read the Scarcity and Industry lenses already carry
-    // between them. The sentinel below is what the cycle counts, so the roster
+    // surfaces whose read the Scarcity lens (and the since-retired Industry
+    // lens) already carried between them. The sentinel below is what the cycle counts, so the roster
     // re-numbers itself with no hand-kept constant to follow.
     scarcity,    ///< Per-market supply-shortfall blocks (hot where demand outran supply). See LENSES.md § Scarcity lens.
-    industry,    ///< Per-tile nation-substrate throughput field (occupation × terrain richness). See LENSES.md § Industry lens (BL-084).
+    // BL-1488 (Ben, 2026-11-04: "we can remove the industry lens, it's not that
+    // informative"): the Industry lens RETIRED. Slot kept for the same save
+    // reason as BL-1406's — the view bindings hold the enum's integer.
+    retired_industry_, ///< RETIRED (BL-1488). Never a live lens.
     reach,       ///< Body-level commercial reach: bodies connected via the corp's trade_route entries, tiered by recency. BL-011. See LENSES.md § Reach lens.
     continent,   ///< Tectonic plates from the Continents/Drift pass: per-plate tint + boundary emphasis, read from the generation report. BL-226. See LENSES.md § Continent lens.
     supply_routes, ///< Aggregated trade_route graph: one edge per body pair, thickness from log-scaled convoy_count, colour from recency tier. BL-014. See LENSES.md § Supply-routes lens.
@@ -85,12 +88,13 @@ enum class overlay_mode
     count,         ///< Sentinel — keep last. The lens-cycle wrap (canvas_command.cpp) derives its modulus from this, so a new lens above is reachable without touching a hand-kept count.
 };
 
-/// BL-1406: true for a lens slot kept only so a saved integer keeps its meaning.
+/// BL-1406 / BL-1488: true for a lens slot kept only so a saved integer keeps its meaning.
 /// A retired slot is never drawn; the cycle steps over it and a load maps it to
 /// `overlay_mode::none`.
 constexpr bool overlay_is_retired(overlay_mode m)
 {
-    return m == overlay_mode::retired_corporation_ || m == overlay_mode::retired_company_;
+    return m == overlay_mode::retired_corporation_ || m == overlay_mode::retired_company_
+        || m == overlay_mode::retired_industry_;
 }
 
 /// A selectable on-canvas marker registered each frame by the Planetary canvas

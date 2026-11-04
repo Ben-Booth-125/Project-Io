@@ -51,8 +51,6 @@ authority; `backlog.json` is authority once items are minted, and the subject's 
   residue that is genuinely aggregate-only is thin, and the parts of it that name rivals disclose more
   than competitor visibility allows (`DISCOVERY.md`). Aggregation is a view on an owning ledger, not a
   ledger of its own.
-- **`overlay_mode::industry` is not a sector lens**: it paints the AI-owned nation substrate, not the
-  player's sector mix, so it is the wrong pairing for any surface asking "what am I in".
 - **Build sites rank by estimated profit** (Ben, 2026-10-25, overturning the 2026-08-29 refusal of a
   best-margin build-opportunity surface). The Construction view's site ledger lists every tile that takes
   a chosen building, sorted by profit, and the placement lens marks them on the map. `CONCEPT.md`

@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*214 entries — 53 gameplay · 36 canvas · 16 lens · 74 ledger · 35 chrome.*
+*213 entries — 53 gameplay · 36 canvas · 15 lens · 74 ledger · 35 chrome.*
 
 ---
 
@@ -1146,7 +1146,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 
-**Expected output.** The overlay lens advances to the next mode in cycle order. The keyboard cycle covers the FULL lens roster, including the off-bar lenses (Scarcity, Industry, Reach, Supply-routes, Company, Trade-flow) the minimap bar has no room for — cycling is the only way to reach those. The active lens re-skins the canvas per that lens's semantics (owned elsewhere) and highlights its glyph on the minimap bar when it is an on-bar lens. Selection, view framing, and sim speed are untouched.
+**Expected output.** The overlay lens advances to the next mode in cycle order. The keyboard cycle covers the FULL lens roster, including the off-bar lenses (Scarcity, Reach, Supply-routes, Trade-flow) the minimap bar has no room for — cycling is the only way to reach those. The active lens re-skins the canvas per that lens's semantics (owned elsewhere) and highlights its glyph on the minimap bar when it is an on-bar lens. Selection, view framing, and sim speed are untouched.
 
 **Reason to select.** Walk the lens family in order — including the keyboard-only lenses — to change which question the map is answering.
 
@@ -1547,7 +1547,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Valid when:**
 - A bar lens must currently be active — with no lens active there is no highlighted glyph and this press does not exist.
 - Selecting a different lens is an ordinary switch, not a clear; only re-clicking the active one clears.
-- Every built lens has a glyph on at least one rung's strip (Ben, 2026-10-07). The minimap lens strip is keyed on the canvas rung (LENSES.md § The strip rotates with the rung): Planetary carries Corporation, Company, Resource, Market, Scarcity, Industry, Population, Continent, Logistics, Trade flow, Nations; Circumplanetary Market, Scarcity, Supply; Solar Supply, Reach, Supply-routes. Opportunity, Production and Country were strip lenses until retired; a press on any of them no longer exists.
+- Every built lens has a glyph on at least one rung's strip (Ben, 2026-10-07). The minimap lens strip is keyed on the canvas rung (LENSES.md § The strip rotates with the rung): Planetary carries Resource, Market, Scarcity, Population, Continent, Logistics, Trade flow, Nations; Circumplanetary Market, Scarcity, Supply; Solar Supply, Reach, Supply-routes. Opportunity, Production, Country, Corporation, Company and Industry were strip lenses until retired; a press on any of them no longer exists.
 
 **Expected output.** The canvas returns to plain terrain (overlay_mode::none) — the state the campaign opens in. All lens tints, marks, and keys disappear. Always-on chrome survives, now at FULL strength rather than the 0.45 a lens attenuates it to (BL-520): the substrate grain and cover pattern that texture the ground, selection outlines and unit markers are not lens-dependent. The plain canvas does NOT mark the player's own buildings (Ben, 2026-10-24): no identity wash and no outline - the home-cluster ring draws under a lens only. EVERY NATION'S CAPITAL carries a filled five-point star in its nation's identity colour, the player's 1.3x larger inside a pale ring (Ben, 2026-10-25; PLANETARY.md § The capital star) - the star also shows under every lens except Resource, Continent and Population. No HQ star and no market-centre marker draw on this canvas (Ben, 2026-10-10: 'We should remove the HQ glyph and market center glyphs'). Pointer clicks revert to resolving the lowest drawn entity (marker, else tile), routing to the Tile Ledger.
 
@@ -1594,21 +1594,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Change the question's subject without changing the question: which good is this market pricing high, what is each market short of — by flipping the good while the lens holds.
 
-### `lens.industry` — Minimap lens strip, Planetary rung, slot 4 (after Resource, Market, Scarcity) — the factory-silhouette glyph (icons::industry).
-
-**Press.** Single left-click on the Industry glyph in the lens strip, or cycle with L / Shift+L.
-
-**Valid when:**
-- Planetary-only. The running half of the field is read from the economy report, so a working plant reads as working only after an economy tick; standing rival plant tints from the first frame.
-- Re-clicking while active clears the lens (see lens.clear); the keyboard cycle (L / Shift+L) also reaches it from any rung.
-
-**Expected output.** A sequential dark-to-amber tint over the ground carrying buildings owned by NATIONS OTHER THAN THE PLAYER'S (BL-1419; LENSES.md § Industry lens) - the player's own plant never tints it. It reads only what the screen may show (DISCOVERY.md § Competitor visibility): presence and running state, never output. Per tile the value is the sum over those buildings of (0.5 + 0.5 x running), running being 1 when the plant is finished and produced this tick - so an idle or under-construction rival plant still reads, a working one reads brighter, and two buildings on one tile stack. The tile values are summed per province and filled flat over it, normalised to the body maximum. Ground with no rival building keeps plain terrain. Low-to-high amber gradient key titled 'Rival industry'. Pure rendering — it changes nothing in the market arithmetic. Pointer clicks fall through to the tile (Tile Ledger); there is no dedicated ledger route. Terrain texture (BL-520) survives this lens at 0.45 strength, with each mark's ink derived from the tile's own lens-tinted fill — so it reads as shading on the lens colour, never as a second, competing colour. National borders are NOT drawn while any lens is active (2026-08-28) — the inset border stroke is suppressed, and the border's click corridor goes with it. The plain canvas is the only place the national read appears.
-
-**Reason to select.** Select to answer 'where is the industry I did not build?' - the distribution of other nations' plant across this body, before choosing where to place your own or which market to lean on. It is a reading of where rival plant IS and whether it is working, never of how much it makes: a rival's production stays private. It does NOT drive market supply or demand; rival nations move the market through their ordinary buildings, which this lens merely locates.
-
 ### `lens.key_toggle` — The lens chrome region's header bar — the minimap's header, top right (BL-602). The bar carries a caret, the key's title, and its row count, e.g. '^ Countries (44)'. Its foot rests on the minimap's top edge and stays there whether the list is open or shut.
 
-**Press.** Single left-click anywhere on the header bar. Only the four COUNT-DRIVEN keys have one — Country, Market, Reach and Supply-routes, whose row list grows with the world. The fixed-height gradient keys (Resource, Scarcity, Population, Industry, Continent) have nothing to overflow and draw open, so they carry no toggle.
+**Press.** Single left-click anywhere on the header bar. Only the four COUNT-DRIVEN keys have one — Country, Market, Reach and Supply-routes, whose row list grows with the world. The fixed-height gradient keys (Resource, Scarcity, Population, Continent) have nothing to overflow and draw open, so they carry no toggle.
 
 **Valid when:**
 - One of Country, Market, Reach or Supply-routes must be active — with no lens, or with a gradient-key lens, there is no header bar to press.
@@ -1695,7 +1683,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Compare or overlay deposits: see where two inputs to one recipe sit together, or narrow the map back to one good, without leaving the lens.
 
-### `lens.scarcity` — Minimap lens strip — Planetary rung slot 5 and Circumplanetary rung slot 2 — the hollow downward-triangle glyph (icons::scarcity).
+### `lens.scarcity` — Minimap lens strip — Planetary rung slot 3 and Circumplanetary rung slot 2 — the hollow downward-triangle glyph (icons::scarcity).
 
 **Press.** Single left-click on the Scarcity glyph in the lens strip, or cycle with L / Shift+L (those hotkeys are catalogued in the controls family).
 
@@ -1737,7 +1725,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Which standing lanes carry my economy, and how heavily? The aggregate counterpart to Supply's in-flight convoys: the carved trade lanes and their traffic weight, for judging which routes are load-bearing and which are vestigial.
 
-### `lens.throughput` — Minimap lens strip, Planetary rung, slot 9 (draw_overlay_controls, src/ui/overlay.cpp): the LOGISTICS lens (named Logistics, Ben 2026-10-24; the action id and overlay_mode::throughput keep the old name, and a verify script arms it as "logistics" or "throughput"). Its glyph is a TRUCK in profile (icons::throughput).
+### `lens.throughput` — Minimap lens strip, Planetary rung, slot 6 (draw_overlay_controls, src/ui/overlay.cpp): the LOGISTICS lens (named Logistics, Ben 2026-10-24; the action id and overlay_mode::throughput keep the old name, and a verify script arms it as "logistics" or "throughput"). Its glyph is a TRUCK in profile (icons::throughput).
 
 **Press.** Click the truck glyph on the lens strip, or cycle with L / Shift+L (Trade-flow is the LAST lens in the family, so one Shift+L from no lens lands on Trade-flow, not Logistics). Re-clicking the active glyph clears to overlay_mode::none, per the strip toggle rule. Planetary rung only.
 
@@ -1751,7 +1739,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Select to answer 'where is my road network short of what is asked of it, and how many Logistic Points reach my ground?' - a red road is one the chain can supply at half or less of what its routed requests need (yellow is just covered), so it says where a new hub, station or port, or a better road, would let production run. Before sending an army past the network that would feed it (a unit's supply is drawn at the tile it stands on, and a tile no source reaches grants it nothing), or siting a building whose points have to come from somewhere. It is the surface half of the Logistic Points cap (LOGISTICS.md): a cap nobody can see is silent interdiction.
 
-### `lens.trade_flow` — Minimap lens strip, Planetary rung, slot 10 — the exchange glyph (icons::trade_flow, ⇄). LENSES.md § Trade-flow lens.
+### `lens.trade_flow` — Minimap lens strip, Planetary rung, slot 7 — the exchange glyph (icons::trade_flow, ⇄). LENSES.md § Trade-flow lens.
 
 **Press.** Single left-click on the Trade flow glyph in the lens strip, or cycle with L / Shift+L -- it is the LAST mode in the cycle, so one Shift+L from no lens lands on it. Planetary rung.
 

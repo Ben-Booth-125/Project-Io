@@ -1080,7 +1080,5 @@ owning doc's § Open items.
 - **Post-WW2 industrial grounding.** The focus→asset-mix patterns should be grounded in research
   on the post-WW2 industries that led to space-related capability, so a charter's buildings
   read as a plausible pathway toward off-world reach rather than an arbitrary mix.
-- **The Industry lens and the background.** The background industry is generated, not authored
-  (§ The economic premise), and the Industry map-lens (`docs/ui/LENSES.md`) renders its aggregate
-  per body. The lens's rendering job is independent of the mechanism beneath it: it draws the
-  industry that each nation owns on its ground, not a per-tile field.
+- **The Industry lens and the background** — retired with the lens (Ben, 2026-11-04: not
+  informative); no map lens renders the background industry's aggregate.

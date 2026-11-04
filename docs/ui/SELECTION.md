@@ -922,9 +922,9 @@ did not just click and has no way to connect to the pointer (the failure NR-697 
 stack to walk, and rule 1 removes it. Under a lens a repeat click on the same ground re-resolves to
 the same structure, which is the honest reading: there is one tier, and it does not move.
 
-**Consequence — a lens with no structure grain is a pure read.** Population and Industry
-draw a per-tile *value field* rather than a region: their subject is a number spread
-across the map, not a thing on it. Under rule 3 they are entirely non-interactive — no hover card,
+**Consequence — a lens with no structure grain is a pure read.** Population
+draws a per-tile *value field* rather than a region: its subject is a number spread
+across the map, not a thing on it. Under rule 3 it is entirely non-interactive — no hover card,
 no selection, anywhere on the body (Ben, 2026-08-28: "for lenses which return none, just don't
 surface a hover, and clicks will do nothing"). This is a deliberate category, not a gap: a value
 field is something you *read*, and giving it a fake selectable grain would promise a pivot it has
@@ -950,7 +950,7 @@ selects the nation"*. Now a press anywhere on the body selects the tile under th
 player's or not, and the band opens on the tile card exactly as the no-lens fallback opens it. It
 is still **one tier**: markers do not outrank it, and a repeat press re-selects the same tile
 rather than walking the repeat-click cycle. No border band is drawn under a lens, so no press is
-taken by one. Population and Industry are unchanged: still pure reads, no hover, no selection
+taken by one. Population is unchanged: still a pure read, no hover, no selection
 (Ben, 2026-10-20: "Throughput only" — the lens now named Logistics).
 
 ### The lens names the ledger the selection drives
@@ -965,7 +965,7 @@ validates the structure also routes it.
 | **Market** / **Scarcity** | the **market catchment** under the pointer | Market Ledger |
 | **Continent** | the **plate** | History ledger, at its tectonic record |
 | **Nations** | the **nation** whose territory is under the pointer | wherever a press on its border band goes — the same `structure_kind::nation` selection |
-| **Population** / **Industry** | nothing — inert | — |
+| **Population** | nothing — inert | — |
 | **Logistics** | **the ground** for the hover card; a press selects **the tile** | the Selection band's tile card |
 | **Supply** / **Supply-routes** / **Reach** | body-to-body; no Planetary structure | — |
 

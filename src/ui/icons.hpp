@@ -219,10 +219,11 @@ void population(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of the outline.
 void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
-/// Draw the Industry-lens glyph — a factory silhouette (a block with a sawtooth
-/// roof and a chimney) — in @p colour. For the overlay-lens control strip; reads as
-/// "industry / throughput", distinct from the production up-triangle and the market
-/// bars. See LENSES.md § Industry lens (BL-084).
+/// Draw the industry glyph — a factory silhouette (a block with a sawtooth roof
+/// and a chimney) — in @p colour. The nav rail's construction slot wears it; it
+/// reads as "industry", distinct from the production up-triangle and the market
+/// bars. (It was also the Industry lens's strip mark until that lens retired,
+/// BL-1488.)
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Glyph centre, screen pixels.

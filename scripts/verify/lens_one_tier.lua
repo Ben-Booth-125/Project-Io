@@ -119,8 +119,9 @@ verify.capture("one_tier_nation_press")
 -- ---------------------------------------------------------------------------
 -- BL-664 R2 — a lens with no structure grain surfaces nothing at all.
 --
--- Population, Industry and Throughput draw a per-tile value field rather than a
--- region, so there is nothing for a selection to be OF. Both halves are checked
+-- Population and Throughput draw a per-tile value field rather than a region, so
+-- there is nothing for a selection to be OF (the Industry lens was the third until
+-- it retired, Ben 2026-11-04). Both halves are checked
 -- on BUILT ground, which is the harder case: before the rule, the building's
 -- marker answered here under every lens.
 -- ---------------------------------------------------------------------------
@@ -128,7 +129,7 @@ verify.capture("one_tier_nation_press")
 -- THROUGHPUT LEFT THIS LIST for its hover half (Ben, 2026-10-20, BL-1353 option A):
 -- it resolves its own nation's ground to "ground" and raises a card, and its press
 -- is still inert - both asserted in the block after this loop.
-for _, lens in ipairs({ "population", "industry" }) do
+for _, lens in ipairs({ "population" }) do
     verify.set_overlay(lens)
 
     local h = dwell(built_col, built_row)

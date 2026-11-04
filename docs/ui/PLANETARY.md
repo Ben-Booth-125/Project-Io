@@ -255,15 +255,14 @@ lens by lens; `lens_blend_mode` in `body_surface_canvas.cpp` is this table's exe
 | **Market** | per catchment | **No reduction needed** | A catchment already covers whole provinces. Blending would soften the catchment boundary the lens exists to show. |
 | **Scarcity** | per catchment | **No reduction needed** | As Market — the value is already constant across every province in the catchment. |
 | **Production** | sparse, per producing tile | **Refusal — stays flat per tile** | The question is "where is output concentrated?" and the building's tile *is* the answer. A province-uniform block would claim the whole province produces. |
-| **Industry** | sparse, per tile with a rival's plant | **Province SUM, filled uniformly** | The one sparse field whose question — "how much plant I did not build stands here?" — is genuinely about the locality. Density is additive, so the member tiles are summed and the whole province fills flat. Blending would spread one works' amber over empty ground beside it, reading as industry that is not there. |
 | **Population** | per-tile **dot mark**, no fill | **N/A — mark, not fill** | Nothing to blend; the dot stays per tile. |
 | **Opportunity** | per-catchment **dot mark**, no fill | **N/A — mark, not fill** | As Population. |
 | **Reach** | body-level | **N/A — paints no tile fill** | The readout is per connected body, not per tile. |
 | **Supply-routes** | body-level edges | **N/A — paints no tile fill** | Aggregated body-pair edges. |
 | **Supply** | per-tile convoy glyph, no fill | **N/A — glyph, not fill** | As Population. |
 
-Only **Industry** carries a genuinely computed per-province reduction; the rest are blends, refusals
-with a reason, or lenses that paint no fill. That is deliberate: the province is the *selection*
+No lens carries a computed per-province reduction; each is a blend, a refusal
+with a reason, or a lens that paints no fill. That is deliberate: the province is the *selection*
 grain under every lens, but it is the *render* grain only where the field is continuous.
 
 **Country has no row because it is not a lens.** The national read is the border band below, which draws on the plain canvas only —
@@ -413,7 +412,7 @@ a filled five-point star with the family's dark outline ([ICONS.md](ICONS.md) §
   widest rung and capped at **14 px** (the player's at 1.3× that) so it never swallows the city it
   marks at the close rungs.
 - **Which views:** the plain canvas, and every lens whose subject is not the ground itself —
-  Logistics, Market, Scarcity, Industry, Trade-flow, Supply-routes, Nations (and Supply and Reach,
+  Logistics, Market, Scarcity, Trade-flow, Supply-routes, Nations (and Supply and Reach,
   which keep the plain canvas's chrome). **Hidden** under **Resource, Continent and Population**,
   where a political mark competes with the field the lens is about.
 - **Fogs:** the survey mask owns it (no star on unsurveyed ground); it is not vision-fogged — a

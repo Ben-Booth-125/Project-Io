@@ -25,8 +25,8 @@ namespace ui {
 /// @param state         Shared UI state; mutated on tile click and pan/zoom.
 /// @param reg           Recipe / economy registry — read where a lens or marker needs
 ///                      to value outputs and recipes.
-/// @param report        Most recent economy-step report — the Industry lens reads
-///                      per-building output quantities from it.
+/// @param report        Most recent economy-step report — the hover card and the
+///                      Logistic Points reads take it.
 /// @param gen           The world's generation report (app::m_generation_report) — the
 ///                      Continent lens reads the active body's retained plate field from
 ///                      it. Presentation data, matched by body name (BL-226); the same

@@ -19,8 +19,7 @@
 --      turning into 1 px noise on a 7 px hex
 --   P5..P9 the per-lens reduction table (PLANETARY.md § Province grain) actually
 --      rendering. EVERY lens must still draw. Resource blends; Country and
---      Continent deliberately REFUSE to blend (categorical fields); Industry
---      reduces to a per-province SUM filled uniformly; Production refuses.
+--      Continent deliberately REFUSE to blend (categorical fields); Production refuses.
 --
 -- Run with: ProjectIo --verify scripts/verify/province_render.lua
 
@@ -73,9 +72,6 @@ verify.capture("province_lens_resource")
 
 verify.set_overlay("continent")    -- REFUSES (categorical: plate)
 verify.capture("province_lens_continent")
-
-verify.set_overlay("industry")     -- PROVINCE SUM, filled uniformly
-verify.capture("province_lens_industry")
 
 verify.set_overlay("market")       -- no reduction needed (catchment is coarser)
 verify.capture("province_lens_market")
