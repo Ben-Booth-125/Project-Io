@@ -192,10 +192,13 @@ verify.set_overlay("none")
 verify.clear_selection()
 local n1 = press(built_col, built_row)
 local n2 = press(built_col, built_row)
-verify.expect(n1.selection_kind == "building",
-              "no lens: the first press on a built tile still gives the building")
-verify.expect(n2.selection_kind ~= n1.selection_kind,
-              "no lens: the repeat-click cycle still advances off the building")
+-- SELECTION.md § Tile repeat-click selection cycle: a building hit lands on its
+-- TILE (§ Multi-building tiles, round 2), and the repeat press reaches the
+-- building rung. BL-1489 (no-lens first press): this asserted the pre-round-2 order.
+verify.expect(n1.selection_kind == "tile",
+              "no lens: the first press on a built tile lands on the tile")
+verify.expect(n2.selection_kind == "building",
+              "no lens: the repeat-click cycle advances to the building")
 
 -- ---------------------------------------------------------------------------
 -- BL-664 R4 — the owner's ground, under the Nations lens (BL-1406: the

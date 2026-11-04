@@ -758,6 +758,52 @@
    ],
    "title": "Retire the Industry lens",
    "design": "Ben, 2026-11-04, after a live click: \"we can remove the industry lens, it's not that informative.\" The Rival industry amber tint, its key and its strip slot go; the overlay_mode slot is kept as retired_industry_ (never drawn, skipped by the cycle, loads as none) because the save's view bindings hold the enum's integer. The factory glyph stays: rail slot 3 (Construction) wears it. Check: lens_modes, lens_one_tier, logistics_lens, province_render, text_overflow_floor pass; a live click shows no Industry slot on the Planetary strip."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-04",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-04: \"File both\")",
+   "requires": [],
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1489",
+   "short_name": "NO_LENS_FIRST_PRESS",
+   "authority_doc": "docs/ui/SELECTION.md",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "scripts/verify/lens_one_tier.lua"
+   ],
+   "title": "With no lens, the first press on a built tile gives the tile, not the building",
+   "design": "Found 2026-11-04 merging BL-1488 (Industry lens retired); fails identically on b2b2502b without it. lens_one_tier.lua's no-lens block: the first press on a built tile returns n1=tile, n2=building - the click cycle lands one step late. SELECTION.md's click model owns the order. Check: lens_one_tier passes; selection_go_to and the click scripts stay green."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-04",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-04: \"File both\")",
+   "requires": [],
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1490",
+   "short_name": "PROVINCE_RESOURCE_CLIP",
+   "authority_doc": "docs/ui/SELECTION.md",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "scripts/verify/text_overflow_floor.lua"
+   ],
+   "title": "The province card's resource names clip to 4 px",
+   "design": "Found 2026-11-04 merging BL-1488 (Industry lens retired); fails identically on b2b2502b without it. text_overflow_floor: 13 selection.province.resource names (Iron Ore 57 px needed, Rare Earth Ore 103 px) get 4 px on the overflow_shell and overflow_selection_building frames. Check: text_overflow_floor passes with no floor lowered."
   }
  ]
 }
