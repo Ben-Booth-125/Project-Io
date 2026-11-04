@@ -319,7 +319,7 @@
     "tools/verify/market_viability.cpp"
    ],
    "title": "After construction capacity: processors finish faster than their inputs; G1 at tick 50 under its gate",
-   "design": "Ben, 2026-10-27: merge BL-1438 (retire construction capacity), keep G1t50 at 85, and treat the new starvation and decommissions as follow-on work. market_viability FULL on main at 9503aa06: G1 92.9, G1t50 78.9 (FAIL; 2106/2668), G1b 3.1, G2 186.3, G3 100.0. In the lane's 16-seed tick-50 totals, processors built 1446 -> 2762, running 1269 -> 2195, input-starved 32 -> 158, decommissioned 54 -> 209. Measure first: which recipes starve, which inputs are short, and whether the scorer now over-builds processors ahead of their extractors (no capacity throttle remains). Fix the cause in the world (input supply, build sequencing by the scorer); never lower the gate or clamp builds to pass it. CARRIED to sprint 59 (Ben, 2026-10-28: cut with G1t50 failing). Main at 302bba15: market_viability FULL G1 93.3 G1t50 79.8 (FAIL) G1b 2.8 G2 191.0 G3 100.0 after the own-market ceiling rule. The remaining gap: power plants over-built into glutted grids (the held bl1232 scorer gate), state buildings left unfunded, remote spare the trade pass does not move, household goods priced over the ceiling; construction draws push steel over the ceiling where steel-using plants stand. MEASURED (main 2f697f80, 2026-11-03, market_viability full --dump-t50): G1t50 82.6 (1830/2215); 53 more running plants clear 85. The 385 not running: input-starved 156 (refined copper <- copper ore 27, atmospheric propellant <- refined fuel 25, consumer goods <- food rations 24, silicon <- silica 11, hydroponics <- water 9, food rations <- agricultural produce 9); decommissioned 124 (65 after starving - consumer goods 17, propellant 8, electronics 8, machinery 7; 43 while RUNNING - oil power plant 17, hydroponics 8, coal power plant 7: the loss reflex idling plants that produce, i.e. glutted power and water); other 61, of which 19 STEEL plants never filed a report row since the build (a lead: a steel recipe or placement the report never covers); no labour 44 (steel 14, refined fuel 8). Not a construction artefact: 139 sites still building at tick 50 are outside the denominator already. Leads in order: (1) why 19+6 steel plants file no row; (2) the intermediate chains copper ore, refined fuel and food rations under-supplied to their consumers - the scorer building consumers ahead of the feeder; (3) power plants over-built into glutted grids, killed by the loss reflex (the held bl1232 scorer gate)."
+   "design": "Ben, 2026-10-27: merge BL-1438 (retire construction capacity), keep G1t50 at 85, and treat the new starvation and decommissions as follow-on work. market_viability FULL on main at 9503aa06: G1 92.9, G1t50 78.9 (FAIL; 2106/2668), G1b 3.1, G2 186.3, G3 100.0. In the lane's 16-seed tick-50 totals, processors built 1446 -> 2762, running 1269 -> 2195, input-starved 32 -> 158, decommissioned 54 -> 209. Measure first: which recipes starve, which inputs are short, and whether the scorer now over-builds processors ahead of their extractors (no capacity throttle remains). Fix the cause in the world (input supply, build sequencing by the scorer); never lower the gate or clamp builds to pass it. CARRIED to sprint 59 (Ben, 2026-10-28: cut with G1t50 failing). Main at 302bba15: market_viability FULL G1 93.3 G1t50 79.8 (FAIL) G1b 2.8 G2 191.0 G3 100.0 after the own-market ceiling rule. The remaining gap: power plants over-built into glutted grids (the held bl1232 scorer gate), state buildings left unfunded, remote spare the trade pass does not move, household goods priced over the ceiling; construction draws push steel over the ceiling where steel-using plants stand. MEASURED (main 2f697f80, 2026-11-03, market_viability full --dump-t50): G1t50 82.6 (1830/2215); 53 more running plants clear 85. The 385 not running: input-starved 156 (refined copper <- copper ore 27, atmospheric propellant <- refined fuel 25, consumer goods <- food rations 24, silicon <- silica 11, hydroponics <- water 9, food rations <- agricultural produce 9); decommissioned 124 (65 after starving - consumer goods 17, propellant 8, electronics 8, machinery 7; 43 while RUNNING - oil power plant 17, hydroponics 8, coal power plant 7: the loss reflex idling plants that produce, i.e. glutted power and water); other 61, of which 19 STEEL plants never filed a report row since the build (a lead: a steel recipe or placement the report never covers); no labour 44 (steel 14, refined fuel 8). Not a construction artefact: 139 sites still building at tick 50 are outside the denominator already. Leads in order: (1) why 19+6 steel plants file no row; (2) the intermediate chains copper ore, refined fuel and food rations under-supplied to their consumers - the scorer building consumers ahead of the feeder; (3) power plants over-built into glutted grids, killed by the loss reflex (the held bl1232 scorer gate). RULED (Ben, 2026-11-04, starvation form): the G1t50 gate is re-ruled to 84 (trajectory noise about +/-1 point); the run reserve and the pending-supply forecast land as corrected estimates; the power grid gate goes to BL-1485 (power grid measure); the glut veto ratio stays 2.0; the broke-nation spiral is BL-1482."
   },
   {
    "status": "proposed",
@@ -779,6 +779,54 @@
    ],
    "title": "unit_upkeep U6d/U6e fail: unit strength no longer reads supply",
    "design": "Found in sprint 61 gating, 2026-11-03: U6d (half supply halves strength) and U6e (an unsupplied unit is strictly weaker) fail; unit_strength no longer reads supply. MILITARY.md decides which is right: if supply still scales strength, restore the read; if the rule moved, the doc and the check move together on Ben's call."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-04",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, starvation form, 2026-11-04)",
+   "requires": [],
+   "id": "BL-1485",
+   "short_name": "POWER_GRID_MEASURE",
+   "category": "AI",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "priority": "B",
+   "difficulty": 3,
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corporation_generation.cpp",
+    "docs/ai/AI_OPPONENT.md",
+    "docs/economy/PRODUCTION.md"
+   ],
+   "title": "The power-plant candidate's grid gate reads a measure that catches the glut",
+   "design": "Ben, 2026-11-04 (starvation form): fix the measure, keep the rule. AI_OPPONENT.md (\"A power-plant candidate is priced against its grid's shortfall\") and PRODUCTION.md state a per-grid power gate the scorer does not run. Measured on 16 seeds 2026-11-03 (BL-1442, post-capacity starvation) the charter walk's body_power_grid_gap admits the glutting builds, because it reads need as upkeep need while supply runs 3-4x demand and power prices at 0.55-0.73 of base. The measure must read the grid's actual draw against its output (listed and pending). The gate's code is in the scratchpad patch bl1442_scorer_measured_not_landed.patch (the hunks citing BL-1232). Check: market_viability full tier, play-built power plants and decommissioned power at tick 50 against the 2026-11-04 baseline; determinism."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-04",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, starvation form, 2026-11-04)",
+   "requires": [],
+   "id": "BL-1486",
+   "short_name": "KIT_RESEARCH_WORTH",
+   "category": "AI",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "priority": "B",
+   "difficulty": 2,
+   "files": [
+    "src/world/nation_tech.cpp",
+    "tools/verify/nation_tech_harness.cpp"
+   ],
+   "title": "A rival's research scorer counts the kit a node opens",
+   "design": "Ben, 2026-11-04 (starvation form): granted, written into AI_OPPONENT.md § 11 (\"A node that opens kit is worth that kit\"). Today the scorer gives unlock_kit effects no worth, so rivals reach kit only on the way to other nodes (BL-1436, kit in the age tree). Weight the opened items by the nation's own military_research budget line and the units it fields. Check: nation_tech_harness (a kit node outranks an equal-cost node with no effect for a nation fielding units), research medians, determinism."
   }
  ]
 }
