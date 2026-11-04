@@ -804,6 +804,31 @@
    ],
    "title": "The province card's resource names clip to 4 px",
    "design": "Found 2026-11-04 merging BL-1488 (Industry lens retired); fails identically on b2b2502b without it. text_overflow_floor: 13 selection.province.resource names (Iron Ore 57 px needed, Rare Earth Ore 103 px) get 4 px on the overflow_shell and overflow_selection_building frames. Check: text_overflow_floor passes with no floor lowered."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-04",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-04: \"Accept it\")",
+   "requires": [
+    "BL-1486"
+   ],
+   "id": "BL-1491",
+   "short_name": "KIT_PULL_PAIRS",
+   "category": "AI",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "priority": "C",
+   "difficulty": 2,
+   "files": [
+    "src/world/nation_ai.cpp",
+    "tools/verify/nation_tech_harness.cpp"
+   ],
+   "title": "With kit worth, no rival takes a pick-one pair by year 20",
+   "design": "Ben, 2026-11-04 (on BL-1486, kit research worth): ACCEPTED as the honest result of the grant. Every kit node is pair-free, so kit worth summed through reach (choose_research_node) pulls each rival onto kit branches; the R7 age sweep (--ai 20 --age-only --seeds 4) took no pick-one pair by year 20 (8 nations took DG-ST-AC-Ab before). R7c was made honest (fails when no pair is taken) and now FAILS; it is a calibration reading, not a defect to fix around. Re-read it when the research dials are next calibrated: whether pairs should appear by year 20, and if so what moves them (cold review: the kit term mostly acts through reach, and the units half of the weight saturates at ~16 groups, so the military_research axis is weakly expressed; a kit item is a catalogue row per unit class, so one rifle on three chassis counts 3)."
   }
  ]
 }
