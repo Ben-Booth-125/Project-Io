@@ -199,12 +199,14 @@ int main(int argc, char** argv)
     int quarters = 20;
     const char* kit_override = nullptr;
     bool diagnose_idle = false;
+    bool no_logistics_cap = false;
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) seeds = parse_ints(argv[++i], ',');
         else if (!std::strcmp(argv[i], "--quarters") && i + 1 < argc) quarters = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--kit") && i + 1 < argc) kit_override = argv[++i];
         else if (!std::strcmp(argv[i], "--diagnose-idle")) diagnose_idle = true;
+        else if (!std::strcmp(argv[i], "--no-logistics-cap")) no_logistics_cap = true;
         else if (!std::strcmp(argv[i], "--pairs") && i + 1 < argc)
         {
             pairs.clear();
@@ -223,7 +225,7 @@ int main(int argc, char** argv)
         }
         else
         {
-            std::fprintf(stderr, "usage: opening_parity [--seeds a,b] [--pairs 20:4,30:4] [--quarters N] [--kit <name>|none]\n");
+            std::fprintf(stderr, "usage: opening_parity [--seeds a,b] [--pairs 20:4,30:4] [--quarters N] [--kit <name>|none] [--diagnose-idle] [--no-logistics-cap]\n");
             return 2;
         }
     }
@@ -244,6 +246,10 @@ int main(int argc, char** argv)
             return 2;
         }
     }
+    // BL-1473 R4: the kit with its logistics counts lifted, so the nodes the history and
+    // the fold left all stand - the control the cap's cover is read against.
+    if (no_logistics_cap)
+        for (auto& [name, kc] : cfg.opening_kit.configs) { (void)name; kc.hubs = kc.stations = kc.ports = -1; }
     lua.load("scripts/works.lua");
     works.load_from_lua(lua);
     lua.load("scripts/recipes.lua");
@@ -284,7 +290,7 @@ int main(int argc, char** argv)
             for (const entity_id nid : majors) at_handoff[nid] = read_nation(w, nid, w.nations.at(nid), force);
             // BL-1473: the major's Logistic Point consumers without cover at the handoff.
             std::map<entity_id, int> uncovered;
-            for (const entity_id nid : majors) uncovered[nid] = count_uncovered_buildings(w, nid);
+            for (const entity_id nid : majors) uncovered[nid] = count_uncovered_buildings(w, nid, true);
             // BL-1473 R4: which idled buildings at the handoff are kit slots, by kit category,
             // and the rest (logistics nodes, military, anything the kit did not lay).
             auto kit_idled = [&](entity_id nid, int out[4]) {

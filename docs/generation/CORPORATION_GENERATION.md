@@ -446,9 +446,20 @@ A slot nothing on the ladder can place stays unbuilt and is recorded on the gene
 slot and reason, as a measured fact of that ground. Nothing is minted for it.
 
 **Logistics slots count the standing nodes, and the count is a cap (Ben, 2026-11-03).** The ports, stations and hubs the history and the fold
-left on a major's ground fill its logistics slots first, in the order the Logistic Point seeding
-lays them out from the capital (`../economy/LOGISTICS.md` § Where generation puts the sources). The
-seeding lays any slot still open, and a node beyond the slot count is taken up. Roads and track
+left on a major's ground fill its logistics slots first. **The nodes that cover the kit come first
+(Ben, 2026-11-04).** The standing node that brings the most kit buildings under Logistic Point cover
+is kept, again and again while one adds any. Cover is read over the kept nodes alone, on the chain to
+the capital. A kit building the cap strands has no cover, so it runs at zero output and idles. The
+remaining slots fill in the order the Logistic Point seeding lays them out from the capital
+(`../economy/LOGISTICS.md` § Where generation puts the sources). The seeding lays any slot still
+open, and a node beyond the slot count is taken up.
+
+**The kit stands within the capped network's reach (Ben, 2026-11-04).** A kit extractor or processor
+the cap leaves without cover is laid again on covered ground of the major's. An extractor digs the
+same good on the same tier, by `place_extractor`'s ranking. A processor runs the same recipe on the
+covered tile nearest its old site that admits it and passes Pass 3. Extractors move first, so a
+moved processor reads its feed where it now stands. A building no covered tile takes stays where it
+stood, and the generation report counts it. Roads and track
 stay as the history left them.
 
 **Opening stock follows the kit.** § Pass 4b's stock is generated once per kit category (extraction

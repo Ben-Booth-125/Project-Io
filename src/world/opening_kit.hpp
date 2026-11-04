@@ -51,9 +51,12 @@ struct opening_kit_major
     // THE LOGISTICS CAP (`cap_major_logistics`), after the Logistic Point seeding.
     int nodes_source  = 0; ///< nodes on the capital tile, kept as the capital's source
     int nodes_kept    = 0; ///< hubs, stations and ports kept in slot
+    int nodes_for_kit = 0; ///< of those, kept first for the kit buildings they cover
     int nodes_taken   = 0; ///< taken up beyond the count
     int nodes_laid    = 0; ///< laid into a slot the seeding left open
     int nodes_open    = 0; ///< slots left open (nothing on the ladder places)
+    int resited       = 0; ///< kit buildings the cap left uncovered, laid again on covered ground
+    int resite_failed = 0; ///< of those, ones no covered tile took (they stay where they stood)
     int uncovered     = 0; ///< the nation's buildings without Logistic Point cover after the cap
     std::string logistics_note;
 };
@@ -89,8 +92,9 @@ void print_opening_kit(const opening_kit_report& r);
 
 /// THE LOGISTICS CAP (CORPORATION_GENERATION.md § A major's opening kit, "the count is
 /// a cap", Ben 2026-11-03). Run after `seed_logistics_sources`. On each major's ground
-/// the nodes on the capital tile stay as its source; the other ports, stations and
-/// hubs are walked in the order the seeding lays out from the capital (road chain
+/// the nodes on the capital tile stay as its source. Then the standing node that brings
+/// the most kit buildings under cover is kept, repeatedly, while one adds any (Ben,
+/// 2026-11-04); the other ports, stations and hubs are walked in the order the seeding lays out from the capital (road chain
 /// distance from the capital, unreached last, then tile id, then building id) and
 /// each kept while its type's count has room, the rest taken up. A slot still open
 /// is laid nearest the capital where placement allows, down its ladder (a port on
@@ -116,4 +120,7 @@ void release_kit_foundings(world& w, state_handover_report& handover);
 
 /// A nation's buildings standing without Logistic Point cover: every Logistic
 /// Point consumer it owns whose tile reads coverage 0 from its running sources.
-int count_uncovered_buildings(world& w, entity_id nation);
+/// @param include_idled Also count a standing extraction site or processor the
+///        settle idled or the state left unfunded - the ones a lack of cover idles,
+///        which `lp_consumer` no longer counts (BL-1473 R4).
+int count_uncovered_buildings(world& w, entity_id nation, bool include_idled = false);

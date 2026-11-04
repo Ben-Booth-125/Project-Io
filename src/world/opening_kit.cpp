@@ -20,6 +20,7 @@
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -1064,6 +1065,149 @@ const char* node_name(int slot)
 constexpr building_type k_node_type[3] = { building_type::port, building_type::railway_station,
                                            building_type::inland_logistics_hub };
 
+/// How many covered candidate tiles a processor's re-site tries before it gives up:
+/// each try authors the plant and runs the Pass 3 chain test there.
+constexpr std::size_t k_resite_processor_tries = 48;
+
+/// KIT WITHIN REACH (Ben, 2026-11-04: "Place within reach too"). The kit is laid
+/// against the network the history left; the cap then takes most of it up. Each kit
+/// extractor or processor the capped network leaves without cover is taken up and
+/// laid again on covered ground of the major's: an extractor digging the same good on
+/// the same tier (spread before stack, then richness x cover or habitability, then the
+/// richer, then the lower tile id, `place_extractor`'s ranking); a processor running
+/// the same recipe on the covered tile nearest its old site that admits it and where
+/// it passes Pass 3 (`chain_recipe_placeable`: chain-feasible and sized to spare
+/// input). Extractors first, so a moved processor reads its feed where it now stands.
+/// A building no covered tile takes stays where it is, counted.
+void resite_uncovered_kit(world& w, const recipe_registry& reg, opening_kit_report& rep)
+{
+    gen_occupancy occ;
+    for (const auto& [bid, b] : w.buildings) // additive counts: order-free
+        occ.add(b);
+    lp_reach_memo memo; // the sources do not change below: one memo for the pass
+    const auto covered_at = [&](entity_id tid) { return lp_coverage_at(w, memo, tid); };
+
+    for (opening_kit_major& m : rep.per_major)
+    {
+        const auto nit = w.nations.find(m.nation);
+        if (nit == w.nations.end())
+            continue;
+        const major_ground g = ground_of(w, m.nation, nit->second);
+        if (g.body == null_entity)
+            continue;
+        std::vector<entity_id> own;
+        for (const opening_kit_slot_record& r : m.slots)
+            if (r.building != null_entity)
+                own.push_back(r.building);
+
+        const auto rebind = [&](opening_kit_slot_record& r, entity_id fresh) {
+            std::replace(own.begin(), own.end(), r.building, fresh);
+            r.building = fresh;
+            r.note += r.note.empty() ? "re-sited within reach" : "; re-sited within reach";
+            ++m.resited;
+        };
+
+        for (int pass = 0; pass < 2; ++pass)
+            for (opening_kit_slot_record& r : m.slots)
+            {
+                const auto bit = w.buildings.find(r.building);
+                if (bit == w.buildings.end() || !lp_consumer(bit->second)
+                    || covered_at(bit->second.tile) > 0.0f)
+                    continue;
+                const building_component old = bit->second;
+                if (pass == 0 && old.type == building_type::extraction_site)
+                {
+                    const resource_type good = old.target_resource;
+                    const dig_site tier = dig_site_of(w, old.tile, w.tiles.at(old.tile), good);
+                    struct cand { int stacked; float key; float rich; entity_id tid; };
+                    std::vector<cand> cs;
+                    for (const entity_id tid : g.tiles)
+                    {
+                        const tile_component& tc = w.tiles.at(tid);
+                        if (dig_site_of(w, tid, tc, good) != tier
+                            || !occ.has_room(tc, tid, building_type::extraction_site, good))
+                            continue;
+                        const float cover = covered_at(tid);
+                        if (!(cover > 0.0f))
+                            continue;
+                        const float rich = tc.resource_deposit[static_cast<std::size_t>(good)];
+                        cs.push_back({ occ.extraction_on(tid, good) > 0 ? 1 : 0,
+                                       tier == dig_site::deposit ? rich * cover : tc.habitability,
+                                       rich, tid });
+                    }
+                    if (cs.empty())
+                    {
+                        ++m.resite_failed;
+                        continue;
+                    }
+                    std::sort(cs.begin(), cs.end(), [](const cand& a, const cand& b) {
+                        if (a.stacked != b.stacked) return a.stacked < b.stacked;
+                        if (a.key != b.key)         return a.key > b.key;
+                        if (a.rich != b.rich)       return a.rich > b.rich;
+                        return a.tid < b.tid;
+                    });
+                    chain_unplace(w, r.building, occ);
+                    const entity_id fresh =
+                        author_building(w, cs.front().tid, building_type::extraction_site, occ, &good);
+                    w.nations.at(m.nation).state_assets.push_back(fresh);
+                    rebind(r, fresh);
+                }
+                else if (pass == 1 && old.type == building_type::processing_facility)
+                {
+                    const recipe* rc = reg.get_recipe(old.recipe);
+                    if (rc == nullptr)
+                        continue;
+                    const placement_gate gate =
+                        reg.placement_gate_for(building_type::processing_facility, old.recipe);
+                    // Take the old plant up first, so its own stack slot and its draw on
+                    // its feed are free for the test; it is laid back if nothing takes it.
+                    const entity_id old_tile = old.tile;
+                    chain_unplace(w, r.building, occ);
+                    input_reach cr = make_input_reach(w, reg);
+                    entity_id fresh = null_entity;
+                    std::size_t tries = 0;
+                    for (const entity_id tid : tiles_nearest(w, g, old_tile))
+                    {
+                        if (tries >= k_resite_processor_tries)
+                            break;
+                        const tile_component& tc = w.tiles.at(tid);
+                        if (!placement_rules::can_place(tc, building_type::processing_facility, k_no_target)
+                            || !occ.has_room(tc, tid, building_type::processing_facility, k_no_target)
+                            || !(covered_at(tid) > 0.0f)
+                            || !placement_rules::can_place_in_world(w, tid, building_type::processing_facility,
+                                                                    k_no_target, -1.0f, null_entity, gate))
+                            continue;
+                        ++tries;
+                        const entity_id bid = author_building(w, tid, building_type::processing_facility, occ);
+                        w.buildings.at(bid).recipe = old.recipe;
+                        chain_begin_decision(w, reg, cr);
+                        if (chain_recipe_placeable(w, reg, cr, bid, market_for_tile(w, tid), *rc, &own)
+                            != chain_tier_none)
+                        {
+                            fresh = bid;
+                            break;
+                        }
+                        chain_unplace(w, bid, occ);
+                    }
+                    if (fresh == null_entity)
+                    {
+                        // Nothing covered takes it: the plant stands again where it stood.
+                        fresh = author_building(w, old_tile, building_type::processing_facility, occ);
+                        w.buildings.at(fresh).recipe = old.recipe;
+                        w.nations.at(m.nation).state_assets.push_back(fresh);
+                        std::replace(own.begin(), own.end(), r.building, fresh);
+                        r.building = fresh;
+                        ++m.resite_failed;
+                        continue;
+                    }
+                    w.nations.at(m.nation).state_assets.push_back(fresh);
+                    rebind(r, fresh);
+                }
+            }
+    }
+    invalidate_logistics_caches(w);
+}
+
 } // namespace
 
 void release_kit_foundings(world& w, state_handover_report& handover)
@@ -1084,7 +1228,7 @@ void release_kit_foundings(world& w, state_handover_report& handover)
         release(p.nation, p.building, p.paid);
 }
 
-int count_uncovered_buildings(world& w, entity_id nation)
+int count_uncovered_buildings(world& w, entity_id nation, bool include_idled)
 {
     const auto nit = w.nations.find(nation);
     if (nit == w.nations.end())
@@ -1096,7 +1240,13 @@ int count_uncovered_buildings(world& w, entity_id nation)
     for (const entity_id bid : bids)
     {
         const auto bit = w.buildings.find(bid);
-        if (bit == w.buildings.end() || !lp_consumer(bit->second))
+        if (bit == w.buildings.end())
+            continue;
+        const building_component& b = bit->second;
+        const bool idled_consumer = include_idled && b.ticks_remaining <= 0
+            && (b.type == building_type::extraction_site
+                || b.type == building_type::processing_facility);
+        if (!lp_consumer(b) && !idled_consumer)
             continue;
         if (!(lp_coverage_at(w, memo, bit->second.tile) > 0.0f))
             ++n;
@@ -1145,14 +1295,151 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
         int filled[3] = { 0, 0, 0 };
         std::vector<char> used(nodes.size(), 0);
         for (std::size_t i = 0; i < nodes.size(); ++i)
-        {
-            const node& n = nodes[i];
-            if (n.tile == g.capital)
+            if (nodes[i].tile == g.capital)
             {
                 ++m.nodes_source; // the capital's source: kept, outside the slots
                 used[i] = 1;
-                continue;
             }
+
+        // KIT COVER FIRST (Ben, 2026-11-04: "Keep covering nodes"): before the seeding's
+        // order fills the slots, the standing node that brings the most of the kit's
+        // buildings under cover is kept, again and again while one adds any, each into
+        // its own type's slot or, that full, the nearest slot up its ladder. Cover is read
+        // as `lp_route_to` reads it - a kept node's own reach touches the building and
+        // the node is on the chain to the capital - over the kept set alone, so the
+        // nodes about to be taken up count for nothing. Ties go to the seeding's order.
+        {
+            std::vector<entity_id> kit_tiles;
+            for (const opening_kit_slot_record& r : m.slots)
+                if (const auto bit = w.buildings.find(r.building);
+                    bit != w.buildings.end() && lp_consumer(bit->second))
+                    kit_tiles.push_back(bit->second.tile);
+            std::sort(kit_tiles.begin(), kit_tiles.end());
+            kit_tiles.erase(std::unique(kit_tiles.begin(), kit_tiles.end()), kit_tiles.end());
+
+            std::vector<lp_network> net(nodes.size(), lp_network::road);
+            std::vector<std::unordered_map<entity_id, float>> field(nodes.size());
+            for (std::size_t i = 0; i < nodes.size(); ++i)
+            {
+                (void)lp_source_network(w.buildings.at(nodes[i].bid).type, net[i]);
+                field[i] = lp_distance_field(w, g.body, net[i], { nodes[i].tile });
+            }
+            const auto reaches = [&](std::size_t i, entity_id tile) {
+                const auto d = field[i].find(tile);
+                return d != field[i].end() && lp_reach(net[i], d->second) > 0.0f;
+            };
+            // The kit tiles the set @p kept covers: the chain closed outward from the
+            // capital (a link counts either way, as `memo_chain`'s), then each tile any
+            // chained node reaches.
+            const auto covered = [&](const std::vector<std::size_t>& kept) {
+                std::vector<std::size_t> chain;
+                std::vector<char> in(kept.size(), 0);
+                for (bool grew = true; grew;)
+                {
+                    grew = false;
+                    for (std::size_t k = 0; k < kept.size(); ++k)
+                    {
+                        if (in[k])
+                            continue;
+                        const std::size_t i = kept[k];
+                        bool joins = reaches(i, g.capital);
+                        for (std::size_t c = 0; c < chain.size() && !joins; ++c)
+                            joins = reaches(i, nodes[chain[c]].tile) || reaches(chain[c], nodes[i].tile);
+                        if (!joins)
+                            continue;
+                        in[k] = 1;
+                        chain.push_back(i);
+                        grew = true;
+                    }
+                }
+                int n = 0;
+                for (const entity_id t : kit_tiles)
+                    for (const std::size_t i : chain)
+                        if (reaches(i, t)) { ++n; break; }
+                return n;
+            };
+            const auto slot_for = [&](std::size_t i) {
+                for (int s = nodes[i].slot; s >= 0; --s)
+                    if (filled[s] < count[s])
+                        return s;
+                return -1;
+            };
+            std::vector<std::size_t> kept;
+            for (std::size_t i = 0; i < nodes.size(); ++i)
+                if (used[i])
+                    kept.push_back(i);
+            int base = covered(kept);
+            for (;;)
+            {
+                std::size_t best = nodes.size();
+                int best_gain = 0;
+                for (std::size_t i = 0; i < nodes.size(); ++i)
+                {
+                    if (used[i] || slot_for(i) < 0)
+                        continue;
+                    kept.push_back(i);
+                    const int gain = covered(kept) - base;
+                    kept.pop_back();
+                    if (gain > best_gain)
+                    {
+                        best_gain = gain;
+                        best      = i;
+                    }
+                }
+                // No one node adds cover: a PAIR may, a bridge onto the chain and the node
+                // beyond it that reaches the kit (a bridge alone adds nothing). The pair
+                // adding the most is kept, both nodes, when the slots hold both.
+                std::size_t second = nodes.size();
+                if (best == nodes.size())
+                    for (std::size_t i = 0; i < nodes.size(); ++i)
+                    {
+                        if (used[i] || slot_for(i) < 0)
+                            continue;
+                        const int si = slot_for(i);
+                        ++filled[si];
+                        kept.push_back(i);
+                        for (std::size_t j = i + 1; j < nodes.size(); ++j)
+                        {
+                            if (used[j] || slot_for(j) < 0)
+                                continue;
+                            kept.push_back(j);
+                            const int gain = covered(kept) - base;
+                            kept.pop_back();
+                            if (gain > best_gain)
+                            {
+                                best_gain = gain;
+                                best      = i;
+                                second    = j;
+                            }
+                        }
+                        kept.pop_back();
+                        --filled[si];
+                    }
+                if (best == nodes.size())
+                    break;
+                for (const std::size_t pick : { best, second })
+                {
+                    if (pick == nodes.size())
+                        continue;
+                    const int s = slot_for(pick);
+                    ++filled[s];
+                    ++m.nodes_kept;
+                    ++m.nodes_for_kit;
+                    used[pick] = 1;
+                    kept.push_back(pick);
+                    if (s != nodes[pick].slot)
+                        m.logistics_note += std::string(" ") + node_name(s) + "<-standing "
+                                          + node_name(nodes[pick].slot);
+                }
+                base += best_gain;
+            }
+        }
+
+        for (std::size_t i = 0; i < nodes.size(); ++i)
+        {
+            const node& n = nodes[i];
+            if (used[i])
+                continue;
             if (filled[n.slot] < count[n.slot])
             {
                 ++filled[n.slot];
@@ -1262,6 +1549,7 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
             }
     }
     invalidate_logistics_caches(w);
+    resite_uncovered_kit(w, reg, rep);
     for (opening_kit_major& m : rep.per_major)
         m.uncovered = count_uncovered_buildings(w, m.nation);
     invalidate_logistics_caches(w);
@@ -1271,9 +1559,12 @@ void print_opening_kit_logistics(const opening_kit_report& r)
 {
     for (const opening_kit_major& m : r.per_major)
         std::printf("[opening_kit] logistics major %llu: capital source %d node(s); kept %d, "
-                    "taken up %d, laid %d, open %d;%s %d building(s) without cover after the cap\n",
+                    "(%d for the kit), taken up %d, laid %d, open %d;%s kit re-sited %d (%d stayed); "
+                    "%d building(s) without cover after the cap\n",
                     static_cast<unsigned long long>(m.nation), m.nodes_source, m.nodes_kept,
+                    m.nodes_for_kit,
                     m.nodes_taken, m.nodes_laid, m.nodes_open,
-                    m.logistics_note.empty() ? "" : m.logistics_note.c_str(), m.uncovered);
+                    m.logistics_note.empty() ? "" : m.logistics_note.c_str(), m.resited,
+                    m.resite_failed, m.uncovered);
     std::fflush(stdout);
 }
