@@ -607,6 +607,18 @@ construction on it**, and places nothing where that is not short. Blind to its o
 construction, the settle scorer started 11–13 plants on a grid needing one, most of which stalled
 and were decommissioned. Like the stack rank above, this is a corrected estimate inside the
 existing scorer grant (§ 11), not a new behaviour.
+**Own buildings live, every other building nominal (Ben, 2026-11-04; BL-1485, power grid
+measure).** The nation reads its own buildings as the grid runs them: their need is their actual
+draw, each at its output share, none for a building its funding gate idled or for the capital's
+free hub (`../economy/LOGISTICS.md`, "The capital's source runs free"), and their output is each
+of its generators at the rate its own staffing and supply run it, one under construction at the
+staffing construction gives it. Every other nation's buildings on the grid are read only as what is
+public of them — that they exist, their type and their recipe — at the nominal reading: a type's
+upkeep once complete, a recipe's output at the nominal run. No new read of another nation's state is
+taken. It is the same measure generation sizes power on (`../economy/PRODUCTION.md`). Read wholly
+nominally, the measure called grids short whose power supply ran 3–4× their demand, priced at
+0.55–0.73 of base. The candidate stands on its own nation's ground and asks only of the grid its own
+listings would feed.
 
 **The processing-facility candidate** (BL-439, AI builds processors) runs on the same score curve
 and the same solvency, glut and reserve-floor gates as the extraction candidate, and differs only

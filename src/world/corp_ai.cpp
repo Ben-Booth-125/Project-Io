@@ -3,6 +3,7 @@
 
 #include "budget_system.hpp"  // compute_building_opex, body_mean_habitability
 #include "construction.hpp"   // construction_capex (BL-1066: the scorer prices a build as the gate does)
+#include "corporation_generation.hpp" // body_power_grid_gap (BL-1485: the power candidate reads its grid's gap)
 #include "building_profit.hpp"
 #include "decision_trace.hpp"  // BL-704: opt-in streaming decision sink
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
@@ -2522,6 +2523,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         rank_extraction_sites(w, reg, p.top_k_sites_per_resource, demand_weight);
     static const std::vector<extraction_site> no_sites;
 
+    // BL-1485: whether power is sized per grid in this band, and one plant's
+    // output (the half-a-plant rule) - registry facts, read once per tick for
+    // the power-plant candidate's grid gate below.
+    const bool  power_per_grid     = power_sized_per_grid(reg);
+    const float power_plant_output = one_power_plant_output(reg);
+
     // BL-1187 (build only what runs): the reach context every processor
     // decision below asks "is this input obtainable here?" of — build, recipe
     // switch and resume alike. Built on first use and shared by every corp this
@@ -3052,6 +3059,37 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const float wf        = 0.5f; // construct_building staffs at 0.5, as above
             const float batches   = pe.base_rate * wf;
 
+            // BL-1485 (power grid measure; Ben, 2026-11-04: "fix the measure,
+            // keep the rule") under BL-1232 (power plants per grid;
+            // AI_OPPONENT.md, "A power-plant candidate is priced against its
+            // grid's shortfall"). Power moves only within its grid (LOGISTICS.md
+            // § 3a), so a generator is a candidate only where the grid its
+            // listings FEED is short: the grid's actual draw over the output of
+            // the plants feeding it, standing and under construction. The
+            // measure is the charter walk's own (`body_power_grid_gap`,
+            // corporation_generation.hpp), read as the grid runs - not a second
+            // copy. Without it the forecast never vetoes a power build: power
+            // carries no posted demand (its draw is an upkeep bid), so the glut
+            // test reads "a buyer exists" and stops there. Read fresh for each
+            // evaluating actor (an earlier actor's build this tick is a plant
+            // under construction by now), memoised per body for this actor
+            // only. The candidate stands on the actor's own ground, so the grid
+            // it asks after is the one its own listings would feed. Where power
+            // is not sized per grid nothing here is read.
+            std::map<entity_id, std::set<std::uint32_t>> short_grids_of;
+            const auto grid_is_short = [&](entity_id gbody, entity_id gtile) -> bool {
+                auto it = short_grids_of.find(gbody);
+                if (it == short_grids_of.end())
+                {
+                    std::set<std::uint32_t> grids;
+                    (void)body_power_grid_gap(w, reg, gbody, power_plant_output, grids, nullptr, nullptr,
+                                              actor.is_nation ? actor.id : null_entity); // own buildings live
+                    it = short_grids_of.emplace(gbody, std::move(grids)).first;
+                }
+                const std::uint32_t g = tile_feed_power_grid(w, gtile); // the grid its listings feed
+                return g != 0 && it->second.count(g) != 0;
+            };
+
             for (const entity_id tile : own_tiles)
             {
                 if (std::binary_search(tiles_with_processor.begin(),
@@ -3128,6 +3166,13 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // The body's air (Ben, 2026-10-09): construct_building refuses
                     // a propellant route the body cannot run.
                     if (!recipe_runs_at_tile(w, *abs, tile))
+                        continue;
+                    // BL-1485: a generator only where its grid is short (above).
+                    // Inside the argmax, as the forecast veto is (BL-1227), so a
+                    // refused generator never claims its group's slot.
+                    if (power_per_grid
+                        && abs->outputs[static_cast<std::size_t>(resource_type::power)] > 0.0f
+                        && !grid_is_short(body, tile))
                         continue;
 
                     // INPUT ACCESS (BL-1187, build only what runs). A processor

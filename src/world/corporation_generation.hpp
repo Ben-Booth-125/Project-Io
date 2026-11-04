@@ -997,17 +997,22 @@ void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir
 /// BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per grid,
 /// not per body"; LOGISTICS.md § 3a). Generation's per-grid power measure: the
 /// charter walk sizes power on it. Exported so harnesses read the walk's own
-/// figure. (A scorer half that would also read it is HELD, Ben 2026-10-08, and
-/// kept on branch bl1232-scorer-gate.)
+/// figure; the play-time scorer's power-plant candidate (corp_ai.cpp, BL-1485;
+/// AI_OPPONENT.md, "A power-plant candidate is priced against its grid's
+/// shortfall") reads the same gap.
 ///
 /// `body_power_grid_gap`: @p body_id's power gap, the sum over its wired grids
-/// of max(0, need - output). Need is the operating buildings' power upkeep,
-/// keyed by each building's own tile grid (the draw side). Output is every
-/// non-decommissioned generator at the nominal rate, keyed by the grid its
-/// MARKET CENTRE is on (`tile_feed_power_grid`: where its listings land, the
-/// feed side) — plants UNDER CONSTRUCTION included, so a plant already started
-/// is counted as the supply it will be. A dark building neither draws nor
-/// feeds. A grid needing under half of @p plant_output is left to roads, not
+/// of max(0, draw - output). Draw is keyed by each building's own tile grid;
+/// output by the grid its MARKET CENTRE is on (`tile_feed_power_grid`: where
+/// its listings land, the feed side), plants UNDER CONSTRUCTION included, so a
+/// plant already started counts as the supply it will be. OWN BUILDINGS ONLY
+/// (BL-1485, Ben 2026-11-04): @p viewer's own buildings are read as the grid
+/// runs them — draw at output share, none for a building its funding gate
+/// idled or the capital's free source, plus any recipe draw; output at the
+/// generator's own staffing and supply factor, a site under construction at
+/// construction staffing. Every other building — all of them when @p viewer is
+/// null, as at generation — is read nominally: its type's upkeep once complete,
+/// its recipe at the nominal run. A dark building neither draws nor feeds. A grid needing under half of @p plant_output is left to roads, not
 /// counted. @p short_grids receives every counted (short) grid;
 /// @p unpowered_short, when given, the short grids no generator feeds at all
 /// (PRODUCTION.md, "Unpowered grids first", Ben 2026-10-08). @p need_output,
@@ -1017,7 +1022,8 @@ void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir
 float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_id,
                           float plant_output, std::set<std::uint32_t>& short_grids,
                           std::set<std::uint32_t>* unpowered_short = nullptr,
-                          std::map<std::uint32_t, std::pair<float, float>>* need_output = nullptr);
+                          std::map<std::uint32_t, std::pair<float, float>>* need_output = nullptr,
+                          entity_id viewer = null_entity);
 
 /// The grids a power firm may SERVE on @p body_id (into @p serve), and the
 /// body's power gap (returned, every short grid's, as `body_power_grid_gap`).
