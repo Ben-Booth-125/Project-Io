@@ -440,7 +440,7 @@
       "id": "62",
       "theme": "equal starts for majors",
       "state": "landed",
-      "status_line": "CLOSED 2026-11-04, no version cut (sprint 61 targets v0.3.0). Every major opens on the Rich-core kit, 12,000 credits and a fixed eight-unit army; the logistics cap keeps the nodes that cover the kit and re-sites what it strands; the kit stocks its processors' inputs. Treasury spread at 20:4 21x -> 1.63x; men spread 1.00x; no major loses money; 569 of 578 kit processors run. Wizard default 30 nations. Two re-pins; the third waits on Ben.",
+      "status_line": "CLOSED 2026-11-04, no version cut (sprint 61 targets v0.3.0). Every major opens on the Rich-core kit, 12,000 credits and a fixed eight-unit army; the logistics cap keeps the nodes that cover the kit and re-sites what it strands; the kit stocks its processors' inputs. Treasury spread at 20:4 21x -> 1.63x; men spread 1.00x; no major loses money; 569 of 578 kit processors run. Wizard default 30 nations. Three re-pins.",
       "opened_date": "2026-11-02",
       "author": "Ben (2026-11-02, starter-package form)",
       "goal": "Collapse the majors' opening treasury and buildings to roughly equal; asymmetry comes from land, population and neighbours.",
