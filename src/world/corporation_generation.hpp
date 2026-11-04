@@ -997,16 +997,20 @@ void add_prospective_draws(world& w, const recipe_registry& reg, input_reach& ir
 /// BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per grid,
 /// not per body"; LOGISTICS.md § 3a). Generation's per-grid power measure: the
 /// charter walk sizes power on it. Exported so harnesses read the walk's own
-/// figure. (A scorer half that would also read it is HELD, Ben 2026-10-08, and
-/// kept on branch bl1232-scorer-gate.)
+/// figure, and the play-time scorer's power-plant candidate reads the same gap
+/// (corp_ai.cpp, BL-1485; AI_OPPONENT.md, "A power-plant candidate is priced
+/// against its grid's shortfall").
 ///
 /// `body_power_grid_gap`: @p body_id's power gap, the sum over its wired grids
-/// of max(0, need - output). Need is the operating buildings' power upkeep,
-/// keyed by each building's own tile grid (the draw side). Output is every
-/// non-decommissioned generator at the nominal rate, keyed by the grid its
-/// MARKET CENTRE is on (`tile_feed_power_grid`: where its listings land, the
-/// feed side) — plants UNDER CONSTRUCTION included, so a plant already started
-/// is counted as the supply it will be. A dark building neither draws nor
+/// of max(0, draw - output), both read as the grid runs (BL-1485). Draw is the
+/// power the grid's operating buildings actually ask of it — upkeep at each
+/// building's output share, none for a building its funding gate idled or the
+/// capital's free source, plus any recipe draw — keyed by each building's own
+/// tile grid. Output is every non-decommissioned generator at the rate its own
+/// staffing and supply factor run it, keyed by the grid its MARKET CENTRE is on
+/// (`tile_feed_power_grid`: where its listings land, the feed side) — plants
+/// UNDER CONSTRUCTION included at their construction staffing, so a plant
+/// already started is counted as the supply it will be. A dark building neither draws nor
 /// feeds. A grid needing under half of @p plant_output is left to roads, not
 /// counted. @p short_grids receives every counted (short) grid;
 /// @p unpowered_short, when given, the short grids no generator feeds at all

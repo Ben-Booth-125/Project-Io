@@ -742,7 +742,10 @@ So power is:
 **Generation is sized per grid, not per body (Ben, 2026-10-07; BL-1232, power plants per grid).**
 Power moves only within a grid (`LOGISTICS.md` § 3a), so the world's generation is measured where
 it can be used: a body's power gap is the sum over its wired grids of `max(0, need − live output)`,
-and a power plant is placed in a short grid's provinces. A surplus on the core grid never cancels a
+and a power plant is placed in a short grid's provinces. Both are read as the grid runs (Ben,
+2026-11-04): the need is the grid's actual draw — its operating buildings' upkeep at their output
+share, none for a building its funding gate idled — and the output is each generator at its own
+staffing and supply factor, a plant under construction at the staffing construction gives it. A surplus on the core grid never cancels a
 deficit on another. A grid needing less than half of one plant's output is left to a road that
 joins it to a bigger one rather than given a plant of its own. **Unpowered grids first (Ben,
 2026-10-08):** the body's power plants — a capped number — go first to short grids with no

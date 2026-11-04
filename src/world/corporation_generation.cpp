@@ -17,6 +17,7 @@
 #include "world/history_sim.hpp"      // trade_record_cell — the retrofit's record (BL-1268)
 #include "world/world_gen_config.hpp" // trade_retrofit_params (BL-1268)
 #include "world/input_reach.hpp"   // the one reach rule (BL-1185 / BL-1187)
+#include "world/state_industry.hpp" // capital_free_source - the power measure's draw (BL-1485)
 #include "world/spawn_seat.hpp"    // repoint_player — enforce_chain_feasible_roster's seat
 #include "world/landscape_score.hpp" // market_terminals_closed — the champion floor (BL-1298)
 #include "world/market_saturation.hpp" // classify_resources, measure_market_balance
@@ -1855,22 +1856,41 @@ std::array<float, resource_count> body_upkeep_demand(const world& w, const recip
 
 // BL-1232: the per-grid power measure is generation's (the charter walk sizes
 // power on it). It is exported (corporation_generation.hpp) so harnesses read
-// the walk's own figure; the scorer half that would also read it is HELD (Ben,
-// 2026-10-08) and kept on branch bl1232-scorer-gate.
+// the walk's own figure, and the play-time scorer's power-plant candidate reads
+// it too (corp_ai.cpp, BL-1485).
 
 /// BL-1232 (power plants per grid; PRODUCTION.md, "Generation is sized per
 /// grid, not per body", Ben 2026-10-07): @p body_id's POWER GAP, read per wired
 /// grid (`tile_power_grid`, LOGISTICS.md § 3a) rather than across the body.
 /// Power moves only within a grid, so a surplus on one grid cannot cancel a
 /// deficit on another: the gap is the sum over the body's grids of
-/// max(0, need - output), where need is the operating buildings' power upkeep
-/// on the grid (`body_upkeep_demand`'s own eligibility and basket), keyed by
-/// the building's own tile grid, and output is the generators FEEDING the grid
-/// — keyed by their market centre's grid (`tile_feed_power_grid`), where their
-/// listings land — at `accumulate_body_production`'s nominal rate. A building
-/// in a dark province (grid 0) draws no power (economy_system.cpp, "no wire, no
-/// draw") and a generator whose market centre is dark feeds nothing, so
-/// neither counts. @p unpowered_short, when given, receives the short grids
+/// max(0, draw - output).
+///
+/// BL-1485 (power grid measure; Ben, 2026-11-04: "fix the measure, keep the
+/// rule"). Both sides are read as the grid RUNS, not as every building's
+/// basket says. Measured 2026-11-03 on the 16 library seeds: read as upkeep
+/// need against every plant at construction staffing, the measure called grids
+/// short whose power supply ran 3-4x their demand and priced at 0.55-0.73 of
+/// base, and the builds it admitted glutted them.
+///  - DRAW, keyed by the building's own tile grid: what `run_building_upkeep`
+///    asks of the grid - every complete building's power upkeep at its output
+///    share (the first-quarter proration), none for a building that draws
+///    nothing (a state building its funding gate idled, the capital's free
+///    source) - plus any recipe draw of power at the plant's staffing
+///    (`building_draw`).
+///  - OUTPUT, keyed by the grid the generator FEEDS (its market centre's grid,
+///    `tile_feed_power_grid`, where its listings land): every standing
+///    generator at the rate its own staffing and supply factor run it
+///    (`building_output`'s nominal reading) - a plant its gate idled this tick
+///    still stands as the grid's capacity - plus every generator UNDER
+///    CONSTRUCTION at the staffing construction gave it, read as if complete
+///    (`pending_plant_output`'s reading, corp_ai.cpp), so a plant already
+///    started is the supply it will be.
+/// A building in a dark province (grid 0) draws no power (economy_system.cpp,
+/// "no wire, no draw") and a generator whose market centre is dark feeds
+/// nothing, so neither counts. At generation every building stands as authored
+/// (half staffed at a full target, nothing idled), so there the reading is the
+/// nominal one. @p unpowered_short, when given, receives the short grids
 /// fed by no generator at all (Unpowered grids first, Ben 2026-10-08).
 ///
 /// A grid whose need is under HALF of one plant's output (@p plant_output: the
@@ -1894,7 +1914,6 @@ float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_i
     std::array<float, building_type_count> need_of{};
     for (std::size_t t = 0; t < building_type_count; ++t)
         need_of[t] = building_upkeep_goods(up, static_cast<building_type>(t), reg.era())[pw];
-    const float batches = nominal_processing_batches(reg);
 
     std::vector<entity_id> bids;
     bids.reserve(w.buildings.size());
@@ -1913,21 +1932,40 @@ float body_power_grid_gap(world& w, const recipe_registry& reg, entity_id body_i
     for (const entity_id bid : bids)
     {
         const building_component& b = w.buildings.at(bid);
-        // NEED is the draw side: a building draws on its OWN tile's grid.
+        // DRAW: a building draws on its OWN tile's grid, as run_building_upkeep
+        // bills it (BL-1485) - complete, not idled by its gate, not the
+        // capital's free source, at its output share; plus any recipe draw.
         if (const std::uint32_t g = tile_power_grid(w, b.tile);
-            g != 0 && b.ticks_remaining <= 0 && static_cast<std::size_t>(b.type) < building_type_count)
+            g != 0 && b.ticks_remaining <= 0 && static_cast<std::size_t>(b.type) < building_type_count
+            && !b.state_idle && !capital_free_source(w, bid))
         {
-            const float n = need_of[static_cast<std::size_t>(b.type)];
+            const float n = need_of[static_cast<std::size_t>(b.type)] * building_output_share(b)
+                          + building_draw(reg, b, pw);
             if (n > 0.0f)
                 grids[g].first += n;
         }
         // OUTPUT is the feed side (review round): a generator lists into its
         // tile's market, whose shelf is on the grid of the market's CENTRE
-        // (`tile_feed_power_grid`) — that is the grid it serves.
+        // (`tile_feed_power_grid`) — that is the grid it serves. BL-1485: at
+        // the rate it runs (its staffing and supply factor); a site under
+        // construction read as it will stand.
         if (b.type == building_type::processing_facility)
             if (const recipe* rcp = reg.get_recipe(b.recipe); rcp && rcp->outputs[pw] > 0.0f)
                 if (const std::uint32_t gf = tile_feed_power_grid(w, b.tile); gf != 0)
-                    grids[gf].second += batches * rcp->outputs[pw];
+                {
+                    float o = 0.0f;
+                    if (b.ticks_remaining > 0)
+                    {
+                        building_component done = b;
+                        done.ticks_remaining = 0;
+                        done.days_remaining  = 0;
+                        o = building_output(w, reg, bid, done, pw, nullptr);
+                    }
+                    else
+                        o = building_output(w, reg, bid, b, pw, nullptr);
+                    if (o > 0.0f)
+                        grids[gf].second += o;
+                }
     }
 
     if (need_output != nullptr)

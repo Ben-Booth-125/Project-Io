@@ -591,6 +591,12 @@ using shelf_snap_fwd = std::map<entity_id, std::array<float, resource_count>>;
 struct seed_reading
 {
     std::uint32_t seed = 0;
+    // BL-1485 / BL-1482 (reported, no target), read at play tick 50 unless named:
+    int pw_play_built = 0, pw_play_live = 0, pw_play_building = 0, pw_play_decom = 0;
+    int pw_decom_t50 = 0;     ///< every power plant decommissioned at t50, handoff ones included
+    int pw_broke20_t50 = 0;   ///< nations with a 20+ tick run at treasury < 1 by t50
+    int pw_broke20_end = 0;   ///< the same by the last play tick
+    int pw_nations = 0;
     bool   built = false;
     std::string fail;                  ///< non-empty: an honesty check failed
     proc_tally g1_handoff, g1_t50;
@@ -1420,6 +1426,15 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     std::uint32_t bg_max_id = max_convoy_id; // BG ship: its own watermark
     const std::array<float, resource_count>& bg_basket = reg.background_demand_basket();
     if (g_logistics) r.lg.assign(g_lg_ticks.size(), lg_reading{});
+    // BL-1485 / BL-1482 (reported, no target): power plants built in play and
+    // nations stuck at an empty treasury. A nation counts as broke on a tick when
+    // its treasury is under one credit; its longest broke run is kept per nation.
+    std::map<entity_id, int> broke_run, broke_max; // nation -> current / longest run (ticks)
+    const auto makes_power = [&](const building_component& b) {
+        if (b.type != building_type::processing_facility) return false;
+        const recipe* rc = reg.get_recipe(b.recipe);
+        return rc != nullptr && rc->outputs[static_cast<std::size_t>(resource_type::power)] > 0.0f;
+    };
     for (int k = 1; k <= ticks; ++k)
     {
         const int day = k * k_econ_tick_days;
@@ -1689,6 +1704,31 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
                 else ++r.b_live;
             }
         }
+        for (const auto& [nid, nc] : w.nations)
+        {
+            int& run = broke_run[nid];
+            run = nc.treasury < 1.0f ? run + 1 : 0;
+            int& mx = broke_max[nid];
+            mx = std::max(mx, run);
+        }
+        if (k == k_g1_g2_play_tick || k == ticks)
+        {
+            int n20 = 0;
+            for (const auto& [nid, mx] : broke_max) { (void)nid; if (mx >= 20) ++n20; }
+            (k == k_g1_g2_play_tick ? r.pw_broke20_t50 : r.pw_broke20_end) = n20;
+            r.pw_nations = static_cast<int>(w.nations.size());
+        }
+        if (k == k_g1_g2_play_tick)
+            for (const auto& [bid, b] : w.buildings)
+            {
+                if (!makes_power(b)) continue;
+                if (b.decommissioned) ++r.pw_decom_t50;
+                if (cohort.count(bid) != 0) continue;
+                ++r.pw_play_built;
+                if (b.decommissioned) ++r.pw_play_decom;
+                else if (b.ticks_remaining > 0) ++r.pw_play_building;
+                else ++r.pw_play_live;
+            }
         r.last_tick = k;
         r.bt_peak_live = std::max(r.bt_peak_live, static_cast<int>(w.battles.size()));
     }
@@ -1871,6 +1911,10 @@ int main(int argc, char** argv)
                     r.tap_lost ? "  (UPPER bound: exchange ring overflowed)" : "");
         std::printf("    buildings at tick 50: live %d  under construction %d  decommissioned %d\n",
                     r.b_live, r.b_build, r.b_decom);
+        std::printf("PW seed %u: play-built power plants at t50 %d (live %d, building %d, decommissioned %d);"
+                    " power plants decommissioned at t50 %d; nations broke 20+ ticks t50 %d end %d of %d\n",
+                    r.seed, r.pw_play_built, r.pw_play_live, r.pw_play_building, r.pw_play_decom,
+                    r.pw_decom_t50, r.pw_broke20_t50, r.pw_broke20_end, r.pw_nations);
         std::printf(" G5 processors idled in the settle or play ticks 1-%d: %d; came back by tick %d: %d (%.1f%%);"
                     " removed while idled: %d | play transitions: idled %d, resumed %d\n",
                     k_g5_idle_window, r.g5_idled, r.last_tick, r.g5_back,

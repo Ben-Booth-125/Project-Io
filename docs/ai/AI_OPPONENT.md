@@ -607,6 +607,14 @@ construction on it**, and places nothing where that is not short. Blind to its o
 construction, the settle scorer started 11–13 plants on a grid needing one, most of which stalled
 and were decommissioned. Like the stack rank above, this is a corrected estimate inside the
 existing scorer grant (§ 11), not a new behaviour.
+**Both sides are read as the grid runs (Ben, 2026-11-04; BL-1485, power grid measure).** The need
+is the grid's actual draw — what its operating buildings ask of it, each at its output share, none
+for a building its funding gate idled — and the live output is each generator at the rate its own
+staffing and supply run it; a plant under construction counts at the staffing construction gives
+it. It is the same measure generation sizes power on (`../economy/PRODUCTION.md`). Read instead as
+every building's upkeep basket against every plant at construction staffing, the measure called
+grids short whose power supply ran 3–4× their demand, priced at 0.55–0.73 of base. The candidate
+stands on its own nation's ground and asks only of the grid its own listings would feed.
 
 **The processing-facility candidate** (BL-439, AI builds processors) runs on the same score curve
 and the same solvency, glut and reserve-floor gates as the extraction candidate, and differs only
