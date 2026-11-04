@@ -34,7 +34,7 @@ shot("logistics_lens_full")
 
 -- Find the home body, then its largest city. Never hard-coded coordinates — the
 -- world moves under a generation change and a fixed pair silently frames empty
--- ground (the trap industry_lens.lua and settlement_labels.lua both record).
+-- ground (the trap settlement_labels.lua records).
 local home_body = nil
 for _, b in ipairs(verify.buildings()) do
   if b.player then home_body = b.body break end

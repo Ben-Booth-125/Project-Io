@@ -8,16 +8,16 @@
 
 ## Headline
 
-**116 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
+**115 elements. 2 committed goldens in the whole repo** (icon_silhouettes_overview.png, icon_silhouettes_supply_lens.png).
 
-**55 of 116 elements can be changed without any check going red.**
+**55 of 115 elements can be changed without any check going red.**
 That is the number that matters to a UI pass: the re-verification cost is near zero,
 and so is the safety net.
 
 | Class | Count | What green means |
 |---|---|---|
 | **GOLDEN** | 3 | A committed `scripts/verify/golden/*.png` diffs this element on every run. It fails by itself. |
-| **ASSERTED** | 58 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
+| **ASSERTED** | 57 | No golden, but a covering check calls `verify.expect` on real content. It fails by itself. |
 | **CLIP-ONLY** | 12 | The only assertion reaching it is `expect_no_clipping`. Green means "no string overran its box", not "this element is right". |
 | **CAPTURE-ONLY** | 35 | A check frames it and saves a PNG. Nothing fails. A human eye is the entire check. |
 | **NONE** | 8 | No verify script drives this element at all. |
@@ -30,7 +30,7 @@ and so is the safety net.
 | `UI-040` Lens system (overlay_mode family) > Supply lens | sub-element | `supply_lens`, `lens_modes`, `icon_silhouettes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-063` Icon vocabulary | element | `icon_silhouettes` | 0 | 0 | 0 |
 
-## ASSERTED (58)
+## ASSERTED (57)
 
 | Element | Kind | Covering checks | expect | clip | clicks |
 |---|---|---|---|---|---|
@@ -48,7 +48,6 @@ and so is the safety net.
 | `UI-034` Lens system (overlay_mode family) > Population lens | sub-element | `population_lens`, `population_legibility`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-037` Lens system (overlay_mode family) > Continent lens | sub-element | `continents_terrain`, `tile_texture`, `landform_relief`, `save_load`, `lens_strip_and_fields` | 11 | 0 | 3 |
 | `UI-038` Lens system (overlay_mode family) > Scarcity lens | sub-element | `scarcity_lens`, `lens_modes`, `lens_strip_and_fields` | 6 | 0 | 2 |
-| `UI-039` Lens system (overlay_mode family) > Industry lens | sub-element | `industry_lens`, `province_render`, `lens_strip_and_fields` | 5 | 0 | 0 |
 | `UI-041` Lens system (overlay_mode family) > Reach lens | sub-element | `lens_modes`, `lens_legend`, `province_render`, `lens_strip_and_fields` | 6 | 0 | 5 |
 | `UI-042` Lens system (overlay_mode family) > Supply-routes lens | sub-element | `lens_modes`, `province_render`, `lens_strip_and_fields` | 6 | 0 | 2 |
 | `UI-043` Selection band | element | `selection_band`, `selection_redesign`, `selection_bar`, `shell_pass`, `lens_one_tier`, `lens_region_destinations` | 27 | 1 | 3 |

@@ -23,7 +23,6 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::resource:    icons::resource   (dl, centre, r, colour); break;
         case overlay_mode::population:  icons::population (dl, centre, r, colour); break;
         case overlay_mode::scarcity:    icons::scarcity   (dl, centre, r, colour); break;
-        case overlay_mode::industry:    icons::industry   (dl, centre, r, colour); break;
         case overlay_mode::continent:   icons::continent  (dl, centre, r, colour); break;
         // Every lens carries its OWN glyph (Ben, 2026-10-07; LENSES.md § The strip
         // rotates with the rung): none borrows another lens's mark.
@@ -49,7 +48,6 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::resource:    return "Resource deposits";
         case overlay_mode::population:  return "Workforce efficiency";
         case overlay_mode::scarcity:    return "Market scarcity";
-        case overlay_mode::industry:    return "Industry density";
         case overlay_mode::continent:   return "Continents (tectonic plates)";
         case overlay_mode::reach:         return "Reach (commercial connectivity)";
         case overlay_mode::supply_routes: return "Supply-routes graph";
@@ -72,7 +70,6 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::resource:    return "Resource";
         case overlay_mode::population:  return "Population";
         case overlay_mode::scarcity:    return "Scarcity";
-        case overlay_mode::industry:    return "Industry";
         case overlay_mode::continent:   return "Continent";
         case overlay_mode::reach:         return "Reach";
         case overlay_mode::supply_routes: return "Supply routes";
@@ -114,8 +111,8 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
     // carries for its press.
     static constexpr overlay_mode planetary_modes[] = {
         overlay_mode::resource,    overlay_mode::market,
-        overlay_mode::scarcity,    overlay_mode::industry,
-        overlay_mode::population,  overlay_mode::continent,
+        overlay_mode::scarcity,    overlay_mode::population,
+        overlay_mode::continent,
         overlay_mode::throughput,  overlay_mode::trade_flow,
         overlay_mode::nations };
 

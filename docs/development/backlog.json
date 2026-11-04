@@ -827,6 +827,32 @@
    ],
    "title": "A rival's research scorer counts the kit a node opens",
    "design": "Ben, 2026-11-04 (starvation form): granted, written into AI_OPPONENT.md § 11 (\"A node that opens kit is worth that kit\"). Today the scorer gives unlock_kit effects no worth, so rivals reach kit only on the way to other nodes (BL-1436, kit in the age tree). Weight the opened items by the nation's own military_research budget line and the units it fields. Check: nation_tech_harness (a kit node outranks an equal-cost node with no effect for a nation fielding units), research medians, determinism."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-04",
+   "parked": false,
+   "blocked_on": null,
+   "author": "ui-dev lane (Ben, live click, 2026-11-04)",
+   "requires": [],
+   "id": "BL-1487",
+   "short_name": "INDUSTRY_LENS_RETIRED",
+   "category": "UI",
+   "authority_doc": "docs/ui/LENSES.md",
+   "priority": "B",
+   "difficulty": 1,
+   "files": [
+    "src/ui/ui_state.hpp",
+    "src/ui/overlay.cpp",
+    "src/ui/body_surface_canvas.cpp",
+    "src/core/verify_api.cpp",
+    "docs/ui/LENSES.md"
+   ],
+   "title": "Retire the Industry lens",
+   "design": "Ben, 2026-11-04, after a live click: \"we can remove the industry lens, it's not that informative.\" The Rival industry amber tint, its key and its strip slot go; the overlay_mode slot is kept as retired_industry_ (never drawn, skipped by the cycle, loads as none) because the save's view bindings hold the enum's integer. The factory glyph stays: rail slot 3 (Construction) wears it. Check: lens_modes, lens_one_tier, logistics_lens, province_render, text_overflow_floor pass; a live click shows no Industry slot on the Planetary strip."
   }
  ]
 }

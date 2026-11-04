@@ -526,7 +526,7 @@
     "src/ui/ui_state.hpp",
     "src/ui/overlay.cpp"
    ],
-   "summary": "The overlay_mode family of data layers the player can arm over the canvases, one active at a time; the lens also decides which entity a click/hover resolves to and which ledger it routes to. The Corporation and Company lenses retired with the firms (BL-1406): their enum slots survive only for old saves, never drawn and skipped by the cycle; 'who owns what' is the Nations lens.",
+   "summary": "The overlay_mode family of data layers the player can arm over the canvases, one active at a time; the lens also decides which entity a click/hover resolves to and which ledger it routes to. The Corporation and Company lenses retired with the firms (BL-1406): their enum slots survive only for old saves, never drawn and skipped by the cycle; 'who owns what' is the Nations lens. The Industry lens retired the same way (Ben, 2026-11-04: not informative).",
    "interesting_question": "The campaign deliberately opens with no lens armed ('a click only updates the Selection element and never re-skins the canvas'), reversing an earlier Corporation-default — why prefer an unskinned canvas at session start over a helpful default?",
    "resolution": "Recorded as a reversal from playtesting, not a first design: LENSES.md notes this 'reverses BL-013's Corporation-default, 2026-06-30' with no further rationale text quoted beyond the player choosing a lens deliberately.",
    "checks": [
@@ -620,23 +620,6 @@
    "checks": [
     "scarcity_lens",
     "lens_modes",
-    "lens_strip_and_fields"
-   ]
-  },
-  {
-   "id": "UI-039",
-   "name": "Industry lens",
-   "kind": "sub-element",
-   "parent": "UI-029",
-   "source": [
-    "docs/ui/LENSES.md § Industry lens"
-   ],
-   "summary": "Sequential dark→amber tint of the plant standing on each province that belongs to nations other than the player's — 'where is the industry I did not build?'. A strip lens on the Planetary rung, keyed 'Rival industry'.",
-   "interesting_question": "A rival's production rate is private (DISCOVERY.md § Competitor visibility) — how does a density lens over rival plant avoid leaking how much each plant makes?",
-   "resolution": "It reads only what the ground shows: each rival building counts 0.5 for standing and 0.5 more when it ran this tick (a working plant is observable; its rate is not), summed per province. Output never enters the field (LENSES.md § Industry lens, BL-1419 (Industry lens fills)).",
-   "checks": [
-    "industry_lens",
-    "province_render",
     "lens_strip_and_fields"
    ]
   },

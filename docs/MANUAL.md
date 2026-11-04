@@ -182,7 +182,7 @@ disagree, the dictionary is right.
 
 Lenses tint the map to show one quantity. On the bar are **Country, Resource,
 Market, Population, Opportunity, Production, Continent** — and four more are reachable only by
-cycling: **Scarcity, Industry, Reach, Supply-routes**.
+cycling: **Scarcity, Reach, Supply-routes**.
 
 | Action | Control |
 |---|---|

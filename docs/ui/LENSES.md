@@ -42,13 +42,14 @@ by the cycle without a literal being kept in step by hand.
 | `population` | Per-tile red→green **value mark** (workforce efficiency) + gradient key |
 | `continent` | Planetary plate tint + boundary lift + plate-count key |
 | `scarcity` | Per-market shortfall blocks + key |
-| `industry` | Rival-plant amber tint + key |
 | `supply` | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph |
 | `reach` | Planetary key listing the active body's trade-route endpoints by recency |
 | `supply_routes` | Planetary key of aggregated lanes, log-scaled thickness |
 | `throughput` — the **Logistics** lens | Planetary: every link of the player nation's chain — roads, rail legs, sea legs — coloured red → yellow → green by supplied over requested where traffic crosses it, steel where it is connected but idle, umber where a road is not tied to the capital + a ring on every source + numbers on every link (supplied over requested; one figure on an idle link) + key. No ground tint; the painted routes leave the ground while it is up. |
 | `culture` | Planetary province fill in the primary culture's lineage hue; a checker of the second culture where it is close + culture key |
 | `trade_flow` | Planetary paths of the player's shipments along the routes they ride (roads, sea lanes, rail), with direction chevrons and a head at the destination + a marker on each short market coloured by why the player's surplus did not go there + class key |
+
+The Industry lens is retired (Ben, 2026-11-04): it was not informative.
 
 Identity colours live in `presentation.hpp`.
 
@@ -107,16 +108,15 @@ ladder while the rest do not, and a copy drifts from the original silently.
 | **Market** | — | per-body price strip | catchment tint + city-name key |
 | **Population** | — | — | per-tile workforce-efficiency **heatmap** |
 | **Scarcity** | — | per-body shortfall badge | per-market shortfall blocks + key |
-| **Industry** | — | — | rival-plant amber tint + key |
 | **Continent** | — | — | plate tint + boundary lift + key |
 | **Nations** | — | — | each nation's whole territory in its identity colour + nation key |
 | **Reach** | connected-body glow | — | connection-list key |
 | **Supply-routes** | aggregated graph edges | — | lane-list key, log-scaled thickness |
 | **Logistics** | — | — | every chain link (road, rail, sea) coloured by traffic or reach + source ring + numbers on links + key |
 
-**Per-lens rung notes.** Resource, Population, Industry and Continent
+**Per-lens rung notes.** Resource, Population and Continent
 are **Planetary-only** — their unit of meaning (a tile, a deposit, a
-rival-plant reading, a plate) is sub-body and has no coherent inter-body
+plate) is sub-body and has no coherent inter-body
 surface. Market and Supply are the genuinely multi-rung lenses (prices per
 body-market; logistics span the ladder). Reach and Supply-routes are body-level
 reads whose natural home is the Solar rung — the connected-body glow and the
@@ -159,10 +159,9 @@ whose buildings they could not see.
   **Categorical** — Market, Continent, the Resource lens's deposits —
   washes at **0.46**: a hue says *which*, and hues separate at under half alpha even over
   textured ground, so the structures and forms keep reading through. **Sequential** —
-  Population, Throughput, Scarcity, Industry — washes at **0.54**: a ramp says *how much*,
+  Population, Throughput, Scarcity — washes at **0.54**: a ramp says *how much*,
   and a value read has to beat the ground's own light and dark, so it takes a little more.
-  Where a sequential lens's value already set its strength (Scarcity's shortfall, Industry's
-  density), the value scales the family strength the same way. The Resource lens's
+  Where a sequential lens's value already set its strength (Scarcity's shortfall), the value scales the family strength the same way. The Resource lens's
   no-deposit ground keeps its white wash (§ Resource lens) at **0.50** over the bake, paler
   than the fill path's 72% so the forms survive it.
   The Continent boundary keeps its lift toward white inside the plate wash. A lit
@@ -205,7 +204,7 @@ captures too. Two shapes share the one region:
   collapsed legend still says how much it is hiding. Rows live in a bounded,
   wheel/drag-scrolling ImGui child; long labels **wrap** rather than widening the
   box (Ben: "keep names shorter, and use text wrapping").
-- **Fixed-height gradient-bar keys** — Resource, Scarcity, Population, Industry, Throughput,
+- **Fixed-height gradient-bar keys** — Resource, Scarcity, Population, Throughput,
   Continent — use `begin_lens_key` and draw **open**. The collapse affordance
   belongs only to the lists, because a list that grows with the world is the only
   thing it was ever for; a key with nothing to overflow gains nothing from a press
@@ -463,7 +462,7 @@ not a fixed set. Owned by BL-670 (rung-keyed lens strip).
 
 | Rung | On the strip |
 |---|---|
-| **Planetary** | Resource, Market, Scarcity, Industry, Population, Continent, Logistics, Trade flow |
+| **Planetary** | Resource, Market, Scarcity, Population, Continent, Logistics, Trade flow, Nations |
 | **Circumplanetary** | Market, Scarcity, Supply |
 | **Solar** | Supply, Reach, Supply-routes |
 
@@ -479,8 +478,8 @@ rung row, and each carries its **own** glyph: no lens borrows another lens's mar
 keyboard-only. Adding a lens means adding it to a rung row and giving it a glyph in
 `src/ui/icons.*`, catalogued in ICONS.md.
 
-**Three lenses draw a value field, not a region**, and are therefore read-only surfaces: Population
-(per-tile habitability), Industry (the rival plant standing on each tile) and Logistics (the points
+**Two lenses draw a value field, not a region**, and are therefore read-only surfaces: Population
+(per-tile habitability) and Logistics (the points
 supplied and requested on every tile, and the flow along every road). Their subject is a number spread across the map rather than a thing standing on it, so
 there is nothing for a selection to be *of*. SELECTION.md carries the reasoning.
 
@@ -673,66 +672,6 @@ scarcity". The resource selector appears in the lens legend (shared with Resourc
 **Interaction notes.** Planetary-only, single-select. The verify script runs `verify.econ_step(12)`
 so market supply/demand populate before capture. Verified by `scripts/verify/scarcity_lens.lua`
 (iron and steel variants prove the selector re-skins the surface).
-
-## Industry lens
-
-**Glyph / access.** On the Planetary strip (§ The strip rotates with the rung), and in the
-keyboard lens-cycle.
-
-**Intent.** Read the map as a *rival-plant surface*: where the industry the player did **not**
-build already stands — distinct from where people live (the population-centre markers) and from
-where labour is efficient (Population). One of a three-layer read: Settlements (discrete
-markers) · Industry (this lens) · You (identity chrome).
-
-**Kept, re-subjected (Ben, 2026-10-26).** The lens survives the corporation's retirement. Its
-subject is the plants of nations other than the player's, and nothing else: the player's own
-plant never tints it.
-
-**Data definition (re-subjected, Ben, 2026-10-23).** The lens reads the **buildings owned by
-nations other than the player's** standing on each tile of the active body: every rival nation's
-`state_assets`, less anything decommissioned. A building's owner is always its ground's nation
-(`../politics/NATIONS.md` § Own ground), so these are the rivals' plants on their own ground.
-
-**Only what the screen may show** (`DISCOVERY.md` § Competitor visibility). A rival's plant is a
-physical structure, and that it is *running* is observable; how much it makes is private. So the
-field reads presence and running state, never output. Per tile it is `Σ (0.5 + 0.5 · running)`
-over those buildings, where `running` is 1 when the plant is finished and produced this tick (the
-economy report's `building_report.active`) and 0 otherwise. The `0.5` floor keeps an idle or
-under-construction plant visible — its *presence* is the fact the lens reports — while the running
-term separates a working plant from a dormant one, and two buildings on one tile stack. The tile
-values are then **summed per province and filled flat over it**: the question is about the
-locality, and density is additive. **Pure rendering**: nothing is written back. `tile.substrate_density` does not feed this
-lens (it is retained on the tile only because removing it would be a save-format touch for no
-gain — Ben, 2026-08-12).
-
-The question it answers is **"where is the industry I did not build?"** — an *ownership*
-question, which is why it survived the roster pruning that retired the Production lens (§ Rung
-applicability): body-relative output intensity *including the player's own holdings* answered no
-question the player was asking at the strip, whereas "whose plant is already standing here" does.
-
-**Rung.** Planetary only — the field is per-tile and has no inter-body surface. Guarded
-behind `overlay_mode::industry` in
-[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
-
-**Colour.** A sequential dark→amber gradient: a tile carrying a rival's plant composites its
-terrain hue toward industrial amber (`IM_COL32(210, 150, 70)`) at opacity `0.15 + 0.6·t`, where `t`
-is the tile's field value normalised to the body's maximum. Tiles with no rival building keep
-their terrain hue untinted. Sequential (not diverging) — density has a single good direction. No
-per-faction colours.
-
-**Glyph.** A factory silhouette — a sawtooth-roofed block with a chimney (`icons::industry`; see
-[ICONS.md](ICONS.md)) — distinct from every other lens glyph.
-
-**Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Industry density"), plus an
-on-canvas **low→high amber gradient key** (`draw_industry_key` in
-[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp)) — a bar running the terrain-hue
-base to full industrial amber, in the shared lens chrome region (§ Legend placement).
-
-**Interaction notes.** Planetary-only, single-select. The key is titled **Rival industry**. The
-running half of the field is read from the economy report, so a working plant reads as working
-only after a tick; the verify script folds its world to ground first, since an unfolded verify
-world has no nation-owned buildings for the lens to read.
-Verified by `scripts/verify/industry_lens.lua` (`industry_lens_full`, `industry_lens_zoom`).
 
 ## Continent lens
 
