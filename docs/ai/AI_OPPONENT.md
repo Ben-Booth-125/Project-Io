@@ -662,6 +662,17 @@ where a processor genuinely differs from a mine:
   input priced over the ceiling at their own market, while the supply clause still found spare in
   reach for most of them. Resume and recipe switch keep their clauses unchanged: applied there too,
   the measured share of running plants fell.
+  **A plant the treasury cannot run is not built (BL-1442, post-capacity starvation).** A nation
+  funds its buildings each tick through the funding gate, in its list's order, and a building
+  whose cost bound does not fit what is left idles (`../politics/NATIONS.md` § What a nation
+  owns). A new plant stands last in that list. So a nation's build of an extraction site or a
+  processor must leave, of its uncommitted treasury, the plant's own funding-gate bound for one
+  running tick (its maintenance, wages, a full run's inputs and its upkeep goods at its market's
+  posted prices — the gate's own reading of the plant as construction authors it), on top of the
+  build's cost and what the evaluation's earlier builds reserved the same way. A build that does
+  not leave it is foregone, as one the treasury cannot pay for is. Measured at play tick 50 on the
+  curated set before the rule: 45 plants built in play stood unfunded, most on treasuries that had
+  spent their last credits on the build and never funded the plant once.
 - **Pricing.** Priced by `estimate_prospective_profit` rather than the extraction candidate's
   inline revenue-minus-wages sum. The inline model survives on the extraction side because
   switching it would move every blessed golden for no player-visible gain; a new candidate had no
@@ -882,7 +893,16 @@ the floor; stage B layers priority buckets and predictive spending over it (§ 2
   and vetoes (removes the candidate entirely) at or above it. The taper and veto apply only to
   build candidates; survey is unaffected (a body's total surveyed area doesn't glut a market). The
   workforce dial reads a narrower buyer signal — posted demand alone (§ 11, the dial reads posted
-  demand) — and is not vetoed.
+  demand) — and is not vetoed. **The glut forecast counts the plants already building (BL-1442,
+  post-capacity starvation).** The projected supply is the market's listed supply **plus the
+  nominal output of every extraction site and processor under construction on that market** —
+  what those sites will list once they stand, at the staffing construction gives them — plus the
+  candidate's own added supply over the horizon. Under-construction state is public
+  (`../ui/DISCOVERY.md`), and the draw side already counts a pending processor's committed draw
+  (§ Build only what runs), so this is the same corrected estimate on the supply side. Blind to
+  its siblings mid-build, every nation due while they built read the same thin supply and built
+  into one glut: on one curated seed 14 oil-fired plants were started on one market in 42 ticks,
+  power priced at 0.55 of base by play tick 50, and the loss reflex then idled most of them.
 
 Verified by `tools/verify/corp_ai_predictive_harness.cpp` (R1: the reason→bucket mapping; R2: the
 Should-Have buffer is well-defined and never loosens the floor; R3: the forecast is
@@ -2239,6 +2259,14 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   quarter while the pool covers the next node — still one node queued at a time, in a bounded loop.
   A node on the route to a major takes a share of that major's worth, read from the route the queue
   previews today; this scores the next pick and is not a plan, since nothing is kept between picks.
+
+  **A node that opens kit is worth that kit — granted (Ben, 2026-11-04, on BL-1436, kit in the age
+  tree).** A new subject, so it was raised, not read into the worth rule above: a node's
+  `unlock_kit` effect (`../economy/RESEARCH.md`) opens catalogue items, and the scorer may count
+  them in the node's worth, weighted by the nation's own `military_research` budget line
+  (`../politics/NATIONS.md`) and the units it fields. **Not admitted:** reading another nation's kit, units or queue beyond what is observable;
+  a kit route kept between picks. Pure, seeded, deterministic, replayable, legal verbs only, never a
+  planner.
 
   **Under spectate, the seat's nation researches too — granted (Ben, 2026-10-15).** A new subject:
   with nobody seated (§ 10i), the nation at the seat is queued for exactly as any AI nation is.

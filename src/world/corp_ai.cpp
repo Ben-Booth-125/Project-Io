@@ -765,6 +765,32 @@ bool zero_bid_veto(const world& w, const market_component& m, std::size_t r, int
 /// The same test at a tile's market: true when a build there of @p target is
 /// vetoed by the zero-bid rule (no demand posted AND zero_bid_veto) — the one
 /// veto the chain start (§ 11) may lift. False with no market, or with demand.
+/// BL-1442 (post-capacity starvation; AI_OPPONENT.md, "A plant the treasury
+/// cannot run is not built"): what one tick of a producing building @p cmd would
+/// build costs its owner to RUN once it stands, read exactly as the funding
+/// gate will read it (`state_building_cost_bound`, state_industry.hpp) on the
+/// building as `construct_building` authors it — its type, tile, target and
+/// recipe, the staffing construction gives it, complete. Public prices only (the
+/// bound reads its market's posted prices). 0 for any build that is not an
+/// extraction site or a processing facility: only a plant runs a recipe or a
+/// deposit, and only those are what this reserve is for.
+float build_run_bound(const world& w, const recipe_registry& reg, const corp_command& cmd)
+{
+    if (cmd.type != building_type::extraction_site && cmd.type != building_type::processing_facility)
+        return 0.0f;
+    building_component b;
+    b.tile               = cmd.tile;
+    b.type               = cmd.type;
+    b.workforce_assigned = construction_initial_workforce(cmd.type);
+    b.workforce_target   = default_workforce_target(cmd.type);
+    if (cmd.type == building_type::extraction_site)
+        b.target_resource = cmd.target;
+    else
+        b.recipe = (cmd.recipe != no_recipe) ? cmd.recipe : reg.default_recipe_id_at(w, cmd.tile);
+    const float bound = state_building_cost_bound(w, reg, b);
+    return std::isfinite(bound) && bound > 0.0f ? bound : 0.0f;
+}
+
 bool zero_bid_veto_at(const world& w, entity_id tile, resource_type target, int hold_ticks)
 {
     const entity_id mid = market_for_tile(w, tile);
@@ -821,9 +847,39 @@ market_good_draw running_consumer_draws(const world& w, const recipe_registry& r
     return out;
 }
 
+pending_output_map pending_plant_output(const world& w, const recipe_registry& reg)
+{
+    std::vector<entity_id> ids;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.ticks_remaining > 0 && !b.decommissioned
+            && (b.type == building_type::extraction_site || b.type == building_type::processing_facility))
+            ids.push_back(bid);
+    std::sort(ids.begin(), ids.end());
+    pending_output_map out;
+    for (const entity_id bid : ids)
+    {
+        const building_component& b = w.buildings.at(bid);
+        const entity_id mid = market_for_tile(w, b.tile);
+        if (mid == null_entity)
+            continue;
+        // Read as the site will stand: complete, at the staffing construction
+        // gave it (building_output's NOMINAL form - no report).
+        building_component done = b;
+        done.ticks_remaining = 0;
+        done.days_remaining  = 0;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float o = building_output(w, reg, bid, done, r, nullptr);
+            if (o > 0.0f)
+                out[std::make_pair(mid, r)] += o;
+        }
+    }
+    return out;
+}
+
 float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
                                float added_rate_per_tick, int horizon_ticks,
-                               const corp_ai_params& p)
+                               const corp_ai_params& p, const pending_output_map* pending)
 {
     if (added_rate_per_tick <= 0.0f)
         return 1.0f;
@@ -839,7 +895,18 @@ float forecast_glut_multiplier(const world& w, entity_id tile, resource_type tar
     if (demand <= 0.0f)
         return zero_bid_veto(w, m, r, std::max(1, p.cadence_k)) ? 0.0f : 1.0f; // BL-1227: read by what it lists
     const float horizon = static_cast<float>(std::max(1, horizon_ticks));
-    const float projected_supply = m.supply[r] + added_rate_per_tick * horizon;
+    // BL-1442 (AI_OPPONENT.md, "The glut forecast counts the plants already
+    // building"): the sites under construction at this market list their output
+    // here once they stand, so their nominal rate joins the listed supply - a
+    // public fact, as the draw side's pending processors are (input_reach.cpp,
+    // BL-1234 round 2). Blind to them, every actor due while they built read the
+    // same thin supply and built into one glut (seed 37: 14 oil-fired plants
+    // started on one market in 42 ticks, power at 0.55 of base by tick 50).
+    float pending_supply = 0.0f;
+    if (pending != nullptr)
+        if (const auto pit = pending->find(std::make_pair(mid, r)); pit != pending->end())
+            pending_supply = pit->second;
+    const float projected_supply = m.supply[r] + pending_supply + added_rate_per_tick * horizon;
     const float ratio = projected_supply / demand;
     if (ratio <= p.glut_taper_ratio)
         return 1.0f;
@@ -2482,6 +2549,15 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             standing_ctx = standing_construction_draws(w, reg);
         return *standing_ctx;
     };
+    // BL-1442: every site under construction's output per (market, good), the
+    // glut forecast's pending supply - built on first use and forgotten with the
+    // reach index below (an earlier actor's builds this tick join it).
+    std::optional<pending_output_map> pending_ctx;
+    const auto pending_out = [&]() -> const pending_output_map& {
+        if (!pending_ctx)
+            pending_ctx = pending_plant_output(w, reg);
+        return *pending_ctx;
+    };
 
     for (std::size_t index = 0; index < corp_ids.size(); ++index)
     {
@@ -2659,6 +2735,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         if (reach_ctx)
             input_reach_invalidate(*reach_ctx);
         standing_ctx.reset(); // BL-1183: likewise the standing construction draw
+        pending_ctx.reset();  // BL-1442: likewise the pending output
 
         // BL-1401: the champion's state-industry branch (BL-1296) RETIRED. A
         // champion no longer dials its nation's buildings: the nation is its own
@@ -2819,7 +2896,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 const float added_rate = ex.base_rate * rich * wf * (1.0f - tc.hazard_level)
                                        * stack_scalar;
                 const int   horizon    = static_cast<int>(ex.build_duration_ticks) + p.forecast_clearing_ticks;
-                float       glut       = forecast_glut_multiplier(w, s.tile, s.target, added_rate, horizon, p);
+                float       glut       = forecast_glut_multiplier(w, s.tile, s.target, added_rate, horizon, p, &pending_out());
                 // BL-1227, the chain start (AI_OPPONENT.md § 11): a mine vetoed
                 // ONLY by the zero-bid rule is held back, not dropped — it is
                 // admitted below iff this same corporation, in this same
@@ -3135,7 +3212,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             continue;
                         const float out_rate = abs->outputs[static_cast<std::size_t>(ort)] * batches;
                         const int   out_hz   = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
-                        if (forecast_glut_multiplier(w, tile, ort, out_rate, out_hz, p) <= 0.0f)
+                        if (forecast_glut_multiplier(w, tile, ort, out_rate, out_hz, p, &pending_out()) <= 0.0f)
                             continue;
                         if (!construction_materials_obtainable(w, reg, reach(), standing(), tile,
                                                                building_type::processing_facility, ort, rid))
@@ -3169,7 +3246,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     {
                         const float added_rate = abs->outputs[static_cast<std::size_t>(rt)] * batches;
                         const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
-                        if (forecast_glut_multiplier(w, tile, rt, added_rate, horizon, p) <= 0.0f)
+                        if (forecast_glut_multiplier(w, tile, rt, added_rate, horizon, p, &pending_out()) <= 0.0f)
                             continue;
                     }
                     const float n = bp.net();
@@ -3229,7 +3306,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         w, reg, tile, building_type::processing_facility, target, best_recipe));
                     const float added_rate = primary_q * batches;
                     const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
-                    const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p);
+                    const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p, &pending_out());
                     if (glut <= 0.0f)
                         continue; // forecast hard glut — veto, as the extraction half does
 
@@ -4476,6 +4553,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // one book; the split counter stays so either book dials as fully.
         int   state_dials = 0;
         float state_spent = 0.0f; // BL-1296: this evaluation's treasury spend
+        float run_reserved = 0.0f; // BL-1442: the running bounds this evaluation's builds reserved
 
         float committed = 0.0f;
         std::vector<entity_id> touched_this_eval;
@@ -4676,8 +4754,21 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             // spends what this tick's running needs.
             const float floor_money = actor.is_nation
                 ? w.nations.at(actor.id).treasury : actor_money(w, actor);
+            // BL-1442 (post-capacity starvation; AI_OPPONENT.md, "A plant the
+            // treasury cannot run is not built"): a nation's producing build
+            // must also leave, uncommitted, the funding gate's own bound for one
+            // tick of the finished plant's running (`build_run_bound`, the
+            // gate's `state_building_cost_bound` on the plant as it will stand),
+            // over and above what this evaluation's earlier builds reserved the
+            // same way. A plant the gate cannot fund idles the day it stands and
+            // every day after while its owner's income does not grow — measured
+            // 2026-11-03 on the 16 library seeds, 45 state plants built in play
+            // standing unfunded at tick 50, most of them on treasuries that
+            // spent their last credits on the build.
+            const float run_bound = (actor.is_nation && is_build)
+                ? build_run_bound(w, reg, c.cmd) : 0.0f;
             const bool over_room = actor.is_nation
-                && actor_money(w, actor) - spent_now - c.spend < 0.0f;
+                && actor_money(w, actor) - spent_now - c.spend - run_reserved - run_bound < 0.0f;
             if (c.spend > 0.0f &&
                 (floor_money - spent_now - c.spend <= required_floor || over_room))
             {
@@ -4767,6 +4858,8 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 state_spent += c.spend;
             else
                 committed += c.spend;
+            if (is_build && actor.is_nation)
+                run_reserved += build_run_bound(w, reg, c.cmd); // BL-1442 (above)
             if (is_build)  ++builds;
             // BL-1309 / BL-1395 grants: the hubs the build was scored with, laid in the
             // same decision through the same legal verb, paid by the same book. The chain

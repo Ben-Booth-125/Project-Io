@@ -57,8 +57,8 @@ keep-awake (`tools/session/keepawake.ps1 -Process market_viability`) on an unatt
   state was input-starved (mothballed because its inputs never came), over built processors.
   Target: pooled <= 5% (Ben, 2026-10-08). G1 alone counts a plant idled for want of a buyer as
   a failure, which is the economy working; G1b is the starvation the sprint chases.
-- **G1 at tick 50** — the same share running, read at play tick 50. Target: pooled >= 85% (Ben,
-  2026-10-08): a plant rescued at the handoff only to be mothballed in play does not count.
+- **G1 at tick 50** — the same share running, read at play tick 50. Target: pooled >= 84% (Ben, 2026-11-04, re-ruled from 85% of
+  2026-10-08, for trajectory noise of about ±1 point): a plant rescued at the handoff only to be mothballed in play does not count.
   **Deferred (Ben, 2026-10-09):** long-term viability moves to a later sprint, so this row is
   reported but does not gate sprint 50; its printed FAIL is expected until that sprint.
 - **G2, field income per tick** — the sum of every corporation's filed `quarterly_return::income`,
@@ -82,7 +82,7 @@ keep-awake (`tools/session/keepawake.ps1 -Process market_viability`) on an unatt
 The run closes with a per-seed table, the pooled rows, one `PASS`/`FAIL` line per target, and:
 
 ```
-market_viability: G1 x/85 G1t50 x/85 G1b x/5 G2 y/50 G3 z/70 | abs run/built h R/B t50 R/B inc26-50 I/seed-tick | L to-short a% dry/read b starved/read c top-class K d%
+market_viability: G1 x/85 G1t50 x/84 G1b x/5 G2 y/50 G3 z/70 | abs run/built h R/B t50 R/B inc26-50 I/seed-tick | L to-short a% dry/read b starved/read c top-class K d%
 ```
 
 The G fields keep their place. The `| abs ...` segment gives the ABSOLUTE counts behind the

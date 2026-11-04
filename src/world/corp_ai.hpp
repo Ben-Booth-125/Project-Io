@@ -411,9 +411,25 @@ entity_id running_consumer_market(const world& w, const recipe_registry& reg,
 /// cleared with nothing listed (a dead market). Only a market that has never
 /// cleared returns 1.0 for "no bid, nothing listed" (no signal). Exposed for
 /// the harness; also used internally by the build-candidate scorer.
+///
+/// BL-1442 (post-capacity starvation; AI_OPPONENT.md, "The glut forecast counts
+/// the plants already building"): @p pending, when given, is every site UNDER
+/// CONSTRUCTION's nominal output per (market, good) (`pending_plant_output`);
+/// the market's output at @p tile is added to its listed supply before the
+/// ratio is read — a public fact (DISCOVERY.md), the supply those sites will
+/// list once they stand. Null reads listed supply alone (the harness form).
+using pending_output_map = std::map<std::pair<entity_id, std::size_t>, float>;
 float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
                                float added_rate_per_tick, int horizon_ticks,
-                               const corp_ai_params& p = {});
+                               const corp_ai_params& p = {},
+                               const pending_output_map* pending = nullptr);
+
+/// BL-1442: every extraction site and processing facility under construction
+/// (not decommissioned), its nominal output per tick once it stands — rate x
+/// the staffing construction gave it, its recipe's outputs or its deposit's
+/// yield (`building_output`'s nominal reading, read as if complete) — summed per
+/// (its tile's market, good). Ascending building id. Pure.
+pending_output_map pending_plant_output(const world& w, const recipe_registry& reg);
 
 /// The corp's solvency reserve floor under `p` (exposed for the harness).
 float corp_reserve_floor(const world& w, const recipe_registry& reg,
