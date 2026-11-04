@@ -513,6 +513,10 @@ struct diplomacy_ledger_state
         bool  expanded = false;
         bool  hostile_out = false, hostile_in = false, friends = false, at_war = false, truce = false;
         float access = 0.0f, trust = 0.0f, alarm = 0.0f; ///< Their sentiment toward the player.
+        /// BL-1470: the centre of the Access bar toward the player, and the cause
+        /// line its hover shows (largest contributor; the seeded war). Empty = none.
+        float access_bar_x = -1.0f, access_bar_y = -1.0f;
+        std::string access_cause;
     };
     std::vector<drawn_row> rows;
     /// One press drawn this frame: its kind ("declare_open", "declare", "cancel",

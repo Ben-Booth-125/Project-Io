@@ -2754,6 +2754,30 @@ void run_tail(generation_cursor& c)
             const grudge_sentiment_report grep_ =
                 seed_grudge_sentiment(w.sentiment, kepler_grudges, polity_nation, gsp, &seeds);
 
+            // BL-1470: KEEP THE CAUSE (RELATIONS.md § Where a grudge lands: a seeded
+            // row carries the war that produced it). One record per row; where two
+            // polities' grudges land on one pair the higher score names it, ties to
+            // the first in the grudge table's own (from, to) order. The region is
+            // kept by NAME — this settlement does not outlive setup.
+            for (const grudge_sentiment_seed& s : seeds)
+            {
+                if (!s.has_cause)
+                    continue;
+                const std::pair<entity_id, entity_id> key{ s.observer, s.subject };
+                const auto have = w.sentiment.seeds.find(key);
+                if (have != w.sentiment.seeds.end() && have->second.score >= s.score)
+                    continue;
+                sentiment_seed_record rec;
+                rec.year       = s.cause.year;
+                rec.cause_kind = static_cast<uint8_t>(s.cause.kind);
+                rec.score      = s.score;
+                if (s.cause.region != owner_none
+                    && static_cast<std::size_t>(s.cause.region) < kepler_settlement.regions.size())
+                    rec.region = kepler_settlement.regions[s.cause.region].name.substr(
+                        0, sentiment_seed_region_max);
+                w.sentiment.seeds[key] = std::move(rec);
+            }
+
             if (report != nullptr)
             {
                 report->grudge_sentiment_rows      = grep_.rows_seeded;

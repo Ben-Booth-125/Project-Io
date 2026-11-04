@@ -133,11 +133,20 @@ void decay_sentiment(sentiment_table& t, const sentiment_params& p,
         return;
     const bool scaled = alarm_decay_scale != nullptr && !alarm_decay_scale->empty();
 
+    // BL-1470: the contributions map walks in LOCKSTEP — the same key order, so
+    // one forward iterator follows the rows. An entry whose row is missing is an
+    // orphan (a caller erased the row directly) and goes as it is passed.
+    auto cit = t.contributions.begin();
+
     // A sorted walk over (observer, subject) — `pairs` is a std::map, so this
     // is the BL-158 rule satisfied by the container choice rather than by a
     // sort here (and the erase-during-walk idiom below relies on it).
     for (auto it = t.pairs.begin(); it != t.pairs.end();)
     {
+        while (cit != t.contributions.end() && cit->first < it->first)
+            cit = t.contributions.erase(cit);
+        std::vector<sentiment_contribution>* shares =
+            (cit != t.contributions.end() && cit->first == it->first) ? &cit->second : nullptr;
         sentiment_value& v = it->second;
         v.access = decayed(v.access, p.access_decay_per_tick, p.neutral_epsilon);
         v.trust  = decayed(v.trust, p.trust_decay_per_tick, p.neutral_epsilon);
@@ -156,8 +165,89 @@ void decay_sentiment(sentiment_table& t, const sentiment_params& p,
         // erased rather than kept as a row of zeroes, so the table stays sparse
         // and a fully-forgotten pair is indistinguishable from one that never
         // interacted. That indistinguishability IS the no-floor property.
+        // BL-1470: each share decays exactly as its row does — the same three
+        // rates (Alarm's scaled for this subject), the same snap — and a share
+        // home on all three dimensions is dropped.
+        if (shares != nullptr)
+        {
+            if (v.neutral())
+                shares->clear();
+            for (auto s = shares->begin(); s != shares->end();)
+            {
+                s->access = decayed(s->access, p.access_decay_per_tick, p.neutral_epsilon);
+                s->trust  = decayed(s->trust, p.trust_decay_per_tick, p.neutral_epsilon);
+                s->alarm  = decayed(s->alarm, alarm_rate, p.neutral_epsilon);
+                s = s->zero() ? shares->erase(s) : std::next(s);
+            }
+            cit = shares->empty() ? t.contributions.erase(cit) : std::next(cit);
+        }
+
         it = v.neutral() ? t.pairs.erase(it) : std::next(it);
     }
+    // Entries past the last row are orphans too.
+    while (cit != t.contributions.end())
+        cit = t.contributions.erase(cit);
+}
+
+const sentiment_contribution* sentiment_contribution_of(const sentiment_table& t,
+                                                        entity_id observer, entity_id subject,
+                                                        sentiment_factor_kind kind)
+{
+    const std::pair<entity_id, entity_id> key{observer, subject};
+    if (t.pairs.find(key) == t.pairs.end())
+        return nullptr;
+    const auto cit = t.contributions.find(key);
+    if (cit == t.contributions.end())
+        return nullptr;
+    for (const sentiment_contribution& c : cit->second)
+        if (c.kind == kind)
+            return &c;
+    return nullptr;
+}
+
+const sentiment_contribution* sentiment_largest_contributor(const sentiment_table& t,
+                                                            entity_id observer, entity_id subject,
+                                                            sentiment_dimension dim)
+{
+    const std::pair<entity_id, entity_id> key{observer, subject};
+    const auto row = t.pairs.find(key);
+    if (row == t.pairs.end())
+        return nullptr;
+    const auto cit = t.contributions.find(key);
+    if (cit == t.contributions.end())
+        return nullptr;
+
+    const auto pick = [dim](const auto& x) {
+        return dim == sentiment_dimension::access ? x.access
+             : dim == sentiment_dimension::trust  ? x.trust
+                                                  : x.alarm;
+    };
+    const float value = pick(row->second);
+    if (value == 0.0f)
+        return nullptr;
+
+    // Ascending kind order, strict `>`: a tie keeps the lower kind (the stable key).
+    const sentiment_contribution* best = nullptr;
+    float best_mag = 0.0f;
+    for (const sentiment_contribution& c : cit->second)
+    {
+        const float share = pick(c);
+        if (share == 0.0f || (share > 0.0f) != (value > 0.0f))
+            continue;
+        const float mag = std::fabs(share);
+        if (mag > best_mag)
+        {
+            best     = &c;
+            best_mag = mag;
+        }
+    }
+    return best;
+}
+
+void prune_sentiment_contributions(sentiment_table& t)
+{
+    for (auto cit = t.contributions.begin(); cit != t.contributions.end();)
+        cit = t.pairs.count(cit->first) == 0 ? t.contributions.erase(cit) : std::next(cit);
 }
 
 void apply_sentiment_events(sentiment_table& t, const sentiment_params& p,
@@ -213,7 +303,33 @@ void apply_sentiment_events(sentiment_table& t, const sentiment_params& p,
         // An event that cancels a row exactly back to neutral erases it, for
         // decay's reason: absent == neutral, with no second spelling.
         if (v.neutral())
+        {
             t.pairs.erase(key);
+            t.contributions.erase(key); // BL-1470: the shares go with the row
+            continue;
+        }
+
+        // BL-1470: this kind's share of the row, before saturation and the
+        // Alarm floor. The batch is canonical, so the shares are as replayable
+        // as the row; the vector stays ascending by kind.
+        std::vector<sentiment_contribution>& shares = t.contributions[key];
+        auto s = std::lower_bound(shares.begin(), shares.end(), e.kind,
+                                  [](const sentiment_contribution& c, sentiment_factor_kind k) {
+                                      return c.kind < k;
+                                  });
+        if (s == shares.end() || s->kind != e.kind)
+        {
+            sentiment_contribution fresh;
+            fresh.kind = e.kind;
+            s = shares.insert(s, fresh);
+        }
+        s->access += delta_access;
+        s->trust  += delta_trust;
+        s->alarm  += delta_alarm;
+        if (s->zero())
+            shares.erase(s);
+        if (shares.empty())
+            t.contributions.erase(key);
     }
 }
 
@@ -265,6 +381,119 @@ void write_sentiment(const sentiment_table& t, std::ostream& out)
         write_f32(out, value.trust);
         write_f32(out, value.alarm); // BL-1432 (version 2)
     }
+
+    // BL-1470 (version 3): the shares of rows that still stand, then the seeds.
+    write_sentiment_provenance(t, out);
+}
+
+void write_sentiment_provenance(const sentiment_table& t, std::ostream& out)
+{
+    uint32_t live = 0;
+    for (const auto& [key, shares] : t.contributions)
+        if (!shares.empty() && t.pairs.count(key) != 0)
+            ++live;
+    write_u32(out, live);
+    for (const auto& [key, shares] : t.contributions)
+    {
+        if (shares.empty() || t.pairs.count(key) == 0)
+            continue;
+        write_u32(out, key.first);
+        write_u32(out, key.second);
+        write_u32(out, static_cast<uint32_t>(shares.size()));
+        for (const sentiment_contribution& c : shares)
+        {
+            const uint8_t k = static_cast<uint8_t>(c.kind);
+            out.write(reinterpret_cast<const char*>(&k), 1);
+            write_f32(out, c.access);
+            write_f32(out, c.trust);
+            write_f32(out, c.alarm);
+        }
+    }
+
+    write_u32(out, static_cast<uint32_t>(t.seeds.size()));
+    for (const auto& [key, s] : t.seeds)
+    {
+        write_u32(out, key.first);
+        write_u32(out, key.second);
+        write_u32(out, static_cast<uint32_t>(s.year));
+        out.write(reinterpret_cast<const char*>(&s.cause_kind), 1);
+        write_u32(out, static_cast<uint32_t>(s.score));
+        const std::size_t n = std::min<std::size_t>(s.region.size(), sentiment_seed_region_max);
+        write_u32(out, static_cast<uint32_t>(n));
+        out.write(s.region.data(), static_cast<std::streamsize>(n));
+    }
+}
+
+bool read_sentiment_provenance(const sentiment_table& t, std::istream& in,
+                               std::map<std::pair<entity_id, entity_id>,
+                                        std::vector<sentiment_contribution>>& contributions,
+                               std::map<std::pair<entity_id, entity_id>, sentiment_seed_record>& seeds)
+{
+    contributions.clear();
+    seeds.clear();
+
+    uint32_t count = 0;
+    if (!read_u32(in, count) || count > t.pairs.size())
+        return false;
+    for (uint32_t i = 0; i < count; ++i)
+    {
+        std::pair<entity_id, entity_id> key{null_entity, null_entity};
+        uint32_t n = 0;
+        if (!read_u32(in, key.first) || !read_u32(in, key.second) || !read_u32(in, n))
+            return false;
+        // Strictly ascending, a row the table holds, 1..count-of-kinds shares.
+        if ((!contributions.empty() && !(contributions.rbegin()->first < key))
+            || t.pairs.count(key) == 0 || n == 0 || n > sentiment_factor_count)
+            return false;
+        std::vector<sentiment_contribution> shares;
+        shares.reserve(n);
+        for (uint32_t j = 0; j < n; ++j)
+        {
+            uint8_t k = 0;
+            sentiment_contribution c;
+            in.read(reinterpret_cast<char*>(&k), 1);
+            if (!in || !read_f32(in, c.access) || !read_f32(in, c.trust) || !read_f32(in, c.alarm))
+                return false;
+            if (k >= sentiment_factor_count
+                || (!shares.empty() && !(static_cast<uint8_t>(shares.back().kind) < k))
+                || !std::isfinite(c.access) || !std::isfinite(c.trust) || !std::isfinite(c.alarm))
+                return false;
+            c.kind = static_cast<sentiment_factor_kind>(k);
+            if (c.zero())
+                return false; // a zero share cannot have been written
+            shares.push_back(c);
+        }
+        contributions.emplace(key, std::move(shares));
+    }
+
+    uint32_t nseeds = 0;
+    if (!read_u32(in, nseeds) || nseeds > sentiment_max_records)
+        return false;
+    for (uint32_t i = 0; i < nseeds; ++i)
+    {
+        std::pair<entity_id, entity_id> key{null_entity, null_entity};
+        uint32_t year = 0, score = 0, len = 0;
+        sentiment_seed_record s;
+        if (!read_u32(in, key.first) || !read_u32(in, key.second) || !read_u32(in, year))
+            return false;
+        in.read(reinterpret_cast<char*>(&s.cause_kind), 1);
+        if (!in || !read_u32(in, score) || !read_u32(in, len))
+            return false;
+        if (key.first == null_entity || key.second == null_entity || key.first == key.second
+            || (!seeds.empty() && !(seeds.rbegin()->first < key)) || len > sentiment_seed_region_max)
+            return false;
+        s.region.resize(len);
+        if (len > 0)
+        {
+            in.read(&s.region[0], static_cast<std::streamsize>(len));
+            if (!in)
+                return false;
+        }
+        s.year  = static_cast<int32_t>(year);
+        s.score = static_cast<int32_t>(score);
+        seeds.emplace(key, std::move(s));
+    }
+    return true;
 }
 
 bool read_sentiment(sentiment_table& t, std::istream& in)
@@ -275,9 +504,10 @@ bool read_sentiment(sentiment_table& t, std::istream& in)
 
     uint32_t version = 0;
     if (!read_u32(in, version)
-        || (version != sentiment_version && version != sentiment_version_pre_alarm))
+        || (version != sentiment_version && version != sentiment_version_pre_contributors
+            && version != sentiment_version_pre_alarm))
         return false;
-    const bool has_alarm = version >= sentiment_version; // BL-1432: v1 reads Alarm 0
+    const bool has_alarm = version >= sentiment_version_pre_contributors; // BL-1432: v1 reads Alarm 0
 
     uint32_t count = 0;
     if (!read_u32(in, count) || count > sentiment_max_records)
@@ -315,6 +545,13 @@ bool read_sentiment(sentiment_table& t, std::istream& in)
         parsed[{observer, subject}] = v;
     }
 
-    t.pairs = std::move(parsed);
+    // BL-1470: a version-3 stream carries the provenance; an older one has none.
+    sentiment_table staged;
+    staged.pairs = std::move(parsed);
+    if (version >= sentiment_version
+        && !read_sentiment_provenance(staged, in, staged.contributions, staged.seeds))
+        return false;
+
+    t = std::move(staged);
     return true;
 }

@@ -60,6 +60,7 @@
 
 #include <cstdio>
 #include <cstdint>
+#include <cstring>
 #include <map>
 #include <limits>
 #include <set>
@@ -91,7 +92,9 @@ bool tables_identical(const sentiment_table& a, const sentiment_table& b)
     for (; ia != a.pairs.end(); ++ia, ++ib)
         if (ia->first != ib->first || ia->second != ib->second)
             return false;
-    return true;
+    // BL-1470: the provenance is part of the table, so every row stated in this
+    // predicate (R5, R6, S, G1) covers the shares and the seed records too.
+    return a.contributions == b.contributions && a.seeds == b.seeds;
 }
 
 entity_id add_corp(world& w, const char* name)
@@ -1291,6 +1294,156 @@ int main()
         fold_pending_sentiment(w, reg);
         check(sentiment_toward(w.sentiment, B, A).alarm > 0.0f,
               "G2 ...and from the handoff the same world emits (B is alarmed by A)");
+    }
+
+    // --- P: provenance (BL-1470) --------------------------------------------
+    // diplomacy.md § Nations: hovering a sentiment bar names its largest
+    // contributing conduct, and a seeded row names the war that seeded it. The
+    // table keeps, per row, each kind's decayed share; these rows pin that the
+    // one read is the largest, that it decays with the row, and that a seeded
+    // row carries its war through the save seam.
+    std::printf("\n-- P  each row names its largest contributor (BL-1470) --\n");
+    {
+        const sentiment_params p = authored_params();
+        const entity_id a = 41, b = 42;
+        sentiment_table t;
+        // Trust: four trades (+3 each = +12) against one battle (-11): +1 net,
+        // so the largest SAME-SIDE share is the trade's +12. Access: the battle's -7.
+        apply_sentiment_events(t, p, {ev(a, b, sentiment_factor_kind::trade_conducted),
+                                      ev(a, b, sentiment_factor_kind::trade_conducted),
+                                      ev(a, b, sentiment_factor_kind::force_used),
+                                      ev(a, b, sentiment_factor_kind::trade_conducted),
+                                      ev(a, b, sentiment_factor_kind::trade_conducted)});
+        const sentiment_contribution* tr =
+            sentiment_largest_contributor(t, a, b, sentiment_dimension::trust);
+        const sentiment_contribution* ac =
+            sentiment_largest_contributor(t, a, b, sentiment_dimension::access);
+        check(same(sentiment_toward(t, a, b).trust, 1.0f) && tr != nullptr
+                  && tr->kind == sentiment_factor_kind::trade_conducted && same(tr->trust, 12.0f),
+              "P1 Trust +1 names trade (+12), its largest same-side share, not the battle's -11");
+        check(ac != nullptr && ac->kind == sentiment_factor_kind::force_used && same(ac->access, -7.0f),
+              "P2 ...and Access -7 names the battle");
+        check(sentiment_largest_contributor(t, a, b, sentiment_dimension::alarm) == nullptr
+                  && sentiment_largest_contributor(t, b, a, sentiment_dimension::trust) == nullptr,
+              "P3 a dimension at 0, and an absent row, name nothing");
+
+        // The largest wins outright, and a tie goes to the lower kind (the stable key).
+        sentiment_params q = p;
+        q.factors[static_cast<std::size_t>(sentiment_factor_kind::equity_taken)] = {5.0f, 0.0f};
+        sentiment_table u;
+        apply_sentiment_events(u, q, {ev(a, b, sentiment_factor_kind::equity_taken, 2.0f),
+                                      ev(a, b, sentiment_factor_kind::contract_completed, 1.0f)});
+        const sentiment_contribution* big =
+            sentiment_largest_contributor(u, a, b, sentiment_dimension::access);
+        sentiment_table v;
+        apply_sentiment_events(v, q, {ev(a, b, sentiment_factor_kind::equity_taken, 1.0f),
+                                      ev(a, b, sentiment_factor_kind::contract_completed, 1.0f)});
+        const sentiment_contribution* tie =
+            sentiment_largest_contributor(v, a, b, sentiment_dimension::access);
+        check(big != nullptr && big->kind == sentiment_factor_kind::equity_taken
+                  && tie != nullptr && tie->kind == sentiment_factor_kind::contract_completed,
+              "P4 the larger share wins (equity 10 over contract 5); a 5-5 tie names the lower kind");
+
+        // DECAYS WITH THE ROW: one kind alone on a row, the share tracks the row
+        // bit-for-bit through every decay tick, and goes when the row is erased.
+        sentiment_params d = p;
+        d.access_decay_per_tick = 0.25f;
+        d.trust_decay_per_tick  = 0.125f;
+        sentiment_table w1;
+        apply_sentiment_events(w1, d, {ev(a, b, sentiment_factor_kind::force_used, 2.0f)});
+        bool tracks = true;
+        int  ticks  = 0;
+        while (!w1.pairs.empty() && ticks < 1000)
+        {
+            decay_sentiment(w1, d);
+            ++ticks;
+            const sentiment_contribution* s =
+                sentiment_contribution_of(w1, a, b, sentiment_factor_kind::force_used);
+            if (!w1.pairs.empty())
+            {
+                const sentiment_value row = sentiment_toward(w1, a, b);
+                tracks = tracks && s != nullptr && same(s->access, row.access) && same(s->trust, row.trust);
+            }
+        }
+        check(tracks && w1.pairs.empty() && w1.contributions.empty() && ticks > 1,
+              "P5 a share decays with its row bit-for-bit, and is erased with it");
+
+        // Two kinds decaying: the share ratio holds, so the largest stays largest.
+        sentiment_table w2;
+        apply_sentiment_events(w2, d, {ev(a, b, sentiment_factor_kind::contract_completed, 3.0f),
+                                       ev(a, b, sentiment_factor_kind::contract_cancelled, 1.0f)});
+        for (int i = 0; i < 4; ++i)
+            decay_sentiment(w2, d);
+        const sentiment_contribution* still =
+            sentiment_largest_contributor(w2, a, b, sentiment_dimension::access);
+        const sentiment_contribution* cc =
+            sentiment_contribution_of(w2, a, b, sentiment_factor_kind::contract_completed);
+        check(still != nullptr && still->kind == sentiment_factor_kind::contract_completed
+                  && cc != nullptr && cc->access < 15.0f && cc->access > 0.0f,
+              "P6 four decay ticks shrink the shares (15 -> less) and the largest stays largest");
+
+        // An event that cancels a row back to neutral takes the shares with it.
+        sentiment_table w3;
+        apply_sentiment_events(w3, p, {ev(a, b, sentiment_factor_kind::contract_completed),
+                                       ev(a, b, sentiment_factor_kind::contract_cancelled)});
+        check(w3.pairs.empty() && w3.contributions.empty(),
+              "P7 a row folded exactly back to neutral leaves no shares");
+
+        // A SEEDED ROW CARRIES ITS WAR. The grudge's own fold records its share;
+        // the seed record (what generation keeps beside it) rides the save seam.
+        sentiment_params g;
+        g.factors[static_cast<std::size_t>(sentiment_factor_kind::historical_grudge)] = {-60.0f, -25.0f};
+        sentiment_table s;
+        apply_sentiment_events(s, g, {ev(a, b, sentiment_factor_kind::historical_grudge, 0.5f)});
+        sentiment_seed_record rec;
+        rec.year = -340; rec.cause_kind = 1; rec.region = "Veloran Reach"; rec.score = 5000;
+        s.seeds[{a, b}] = rec;
+        const sentiment_contribution* gr =
+            sentiment_largest_contributor(s, a, b, sentiment_dimension::access);
+        std::stringstream ss(std::ios::in | std::ios::out | std::ios::binary);
+        write_sentiment(s, ss);
+        sentiment_table back;
+        const bool read_ok = read_sentiment(back, ss);
+        const auto seed_back = back.seeds.find({a, b});
+        check(gr != nullptr && gr->kind == sentiment_factor_kind::historical_grudge
+                  && same(gr->access, -30.0f) && read_ok && tables_identical(s, back)
+                  && seed_back != back.seeds.end() && seed_back->second.region == "Veloran Reach"
+                  && seed_back->second.year == -340,
+              "P8 a seeded row's Access names the grudge (-30), and its war (region, year) round-trips");
+
+        // Untrusted: a share naming a row the stream does not hold is refused whole.
+        sentiment_table orphan = s;
+        orphan.contributions[{b, a}] = {sentiment_contribution{sentiment_factor_kind::trade_conducted, 0.0f, 1.0f, 0.0f}};
+        orphan.pairs[{b, a}] = sentiment_value{0.0f, 1.0f, 0.0f};
+        // The writer never emits such a share, so the corrupt stream is spliced:
+        // `s`'s rows (no (b, a) row), then `orphan`'s provenance (a (b, a) share).
+        sentiment_table rows_only = s;
+        std::stringstream body(std::ios::in | std::ios::out | std::ios::binary);
+        write_sentiment(rows_only, body);
+        std::string corrupt = body.str();
+        std::stringstream prov(std::ios::in | std::ios::out | std::ios::binary);
+        write_sentiment_provenance(orphan, prov);
+        const std::size_t prov_len_s = [&] {
+            std::stringstream x(std::ios::in | std::ios::out | std::ios::binary);
+            write_sentiment_provenance(rows_only, x);
+            return x.str().size();
+        }();
+        corrupt = corrupt.substr(0, corrupt.size() - prov_len_s) + prov.str();
+        std::stringstream cs(corrupt, std::ios::in | std::ios::out | std::ios::binary);
+        sentiment_table keep = s;
+        check(!read_sentiment(keep, cs) && tables_identical(keep, s),
+              "P9 a stream whose share names no row is refused, leaving the table untouched");
+
+        // A v2 stream (no provenance) still reads, as a table with none.
+        std::string v2 = body.str();
+        v2 = v2.substr(0, v2.size() - prov_len_s);
+        const uint32_t two = sentiment_version_pre_contributors;
+        std::memcpy(&v2[4], &two, sizeof two);
+        std::stringstream v2s(v2, std::ios::in | std::ios::out | std::ios::binary);
+        sentiment_table old;
+        check(read_sentiment(old, v2s) && old.pairs == s.pairs && old.contributions.empty()
+                  && old.seeds.empty(),
+              "P10 a version-2 stream reads, its rows whole and no provenance");
     }
 
     // --- N: the authoring roster --------------------------------------------

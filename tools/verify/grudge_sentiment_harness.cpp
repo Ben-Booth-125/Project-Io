@@ -466,6 +466,38 @@ int main()
         check(wa.sentiment.pairs == wb.sentiment.pairs,
               "G8d  two generations of one seed seed IDENTICAL sentiment");
 
+        // BL-1470: a seeded row CARRIES ITS WAR (RELATIONS.md § Where a grudge
+        // lands) — every row with a grudge share has a seed record naming the
+        // year and a region, the share is that row's largest Access contributor,
+        // and the records are as deterministic as the rows.
+        int grudge_rows = 0, carried = 0, named = 0, largest = 0;
+        for (const auto& kv : wa.sentiment.pairs)
+        {
+            const entity_id o = kv.first.first, s = kv.first.second;
+            if (sentiment_contribution_of(wa.sentiment, o, s,
+                                          sentiment_factor_kind::historical_grudge) == nullptr)
+                continue;
+            ++grudge_rows;
+            const auto rec = wa.sentiment.seeds.find(kv.first);
+            if (rec != wa.sentiment.seeds.end())
+            {
+                ++carried;
+                if (!rec->second.region.empty()) ++named;
+            }
+            const sentiment_contribution* top =
+                sentiment_largest_contributor(wa.sentiment, o, s, sentiment_dimension::access);
+            if (top != nullptr && top->kind == sentiment_factor_kind::historical_grudge) ++largest;
+        }
+        const auto first = wa.sentiment.seeds.begin();
+        if (first != wa.sentiment.seeds.end())
+            std::printf("      %d grudge rows, %d carry a seed record (%d with a region); e.g. %s, year %d\n",
+                        grudge_rows, carried, named, first->second.region.c_str(), first->second.year);
+        check(grudge_rows > 0 && carried == grudge_rows && named > 0 && largest == grudge_rows,
+              "G8f  every seeded row carries its war (a seed record, regions named) and names the grudge as its largest Access cause");
+        check(wa.sentiment.contributions == wb.sentiment.contributions
+                  && wa.sentiment.seeds == wb.sentiment.seeds,
+              "G8g  ...and two generations of one seed keep IDENTICAL provenance");
+
         // And a different seed does not, or G8d is vacuous.
         world_params wp2 = wp;
         wp2.seed = 20260912u;

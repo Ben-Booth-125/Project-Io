@@ -64,6 +64,29 @@ print("diplomacy_ledger: " .. #d.rows .. " nation rows; first " .. d.rows[1].nat
       .. " alarm " .. string.format("%.2f", d.rows[1].alarm))
 verify.capture("diplomacy_nations_folded")
 
+-- BL-1470: hovering a sentiment bar names its largest cause. Aim at the first row
+-- whose Access toward the player is not zero and hover its Access bar.
+local caused = nil
+for _, row in ipairs(d.rows) do
+    if row.access ~= 0 and row.access_bar_x and row.access_bar_x >= 0 then caused = row; break end
+end
+if caused then
+    print("diplomacy_ledger: nation " .. caused.nation .. " access "
+          .. string.format("%.2f", caused.access) .. " cause '" .. tostring(caused.access_cause) .. "'")
+    if caused.access_cause ~= nil and caused.access_cause ~= "" then
+        ok("a non-zero Access bar names its largest cause")
+    else
+        fail("a non-zero Access bar names no cause")
+    end
+    verify.hover(caused.access_bar_x, caused.access_bar_y, 3)
+    verify.frames(3)
+    verify.capture("diplomacy_bar_hover_cause")
+    verify.mouse(-1, -1)
+    verify.frames(2)
+else
+    print("diplomacy_ledger: no row with a non-zero Access toward the player; the cause hover is not reached")
+end
+
 -- The target: a rival whose stack stands on the surface, so a goal can be clicked.
 local theirs = nil
 for _, u in ipairs(verify.units()) do

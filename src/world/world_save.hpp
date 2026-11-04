@@ -689,7 +689,25 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// streams stay readable as v74 made them: a v74 or v75 stream is read with every array
 /// of `resource_count` elements 54 wide (`k_resource_count_pre_airframes`), an older one
 /// 49 wide, airframes reading as zero. Nothing else moved: v75 is v76 one column narrower.
-inline constexpr uint32_t world_save_version = 76;
+///
+/// Bumped to 77 (BL-1470, sentiment contributors; RELATIONS.md § Where a grudge lands,
+/// diplomacy.md § Nations): A TRAILING SECTION after v75's peace refusals carries the
+/// sentiment table's provenance in `write_sentiment_provenance`'s layout — after a u32
+/// count, every row with a live share, ascending (observer, subject), each a row the
+/// sentiment map holds, as (observer, subject, u32 n in [1, 20], n x (u8 kind, f32
+/// access, f32 trust, f32 alarm)) kinds strictly ascending, finite, no share all zero;
+/// then, after a u32 count, every grudge seed record ascending, as (observer, subject,
+/// i32 year, u8 cause kind, i32 score, u32 len <= 256, len bytes of region name). v76 is
+/// a STRICT PREFIX of v77 and is read too (`k_world_save_version_pre_contributors`), as a
+/// world whose rows name no contributor and no seeded war; so is every older version the
+/// reader already accepted.
+inline constexpr uint32_t world_save_version = 77;
+
+/// BL-1470: the first version carrying the sentiment-provenance section (see above).
+inline constexpr uint32_t k_world_save_version_contributors = 77;
+
+/// BL-1470: v76, a strict prefix of v77 (the provenance section is v77's only addition).
+inline constexpr uint32_t k_world_save_version_pre_contributors = 76;
 
 /// BL-1436: the first version whose per-resource arrays are 55 wide.
 inline constexpr uint32_t k_world_save_version_airframes = 76;
@@ -876,6 +894,11 @@ std::size_t world_save_sea_recruits_section_bytes(const world& w);
 /// refusal. The LAST section of a v75 stream.
 std::size_t world_save_refusals_section_bytes(const world& w);
 
+/// BL-1470: the byte length of the v77 sentiment-provenance section `w` writes - 8, plus
+/// 12 + 13 per share for each row with shares, plus 21 + the name for each seed record.
+/// The LAST section of a v77 stream.
+std::size_t world_save_contributors_section_bytes(const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -992,6 +1015,9 @@ void write_world_snapshot_pre_refusals(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1436): the v75 stream shape - every per-resource array 54 wide,
 /// airframes dropped - so the narrowed reader has a producer.
 void write_world_snapshot_pre_airframes(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1470): the v76 stream shape - no sentiment-provenance section.
+void write_world_snapshot_pre_contributors(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

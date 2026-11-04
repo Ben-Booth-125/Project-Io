@@ -3124,6 +3124,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             e["hostile_out"] = r.hostile_out; e["hostile_in"] = r.hostile_in;
             e["friends"] = r.friends; e["at_war"] = r.at_war; e["truce"] = r.truce;
             e["access"] = r.access; e["trust"] = r.trust; e["alarm"] = r.alarm;
+            // BL-1470: where the Access bar is drawn and the cause line its hover shows.
+            e["access_bar_x"] = r.access_bar_x; e["access_bar_y"] = r.access_bar_y;
+            e["access_cause"] = r.access_cause;
             rows[++k] = e;
         }
         out["rows"] = rows;
