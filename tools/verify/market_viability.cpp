@@ -1430,6 +1430,37 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     // nations stuck at an empty treasury. A nation counts as broke on a tick when
     // its treasury is under one credit; its longest broke run is kept per nation.
     std::map<entity_id, int> broke_run, broke_max; // nation -> current / longest run (ticks)
+    // BL-1482 (broke nation spiral; Ben 2026-11-04, "measure first"): the BR split.
+    // Each nation's FIRST broke run to reach 20 ticks is classed when it does:
+    //   a  broke at the handoff and the run began at play tick 1;
+    //   b  solvent at the handoff, and a building of its own was started in the
+    //      k_br_window ticks up to the run's first tick (the latest is named);
+    //   c  any other.
+    // A class-a nation's later recovery (treasury >= 1 on any later tick) is counted.
+    constexpr int k_br_window = 10;
+    std::map<entity_id, bool> br_handoff_broke;
+    std::map<entity_id, std::set<entity_id>> br_assets; // nation -> its asset ids last tick
+    std::map<entity_id, std::pair<int, std::string>> br_last_build; // nation -> (tick, what)
+    std::map<entity_id, std::pair<int, std::string>> br_pre_build;  // the last build as the current run began
+    std::map<entity_id, int> br_run_start, br_class_tick; // run's first tick; tick classed
+    std::map<entity_id, char> br_class;
+    std::map<entity_id, std::string> br_cause; // class b: the build named
+    std::map<entity_id, bool> br_recovered;
+    for (const auto& [nid, nc] : w.nations)
+    {
+        br_handoff_broke[nid] = nc.treasury < 1.0f;
+        br_assets[nid] = std::set<entity_id>(nc.state_assets.begin(), nc.state_assets.end());
+    }
+    const auto br_what = [&](const building_component& b) -> std::string {
+        if (b.type == building_type::processing_facility)
+        {
+            const recipe* rc = reg.get_recipe(b.recipe);
+            return std::string("processor:") + (rc ? rc->name : "?");
+        }
+        if (b.type == building_type::extraction_site)
+            return "extraction:" + resource_names::name_of(b.target_resource);
+        return "type" + std::to_string(static_cast<int>(b.type));
+    };
     const auto makes_power = [&](const building_component& b) {
         if (b.type != building_type::processing_facility) return false;
         const recipe* rc = reg.get_recipe(b.recipe);
@@ -1706,10 +1737,41 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
         }
         for (const auto& [nid, nc] : w.nations)
         {
+            // BL-1482: this tick's new own buildings (ascending id; the latest wins).
+            std::set<entity_id> now(nc.state_assets.begin(), nc.state_assets.end());
+            std::set<entity_id>& before = br_assets[nid];
+            for (const entity_id a : now)
+                if (before.count(a) == 0)
+                    if (const auto bit = w.buildings.find(a); bit != w.buildings.end())
+                        br_last_build[nid] = { k, br_what(bit->second) };
+            before = std::move(now);
+
             int& run = broke_run[nid];
             run = nc.treasury < 1.0f ? run + 1 : 0;
+            if (run == 1)
+            {
+                br_run_start[nid] = k;
+                if (const auto lbb = br_last_build.find(nid); lbb != br_last_build.end()) br_pre_build[nid] = lbb->second;
+                else br_pre_build.erase(nid);
+            }
             int& mx = broke_max[nid];
             mx = std::max(mx, run);
+            if (run >= 20 && br_class.count(nid) == 0)
+            {
+                const int start = br_run_start[nid];
+                char cls = 'c';
+                const auto lb = br_pre_build.find(nid);
+                if (br_handoff_broke[nid] && start == 1)
+                    cls = 'a';
+                else if (!br_handoff_broke[nid] && lb != br_pre_build.end()
+                         && lb->second.first <= start && lb->second.first > start - k_br_window)
+                    cls = 'b';
+                br_class[nid] = cls;
+                br_class_tick[nid] = k;
+                if (cls == 'b') br_cause[nid] = lb->second.second;
+            }
+            if (nc.treasury >= 1.0f && br_class.count(nid) != 0 && br_class[nid] == 'a')
+                br_recovered[nid] = true;
         }
         if (k == k_g1_g2_play_tick || k == ticks)
         {
@@ -1717,6 +1779,20 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
             for (const auto& [nid, mx] : broke_max) { (void)nid; if (mx >= 20) ++n20; }
             (k == k_g1_g2_play_tick ? r.pw_broke20_t50 : r.pw_broke20_end) = n20;
             r.pw_nations = static_cast<int>(w.nations.size());
+            int na = 0, nb = 0, nc_ = 0, na_rec = 0;
+            std::map<std::string, int> what;
+            for (const auto& [nid, cls] : br_class)
+            {
+                if (cls == 'a') { ++na; if (br_recovered.count(nid)) ++na_rec; }
+                else if (cls == 'b') { ++nb; ++what[br_cause.at(nid)]; }
+                else ++nc_;
+            }
+            std::string ws;
+            for (const auto& [name, n] : what) ws += " " + name + "=" + std::to_string(n);
+            std::printf("BR seed %u %s: nations broke 20+ ticks %d: a broke-at-handoff %d (recovered later %d)"
+                        " b build-then-zero %d c other %d | b builds:%s\n",
+                        seed, k == ticks ? "end" : "t50", na + nb + nc_, na, na_rec, nb, nc_,
+                        ws.empty() ? " -" : ws.c_str());
         }
         if (k == k_g1_g2_play_tick)
             for (const auto& [bid, b] : w.buildings)
