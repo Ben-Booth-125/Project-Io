@@ -2,12 +2,10 @@
 
 ## Sprint 62 — equal starts for majors (opened 2026-11-02, CLOSED 2026-11-04)
 
-**Closed.** Delivered BL-1475 (opening parity census) and BL-1473 (major opening kit); requirement group
-`major-opening-kit` closed with R4 failed. Retro: archive/sprints-2026-Q4.json, record 62.
-
-**Carried to sprint 61 (re-tagged in the backlog).** BL-1474 (major opening army), BL-1476 (wizard default
-thirty), BL-1487 (kit processors idle): 38 of 578 kit processors idled at the handoff, against 20 with the
-logistics cap lifted.
+**Closed.** Delivered BL-1475 (opening parity census), BL-1473 (major opening kit), BL-1474 (major
+opening army), BL-1476 (wizard default thirty) and BL-1487 (kit processors idle). Requirement group
+`major-opening-kit` closed with R4 failed; BL-1487 then brought kit processors running to 569 of 578.
+Retro: archive/sprints-2026-Q4.json, record 62. Owed: Ben's live click on the setup round (30 / 4).
 
 ## Sprint 61 — diplomacy and war (designed 2026-10-30, beside sprint 60)
 

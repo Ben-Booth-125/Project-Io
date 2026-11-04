@@ -440,7 +440,7 @@
       "id": "62",
       "theme": "equal starts for majors",
       "state": "landed",
-      "status_line": "CLOSED 2026-11-04, no version cut (sprint 61 targets v0.3.0). Every major opens on the Rich-core kit and 12,000 credits; the logistics cap keeps the nodes that cover the kit and re-sites what it strands. Treasury spread at 20:4 21x -> 1.77x; no major loses money. R4 failed and carried (38 kit processors idled). Two re-pins.",
+      "status_line": "CLOSED 2026-11-04, no version cut (sprint 61 targets v0.3.0). Every major opens on the Rich-core kit, 12,000 credits and a fixed eight-unit army; the logistics cap keeps the nodes that cover the kit and re-sites what it strands; the kit stocks its processors' inputs. Treasury spread at 20:4 21x -> 1.63x; men spread 1.00x; no major loses money; 569 of 578 kit processors run. Wizard default 30 nations. Two re-pins; the third waits on Ben.",
       "opened_date": "2026-11-02",
       "author": "Ben (2026-11-02, starter-package form)",
       "goal": "Collapse the majors' opening treasury and buildings to roughly equal; asymmetry comes from land, population and neighbours.",
@@ -459,16 +459,20 @@
           "CENSUS: BL-1475 (opening parity census): opening_parity, per-major treasury, buildings, men and five years of operating net; --kit, --diagnose-idle and --no-logistics-cap; the opening-parity skill.",
           "KIT: BL-1473 (major opening kit): every major takes up its walk-placed plant and lays the Rich-core kit with the substitution ladder; flat 12,000-credit treasury; the opening cut skips majors; want at the major's own markets; curated feed counts; the logistics count is a cap.",
           "KIT WITHIN REACH: the cap keeps the standing nodes (or bridge pairs) that cover the kit first, then re-sites each kit extractor or processor left uncovered. Idled kit buildings 374 -> 100; kit processors running 511 -> 540 of 578.",
-          "PARITY (20:4, 16 seeds): treasury spread median 21x -> 1.77x (worst 2.52x); majors losing money 17 -> 0; median major treasury 21,980."
+          "PARITY (20:4, 16 seeds): treasury spread median 21x -> 1.77x (worst 2.52x); majors losing money 17 -> 0; median major treasury 21,980.",
+          "ARMY: BL-1474 (major opening army): eight units of 50 men posted as garrisons, four at the capital, four to the border posts by grudge; military bases re-laid so none is raised; seat moves keep every major's eight (Ben, 2026-11-04).",
+          "WIZARD: BL-1476 (wizard default thirty): the wizard suggests 30 nations and 4 majors.",
+          "INPUT STOCK: BL-1487 (kit processors idle): the kit shelves its processors' inputs for the idle reflex's window; kit processors running 541 -> 569 of 578 at 20:4, past the cap-off control's 558."
         ],
         "carried": [
-          "To sprint 61, re-tagged in the backlog: BL-1474 (major opening army), BL-1476 (wizard default thirty), and BL-1487 (kit processors idle), R4's residue: 38 kit processors idled at the handoff, against 20 with the cap lifted.",
-          "Open in the queue: NR-1133 (fuel, power and ordnance never wanted). Almost every major's university slot goes unbuilt (it needs a larger centre than most capitals hold)."
+          "Nothing re-tagged: BL-1474, BL-1476 and BL-1487 were carried to sprint 61 at the first close, then built the same day in this sprint (Ben, 2026-11-04).",
+          "Open in the queue: NR-1133 (fuel, power and ordnance never wanted): coal extractors produce at the price floor into markets with no buyer. Almost every major's university slot goes unbuilt. Ben's live click on the setup round (30 / 4) is owed."
         ],
         "feedback": [
           "The census counted uncovered buildings through lp_consumer, which skips decommissioned ones, so it read 0 on exactly the buildings the cap stranded. A census of a failure mode must count the buildings that failure switches off.",
           "Cover-first alone reached 273 idled against the cap-off control's 38: the control is what showed the slot counts, not the choice of nodes, were the limit.",
-          "BL-1436 (kit in the age tree) merged mid-sprint without a re-pin, so main failed its digests until the 2026-11-04 re-pin named both movers. A merge that moves the save format re-pins with it."
+          "BL-1436 (kit in the age tree) merged mid-sprint without a re-pin, so main failed its digests until the 2026-11-04 re-pin named both movers. A merge that moves the save format re-pins with it.",
+          "The diagnosis lambda labelled 31 uncovered buildings \"no labour\"; their Logistic Point fraction was 0. Read the fraction before the workforce."
         ]
       }
     }

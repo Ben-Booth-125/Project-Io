@@ -97,5 +97,19 @@
   "anchor": "The kit stands within the capped network's reach \\(Ben, 2026-11-04\\)",
   "stale": [],
   "owner": "BL-1473 (major opening kit)"
+ },
+ {
+  "ruling": "Taking a seat keeps the army (Ben, 2026-11-04)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Taking a seat keeps the army \\(Ben, 2026-11-04\\)",
+  "stale": [],
+  "owner": "BL-1474 (major opening army)"
+ },
+ {
+  "ruling": "The kit also stocks its processors inputs (Ben, 2026-11-04)",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "The kit also stocks its processors' inputs \\(Ben,\\s+2026-11-04\\)",
+  "stale": [],
+  "owner": "BL-1487 (kit processors idle)"
  }
 ]

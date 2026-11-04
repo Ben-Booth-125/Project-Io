@@ -17,7 +17,13 @@ release.
 - **Every major opens on the same kit** (BL-1473 (major opening kit)): its walk-placed plant is
   taken up and the Rich-core kit laid in its place, with a substitution ladder for slots the ground
   cannot hold, on a flat 12,000-credit treasury. Asymmetry now comes from land, population and
-  neighbours. The kit stands within reach of the capped logistics network.
+  neighbours. The kit stands within reach of the capped logistics network, and stocks its
+  processors' inputs so a fresh chain is fed before its own feeders deliver (BL-1487 (kit
+  processors idle)).
+- **Every major opens with the same army** (BL-1474 (major opening army)): eight units of 50 men,
+  four at the capital and four facing its most aggrieved neighbours. The player's major keeps
+  them when it takes the seat.
+- **The wizard suggests 30 nations** (BL-1476 (wizard default thirty)), with 4 majors.
 - **Opening parity census** (BL-1475 (opening parity census)): `opening_parity` and the
   `opening-parity` skill measure the majors' spread and workability over five years of play.
 

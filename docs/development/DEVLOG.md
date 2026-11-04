@@ -35,9 +35,14 @@ kit processors running 540 of 578.
 **Re-bless.** Two. 2026-11-03 for the kit and the Trust rates; 2026-11-04 for BL-1436 (kit in the age
 tree, save v76, merged without a re-pin) and the kit re-site. D_search unmoved both times; 16 of 16 PASS.
 
-**Left open.** BL-1474 (major opening army), BL-1476 (wizard default thirty) and BL-1487 (kit
-processors idle) carry to sprint 61. NR-1133 (fuel, power and ordnance never wanted) is open; most
-majors' university slot goes unbuilt.
+**The carries, built the same day.** Ben asked to finish the sprint's three carries in the same session.
+- **Army:** BL-1474 (major opening army). Eight 50-man units posted as garrisons; the major's military bases are re-laid so none reads as raised. Ben ruled that a seat move keeps every major's eight. Men spread 1.00x on every seed.
+- **Wizard:** BL-1476 (wizard default thirty). Majors still share a border on 13 of 16 seeds at 30:4, as at 20:4.
+- **Input stock:** BL-1487 (kit processors idle). The idled processors were a settle deadlock: an empty shelf, eight loss ticks, then the feeder idled too. The kit now shelves its processors' inputs for that window. Kit processors running at 20:4: 541 -> 569 of 578.
+
+**Left open.** NR-1133 (fuel, power and ordnance never wanted): coal extractors produce at the price
+floor into markets with no buyer. Most majors' university slot goes unbuilt. Ben's live click on the
+setup round is owed.
 
 ## 2026-10-30 — Sprint 60: war in time and on the ground — version 0.2.4
 

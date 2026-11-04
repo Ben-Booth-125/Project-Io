@@ -12945,6 +12945,54 @@
         "archived"
       ]
     },
+    "BL-1474": {
+      "design": "Written in docs/military/MILITARY.md § Nation garrisons (Ben, 2026-11-02). Work: for a major, replace treasury-scaled garrison sizing with the kit's force (5 infantry, 1 motorised, 1 artillery, 1 light armour, base kit), four at the capital post and one each at border posts in grudge order, wrapping; seed_starting_military's unit counts among the eight; land pool opens at 200. Minors unchanged. DELIVERED 2026-11-04 (79c030ba): every major takes up its units and military bases and posts the kit's eight; the capital base is laid fresh after, so none reads as raised. Seat moves keep every major's eight (Ben, 2026-11-04, MILITARY.md § Nation garrisons). 16 seeds at 20:4 and 30:4: men 400 on every major, spread 1.00x. The settle's twelve quarters fill the land pool from 200 to its cap (750) on every major alike.",
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 62,
+      "version_goal": "v0.3.0",
+      "written": "2026-11-02",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (Ben, starter-package form, 2026-11-02)",
+      "requires": [
+        "BL-1473"
+      ],
+      "id": "BL-1474",
+      "short_name": "MAJOR_OPENING_ARMY",
+      "category": "Military",
+      "authority_doc": "docs/military/MILITARY.md",
+      "priority": "A",
+      "difficulty": 3,
+      "files": [
+        "src/world/nation_generation.cpp",
+        "src/world/corporation_generation.cpp",
+        "src/world/recruits.cpp"
+      ],
+      "title": "Every major opens with eight land units and 200 recruits",
+      "delivered": "2026-11-04",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "short_name",
+        "category",
+        "authority_doc",
+        "priority",
+        "difficulty",
+        "files",
+        "title",
+        "design",
+        "delivered"
+      ]
+    },
     "BL-1475": {
       "design": "@docs/development/archive/backlog-design-2026-Q4.json",
       "status": "complete",
@@ -12988,6 +13036,97 @@
         "delivered",
         "design",
         "archived"
+      ]
+    },
+    "BL-1476": {
+      "design": "Written in docs/generation/NATION_GENERATION.md § The nation count is a target (Ben, 2026-11-02). Work: wizard_default_nation_total 20 -> 30. Spacing is measured by BL-1475 (opening parity census) before any rule. DELIVERED 2026-11-04 (79c030ba): wizard_default_nation_total 30; setup_round.lua passes at 30 / 4. Spacing, measured: majors share a border on 13 of 16 seeds at both 20:4 and 30:4 (pairs median 1, max 3 at 20:4 and 2 at 30:4), so the count alone does not part them. Ben's live click on the setup round is owed.",
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 62,
+      "version_goal": "v0.3.0",
+      "written": "2026-11-02",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (Ben, starter-package form, 2026-11-02)",
+      "requires": [],
+      "id": "BL-1476",
+      "short_name": "WIZARD_DEFAULT_THIRTY",
+      "category": "UI",
+      "authority_doc": "docs/generation/NATION_GENERATION.md",
+      "priority": "B",
+      "difficulty": 1,
+      "files": [
+        "src/core/app.hpp"
+      ],
+      "title": "The wizard suggests 30 nations and 4 majors",
+      "delivered": "2026-11-04",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "short_name",
+        "category",
+        "authority_doc",
+        "priority",
+        "difficulty",
+        "files",
+        "title",
+        "design",
+        "delivered"
+      ]
+    },
+    "BL-1487": {
+      "design": "The residue of BL-1473 (major opening kit) R4, measured 2026-11-04 on eba4f3dc with opening_parity --pairs 20:4 --diagnose-idle (16 seeds, 64 majors). After the cover-first cap and the kit re-site (CORPORATION_GENERATION.md § A major's opening kit, Ben 2026-11-04), 100 kit buildings idle at the handoff (62 extraction, 38 processing); with the cap lifted (--no-logistics-cap) 38 idle (18, 20). Of the 100: 28 have no labour, 22 are starved of copper ore, silica or coal, 3 have no deposit; 38 found no covered tile to re-site to. Work: read the 28 no-labour cases (the pool is per nation and body; contention allocates by wage), then the starved processors' feeds, and decide whether the gap to the control is the cap's or the kit's. The requirement is R4's own: every kit processor passes Pass 3 and runs at the handoff. DELIVERED 2026-11-04 (79c030ba): the kit shelves each processor's inputs for the idle reflex's window (Ben, 2026-11-04: \"Kit stocks its inputs\"; CORPORATION_GENERATION.md § Opening stock follows the kit). Kit processors running at the handoff: 20:4 541 -> 569 of 578, 30:4 536 -> 551 of 554; starvation 33 -> 0. Left: 7 processors with no covered tile of their kind and 3 producing at a loss; idled extraction is mostly uncovered ground and the coal glut (NR-1133).",
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 62,
+      "version_goal": "v0.3.0",
+      "written": "2026-11-04",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (sprint 62 close, Ben, 2026-11-04)",
+      "requires": [
+        "BL-1473"
+      ],
+      "id": "BL-1487",
+      "short_name": "KIT_PROCESSORS_IDLE",
+      "category": "Generation",
+      "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+      "priority": "B",
+      "difficulty": 3,
+      "files": [
+        "src/world/opening_kit.cpp",
+        "tools/verify/opening_parity.cpp"
+      ],
+      "title": "38 of 578 kit processors are idled at the handoff, against 20 with the logistics cap lifted",
+      "delivered": "2026-11-04",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "short_name",
+        "category",
+        "authority_doc",
+        "priority",
+        "difficulty",
+        "files",
+        "title",
+        "design",
+        "delivered"
       ]
     }
   }
