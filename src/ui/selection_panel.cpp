@@ -3464,7 +3464,11 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
     {
         const float cpad = style.CellPadding.x * 2.0f;
         ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("##good",   ImGuiTableColumnFlags_WidthStretch, 1.0f);
+        // The good is its extraction glyph in its colour, the name on hover (Ben,
+        // 2026-11-04, BL-1490): at the 1280x720 floor this card is ~135 px and a
+        // name column left the longest names 4 px.
+        const float glyph_w = ImGui::GetTextLineHeight();
+        ImGui::TableSetupColumn("##good",   ImGuiTableColumnFlags_WidthFixed, glyph_w);
         ImGui::TableSetupColumn("Built",    ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Built").x + cpad);
         ImGui::TableSetupColumn("Max",      ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Max").x + cpad);
         ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Resource").x + cpad);
@@ -3474,13 +3478,17 @@ void draw_province_card(const world& w, ui_state& ui, entity_id tile_id, float c
             const resource_presentation& rp = presentation_of(r.resource);
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(rp.colour));
+            {
+                const ImVec2 gp = ImGui::GetCursorScreenPos();
+                const float  gr = glyph_w * 0.5f;
+                icons::building(ImGui::GetWindowDrawList(), {gp.x + gr, gp.y + gr}, gr,
+                                building_type::extraction_site, r.resource, rp.colour);
+                ImGui::Dummy({glyph_w, glyph_w});
+            }
             // Agricultural Produce reads "Farm" here (Ben, 2026-10-14): the row's
-            // question is what can be built, and the 247 px card elided the long name.
-            const char* row_label = (r.resource == resource_type::agricultural_produce) ? "Farm" : rp.name;
-            fit_text(text_box::table_cell, "selection.province.resource", row_label,
-                     ImGui::GetContentRegionAvail().x);
-            ImGui::PopStyleColor();
+            // question is what can be built.
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s", (r.resource == resource_type::agricultural_produce) ? "Farm" : rp.name);
             ImGui::TableSetColumnIndex(1);
             ImGui::Text("%d", r.built);
             if (ImGui::IsItemHovered())

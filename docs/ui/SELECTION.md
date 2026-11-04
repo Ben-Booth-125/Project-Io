@@ -172,9 +172,11 @@ a tile keep the shared header (§ Layout & chrome).
      site, through the same `can_place_in_world` the placement seam uses, so the table cannot
      disagree with the build button) and **Resource** (the province's deposit of it, **summed**
      across member tiles — a deposit is a stock, so several tiles each holding a little iron *is*
-     one province holding that much). Richest deposit first. Agricultural Produce
-     is labelled **Farm** in this table (Ben, 2026-10-14) — the name of what is built on it, short
-     enough for the card. This one table replaces the former
+     one province holding that much). Richest deposit first. Each row names its resource by
+     **glyph, not text**: the extraction-site glyph keyed to that resource, in its colour, with
+     the name on hover (Ben, 2026-11-04) — at the 1280×720 floor the card is about 135 px, and a
+     name column left the longest names 4 px. Agricultural Produce's hover name is **Farm**
+     (Ben, 2026-10-14) — the name of what is built on it. This one table replaces the former
      separate Buildings and Deposits sections: they were two readings of the same rows.
      It takes the rest of the card's height and **scrolls inside itself**.
    - **Population** — the province total in thousands, **top right of the header row**.
