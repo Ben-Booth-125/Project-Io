@@ -280,11 +280,94 @@ std::string war_context(const world& w, entity_id a, entity_id b)
     return {};
 }
 
+/// BL-1470: the player's words for a factor kind — RELATIONS.md § The factors,
+/// read aloud. Indexed by the kind, so a new kind is one more entry.
+const char* conduct_words(sentiment_factor_kind k)
+{
+    static constexpr const char* words[sentiment_factor_count] = {
+        "contracts delivered",       // contract_completed
+        "contracts cancelled",       // contract_cancelled
+        "trade",                     // trade_conducted
+        "a firm taken",              // equity_taken
+        "a declaration of war",      // hostility_declared
+        "a friendship accepted",     // friendship_accepted
+        "levies charged",            // levy_charged
+        "an embargo",                // embargo_imposed
+        "lobbying against them",     // lobbied_against
+        "force used",                // force_used
+        "a contract failed",         // contract_failed
+        "an old grudge",             // historical_grudge
+        "a war declared on others",  // war_declared
+        "a peace concluded",         // peace_concluded
+        "provinces ceded",           // province_ceded
+        "visible technology",        // technology_visible
+        "large facilities",          // facility_visible
+        "force on the border",       // border_force
+        "trade severed",             // trade_severed
+        "unrest",                    // unrest_visible
+    };
+    const std::size_t i = static_cast<std::size_t>(k);
+    return i < sentiment_factor_count ? words[i] : "conduct";
+}
+
+/// BL-1470: the seeded war's cause, in grudge_event_line's words (`grudge_kind`).
+const char* grudge_cause_words(uint8_t kind)
+{
+    switch (kind)
+    {
+    case 0: return "ground taken";
+    case 1: return "the seat sacked";
+    case 2: return "the border raided";
+    case 3: return "a realm ended";
+    case 4: return "a treaty broken";
+    case 5: return "a faith sundered";
+    }
+    return "an old wrong";
+}
+
+/// BL-1470: the hover's cause line for one dimension of @p obs -> @p subj — its
+/// largest contributing conduct and, on a row still carrying the seeded grudge,
+/// the war that seeded it with its region and year. Empty with neither.
+std::string cause_line(const world& w, entity_id obs, entity_id subj, sentiment_dimension dim)
+{
+    std::string out;
+    if (const sentiment_contribution* c = sentiment_largest_contributor(w.sentiment, obs, subj, dim))
+    {
+        const float share = dim == sentiment_dimension::access ? c->access
+                          : dim == sentiment_dimension::trust  ? c->trust
+                                                               : c->alarm;
+        char line[128];
+        std::snprintf(line, sizeof line, "Largest cause: %s (%+.1f)", conduct_words(c->kind), share);
+        out = line;
+    }
+    if (sentiment_contribution_of(w.sentiment, obs, subj, sentiment_factor_kind::historical_grudge))
+    {
+        const auto s = w.sentiment.seeds.find({obs, subj});
+        if (s != w.sentiment.seeds.end())
+        {
+            const sentiment_seed_record& r = s->second;
+            char line[256];
+            const int  y  = r.year;
+            const bool bc = y < 0;
+            std::snprintf(line, sizeof line, "Seeded by an old war: %s at %s, %d %s",
+                          grudge_cause_words(r.cause_kind),
+                          r.region.empty() ? "an unnamed place" : r.region.c_str(),
+                          bc ? -y : y, bc ? "BCE" : "CE");
+            if (!out.empty())
+                out += "\n";
+            out += line;
+        }
+    }
+    return out;
+}
+
 /// One signed bar: a track over [-limit, limit] with a centre tick, the value's
 /// fill from the centre, the figure after it and a trend arrow. @p bad_high says
-/// positive is the bad side (Alarm). Hover names the value, band, change and war.
-void sentiment_bar(const char* label, float v, bool has_trend, float delta, bool bad_high,
-                   const sentiment_params& p, const std::string& context)
+/// positive is the bad side (Alarm). Hover names the value, band, change, its
+/// largest cause (BL-1470) and the war. Returns the bar's centre on screen.
+ImVec2 sentiment_bar(const char* label, float v, bool has_trend, float delta, bool bad_high,
+                     const sentiment_params& p, const std::string& context,
+                     const std::string& cause = std::string())
 {
     // One label column wide enough for the longest label, from wherever the row
     // starts (the expanded block is indented), so the bar never runs into it.
@@ -313,6 +396,7 @@ void sentiment_bar(const char* label, float v, bool has_trend, float delta, bool
     dl->AddLine({cx, y0 - 2.0f}, {cx, y0 + h + 2.0f}, palette::text_secondary, 1.0f);
     ImGui::InvisibleButton(label, {bw, ImGui::GetTextLineHeight()});
     const bool hovered = ImGui::IsItemHovered();
+    const ImVec2 centre{cx, p0.y + ImGui::GetTextLineHeight() * 0.5f};
     ImGui::SameLine();
     ImGui::Text("%+.1f", v);
     if (has_trend && std::fabs(delta) >= 0.05f)
@@ -340,15 +424,21 @@ void sentiment_bar(const char* label, float v, bool has_trend, float delta, bool
             std::snprintf(ch, sizeof ch, "\n%+.1f over the last four ticks", delta);
             tip += ch;
         }
+        if (!cause.empty())
+            tip += "\n" + cause;
         if (!context.empty())
             tip += "\n" + context;
         ImGui::SetTooltip("%s", tip.c_str());
     }
+    return centre;
 }
 
-/// The three bars @p obs feels toward @p subj.
+/// The three bars @p obs feels toward @p subj. BL-1470: @p access_at / @p
+/// access_cause, when given, receive the Access bar's centre and its cause line
+/// (the verify API publishes them so a capture can aim the hover).
 void sentiment_block(const world& w, const diplomacy_ledger_state& d, const sentiment_params& p,
-                     entity_id obs, entity_id subj, const std::string& context)
+                     entity_id obs, entity_id subj, const std::string& context,
+                     ImVec2* access_at = nullptr, std::string* access_cause = nullptr)
 {
     const sentiment_value v = sentiment_toward(w.sentiment, obs, subj);
     sentiment_value dt;
@@ -356,9 +446,16 @@ void sentiment_block(const world& w, const diplomacy_ledger_state& d, const sent
     // Two pushes, not one product: an id product overflows a signed int.
     ImGui::PushID(static_cast<int>(obs));
     ImGui::PushID(static_cast<int>(subj));
-    sentiment_bar("Access", v.access, has, dt.access, false, p, context);
-    sentiment_bar("Trust",  v.trust,  has, dt.trust,  false, p, context);
-    sentiment_bar("Alarm",  v.alarm,  has, dt.alarm,  true,  p, context);
+    // BL-1470: each bar's hover names its largest cause. Built every frame, before
+    // the bar knows it is hovered; the read is a few map finds per bar.
+    const std::string ac = cause_line(w, obs, subj, sentiment_dimension::access);
+    const ImVec2 at = sentiment_bar("Access", v.access, has, dt.access, false, p, context, ac);
+    if (access_at != nullptr) *access_at = at;
+    if (access_cause != nullptr) *access_cause = ac;
+    sentiment_bar("Trust",  v.trust,  has, dt.trust,  false, p, context,
+                  cause_line(w, obs, subj, sentiment_dimension::trust));
+    sentiment_bar("Alarm",  v.alarm,  has, dt.alarm,  true,  p, context,
+                  cause_line(w, obs, subj, sentiment_dimension::alarm));
     ImGui::PopID();
     ImGui::PopID();
 }
@@ -968,10 +1065,13 @@ void draw_nations(const world& w, const recipe_registry& reg, const std::vector<
         else                      chip("Neutral", palette::neutral);
 
         // Their sentiment toward you.
-        sentiment_block(w, d, sp, r.id, me, war_context(w, r.id, me));
+        ImVec2      access_at{-1.0f, -1.0f};
+        std::string access_cause;
+        sentiment_block(w, d, sp, r.id, me, war_context(w, r.id, me), &access_at, &access_cause);
 
         d.rows.push_back({r.id, ex, ey, open, r.hostile_out, r.hostile_in, r.friends, r.at_war, r.truce,
-                          r.toward_me.access, r.toward_me.trust, r.toward_me.alarm});
+                          r.toward_me.access, r.toward_me.trust, r.toward_me.alarm,
+                          access_at.x, access_at.y, access_cause});
 
         if (open)
             draw_expanded(w, reg, standings, s, r, me);

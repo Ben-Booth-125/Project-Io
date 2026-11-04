@@ -2060,6 +2060,7 @@ fold_report fold_legacy_firms(world& w, const std::map<entity_id, legacy_firm>& 
     for (auto it = w.sentiment.pairs.begin(); it != w.sentiment.pairs.end();)
         it = (is_firm(it->first.first) || is_firm(it->first.second)) ? w.sentiment.pairs.erase(it)
                                                                       : std::next(it);
+    prune_sentiment_contributions(w.sentiment); // BL-1470: the shares go with their rows
     return out;
 }
 

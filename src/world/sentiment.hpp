@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <iosfwd>
 #include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -448,6 +449,56 @@ inline bool operator==(const sentiment_trade_streak& a, const sentiment_trade_st
     return a.traded == b.traded && a.idle == b.idle && a.armed == b.armed;
 }
 
+/// BL-1470: ONE KIND OF CONDUCT'S SHARE OF ONE ROW — the running sum of every
+/// delta that kind has folded into the row, per dimension, DECAYED WITH THE ROW
+/// (the same rate, the same epsilon snap). It is what lets a surface name the
+/// conduct that moved a value: "this Trust is mostly the trade" rather than a
+/// bare number. A share is the delta BEFORE saturation and Alarm's floor, so the
+/// shares of a saturated or floored row need not sum to it; the read is "which
+/// conduct is largest", never an exact decomposition.
+struct sentiment_contribution
+{
+    sentiment_factor_kind kind = sentiment_factor_kind::contract_completed;
+    float access = 0.0f;
+    float trust  = 0.0f;
+    float alarm  = 0.0f;
+
+    bool zero() const { return access == 0.0f && trust == 0.0f && alarm == 0.0f; }
+};
+
+inline bool operator==(const sentiment_contribution& a, const sentiment_contribution& b)
+{
+    return a.kind == b.kind && a.access == b.access && a.trust == b.trust && a.alarm == b.alarm;
+}
+
+/// BL-1470: THE WAR THAT SEEDED A ROW (RELATIONS.md § Where a grudge lands: "each
+/// seeded row carries the largest contributing event — what was done, in which
+/// region, in which year"). Plain data, resolved by the generation caller from
+/// `grudge_sentiment_seed` (this file never sees a grudge or a settlement): the
+/// cause's `grudge_kind` as its raw value, the region's NAME (generation's
+/// settlement does not survive setup, so the name is kept rather than an index
+/// into it), and the signed calendar year. Kept for the campaign's life; a
+/// surface shows it while the row still carries a `historical_grudge` share.
+struct sentiment_seed_record
+{
+    int32_t     year       = 0;
+    uint8_t     cause_kind = 0;  ///< `grudge_kind`, raw (history_sim.hpp).
+    std::string region;          ///< The cause's region name; empty = no place.
+    int32_t     score      = 0;  ///< The grudge score that seeded the row.
+};
+
+inline bool operator==(const sentiment_seed_record& a, const sentiment_seed_record& b)
+{
+    return a.year == b.year && a.cause_kind == b.cause_kind && a.region == b.region
+        && a.score == b.score;
+}
+
+/// Sanity ceiling on a seed record's region name, in bytes (the save seam's).
+inline constexpr uint32_t sentiment_seed_region_max = 256;
+
+/// Which dimension a contributor read asks about.
+enum class sentiment_dimension : uint8_t { access = 0, trust = 1, alarm = 2 };
+
 /// THE TABLE. Sparse and directed: keyed (observer, subject), and an ABSENT ROW
 /// IS NEUTRAL. A `std::map` so every walk is a sorted walk over ids (BL-158),
 /// which is the same reason `corp_market_pools` and `corp_reputation` are maps.
@@ -461,7 +512,38 @@ inline bool operator==(const sentiment_trade_streak& a, const sentiment_trade_st
 struct sentiment_table
 {
     std::map<std::pair<entity_id, entity_id>, sentiment_value> pairs;
+
+    /// BL-1470: per row, every kind of conduct with a live share, ASCENDING BY
+    /// KIND (a vector, not a map: a row holds a handful). Kept in lockstep with
+    /// `pairs` by the fold and the decay — a row's entry goes when the row goes,
+    /// and a share that decays to zero on all three dimensions is dropped. Read
+    /// through `sentiment_largest_contributor`, never walked for a decision:
+    /// presentation provenance, like `band_of`.
+    std::map<std::pair<entity_id, entity_id>, std::vector<sentiment_contribution>> contributions;
+
+    /// BL-1470: the war that seeded each grudge row, by (observer, subject).
+    /// Written once at world setup; never touched by the fold or the decay.
+    std::map<std::pair<entity_id, entity_id>, sentiment_seed_record> seeds;
 };
+
+/// BL-1470: the largest live contribution to @p observer -> @p subject's @p dim,
+/// or nullptr where the row is absent or nothing moved that dimension. "Largest"
+/// is the greatest |share| among shares on the SAME SIDE as the row's value (a
+/// relieving trade does not explain a raised Alarm), ties to the lower kind; a
+/// row at exactly 0 on @p dim has no contributor. Pure; never inserts.
+const sentiment_contribution* sentiment_largest_contributor(const sentiment_table& t,
+                                                            entity_id observer, entity_id subject,
+                                                            sentiment_dimension dim);
+
+/// BL-1470: the share of @p kind in the row, or nullptr (also for an absent row). Pure.
+const sentiment_contribution* sentiment_contribution_of(const sentiment_table& t,
+                                                        entity_id observer, entity_id subject,
+                                                        sentiment_factor_kind kind);
+
+/// BL-1470: drop every contributions entry whose row is gone. The fold and the
+/// decay keep the two in step themselves; this is for a caller that erases rows
+/// from `pairs` directly (the legacy-firm fold).
+void prune_sentiment_contributions(sentiment_table& t);
 
 /// What @p observer feels about @p subject. Neutral for an absent row, a self
 /// pair, or a null id — the single read point, so no consumer invents its own
@@ -572,7 +654,14 @@ inline constexpr uint32_t sentiment_magic =
 /// Format version. Bump on any layout change to the record below — including an
 /// appended `sentiment_factor_kind`, IF a kind is ever stored (it is not today:
 /// the table stores the derived value, not the history that produced it).
-inline constexpr uint32_t sentiment_version = 2;
+inline constexpr uint32_t sentiment_version = 3;
+
+/// BL-1470: version 2 streams carry no contributions and no seed records; still
+/// read, as a table with none. Version 3 appends both after the rows: a u32 count
+/// of contribution rows, each (observer, subject, u32 n, n x (u8 kind, f32 access,
+/// f32 trust, f32 alarm)) ascending, kinds ascending; then a u32 count of seeds,
+/// each (observer, subject, i32 year, u8 cause kind, i32 score, u32 len, len bytes).
+inline constexpr uint32_t sentiment_version_pre_contributors = 2;
 
 /// BL-1432: version 1 records carry (access, trust) only; still read, with
 /// Alarm 0. Version 2 adds the Alarm float to each record.
@@ -593,3 +682,20 @@ void write_sentiment(const sentiment_table& t, std::ostream& out);
 /// the call returns false. Parse into a local, commit only on success: a
 /// half-loaded relational table is worse than none.
 bool read_sentiment(sentiment_table& t, std::istream& in);
+
+/// BL-1470: the provenance half alone — the contribution rows of every row
+/// @p t holds, then the seed records — in the layout `sentiment_version` 3
+/// documents. The world save's own section writes through this, so the two
+/// seams cannot drift.
+void write_sentiment_provenance(const sentiment_table& t, std::ostream& out);
+
+/// BL-1470: read what `write_sentiment_provenance` wrote, validated against the
+/// rows @p t already holds (a share names a row the table holds, keys strictly
+/// ascending, kinds strictly ascending and in range, values finite, no zero
+/// share; seeds non-null distinct ids ascending, region within the ceiling).
+/// Fills @p contributions and @p seeds (cleared first); false on any failure, and
+/// the caller commits nothing.
+bool read_sentiment_provenance(const sentiment_table& t, std::istream& in,
+                               std::map<std::pair<entity_id, entity_id>,
+                                        std::vector<sentiment_contribution>>& contributions,
+                               std::map<std::pair<entity_id, entity_id>, sentiment_seed_record>& seeds);

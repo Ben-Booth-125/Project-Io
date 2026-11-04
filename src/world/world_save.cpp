@@ -2029,6 +2029,29 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_i32(out, tick);
         }
     }
+
+    // world_save_version 77 (BL-1470): THE SENTIMENT PROVENANCE, the last section,
+    // after the refusals (v75) - each row's live shares, then the grudge seed records,
+    // in the sentiment substrate's own layout so the two seams cannot drift.
+    if (version >= k_world_save_version_contributors)
+        write_sentiment_provenance(w.sentiment, out);
+}
+
+void write_world_snapshot_pre_contributors(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1470): the v76 stream shape - no provenance section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_contributors);
+}
+
+std::size_t world_save_contributors_section_bytes(const world& w)
+{
+    std::size_t n = 4 + 4;
+    for (const auto& [key, shares] : w.sentiment.contributions)
+        if (!shares.empty() && w.sentiment.pairs.count(key) != 0)
+            n += 12 + 13 * shares.size();
+    for (const auto& [key, s] : w.sentiment.seeds)
+        n += 21 + std::min<std::size_t>(s.region.size(), sentiment_seed_region_max);
+    return n;
 }
 
 void write_world_snapshot_pre_refusals(const world& w, std::ostream& out)
@@ -2098,7 +2121,7 @@ std::size_t world_save_kit_goods_bytes(const world& w)
 std::size_t world_save_airframes_bytes(const world& w)
 {
     std::ostringstream wide(std::ios::binary), narrow(std::ios::binary);
-    write_world_snapshot(w, wide);                 // v76
+    write_world_snapshot_pre_contributors(w, wide); // v76 (BL-1470: less v77's provenance)
     write_world_snapshot_pre_airframes(w, narrow); // v75: one column narrower, nothing else
     return wide.str().size() - narrow.str().size();
 }
@@ -2370,7 +2393,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_sea_recruits // 2026-11-02: v72, no sea pools
             && version != k_world_save_version_pre_kit_goods    // BL-1422: v73, arrays 49 wide
             && version != k_world_save_version_pre_refusals     // BL-1480: v74, no peace refusals
-            && version != k_world_save_version_pre_airframes))  // BL-1436: v75, arrays 54 wide
+            && version != k_world_save_version_pre_airframes    // BL-1436: v75, arrays 54 wide
+            && version != k_world_save_version_pre_contributors)) // BL-1470: v76, no provenance
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -3972,6 +3996,13 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             s.peace_refusals.emplace(key, tick);
         }
     }
+
+    // v77 (BL-1470): the sentiment provenance. Untrusted, validated against the rows
+    // already read (`read_sentiment_provenance`); refused whole otherwise. A v76 (and
+    // older) stream ends before it: no row names a contributor or a seeded war.
+    if (version >= k_world_save_version_contributors
+        && !read_sentiment_provenance(s.sentiment, in, s.sentiment.contributions, s.sentiment.seeds))
+        return false;
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all
