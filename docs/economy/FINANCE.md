@@ -45,8 +45,11 @@ debt charge (§ Debt interest); and the extraction levy was a nation charging a 
 cannot do to itself (§ Levies).
 
 **A losing building idles (Ben, 2026-10-23).** When its costs exceed what the treasury can pay, a
-building stops producing and paying until the treasury can pay again. The treasury never goes
-below zero. **Network nodes are paid first (Ben, 2026-10-22):** hubs, stations and ports are funded
+building stops producing and paying until the treasury can pay again. **A treasury may sit
+briefly below zero (Ben, 2026-11-05).** The funding gate commits a tick's bills against posted
+prices, and the earners it admits at an empty treasury (below) can sell for less than that
+estimate; the shortfall is carried as a negative treasury, never clamped, so no money is created.
+It charges no interest (§ Debt interest) and refills from the same earnings. **Network nodes are paid first (Ben, 2026-10-22):** hubs, stations and ports are funded
 before any other building (`NATIONS.md` § What a nation owns).
 
 **Earners keep running (Ben, 2026-11-04; BL-1482, broke nation spiral).** A treasury at zero
@@ -264,9 +267,9 @@ numbers are settled.
 
 ## Debt interest
 
-**Retired (Ben, 2026-10-23).** It compounded a firm's negative balance each quarter. A nation never
-runs into debt: a building its treasury cannot pay for idles instead (§ The money loop), so there
-is no negative balance to charge. The opening working capital that buffered a firm against the
+**Retired (Ben, 2026-10-23).** It compounded a firm's negative balance each quarter. A nation does not
+borrow: a building its treasury cannot pay for idles instead (§ The money loop). The brief
+negative a shortfall leaves is carried, not charged. The opening working capital that buffered a firm against the
 spiral retires with it; a nation's opening money is generation's credit to its treasury
 (`NATIONS.md` § 2).
 
@@ -378,7 +381,7 @@ every store keyed by an erased firm. No verb erases an actor now.
 ## Firm exit — insolvency has a consequence
 
 **Retired (Ben, 2026-10-23).** It wound up a firm whose filed quarters all closed below a balance
-floor. A nation never goes insolvent: a building it cannot pay for idles (§ The money loop), and
+floor. A nation is never wound up: a building it cannot pay for idles (§ The money loop), and
 an idle producer leaving the shelf is what clears a glut.
 
 ## Surfaces
