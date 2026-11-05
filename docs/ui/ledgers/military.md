@@ -58,11 +58,11 @@ explains, never wrapped text in the column.
 arrives) — as a row of **theatre tabs** under the Recruit / Design tabs, one theatre shown at a time,
 each tab carrying the theatre's name and its count. A theatre tab switches what the view lists, so it
 is a selector, not a toggle: re-pressing the active one does nothing (the Recruit / Design tabs keep
-the toggle rule). The **Sea** tab is a stub: it reads that ships are not raised yet, and lists the
-nation's ports under a base picker, the sea pool showing in the header as the other two do. On Recruit the base picker lists military bases
-under Land and airbases under Air, and a row raises at a base of its own theatre only. Design lists
-the air classes beside the land ones; each opens the same full-canvas designer with its own slots
-(airframe, armament, avionics).
+the toggle rule). The **Sea** tab lists the four ship classes, the sea pool showing in the header as the
+other two do. On Recruit the base picker lists military bases under Land, airbases under Air and ports
+under Sea, and a row raises at a base of its own theatre only. Design lists the air and ship classes
+beside the land ones; each opens the same full-canvas designer with its own slots (airframe, armament,
+avionics; hull, armament, sensors).
 
 **A wing is ordered from the canvas.** With a wing selected, right-clicking a province assigns the
 wing there on its current mission; a province out of range is refused with its distance and the

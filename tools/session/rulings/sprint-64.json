@@ -1,0 +1,55 @@
+[
+ {
+  "ruling": "Ships: four classes, raised at a port, sail to a mission zone; patrol, escort and raid; sea control; blockade; landings; no bombardment (Ben, 2026-11-05)",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Ships fight for what crosses the water, and for the right to cross it \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "Nothing spends the sea pool until ships",
+   "Classes: submarines, destroyers and capital ships\\.",
+   "`open_ocean` \\| No \\|"
+  ],
+  "owner": "sprint 64 (BL-1430, sea theatre)"
+ },
+ {
+  "ruling": "On the water a raid decides, not a unit on the tile; escorts can defend a sea leg (Ben, 2026-11-05)",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "On the water a raid decides instead \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "\\*\\*A convoy is cargo and cannot be defended",
+   "a Port, or the sea leg's water"
+  ],
+  "owner": "sprint 64 (BL-1529, patrol escort raid)"
+ },
+ {
+  "ruling": "A blockaded Port makes no trade points (Ben, 2026-11-05)",
+  "doc": "docs/economy/TRADE.md",
+  "anchor": "A blockaded Port makes no trade points \\(Ben, 2026-11-05\\)",
+  "stale": [],
+  "owner": "sprint 64 (BL-1530, sea control and blockade)"
+ },
+ {
+  "ruling": "State holds a fourth research branch, Naval (Ben, 2026-11-05)",
+  "doc": "docs/economy/tech/DIGITISATION_TREE.md",
+  "anchor": "State's fourth branch is Naval \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "nine branches",
+   "split into three \\*\\*branches",
+   "Kit lives by subject in three branches"
+  ],
+  "owner": "sprint 64 (BL-1528, naval branch)"
+ },
+ {
+  "ruling": "A nation opens with the fleet its history left it, sized to its chest (Ben, 2026-11-05)",
+  "doc": "docs/generation/NATION_GENERATION.md",
+  "anchor": "A nation opens with the fleet its history left it \\(Ben, 2026-11-05\\)",
+  "stale": [],
+  "owner": "sprint 64 (BL-1532, opening fleets)"
+ },
+ {
+  "ruling": "Rival nations sail fleets, every mission, on the standing grant terms (Ben, 2026-11-05)",
+  "doc": "docs/ai/AI_OPPONENT.md",
+  "anchor": "Rival nations sail fleets — granted \\(Ben, 2026-11-05",
+  "stale": [],
+  "owner": "sprint 64 (BL-1533, rival fleets)"
+ }
+]

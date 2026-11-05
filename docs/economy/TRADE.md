@@ -39,6 +39,9 @@ makes its points for the **market whose catchment holds it**, and those points m
 *leaving that market*. An owner trades from the markets where it holds a trade building, and from
 nowhere else.
 
+**A blockaded Port makes no trade points (Ben, 2026-11-05).** While a hostile fleet holds the sea province
+at its mouth, it loads and unloads no sea leg and makes no points (`../military/MILITARY.md` § Sea).
+
 **Trade buildings have upkeep (Ben, 2026-10-10).** A Planetary Marketplace and a Port each draw an
 upkeep of **fuel and building materials** every tick, bought from their own market's shelf like
 any other upkeep (`PRODUCTION.md`); the goods and amounts are authored in data. A trade building

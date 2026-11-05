@@ -293,7 +293,7 @@ larger, but not larger than say 80 tiles."*
 
 | Domain (`province_kind`) | Band | Notes |
 |---|---|---|
-| **`land`** | 7–12 soft, 20 hard | The only domain anything can stand in |
+| **`land`** | 7–12 soft, 20 hard | The only domain a land unit stands in unless it holds the shore; ships stand on the two water domains (`../military/MILITARY.md` § Sea) |
 | **`coastal_water`** | the land band exactly — 7–12 soft, 20 hard | The shoreline ring and the lakes. **No population centre seeds one** — the least-accessible-tile seeding survives here (water holds no centres; the BL-611 anchor rule is a land-domain rule). Reuses the land constants; none of its own |
 | **`open_ocean`** | `k_sea_province_soft_target` 42, `k_sea_province_max_tiles` 80 | The sea out of sight of land; seeds spaced `k_sea_province_seed_spacing` = 7 |
 

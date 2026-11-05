@@ -676,6 +676,9 @@ Bases carry no upkeep in play (`../military/MILITARY.md` § Recruits), so their 
 nothing; the opening sizing alone prices each military base and airbase at the maintenance and wage
 it carried before that ruling, so a chest that cannot carry its bases still opens with fewer. The capital's source costs nothing to run (`../economy/LOGISTICS.md`
 § Every capital holds a source), so even a nation with an empty chest opens with its capital lit.
+**A nation opens with the fleet its history left it (Ben, 2026-11-05).** The standing navy at the handoff
+becomes ships at the nation's ports (`../military/MILITARY.md` § Sea), priced at their upkeep in this same
+sizing, so a chest that cannot run them opens with fewer. A nation with no port opens with none.
 **The settle builds only from surplus (Ben, 2026-10-29):** a nation's scorer in the settle may build
 only from income above its running bill, so it never spends the chest the cut sized. No nation, the player's or a
 rival's, takes on debt before the game starts. How much

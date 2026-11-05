@@ -38,7 +38,7 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": null,
+   "sprint": "64",
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
    "parked": false,
@@ -49,14 +49,19 @@
    "category": "Military",
    "authority_doc": "docs/military/MILITARY.md",
    "short_name": "SEA_THEATRE",
-   "priority": "A",
-   "difficulty": 4,
+   "priority": "S",
+   "difficulty": 5,
    "files": [
     "src/world/components.hpp",
-    "src/world/supply_system.cpp"
+    "src/world/unit_roster.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/world_save.cpp",
+    "src/world/combat.hpp",
+    "scripts/economy.lua"
    ],
-   "title": "Submarines, destroyers and capital ships patrol, escort and raid convoys",
-   "design": "MILITARY.md § Sea. One attack to HP plus detection and a target mask; engaged only once detected. Raiding acts on SUPPLY's convoys. Amphibious transport is an open design question."
+   "title": "Ships exist: the four classes, the port door, sailing, the daily detect-and-hit pass",
+   "design": "MILITARY.md § Sea (Ben, 2026-11-05, which replaces this item's open question on amphibious transport). The core every other sprint 64 item stands on: a ship entity with its save section, class table and sea pool spend, the orphan rule, tile-by-tile sailing, mission zones over sea provinces in range, the seeded daily detect-and-hit pass, upkeep and refit at the home port, tactical bombing of a detected ship, and the assign verbs. Combat.hpp's comments still read that the campaign raises no naval unit; correct them here. Harness: replay determinism, an all-submarine fight never hits an undetecting side, save round trip."
   },
   {
    "status": "proposed",
@@ -974,6 +979,268 @@
    ],
    "title": "Doc-versus-code drift found reading the playtest list",
    "design": "Found 2026-11-05, read not run: ACTIONS chrome.esc lists sticky-card rungs the code lacks; LAYOUT:150 calls Diplomacy reserved; MENU:156-160 places own buildings on the dashboard, code uses Construction; MENU:218 says no in-session save, F5 exists; corporation.md:36-38 a Force segment never filled; market.md:151 read 3 versus rank_trade_routes; SUPPLY:67 says convoys are outside state_hash but rail waypoints are folded (world.cpp:235-241); SUPPLY's table omits station_a and station_b; logistics.hpp:483 stale; AI_OPPONENT:2379 province versus MILITARY:549 tile for push; SELECTION:506 water no-op versus march_check. Reconcile each; skip any the rulings already fixed."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [],
+   "id": "BL-1526",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "SEA_TRADE_READING",
+   "priority": "A",
+   "difficulty": 2,
+   "files": [
+    "tools/verify/"
+   ],
+   "title": "Measure how much trade crosses water, per seed and per nation, before any raid number is set",
+   "design": "MEASURE FIRST. Raiding and blockade are worth only what crosses the water. Per library seed and per major: the share of landed cargo value on a sea leg, the same for a nation's imports, and how many ports carry it. Goldens cannot see trade, so this is a harness reading on the shipped start. If the share is small, that is a finding to raise with Ben before patrol, escort and raid are tuned. Run after sprint 63's economy wave."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [
+    "BL-1430"
+   ],
+   "id": "BL-1527",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "SHIP_KIT",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "src/world/unit_designs.cpp",
+    "scripts/recipes.lua",
+    "scripts/economy.lua"
+   ],
+   "title": "Ship designs: hull, armament and sensor slots, and the ship hulls good",
+   "design": "MILITARY.md § Sea, the kit; RESOURCES.md § The kit goods. One live design per class on the existing designer. Ship hulls is a new terminal good at the Arms Works, priced by the margin anchor. Refit at the home port. New good moves the recipe table, so read PRODUCTION.md first."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [
+    "BL-1527"
+   ],
+   "id": "BL-1528",
+   "category": "Military",
+   "authority_doc": "docs/economy/tech/DIGITISATION_TREE.md",
+   "short_name": "NAVAL_BRANCH",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "docs/economy/tech/digitisation_tree.json",
+    "src/world/digitisation_tree_data.hpp",
+    "src/ui/"
+   ],
+   "title": "The Naval research branch: State's fourth, authored in the store",
+   "design": "DIGITISATION_TREE.md § Naval. Author the nodes in the store and render with tech_tree_store.js. The ring and the research panel assume three branches per tree (ST gains ST-NA), so the store check and the panel's sector layout both change. Its quest and joint are authored here. The panel needs a live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [
+    "BL-1430",
+    "BL-1526"
+   ],
+   "id": "BL-1529",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "PATROL_ESCORT_RAID",
+   "priority": "S",
+   "difficulty": 5,
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/logistics.cpp",
+    "src/world/economy_system.cpp"
+   ],
+   "title": "Patrol, escort and raid: the sea leg stops being cut by a unit on its tile",
+   "design": "MILITARY.md § Sea; LOGISTICS.md § 7; SUPPLY.md, the lane. The seeded daily raid on a sea leg in the zone, the escort share, submarine sink against surface prize, and the announcement with \"an unseen raider\". Must conserve: a sunk cargo is destroyed, a prize lands at the nearest own port. Land interdiction is unchanged. Harness: replay determinism, money and goods conservation, friend immunity, undetected submarine ignores escort."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [
+    "BL-1529"
+   ],
+   "id": "BL-1530",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "SEA_CONTROL_BLOCKADE",
+   "priority": "S",
+   "difficulty": 4,
+   "files": [
+    "src/world/supply_system.cpp",
+    "src/world/logistics.cpp",
+    "src/world/economy_system.cpp"
+   ],
+   "title": "Sea control per sea province, and the blockade that closes a port",
+   "design": "MILITARY.md § Sea; TRADE.md, ports. The share per province, the holding bar, the reveal. A held port-mouth province stops sea legs and trade points; the route pricer reads the port as lost, and the caches invalidate on both edges. Harness: prices move at the blockaded market, reopening is same-day, a convoy at sea finishes its leg."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [
+    "BL-1530"
+   ],
+   "id": "BL-1531",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "TROOP_LANDINGS",
+   "priority": "S",
+   "difficulty": 5,
+   "files": [
+    "src/world/unit_roster.hpp",
+    "src/world/economy_system.cpp",
+    "src/world/battle_system.cpp",
+    "src/world/fronts.cpp"
+   ],
+   "title": "Transports embark land units and land them on a coast, gated by sea control",
+   "design": "MILITARY.md § Sea, landings; § Domains and traversal. Embark, carried supplies aboard, loss with a sunk transport, the landing door, the attacker's opening penalty, and life on carried supplies until the network reaches. Read Fronts and Occupation first: a landed unit's front and a taken port's effect on reach are the seams. Live click required."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [
+    "BL-1430",
+    "BL-1527"
+   ],
+   "id": "BL-1532",
+   "category": "Military",
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "short_name": "OPENING_FLEETS",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "src/world/history_sim.cpp",
+    "src/world/hard_coded_world.cpp"
+   ],
+   "title": "Nations open with ships from their history, sized to the chest",
+   "design": "NATION_GENERATION.md, the opening sizing; MILITARY.md § Sea. Read first whether navy_stock survives to the handoff and reaches a nation, because the fold may not carry it. Ships are priced at upkeep in the sizing. A world-mover: measure before and after, and land it in the sprint's one re-bless, not alone."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [
+    "BL-1529",
+    "BL-1530",
+    "BL-1531",
+    "BL-1532"
+   ],
+   "id": "BL-1533",
+   "category": "Military",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "short_name": "RIVAL_FLEETS",
+   "priority": "S",
+   "difficulty": 5,
+   "files": [
+    "src/world/corp_ai.cpp",
+    "src/world/corp_command.cpp"
+   ],
+   "title": "Rival nations raise ships and assign every mission by the scorer",
+   "design": "AI_OPPONENT.md § 11, the fleet grant. Hire, design, mission and landing verbs through corp_command, and no reading of undetected ships. A sunk cargo must score above zero or a rival submarine never raids. Validate each new verb as an untrusted input at the seam. The next-verb bound applies: an invasion is a sequence of separately scored verbs, so measure whether rivals actually land."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [
+    "BL-1430",
+    "BL-1527"
+   ],
+   "id": "BL-1534",
+   "category": "Military",
+   "authority_doc": "docs/ui/ledgers/military.md",
+   "short_name": "SEA_UI",
+   "priority": "S",
+   "difficulty": 4,
+   "files": [
+    "src/ui/",
+    "docs/ai/ACTIONS.json",
+    "docs/ui/question_log.json",
+    "docs/ui/ICONS.md"
+   ],
+   "title": "The Sea tab, ships on the canvas, the mission right-click, and landing presses",
+   "design": "ledgers/military.md; MILITARY.md § Sea. Replace the stub tab, draw ships on water with class and owner, and add mission assignment by right-click, embark and land presses, a closed-port mark on the map, and raid causes in the Convoys ledger. Every control updates ACTIONS.json and every surface the question log. Every press needs a live click."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
+   "requires": [
+    "BL-1533",
+    "BL-1534"
+   ],
+   "id": "BL-1535",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "short_name": "NAVAL_WAR_READING",
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "tools/verify/",
+    "tools/session/rulings/sprint-64.json"
+   ],
+   "title": "Close the sprint on a measured war at sea and the one re-bless",
+   "design": "v0.3.0 needs the naval system and a playtest with a few wars. Sweep the library: fleets raised, raids landed, ports closed, landings made, treasuries under fleet upkeep. Then the sprint's one re-bless, described by rebless_shape_probe, ruling-check, and a live war played to a landing."
   }
  ]
 }

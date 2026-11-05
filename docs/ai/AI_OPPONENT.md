@@ -2402,6 +2402,15 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   declaring the hostility a bombing mission needs (that stays the stance scorer's, BL-450); a
   campaign of missions planned beyond the next assignment. Pure, seeded, deterministic, replayable,
   legal verbs only, never a planner.
+  **Rival nations sail fleets — granted (Ben, 2026-11-05; `../military/MILITARY.md` § Sea).** A new
+  subject: a rival nation's scorer may hire ships at its own ports, design them as the player's designer
+  does, assign each of its OWN ships a patrol, escort, raid or blockade mission over sea provinces in
+  range, embark its OWN land units, and land them, by scored utility over the same legal verbs the player
+  presses. Raids, blockades and opposed landings target only a nation the rival is already hostile to. A
+  raid is scored on the prize taken and on the loss to the hostile owner, so a submarine's sunk cargo scores
+  above zero. **Not admitted:** any ship, port or unit of another nation, the player's included; declaring
+  the hostility a mission needs; reading a ship the rival has not detected; an invasion planned beyond the
+  next verb. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
   **Rival nations wage war whole — granted (Ben, 2026-10-30, resolving NR-1100;
   `../politics/RELATIONS.md` § 7).** The stance grant (BL-450) already covers a rival declaring
   war, and Ben confirmed it does, goals included. The rest of a war is a new subject — territory,

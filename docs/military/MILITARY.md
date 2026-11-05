@@ -451,7 +451,7 @@ conscript or professional choice (BL-1424 (soldiers from labour) is superseded).
 - **Ports make sea recruits (Ben, 2026-11-02).** A completed `port` makes **sea recruits** at a fixed
   number per quarter (`economy.military.recruits`), taken from its province's centres as a base's are,
   into the nation's one **sea pool**, capped at fifteen quarters of its ports' output. Nothing spends
-  the sea pool until ships are raised (the naval system); until then it fills to its cap and stops.
+  the sea pool but a ship's hire (§ Sea).
 - **Seen in the header (Ben, 2026-11-02).** The header's top right shows each theatre's pool - land,
   air and sea - as an icon, recruits held against the cap, and a bar of the pool's fill beneath
   (`../ui/HEADER.md`).
@@ -645,10 +645,99 @@ refits HP, so a bombed economy rebuilds at a cost and an unbuildable repair stay
 
 ### Sea
 
-Sea units operate on coast and ocean tiles, on **patrol**, **escort** and **convoy raiding**.
-They carry HP, morale and **one attack** straight to HP, plus a **detection** value and a **target
-mask** (which classes they can hit). A unit is engaged only once detected, which is a submarine's
-whole value. Classes: submarines, destroyers and capital ships. A raided convoy is SUPPLY's convoy.
+**Ships fight for what crosses the water, and for the right to cross it (Ben, 2026-11-05).** A ship is
+raised at a port, sails to a mission zone, and works it. Three missions fight over convoys: **patrol**,
+**escort** and **raid**. Two things project power onto a shore: the **blockade** and the **landing**. A
+ship's attack reaches ships and convoys only; it does not bombard the shore, and a missile it fires is
+§ Missiles'.
+
+**Four classes (Ben, 2026-11-05).**
+
+| Class | Missions | Character |
+|---|---|---|
+| **Submarine** | Raid | High stealth, so hard to engage. Hits convoys, transports and capital ships. Holds no water. |
+| **Destroyer** | Patrol, escort, raid, blockade | High detection. The class that hits submarines. Cheap, thin hull. |
+| **Capital ship** | Patrol, escort, raid, blockade | The heaviest attack and HP. Cannot hit a submarine, and sees poorly. Most of a fleet's sea control. |
+| **Transport** | Carries land units (below) | No attack and no mission. It is the prize target. |
+
+A sea unit carries HP, morale, **one attack** straight to HP, **detection**, **stealth** and a **target
+mask** (which classes it can hit). There is no hardness and no terrain: water gives 0 defence.
+
+**A port is the one door (Ben, 2026-11-02).** A ship is hired at a completed port on the nation's own
+ground, for credits, its kit and sea recruits from the sea pool, and it records that port as its home.
+The orphan rule is the wing's: a ship whose home port is torn down and that has no other own port
+disbands. Its quarterly supply is drawn at its home port (§ Upkeep), and HP is refit there by drawing
+goods, so a damaged ship goes home to mend. A dropped hire refunds its recruits as a land hire does.
+
+**The kit is the designer's (Ben, 2026-11-05).** Upgrades are designs, not purchases per ship: one live
+design per class (§ The kit), refitting at the home port as kit arrives. The slots are **hull, armament
+and sensors**, and a transport has no armament. Hull sets HP, speed, stealth and a transport's capacity,
+and draws ship hulls (`../economy/RESOURCES.md` § The kit goods). Armament sets attack and target mask,
+and draws artillery pieces or guided weapons. Sensors set detection, and draw electronics. Ship kit opens
+in the **Naval** research branch (`../economy/tech/DIGITISATION_TREE.md` § Naval).
+
+**A ship sails, then works a zone (Ben, 2026-11-05).** A ship stands on one water tile, on coast and
+ocean alike, and moves tile by tile at its class's pace on the same day step as the march. It is drawn
+and can be caught in transit, in whatever province it is crossing. The player assigns a mission and a set
+of **sea provinces** (`../generation/PROVINCES.md` § Three domains) by **right-clicking a sea province
+with the ship selected**. The ship sails there and works the zone with no further orders, and a recalled
+ship sails home. A zone must lie within the class's range of an own port, measured over water, so a
+far ocean is worked only from a port near it.
+
+**The daily pass: detect, then hit.** Sea missions run **daily**, seeded from the world seed, the day and
+the province, so they replay. A side's **detection** in a province is the sum of its ships there, raised
+by a patrol, and by any recon wing flying over it (§ Air). It is compared with each hostile ship's
+stealth, and **a ship is engaged only once detected**, which is a submarine's whole value. A detected
+ship takes hits that day from each hostile ship whose mask allows it, scaled per day as a land round is.
+There is no battle record, and no withdrawal is priced: a ship past its class's HP or morale floor breaks
+off and sails home. A sunk ship is gone. Hostility gates all of it, as on land. Tactical bombing reaches a
+detected ship in the province as it reaches a land unit (§ Air), and a ship cannot shoot back.
+
+**Sea control is a share (Ben, 2026-11-05).** In a sea province it is each hostile side's share of the
+surface attack on patrol, escort or blockade there, as air superiority is a share of air attack. An
+uncontested side holds all of it. Submarines and transports count for nothing, so submarines deny water
+without ever holding it. The side at or past the authored bar **holds** the province. Holding it reveals
+hostile surface ships there, and it is what a blockade and a landing read.
+
+**Patrol** raises its side's detection in the zone, engages whatever it finds, and counts for sea control.
+
+**Escort covers the lanes through its zone (Ben, 2026-11-05).** An escort guards no named convoy, since
+trades dispatch their own shipments. Every sea leg of its own nation's cargo crossing the zone is covered.
+It counts for sea control, and engages a raider it has detected.
+
+**Raid (Ben, 2026-11-05).** A raider acts on a convoy (`../economy/SUPPLY.md`) whose sea leg crosses its
+zone and whose owner its nation has declared hostile; a friend is never raided
+(`../economy/LOGISTICS.md` § 7). On each day of that crossing the cargo is taken at a seeded chance set
+by the raiders' attack against the attack of the escorts in the province **that have detected them**. An
+unescorted convoy is the easy kill, and a submarine no escort has found is not slowed at all.
+**A submarine sinks what it takes. A surface raider takes a prize:** the cargo lands on the market at its
+nearest own port in range and is sold there for its nation, and with no such port it is sunk. Either way
+the goods were committed when the shipment left, so the owner has lost them, and either way it is announced
+(`../economy/LOGISTICS.md` § 7). A raider the owner has not detected is named as **an unseen raider**, so
+the loss has a stated cause without revealing a ship no one has seen.
+
+**Blockade (Ben, 2026-11-05).** A destroyer or capital ship may blockade a port of a nation its nation has
+declared hostile, on the sea province at the port's mouth. **While its side holds that province the port
+loads and unloads no sea leg for anyone, and makes no trade points** (`../economy/TRADE.md`). The route
+pricer reads the closed port as it reads a lost one, so trade reroutes or stops, and the cost lands on the
+blockaded market's prices. A convoy already at sea finishes its leg, and a blockading ship may raid its
+hostile cargo as a raider does. Lose the province and the port reopens that day.
+
+**Landings carry armies over the ocean (Ben, 2026-11-05).** Open ocean bars a land unit except aboard a
+transport (§ Domains and traversal). A land unit **embarks** at an own port up to the transport's capacity.
+Aboard, it neither marches nor fights, it keeps the carried supplies it boarded with (§ Carried supplies),
+and **it goes down with a sunk transport**. A transport **lands** its units on a coast tile touching a
+sea province, on own, friend's or hostile ground and never on a neutral's. On hostile ground the landing
+needs its side to hold that province, so a fleet must win the water first. Landing takes authored days,
+and a landing met by a defender opens the ordinary campaign battle, its first days at an authored penalty
+to the attacker. **Ashore the army lives on carried supplies** until its network reaches it, so it must
+take a port or lose its strength, and overseas supply works through the port it takes (§ Domains and
+traversal).
+
+**Fleets open from history (Ben, 2026-11-05).** A nation opens with ships at its ports, drawn from the
+standing navy its history left it and sized to its chest
+(`../generation/NATION_GENERATION.md`, the opening sizing). A nation with no port opens with no ship.
+**Rival nations sail fleets** under the grant in `../ai/AI_OPPONENT.md` § 11.
 
 ### Missiles
 
@@ -670,7 +759,8 @@ satellite lifts fog over enemy ground and reveals unit stacks; the satellite cla
 
 *Owners: BL-1421 (soft hard resolver), BL-1422 (land classes and kit), BL-1423 (refit and
 retreat), BL-1424 (soldiers from labour), BL-1425 (unit counter render), BL-1426 (bunkers),
-BL-1427 (fronts), BL-1449 (air combat core), BL-1430 (sea theatre), BL-1431 (missiles and
+BL-1427 (fronts), BL-1449 (air combat core), BL-1430 (sea theatre), BL-1527 (ship kit), BL-1529 (patrol escort
+raid), BL-1530 (sea control and blockade), BL-1531 (troop landings), BL-1431 (missiles and
 satellites).*
 
 ---
@@ -881,7 +971,7 @@ units are land-bound, and it is what makes water a place rather than a wall.
 |---|---|---|
 | `land` | Yes | No |
 | `coastal_water` | **Only where OWNED** (`docs/generation/PROVINCES.md` § Who owns water) | Yes |
-| `open_ocean` | No | Yes |
+| `open_ocean` | **Only aboard a transport** (§ Sea) | Yes |
 
 **Land units crossing owned coastal water is the deliberate middle case.** A shoreline your polity
 holds is a shallow, bridged, causewayed thing — the road layer already reasons this way, treating a
@@ -1188,7 +1278,8 @@ its tile, blocking a step, until the quarter ends.
 The days are authored data: `economy.military.march_days_per_tile`, keyed by land class, and
 `economy.military.march_days_per_tile_by_cls` for a **pre-modern row**, which declares no land
 class and marches by its `cls` — infantry 3, cavalry 1.5, ranged 3, siege 3 (foot pace for a siege
-train); naval has no entry, so a naval row cannot march on this table. The loader rejects any entry
+train); naval has no entry, so a naval row cannot march on this table. A campaign ship sails on its
+class's own pace (§ Sea). The loader rejects any entry
 that is not a positive, finite number, and any key that names no class. A day's movement is
 1 / the class's days, banked in `order.progress` in units of traversal cost — the unit the field
 always had, so a saved part-tile reads as the same part-tile — and the unit steps whenever the bank

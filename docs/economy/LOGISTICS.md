@@ -772,8 +772,15 @@ a stated cause, and the tile is marked for a few ticks. An interception is the m
 thing that can happen to a player's economy without them pressing anything, so silence is the
 wrong default (NR-407).
 
-**A convoy is cargo and cannot be defended.** Assigning a unit to a convoy — turning interception
-into a real battle — is named in BL-458's design and deliberately excluded from it.
+**On land a convoy is cargo and cannot be defended.** Assigning a unit to a convoy — turning
+interception into a real battle — is named in BL-458's design and deliberately excluded from it.
+
+**On the water a raid decides instead (Ben, 2026-11-05).** A ship takes a sea leg by the **raid** mission,
+never by standing on its tile, and an **escort** in the province can stop it; detection decides whether it
+does. A submarine sinks what it takes and a surface raider takes a prize to its nearest own port, so a
+raided cargo does not land under the tile. The friend's immunity, the declared-hostility gate and the
+announcement above all hold. A hostile fleet may also close a port by **blockade**. The rules are
+`../military/MILITARY.md` § Sea's.
 
 **A front at war closes the lanes across it (Ben, 2026-11-05).** Interdiction above is a unit on a
 tile; this is the front itself. Convoys of the nations at war route around it, a neutral third

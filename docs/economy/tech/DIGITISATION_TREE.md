@@ -1,6 +1,6 @@
 # Project Io — The Digitisation Tree
 
-> **Settles:** the nodes of the Digitisation age's tech tree — its three trees, nine branches,
+> **Settles:** the nodes of the Digitisation age's tech tree — its three trees, ten branches,
 > clusters, pairs, joints, masteries, quests and placeholders · every node's advantage, ring and
 > requirements · which next-age branch each quest keys · the traps the tree carries for Era 1.
 > **Not here:** the grammar every age's tree obeys, research points and the queue (../RESEARCH) ·
@@ -13,7 +13,8 @@ The Digitisation tree is the tech tree of the age the campaign opens in, 1960 on
 § Era 1). Every nation starts holding none of it (`../RESEARCH.md` § Who holds technology). It is the
 first tree cut to the grammar in `../RESEARCH.md` § The shape of an age's tree: 193 nodes in three
 trees of three branches, on four rings — 160 in the branches' common shape and 33 kit nodes that
-lengthen the arms of Force, Processing and Signal & Orbit (§ Kit).
+lengthen the arms of Force, Processing and Signal & Orbit (§ Kit), with State's fourth branch, Naval,
+beside them (§ Naval).
 
 The store is `digitisation_tree.json`, canonical for every node; this document owns the prose and
 carries the store's tables, rendered by `node tools/session/tech_tree_store.js digitisation`, which
@@ -119,10 +120,19 @@ nodes also open kit beside their own advantage: *Armoured Carriers*, *Early Warn
 *Mechanised Divisions*, *Precision Munitions* and *Airmobile Forces* in Force, *Numerical Control*
 in Processing.
 
-**Kit lives by subject in three branches**: small arms, section weapons, missiles, guns and
+**Kit lives by subject in four branches**: small arms, section weapons, missiles, guns and
 vehicles in **Force**; armour materials and airframes in **Processing**; sensors, fire control,
-drones and networked kit in **Signal & Orbit**. No kit node requires a node of another branch
-(Ben, 2026-11-03); the tie between them is the goods — later kit draws electronics off the shelf.
+drones and networked kit in **Signal & Orbit**; every ship's kit in **Naval**. No kit node requires a
+node of another branch (Ben, 2026-11-03); the tie between them is the goods — later kit draws
+electronics off the shelf.
+
+## Naval
+
+**State's fourth branch is Naval (Ben, 2026-11-05).** It opens ships' hulls, armament and sensors in the
+three slots of `../../military/MILITARY.md` § Sea, for the four classes. It obeys the grammar every branch
+does (`../RESEARCH.md` § The shape of an age's tree): travel nodes with one stacking buff, clusters of
+two minors feeding a major, a mastery, one quest keying the next age's branch, and a joint on the ring.
+No Naval kit node requires a node of another branch.
 
 **Kit clusters lengthen the existing arms (Ben, 2026-11-03).** Each is two minors feeding a major,
 laid in line along an arm: its minors hang off the arm node before them, and the arm's next node
