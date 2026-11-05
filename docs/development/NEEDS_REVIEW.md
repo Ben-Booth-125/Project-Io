@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*22 entries — 22 open, 0 resolved.*
+*23 entries — 23 open, 0 resolved.*
 
 ---
 
@@ -269,6 +269,13 @@ Read from selection_panel.cpp:4764: the door lists Port, Marketplace, Launchpad,
 Ben ruled the master at 96 px and the top rung lowered to about 96 px. Written beyond that: the lower zoom rungs halve from about 96; and a 4K-height window now magnifies the top rung about 2x (computed), where the 2026-10-10 ruling accepted about 1.7x. TECH_FOUNDATIONS.md keeps a benchmark measured at 128 px, labelled as such.
 
 **Why it matters.** Halving lowers every zoom level, not only the closest, and 4K play looks softer than the accepted figure.
+
+### NR-1143 — Research spends outside net: should it count, and how does it share with construction?
+*question · raised 2026-11-05 · from BUILD_PAYBACK_CENSUS (BL-1496)*
+
+The research line takes a weighted share of the treasury, up to what the queue owes, as a direct expenditure the quarterly return does not carry. Mean 1,644 credits a major-quarter over 20 years, against net of 1,000-2,500. So the header NET and the Earnings chart overstate free cash, and "a mine costs six months of net" means different things before and after research. Recommended: book research in the return, so NET is the money left; the mine target then reads net after research.
+
+**Why it matters.** A player with a research queue may have little left for construction under the new prices, and a share of treasury shrinks as the opening treasury falls. This sets how research and construction compete at the opening.
 
 ---
 
