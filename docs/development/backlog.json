@@ -32,7 +32,7 @@
     "tools/session/seed_library.js"
    ],
    "title": "Re-curate the six library seeds that no longer serve their purpose",
-   "design": "Ben, 2026-10-26 (NR-979 A): re-curate all six. Seeds 41, 43, 38, 32, 9 and one more no longer answer the question they were chosen for. THE WORK: sweep a seed pool for replacements that serve each lost purpose, measured with the harness each tag names; rewrite seed_library.json; seed_library.js --check passes."
+   "design": "Ben, 2026-10-26 (NR-979 A): re-curate all six. Seeds 41, 43, 38, 32, 9 and one more no longer answer the question they were chosen for. THE WORK: sweep a seed pool for replacements that serve each lost purpose, measured with the harness each tag names; rewrite seed_library.json; seed_library.js --check passes. RULINGS (Ben, 2026-11-05): re-curate all sixteen, not six - the 96-seed pool at main f5cd40c9 showed every library seed had moved (12 no longer held, 46 no longer the rich outlier); use the treasury outliers, since 82 of 96 seeds sit within 10% of a 69M median chest; take the proposed six (3, 29, 92, 2, 7, 54). DELIVERED 2026-11-05: library 0, 46, 7, 3, 29, 92, 2, 54, 17, 27, 31, 22, 13, 64, 63, 60 (four kept), seed_library_sweep.json regenerated, --check 16/16 unchanged, digest pins minted for the twelve new seeds (16/16 PASS). market_viability on the new sixteen: G1t50 82.3 FAIL against 84 (the old sixteen read 84.2 on the same code); Ben kept the floor - BL-1494 (new-library tick-50 stall) carries it."
   },
   {
    "status": "proposed",
@@ -877,6 +877,30 @@
    ],
    "title": "grudge_sentiment_harness G7f fails: the history is not unchanged with grudge weights zeroed",
    "design": "Found 2026-11-04 verifying BL-1470 (sentiment contributors): G7f ('the history is UNCHANGED - the sim's scorer reads no grudge', BL-827) fails identically on 41ad4e7c and 286bd8b6, so it predates BL-1470. Lane Y's unconfirmed guess: the check zeroes four grudge weights but not the treaty-broken and faith-sundered ones. Diagnose which is wrong - the check or a scorer that now reads a grudge - before changing anything; never weaken it to pass."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 61,
+   "version_goal": "v0.3.0",
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: \"Keep 84, file work\")",
+   "requires": [],
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1494",
+   "short_name": "NEW_LIBRARY_T50_STALL",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "tools/verify/market_viability.cpp",
+    "src/world/corporation_generation.cpp",
+    "src/world/state_industry.cpp"
+   ],
+   "title": "Processors stop running by tick 50 on the re-curated library's colonial, rich and roadless worlds",
+   "design": "Found 2026-11-05 re-curating the seed library (BL-1413): market_viability G1t50 pools 82.3 on the new sixteen against the 84 floor, where the old sixteen read 84.2 on the same code; handoff G1 is 94.8, so processors start running and stop by tick 50. Per seed: 92 (colonial) 72.8, 64 (colonial-undone) 74.3, 46 (rich) 77.3, 7 (wealth at home) 77.5, 63 (roadless) 77.8, 54 (road world) 79.3, 0+60 80.4, 29 82.8; 13 84.9, 3 87.1, 2 87.6, 22 87.7, 27 89.0, 17 90.4, 31 90.7. Ben kept the floor at 84 (2026-11-05): the broader library exposes a real stall, it is not a calibration to move. THE WORK: read the low seeds' tick-50 idle reasons (market_viability's per-seed idle census and the BR/PW lines) and name the cause before any change. Check: G1t50 >= 84 pooled on the library, every other gate held."
   }
  ]
 }
