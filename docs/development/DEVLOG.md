@@ -10,6 +10,43 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-05 — Sprint 61: diplomacy and war
+
+**Runtime:** seven days (opened 2026-10-30). Design from Ben's 2026-10-30 form, then Delivery Full in
+worktree lanes (V, W, X, Y, Z in the last two days) with cold reviews; integration, gates and re-pins
+in the main session. No version cut: v0.3.0 still needs the naval system and a war playtest.
+
+**What was built.**
+- **War:** BL-1459 (war record and declaration), BL-1428 (war goals and peace), BL-1460 (cession moves territory), BL-1480 (war loose ends).
+- **Rivals:** BL-1461 (rivals declare war), BL-1481 (rival embargo), BL-1478 (bunker retune), BL-1486 (kit research worth).
+- **Sentiment:** BL-1458 (sentiment emitters), BL-1432 (Alarm as sentiment), BL-1479 (grievance and Alarm floor); BL-1470 (sentiment contributors) built, save v77.
+- **Ledger:** BL-1462 (diplomacy ledger), slot 9; Ben's live clicks passed 2026-11-04.
+- **Military:** BL-1422 (land classes and kit), BL-1423 (refit and retreat), BL-1426 (bunkers), BL-1436 (kit in the age tree), BL-1463 (recruits), BL-1454 (unit stat grid).
+- **Economy:** BL-1442 (post-capacity starvation), BL-1485 (power grid measure), BL-1482 (broke nation spiral).
+- **Library:** BL-1413 (seed re-curation), all sixteen re-chosen off a 96-seed pool.
+
+**Decisions.** The register (`tools/session/rulings/sprint-61.json`) passes 18 of 18. The close added:
+- The grid gate reads the nation's own buildings live, every other building nominally (2026-11-04).
+- Earners keep running at an empty treasury (2026-11-04), and a treasury may sit briefly below zero (2026-11-05). FINANCE.md, SYSTEMS.md and the ACTIONS entry no longer claim never-debt.
+- BL-1492 (rescue grid gate) stays parked: it cuts play-built power 71 -> 15 but costs G1t50 0.7 pp.
+- Re-curate all sixteen seeds, using the treasury outliers; keep the 84 G1t50 floor on the new set.
+
+**Lane W's forks.** Each fix measured alone and together, 16 seeds pooled:
+- BL-1485 alone 84.3; with BL-1492 83.6; with BL-1482 84.2; all three 83.7.
+- BL-1482 lifted nation-ticks below zero from 215 to 4148. The 215 were already there, with no gate looking.
+
+**Re-bless.** Three. 157c6dee for BL-1442 (D_settle and D_seat on 16). f5cd40c9 for BL-1470: the
+snapshot field alone, seed 46 bisected to 286bd8b6, the shape probe identical on all 16. bc7ac30f for
+the new library: no code moved, twelve new rows, four unchanged. D_search unmoved throughout.
+
+**The library.** Every library seed had moved since 2026-10-07. Seed 12 no longer read held; 46 was no
+longer the rich outlier; 82 of 96 pool seeds sit within 10% of a 69M median chest. Kept: 0, 46, 31, 13.
+On the new sixteen, G1t50 reads 82.3 against 84, where the old sixteen read 84.2 on the same code.
+
+**Left open.** BL-1494 (new-library tick-50 stall) leads: seeds 92, 64, 46, 7 and 63 sit at 72.8-77.8.
+Ben's live clicks owed on BL-1470 (sentiment contributors) and BL-1490 (province resource clip, which
+still clips at 1280x720). BL-1491 (kit pull on pairs), BL-1493 (grudge G7f) filed; BL-1414 parked.
+
 ## 2026-11-04 — Sprint 62: equal starts for majors
 
 **Runtime:** three days; Design from Ben's starter-package form, Delivery Full in a worktree lane with

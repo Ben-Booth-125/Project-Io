@@ -7,7 +7,14 @@ opening army), BL-1476 (wizard default thirty) and BL-1487 (kit processors idle)
 `major-opening-kit` closed with R4 failed; BL-1487 then brought kit processors running to 569 of 578.
 Retro: archive/sprints-2026-Q4.json, record 62. Owed: Ben's live click on the setup round (30 / 4).
 
-## Sprint 61 — diplomacy and war (designed 2026-10-30, beside sprint 60)
+## Sprint 61 — diplomacy and war (designed 2026-10-30, beside sprint 60, CLOSED 2026-11-05)
+
+**Closed.** No version cut; v0.3.0 still needs the naval system and a war playtest. 26 items
+delivered and archived, BL-1471 (seat opening force leak) cancelled as superseded by BL-1474.
+Ruling register sprint-61: 18 of 18 pass. Retro: archive/sprints-2026-Q4.json, record 61.
+Carried open: BL-1470 (sentiment contributors) and BL-1490 (province resource clip), each owing
+Ben's live click; BL-1491 (kit pull on pairs), BL-1492 (rescue grid gate, parked), BL-1493
+(grudge G7f), BL-1494 (new-library tick-50 stall), BL-1414 (trade flow room, parked).
 
 **Target.** v0.3.0. Opens once sprint 60 closes, or beside it on disjoint files. `sprints.json`
 `next_up` still holds sprint 60's line.

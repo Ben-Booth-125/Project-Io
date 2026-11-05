@@ -436,6 +436,51 @@
         ]
       }
     },
+    "61": {
+      "id": "61",
+      "theme": "diplomacy and war",
+      "state": "landed",
+      "status_line": "CLOSED 2026-11-05, no version cut (v0.3.0 still needs the naval system and a war playtest). Wars are records with goals, a score, exhaustion and a peace that may cede ground; rivals declare, answer, impose peace and embargo; Alarm is the third sentiment dimension; the Diplomacy ledger is slot 9. Military kit, recruits, refit, bunkers and the kit in the age tree. Seed library re-curated. Three re-pins.",
+      "opened_date": "2026-10-30",
+      "author": "Ben (2026-10-30, diplomacy and war design form)",
+      "goal": "Make relations and war a system the player meets: conduct writes sentiment, a war is a declared record that ends in a peace, rivals wage it, and the Diplomacy ledger shows it. Carry sprint 60's military and economy items.",
+      "planned": [
+        "BL-1458 (sentiment emitters), BL-1432 (Alarm as sentiment)",
+        "BL-1459 (war record and declaration), BL-1428 (war goals and peace), BL-1460 (cession moves territory)",
+        "BL-1461 (rivals declare war), BL-1462 (diplomacy ledger)",
+        "Sprint 60 carries led by BL-1442 (post-capacity starvation) and BL-1454 (unit stat grid)"
+      ],
+      "risk": "Cession moves tile_to_nation, the heaviest seam; three save bumps in one sprint.",
+      "done_when": "A war can be declared, scored and ended by either side with a peace that may cede ground, and the ledger shows it, on the shipped world.",
+      "notes": "Register sprint-61: 18 of 18 pass (11 rulings 2026-10-30; 7 added at close, 2026-11-04 and 2026-11-05).",
+      "closed_date": "2026-11-05",
+      "retro": {
+        "landed": [
+          "WAR: BL-1459 (war record and declaration), BL-1428 (war goals and peace), BL-1460 (cession moves territory), BL-1480 (war loose ends: rivals impose on the player at 100, a four-tick offer clock).",
+          "RIVALS: BL-1461 (rivals declare war), BL-1481 (rival embargo), BL-1478 (bunker retune: rivals fortify hostile-border posts), BL-1486 (kit research worth: a node that opens kit is worth that kit).",
+          "SENTIMENT: BL-1458 (sentiment emitters), BL-1432 (Alarm as sentiment), BL-1479 (grievance and Alarm floor), BL-1470 built (sentiment contributors: each row names its largest cause, world save v77), live click owed.",
+          "LEDGER: BL-1462 (diplomacy ledger), slot 9, Nations and Wars; Ben's live clicks passed 2026-11-04.",
+          "MILITARY: BL-1422 (land classes and kit), BL-1423 (refit and retreat), BL-1426 (bunkers), BL-1436 (kit in the age tree), BL-1447 (kit goods priced), BL-1463 (recruits), BL-1472 (recruit header tabs), BL-1454 (unit stat grid), BL-1464 (capital base missing).",
+          "ECONOMY: BL-1442 (post-capacity starvation: run reserve and pending-supply forecast), BL-1485 (power grid measure: own buildings live, others nominal), BL-1482 (broke nation spiral: earners keep running; a treasury may sit briefly below zero).",
+          "UI: BL-1415 (header NET), BL-1416 (player wash dropped), BL-1417 (emblem removed), BL-1418 (embargo bars goods), BL-1419 then BL-1488 (Industry lens filled, then retired), BL-1489 (no-lens first press: the script asserted the old order), BL-1490 built (resource rows by glyph), live click owed.",
+          "VERIFICATION: BL-1420, BL-1440, BL-1441, BL-1444, BL-1457, BL-1465, BL-1466, BL-1467, BL-1468, BL-1469, BL-1483, BL-1484 - fixtures, stale aims and harness rows brought true.",
+          "LIBRARY: BL-1413 (seed re-curation): all sixteen re-chosen off a 96-seed pool; four kept; capital found nearly flat (82 of 96 seeds within 10% of a 69M median chest).",
+          "RE-PINS: 157c6dee (BL-1442), f5cd40c9 (BL-1470: the snapshot field alone, shape probe identical on all 16), bc7ac30f (new library, twelve new rows)."
+        ],
+        "slipped": [
+          "BL-1492 (rescue grid gate) parked: it cuts play-built power plants 71 -> 15 but costs G1t50 0.7 pp below the floor (Ben, 2026-11-05: keep parked).",
+          "BL-1494 (new-library tick-50 stall): the re-curated library reads G1t50 82.3 against 84; the old sixteen read 84.2 on the same code. Ben kept the floor.",
+          "BL-1491 (kit pull on pairs) and BL-1493 (grudge G7f) filed, not built. BL-1414 (trade flow room) stays parked.",
+          "BL-1424 (soldiers from labour) cancelled for BL-1463 (recruits); BL-1471 (seat opening force leak) cancelled as superseded by BL-1474."
+        ],
+        "feedback": [
+          "A seed set is a calibration. Re-curating the library moved G1t50 by 1.9 pp with no code change, so every pooled floor was implicitly tuned to the old sixteen; a floor should be re-read whenever the set moves.",
+          "Measure every fork separately. Lane W's per-item runs (A, A+B, A+C, A+B+C) showed that B alone broke the floor and C alone broke never-debt; a combined run would have hidden both.",
+          "The never-debt rule was already false before C: 215 nation-ticks below zero with BL-1485 alone, and no gate looked. A rule with no measure drifts silently.",
+          "Sprint 61 never had a sprints.json record until its close; the record was written from the backlog and REFINED.md."
+        ]
+      }
+    },
     "62": {
       "id": "62",
       "theme": "equal starts for majors",

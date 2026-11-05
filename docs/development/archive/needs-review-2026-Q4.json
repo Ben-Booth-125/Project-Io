@@ -1884,6 +1884,78 @@
       ],
       "resolution": "Ben, 2026-10-27: A — rivals assign their own units to their own fronts and choose hold or push. Written as a grant in AI_OPPONENT.md § 11 and in MILITARY.md § Fronts."
     },
+    "NR-1084": {
+      "id": "NR-1084",
+      "title": "Four combat calls taken in writing the land model",
+      "raised": "2026-10-26",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "sprint 58 military design",
+      "what": "Writing Ben's land rulings into MILITARY.md § The campaign force model took four calls he did not make: (1) defence and breakthrough are separate stats (defending vs attacking); (2) no piercing-versus-armour check, hardness alone; (3) readiness takes the larger share of landed damage, so most fights end in retreat; (4) the seven classes - motorised infantry replaces trucks, one main battle tank line replaces light/medium/heavy, light armour is low-hardness reconnaissance, and air defence is added.",
+      "why_it_matters": "Each shapes BL-1421 (soft hard resolver) and BL-1422 (land classes and kit) before they are built.",
+      "recommendation": "Keep all four; the realism case is in research/MILITARY_1960_PRESENT.md § 4 and § 10.",
+      "files": [
+        "docs/military/MILITARY.md",
+        "docs/research/MILITARY_1960_PRESENT.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1085": {
+      "id": "NR-1085",
+      "title": "Five calls taken in retiring the Era catastrophe",
+      "raised": "2026-10-26",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "era catastrophe retirement design pass",
+      "what": "Writing Ben's retirement (ERAS.md § The point of an Era) took five calls he did not make: (1) each nation crosses into the next Era on its own when it meets the gate, not the world at once; (2) Alarm is a third sentiment dimension beside Access and Trust (RELATIONS.md § 6), directed per pair, decaying, under the informs-never-declares invariant; (3) three Digitisation nodes that read the retired Ceiling were rewritten in the store: Inspection Regimes 'Alarm raised by your visible capability -10%', Arms Control Verification's second effect 'every nation's Alarm toward every other decays 10% faster', Quiet Borders' deed 'no nation's Alarm toward you rises for 8 quarters'; Planetary Accords keys 'shared limits on climate Load'; (4) the tempo trap retired with the countdown; (5) climate is Era 2's continuous pressure with no test.",
+      "why_it_matters": "Each shapes what a nation chases and what Alarm costs it before any of it is built.",
+      "recommendation": "Keep all five. (1) makes the race to orbit the success Ben asked for; (2) reuses a tested substrate rather than adding a new store.",
+      "files": [
+        "docs/economy/ERAS.md",
+        "docs/politics/RELATIONS.md",
+        "docs/economy/tech/digitisation_tree.json",
+        "docs/CLIMATE.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1087": {
+      "id": "NR-1087",
+      "title": "Six calls taken building the land combat core",
+      "raised": "2026-10-27",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "BL-1421 (soft hard resolver)",
+      "what": "(1) HP is the unit's count of men against a stored establishment; equipment joins HP with BL-1423 (refit and retreat). (2) Terrain DIVIDES the attacker's hits (a mountain halves them) rather than raising the defender's absorb: an absorb raise mattered only where hits already exceeded defence, so infantry-on-infantry ignored mountains. MILITARY.md says so now. (3) The calibration, measured by campaign_battle_harness C4 (infantry on plains, 200 seeds): breaking a defender takes about 2:1 - decisive 0% at 1:1, 15% at 1.5:1, 64% at 1.75:1, 89% at 2:1, 99% from 2.5:1; fights last about two ticks. The old curve was 50% at 1:1 because the old round had no attacker penalty. (4) A side of spent units is overrun: it deals nothing, the enemy's hits land on it in full, and it is broken. (5) A retreat moves one tile: land, never onto an enemy of the fight, preferring outside the province then own ground, ties to the lowest tile id; a unit with nowhere to go stays put, out of the fight. (6) Morale: +50 to a battle's winners, -100 to its losers and to every unit that retreats; out of contact readiness regains 100 a tick scaled by supply, never above morale, and morale moves 10 a tick toward supply. Found by the cold review and left for you: (7) a static nation garrison that retreats has no order to return, so it stays off its post; (8) the rival scorer's unit_strength still reads men x quality x supply and ignores class, readiness and morale, so the AI's picture of strength has drifted from the resolver (BL-1427, fronts, is where the AI reads force); (9) a v57 save loads its units with no establishment, so a unit wounded before the load reads at full HP.",
+      "why_it_matters": "Each sets how war feels before fronts and the AI are built on it. And the re-bless: player_seed_sweep digests fail 16/16 with the v58 stream, owed to the sprint's re-bless.",
+      "recommendation": "Keep all six; (3) is the one to feel in play.",
+      "files": [
+        "src/world/campaign_battle.cpp",
+        "src/world/battle_system.cpp",
+        "src/world/unit_roster.cpp",
+        "docs/military/MILITARY.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1089": {
+      "id": "NR-1089",
+      "title": "Refit: the calls taken on your behalf",
+      "raised": "2026-10-27",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "sprint 58 refit lane (Ben, 2026-10-27: \"add refitting a unit's type from selection to a newer compatible model\")",
+      "what": "Compatible means the same land class and a newer row: a later band, or the same band with a higher power. Credits are the hire price difference (hire_cost_per_power x the power gap, floored at 0) plus the target row's goods in full. It takes the target's muster days. The unit must stand on its own nation's ground, out of battle, and cannot march while refitting. Men, readiness and morale are kept. A refit clears the unit's standing march order. Rival nations never refit.",
+      "why_it_matters": "Each is a balance or feel call. Charging the full goods makes kit upgrades cost as much as new kit; clearing the march order is a choice the brief did not make.",
+      "options": [
+        "A: keep all as built",
+        "B: change one (say which)"
+      ],
+      "recommendation": "A. Revisit the price once kit and designs (BL-1434, BL-1436) give refits more to buy.",
+      "files": [
+        "docs/military/MILITARY.md",
+        "src/world/corp_command.cpp"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
     "NR-1091": {
       "raised": "2026-10-27",
       "status": "resolved",
@@ -1926,6 +1998,542 @@
         "src/world/corp_ai.cpp"
       ],
       "resolved_on": "2026-10-28"
+    },
+    "NR-1093": {
+      "raised": "2026-10-27",
+      "status": "resolved",
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken.",
+      "id": "NR-1093",
+      "kind": "decision",
+      "title": "Capital base: the calls taken on your behalf",
+      "source": "BL-1439 (capital military base) lane",
+      "what": "The base goes on the legal own tile nearest the capital garrison, empty before stacked. 592 of 593 nations on the 16 library seeds get one; seed 25's Lainka owns one tile already full and gets none. The opening unit now musters at the capital base, so a nation has one base. A seat moved at Begin keeps its base and garrisons and loses only its opening unit. A garrison is told from a hired unit by entity-id order (no saved flag). The capital garrison records the base, so demolishing the base disbands it (the orphan rule, which never ran until today's fix).",
+      "why_it_matters": "The garrison-dies-with-its-base rule is new in effect; the id-order test is an implicit invariant.",
+      "options": [
+        "A: keep all",
+        "B: garrisons are never orphaned by their base",
+        "C: add a saved garrison flag instead of id order"
+      ],
+      "recommendation": "A, with C if garrisons ever get hired-in replacements.",
+      "files": [
+        "docs/military/MILITARY.md",
+        "src/world/corporation_generation.cpp",
+        "src/world/economy_system.cpp"
+      ]
+    },
+    "NR-1095": {
+      "raised": "2026-10-28",
+      "status": "resolved",
+      "resolution": "Ben, 2026-10-28: A - keep it as the one image path. Written into TECH_FOUNDATIONS.md § Framework - SDL3. The output cap is BL-1447 (kit goods priced)'s tail.",
+      "id": "NR-1095",
+      "kind": "novel-work",
+      "title": "A PNG decoder in src/ui/png_decode.cpp",
+      "source": "BL-1446 (unit designer) lane",
+      "what": "The designer draws a class image, and the app links no image library: SDL 3.2 loads BMP only and ImGui bundles no stb_image. The lane wrote an in-tree decoder (~340 lines): a full zlib inflate plus 8-bit grey, grey+alpha, RGB, RGBA and palette PNGs, non-interlaced; anything else is refused with a reason.",
+      "why_it_matters": "No doc owns image loading. Every later authored image (unit art, emblems, icons as files) will reach for this, and an in-tree decoder is code to maintain against untrusted-looking input.",
+      "options": [
+        "A: keep it, and name it in TECH_FOUNDATIONS.md as the one image path",
+        "B: replace it with a vendored stb_image",
+        "C: keep it designer-only until real art lands"
+      ],
+      "recommendation": "A. It is small, pure and refuses what it cannot read; a vendored library is a bigger surface for a handful of files.",
+      "files": [
+        "src/ui/png_decode.cpp",
+        "src/ui/png_decode.hpp",
+        "docs/tech/TECH_FOUNDATIONS.md"
+      ]
+    },
+    "NR-1096": {
+      "raised": "2026-10-28",
+      "status": "resolved",
+      "resolution": "Ben, 2026-10-28: C - a pick drafts and Save commits; the fitted item stays disabled. Written into docs/ui/ledgers/military.md § The designer; the work is BL-1448 (designer draft and Save).",
+      "id": "NR-1096",
+      "kind": "question",
+      "title": "Designer: a pick saves at once; the fitted item is disabled rather than a toggle",
+      "source": "BL-1446 (unit designer) lane",
+      "what": "Two UI calls the lane made. (1) Each pick in a slot list sends set_unit_design at once: there is no draft, confirm or revert, so a misclick changes the live design for every new hire. (2) The fitted item in a slot list is disabled (\"Fitted now\"), not a toggle: pressing it again does not return the slot to base kit.",
+      "why_it_matters": "The toggle rule says a control whose active state is visible undoes on a second press. The fitted badge is a visible active state, so (2) reads as an exception the rule does not list. (1) follows military.md § The designer (\"Saving is the pick\") but has no undo.",
+      "options": [
+        "A: keep both as built",
+        "B: make the fitted item a toggle back to base kit",
+        "C: add a draft with a Save button",
+        "D: B and C"
+      ],
+      "recommendation": "A. The slot is a selector of one-of-n, like the exempt combos; base kit is one press away in the same list.",
+      "files": [
+        "src/ui/unit_designer.cpp",
+        "docs/ui/ledgers/military.md"
+      ]
+    },
+    "NR-1097": {
+      "raised": "2026-10-29",
+      "status": "resolved",
+      "id": "NR-1097",
+      "kind": "decision",
+      "title": "Land battle form: three readings taken in writing the carried-supplies and recon rulings",
+      "source": "main session (Ben land battle form 2026-10-29)",
+      "what": "(1) The quarterly supply share arrives as a DAILY resupply of share x daily need, not one quarterly top-up - a quarterly refill dips below full the day after, so the flat hunger penalty would apply almost always. (2) The round reads the three carried stocks; supply_factor_permille no longer scales hits directly, it only sets the resupply rate. (3) Air superiority adds recon in proportion to its share rather than making revealed units fully visible, so superiority alone does not settle every battle. Also: the stat grid replaces the unit card's Strength and Roster pages.",
+      "why_it_matters": "Each changes how strong a supplied, a half-supplied and an air-covered army is. Written into MILITARY.md § Carried supplies, § Recon and § Air, ledgers/military.md § The stat grid, SELECTION.md. Work: BL-1452 (carried supplies), BL-1453 (land recon), BL-1454 (unit stat grid).",
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1098": {
+      "raised": "2026-10-29",
+      "status": "resolved",
+      "id": "NR-1098",
+      "kind": "decision",
+      "title": "Terrain and the classes: four readings the build took",
+      "source": "BL-1455 (terrain class modifiers) lane, cold review 2026-10-29",
+      "what": "(a) Wear is x1.5 equipment drain - the ruling named the cells but no rate. (b) \"Blocked unless roaded\" means any road edge on the tile, so armour may enter a mountain tile from a roadless side if some road touches it. (c) The move rows change a march's days but not its route: the path stays the shared terrain-weighted one, so medium armour may be routed through forest at x1.5 when a faster route for it exists. (d) Pre-modern rows (no land class) read none of the rows, not even the open-ground stealth x0.75 the doc gives every unit. Also: carriers dismount even on a mountain road, as the doc reads.",
+      "why_it_matters": "(b) and (c) decide whether terrain shapes WHERE armour goes or only how slowly; (c) in particular lets an armoured column walk into a forest debuff it could have avoided. Written into MILITARY.md § Terrain and the classes. Work: BL-1455 (terrain class modifiers).",
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1099": {
+      "raised": "2026-10-30",
+      "status": "resolved",
+      "id": "NR-1099",
+      "kind": "decision",
+      "title": "Carried supplies: a hub on every capital, and one purse gate caps surveys too",
+      "source": "BL-1452 (carried supplies) lane, cold-review round 2026-10-30",
+      "what": "(a) The free source is the lowest-id running inland logistics hub on the capital. Seeds 10, 11, 12, 25 and 31 had a railway station or port standing as the capital's source and no hub, so nothing ran free and the opening cut removed their capitals' buildings (dark at the handoff). The seeding's step 0 now stands a hub on EVERY capital, beside any station or port already there. (b) purse_room_of now carries the settle cap for every spend - builds, retools, hires, refits, roads and survey dispatch alike; surveys in the settle were not separately ruled.",
+      "why_it_matters": "(a) changes world shape: every capital opens with one more building (the shape probe was not re-run). The alternative is to let a station or port on the capital be the free source instead. (b) a poor nation may send fewer surveys in the settle. Merged at b0a9e9b5, G1t50 full 84.6. Work: BL-1452 (carried supplies).",
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1100": {
+      "raised": "2026-10-30",
+      "status": "resolved",
+      "id": "NR-1100",
+      "kind": "question",
+      "title": "Does the stance grant cover a rival answering, offering and accepting peace, and so ceding ground?",
+      "source": "Sprint 61 design (diplomacy and war), 2026-10-30",
+      "what": "Ben ruled the 2026-08-18 stance grant covers a rival DECLARING war. A whole war also needs the rival to answer a declaration (naming goals), offer peace, accept or refuse one, and impose at 100. Accepting a cession is a rival choosing to give up ground, which is a new subject (territory), not a stance. Recommended: yes, same terms (pure, seeded, deterministic, legal verbs, never a planner), recorded as a dated entry in AI_OPPONENT.md § 11. Alternative: rivals answer and accept white peace only; cession happens only when imposed at 100.",
+      "why_it_matters": "Without it, a war against a rival can only end by imposition, and a rival never ends a war it started. Blocks the peace half of BL-1461 (rivals declare war). RELATIONS.md § 1 and § 7 cite this entry.",
+      "resolution": "Ben, 2026-10-30: yes - full peace including cession, on the same grant terms, dated in AI_OPPONENT.md § 11 (\"Rival nations wage war whole\"). Written into RELATIONS.md § 1 and § 7."
+    },
+    "NR-1101": {
+      "raised": "2026-10-30",
+      "status": "resolved",
+      "id": "NR-1101",
+      "kind": "question",
+      "title": "The war strawman: goals, score weights, imposing at 100, truce, the free answer",
+      "source": "Sprint 61 design (diplomacy and war), 2026-10-30",
+      "what": "RELATIONS.md § 7 sets shapes I proposed, not ones you ruled: (a) 1-3 goals, each a defender province bordering the declarer or coastal, never a capital; (b) score = occupation + battles, strawman 60/40; (c) a side at 100 may impose; (d) a truce after peace, strawman 8 ticks (two years); (e) the defender's answer is free and names its own goals; (f) a war ends only in peace (return_to_neutral refused between parties); (g) a justification cuts the third-party price, strawman by half. Numbers inside these shapes are delegated calibration; the shapes are not.",
+      "why_it_matters": "Each shape is a rule a player learns. Overturning one after BL-1459 and BL-1428 build is a save-format change. Answer before those lanes start; numbers can follow.",
+      "resolution": "Ben, 2026-10-30: (a) any of the defender's provinces may be a goal, capitals included, no reach rule; (b) occupation and battles carry half each; (c) a side at 100 imposes; (d) truce sixteen ticks (four years); (e) the answer is free and names its own goals; (f) only peace ends a war; (g) a justification halves the price. The goal count was not addressed; one to three stands. Written into RELATIONS.md § 7 and ledgers/diplomacy.md. Allowing capitals raised NR-1102."
+    },
+    "NR-1102": {
+      "raised": "2026-10-30",
+      "status": "resolved",
+      "id": "NR-1102",
+      "kind": "question",
+      "title": "A ceded capital, and a nation ceded away",
+      "source": "NR-1101 ruling (capitals may be goals), 2026-10-30",
+      "what": "With capitals open as goals, two cases now exist that nothing owned. (a) A nation that cedes its capital province takes as its new capital the remaining province with the largest population centre, ties to the lower id. The capital is where the treasury sits and where the free logistics hub stands (NR-1099), so the hub must move too. (b) Three goals can take every province of a small nation. Strawman: it leaves the map, its wars close, and its sentiment rows are erased. The alternative is a floor: the last province can never be a goal or ceded.",
+      "why_it_matters": "(b) is elimination, and nothing else in the campaign removes a nation, so every consumer of the nation list meets it for the first time (fronts, markets, the scorer, saves, spectating). Both rules are strawman in RELATIONS.md § 7. Work: BL-1460 (cession moves territory).",
+      "options": [
+        "A: both strawman rules as written",
+        "B: the capital moves as written; a nation's last province can never be ceded",
+        "C: a capital can never be ceded (a goal, but not cedable)"
+      ],
+      "recommendation": "B. Elimination is a whole subject. The floor keeps every nation on the map until it is designed on purpose.",
+      "resolution": "Ben, 2026-10-30: B - the capital moves to the largest remaining population centre (with its free hub); a nation's last province can never be ceded, so no nation leaves the map by war. Written into RELATIONS.md § 7 and ledgers/diplomacy.md."
+    },
+    "NR-1103": {
+      "id": "NR-1103",
+      "title": "An answered war can never reach a score of 100",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31",
+      "what": "The occupation half divides held goals by ALL goals named. Once the defender answers with its own goals, neither side can reach +-100: holding every enemy goal while losing none reads 83 in the harness (P1e), and the defender tops out lower still (P1f: -67). So the defender can never impose, and the declarer can impose only while the war is unanswered. A cold review (2026-10-31) adds: the defender's score is bounded above -100 in EVERY war, since the declarer always names a goal, so the defender can never impose at all; and the battles half needs the imposer to lose almost nothing.",
+      "why_it_matters": "Impose at 100 (NR-1101 C) silently becomes declarer-only, and answering a war makes it unwinnable by force. Work: BL-1428 (war goals and peace).",
+      "options": [
+        "A: normalise each side by its own goals: (my held share of your goals) less (your held share of mine), so holding all of theirs and losing none is 100",
+        "B: keep as built; imposing is only for an unanswered war",
+        "C: keep the formula, lower the impose threshold"
+      ],
+      "recommendation": "A. It keeps half-occupation, half-battles and makes 100 reachable for either side.",
+      "files": [
+        "src/world/war.cpp",
+        "docs/politics/RELATIONS.md"
+      ],
+      "resolution": "Ben, 2026-10-31: A - each side is normalised by its own goals; holding every goal you named and losing none of your own is the full occupation half, for either side. Written into RELATIONS.md § 7 War score; code in BL-1428 (war goals and peace)."
+    },
+    "NR-1104": {
+      "id": "NR-1104",
+      "title": "Grievance can almost never hold",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31",
+      "what": "The grievance justification reads the adverse band, Trust <= -50 toward the target. With the nine-tick decay and the authored weights, conduct between two nations rarely pushes Trust that far, so grievance will almost never halve a price. The other three (embargo, lost ground, a friend attacked) hold as designed.",
+      "why_it_matters": "A justification that never holds is a rule nobody meets. The threshold is RELATIONS § 7 design, not calibration inside a ruled range.",
+      "options": [
+        "A: grievance holds at the hostile-leaning band (Trust <= -25)",
+        "B: keep -50 and let war price grievance only after long conduct",
+        "C: grievance counts the seeded grudge too, so an inherited war justifies the next one"
+      ],
+      "recommendation": "A, measured once rivals declare (BL-1461 rivals declare war) so the census shows how often it holds.",
+      "files": [
+        "src/world/war.cpp"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): A - grievance holds at the hostile-leaning band, Trust <= -25. RELATIONS.md carries it."
+    },
+    "NR-1105": {
+      "id": "NR-1105",
+      "title": "Is hostility without a war retired?",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31",
+      "what": "declare_war now writes the hostility row, and a bare declare_hostile between war parties is refused, so the defender must answer instead. Between nations NOT at war, declare_hostile still writes a hostility row with no war record: no goals, no score, no peace, and return_to_neutral ends it.",
+      "why_it_matters": "Two ways to be hostile with different exits is the opposite of legible. RELATIONS § 1 predates § 7 here.",
+      "options": [
+        "A: retire bare hostility; declare_hostile becomes declare_war (the right-click path already is)",
+        "B: keep both; hostility is a cold stance, war is the hot one"
+      ],
+      "recommendation": "A. Every hostility then has goals, a score and a peace.",
+      "files": [
+        "src/world/stance.cpp",
+        "docs/politics/RELATIONS.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): B - keep both: hostility is the cold stance, war the hot one. declare_hostile stays between nations not at war."
+    },
+    "NR-1106": {
+      "id": "NR-1106",
+      "title": "Four war calls the lane took",
+      "raised": "2026-10-31",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Lane W report, sprint 61 (BL-1459 war record, BL-1428 war goals and peace), 2026-10-31",
+      "what": "(1) A province belongs, for goal validity and cession, to the plurality of tile_to_nation over its tiles, ties to the lower id; province_holder is only the military holder. (2) A right-click attack on a stack standing off the defender's ground takes the defender's capital province as the first goal. (3) Justifications are pair-measure rows in war.cpp in the condition grammar (measure, comparator, operand), not condition_subject entries, which measure one actor; promoting them with a counterparty qualifier would change the save layout. (4) Exhaustion's field days are counted once a quarter from where units stand then. Cold review (2026-10-31): (4) deviates from RELATIONS § 7 (\"each day in the field\") and is being fixed to a daily accumulation, so it drops out of this list.",
+      "why_it_matters": "(2) means a declaration can name a capital the player never pointed at; (3) leaves a second predicate grammar beside META_LAYER.md.",
+      "recommendation": "Accept all four; promote (3) into META_LAYER only if another pair rule needs it.",
+      "files": [
+        "src/world/war.cpp",
+        "src/core/app.cpp"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1108": {
+      "id": "NR-1108",
+      "title": "Trade-flow room: nothing computes \"no room\" today",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Lane U report, sprint 61 (UI carries), 2026-10-31, BL-1414 (trade-flow room)",
+      "what": "BL-1414 asks the Trade-flow lens to compute a lane's room without rivals' cargo, so a no-room marker never reveals a rival's shipments. But the dispatcher (src/world/trade.cpp) only ever records trade_refusal::sent, so the lens never draws a refusal marker and there is no room figure to change. The item was skipped.",
+      "why_it_matters": "Building a room figure is new lens-side economics, not polish. The brief and the row also disagreed on which way rivals' cargo counts.",
+      "options": [
+        "A: bring the refusal classes back in the dispatcher, room computed without rivals' cargo (private stays private)",
+        "B: cancel BL-1414; the lens shows flows only",
+        "C: park it until trade capacity is next touched"
+      ],
+      "recommendation": "B unless a refusal marker answers a question the player is asking now; the lens question is \"where do my goods go\".",
+      "files": [
+        "src/world/trade.cpp",
+        "docs/economy/TRADE.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): C - park BL-1414 (trade-flow room) until trade capacity is next touched."
+    },
+    "NR-1109": {
+      "id": "NR-1109",
+      "title": "The \"always-on player outline\" draws only under a lens",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Lane U report, sprint 61 (UI carries), 2026-10-31, BL-1416 (identity wash)",
+      "what": "The 2026-10-26 ruling says \"keep the always-on player outline\". Since the 2026-10-24 ruling the outline draws only under a lens, and PLANETARY.md and LENSES.md both say the plain canvas has no outline. The lane removed the stale wash wording and did not bring the outline back.",
+      "why_it_matters": "Two dated rulings disagree; the code and two docs follow the earlier one.",
+      "options": [
+        "A: the plain canvas has no outline (as built and documented)",
+        "B: the player outline is always on, plain canvas included"
+      ],
+      "recommendation": "A: read \"always-on\" as \"under every lens\", and amend the 10-26 wording.",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "docs/ui/canvases/PLANETARY.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): A - the player outline draws under every lens and not on the plain canvas; the 2026-10-26 'always-on' reads 'under every lens'."
+    },
+    "NR-1110": {
+      "id": "NR-1110",
+      "title": "Five UI calls the lane took",
+      "raised": "2026-10-31",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Lane U report, sprint 61 (UI carries), 2026-10-31",
+      "what": "(1) BL-1417: with the emblem gone, the profile card marks the nation by a thin rule in its colour beside the name. (2) BL-1454: new colours palette::unit_food, unit_ammo, unit_equipment. (3) A rival unit's design stats count as \"seen\" only while it is in a battle against the player or air-revealed to the player; nothing remembers a past sighting, since that needs a save field. (4) New verify reads verify.unit_stat_grid(id) and verify.unit_designer().grid return only the cells the screen draws (unit stats, no tile data). (5) The unit card's Strength/Roster pager is gone; verify.unit_card_page is kept as a no-op. Cold review (2026-10-31): air_revealed is rebuilt every air pass, so (3) blanks a rival's stats the day after any battle; ledgers/military.md § The stat grid says \"only once seen\", which reads as remembered.",
+      "why_it_matters": "(3) means a rival's stats blank again the day a battle ends, which may read as forgetting. The rest are look-and-feel; each is in the live click list.",
+      "recommendation": "Accept (1), (2), (4), (5). For (3), a saved per-nation set of seen rival designs matches the doc's \"once seen\"; it is a save field, so it would ride the next save bump (the war or embargo lane).",
+      "files": [
+        "src/ui/unit_stat_grid.cpp",
+        "src/ui/profile_panel.cpp"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1111": {
+      "id": "NR-1111",
+      "title": "A harbour group's far ends get their own harbour",
+      "raised": "2026-10-31",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Lane G report, sprint 61 (BL-1420 lane and port defects), 2026-10-31",
+      "what": "The ruling that colonial ends within two tiles share one harbour port and LOGISTICS.md § 4b's chaining of harbour groups could not both hold: a chain carried an end three or four steps from its port (seed 13). The lane kept the two-tile reach: harbour land is now chosen so its sea mouths lie within two steps of every end in the group, and ends still beyond two steps get a harbour of their own. Written into § 4b as a delegated reading.",
+      "why_it_matters": "More, smaller harbours on chained coasts (seed 10 gained two ports). The alternative accepts longer dead spurs and loosens the check.",
+      "recommendation": "Accept.",
+      "files": [
+        "src/world/road_generation.cpp",
+        "docs/economy/LOGISTICS.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1114": {
+      "id": "NR-1114",
+      "title": "Which pair trade counts for, and when trade is severed",
+      "raised": "2026-10-31",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Lane S report, sprint 61 (BL-1458 sentiment emitters, BL-1432 Alarm as sentiment), 2026-10-31",
+      "what": "(1) trade_conducted counts the cargo owner's nation and the destination market's nation (the import-tariff foreign-goods rule), foreign landings only, one event each way per tick. (2) trade_severed is raised by the receiver toward the shipper (+2 Alarm, once) when a pair that traded at the last fold lands nothing now; a pair whose trade flickers raises repeated spikes. (3) embargo_imposed has no emitter yet: no embargo law is enacted anywhere; BL-1418 (embargo bars goods) is where it gets one. (4) BL-1432's rival scorer reading Alarm and its player surface are left to BL-1461 (rivals declare war) and BL-1462 (diplomacy ledger).",
+      "why_it_matters": "(2) may want a streak (several ticks of trade, then several of none) before it counts; flicker is common on thin lanes.",
+      "recommendation": "Accept (1), (3), (4); for (2), require two ticks traded and two ticks silent - in-band, delegated unless you object. Cold review agreed the flicker is real (alternating landings net about +7 Alarm, worse than not trading); the two-and-two window is being built.",
+      "files": [
+        "src/world/sentiment_emitters.cpp"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1115": {
+      "id": "NR-1115",
+      "title": "Can Alarm go below zero?",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Cold review of Lane S, sprint 61 (BL-1432 Alarm as sentiment), 2026-10-31",
+      "what": "Relief - live trade, an accepted friendship, a peace - lowers Alarm below zero, and the floor is the substrate's -100. A pair landing 500 credits a tick sits near -13.5, so a later war declaration (+3) or a modest border force still reads as reassured on balance. RELATIONS § 6 says positive is alarmed and lists relief as decay toward neutral and live trade; it does not say relief can bank a reserve.",
+      "why_it_matters": "A banked reserve means trade buys immunity to Alarm; a floor at 0 means relief only ever cancels Alarm already raised. The rival war scorer (BL-1461 rivals declare war) will read this number.",
+      "options": [
+        "A: Alarm's floor is 0 - relief cancels raised Alarm and never goes past neutral (Alarm is a one-sided dimension)",
+        "B: Alarm is signed like Access and Trust; negative is reassured, and a reserve is intended"
+      ],
+      "recommendation": "A. Reassurance is already what Trust measures; a signed Alarm double-counts it.",
+      "files": [
+        "src/world/sentiment.cpp",
+        "docs/politics/RELATIONS.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): A - Alarm's floor is 0: relief cancels raised Alarm and never goes past neutral. RELATIONS.md § 6 carries it."
+    },
+    "NR-1116": {
+      "id": "NR-1116",
+      "title": "An embargo is a verb and a pair, not a law record",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Lane E report, sprint 61 (BL-1418 embargo bars goods), 2026-10-31",
+      "what": "RELATIONS § 3 says an embargo's author is a law (the relationship family). No law verb could carry it, so the lane added one verb, set_embargo (author, target, enact or repeal), stored as an (author, embargoed) pair set and saved at v70. Nothing is a law record with a law_effect_kind. Refused cargo is destroyed at the border (it was bought and hauled at dispatch), and dispatch itself now refuses an embargoed shipment so a standing trade does not buy goods to burn each tick.",
+      "why_it_matters": "Either the doc sentence changes to match, or the embargo is re-housed as a law (and then the Diplomacy ledger's Embargo press becomes a law press). The ledger is being built against set_embargo.",
+      "options": [
+        "A: keep the verb; RELATIONS § 3 says the author is the nation, enacted by set_embargo",
+        "B: re-house as a law record with a law_effect_kind, enacted through the law verb"
+      ],
+      "recommendation": "A. A pair set is the legible form; nothing else in the law family reads it.",
+      "files": [
+        "src/world/embargo.cpp",
+        "docs/politics/RELATIONS.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): A - keep the verb: set_embargo, stored as an (author, embargoed) pair set. RELATIONS.md § 3 says the author is the nation, enacted by set_embargo."
+    },
+    "NR-1117": {
+      "id": "NR-1117",
+      "title": "May rival nations embargo?",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Lane E report, sprint 61 (BL-1418 embargo bars goods), 2026-10-31",
+      "what": "set_embargo exists and the player can press it; no scorer issues it, so rivals never embargo. Letting them would be a new subject under the AI-behaviour prohibition (a relation, not an action on own ground), so it is raised, not assumed.",
+      "why_it_matters": "Without it, embargo_imposed only ever names the player as author, and the embargo justification for war only ever fires against the player.",
+      "options": [
+        "A: grant - a rival may enact or repeal an embargo against a nation, scored over its own sentiment, Alarm and trade exposure, on the standing terms",
+        "B: not now; embargo stays the player's"
+      ],
+      "recommendation": "A, as a dated grant in AI_OPPONENT § 11, built with BL-1461 (rivals declare war) since it shares the scorer.",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "docs/ai/AI_OPPONENT.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): A - grant: a rival may enact or repeal an embargo against a nation, scored over its own sentiment, Alarm and trade exposure, on the standing terms. Dated grant in AI_OPPONENT.md § 11."
+    },
+    "NR-1118": {
+      "id": "NR-1118",
+      "title": "Five cession calls RELATIONS § 7 does not settle",
+      "raised": "2026-10-31",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Lane C and its cold review, sprint 61 (BL-1460 cession moves territory), 2026-10-31",
+      "what": "(1) Any peace returns every occupied, uncedeed goal of that war to its owner and withdraws the occupier, so no province stays held at peace by a former enemy. (2) A loser's air wing whose airbase passed rebases to its nearest own airbase, or disbands if it has none (the existing gone-base rule). (3) Units withdraw from ceded ground by the retreat rule, aimed at their own nation's nearest ground; a unit with no legal step stays. (4) A ceded site under construction keeps what the loser paid; if the gainer cancels it, the refund goes to the gainer. (5) A moved capital must not re-roll national cravings: the preference hash will read a saved generation-time capital (save v71).",
+      "why_it_matters": "(1) and (2) change what a peace does on the map; (4) moves money between nations.",
+      "recommendation": "Accept all five; (4) is the ground passing with what stands on it.",
+      "files": [
+        "src/world/war.cpp",
+        "src/world/market_clearing.cpp"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1119": {
+      "id": "NR-1119",
+      "title": "May a rival impose peace on the player at 100?",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Lane R report, sprint 61 (BL-1461 rivals declare war), 2026-10-31",
+      "what": "The war grant's Not-admitted clause says the player's wars \"only the player answers and ends\". The lane read that as forbidding a rival to IMPOSE on the player at 100: at 100 against the player a rival offers instead, and may accept or refuse the player's offers. Imposing on a rival works as designed. Also taken: rivals declare only across a shared front; front strength counts visible standing units on the front's provinces only; answering is always taken; the war pass runs just before the fronts pass.",
+      "why_it_matters": "If imposing is the player's alone to suffer too, the player can never lose ground to a rival by force - only by accepting. That makes war against the player toothless at 100.",
+      "options": [
+        "A: a rival may impose on the player at 100 (\"answers and ends\" means the rival never answers or offers FOR the player, not that the player is immune)",
+        "B: as built - the player can only lose ground by accepting"
+      ],
+      "recommendation": "A. Imposing at 100 is the war's one forcing outcome; immunity removes the threat the ledger exists to read.",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "docs/ai/AI_OPPONENT.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): A - a rival may impose peace on the player at 100. 'Only the player answers and ends' means a rival never answers or offers FOR the player; the player is not immune."
+    },
+    "NR-1120": {
+      "id": "NR-1120",
+      "title": "Three war loose ends: spectate, offer churn, the public record",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Cold review of Lane R, sprint 61 (BL-1461 rivals declare war), 2026-10-31",
+      "what": "(1) In spectate mode the player's nation has no one in its seat and the war pass never scores it, so a rival's war against it is never answered, its offers never answered, and it never ends; other strategic tiers score the player's nation while spectating (BL-409). (2) A rival that offers white peace and is refused re-offers on its next evaluation with no cooldown - endless offer and refuse, one verb a war per evaluation. (3) No war verb writes to the history log or the AI decision ring; only a harness-only trace records why a rival declared, though every declaration is public.",
+      "why_it_matters": "(1) leaves permanent wars in every spectated run; (3) means the player learns of a war on them only from the ledger, never from a dispatch or the log.",
+      "options": [
+        "(1) A: while spectating, the war pass scores the player's nation like any rival (BL-409's rule) / B: leave it",
+        "(2) A: a refused offer may not be repeated for 4 ticks (needs a saved refusal tick) / B: accept the churn",
+        "(3) A: declarations and peaces write a history entry and raise a chat dispatch to the player when it is party / B: the ledger is enough"
+      ],
+      "recommendation": "1A, 2A, 3A. (3) answers diplomacy.md open question 2 as well.",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "src/world/war.cpp"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): 1A, 2A, 3A - while spectating the war pass scores the player's nation like any rival; a refused offer may not be repeated for 4 ticks (saved refusal tick); declarations and peaces write a history entry and raise a chat dispatch to the player when it is party."
+    },
+    "NR-1121": {
+      "id": "NR-1121",
+      "title": "Wars cost the economy gate 1.6 points: G1 at tick 50 now 83.5",
+      "raised": "2026-10-31",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Sprint 61 wave 2 gate on main 37b8ac7c (rivals declare war merged), 2026-10-31",
+      "what": "War census, 16 library seeds to tick 40: 34 wars on 9 seeds (seed 25 has 13, with 11 of 43 nations at war at once); seeds 12, 28, 31, 32, 37, 38, 40 see none; every peace by tick 40 is white; one rival declares on the player (seed 10). market_viability full with wars: G1 93.2, G1b 2.5, G2 190.5, G3 100 all pass; G1 at tick 50 falls from 85.1 to 83.5 against its 85 floor (seed 25 92.1 -> 84.6, seed 0 87.5 -> 83.1). Hostile cargo is intercepted, so a war idles the processors that fed on it - the designed consequence, measured.",
+      "why_it_matters": "G1t50 is already the marginal gate BL-1442 (post-capacity starvation) carries; wars push it under. The war band, and this cost, are what the wave re-bless will pin.",
+      "options": [
+        "A: accept - wars are meant to cost trade; BL-1442 carries G1t50 as before",
+        "B: calm the rivals (raise the declaration bar) until G1t50 clears 85 with wars on"
+      ],
+      "recommendation": "A. A war that costs nothing would be the defect; damping rivals to protect a gate is a forced outcome.",
+      "files": [
+        "src/world/corp_ai.cpp",
+        "tools/verify/war_census.cpp"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): A - accept: wars are meant to cost trade. BL-1442 (post-capacity starvation) carries G1t50 as before."
+    },
+    "NR-1122": {
+      "id": "NR-1122",
+      "title": "Two rulings collide: every capital has a base, and bases are cut like any building",
+      "raised": "2026-10-31",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Lane D report, sprint 61 (BL-1464 capital base missing), 2026-10-31",
+      "what": "capital_military_base fails because size_opening_state_to_chest (finish_campaign_world, after the capital bases are laid) demolishes military bases on purpose: seed 46 cuts 15 (all 15 baseless nations are in the cut list), seed 28 cuts 9, seed 11 cuts 26. MILITARY.md § Nation garrisons (Ben, 2026-10-27) says every capital is generated with a military base; NATION_GENERATION.md (Ben, 2026-10-29) says military bases are cut like any building and a cut garrison stands with no recorded base.",
+      "why_it_matters": "A third to two-thirds of nations open with no base, so they cannot recruit or refill (the recruit design of 2026-10-30 hires at bases) until they rebuild one.",
+      "options": [
+        "A: the newer ruling stands - a chest can cut the capital base; the harness accepts and names it; MILITARY.md states the exception",
+        "B: the capital base is exempt from the cut, as the capital's free Logistic Point source is"
+      ],
+      "recommendation": "B. Recruits now come from bases, so a baseless opening nation cannot raise or refill an army; the capital base is infrastructure the state needs, like the free hub.",
+      "files": [
+        "src/world/state_industry.cpp",
+        "docs/military/MILITARY.md",
+        "docs/generation/NATION_GENERATION.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): A - the newer ruling stands: the chest cut may remove a capital base like any building, and a cut nation rebuilds one to recruit. MILITARY.md § Nation garrisons states the exception; capital_military_base accepts and names a cut base. BL-1464 (capital base missing) becomes that harness and doc change."
+    },
+    "NR-1123": {
+      "id": "NR-1123",
+      "title": "A land unit may cross a bridge over another nation's water",
+      "raised": "2026-10-31",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Lane D, sprint 61 (BL-1466 march path domain), 2026-10-31",
+      "what": "MILITARY.md § Domains and traversal lets land classes onto coastal water only where owned. A roaded water tile (a bridge) now counts as land for a land class, as a road already lifts the class terrain wall - so a land unit may cross a bridge over another nation's strait. Naval rows still see the water under it.",
+      "why_it_matters": "A bridge over a rival's strait becomes an invasion route; without the rule a bridge would be a road nobody may walk.",
+      "recommendation": "Accept; a bridge is ground. Write it into § Domains and traversal.",
+      "files": [
+        "src/world/battle_system.cpp",
+        "docs/military/MILITARY.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1124": {
+      "id": "NR-1124",
+      "title": "Bunkers: four first-cut calls (hardness as a soft-fire screen, strength, rival uptake, numbers)",
+      "raised": "2026-11-02",
+      "kind": "decision",
+      "status": "resolved",
+      "source": "Sprint 61 kit lane, BL-1426 (bunkers) merged at 18b6b22e, 2026-11-02",
+      "what": "(1) HARDNESS: MILITARY.md says concrete makes infantry hard to soft attack. Taken as plain hardness, armour's hard attack (140 > its soft 100) would land 1.8x its open-ground hits and take a bunker faster (day 13 vs day 23). Built instead as a soft-fire SCREEN: 40% of each on-tile defender's soft share screened, hard fire unchanged; MILITARY.md § Fortifications says so. (2) STRENGTH: +50% defence plus the screen, both scaled by condition. campaign_battle C8: first break 1.5:1 open vs 1.75:1 full bunker; at 2:1 the defender breaks day 12 open vs day 118 bunkered. Through the daily pass a supplied 2:1 attack takes open ground day 13 and never takes the bunker (held at day 400) - it falls inside the 1.25 dig-in band; breaking it needs artillery wear first (12 condition a day per battery) or more than about 2.1:1. (3) RIVAL UPTAKE: 1 rival bunker in 16 seeds to tick 40 (seed 25). A candidate is an own-ground front tile toward a hostile neighbour where the nation's own units stand, with a road; garrisons mostly stand on posts, not fronts. (4) NUMBERS: 120 credits + stone 20 + steel 8, 90 days, upkeep 5; shelling 12/day per battery; rival cap 4 built or building, only while uncommitted treasury holds 2x capex. Bunkers count against the province building ceiling and tile stack cap.",
+      "why_it_matters": "(2) decides whether a supplied front can be broken without artillery; (3) decides whether rivals visibly fortify at all; (1) is a reading of a doc sentence.",
+      "options": [
+        "(1) A keep the screen / B plain hardness",
+        "(2) A keep / B lower defence or screen so 2:1 eventually breaks a supplied bunker",
+        "(3) A keep / B widen candidates to tiles beside the front and posts on a hostile border",
+        "(4) A keep the first-cut numbers / B retune named ones"
+      ],
+      "recommendation": "(1) A; (2) B - drop defence to +30% so a supplied 2:1 breaks it slowly and artillery shortens it; (3) B, posts on a hostile border count; (4) A.",
+      "files": [
+        "src/world/battle_system.cpp",
+        "src/world/campaign_battle.cpp",
+        "src/world/corp_ai.cpp",
+        "scripts/economy.lua",
+        "docs/military/MILITARY.md"
+      ],
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): (1) A - keep the soft-fire screen. (2) B - defence drops to +30% so a supplied 2:1 breaks a bunker slowly and artillery shortens it. (3) B - candidates widen to posts on a hostile border. (4) A - keep the first-cut numbers. MILITARY.md § Fortifications carries it; the build is the bunker follow-up lane."
+    },
+    "NR-1125": {
+      "id": "NR-1125",
+      "title": "Major opening kit: five calls taken while writing the ruling",
+      "raised": "2026-11-02",
+      "kind": "decision-taken",
+      "status": "resolved",
+      "source": "Sprint 62 design session, Ben's form 2026-11-02 (fixed kit, substitute, Standard, flat treasury, count only)",
+      "what": "(1) KIT MIX: the proposed construction-materials and Arms Works slots are replaced by refined copper and machinery. Arms Works output is wanted only once kit is researched (base kit costs no goods) and the industrial construction recipe is retired, so both would idle on day one against Pass 3's want rule. Steel, copper and machinery make one chain toward ordnance. (2) TAKE-UP: what the walk placed on a major's ground is taken up once majors are known, after the search scored it, and the kit laid in its place; a minor's processor whose feed stood on that ground may lose it. (3) LOGISTICS: history and fold nodes fill the kit's four logistics slots in seeding order; nodes beyond the count are taken up, roads and track stay. (4) ARMY POSTS: of the eight units, four at the capital (2 infantry, artillery, light armour) and four one each at border posts in grudge order, wrapping; land pool opens at 200 recruits. (5) LADDER END: a slot nothing on the substitution ladder places stays unbuilt and is reported, not paid in credits.",
+      "files": [
+        "docs/generation/CORPORATION_GENERATION.md",
+        "docs/military/MILITARY.md",
+        "docs/generation/NATION_GENERATION.md"
+      ],
+      "why_it_matters": "Each is a reading of the form Ben answered, not a choice he made. (2) and (3) can change what a minor opens with, and every seed digest moves with them.",
+      "recommendation": "Confirm all five; (2) and (3) are the ones most likely to move a minor's opening.",
+      "resolution": "Ben, 2026-11-03 (sprint 61 calls form): ratified as taken."
+    },
+    "NR-1129": {
+      "id": "NR-1129",
+      "title": "Grievance never holds: no pair's Trust reaches -25",
+      "raised": "2026-11-03",
+      "status": "resolved",
+      "resolution": "Ben, 2026-11-03: steeper Trust, then (after measurement showed weights or decay alone reach only -11 / -9) both together with the edge at -15. Trust-negative weights doubled, Trust half-life 18 ticks (Access and Alarm keep 9), k_war_grievance_trust -15; RELATIONS.md § The authored numbers and § 7. war_census 16 seeds: grievance holds on 100 pair-ticks (was 0) and carried 2 declarations; wars declared 95 (was 36), 47 still at war at tick 40; rival embargoes 48 enacted, 31 repealed, 17 standing (was 3/3/0); none on the player.",
+      "kind": "question",
+      "source": "BL-1479 (grievance and Alarm floor), war_census 16 seeds",
+      "what": "Grievance now holds at Trust -25 as ruled. Over 16 seeds the lowest Trust any pair reached was about -11.8, so grievance held on 0 of 652,094 live pair-ticks and carried no declaration.",
+      "why_it_matters": "A declared casus belli that nothing meets is a dead rule. The conduct weights and the nine-tick decay cap Trust well above the edge.",
+      "recommendation": "Either raise the conduct weights (or slow the decay) so a sustained offence reaches -25, or move the edge toward the observed floor (about -10). Measure with war_census either way.",
+      "files": [
+        "src/world/war.hpp",
+        "src/world/sentiment.cpp",
+        "docs/politics/RELATIONS.md"
+      ]
     }
   }
 }

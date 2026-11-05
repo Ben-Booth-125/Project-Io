@@ -156,9 +156,9 @@ conduct retired with the corporations keeps its enumerator and moves nothing (Be
 
 ### Who emits each factor (Ben, 2026-10-30)
 
-**Every live factor has an emitter, and each emitter is one call site.** Until now only the opening
-grudge wrote a row, and its Trust fades within about fourteen campaign years; past that, every pair read
-neutral. A factor's direction on each dimension is fixed below; its size is an authored weight in
+**Every live factor has an emitter, and each emitter is one call site.** With the opening grudge as
+the only writer, its Trust would fade within about fourteen campaign years and every pair would then
+read neutral. A factor's direction on each dimension is fixed below; its size is an authored weight in
 `economy.sentiment.factors`, and an occurrence with a natural size passes it as the magnitude.
 
 | Factor | Emitted by | Observer → subject | Access | Trust | Alarm |

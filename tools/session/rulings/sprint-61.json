@@ -98,5 +98,62 @@
    "whether a nation can be ceded away"
   ],
   "owner": "BL-1460 (cession moves territory)"
+ },
+ {
+  "ruling": "The grid read: own buildings live, every other building nominal (Ben, 2026-11-04)",
+  "doc": "docs/economy/PRODUCTION.md",
+  "anchor": "every other building nominally \\(Ben, 2026-11-04; BL-1485",
+  "stale": [
+   "the two readings are one"
+  ],
+  "owner": "BL-1485 (power grid measure)"
+ },
+ {
+  "ruling": "Own buildings live in the scorer's grid gate (Ben, 2026-11-04)",
+  "doc": "docs/ai/AI_OPPONENT.md",
+  "anchor": "Own buildings live, every other building nominal \\(Ben, 2026-11-04",
+  "stale": [],
+  "owner": "BL-1485 (power grid measure)"
+ },
+ {
+  "ruling": "Earners keep running at an empty treasury (Ben, 2026-11-04)",
+  "doc": "docs/economy/FINANCE.md",
+  "anchor": "Earners keep running \\(Ben, 2026-11-04",
+  "stale": [
+   "solvency reserve"
+  ],
+  "owner": "BL-1482 (broke nation spiral)"
+ },
+ {
+  "ruling": "A treasury may sit briefly below zero (Ben, 2026-11-05)",
+  "doc": "docs/economy/FINANCE.md",
+  "anchor": "A treasury may sit\\s+briefly below zero \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "The treasury never goes\\s+below zero",
+   "A nation never\\s+runs into debt: a building its treasury",
+   "A nation never goes insolvent"
+  ],
+  "owner": "BL-1482 (broke nation spiral)"
+ },
+ {
+  "ruling": "A node that opens kit is worth that kit (Ben, 2026-11-04)",
+  "doc": "docs/ai/AI_OPPONENT.md",
+  "anchor": "A node that opens kit is worth that kit",
+  "stale": [],
+  "owner": "BL-1486 (kit research worth)"
+ },
+ {
+  "ruling": "The Industry lens is retired (Ben, 2026-11-04)",
+  "doc": "docs/ui/LENSES.md",
+  "anchor": "The Industry lens is retired \\(Ben, 2026-11-04\\)",
+  "stale": [],
+  "owner": "BL-1488 (Industry lens retired)"
+ },
+ {
+  "ruling": "Province resource rows show the good by glyph, the name on hover (Ben, 2026-11-04)",
+  "doc": "docs/ui/SELECTION.md",
+  "anchor": "the name on hover \\(Ben, 2026-11-04\\)",
+  "stale": [],
+  "owner": "BL-1490 (province resource clip)"
  }
 ]

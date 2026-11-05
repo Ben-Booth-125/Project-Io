@@ -10,6 +10,48 @@
   ],
   "bucket": "2026-Q4",
   "records": {
+    "alarm-as-sentiment": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: sentiment_harness",
+            "headless: save_roundtrip"
+          ],
+          "requirement": "Alarm is a third float beside Access and Trust per (observer, subject): folded by authored factor weights, decayed toward neutral at an authored rate, a row erased only when all three are neutral. Saved (save version bump); a stream from before the bump loads with Alarm 0.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 (A1-A7, C1-C5, E5a-d, G1-G2); save_roundtrip P8 (v68, v67 loads with Alarm 0); nation_tech_harness --fixture-only T1e/T2/T3; industrialisation_sim_harness [13] Alarm lean."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: sentiment_harness"
+          ],
+          "requirement": "Alarm's factors emit (RELATIONS.md § 6): visible capability (a technology whose tell is public, a large single-site facility), standing force on the observer's border, severed trade. Unrest has no store; its factor is authored zero. Live trade between the pair relieves it (trade_conducted, BL-1458).",
+          "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 (A1-A7, C1-C5, E5a-d, G1-G2); save_roundtrip P8 (v68, v67 loads with Alarm 0); nation_tech_harness --fixture-only T1e/T2/T3; industrialisation_sim_harness [13] Alarm lean."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: tech_tree_effects or the harness that reads tree effects"
+          ],
+          "requirement": "The Digitisation nodes whose effect reads \"Alarm toward you\" write to the Alarm dimension instead of reading nothing.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 (A1-A7, C1-C5, E5a-d, G1-G2); save_roundtrip P8 (v68, v67 loads with Alarm 0); nation_tech_harness --fixture-only T1e/T2/T3; industrialisation_sim_harness [13] Alarm lean."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: industrialisation_sim_harness"
+          ],
+          "requirement": "Reading [13] prints \"Alarm lean\", not \"Catastrophe lean\" (INDUSTRIALISATION.md acceptance table).",
+          "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 (A1-A7, C1-C5, E5a-d, G1-G2); save_roundtrip P8 (v68, v67 loads with Alarm 0); nation_tech_harness --fixture-only T1e/T2/T3; industrialisation_sim_harness [13] Alarm lean."
+        }
+      ],
+      "resolution": "All four rows complete on integrated main 3f2c068a."
+    },
     "beat-one-ships": {
       "rows": [
         {
@@ -293,6 +335,51 @@
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
     },
+    "cession-moves-territory": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: cession_harness"
+          ],
+          "requirement": "On a library seed, a ceded province's tiles move to the receiver in tile_to_nation; every building on them changes owner with the ground; its population centre, law jurisdiction and road network membership follow; fronts re-derive; the loser's units on ceded ground withdraw by the retreat rule.",
+          "notes": "main 13ee6831, 2026-10-31: cession_harness 23/0 on seed 28 (C1 ground, buildings, centres, jurisdiction, roads, fronts, withdrawal; C3 capital and hub, last-province refusal; C4 white peace; C2/C5 caches, money, save, determinism; C6 load-safe fronts; C7 wings; C8/C9 cravings fixed at v71); money_conservation, fold_census, fronts_harness, world_determinism unmoved."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: cession_harness"
+          ],
+          "requirement": "A ceded capital moves the loser's capital to its remaining province with the largest population centre (ties to the lower id), and the free logistics hub moves with it. A peace that would cede the last province is refused.",
+          "notes": "main 13ee6831, 2026-10-31: cession_harness 23/0 on seed 28 (C1 ground, buildings, centres, jurisdiction, roads, fronts, withdrawal; C3 capital and hub, last-province refusal; C4 white peace; C2/C5 caches, money, save, determinism; C6 load-safe fronts; C7 wings; C8/C9 cravings fixed at v71); money_conservation, fold_census, fronts_harness, world_determinism unmoved."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: cession_harness"
+          ],
+          "requirement": "A white peace returns every occupied goal's holder to its owner, and the occupying units withdraw by the retreat rule.",
+          "notes": "main 13ee6831, 2026-10-31: cession_harness 23/0 on seed 28 (C1 ground, buildings, centres, jurisdiction, roads, fronts, withdrawal; C3 capital and hub, last-province refusal; C4 white peace; C2/C5 caches, money, save, determinism; C6 load-safe fronts; C7 wings; C8/C9 cravings fixed at v71); money_conservation, fold_census, fronts_harness, world_determinism unmoved."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: money_conservation",
+            "headless: fold_census",
+            "headless: save_roundtrip",
+            "headless: world_determinism",
+            "headless: the front harnesses"
+          ],
+          "requirement": "Conservation, the fold, the save and determinism hold across a cession; no consumer of tile_to_nation keeps a stale cache.",
+          "notes": "main 13ee6831, 2026-10-31: cession_harness 23/0 on seed 28 (C1 ground, buildings, centres, jurisdiction, roads, fronts, withdrawal; C3 capital and hub, last-province refusal; C4 white peace; C2/C5 caches, money, save, determinism; C6 load-safe fronts; C7 wings; C8/C9 cravings fixed at v71); money_conservation, fold_census, fronts_harness, world_determinism unmoved."
+        }
+      ],
+      "resolution": "All rows complete on main 13ee6831."
+    },
     "culture-ground-profile-reader": {
       "rows": [
         {
@@ -408,6 +495,39 @@
         }
       ],
       "resolution": "Delivered with sprint 52."
+    },
+    "diplomacy-ledger": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "visual: scripts/verify/diplomacy_ledger.lua"
+          ],
+          "requirement": "Slot 8 (MENU.md's slot; diplomacy.md said 9 in error) opens the ledger. Nations shows one row per nation with stance chips and Access/Trust/Alarm toward the player; an expanded row shows the reverse sentiment, power and front strength, trade exposure, friendship, embargo and Declare war. Wars lists every war with score, exhaustion and goals.",
+          "notes": "main 3233826b, 2026-10-31: diplomacy_ledger.lua 0 failures on the integrated build (slot 8, 40 nation rows, expand, declaration with canvas goals and price, embargo enact/lift, tab switch closes the declaration, Wars 2 of 2, peace composer, toggle rule). The hover cause line is BL-1470."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "live"
+          ],
+          "requirement": "In the running game: open slot 9, expand a row, declare war choosing a goal on the canvas with the price shown, answer and offer peace from Wars, offer friendship, toggle the embargo; each press does what it says and the toggle rule holds.",
+          "notes": "Owed: Ben's live click (the ten-step list in the Lane L report).",
+          "evidence": "COMPLETE, live click by Ben 2026-11-04 in the release build at 56ecddde: the diplomacy ledger, war declaration and peace flows, the peace-offer cooldown and the embargo toggle all behave as stated (Ben: \"All of the live clicks look good\")."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "static: question_log.json, ui_elements.json, ACTIONS.json"
+          ],
+          "requirement": "The surface carries its question log entry, a ui_elements entry with its checks, and an ACTIONS.json entry per press.",
+          "notes": "question_log diplomacy_ledger, ui_elements UI-133, ACTIONS.json ledger.diplomacy_* entries (212), mirrors regenerated."
+        }
+      ],
+      "resolution": "All three rows complete; R2 by Ben's live click 2026-11-04."
     },
     "far-pairs-across-water": {
       "rows": [
@@ -1875,6 +1995,49 @@
       ],
       "resolution": "Cancelled with its item BL-699 (rival coalitions, cancelled 2026-09-01)."
     },
+    "rivals-declare-war": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: stance_determinism",
+            "headless: spectator_determinism"
+          ],
+          "requirement": "A rival's war choices are pure, seeded and replayable: two runs of one seed declare, answer and make peace identically.",
+          "notes": "main 13ee6831, 2026-10-31: war_harness RW9/RW10; war_census --replay byte-identical on seeds 0, 11, 25, 41 (stance_determinism does not reach the war pass, recorded)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: war_census (par-seeds, 16 seeds)"
+          ],
+          "requirement": "Across the 16 library seeds by tick 40 at least one war is declared somewhere, and no seed has every nation at war. The measured counts are reported as a decision entry (the band is calibration).",
+          "notes": "main 13ee6831, 2026-10-31: war_census 16 seeds to tick 40: 34 wars on 9 seeds, max 11 of 43 at war, none on 7 seeds, no settle wars; decision entry NR-1121."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: war_harness"
+          ],
+          "requirement": "A rival answers a declaration against it, offers and accepts or refuses peace, and imposes at 100, only through the legal verbs; the player's nation is never acted for.",
+          "notes": "main 13ee6831, 2026-10-31: war_harness RW1-RW10b: answers, offers, accepts, refuses, imposes at 100 only through verbs; the player's nation is never acted for."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: market_viability (full)",
+            "headless: world_determinism"
+          ],
+          "requirement": "The economy readings and digest movement are reported with their cause; only invariants gate the merge, and the wave's re-bless waits on Ben.",
+          "notes": "main 13ee6831, 2026-10-31: market_viability FULL with wars: G1 93.2 PASS, G1t50 83.5 FAIL (85.1 before wars; a calibration gate carried by BL-1442, not an invariant), G1b 2.5, G2 190.5, G3 100; world_determinism unmoved; live-tick digests move - re-bless waits on Ben (NR-1121)."
+        }
+      ],
+      "resolution": "All rows complete on main 13ee6831."
+    },
     "rivals-start-armed-again": {
       "rows": [
         {
@@ -2180,6 +2343,40 @@
         }
       ],
       "resolution": "Closed at the sprint 48 close (2026-10-04): every row terminal; see row evidence."
+    },
+    "sentiment-emitters": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: sentiment_harness"
+          ],
+          "requirement": "Each emitter in RELATIONS.md § Who emits each factor writes its factor on the stated observer -> subject rows with the stated sign per dimension: trade_conducted (per tick per pair, magnitude = value landed), friendship_accepted, embargo_imposed, force_used (magnitude = strength the observer lost). The war emitters (hostility_declared, war_declared, peace_concluded, province_ceded) are asserted by war_harness (BL-1459, BL-1428).",
+          "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness 77/0 covers trade_conducted, friendship_accepted, force_used; embargo_imposed has no emitter because no embargo law exists - it lands with BL-1418 (embargo bars goods). Then main ae736e46: embargo_imposed emits on set_embargo enactment through queue_conduct (sentiment_harness 81/0, E4a-d; embargo_harness 54/0)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: sentiment_harness"
+          ],
+          "requirement": "sentiment.cpp still takes no world& (R1 holds); emitters gather sentiment_events and fold one canonicalised batch per tick, so gather order is not observable. War_declared, peace_concluded and province_ceded are appended to sentiment_factor_kind after historical_grudge, in that order.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: sentiment_harness E6 (one canonicalised batch a tick, gather order unobservable); sentiment.cpp takes no world&; enumerators 12-14."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: world_determinism",
+            "headless: save_roundtrip",
+            "headless: market_viability (quick)"
+          ],
+          "requirement": "Determinism and the save hold. Nothing reads the emitted rows yet but the scorer and the ledger, so the economy is unmoved; digest movement is reported, not re-blessed.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: world_determinism ALL PASS, digests unmoved; save_roundtrip OK; market_viability FULL (16 seeds) pooled G1 93.2 G1t50 85.1 G1b 2.5 G2 193.4 G3 100."
+        }
+      ],
+      "resolution": "All three rows complete on main ae736e46."
     },
     "settle-spacing": {
       "rows": [
@@ -2616,6 +2813,101 @@
           "notes": "scripts/verify/unit_designer.lua 0 failures (merge 11bc6ad6): opens from a Design-tab class and a unit card's type name; placeholder class image, one box per slot with a leader line, per-pick save; the same press and Esc close it. Live check: Ben looked at the designer in the release build, 2026-10-28 (\"Looks pretty good\")."
         }
       ]
+    },
+    "war-goals-and-peace": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: war_harness"
+          ],
+          "requirement": "War score in [-100, 100], positive for the declarer: half occupation and half battles. Occupation normalises each side by its own goals (Ben, 2026-10-31, NR-1103): the tile-weighted share of the declarer's goals the declarer holds by province_holder, less the share of the defender's answered goals the defender holds; holding every goal named and losing none of one's own is the full half for either side, so either side can reach +-100 in an answered war. Battles: strength destroyed between the pair, declarer's share less the defender's.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0 (P1 per-side occupation per NR-1103, P2 daily field days, F1 peace ends battles, F2 truce refuses hostility); save_roundtrip OK; agent_seam 23/0."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: war_harness"
+          ],
+          "requirement": "Exhaustion in [0, 100] per party rises with its own strength lost, each day its units stand in the field, and each of its provinces the enemy holds; it decays once at peace, and it moves the morale of the nation's units.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0 (P1 per-side occupation per NR-1103, P2 daily field days, F1 peace ends battles, F2 truce refuses hostility); save_roundtrip OK; agent_seam 23/0."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: war_harness"
+          ],
+          "requirement": "Peace offers live in their own table, one pending per war. White peace changes nothing hands; cession passes only named goals the receiver holds, never the loser's last province. A side at score 100 may impose without acceptance. At peace both hostility rows clear, the record closes, and a 16-tick truce refuses declare_war either way. peace_concluded and province_ceded emit as RELATIONS.md says.",
+          "notes": "main 13ee6831, 2026-10-31: war_harness P3v2: successive real cessions bring a nation to one province; ceding it is refused offered or imposed, world unchanged; P3r2/P3r3 every peace returns the war's uncedeed goals, third nations untouched."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: save_roundtrip",
+            "headless: world_determinism",
+            "headless: agent_seam"
+          ],
+          "requirement": "Offers, truces, score and exhaustion are saved; the peace verbs are seam-validated and in ACTIONS.json.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0 (P1 per-side occupation per NR-1103, P2 daily field days, F1 peace ends battles, F2 truce refuses hostility); save_roundtrip OK; agent_seam 23/0."
+        }
+      ],
+      "resolution": "All rows complete on main 13ee6831."
+    },
+    "war-record-and-declaration": {
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "verification": [
+            "headless: war_harness"
+          ],
+          "requirement": "declare_war(declarer, defender, goals) writes the declarer's hostility row and opens the war record in one call. It is refused, mutating nothing, on: an existing war between the pair, a standing truce, zero or more than three goals, a goal that is not the defender's province, declarer == defender. Friendship between the pair dissolves. return_to_neutral between war parties is refused.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0; save_roundtrip OK (v69 over v68); agent_seam_harness 23/0; ACTIONS.json carries the six war verbs. R5 is the harness path; the app right-click is in the live-click batch."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "verification": [
+            "headless: war_harness"
+          ],
+          "requirement": "The price: hostility_declared on the defender's row toward the declarer; war_declared on every other nation's row toward the declarer, magnitude doubled for a nation bordering either party and raised per goal past the first; halved when any justification holds. Each of the four justifications (grievance, embargo, lost ground, a friend attacked) is detected by its condition row, and a preview read returns the same price the declaration then charges.",
+          "notes": "main 13ee6831, 2026-10-31: war_harness 158/0; P3z: after a real cession the loser declares naming the province it lost, the preview shows lost ground and declare_war is accepted."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "verification": [
+            "headless: war_harness"
+          ],
+          "requirement": "The defender's answer costs nothing, writes its hostility row, and names one to three goals among the declarer's provinces; refused, mutating nothing, on an invalid goal or a war that is not its own.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0; save_roundtrip OK (v69 over v68); agent_seam_harness 23/0; ACTIONS.json carries the six war verbs. R5 is the harness path; the app right-click is in the live-click batch."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "verification": [
+            "headless: save_roundtrip",
+            "headless: world_determinism",
+            "headless: agent_seam"
+          ],
+          "requirement": "The war record and its tables are in the world snapshot (save version bump; older streams load with no wars). The verbs cross the AI-facing seam as untrusted input: an out-of-range id or goal list rejects the whole command and mutates nothing. ACTIONS.json carries declare_war and the answer.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0; save_roundtrip OK (v69 over v68); agent_seam_harness 23/0; ACTIONS.json carries the six war verbs. R5 is the harness path; the app right-click is in the live-click batch."
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "verification": [
+            "headless: war_harness"
+          ],
+          "requirement": "The right-click declare-and-attack path declares through declare_war with the attacked tile's province as its first goal.",
+          "notes": "integrated main 3f2c068a, 2026-10-31: war_harness 130/0; save_roundtrip OK (v69 over v68); agent_seam_harness 23/0; ACTIONS.json carries the six war verbs. R5 is the harness path; the app right-click is in the live-click batch."
+        }
+      ],
+      "resolution": "All rows complete on main 13ee6831."
     },
     "wharf-placed-on-shore": {
       "rows": [

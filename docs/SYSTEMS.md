@@ -42,7 +42,7 @@ There are **two battle resolvers**, and the split is deliberate (Ben, 2026-08-13
 *The systems the player actively builds and maintains to keep both pillars running.*
 
 ### Budget
-The nation's treasury and its weighted budget. Revenue comes from what its buildings sell, its wage tax and its tariffs; outgoings cover construction, inputs, wages, maintenance, research and military operations. Budget is the direct converter between economic output and military capability. A nation never runs into debt: a building its treasury cannot pay for idles, network nodes paid first (`docs/politics/NATIONS.md` § What a nation owns). Financial collapse — a treasury that can pay for little, so its industry idles — stays one of the two primary loss vectors (CONCEPT.md).
+The nation's treasury and its weighted budget. Revenue comes from what its buildings sell, its wage tax and its tariffs; outgoings cover construction, inputs, wages, maintenance, research and military operations. Budget is the direct converter between economic output and military capability. A nation does not borrow: a building its treasury cannot pay for idles, earners excepted at an empty treasury (`docs/economy/FINANCE.md` § The money loop), network nodes paid first (`docs/politics/NATIONS.md` § What a nation owns). Financial collapse — a treasury that can pay for little, so its industry idles — stays one of the two primary loss vectors (CONCEPT.md).
 
 ### Resources
 Raw materials are extracted from bodies and processed into higher-tier goods through industrial chains. Output feeds both trade networks and military supply. Starting resource conditions differ between factions, making early industrial priorities a meaningful strategic choice.
