@@ -83,32 +83,6 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 61,
-   "version_goal": "v0.3.0",
-   "written": "2026-10-31",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (sprint 61 delivery, from Lane L, 2026-10-31)",
-   "requires": [],
-   "id": "BL-1470",
-   "short_name": "SENTIMENT_CONTRIBUTORS",
-   "category": "Politics",
-   "authority_doc": "docs/politics/RELATIONS.md",
-   "priority": "B",
-   "difficulty": 3,
-   "files": [
-    "src/world/sentiment.hpp",
-    "src/world/sentiment.cpp",
-    "src/world/hard_coded_world.cpp",
-    "src/world/world_save.cpp",
-    "src/ui/diplomacy_ledger.cpp"
-   ],
-   "title": "A sentiment row remembers what moved it, so the ledger can name the cause",
-   "design": "ledgers/diplomacy.md § Nations - the folded row: hovering a bar names its largest contributing conduct, and a seeded row names the war that seeded it with its region and year (RELATIONS § Where a grudge lands). Found by Lane L, sprint 61 (2026-10-31): the world keeps no record of which conduct moved a value, and hard_coded_world.cpp discards the grudge seed records (grudge_sentiment_seed) after seeding. THE WORK: keep, per (observer, subject) row, the largest live contributor per dimension (factor kind and, for a grudge, its seed record), decayed with the row; keep the grudge seeds; save it (next save version). sentiment.cpp still takes no world&. The ledger hover then reads it. Also consider a saved short history so the trend arrows and trade exposure survive a load (today a UI-side ring buffer). Check: sentiment_harness rows, save_roundtrip, world_determinism. CARRIED at the sprint 61 close (2026-11-05): built and merged; Ben's live click is owed on the diplomacy bar hover (Largest cause)."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
    "sprint": 62,
    "version_goal": "v0.3.0",
    "written": "2026-11-02",
@@ -132,13 +106,15 @@
   {
    "status": "proposed",
    "glyph": "○",
-   "sprint": 61,
+   "sprint": 63,
    "version_goal": "v0.3.0",
    "written": "2026-11-04",
    "parked": false,
    "blocked_on": null,
    "author": "main session (Ben, 2026-11-04: \"File both\")",
-   "requires": [],
+   "requires": [
+    "BL-1495"
+   ],
    "category": "UI",
    "priority": "B",
    "difficulty": 2,
@@ -150,7 +126,7 @@
     "scripts/verify/text_overflow_floor.lua"
    ],
    "title": "The province card's resource names clip to 4 px",
-   "design": "Found 2026-11-04 merging BL-1488 (Industry lens retired); fails identically on b2b2502b without it. text_overflow_floor: 13 selection.province.resource names (Iron Ore 57 px needed, Rare Earth Ore 103 px) get 4 px on the overflow_shell and overflow_selection_building frames. Check: text_overflow_floor passes with no floor lowered. CARRIED at the sprint 61 close (2026-11-05): built and merged; Ben's live click is owed, and at 1280x720 the deposit column still clips at the right edge and the Province title overlaps the population figure."
+   "design": "Found 2026-11-04 merging BL-1488 (Industry lens retired); fails identically on b2b2502b without it. text_overflow_floor: 13 selection.province.resource names (Iron Ore 57 px needed, Rare Earth Ore 103 px) get 4 px on the overflow_shell and overflow_selection_building frames. Check: text_overflow_floor passes with no floor lowered. CARRIED at the sprint 61 close (2026-11-05): built and merged; Ben's live click is owed, and at 1280x720 the deposit column still clips at the right edge and the Province title overlaps the population figure. LIVE CLICK 2026-11-05: not passed. Ben's answer to the remaining clipping is to scale the UI down, so this stays open until BL-1495 (UI scale down) lands and the card is clicked again."
   },
   {
    "status": "proposed",
@@ -248,6 +224,29 @@
    ],
    "title": "Processors stop running by tick 50 on the re-curated library's colonial, rich and roadless worlds",
    "design": "Found 2026-11-05 re-curating the seed library (BL-1413): market_viability G1t50 pools 82.3 on the new sixteen against the 84 floor, where the old sixteen read 84.2 on the same code; handoff G1 is 94.8, so processors start running and stop by tick 50. Per seed: 92 (colonial) 72.8, 64 (colonial-undone) 74.3, 46 (rich) 77.3, 7 (wealth at home) 77.5, 63 (roadless) 77.8, 54 (road world) 79.3, 0+60 80.4, 29 82.8; 13 84.9, 3 87.1, 2 87.6, 22 87.7, 27 89.0, 17 90.4, 31 90.7. Ben kept the floor at 84 (2026-11-05): the broader library exposes a real stall, it is not a calibration to move. THE WORK: read the low seeds' tick-50 idle reasons (market_viability's per-seed idle census and the BR/PW lines) and name the cause before any change. Check: G1t50 >= 84 pooled on the library, every other gate held."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: BL-1490 live click)",
+   "requires": [],
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1495",
+   "short_name": "UI_SCALE_DOWN",
+   "authority_doc": "docs/ui/LAYOUT.md",
+   "files": [
+    "src/core/app.cpp",
+    "src/core/app.hpp"
+   ],
+   "title": "Scale the UI down so each element is smaller and stops clipping",
+   "design": "Ben, 2026-11-05, on the BL-1490 (province resource clip) live click: scale the UI down so each element is smaller, which avoids the clipping. At 1280x720 the Province card's deposit column clips at the right edge and its title overlaps the population figure. TODAY: apply_ui_scale (src/core/app.cpp) offers 16, 20 and 24 px fonts (1.0x, 1.25x, 1.5x); 1.0x is the smallest and the default. It reloads the font only, without ScaleAllSizes, so hard-coded px chrome does not move with it. OPEN, for Ben when this is picked up: how much smaller; whether smaller becomes the default or a new setting; and whether element sizes shrink with the text, which the current mechanism does not do. Measure legibility at the chosen size, and re-read the BL-1490 name-to-glyph change, since smaller elements may leave room for names. Check: text_overflow_floor passes with no floor lowered; a live click at 1280x720 and on Ben's display."
   }
  ]
 }

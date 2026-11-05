@@ -14342,6 +14342,52 @@
         "title",
         "design"
       ]
+    },
+    "BL-1470": {
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 61,
+      "version_goal": "v0.3.0",
+      "written": "2026-10-31",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (sprint 61 delivery, from Lane L, 2026-10-31)",
+      "requires": [],
+      "id": "BL-1470",
+      "short_name": "SENTIMENT_CONTRIBUTORS",
+      "category": "Politics",
+      "authority_doc": "docs/politics/RELATIONS.md",
+      "priority": "B",
+      "difficulty": 3,
+      "files": [
+        "src/world/sentiment.hpp",
+        "src/world/sentiment.cpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/world_save.cpp",
+        "src/ui/diplomacy_ledger.cpp"
+      ],
+      "title": "A sentiment row remembers what moved it, so the ledger can name the cause",
+      "design": "ledgers/diplomacy.md § Nations - the folded row: hovering a bar names its largest contributing conduct, and a seeded row names the war that seeded it with its region and year (RELATIONS § Where a grudge lands). Found by Lane L, sprint 61 (2026-10-31): the world keeps no record of which conduct moved a value, and hard_coded_world.cpp discards the grudge seed records (grudge_sentiment_seed) after seeding. THE WORK: keep, per (observer, subject) row, the largest live contributor per dimension (factor kind and, for a grudge, its seed record), decayed with the row; keep the grudge seeds; save it (next save version). sentiment.cpp still takes no world&. The ledger hover then reads it. Also consider a saved short history so the trend arrows and trade exposure survive a load (today a UI-side ring buffer). Check: sentiment_harness rows, save_roundtrip, world_determinism. CARRIED at the sprint 61 close (2026-11-05): built and merged; Ben's live click is owed on the diplomacy bar hover (Largest cause). CLOSED 2026-11-05: Ben's live click on the diplomacy bar hover passed.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "id",
+        "short_name",
+        "category",
+        "authority_doc",
+        "priority",
+        "difficulty",
+        "files",
+        "title",
+        "design"
+      ]
     }
   }
 }
