@@ -612,6 +612,79 @@ float gate_walk_buildings(W& w, const recipe_registry& reg, const nation_compone
     return left;
 }
 
+/// BL-1482 (broke nation spiral; FINANCE.md, "Earners keep running", Ben
+/// 2026-11-04): what @p b would earn in one tick if it ran - each good it makes,
+/// at its own staffing and supply factor (`building_output`'s nominal reading),
+/// at its market's POSTED price, the price its bound bills inputs at. 0 for a
+/// building that makes no good (a node, a marketplace's points, a school) or has
+/// no shelf.
+float gate_run_earnings(const world& w, const recipe_registry& reg, entity_id bid,
+                        const building_component& b)
+{
+    if (b.type != building_type::processing_facility && b.type != building_type::extraction_site)
+        return 0.0f;
+    const entity_id mid = market_for_tile(w, b.tile);
+    if (mid == null_entity)
+        return 0.0f;
+    const auto mit = w.markets.find(mid);
+    if (mit == w.markets.end())
+        return 0.0f;
+    float earn = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float q = building_output(w, reg, bid, b, r, nullptr);
+        if (q > 0.0f)
+            earn += q * posted_price(mit->second, r);
+    }
+    return std::isfinite(earn) ? earn : 0.0f;
+}
+
+/// EARNERS KEEP RUNNING (BL-1482). For a nation whose treasury is under one
+/// credit, of the buildings the gate walk would idle (@p idled: (building,
+/// bound), in walk order), the ones that earn more than their bound
+/// (`gate_run_earnings` > bound), taken cheapest bound first - ties by building
+/// id - and admitted while the admitted set's summed bound stays within its
+/// summed earnings. Returns the admitted (building, bound), in admission order.
+/// Pure; the gate and its read-only twin both call it, so they cannot drift.
+template <class W>
+std::vector<std::pair<entity_id, float>> gate_earners_at_zero(
+    W& w, const recipe_registry& reg, const nation_component& nc,
+    const std::vector<std::pair<entity_id, float>>& idled)
+{
+    std::vector<std::pair<entity_id, float>> out;
+    if (!(nc.treasury < 1.0f))
+        return out;
+    struct earner { entity_id bid; float bound; float earn; };
+    std::vector<earner> cand;
+    for (const auto& [bid, bound] : idled)
+    {
+        if (!std::isfinite(bound))
+            continue;
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const building_component& b = bit->second;
+        if (b.decommissioned || b.ticks_remaining > 0)
+            continue; // not running: nothing to earn with
+        const float earn = gate_run_earnings(w, reg, bid, b);
+        if (earn > bound)
+            cand.push_back({ bid, bound, earn });
+    }
+    std::sort(cand.begin(), cand.end(), [](const earner& a, const earner& b) {
+        return a.bound != b.bound ? a.bound < b.bound : a.bid < b.bid;
+    });
+    float bill = 0.0f, earned = 0.0f;
+    for (const earner& e : cand)
+    {
+        if (bill + e.bound > earned + e.earn)
+            continue;
+        bill   += e.bound;
+        earned += e.earn;
+        out.emplace_back(e.bid, e.bound);
+    }
+    return out;
+}
+
 } // namespace
 
 bool state_commit_change(world& w, const recipe_registry& reg, entity_id nation,
@@ -765,8 +838,9 @@ void plan_state_funding(world& w, const recipe_registry& reg)
         world::state_tick_ledger& led = w.state_ledger[nid];
         led.treasury_open = nc.treasury;
         // THE ONE GATE WALK (gate_walk_buildings): funded or idled, in order.
+        std::vector<std::pair<entity_id, float>> idled; // BL-1482: (building, bound)
         float left = gate_walk_buildings(w, reg, nc, std::max(0.0f, nc.treasury),
-            [&](entity_id, building_component& b, float bound, bool fits) {
+            [&](entity_id bid, building_component& b, float bound, bool fits) {
                 const bool was_idle = b.state_idle;
                 if (fits)
                 {
@@ -778,12 +852,26 @@ void plan_state_funding(world& w, const recipe_registry& reg)
                 {
                     b.state_idle = true;
                     ++led.idled;
+                    idled.emplace_back(bid, bound);
                 }
                 // BL-1255 (review 3): an idle station carries nothing, so its
                 // flip stales the rail network.
                 if (b.type == building_type::railway_station && b.state_idle != was_idle)
                     station_flipped = true;
             });
+        // BL-1482 (FINANCE.md, "Earners keep running", Ben 2026-11-04): at a
+        // treasury under one credit, the buildings that pay for themselves run
+        // anyway, so income restarts. Committed like any funded building; the
+        // uncommitted treasury then reads 0, so nothing else spends against it.
+        // Only goods-makers are admitted, so no station flips here.
+        for (const auto& [bid, bound] : gate_earners_at_zero(w, reg, nc, idled))
+        {
+            building_component& b = w.buildings.at(bid);
+            b.state_idle   = false;
+            led.committed += bound;
+            ++led.funded;
+            --led.idled;
+        }
         // BL-1255 fix round (review 2; Ben's state rule "a losing building idles,
         // never debt"): THE TRACK'S UPKEEP IS FUNDED HERE, after the nation's
         // buildings. Funded: committed, and apply_budget charges it. Not: the
@@ -898,11 +986,25 @@ std::vector<entity_id> state_gate_would_idle(const world& w, const recipe_regist
     for (const entity_id nid : gate_nations(w, gate_rail_tiles(w)))
     {
         const nation_component& nc = w.nations.at(nid);
+        std::vector<std::pair<entity_id, float>> walk_idled;
         (void)gate_walk_buildings(w, reg, nc, std::max(0.0f, nc.treasury),
-            [&](entity_id bid, const building_component&, float, bool fits) {
+            [&](entity_id bid, const building_component&, float bound, bool fits) {
                 if (!fits)
-                    idled.push_back(bid);
+                    walk_idled.emplace_back(bid, bound);
             });
+        // BL-1482: the earners the empty treasury still runs are not idled.
+        std::set<entity_id> runs;
+        for (const auto& [bid, bound] : gate_earners_at_zero(w, reg, nc, walk_idled))
+        {
+            (void)bound;
+            runs.insert(bid);
+        }
+        for (const auto& [bid, bound] : walk_idled)
+        {
+            (void)bound;
+            if (runs.count(bid) == 0)
+                idled.push_back(bid);
+        }
     }
     std::sort(idled.begin(), idled.end());
     return idled;

@@ -49,6 +49,18 @@ building stops producing and paying until the treasury can pay again. The treasu
 below zero. **Network nodes are paid first (Ben, 2026-10-22):** hubs, stations and ports are funded
 before any other building (`NATIONS.md` § What a nation owns).
 
+**Earners keep running (Ben, 2026-11-04; BL-1482, broke nation spiral).** A treasury at zero
+(under one credit) still runs the nation's buildings that pay for themselves, so its income can
+restart. A building earns when what it makes, at its own staffing and at its market's posted
+prices, is worth more than its running bill — the bill the funding gate reads for it: maintenance,
+wages, a full run's inputs and its upkeep goods, at the same posted prices. Of the buildings the
+empty treasury would idle, the earners are taken cheapest bill first (ties by building id), and
+each is admitted while the admitted set's summed bill stays within its summed earnings. Everything
+else idles as before. It is the money loop, so it holds for every nation, the player's included.
+Without it a nation that reached zero stayed there: everything idled, nothing earned, and nothing
+refilled the treasury — measured on the curated seeds, most such nations had built nothing before
+the fall.
+
 **Household consumption is not a flow.** A household draws its basket off the market's shelf and
 pays nothing for it (`MARKETS.md` § The clearing tick, step 9). The maker was already paid when
 the goods landed and the market bought them, so consumption moves goods, never credits.

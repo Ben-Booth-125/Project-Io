@@ -1446,6 +1446,8 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
     std::map<entity_id, char> br_class;
     std::map<entity_id, std::string> br_cause; // class b: the build named
     std::map<entity_id, bool> br_recovered;
+    long long br_neg_ticks = 0; // nation-ticks with a treasury below zero (the never-debt check)
+    float     br_min_treasury = 0.0f;
     for (const auto& [nid, nc] : w.nations)
     {
         br_handoff_broke[nid] = nc.treasury < 1.0f;
@@ -1746,6 +1748,7 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
                         br_last_build[nid] = { k, br_what(bit->second) };
             before = std::move(now);
 
+            if (nc.treasury < 0.0f) { ++br_neg_ticks; br_min_treasury = std::min(br_min_treasury, nc.treasury); }
             int& run = broke_run[nid];
             run = nc.treasury < 1.0f ? run + 1 : 0;
             if (run == 1)
@@ -1796,9 +1799,9 @@ void run_seed(std::uint32_t seed, int ticks, seed_reading& r)
                 if ((when[0] == 't' && k != k_g1_g2_play_tick) || (when[0] == 'e' && k != ticks))
                     continue;
                 std::printf("BR seed %u %s: nations broke 20+ ticks %d: a broke-at-handoff %d (recovered later %d)"
-                            " b build-then-zero %d c other %d | b builds:%s\n",
+                            " b build-then-zero %d c other %d | b builds:%s | treasury<0 nation-ticks %lld (min %.1f)\n",
                             seed, when, na + nb + nc_, na, na_rec, nb, nc_,
-                            ws.empty() ? " -" : ws.c_str());
+                            ws.empty() ? " -" : ws.c_str(), br_neg_ticks, static_cast<double>(br_min_treasury));
             }
         }
         if (k == k_g1_g2_play_tick)
