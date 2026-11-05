@@ -1,0 +1,196 @@
+[
+ {
+  "ruling": "Opening pace: a mine costs about six months of a major's net; construction reaches one month of net after 10-20 years of reinvestment; cost mostly in materials; the site finder stays open (Ben, 2026-11-05)",
+  "doc": "docs/economy/PRODUCTION.md",
+  "anchor": "What construction costs at the opening \\(Ben, 2026-11-05\\)",
+  "stale": [],
+  "owner": "sprint 63 (opening balance item, filed by the main session)"
+ },
+ {
+  "ruling": "Every major starts play on the same credits, at the handoff after the settle: one authored figure, the runway plus a build fund of two to three buildings",
+  "doc": "docs/generation/NATION_GENERATION.md",
+  "anchor": "Every major starts play on the same credits \\(Ben, 2026-11-05",
+  "stale": [
+   "A major opens on a flat treasury",
+   "a treasury of 12,000 credits",
+   "\\*\\*12,000 credits\\*\\* for the Rich-core",
+   "the handoff, not generation, is where parity is measured"
+  ],
+  "owner": "sprint 63 (opening balance item, filed by the main session)"
+ },
+ {
+  "ruling": "Build durations scale together, anchored so an extraction site takes 120 days",
+  "doc": "docs/economy/PRODUCTION.md",
+  "anchor": "Durations scale together \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "A 180-day build placed on day 10",
+   "a two-quarter build is 180 days"
+  ],
+  "owner": "sprint 63 (build time item, filed by the main session)"
+ },
+ {
+  "ruling": "Generation obeys the tile cap with no exemptions: hubs, stations, ports and the capital's source all count",
+  "doc": "docs/economy/PRODUCTION.md",
+  "anchor": "Generation obeys the cap with no exemptions \\(Ben, 2026-11-05\\)",
+  "stale": [],
+  "owner": "sprint 63 (tile cap item, filed by the main session)"
+ },
+ {
+  "ruling": "Occupation layer: at war, marching past a front occupies ground and moves the front; legal ownership moves only at a ceding peace; occupation clears at peace",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "### Occupation \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "A unit already standing on the neighbour's ground holds what it took"
+  ],
+  "owner": "sprint 63 (occupation item, filed by the main session)"
+ },
+ {
+  "ruling": "A land unit on hold never takes a water front slot, bridges excepted",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A land unit on hold never takes a water slot, bridges excepted \\(Ben,",
+  "stale": [],
+  "owner": "sprint 63 (hold into water item, filed by the main session)"
+ },
+ {
+  "ruling": "Defend province: a unit reacts inside its province and does not pursue; units can start on it at the capital; AI grant for player orders and rivals",
+  "doc": "docs/ai/AI_OPPONENT.md",
+  "anchor": "Defend province moves units — granted \\(Ben, 2026-11-05",
+  "stale": [],
+  "owner": "sprint 63 (defend province item, filed by the main session)"
+ },
+ {
+  "ruling": "A lane may not cross a warring front: convoys re-route around it; neutrals are not bound",
+  "doc": "docs/economy/SUPPLY.md",
+  "anchor": "A lane does not cross a warring front \\(Ben, 2026-11-05\\)",
+  "stale": [],
+  "owner": "sprint 63 (convoys at fronts item, filed by the main session)"
+ },
+ {
+  "ruling": "Tile resolution: the master bake is 96 px per hex and the top zoom rung is lowered so nothing magnifies at the reference window, overturning 128 px",
+  "doc": "docs/ui/RENDERING.md",
+  "anchor": "at \\*\\*96 px per hex\\*\\* \\(Ben, 2026-11-05",
+  "stale": [
+   "one 128 px/hex master",
+   "the one 128 px/hex image",
+   "128 — the master",
+   "at \\*\\*128 px per hex\\*\\*",
+   "an Earth-sized body at 128 px per hex"
+  ],
+  "owner": "sprint 63 (tile resolution item, filed by the main session)"
+ },
+ {
+  "ruling": "Forest trees are pointed; scrub keeps its round form by default",
+  "doc": "docs/ui/RENDERING.md",
+  "anchor": "Forest trees are pointed \\(Ben, 2026-11-05\\)",
+  "stale": [],
+  "owner": "sprint 63 (pointed trees item, filed by the main session)"
+ },
+ {
+  "ruling": "A wind turbine is a land power building that burns no fuel; offshore arrives with the naval system, and the water rule stands",
+  "doc": "docs/economy/PRODUCTION.md",
+  "anchor": "### Wind \\(Ben, 2026-11-05\\)",
+  "stale": [],
+  "owner": "sprint 63 (wind turbine item, filed by the main session)"
+ },
+ {
+  "ruling": "Nation overview ranks the nation on GDP, market share, reach and total force; rival treasuries stay private; Earnings and Expenses are horizontal bars",
+  "doc": "docs/ui/ledgers/corporation.md",
+  "anchor": "Standing \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "The chart is two columns sharing a baseline",
+   "there is no score and no ranking in the model"
+  ],
+  "owner": "sprint 63 (nation overview item, filed by the main session)"
+ },
+ {
+  "ruling": "Header: NET collapses to brackets beside the treasury; the graph moves to a tooltip on the treasury or either number",
+  "doc": "docs/ui/HEADER.md",
+  "anchor": "Net, in brackets beside the treasury \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "the last decorative element to drop",
+   "followed by a small \\*\\*sparkline\\*\\*"
+  ],
+  "owner": "sprint 63 (header item, filed by the main session)"
+ },
+ {
+  "ruling": "Escape menu: gear right of the time controls opens a full-canvas pausing menu with Save, Options, Exit to Menu and Exit Game, warning on unsaved progress; the main menu gains Load",
+  "doc": "docs/ui/MENU.md",
+  "anchor": "The escape menu \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "there is no in-session save",
+   "no Load/Save on the menu",
+   "just left of the time column"
+  ],
+  "owner": "sprint 63 (escape menu item, filed by the main session)"
+ },
+ {
+  "ruling": "Esc closes Menu, then Ledger, then Selection; with nothing open it opens the escape menu",
+  "doc": "docs/ui/SELECTION.md",
+  "anchor": "Esc ends at the escape menu \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "Esc ends at the system menu"
+  ],
+  "owner": "sprint 63 (escape queue item, filed by the main session)"
+ },
+ {
+  "ruling": "Alert strip, centre below the header: research not set, idle buildings, wars, low runway, construction stalled, deposit exhausted, trades exceed trade points; each clicks through",
+  "doc": "docs/ui/LAYOUT.md",
+  "anchor": "## Alert strip — centre, below the header \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "are BL-261, player alerts"
+  ],
+  "owner": "sprint 63 (alert strip item, filed by the main session)"
+ },
+ {
+  "ruling": "Diplomacy's Nations view is a dropdown selector that arms the Nations lens; a press on a nation under the lens navigates the ledger to it; Wars stays",
+  "doc": "docs/ui/ledgers/diplomacy.md",
+  "anchor": "dropdown selector of nations \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "\\*\\*None by default\\.\\*\\* During the declaration only",
+   "Rows sort hostile first"
+  ],
+  "owner": "sprint 63 (diplomacy selector item, filed by the main session)"
+ },
+ {
+  "ruling": "One item glyph per good, the full set, overturning the four track silhouettes",
+  "doc": "docs/ui/ICONS.md",
+  "anchor": "One glyph per good, the full set \\(Ben, 2026-11-05",
+  "stale": [
+   "Author four silhouettes keyed to the VALUE TRACK",
+   "a value-track silhouette, not one shape per good"
+  ],
+  "owner": "sprint 63 (resource glyphs item, filed by the main session)"
+ },
+ {
+  "ruling": "The goods table carries shelf stock and sorts by every heading; potential trades offer only routes from a market where the acting nation has trade points",
+  "doc": "docs/ui/ledgers/market.md",
+  "anchor": "Goods carries shelf stock and sorts \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "\\*\\*item glyph · name · price · price vs base · 8-quarter graph\\*\\*"
+  ],
+  "owner": "sprint 63 (market goods and potential trades items, filed by the main session)"
+ },
+ {
+  "ruling": "Construction door: Power Generation in Infrastructure; a Road fold holds Track, Road, Highway and Railroad with smaller glyphs; the finder picker draws building glyphs",
+  "doc": "docs/ui/SELECTION.md",
+  "anchor": "Two folds were re-cut \\(Ben, 2026-11-05\\)",
+  "stale": [],
+  "owner": "sprint 63 (construction door item, filed by the main session)"
+ },
+ {
+  "ruling": "Selection: drag selects a group of own units and shift adds; a building shows its recipe with shortages; convoys on the map are selectable",
+  "doc": "docs/ui/SELECTION.md",
+  "anchor": "The dragged group \\(Ben, 2026-11-05\\)",
+  "stale": [
+   "Multi-select\\.\\*\\* Out of scope"
+  ],
+  "owner": "sprint 63 (group select, building recipe and convoy items, filed by the main session)"
+ },
+ {
+  "ruling": "A marching unit is drawn moving smoothly from tile centre to tile centre",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A marching unit moves smoothly \\(Ben, 2026-11-05\\)",
+  "stale": [],
+  "owner": "sprint 63 (smooth movement item, filed by the main session)"
+ }
+]

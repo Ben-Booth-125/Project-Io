@@ -558,6 +558,10 @@ jurisdiction of law, its roads' network and the fronts, which re-derive. The los
 ground withdraw by the retreat rule. A white peace hands every occupied goal's holder back to its
 owner, and the occupying units withdraw the same way.
 
+**Occupation is not cession (Ben, 2026-11-05).** At war, marching past a front occupies ground and
+moves the front (`../military/MILITARY.md` § Occupation), but `tile_to_nation` still moves only at a
+peace that cedes the province. Occupation clears at peace.
+
 **Who scores a war.** The player declares, answers and makes peace through the Diplomacy ledger. A
 rival declares, answers and makes peace under the stance grant (§ 1), on its standing terms. "Only
 the player answers and ends" its wars means no rival answers, offers or accepts **for** the player;

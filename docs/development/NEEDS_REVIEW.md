@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*15 entries — 15 open, 0 resolved.*
+*22 entries — 22 open, 0 resolved.*
 
 ---
 
@@ -220,6 +220,55 @@ On every major the refined fuel, power and (Rich-core) ordnance slots fail the w
 > **Recommendation:** Count the real draws: the goods are wanted in play, and generation is blind to it.
 
 *Files: `docs/generation/CORPORATION_GENERATION.md`, `src/world/opening_kit.cpp`*
+
+### NR-1134 — Build times anchored at x2/3, so a mine takes 120 days
+*decision taken on your behalf · raised 2026-11-05 · from BUILD_DAYS_SCALED (BL-1499)*
+
+Ben chose "scale all down, keep the differences" without naming the anchor. Taken: extraction 180 to 120, the rest x2/3: bunker 60, processing 180, base 240, university 300, launchpad 360.
+
+**Why it matters.** A processor at 120 instead would mean x4/9 and much faster builds overall.
+
+### NR-1135 — Occupation defaults
+*decision taken on your behalf · raised 2026-11-05 · from OCCUPATION_MOVES_FRONT (BL-1502)*
+
+Taken: an empty tile is occupied on entry, with no stay needed; an occupied tile's output is denied to its owner and not gained by the occupier; occupation needs a war, in Ben's words "when at war", while push stays open under one-way hostility and without a war still stops at the first tile. Rivals' pushes take ground under the same rule with no new grant, since push is an existing verb.
+
+**Why it matters.** Sets how fast wars move the map. Hostility without war taking no ground is the reading to confirm; the rival reading is the one to check against the AI register.
+
+### NR-1136 — A convoy with no way round
+*decision taken on your behalf · raised 2026-11-05 · from CONVOY_REROUTES_FRONTS (BL-1505)*
+
+Ben chose re-route. Taken for the case with no route: dispatch refused with a surfaced reason; in-flight cargo returns to origin. A neutral third nation is not bound by the front.
+
+**Why it matters.** Returning cargo is not captured, so war does not seize goods; capture was the other option on the form.
+
+### NR-1137 — "Same amount" read as same at the handoff
+*decision taken on your behalf · raised 2026-11-05 · from FLAT_HANDOFF_TREASURY (BL-1498)*
+
+Today majors share 12,000 before the settle and reach 16,994-36,214 when play starts. Taken: one figure set at the handoff, after the settle.
+
+**Why it matters.** Setting a value after the settle could read as a clamp; it is written as the kit's grant.
+
+### NR-1138 — Small defaults on the UI list
+*decision taken on your behalf · raised 2026-11-05 · from Sprint 63 playtest list*
+
+Taken, stated to Ben before the form: scrub stays round; rail Track reads Railroad; drag-select is own units with shift to add; trades gate on the viewed market only; alerts are not dismissable; the side-by-side nation scan goes.
+
+**Why it matters.** Each is a one-line reversal if he disagrees.
+
+### NR-1139 — Schooling and University are not in the Build door
+*question · raised 2026-11-05 · from CONSTRUCTION_FOLDS (BL-1513)*
+
+Read from selection_panel.cpp:4764: the door lists Port, Marketplace, Launchpad, Hub and Station under Infrastructure, Base, Airbase, Bunker and Research Institute under Military, and no Schooling or University. The form did not ask.
+
+**Why it matters.** If unintended, players cannot build them, and Research Institute under Military reads oddly. Fold them into the construction pass, or leave?
+
+### NR-1140 — What 96 px does beyond the top rung
+*decision taken on your behalf · raised 2026-11-05 · from TILE_RES_96 (BL-1523)*
+
+Ben ruled the master at 96 px and the top rung lowered to about 96 px. Written beyond that: the lower zoom rungs halve from about 96; and a 4K-height window now magnifies the top rung about 2x (computed), where the 2026-10-10 ruling accepted about 1.7x. TECH_FOUNDATIONS.md keeps a benchmark measured at 128 px, labelled as such.
+
+**Why it matters.** Halving lowers every zoom level, not only the closest, and 4K play looks softer than the accepted figure.
 
 ---
 

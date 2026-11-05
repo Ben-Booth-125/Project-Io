@@ -323,6 +323,9 @@ targeted action reached through the tile Selection element**, not a reserved men
 nav-rail construction surface stays a broad overview (`docs/ui/MENU.md`). The equivalent
 placement-mode canvas click enqueues the same request.
 
+**Two folds were re-cut (Ben, 2026-11-05).** **Power Generation** sits in **Infrastructure**. A **Road**
+fold holds **Track, Road, Highway and Railroad**, with smaller glyphs than the building rows.
+
 Placeability is gated by `placement_rules::can_place`, and a type's cost is **budget *and*
 materials** (e.g. `100 cr · 20 Steel`, from the registry `build_cost` + `resource_build_cost`).
 Affordability is gated on both: the player nation's treasury *and* its material pool on
@@ -382,6 +385,9 @@ The preview and the province card do not move; two columns change.
      splits it into `input_cost` / `maintenance` / `wages` (NR-248). The column chart of
      revenue against stacked expenses and the Inputs bar chart are retired: one number says
      what the column pair said, in a fraction of the height.
+   - **The recipe (Ben, 2026-11-05)** — the recipe the building runs, as rows: its **inputs and
+     outputs**, each input flagged when it is short. Owner only, under the recipe-disclosure rule
+     above.
    - **The workforce row** — the building's workforce target as a **read-only bar** with the
      percentage of full employment to its right (0–100 %, the internal target ÷ 2). The game sets it, one 25 % step a quarter toward the
      most profitable level (`../economy/PRODUCTION.md` § Workforce target and the auto-solver);
@@ -491,6 +497,12 @@ readiness or morale (BL-068, the counter's own rule).
 A counter stands below its hex centre and can overhang the hex beneath. A press on it takes the
 counter, never a repeat-click step on the ground under the pointer.
 
+### The dragged group (Ben, 2026-11-05)
+
+**Dragging over units selects them as a group.** A left drag on the canvas draws a box, and every own
+unit inside it joins the group, across tiles. **Shift adds** to the group. Right-click orders and
+front assignment apply to every unit in it. Own units only: a rival's units are not gathered.
+
 ### Right-click orders
 
 **With the player's own unit or group selected, a right-click on a tile is an order** (Ben,
@@ -525,6 +537,13 @@ the player sees the goals, the justifications and the price before anything is s
 
 The unit card's **March** cell remains the two-step route: the press arms the pick, the next
 left-click on a land tile names the destination, with the same green outline.
+
+### The convoy element (Ben, 2026-11-05)
+
+**Convoys are drawn on the map as they move, and a press selects one.** The Selection band then shows
+that convoy: its cargo, owner, route and arrival. A convoy is not an entity and its id is what the
+selection holds. What the player may see of another nation's convoy follows the visibility rules
+(`DISCOVERY.md`).
 
 ### The front element
 
@@ -818,8 +837,8 @@ the screen, rather than floating with the cursor."* The band is:
   square for building, outlined square for tile, pentagon otherwise), then the title line
   (name · type), then a right-aligned **`[>]`** ('go to') button. There is no close button
   (see § Always open).
-- **Always open.** The band never hides: there is no `[x]` button, no Esc hide rung, and no
-  hidden state. With the shell filling the perimeter, a hidden band reads as a hole in the
+- **Always open.** The band never hides: there is no `[x]` button, no Esc hide rung (Esc clears
+  the selection, and the band rests on the player's nation), and no hidden state. With the shell filling the perimeter, a hidden band reads as a hole in the
   frame (Ben, NR-017).
 
   Being selection-driven with no rail slot, the element is **not** governed by the universal
@@ -832,9 +851,10 @@ the screen, rather than floating with the cursor."* The band is:
   `selected_entity` stays null while resting, so deselect remains representable; the band
   substitutes the player's nation at draw time and never renders `selection_kind::none`. The
   player's nation exists before the first frame, so there is no bootstrap gap.
-- **Esc ends at the system menu.** Esc's ladder is: exit-confirm → close system menu → pop a
-  drill level → nation roll-up → fold overlay → open the system menu. The "pause screen" IS
-  `show_system_menu` (settled 2026-08-02).
+- **Esc ends at the escape menu (Ben, 2026-11-05).** Esc closes **Menu, then Ledger, then
+  Selection**. Its ladder is: exit warning → close the escape menu → back out of a declaration → pop
+  a drill level → fold overlay → close the ledger → clear the Selection to the resting nation → open
+  the escape menu. The escape menu is the pause screen (`MENU.md`).
 
 **Click-through.** The band draws as an ordinary ImGui window over the canvas; ImGui's
 `WantCaptureMouse` flag (how every other chrome window — nav rail, header, minimap — prevents
@@ -1004,8 +1024,6 @@ under the Nations lens. Ground held by nobody is inert under it, by rule 3.
 
 ## Open questions
 
-- **Multi-select.** Out of scope; the model is single-selection. A future
-  drag-box or shift-click would extend `selected_entity` to a set.
 - **Selection persistence across navigation.** A selection survives canvas
   navigation (it is independent of Active). Whether a stale selection (entity
   destroyed) auto-clears is an implementation detail — treat a missing id as

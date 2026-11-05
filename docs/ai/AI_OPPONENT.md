@@ -2378,7 +2378,8 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   § Fronts).** A new subject on the player's own nation: units **the player assigns** to a front are
   spread along its border tiles, refill gaps, fall back on retreat, and under a **push** order advance
   into the weakest enemy province — every move a legal `march_unit`. **Not admitted:** any
-  unit the player did not assign; choosing a front, an order, a war or a target for the player's
+  unit the player did not assign, save one it ordered to defend a province (the defend-province
+  grant below); choosing a front, an order, a war or a target for the player's
   nation; a campaign planned beyond the next move. Pure, seeded, deterministic, replayable, legal
   verbs only, never a planner.
 
@@ -2446,3 +2447,12 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   another nation's ground, the player's included, or for the player; repairing or degrading another
   nation's bunker; a fortification line planned beyond the next build. Pure, seeded, deterministic,
   replayable, legal verbs only, never a planner.
+  **Defend province moves units — granted (Ben, 2026-11-05; `../military/MILITARY.md` § Defend
+  province).** A new subject, raised and given in the sprint 63 form. A unit under a defend-province
+  order reacts inside that province: it marches to a hostile stack there and otherwise returns to its
+  post, every move a legal `march_unit`. This covers **the player's units under the order the player
+  gave, or the start order on its capital province**, and **rival nations' units**, whose scorer may
+  also issue and clear the order for its own units. **Not admitted:** pursuit out of the province;
+  ordering another nation's units, the player's included; choosing a province, war or target for the
+  player's nation; a defence planned beyond the next move. Pure, seeded, deterministic, replayable,
+  legal verbs only, never a planner.

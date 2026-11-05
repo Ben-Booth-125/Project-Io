@@ -151,6 +151,22 @@ A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, 56
 
 ---
 
+## Alert strip — centre, below the header (Ben, 2026-11-05)
+
+A strip at the top centre of the canvas area, just below the header. It says what wants the player's
+attention, and **each alert clicks through** to the surface that answers it. It informs and never acts
+(`../CONCEPT.md` § Player identity). The alerts:
+
+- **Research not set**
+- **Idle buildings**
+- **Wars**
+- **Low runway**
+- **Construction stalled**
+- **Deposit exhausted**
+- **Trades exceed trade points**
+
+---
+
 ## Canvas area — centre
 **Spec: `CANVASES.md`**
 

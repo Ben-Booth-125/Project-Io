@@ -30,8 +30,8 @@ belongs to `SUPPLY.md`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · price · price vs base · 8-quarter graph**, the graph flattened INTO the row rather than stacked under it. Every row is drawn against a **shared `price / base_price` axis with a 1.0 baseline**, which is what makes goods comparable; direction is carried by the line's colour. **`body_average_price` does not fit and is dropped** — see below |
-| **Trades** | What am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving? | **Five headed sections** in one scroller, the long ones bounded and scrolling inside themselves (`TRADE.md`): **Trade points** (made / manual / auto, the reserve field and **Set reserve**); **My trades** (the player's trades through this market, an `x` per row, the **Add a trade** form folded under it); **All trades here**, gated on the player owning a building on the body; **Potential trades**, the trade pass's own ranking from this market, best per point, a `+` per row that fills the form; and **Recent exchanges**, over the exchange record. See § 2b |
+| **Goods** *(default)* | What is each good worth here, and which way is it moving? | A table, one row per traded good: **item glyph · name · shelf · price · price vs base · 8-quarter graph**, the graph flattened INTO the row rather than stacked under it. Every row is drawn against a **shared `price / base_price` axis with a 1.0 baseline**, which is what makes goods comparable; direction is carried by the line's colour. **`body_average_price` does not fit and is dropped** — see below |
+| **Trades** | What am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving? | **Five headed sections** in one scroller, the long ones bounded and scrolling inside themselves (`TRADE.md`): **Trade points** (made / manual / auto, the reserve field and **Set reserve**); **My trades** (the player's trades through this market, an `x` per row, the **Add a trade** form folded under it); **All trades here**, gated on the player owning a building on the body; **Potential trades**, the trade pass's own ranking from this market, best per point, offered only where the acting nation has trade points here, a `+` per row that fills the form; and **Recent exchanges**, over the exchange record. See § 2b |
 
 **Above the tabs, below the selectors: the market's top section** (Ben, 2026-10-13, superseding
 the 2026-08-29 chip row). It takes about **2/7 of the column's height**, leaving about **5/7 to the
@@ -53,6 +53,9 @@ Goods and Trades tabs**, and splits left and right:
   out of this market by trades to and from other markets, for the last completed quarter
   (`../../economy/TRADE.md` § The trade value record).
   Values, not quantities, because a ton of ore and a ton of electronics do not add.
+
+**Goods carries shelf stock and sorts (Ben, 2026-11-05).** Each row shows the good's stock on this
+market's shelf, and the table sorts by every heading.
 
 **Default on open:** **Goods**.
 **Cross-cutting selectors (NOT views, toggle-exempt):** the **Body** combo and the **Market**
@@ -92,7 +95,7 @@ of my trade capacity do I steer, and what could I be moving?"**
 | **Trade points** | The acting nation's `trade_points` made on the last pass, its `trade_reserve` as used (clamped to what it makes), and the rest — auto. The reserve field and its **Set reserve** press (`set_trade_reserve`); a warning when the reserve exceeds what is made, or the manual trades ask for more than it covers | `Made X pts · manual Y · auto Z` |
 | **My trades** | The acting nation's manual trades (`world::trades`) that **leave or land on the selected market**, in placement order — the order the reserve is spent in. A count of its trades elsewhere; the **Add a trade** fold (good, from, to, points → `set_trade`); the seam's answer to the last trade press | Good · Route (`from > to`, by city) · Pts · `x` (`clear_trade`); units a tick on hover |
 | **All trades here** | Every nation's manual trades touching this market | Good · Holder · Route · Pts |
-| **Potential trades** | The trade pass's own ranking (`rank_trade_routes`) of routes leaving this market: only goods trade carries, a source shelf that holds the good under the fair-price ceiling, a margin above `dispatch_margin()` of the source price. Margin per unit; ordered by margin per point, best first | Good · To · Margin · `+` (fills the Add a trade form); buy, sell, haul, per-unit and per-point margin on hover |
+| **Potential trades** | **Only routes the acting nation can supply: this market, when it has trade points here (Ben, 2026-11-05).** The trade pass's own ranking (`rank_trade_routes`) of routes leaving this market: only goods trade carries, a source shelf that holds the good under the fair-price ceiling, a margin above `dispatch_margin()` of the source price. Margin per unit; ordered by margin per point, best first | Good · To · Margin · `+` (fills the Add a trade form); buy, sell, haul, per-unit and per-point margin on hover |
 | **Recent exchanges** | The exchange record filtered to this market, newest first | qtr · Good · With · **Revenue** |
 
 **A trade lists under both of its markets.** It leaves one and lands on the other, and the

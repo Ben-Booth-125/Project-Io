@@ -14,7 +14,7 @@ Alarm (§ 6) and war (§ 7).
 
 **"Who could I fight, who might fight me, and what would it cost?"**
 
-It earns a rail slot under `../MENU.md` § Menus are broad ledgers: every nation is a row, and every
+It earns a rail slot under `../MENU.md` § Menus are broad ledgers: every nation is in its selector, and every
 war in the world is listed. This slot held the corporation stance surface until the corporations retired
 (Ben, 2026-10-23); this is its subject at the nation grain.
 
@@ -28,22 +28,22 @@ Two views behind a `nav_button` strip, inside `foldout_begin("Diplomacy")`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Nations** *(default)* | "How does each nation stand with me, and what would a war with it cost?" | One row per nation, folded (`../DRILL_THROUGH.md`). Expanding a row in place shows its detail and presses. |
+| **Nations** *(default)* | "How does each nation stand with me, and what would a war with it cost?" | A **dropdown selector of nations (Ben, 2026-11-05)**, with the chosen nation's detail and presses open below it. A press on a nation under the Nations lens chooses it here (§ 3). |
 | **Wars** | "Who is fighting whom, and how is each war going?" | Every war in the world, the player's first, then truces with their time left. |
 
 **Why Nations is the default.** The ledger exists to inform a choice about a nation; Wars is the
 world's state.
 
-### Nations — the folded row
+### Nations — the chosen nation's summary
 
 - **Name and stance chips**: *you → them* (hostile, friend, offer pending) and *them → you*.
 - **Their sentiment toward you**: Access, Trust and Alarm, each a signed bar with a trend arrow
   over the last four ticks. Hovering a bar names its largest contributing conduct; a seeded row names
   the war that seeded it, with its region and year (RELATIONS § Where a grudge lands).
 
-Rows sort hostile first, then by Alarm toward you, highest first.
+The selector lists hostile nations first, then by Alarm toward you, highest first.
 
-### Nations — the expanded row (extras ruled by Ben, 2026-10-30)
+### Nations — the chosen nation's detail (extras ruled by Ben, 2026-10-30)
 
 - **Your sentiment toward them** — the same three bars, the other direction.
 - **Power comparison** — their reach and market share (public), their GDP (public), beside yours.
@@ -87,7 +87,10 @@ centred bar, each side's exhaustion, and days since it opened. Every war is publ
 
 ## 3. Lens on open
 
-**None by default.** During the declaration only, the canvas marks the provinces that may be goals,
+**Nations (Ben, 2026-11-05).** Opening the ledger's Nations view arms the Nations lens, and closing it
+disarms the lens. A press on a nation with the lens active navigates this ledger to that nation,
+opening it if it is closed (`../LENSES.md` § The Nations lens). The Wars view stays as it is. During
+the declaration only, the canvas marks the provinces that may be goals,
 and the ones chosen. That is a mode of the declaration flow, as the placement lens is of the build
 flow, not an `overlay_mode`.
 

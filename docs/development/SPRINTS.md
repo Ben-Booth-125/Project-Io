@@ -59,17 +59,20 @@ and/or a version goal (v0.1.1 etc.).
 
 ## Open now
 
-### Sprint 63 — UI and QOL
+### Sprint 63 — UI, QOL and the opening
 *Open · opened 2026-11-05 · Ben (2026-11-05)*
 
-**Goal.** Make the game easier and nicer to play: UI and quality-of-life improvements drawn from Ben's playtest.
+**Goal.** Make the opening a real climb, with construction taking 10-20 years to feel as easy as it does today and searching for good sites rewarded; and fix the war, supply and UI faults Ben's playtest found.
 
 **Planned.**
 - BL-1495 (UI scale down): smaller elements, so the UI stops clipping.
 - BL-1490 (province resource clip): re-clicked after BL-1495.
-- Ben's playtest list: filed as backlog items when it arrives, then planned here.
+- MEASURE FIRST: BL-1496 (build payback census), with the counters inside BL-1500 (nodes count to cap), BL-1501 (units start supplied).
+- ECONOMY, one shared re-bless: BL-1497 (opening cost curve), BL-1498 (flat handoff treasury), BL-1499 (build days scaled), BL-1500 (nodes count to cap), BL-1501 (units start supplied), BL-1521 (wind turbine).
+- WAR: BL-1502 (occupation moves front), BL-1503 (hold not into water), BL-1504 (defend province), BL-1505 (convoy reroutes fronts).
+- UI AND ART, parallel: BL-1519 (escape menu), BL-1520 (escape queue), BL-1515 (alert strip), BL-1506 (convoys on map), BL-1507 (unit smooth march), BL-1508 (drag select units), BL-1509 (nation standing bars), BL-1510 (finder building glyphs), BL-1511 (diplomacy nation selector), BL-1512 (header net brackets), BL-1513 (construction folds), BL-1514 (building recipe rows), BL-1516 (trade offers sourced), BL-1517 (goods table stock sort), BL-1518 (resource glyphs), BL-1523 (tile res 96), BL-1524 (pointed trees), BL-1525 (playtest doc drift).
 
-Build under test: build_rel at 8af285f7. A UI item needs a live click before it is complete.
+Build under test: build_rel at 8af285f7. A UI item needs a live click before it is complete. BL-1522 (offshore drilling) is filed but parked for the naval system.
 
 ## Where things stand
 
@@ -156,9 +159,9 @@ Build under test: build_rel at 8af285f7. A UI item needs a live click before it 
 | 60 | war in time and on the ground | CLOSED 2026-10-30 at v0.2.4 (Ben: cut a version; v0.3.0 waits for the naval system and a playtest with a few wars). Units move by the day, battles run for weeks with no cap and no randomness, armies carry supplies drawn up to 8 tiles off the road, recon is one-sided against named stealth, terrain shapes each class, and air combat arrives with rivals flying too. G1t50 84.6 (from 79.8). One re-bless at the close. |
 | 61 | diplomacy and war | CLOSED 2026-11-05, no version cut (v0.3.0 still needs the naval system and a war playtest). Wars are records with goals, a score, exhaustion and a peace that may cede ground; rivals declare, answer, impose peace and embargo; Alarm is the third sentiment dimension; the Diplomacy ledger is slot 9. Military kit, recruits, refit, bunkers and the kit in the age tree. Seed library re-curated. Three re-pins. |
 | 62 | equal starts for majors | CLOSED 2026-11-04, no version cut (sprint 61 targets v0.3.0). Every major opens on the Rich-core kit, 12,000 credits and a fixed eight-unit army; the logistics cap keeps the nodes that cover the kit and re-sites what it strands; the kit stocks its processors' inputs. Treasury spread at 20:4 21x -> 1.63x; men spread 1.00x; no major loses money; 569 of 578 kit processors run. Wizard default 30 nations. Three re-pins. |
-| 63 | UI and QOL | OPEN 2026-11-05. UI and quality-of-life improvements, scoped by Ben's playtest of the Release build at 8af285f7. BL-1495 (UI scale down) and BL-1490 (province resource clip) are in; the rest of the list arrives after the playtest. |
+| 63 | UI, QOL and the opening | OPEN 2026-11-05. Ben's playtest list: 29 items in three waves. The opening balance leads: a mine costs six months of net, easing over 10-20 years, and every major starts play on the same credits. |
 
-**Next up.** SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI and QOL) OPEN 2026-11-05: scoped by Ben's playtest, list to come.
+**Next up.** SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census runs first.
 
 **The standing debt out of P1**, worth repeating here because it spans four items: nothing built in that sprint was ever *rendered*. The session ran in a container that cannot build the GUI, so every UI half is compile-clean and arithmetically checked and visually unseen, and no golden was blessed. For a sprint whose own method note is *build it, look at it, then rule*, that is the thing to fix first.
 

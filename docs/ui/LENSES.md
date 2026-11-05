@@ -250,7 +250,9 @@ gives one edge at a time. It sits on the Planetary row of the lens bar like any 
   lens is the strictest reader of.
 - **Selection is unchanged** (Ben, 2026-10-14): a press on the border band selects the nation,
   on the plain map as before; under the lens a press resolves as any lens's does (§ A lens
-  collapses selection to ONE TIER), to the nation.
+  collapses selection to ONE TIER), to the nation. **That press also navigates the Diplomacy ledger to
+  the nation, opening it if it is closed, and the ledger's Nations view arms this lens (Ben,
+  2026-11-05; `ledgers/diplomacy.md` § 3).**
 - Unowned ground and open ocean take no fill.
 
 This reverses the 2026-08-24 retirement (BL-601) only in part: the band it created stays, and

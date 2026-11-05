@@ -3,8 +3,8 @@
 > **Two surfaces shared the word "Corporation"; one survives, re-subjected to the nation.**
 >
 > - **Slot 1** is the ledger `src/ui/corporation_dashboard.cpp` draws. It asks **"How well am
->   I doing?"** and holds **one card, Balance**: a verdict line ("±X/qtr, treasury Y") over a
->   two-column chart — the quarter's earnings against its expenses stacked by flow — with the
+>   I doing?"** and holds **the Balance card and a Standing section**. Balance is a verdict line ("±X/qtr, treasury Y") over
+>   horizontal bars — the quarter's earnings against its expenses stacked by flow — with the
 >   quarter's net beneath it. It is about the **player's own nation's** money, not the rival
 >   field (re-subjected, Ben, 2026-10-23: the corporation is retired and a building's money is
 >   its nation's treasury's — `docs/politics/NATIONS.md` § What a nation owns). Owned by
@@ -33,9 +33,9 @@ carrying the full-canvas control alone — there is nothing to expand in place w
 already draws its chart — then the chart, then the quarter's net, and a force line when the
 nation fields units.
 
-**The chart is two columns sharing a baseline.** Earnings on the left — what the nation's
+**The chart is two horizontal bars sharing a left edge (Ben, 2026-11-05).** Earnings on top — what the nation's
 buildings sold, plus the tariff and the tax that return to the treasury (`NATIONS.md` § 2); every
-outflow of the nation's quarterly return stacked on the right — **Inputs, Maintenance, Wages,
+outflow of the nation's quarterly return stacked on the bar below — **Inputs, Maintenance, Wages,
 Force** — each segment its own shade, naming itself and its figure on hover. Force keeps its own
 segment rather than folding into Wages for the reason it was given its own bar in the first
 place: a force cost buried inside Wages is a term nobody can tune against. The former
@@ -44,8 +44,12 @@ never runs into debt, the extraction levy retired, and no nation pays another's 
 
 **A zero flow is absent from the stack, not drawn flat.** That rule lives in the **shared
 drawer** (`ui::charts::draw_stacked_columns`) rather than in a fork of it — the building card's
-Revenue / Expenses graph is the same function over `building_profit`. One chart, one
-arithmetic, two surfaces that cannot come to disagree.
+Revenue / Expenses graph is the same arithmetic over `building_profit`, whichever way it is drawn:
+two surfaces that cannot come to disagree.
+
+**Standing (Ben, 2026-11-05).** Under Balance, the nation's rank among nations on **GDP, market share,
+reach and total force**, so the card can say how strong the nation is relative to the rest. A rival's
+treasury stays private (`../../economy/FINANCE.md` § Disclosure).
 
 **Vertical budget.** The chart takes the host's own remaining height, less the lines that
 follow it. That is the point of the card: the resting column used to be four verdict lines over
@@ -60,9 +64,9 @@ of this doc set's one-question-one-home line, taken for these two surfaces and d
 general licence to duplicate, and not an oversight for a later sweep to clean up. With both
 surfaces now reading the one treasury, the overlap is wider than when it was accepted.
 
-**Deferred by name, not forgotten:** research points, score, ranking and other heuristics —
+**Deferred by name, not forgotten:** research points, score and other heuristics —
 *"we will revisit this once core gameplay is established"* (Ben, 2026-08-29). Several have no
-store behind them at all: there is no score and no ranking in the model, and research points are
+store behind them at all: there is no score in the model, and research points are
 the nation's (`docs/economy/RESEARCH.md` § Who holds technology).
 
 **Toggle semantics.** The rail's slot-1 icon toggles the ledger. The card's one control is the

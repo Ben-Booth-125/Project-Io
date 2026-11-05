@@ -47,7 +47,7 @@ dramatic landforms and rivers leave the canvas's vector layer for the bake too; 
 is **never magnified** at any rung (§ Level of detail).
 
 Ruled by Ben, 2026-10-09, after walking the sprint 51 build: the ground is viewed at **one
-angle** (22.5°) at every rung, and **zooming does not add detail** — one 128 px/hex master
+angle** (22.5°) at every rung, and **zooming does not add detail** — one 96 px/hex master
 per body, pre-baked during generation and held in RAM, with every other zoom a downsample
 of it (§ Level of detail; § One angle). This supersedes the never-magnify tier ladder and
 the stepped tilt.
@@ -95,7 +95,7 @@ established rule (wrap copies of one tile must agree; no crawl under pan).
 
 **The master carries feature stamps and sharpened relief** (Ben, 2026-09-01: *"we
 should be able to render individual trees, and sharper hills"*). At bake resolutions
-≥ 40 px per hex (the 128 px master — and so, downsampled, every level): forest and scrub tiles scatter **individual tree
+≥ 40 px per hex (the 96 px master — and so, downsampled, every level): forest and scrub tiles scatter **individual tree
 canopies** — hash-positioned, density-counted, NW-lit with an SE drop shadow, drawn
 before the grade so they take it exactly as the ground does, and never painted over
 the survey lock fill; mountain-biased detail noise folds toward a **ridged** variant
@@ -103,6 +103,9 @@ whose creases shade as ridge lines; and steep slopes shed cover colour toward ba
 **rock**. All deterministic and wrap-exact (`ground_bake_check` P8). These are the
 procedural stand-ins the authored brushes of the asset pipeline will replace or
 augment, on the same stamp seam.
+
+**Forest trees are pointed (Ben, 2026-11-05)**: a tapering crown, not a bushy round head. Default
+for Ben's review: scrub keeps its round form.
 
 **Fallback by coverage.** A pass whose brushes are not yet authored bakes from the
 current vector-fill logic instead (`ui::terrain_colour` becomes the base-ground
@@ -649,8 +652,8 @@ biggest fix even if we keep a high resolution"*). This supersedes the per-rung b
 tiers of 2026-09-01 and the never-magnify tier chooser of 2026-10-08: a zoom step had
 been a fresh, expensive bake, and that bake was the lag.
 
-- **One master per body.** The ground is baked ONCE per body, at **128 px per hex** (Ben,
-  2026-10-10: "simply up the resolution in each tile"; it was 96), at
+- **One master per body.** The ground is baked ONCE per body, at **96 px per hex** (Ben, 2026-11-05, overturning 128 px, Ben,
+  2026-10-10: "simply up the resolution in each tile"), its levels halving from there, at
   the one camera angle (§ One angle), whole-body, in 512 px chunks. Everything the
   player sees at any rung is this image: the close-tier features (trees, crags, strata,
   structures) are always in it and simply grow small with distance.
@@ -683,20 +686,20 @@ been a fresh, expensive bake, and that bake was the lag.
   — the one rung that reads the master near 1:1 — would gain from a 2× bake, at four
   times the bake cost. A 2× master is taken only if the pool's measured pre-bake still
   fits the target in TECH_FOUNDATIONS.md § Target hardware.
-- **No rung magnifies at the reference window**: the top rung draws ~110 px from the
-  128 px master (minified ~1.16:1). A 4K-height window magnifies the top rung ~1.7×,
-  accepted for the prototype (Ben, 2026-10-10: 128 over 96, and over 192, which would
-  break the 16 GB minimum).
+- **No rung magnifies at the reference window (Ben, 2026-11-05)**: the top rung is lowered to
+  ~96 px, drawn from the 96 px master at about 1:1. A 4K-height window magnifies the top rung
+  ~2× (the 2026-10-10 ruling accepted ~1.7× for the prototype, choosing 128 over 96 and over
+  192, which would break the 16 GB minimum; the 2026-11-05 ruling overturns its 128).
 
 At the reference 1720×1080 window:
 
 | Zoom rung (drawn hex radius) | Level drawn (px per hex) |
 |---|---|
-| ~7 px (whole grid) | 8, minified (~1.14:1) |
-| ~14 px | 16, minified |
-| ~28 px | 32, minified |
-| ~55 px | 64, minified |
-| ~110 px | 128 — the master, minified (~1.16:1) |
+| ~6 px (whole grid) | 6, about 1:1 |
+| ~12 px | 12, about 1:1 |
+| ~24 px | 24, about 1:1 |
+| ~48 px | 48, about 1:1 |
+| ~96 px | 96 — the master, about 1:1 |
 
 The vector fill remains only as the fallback before a body's far page exists. What the
 canvas strokes OVER the ground — washes, roads, lanes, the border rule — has its own

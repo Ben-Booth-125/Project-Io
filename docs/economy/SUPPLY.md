@@ -194,6 +194,15 @@ destination; releasing the hold is what delivers it.
 
 ---
 
+### A lane does not cross a warring front (Ben, 2026-11-05)
+
+**A convoy re-routes around a front at war.** A lane may not cross a front (`../military/MILITARY.md`
+§ Fronts, owner or occupier) between nations at war, and the route solves around it, so the route's
+price and the lane it flies are one answer. A neutral third nation's convoy is not bound.
+
+**Default details, for Ben's review (2026-11-05).** With no route left, dispatch is refused with a
+surfaced reason. Cargo in flight with no route left returns to its origin.
+
 ## Infrastructure gates
 
 Mode is selected by the source/destination pair: inter-body → **space**; intra-body → a route of **legs**, land by default with a **sea** leg wherever a port-to-port crossing makes the whole route cheaper (§ Logistical cost — the *route* picks the legs, and a sea leg exists only where ports do). The gates per mode:

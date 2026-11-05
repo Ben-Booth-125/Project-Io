@@ -775,6 +775,11 @@ wrong default (NR-407).
 **A convoy is cargo and cannot be defended.** Assigning a unit to a convoy — turning interception
 into a real battle — is named in BL-458's design and deliberately excluded from it.
 
+**A front at war closes the lanes across it (Ben, 2026-11-05).** Interdiction above is a unit on a
+tile; this is the front itself. Convoys of the nations at war route around it, a neutral third
+nation's are not bound, and the route's price and lane stay one answer (`SUPPLY.md` § A lane does not
+cross a warring front).
+
 ### 8. Inter-body distance
 
 Space distance is Euclidean body-centre to body-centre; there are no orbital mechanics in the

@@ -617,12 +617,13 @@ exist — which is why `generate_population_centres` runs before `generate_natio
 
 ### Pass 7 — Starting treasury *(Ben, 2026-08-24; the source ruled BL-975, 2026-09-15)*
 
-**A major opens on a flat treasury (Ben, 2026-11-02).** Every major's treasury is set to its kit's
-authored figure, **12,000 credits** for the Rich-core kit in play (8,000 for Standard) (`CORPORATION_GENERATION.md` § A major's
-opening kit), in place of the chest its history folded. It is set once the kit stands and before the
-opening reserve, and it is the same for every major. It is about sixteen ticks of the kit's running
-bill and its army's wage, plus a build fund. Majors differ by ground, people and neighbours, not by
-their chests. **The opening cut does not run on a major**: its kit is sized to its chest by
+**Every major starts play on the same credits (Ben, 2026-11-05; flat since Ben, 2026-11-02).** Every
+major's treasury is its kit's **one authored figure** (`CORPORATION_GENERATION.md` § A major's opening
+kit), in place of the chest its history folded. The figure holds **at the handoff, after the settle**:
+what the settle's ticks earned or spent does not carry into play, so an equal figure in the kit table
+is not enough on its own. The figure is the runway, about sixteen ticks of the kit's running bill and
+its army's wage, plus a **build fund of two to three buildings** at opening prices. Majors differ by
+ground, people and neighbours, not by their chests. **The opening cut does not run on a major**: its kit is sized to its chest by
 construction, so a major short of sixteen ticks of its bill is a defect in the kit table, not a nation
 to shrink. Everything below holds for every minor, and for every nation's chest *through* the
 history: the spans still bank, tribute and fight with the chests as below. Only a major's figure at

@@ -145,13 +145,15 @@ fare stays on the canvas; the labour read is a roll-up on the
   > four roll-ups over those when asked directly, and the 2026-08-29 cut then reduced those four
   > to one. The MVP's **click-through into the relevant per-system ledger** survives as the
   > **host axis** (`[>]` / `focus_on_entity`), orthogonal per BL-214's three-axis model. There is
-  > no separate **alert** mechanism here: a negative net reads as a red verdict on the card,
-  > which is the same signal without a second mechanism to maintain (player alerts as a system
-  > are BL-261, player alerts).
+  > no separate **alert** mechanism on this card: a negative net reads as a red verdict,
+  > which is the same signal without a second mechanism to maintain. Player alerts as a system are
+  > the alert strip (`LAYOUT.md` § Alert strip, Ben, 2026-11-05).
 
   The **rival-field comparison** — corporations grouped by stance — **retired** with the
   corporation (Ben, 2026-10-23), and the Acquisitions ledger that carried its financial half
-  retired with the buyout.
+  retired with the buyout. **Relative strength returns at the nation grain (Ben, 2026-11-05):**
+  Nation overview ranks the nation on **GDP, market share, reach and total force**. Rival
+  treasuries stay private (`ledgers/corporation.md`).
 
 - **Buildings have no dedicated ledger (settled 2026-06-15, [F4]).** A standalone buildings
   overview is more "good to know" than goal-driving, so it earns no reserved slot. Buildings are
@@ -204,24 +206,22 @@ fare stays on the canvas; the labour read is a roll-up on the
 
 The session menu is BL-070 (in-app system menu). Separate from the nav-rail ledgers above
 (per-system overviews) and from the display-options surface below. This is the **session
-shell** — start/pause/exit — the application-level control the player reaches without knowing a
+shell** — save, options and exit, behind a pause — the application-level control the player reaches without knowing a
 hotkey (`src/ui/time_panel.cpp`, `src/ui/ui_state.hpp`).
 
-- **Surface — corner gear (hamburger) button.** A small three-line glyph pinned to the **top-right**,
-  just left of the time column, clear of the header content and the time panel. Lowest layout
-  disruption, no permanent chrome, reuses the icon-rail visual language. (The top menu-bar and
-  the centred pause-modal alternatives were rejected for the prototype minimum — the centred
-  modal is the right long-term home from a title screen.)
-- **Contents.** **Pause / Resume** and **Exit Game**. Pause mirrors the Space-hotkey pause —
-  popup and keyboard drive **one** shared session-control flag (routed through the same
-  `pause_toggle` path / `sim_loop` speed-0 + remembered speed), not two. Exit is **destructive**
-  (there is no in-session save), so it arms an **inline "Really quit?" confirm** in the same
-  popup rather than quitting on the first click.
-- **Keyboard parity.** **Esc** toggles the same popup (handled ahead of the ImGui keyboard guard so
-  it works while the popup or another panel holds focus); an armed exit-confirm backs out first, so
-  Esc cancels the confirm before it closes the menu.
-- **Reserved home.** This popup is the reserved session-control home: New/Restart — routing back to
-  the title screen (`STARTUP.md`) — and **Save/Load** (BL-536, world snapshot save) belong here.
+- **Surface — the gear, to the right of the time controls (Ben, 2026-11-05).** It sits inside the
+  right end of the time column, because the column is flush to the screen edge
+  (`TIME_CONTROLS.md` § The escape menu).
+- **The escape menu (Ben, 2026-11-05).** Pressing the gear, or Esc with nothing open, opens a
+  **full-canvas** menu and pauses the game: **Save**, **Options**, **Exit to Menu**, **Exit Game**.
+  Closing it restores the remembered speed, through the one `pause_toggle` session-control flag the
+  Space hotkey uses. This overturns the corner popup and the rejection of a centred modal.
+- **Unsaved progress is warned.** Exit to Menu and Exit Game each warn about unsaved progress before
+  they act. Exit to Menu returns to the main menu, which offers Load (`STARTUP.md` § Main menu).
+- **Options** is the display-options window below, and **Save** writes the in-game save F5 writes.
+- **Keyboard (Ben, 2026-11-05).** Esc closes what is open in a queue: **Menu, then Ledger, then
+  Selection**. With nothing open it opens the escape menu. The full ladder is
+  `SELECTION.md` § Layout & chrome.
 
 ## Application / system menu — display options
 

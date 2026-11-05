@@ -110,6 +110,10 @@ non-extraction type on one tile combined, not per type — by a per-composition 
 placement on that tile. Extraction stacking (`k_richness_per_site`, above) is a separate,
 richness-bound axis.
 
+**Generation obeys the cap with no exemptions (Ben, 2026-11-05).** Every building generation stands
+counts toward its tile's cap. Hubs, stations, ports and the capital's source count like any other
+building.
+
 Implementation: the constants and the rank helpers live in
 `src/world/placement_rules.{hpp,cpp}` (`stack_output_scalar`, which is 1 at every rank,
 `stack_members`, `stack_rank`); the combined-nominal taper is a per-tile **stack pre-pass** in
@@ -764,6 +768,12 @@ four of five seeds, and the settle then started 11–13 plants on a grid needing
 a profit, which is the point: it gives the plant a reason to exist, and it means
 power supply is induced by price the way every other good's is.
 
+### Wind (Ben, 2026-11-05)
+
+**A wind turbine is a power building that burns no fuel.** It stands on land and feeds the grid as a
+plant does, and it pays its way by its site, not its fuel bill. Water still takes no building
+(`TILES.md`); offshore turbines and drilling arrive with the naval system.
+
 ### Why this closes the fuel chain at BOTH ends
 
 `coal` and `petroleum` are on the census's *extractable, no market sink* list — petroleum produced
@@ -894,14 +904,34 @@ are paid for across the build. The front door shows the analog rate/ETA/paused s
 binary reject. Tunables live in `scripts/economy.lua` § `construction`. A build stalled for want
 of an input registers that want as demand, so the stall is visible to the price signal.
 
+### What construction costs at the opening (Ben, 2026-11-05)
+
+**Construction is the opening's scarce decision.** At the opening a mine costs about **six months of
+a major's net**. Construction comes back to about one month of net only after **10-20 years of
+play**. No timer and no era gate carries that curve: it is reinvestment, income growing as the
+buildings a nation chose pay back.
+
+**The extra cost lives mostly in materials.** Materials are bought off the shelf at the tile market's
+price, so a nation that planned a steel chain has a real edge over one that did not, and a nation
+building hard moves the price it pays.
+
+**Searching is rewarded by the sites themselves.** A good site pays back in years and a poor one
+barely. The site finder stays open from the start (`../ui/ledgers/construction.md` § The site ledger;
+Ben declined gating it behind research), so what rewards searching and planning is the spread between
+sites, not access to the list.
+
 ### Construction is measured in days (Ben, 2026-10-24)
 
 **A build's time is a number of days, so a building can finish between quarters.** Each type's
-duration is authored in days (`build_duration_days`; a two-quarter build is 180 days), times the
-placement's site multiplier (§ Construction site time), rounded to a whole day.
+duration is authored in days (`build_duration_days`, `scripts/economy.lua`), times the placement's
+site multiplier (§ Construction site time), rounded to a whole day.
+
+**Durations scale together (Ben, 2026-11-05).** Every type's days scale by the same factor, anchored
+so an extraction site takes **120 days** (a ×2/3 scale), and the differences between types stand. Time
+is not the opening's brake; money and materials are (§ What construction costs at the opening).
 
 - **Construction starts on the placement day (Ben, 2026-10-25).** A site begins building the day it
-  is placed. A 180-day build placed on day 10 of a quarter completes on day 190.
+  is placed. A 120-day build placed on day 10 of a quarter completes on day 130.
 - **Credits are paid up front, once (Ben, 2026-10-25).** The whole flat build cost — `build_cost`
   times the site multiplier, the credit part of the capex — leaves the builder's treasury when the
   site is placed. No economy tick pays construction credits after that. The build door admits a site

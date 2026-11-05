@@ -48,7 +48,8 @@ in-game days. `run_verify()` jumps straight to `in_game`
 ## Main menu — `draw_main_menu`
 
 A dark, centred title card — deliberately spare, a launch entry point, not a
-settings hub (no Load/Save on the menu; `--load` is a command-line path). Contents:
+settings hub. **It offers Load (Ben, 2026-11-05)**, because Exit to Menu must not strand a save
+(`MENU.md`); it offers no Save, and `--load` stays a command-line path too. Contents:
 
 - **Seed** — **not on the menu, and not shown anywhere (Ben, 2026-10-15; § Rounds)**: no entry,
   Roll or Copy. A `random_device` draw feeds *only* the seed value, unseen; generation stays a
@@ -69,7 +70,7 @@ settings hub (no Load/Save on the menu; `--load` is a command-line path). Conten
   with the seed (Ben, 2026-10-11).**
 - **Bodies** — a disabled slider, fixed at 5; the count knob is phased to a
   later update. The nation targets are set on the setup round, not here (§ Rounds).
-- **New Game** → `open_new_world_wizard()` (commits nothing); **Quick Start**; **Quit**.
+- **New Game** → `open_new_world_wizard()` (commits nothing); **Quick Start**; **Load**; **Quit**.
 - **Quick Start (Ben, 2026-10-08)** — generates the world straight through with no wizard rounds
   drawn but the setup round, which it opens alone (§ Rounds): the cold build behind one loading bar, then the **seat
   screen**, so the player still chooses the nation. It is the same world the wizard builds
@@ -651,7 +652,7 @@ presentation half:
 **The ground pre-bakes behind the wizard** (Ben, 2026-10-09; started at the Life round on
 Ben's ruling the same day, after the first build measured 36-55 s when the bake began at
 round 6). The homeworld's **ground master** ([RENDERING.md](RENDERING.md) § Level of detail) —
-the one 128 px/hex image every zoom of the Planetary canvas is drawn from — starts baking on the
+the one 96 px/hex image every zoom of the Planetary canvas is drawn from — starts baking on the
 worker pool as soon as **the Life round has built the homeworld's terrain**, and runs behind the
 rest of the wizard, which the player spends minutes watching. Each later round changes the
 world on its own worker, so the ground layer takes a **fresh source snapshot only at a round

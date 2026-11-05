@@ -210,7 +210,7 @@ whose drawn level is not wholly final under the view; frame time is the frame's 
 vsync wait excluded), judged on the 1%-low of a sustained pan at each rung.
 
 What these budgets cost, and why they fit: the ground is painted on the CPU by a worker pool
-and held in system RAM (an Earth-sized body at 128 px per hex, opaque chunks held losslessly as RGB, home pinned and other bodies streaming from a disk cache, the whole process under 6 GB — Ben, 2026-10-17); the
+and held in system RAM (an Earth-sized body at 96 px per hex, opaque chunks held losslessly as RGB, home pinned and other bodies streaming from a disk cache, the whole process under 6 GB — Ben, 2026-10-17); the
 GPU holds only the textures on screen and draws them as quads, so GPU time is not the
 constraint (RENDERING.md § Level of detail). A check that misses a budget on the reference PC
 is a defect; one that only the minimum PC would miss is measured on it before release.

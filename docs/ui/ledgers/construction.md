@@ -70,7 +70,9 @@ extraction option per extractable good ("Farm" covers the coastal Fishing Wharf,
 covers the Well), one **per processing recipe** (the profit turns on the recipe, so the finder
 prices a recipe, where the door folds recipes under their group and picks the best per tile), then
 the infrastructure and military types. The door's era, tech and recipe-unlock filters apply; the
-body's-air filter is applied per tile.
+body's-air filter is applied per tile. **Each option draws its building glyph (Ben, 2026-11-05).**
+Power Generation recipes sit under Infrastructure, as they do in the door (`../SELECTION.md` § The tile
+construction ledger).
 
 **The table.** One row per tile of the player's **own ground** on the active body that the **Build
 door accepts** the chosen building on — `placement_rules::can_place_in_world` with the player's

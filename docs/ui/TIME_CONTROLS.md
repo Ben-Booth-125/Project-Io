@@ -14,7 +14,7 @@ same width as the minimap so the right edge stays aligned (`tick_w = mm_w`). It
 is **four stacked full-width rows** (BL-138, compact time panel; legibility pass
 BL-178, revised on Ben's 2026-07-10 and 2026-07-15 reviews). See `LAYOUT.md`
 for placement; the draw is `ui::draw_time_panel` in `src/ui/time_panel.{hpp,cpp}`
-(the `##time_panel` block, which also hosts the in-app system menu), and the
+(the `##time_panel` block, which also hosts the gear that opens the escape menu), and the
 authoritative pacing constants are in `src/core/sim_loop.hpp`.
 
 ---
@@ -92,6 +92,12 @@ date alongside the relative count is not shown; there is no demand for it.
 mirroring the on-screen buttons. These route through the shared canvas-command vocabulary
 (`canvas_command`) so they read as key bindings, consistent with the canvas keyboard model
 (CANVASES.md § Keyboard).
+
+## The escape menu (Ben, 2026-11-05)
+
+The session gear sits **to the right of the time controls**, inside the right end of this panel,
+because the panel is flush to the screen edge. It opens the full-canvas escape menu and pauses the
+game (`MENU.md`).
 
 ## Related
 

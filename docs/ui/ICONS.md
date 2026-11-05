@@ -255,7 +255,12 @@ the marker the canvas already draws for cargo in transit is the slot's silhouett
 pairing this catalogue prefers wherever a slot has a canvas twin. Its rail position is a MENU.md
 curation question and not an icon one.
 
-### 2b. The item glyph — a value-track silhouette, not one shape per good
+### 2b. The item glyph — one shape per good
+
+**One glyph per good, the full set (Ben, 2026-11-05, overturning the four track silhouettes of
+2026-08-29).** Every good in the roster has its own item glyph, in its identity colour. The record of
+the overturned design follows, for its reasoning: its placeholder conditions and its pip rule stand,
+and its four-silhouette conclusion does not.
 
 > **PLACEHOLDERS UNTIL A LATER SPRINT** (Ben, 2026-08-29: *"For flags and glyphs, use
 > placeholders. We will come to that in a different sprint later."*). The four track silhouettes
@@ -275,7 +280,7 @@ across ~42 rows that is forty-two identical diamonds, discriminating by hue alon
 beside the resource's own name in that same hue. It would be decoration duplicating the column
 next to it.
 
-**Author four silhouettes keyed to the VALUE TRACK, not one per good.** `RESOURCES.md`
+**The overturned 2026-08-29 design: four silhouettes keyed to the VALUE TRACK.** `RESOURCES.md`
 § Resource categories already divides the roster into **Industrial / Ambient / Habitability /
 Mercantile**, and that division is a real thing a player acts on — it says what a good is *for*.
 Four shapes in the resource's identity colour give a glyph that discriminates at row height and

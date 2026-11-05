@@ -31,6 +31,10 @@ That is also why the site ledger's ranking passes the test. Its figure is an est
 This is the player-facing twin of the AI-behaviour prohibition in `.claude/rules/io-standing-rules.md`, and the two are one idea seen from either end. That rule stops the *simulation* acting on the player's nation; this one stops the *interface* deciding for them. Both leave the same thing intact — the player's own judgement about what to do next — which is why the one sanctioned auto-action on the player's nation is a single micromanagement dial with an opt-out, and not a planner — and why nothing builds on the player's ground for it (Ben, 2026-10-23).
 ### Territorial existence
 The player persists as long as its nation holds any territory (Ben, 2026-10-10). A nation that holds no tile is eliminated; since it owns buildings only on its own ground, losing the last tile takes the last building with it. This replaces asset-based existence, under which owning a single building kept a firm alive.
+### Construction is a decision before it is a habit
+
+**Early building is scarce (Ben, 2026-11-05).** A mine costs about six months of a major's net at the opening, and construction takes 10-20 years of reinvestment to feel routine. Good sites and planned chains are what shorten that, and the interface makes a good building quick to find later without making it free early (`economy/PRODUCTION.md` § What construction costs at the opening).
+
 ### Development through ages
 Early game involves buying land, building industrial chains, and raising forces before space becomes viable. The nation **raises its own units and buys their equipment on the market** (Ben, 2026-10-10): it musters, and its equipment comes off the shelf like any good — made by its own works or another nation's (Ben, 2026-10-23, the corporations that sold it retired). It buys that equipment **as a real buyer on the order book** (Ben, 2026-10-10, NR-1028), bidding and clearing like any other buyer (`docs/politics/NATIONS.md` § 2. Conservation). The Era 1 → Era 2 gate — ERAS.md's rocketry + launchpad + propellant set — is what the player is equipping toward from the opening tick.
 

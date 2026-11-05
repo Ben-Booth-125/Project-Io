@@ -464,6 +464,10 @@ colour; HP is men over establishment, readiness men-weighted. The bars are the p
 (a rival's internals stay private, BL-068). The unit card carries HP, readiness and morale, and
 the land class the unit fights as (`../ui/ICONS.md` § Entity markers).
 
+**A marching unit moves smoothly (Ben, 2026-11-05).** It is drawn travelling from tile centre to tile
+centre, at the pace the march is actually banking, and its press follows what is drawn. This is
+presentation: the march still resolves tile by tile.
+
 ### Fortifications
 
 A **bunker** is a building. Units on its tile gain defence, and the tile's defenders gain hardness
@@ -542,19 +546,20 @@ side. Tiles off that line sit beside their nearest line tile. Every tie goes to 
 **Slots.** A front with *n* assigned units cuts its span into *n* equal stretches. Unit *i*, in
 ascending unit id, takes the middle tile of stretch *i*. A unit is on its slot once it stands on
 the slot tile; a march ends on its tile (§ Marching). The front re-issues a march whenever a unit's
-order points anywhere else. To move an assigned unit by hand,
-unassign it first. A unit in a battle or refitting is left alone. A dead unit frees its slot, and
+order points anywhere else. **A land unit on hold never takes a water slot, bridges excepted (Ben,
+2026-11-05).** The owned-coast marching rule (§ Domains and traversal) still stands for marches. To
+move an assigned unit by hand, unassign it first. A unit in a battle or refitting is left alone. A dead unit frees its slot, and
 the rest re-space on the next tick.
 
 **The push target (Ben, 2026-10-27: "fronts and push use tiles too").** A push considers the
 neighbour's land tiles with a hex side onto the span. Each pushing unit marches onto the one whose
 standing stack is weakest — the summed `unit_strength` of the units on it, an empty tile weakest
 of all — nearest its own slot, ties to the lower tile id. A tile the nation's own units already
-stand on is taken, not a target. Marching onto a held tile is an attack (§ Battles). A unit already standing on the neighbour's ground holds what it took. A push is open only while the nation has declared hostility
+stand on is taken, not a target. Marching onto a held tile is an attack (§ Battles). A unit that takes ground occupies it, the front moves, and the push continues from the new span (§ Occupation, Ben, 2026-11-05). A push is open only while the nation has declared hostility
 toward the neighbour, which is the battle trigger's one-way test. If that hostility ends, the stored
 push acts as hold until it returns.
 
-**When the border moves.** Fronts re-derive from the territory map. An assignment or order follows
+**When the border moves.** Fronts re-derive from the territory map and the occupation layer. An assignment or order follows
 its key. If the key no longer names a front, it moves to the front toward the **same neighbour**
 whose span now holds the key tile. Failing that, it goes to the front toward that neighbour nearest
 the key tile, in hex steps, ties to the lower key. If no front toward that neighbour remains, it is
@@ -567,6 +572,17 @@ whose nearest enterable span tile to the span's middle a march would accept. A u
 no front stays unassigned. A rival pushes where it is hostile to
 the neighbour and its assigned strength exceeds 3:2 over the push target's defence. Otherwise it
 holds. It never declares the hostility a push needs.
+
+### Defend province (Ben, 2026-11-05)
+
+**A unit may be ordered to defend a province.** It is an ability beside a front assignment, for ground
+a front does not cover: a landing from the sea, or a province a nation cannot supply a front from. A
+defending unit reacts only inside its province. It marches to a hostile stack there and otherwise
+returns to its post. It does not pursue out of the province.
+
+**Units can start on it at the capital province.** This does not assign a front, so § Nation garrisons'
+no-default-assignment rule stands. Every move is a legal `march_unit`, under the grant in
+`../ai/AI_OPPONENT.md` § 11.
 
 ### Air
 
@@ -1301,6 +1317,18 @@ narrow — a military fact a contract predicate can read, not a political one: `
 territorial map) does not follow the holder in battle. It follows only at a **peace that cedes the
 province** (`../politics/RELATIONS.md` § 7, Ben 2026-10-30), and a held war goal counts toward the
 war score. Battle state survives a save under BL-536 (world snapshot save).
+
+### Occupation (Ben, 2026-11-05)
+
+**Legal ownership still moves only at a ceding peace; the front moves with the army.** At war, a
+unit that marches past a front **occupies** the ground it enters. `tile_to_nation` does not change.
+An occupation layer records who occupies each tile, and a front derives from **owner or occupier**,
+so a push moves the front and can keep going. Occupation clears at peace: a ceded province keeps its
+new owner (`../politics/RELATIONS.md` § 7) and every other tile returns to its owner. Battles work
+as they did, and the province holder stays the narrower military fact above.
+
+**Default details, for Ben's review (2026-11-05).** An empty tile is occupied on entry. An occupied
+tile's output is denied to its owner and not gained by the occupier.
 
 ### Dispatches and the card
 
