@@ -409,10 +409,12 @@
    "title": "Does offshore drilling join sprint 64?",
    "raised": "2026-11-05",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "OFFSHORE_DRILLING (BL-1522)",
    "what": "You ruled offshore drilling lands with the naval system, and it is parked on that. It is a separate build: new sea petroleum moves world generation, TILES.md must change, and shelf-only against open ocean is unruled. I left it out of sprint 64's plan.",
-   "why_it_matters": "Adding it enlarges an already five-difficulty sprint and adds a second world-mover to its re-bless."
+   "why_it_matters": "Adding it enlarges an already five-difficulty sprint and adds a second world-mover to its re-bless.",
+   "resolved": "2026-11-05",
+   "resolution": "Ben, 2026-11-05: keep it out of sprint 64. BL-1522 (offshore drilling) stays parked."
   }
  ]
 }

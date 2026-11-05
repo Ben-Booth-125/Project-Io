@@ -886,7 +886,7 @@
    "version_goal": null,
    "written": "2026-11-05",
    "parked": true,
-   "blocked_on": "the naval system",
+   "blocked_on": "sprint 64 (the naval system) closing",
    "author": "main session (Ben, 2026-11-05: playtest list and design form)",
    "requires": [],
    "category": "Economy",
@@ -901,7 +901,7 @@
     "src/world/logistics.cpp"
    ],
    "title": "Offshore drilling, supplied by nearby ports",
-   "design": "Playtest item 1. Ben, 2026-11-05: lands with the naval system. PARKED until then. Amends TILES' no-buildings-on-water; adds sea petroleum (worldgen moves); DG-PR-EX-A already promises oil platforms on shelf sea. Port points ride lanes and land only on port tiles, so \"supplied by ports nearby\" needs a new rule (a rig tile counts as landed, or a radius). Offshore wind has no grid (power rides roads). Not settled: shelf only or open ocean."
+   "design": "Playtest item 1. Ben, 2026-11-05: lands with the naval system. PARKED until then. Amends TILES' no-buildings-on-water; adds sea petroleum (worldgen moves); DG-PR-EX-A already promises oil platforms on shelf sea. Port points ride lanes and land only on port tiles, so \"supplied by ports nearby\" needs a new rule (a rig tile counts as landed, or a radius). Offshore wind has no grid (power rides roads). Not settled: shelf only or open ocean. NOT IN SPRINT 64 (Ben, 2026-11-05): stays parked after the naval system."
   },
   {
    "status": "proposed",

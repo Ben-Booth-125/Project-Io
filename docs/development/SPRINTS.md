@@ -87,7 +87,7 @@ Build under test: build_rel at 8af285f7. A UI item needs a live click before it 
 - THE WORLD: BL-1532 (opening fleets), BL-1533 (rival fleets).
 - CLOSE: BL-1535 (naval war reading), with the one re-bless.
 
-BL-1522 (offshore drilling) is parked for the naval system; NR-1142 asks whether it joins this sprint. BL-1431 (missiles and satellites) stays out: ship armament uses plain attack until it lands.
+BL-1522 (offshore drilling) stays out of this sprint (Ben, 2026-11-05). BL-1431 (missiles and satellites) stays out: ship armament uses plain attack until it lands.
 
 ## Where things stand
 

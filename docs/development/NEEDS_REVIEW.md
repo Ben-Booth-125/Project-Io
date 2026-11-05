@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*24 entries — 24 open, 0 resolved.*
+*24 entries — 23 open, 1 resolved.*
 
 ---
 
@@ -277,6 +277,13 @@ Your form settled the shape; I wrote these to make it whole. (1) A blockade clos
 
 **Why it matters.** Items 1, 3 and 6 decide how third parties feel a sea war; item 8 means sea fights read differently from land battles.
 
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-1142 — Does offshore drilling join sprint 64?
 *question · raised 2026-11-05 · from OFFSHORE_DRILLING (BL-1522)*
 
@@ -284,10 +291,5 @@ You ruled offshore drilling lands with the naval system, and it is parked on tha
 
 **Why it matters.** Adding it enlarges an already five-difficulty sprint and adds a second world-mover to its re-bless.
 
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
+> **RESOLVED.** Ben, 2026-11-05: keep it out of sprint 64. BL-1522 (offshore drilling) stays parked.
 

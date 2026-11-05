@@ -106,7 +106,7 @@
     "THE WORLD: BL-1532 (opening fleets), BL-1533 (rival fleets).",
     "CLOSE: BL-1535 (naval war reading), with the one re-bless."
    ],
-   "notes": "BL-1522 (offshore drilling) is parked for the naval system; NR-1142 asks whether it joins this sprint. BL-1431 (missiles and satellites) stays out: ship armament uses plain attack until it lands."
+   "notes": "BL-1522 (offshore drilling) stays out of this sprint (Ben, 2026-11-05). BL-1431 (missiles and satellites) stays out: ship armament uses plain attack until it lands."
   }
  ],
  "next_up": "SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census runs first.",
