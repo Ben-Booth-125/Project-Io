@@ -7667,6 +7667,181 @@
      "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
     }
    ]
+  },
+  {
+   "brief": "lane-market",
+   "title": "Sprint 63 Market lane",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in_progress",
+   "promoted_from": "backlog.json - sprint 63 (Ben, 2026-11-05)",
+   "batch": "sprint-63",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Merged after cold review and a fix round, with the lane's gates passing on the merged tree.",
+     "kind": "measured",
+     "status": "complete",
+     "evidence": "Merge commit on main, 2026-11-06; failures on record are the ones the base carries."
+    },
+    {
+     "id": "R2",
+     "text": "Live click: One glyph per good; sort cycles on goods-table headings; tabs; offers open and shut; trades from own markets within points.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
+    }
+   ]
+  },
+  {
+   "brief": "lane-canvas",
+   "title": "Sprint 63 Canvas lane",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in_progress",
+   "promoted_from": "backlog.json - sprint 63 (Ben, 2026-11-05)",
+   "batch": "sprint-63",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Merged after cold review and a fix round, with the lane's gates passing on the merged tree.",
+     "kind": "measured",
+     "status": "complete",
+     "evidence": "Merge commit on main, 2026-11-06; failures on record are the ones the base carries."
+    },
+    {
+     "id": "R2",
+     "text": "Live click: Unit glide; convoy marker press and walk; drag band, shift and right-click; diplomacy dropdown and slot 8 lens; standing bars.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
+    }
+   ]
+  },
+  {
+   "brief": "lane-shell",
+   "title": "Sprint 63 Shell lane",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in_progress",
+   "promoted_from": "backlog.json - sprint 63 (Ben, 2026-11-05)",
+   "batch": "sprint-63",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Merged after cold review and a fix round, with the lane's gates passing on the merged tree.",
+     "kind": "measured",
+     "status": "complete",
+     "evidence": "Merge commit on main, 2026-11-06; failures on record are the ones the base carries."
+    },
+    {
+     "id": "R2",
+     "text": "Live click: Gear and Esc pause, Options, Save, Exit and Load twice, Exit to New Game Quick Start, Exit Game; each Esc rung; header hover; each alert kind; hit-testing through the UI scale.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
+    }
+   ]
+  },
+  {
+   "brief": "lane-war",
+   "title": "Sprint 63 War lane",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in_progress",
+   "promoted_from": "backlog.json - sprint 63 (Ben, 2026-11-05)",
+   "batch": "sprint-63",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Merged after cold review and a fix round, with the lane's gates passing on the merged tree.",
+     "kind": "measured",
+     "status": "complete",
+     "evidence": "Merge commit on main, 2026-11-06; failures on record are the ones the base carries."
+    },
+    {
+     "id": "R2",
+     "text": "Live click: Defend this province menu; a front moves under a push; Trade flow reads front closed; set_trade refusal text; a hand march on a defender.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
+    }
+   ]
+  },
+  {
+   "brief": "lane-art",
+   "title": "Sprint 63 Art lane",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in_progress",
+   "promoted_from": "backlog.json - sprint 63 (Ben, 2026-11-05)",
+   "batch": "sprint-63",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Merged after cold review and a fix round, with the lane's gates passing on the merged tree.",
+     "kind": "measured",
+     "status": "complete",
+     "evidence": "Merge commit on main, 2026-11-06; failures on record are the ones the base carries."
+    },
+    {
+     "id": "R2",
+     "text": "Live click: Live look at 96 px through the zoom ladder; the zoom-out floor; firs at the closest rungs.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
+    }
+   ]
+  },
+  {
+   "brief": "lane-generation",
+   "title": "Sprint 63 Generation lane",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json - sprint 63 (Ben, 2026-11-05)",
+   "batch": "sprint-63",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Merged after cold review and a fix round, with the lane's gates passing on the merged tree.",
+     "kind": "measured",
+     "status": "complete",
+     "evidence": "Merge commit on main, 2026-11-06; failures on record are the ones the base carries."
+    }
+   ]
+  },
+  {
+   "brief": "lane-money",
+   "title": "Sprint 63 Money lane",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "in_progress",
+   "promoted_from": "backlog.json - sprint 63 (Ben, 2026-11-05)",
+   "batch": "sprint-63",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Merged after cold review and a fix round, with the lane's gates passing on the merged tree.",
+     "kind": "measured",
+     "status": "complete",
+     "evidence": "Merge commit on main, 2026-11-06; failures on record are the ones the base carries."
+    },
+    {
+     "id": "R2",
+     "text": "Live click: Balance card Research segment; header NET; method grid with wind locked and open.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
+    }
+   ]
   }
  ]
 }
