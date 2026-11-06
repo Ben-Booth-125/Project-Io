@@ -2017,7 +2017,8 @@ void advance_musters(world& w)
         // ground, but another nation's stack may be marching through it. The
         // finished muster waits — at zero days, so it completes the first tick the
         // tile is clear — rather than raise a unit onto a foreign stack.
-        bool foreign = false;
+        // MILITARY.md § Occupation: nor onto its own ground an enemy holds, stack or no stack.
+        bool foreign = w.tile_occupied(bit->second.tile);
         for (const auto& [uid, u] : w.units) // a test: the walk order cannot matter
             foreign = foreign || (u.count > 0 && u.position == bit->second.tile && u.owner != m.owner);
         if (foreign)
