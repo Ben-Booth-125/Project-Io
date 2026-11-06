@@ -1,5 +1,10 @@
 # REFINED — active worklist
 
+## Sprint 64 — the war at sea (opened 2026-11-06)
+
+Runs beside sprint 63. The core has no money dependency; the sea trade reading and the tuning wait on
+63's economy wave.
+
 ## Sprint 63 — UI, QOL and the opening (opened 2026-11-05)
 
 Scoped by Ben's 24-item playtest. The opening climb leads. Seven lanes run in worktrees; the main

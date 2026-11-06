@@ -36,8 +36,8 @@
    "design": "Ben, 2026-10-26 (NR-980 B): the lens computes a market's room without other nations' cargo in flight to it, so no-room never reveals a rival's shipments. The dispatcher keeps its own room figure; write in LENSES.md that the lens figure is the player's own view and may differ.  PARKED (Ben, 2026-11-03, NR-1108 C): until trade capacity is next touched."
   },
   {
-   "status": "proposed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "◐",
    "sprint": "64",
    "version_goal": "v0.3.0",
    "written": "2026-10-26",
@@ -61,7 +61,9 @@
     "scripts/economy.lua"
    ],
    "title": "Ships exist: the four classes, the port door, sailing, the daily detect-and-hit pass",
-   "design": "MILITARY.md § Sea (Ben, 2026-11-05, which replaces this item's open question on amphibious transport). The core every other sprint 64 item stands on: a ship entity with its save section, class table and sea pool spend, the orphan rule, tile-by-tile sailing, mission zones over sea provinces in range, the seeded daily detect-and-hit pass, upkeep and refit at the home port, tactical bombing of a detected ship, and the assign verbs. Combat.hpp's comments still read that the campaign raises no naval unit; correct them here. Harness: replay determinism, an all-submarine fight never hits an undetecting side, save round trip."
+   "resolved": "2026-11-06",
+   "design": "@docs/development/archive/backlog-design-2026-Q4.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
    "status": "proposed",

@@ -226,6 +226,8 @@ const char* play_log::verb_name(corp_verb v)
         case corp_verb::set_unit_design:      return "set_unit_design"; // BL-1434
         case corp_verb::hire_wing:            return "hire_wing";          // BL-1449
         case corp_verb::assign_air_mission:   return "assign_air_mission"; // BL-1449
+        case corp_verb::hire_ship:            return "hire_ship";          // BL-1430
+        case corp_verb::assign_sea_mission:   return "assign_sea_mission"; // BL-1430
         case corp_verb::set_air_design:       return "set_air_design";     // BL-1449
         case corp_verb::declare_war:          return "declare_war";        // BL-1459
         case corp_verb::answer_war:           return "answer_war";         // BL-1459

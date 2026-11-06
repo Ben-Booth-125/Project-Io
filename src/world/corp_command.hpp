@@ -236,6 +236,11 @@ enum class corp_verb : uint8_t
     // Appended after set_embargo, same append-only rule. Any nation on its OWN unit; a
     // rival's scorer issues it by the grant in AI_OPPONENT.md § 11.
     defend_province,      ///< Order unit `subject` to defend province `province` (`no_province` clears the order); the unit stores it and its post, and leaves any front. The post is the tile it stands on when inside the province, else the nearest tile of the province the actor owns that a march reaches. rejected_invalid (no such unit or province, a unit no land class, a province with no land the actor owns, no reachable post) / rejected_not_owner (not the actor's unit) / rejected_state (already so).
+    // --- BL-1430: ships (MILITARY.md § Sea, Ben 2026-11-05) ---
+    // Appended after defend_province, same append-only rule. A nation on its OWN port and
+    // ships. No scorer issues them until the fleet grant's item (AI_OPPONENT.md § 11).
+    hire_ship,            ///< Raise a ship of sea roster row `unit_type` (ship_roster_table) at the actor's own completed port on `tile`. Pays the class's hire credits and goods off the shelves, both legs checked first, and its crew from the sea pool; the ship is created at once, with the class's muster days to run, at the port's mouth, and returned through `out_building`. rejected_invalid (unknown row, a row the nation's shelves cannot field, unknown tile) / rejected_placement (no such port, or no water at its mouth) / rejected_no_recruits / rejected_funds — see `hire_ship_check`.
+    assign_sea_mission,   ///< Assign ship `subject` mission `order` (0 none, 1 patrol, 2 escort, 3 raid, 4 blockade) over the sea provinces in `air_provinces` (unused slots `no_province`; any order). It sails there and works the zone; `none` recalls it home. rejected_invalid (no such ship, a mission its class does not work, none with provinces or a mission with none, an unknown or repeated province) / rejected_not_owner / rejected_placement (a province that is land, out of range over water of an own port, or that this ship cannot reach) / rejected_state (no change) — see `sea_mission_check`.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -245,7 +250,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::defend_province) + 1;
+    static_cast<uint8_t>(corp_verb::assign_sea_mission) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

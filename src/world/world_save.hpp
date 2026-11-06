@@ -712,7 +712,17 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// a u32 count, every defending unit ascending id as (unit, u32 province, post tile). Each
 /// names a unit of the stream, a province of the stream and a tile of it. Refused whole
 /// otherwise. v78 is a STRICT PREFIX of v79 and is read too, as no unit defending.
-inline constexpr uint32_t world_save_version = 79;
+/// v80 (BL-1430, MILITARY.md § Sea) appends THE SHIPS after the v79 sections: a u32 count,
+/// then every ship ascending id. Refused whole unless each names a nation, a port and a
+/// water tile of the stream and every field is in its domain. v79 is a STRICT PREFIX of
+/// v80 and is read too, as a world with no ship.
+inline constexpr uint32_t world_save_version = 80;
+
+/// BL-1430: the first version carrying the ship section.
+inline constexpr uint32_t k_world_save_version_ships = 80;
+
+/// BL-1430: v79, a strict prefix of v80.
+inline constexpr uint32_t k_world_save_version_pre_ships = 79;
 
 /// BL-1504: the first version carrying the defend-order section.
 inline constexpr uint32_t k_world_save_version_defend = 79;
@@ -1053,6 +1063,12 @@ void write_world_snapshot_pre_occupation(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1504): the v78 stream shape, no defend-order section.
 void write_world_snapshot_pre_defend(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1430): the v79 stream shape - no ship section.
+void write_world_snapshot_pre_ships(const world& w, std::ostream& out);
+
+/// BL-1430: the bytes the ship section takes, the last of the stream.
+std::size_t world_save_ships_section_bytes(const world& w);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

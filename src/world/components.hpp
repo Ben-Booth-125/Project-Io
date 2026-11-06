@@ -2154,6 +2154,58 @@ struct air_wing
     std::vector<uint32_t> provinces; ///< Assigned provinces, ascending, <= k_air_mission_provinces_max.
 };
 
+// ---------------------------------------------------------------------------
+// BL-1430 — ships (MILITARY.md § Sea, Ben 2026-11-05)
+// ---------------------------------------------------------------------------
+// A ship stands on a water tile and sails, so it has a position a wing does not; but it
+// is NOT a unit_component and lives in its own container (`world::ships`) for the reason
+// a wing does: no land pass can see it. sea_combat.hpp owns everything a ship does.
+
+/// The four ship classes. APPEND-ONLY: a ship's roster row names one.
+enum class ship_class : uint8_t
+{
+    submarine = 0, ///< Raids. High stealth; hits capital ships and transports.
+    destroyer = 1, ///< High detection; the class that hits submarines.
+    capital   = 2, ///< The heaviest attack and HP; cannot hit a submarine.
+    transport = 3, ///< No attack and no mission; carries land units.
+};
+inline constexpr int ship_class_count = 4;
+
+/// A ship's mission. APPEND-ONLY (saved, and carried in `corp_command::order`).
+enum class sea_mission : uint8_t
+{
+    none     = 0, ///< Unassigned: lies at its home port.
+    patrol   = 1, ///< Raises its side's detection in the zone; engages what it finds.
+    escort   = 2, ///< Covers its nation's sea legs through the zone.
+    raid     = 3, ///< Takes hostile sea legs through the zone.
+    blockade = 4, ///< Holds the water at a hostile port's mouth.
+};
+inline constexpr int sea_mission_count = 5;
+
+/// The most provinces one assignment may name (the verb's fixed-size field).
+inline constexpr std::size_t k_sea_mission_provinces_max = 8;
+
+/// A ship's HP is held in parts per million of its full HP, as a wing's is.
+inline constexpr int32_t k_ship_hp_full = 1000000;
+
+struct sea_ship
+{
+    entity_id owner     = null_entity; ///< The nation that sails it.
+    entity_id home_port = null_entity; ///< Its port: raised at, supplied and refit at.
+    entity_id tile      = null_entity; ///< The water tile it stands on.
+    uint16_t  type      = 0;           ///< Sea roster row (sea_combat.hpp `ship_roster_table`).
+    int32_t   hp_ppm    = k_ship_hp_full; ///< HP, ppm of full. At 0 the ship is sunk.
+    int32_t   morale_permille        = 1000; ///< Scales its attack.
+    int32_t   supply_factor_permille = 1000; ///< Steered by its upkeep draw, as a unit's.
+    int32_t   muster_days = 0;         ///< Days left raising it; it does nothing until 0.
+    int32_t   sail_bank_permille = 0;  ///< Part of a tile sailed, per-mille of a day.
+    bool      returning = false;       ///< Broken off: making for home until mended.
+    unit_design kit{};                 ///< The design it was raised to (hull/armament/sensors).
+    sea_mission mission = sea_mission::none;
+    std::vector<uint32_t>  provinces;  ///< The zone, ascending, <= k_sea_mission_provinces_max.
+    std::vector<entity_id> route;      ///< Water tiles still to sail, next first.
+};
+
 /// BL-1427 (fronts; MILITARY.md § Fronts): a front's order. Hold is the default and
 /// is never stored; push is open only toward a neighbour the nation is hostile to.
 enum class front_order : uint8_t

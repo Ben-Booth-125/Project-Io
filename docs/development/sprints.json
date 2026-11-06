@@ -92,9 +92,9 @@
   {
    "id": "64",
    "theme": "The war at sea",
-   "state": "gated",
-   "status_line": "GATED 2026-11-05 on sprint 63's economy wave, because fleet upkeep and raid value are read against its money. Design settled by Ben's form; written into MILITARY.md § Sea.",
-   "opened_date": null,
+   "state": "open",
+   "status_line": "OPEN 2026-11-06 (Ben: start delivering). Beside sprint 63. The core has no money dependency, so it starts now; the sea trade reading and the tuning still wait on 63's economy wave.",
+   "opened_date": "2026-11-06",
    "closed_date": null,
    "author": "Ben (2026-11-05)",
    "goal": "Ships patrol, escort, raid, blockade and land armies, for the player and every rival, so that a war can be won or lost on the water.",

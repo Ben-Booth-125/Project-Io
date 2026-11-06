@@ -4,6 +4,7 @@
 #include "recipe_registry.hpp"
 #include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
 #include "air_combat.hpp"    // air_day_tick, wing_upkeep_tick (BL-1449)
+#include "sea_combat.hpp"    // sea_day_tick, ship_upkeep_tick (BL-1430)
 #include "carried_supplies.hpp" // BL-1452: carried_supplies_day, the daily stock step
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
@@ -354,6 +355,9 @@ struct economy_report
     /// BL-1449 (air combat): what this tick's air days and the wing upkeep did.
     air_day_tick     air;
     wing_upkeep_tick wing_upkeep;
+
+    /// BL-1430 (MILITARY.md § Sea): what this tick's ship upkeep did.
+    ship_upkeep_tick ship_upkeep;
 
     /// Per (corporation, pool key) — BL-1003: the MARKET the draw happened in
     /// (the consumer's tile market), or the body id on a market-less body. The
@@ -987,6 +991,7 @@ struct military_day_result
     carried_supplies_day supplies; ///< BL-1452: the day's drain, resupply and starvation.
     int             disbanded = 0; ///< Units removed after the battles and starvation (`disband_orphaned_units`).
     unit_march_tick march;         ///< The march, including the attacks it opened.
+    sea_day_tick    sea;           ///< BL-1430: the ships' day.
 };
 
 /// THE DAILY MILITARY PASS (BL-1445, move by days; MILITARY.md § Marching and

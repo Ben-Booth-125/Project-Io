@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*25 entries — 23 open, 2 resolved.*
+*26 entries — 24 open, 2 resolved.*
 
 ---
 
@@ -276,6 +276,13 @@ Ben ruled the master at 96 px and the top rung lowered to about 96 px. Written b
 Your form settled the shape; I wrote these to make it whole. (1) A blockade closes the port for everyone, neutrals included, with no Alarm cost to the blockader. (2) Prize cargo goes to the raider's nearest own port in range, or is sunk. (3) An escort covers its own nation's cargo, not a friend's. (4) Submarines count for nothing in sea control. (5) Mission reach is a per-class range over water from any own port. (6) A landing is refused on a neutral's coast. (7) Ship hulls are one new good, made at the Arms Works. (8) Sea fights keep no battle record: a damaged ship breaks off home. (9) A ship's attack never reaches the shore, since you did not pick bombardment.
 
 **Why it matters.** Items 1, 3 and 6 decide how third parties feel a sea war; item 8 means sea fights read differently from land battles.
+
+### NR-1144 — Seven sea-day details taken inside the sea theatre core
+*decision taken on your behalf · raised 2026-11-06 · from SEA_THEATRE (BL-1430)*
+
+Taken so the core could land; each is one line to change. (1) A ship working a zone spreads its presence 1/N over the zone's provinces, as a wing's day does. (2) A ship fires when its side found a target even with no mission; a broken-off ship does not fire. (3) Refit at the home port costs goods only, no recruits. (4) A hire spends sea recruits and refunds them only if its port is lost before it stands. (5) A ship working a zone that holds its own mouth does not mend there; only a ship broken off or recalled does. (6) A ship that loses its home re-homes to the nearest own port BY WATER, and disbands if it can reach none, even with a port on another sea. (7) A blockade order is legal on any in-range water; its target and effect arrive with BL-1530 (sea control and blockade).
+
+**Why it matters.** (1) makes a larger zone thinner, which is the trade-off the zone choice is meant to carry. (2) means a ship in transit can start a fight.
 
 ---
 

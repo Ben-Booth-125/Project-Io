@@ -61,7 +61,7 @@ const VERBS = [
   'refit_unit', 'assign_front', 'set_front_order', 'set_unit_design',
   'hire_wing', 'assign_air_mission', 'set_air_design', 'declare_war',
   'answer_war', 'offer_peace', 'accept_peace', 'refuse_peace',
-  'impose_peace', 'set_embargo', 'defend_province',
+  'impose_peace', 'set_embargo', 'defend_province', 'hire_ship', 'assign_sea_mission',
 ];
 
 // Every code corp_command_result declares.

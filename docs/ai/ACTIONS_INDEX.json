@@ -892,6 +892,14 @@
   [
    "ledger.diplomacy_refuse_peace",
    "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Refuse' under a peace offer the other party made."
+  ],
+  [
+   "gameplay.hire_ship",
+   "A corp_verb (corp_verb::hire_ship, 55) on the command seam."
+  ],
+  [
+   "gameplay.assign_sea_mission",
+   "A corp_verb (corp_verb::assign_sea_mission, 56) on the command seam."
   ]
  ]
 }

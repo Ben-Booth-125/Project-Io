@@ -666,8 +666,8 @@ mask** (which classes it can hit). There is no hardness and no terrain: water gi
 
 **A port is the one door (Ben, 2026-11-02).** A ship is hired at a completed port on the nation's own
 ground, for credits, its kit and sea recruits from the sea pool, and it records that port as its home.
-The orphan rule is the wing's: a ship whose home port is torn down and that has no other own port
-disbands. Its quarterly supply is drawn at its home port (§ Upkeep), and HP is refit there by drawing
+The orphan rule is the wing's, by water: a ship whose home port is torn down takes up the nearest other
+own port it can sail to, and disbands with none. A lake is not sea: no ship stands on or crosses one. Its quarterly supply is drawn at its home port (§ Upkeep), and HP is refit there by drawing
 goods, so a damaged ship goes home to mend. A dropped hire refunds its recruits as a land hire does.
 
 **The kit is the designer's (Ben, 2026-11-05).** Upgrades are designs, not purchases per ship: one live

@@ -180,6 +180,8 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::set_unit_design:   // BL-1434: the seat's nation; the seam refuses any other
         case corp_verb::hire_wing:          // BL-1449: the actor's own airbase
         case corp_verb::assign_air_mission: // BL-1449: the actor's own wing
+        case corp_verb::hire_ship:          // BL-1430: the actor's own port
+        case corp_verb::assign_sea_mission: // BL-1430: the actor's own ship; the zone rides `provinces=`
         case corp_verb::set_air_design:     // BL-1449: the seat's nation; the seam refuses any other
         case corp_verb::declare_war:        // BL-1459: the actor's own war; goals ride `provinces=`
         case corp_verb::answer_war:         // BL-1459

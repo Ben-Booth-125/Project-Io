@@ -4013,6 +4013,66 @@
    ],
    "expected_output": "Issues gameplay.refuse_peace; the offer is erased and the war goes on. The press queues a corp_command that app::render sends at the frame's end through player_command - the same apply_corp_command an agent reaches, with its full re-validation; the result is the line at the ledger's head.",
    "reason_to_select": "Fight on for better terms."
+  },
+  {
+   "id": "gameplay.hire_ship",
+   "family": "gameplay",
+   "surface": "A corp_verb (corp_verb::hire_ship, 55) on the command seam.",
+   "press": "Over the seam: COMMAND corp=<nation> nation=<nation> verb=55 tile=<the port's tile> unit_type=<sea roster row: 0 Attack Submarine, 1 Fleet Destroyer, 2 Capital Ship, 3 Fleet Transport>.",
+   "args": [
+    {
+     "name": "tile",
+     "type": "entity_id (tile)",
+     "meaning": "The tile of one of the actor's own completed ports."
+    },
+    {
+     "name": "unit_type",
+     "type": "uint16 sea roster row",
+     "meaning": "Which ship class to raise (ship_roster_table, src/world/sea_combat.hpp)."
+    }
+   ],
+   "preconditions": [
+    "The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner.",
+    "unit_type names a sea row (rejected_invalid otherwise) the nation's shelves can field now, by the land rows' binary gate (rejected_invalid otherwise).",
+    "tile is a tile (rejected_invalid) carrying the actor's own completed port with water at its mouth (rejected_placement).",
+    "The nation's sea pool holds the class's crew (rejected_no_recruits).",
+    "Its uncommitted treasury covers the class's credits and hire goods, and its shelves hold those goods (rejected_funds)."
+   ],
+   "expected_output": "The credits, goods and crew are spent and the ship is created at the port's mouth with the class's muster days to run, doing nothing until they end. Its id returns through out_building. Saved (world_save_version 80).",
+   "reason_to_select": "Raise a ship: submarines to raid, destroyers to find them, capital ships to hold water, transports to carry an army."
+  },
+  {
+   "id": "gameplay.assign_sea_mission",
+   "family": "gameplay",
+   "surface": "A corp_verb (corp_verb::assign_sea_mission, 56) on the command seam.",
+   "press": "Over the seam: COMMAND corp=<nation> nation=<nation> verb=56 subject=<ship> order=<0 none, 1 patrol, 2 escort, 3 raid, 4 blockade> provinces=<id>,<id>,...",
+   "args": [
+    {
+     "name": "subject",
+     "type": "entity_id (ship)",
+     "meaning": "One of the actor's own ships."
+    },
+    {
+     "name": "order",
+     "type": "uint32 sea_mission",
+     "meaning": "The mission. 0 recalls the ship home and names no province."
+    },
+    {
+     "name": "provinces",
+     "type": "province ids",
+     "meaning": "The zone: 1 to 8 distinct sea provinces, any order."
+    }
+   ],
+   "preconditions": [
+    "The actor is the nation (corp == as_nation, or as_nation unnamed); on the wire `COMMAND corp=<nation> nation=<nation> ...`, any other actor rejected_not_owner.",
+    "subject is a ship (rejected_invalid) of the actor (rejected_not_owner).",
+    "order is a mission (rejected_invalid) its class works: a submarine raids; a destroyer and a capital ship patrol, escort, raid and blockade; a transport works no mission (rejected_invalid).",
+    "none names no province and every other mission 1 to 8 distinct real provinces (rejected_invalid).",
+    "Each province is water, within the class's range over water of an own port, and reachable by this ship (rejected_placement).",
+    "The assignment changes something (rejected_state)."
+   ],
+   "expected_output": "The ship sets its course: it sails tile by tile to the zone's nearest tile and works it, its day spread over the provinces; on none it sails home. A ship that has broken off keeps its course home and takes the mission up once mended. Saved (world_save_version 80).",
+   "reason_to_select": "Put a raised ship to work: hunt hostile ships, cover or raid sea lanes, or stand off a hostile port."
   }
  ]
 }

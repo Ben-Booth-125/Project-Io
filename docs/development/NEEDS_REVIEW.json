@@ -427,6 +427,16 @@
    "why_it_matters": "Adding it enlarges an already five-difficulty sprint and adds a second world-mover to its re-bless.",
    "resolved": "2026-11-05",
    "resolution": "Ben, 2026-11-05: keep it out of sprint 64. BL-1522 (offshore drilling) stays parked."
+  },
+  {
+   "id": "NR-1144",
+   "title": "Seven sea-day details taken inside the sea theatre core",
+   "raised": "2026-11-06",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "SEA_THEATRE (BL-1430)",
+   "what": "Taken so the core could land; each is one line to change. (1) A ship working a zone spreads its presence 1/N over the zone's provinces, as a wing's day does. (2) A ship fires when its side found a target even with no mission; a broken-off ship does not fire. (3) Refit at the home port costs goods only, no recruits. (4) A hire spends sea recruits and refunds them only if its port is lost before it stands. (5) A ship working a zone that holds its own mouth does not mend there; only a ship broken off or recalled does. (6) A ship that loses its home re-homes to the nearest own port BY WATER, and disbands if it can reach none, even with a port on another sea. (7) A blockade order is legal on any in-range water; its target and effect arrive with BL-1530 (sea control and blockade).",
+   "why_it_matters": "(1) makes a larger zone thinner, which is the trade-off the zone choice is meant to carry. (2) means a ship in transit can start a fight."
   }
  ]
 }

@@ -3530,6 +3530,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // BL-1449: the wings' half of the same pass — orphans disbanded, supply drawn at
     // the airbase — straight after, on the same rule and for the same reason (last).
     report.wing_upkeep = run_wing_upkeep(w, reg, report);
+    // BL-1430 (MILITARY.md § Sea): the ships' half, on the same rule.
+    report.ship_upkeep = run_ship_upkeep(w, reg, report);
     phase_stamp(12); // unit_upkeep
 
     // BL-641: the building pass — the goods half of a building's upkeep and the
@@ -4990,6 +4992,8 @@ bool carried_supplies_live(const world& w, int day_tick)
 /// (the scorers are quarterly), so a quarter that goes quiet stays quiet.
 bool military_active(const world& w, const recipe_registry& reg, int day_tick)
 {
+    if (!w.ships.empty()) // BL-1430: a ship keeps the day walking (MILITARY.md § Sea)
+        return true;
     if (!w.battles.empty())
         return true;
     for (const auto& [uid, u] : w.units) // a pure any-of: walk order cannot reach it
@@ -5039,6 +5043,9 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
     // may end and release them).
     const std::set<entity_id> fought = units_in_live_battles(w);
     out.battles = run_battles(w, reg, day_tick);
+    // BL-1430 (MILITARY.md § Sea): the ships' day, on the same step. Nothing it does reaches
+    // a land unit, so its place among the land passes decides nothing about them.
+    out.sea = run_sea_day(w, reg, day_tick);
     // BL-1428 (RELATIONS.md § 7): today's battles between war parties feed the war's
     // battles score and each side's exhaustion, and exhaustion's morale ceiling.
     // A no-op with no wars.

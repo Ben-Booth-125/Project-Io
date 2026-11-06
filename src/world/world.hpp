@@ -408,6 +408,11 @@ struct world
     /// wing never stands on a tile, and no land pass may see it. Saved (v65).
     std::map<entity_id, air_wing> wings;
 
+    /// BL-1430 (MILITARY.md § Sea): every ship, keyed by its entity id. ORDERED, so every
+    /// walk is ascending id. Deliberately NOT in `units`: no land pass may see a ship.
+    /// Saved (v80).
+    std::map<entity_id, sea_ship> ships;
+
     /// BL-1449: each nation's AIR SUPERIORITY power over each province as the last
     /// air day flew it, keyed (province, nation), milli-HP of air attack a day. The
     /// share it gives (`air_share_permille`) scales a side's bombing, slows its

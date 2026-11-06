@@ -357,7 +357,7 @@ set(IO_WARNING_FLAGS
 target_compile_options(ProjectIo PRIVATE ${IO_WARNING_FLAGS})
 target_compile_options(io_ground_bake PRIVATE ${IO_WARNING_FLAGS})
 
-# verify_api.cpp needs /bigobj on MSVC.
+# verify_api.cpp and startup_screens.cpp need /bigobj on MSVC.
 #
 # It is one translation unit holding the WHOLE verify surface — every
 # `v.set_function(...)` binding, each of which instantiates a pile of sol2
@@ -370,7 +370,7 @@ target_compile_options(io_ground_bake PRIVATE ${IO_WARNING_FLAGS})
 # that quietly grows past the limit still reports it here instead of being
 # absorbed silently.
 if(MSVC)
-    set_source_files_properties(src/core/verify_api.cpp
+    set_source_files_properties(src/core/verify_api.cpp src/ui/startup_screens.cpp
         PROPERTIES COMPILE_OPTIONS "/bigobj")
 endif()
 

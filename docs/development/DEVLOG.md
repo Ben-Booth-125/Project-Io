@@ -10,6 +10,27 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-06 — BL-1430 (sea theatre): ships exist
+
+**Runtime:** one session, Delivery Full on the naval worktree, after the sprint 64 design form.
+
+**What was built.** The four classes on `world::ships`, invisible to the land passes. The port door
+(`hire_ship`), the mission door (`assign_sea_mission`), sailing by water, the daily detect-and-hit
+pass, break-off, refit and the orphan rule. Save v80 with a strict reader. Numbers in Lua
+`economy.military.sea`, checked equal to the C++ defaults.
+
+**Decisions.** Seven sea-day details taken inside the core, logged as NR-1144. A lake is not sea.
+
+**Review.** The cold review's thirteen findings were all real and all fixed, with checks added:
+save pruning, lake mouths, bombing parity, stranded re-homing, reader strictness, vacuous tests,
+untested wiring and patrol bonuses in transit among them.
+
+**Left open.** The sixteen digest pins were already stale on base after sprint 63's merges, and v80
+moves the snapshot-byte digests again. Shape is identical to base on seeds 0, 46 and 28, so the
+re-pin waits for the wave's one re-bless.
+
+---
+
 ## 2026-11-05 — Sprint 61: diplomacy and war
 
 **Runtime:** seven days (opened 2026-10-30). Design from Ben's 2026-10-30 form, then Delivery Full in

@@ -28,6 +28,7 @@
 #include "unit_roster.hpp"
 #include "unit_designs.hpp" // BL-1434: the live design a hire and a refit read
 #include "air_combat.hpp"   // BL-1449: hire_wing / assign_air_mission / set_air_design
+#include "sea_combat.hpp"   // BL-1430: hire_ship / assign_sea_mission
 #include "recruits.hpp"     // BL-1463: the recruit pools a hire spends
 #include "world.hpp"
 
@@ -345,6 +346,8 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::set_front_order: // BL-1427
         case corp_verb::hire_wing:          // BL-1449: a nation's own airbase
         case corp_verb::assign_air_mission: // BL-1449: a nation's own wing
+        case corp_verb::hire_ship:          // BL-1430: a nation's own port
+        case corp_verb::assign_sea_mission: // BL-1430: a nation's own ship
         case corp_verb::place_road:
         case corp_verb::set_trade:
         case corp_verb::clear_trade:
@@ -1131,6 +1134,51 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             air_wing& wg = w.wings.at(cmd.subject);
             wg.mission   = static_cast<air_mission>(cmd.order);
             wg.provinces = std::move(set);
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::hire_ship:
+        {
+            // The port is the one door: every placement check first, read-only.
+            entity_id port = null_entity;
+            const corp_command_result r = hire_ship_check(w, reg, cmd.corp, cmd.tile, cmd.unit_type, &port);
+            if (r != corp_command_result::applied)
+                return r;
+            const ship_class cls = ship_roster_table()[cmd.unit_type].cls;
+            const ship_class_stats& cs = reg.military().sea.cls[static_cast<std::size_t>(cls)];
+            // Both legs checked before either is taken.
+            if (purse_room_of(w, cmd.corp) < cs.hire_cost)
+                return corp_command_result::rejected_funds;
+            if (!hire_goods_affordable(w, cmd.corp, nullptr, cs.hire_goods))
+                return corp_command_result::rejected_funds;
+            if (purse_room_of(w, cmd.corp) < cs.hire_cost + hire_goods_price_bound(w, cmd.corp, cs.hire_goods))
+                return corp_command_result::rejected_funds;
+            debit_kit_goods(w, cmd.corp, cs.hire_goods);
+            *purse_of(w, cmd.corp) -= cs.hire_cost;
+            w.nations.at(cmd.corp).sea_recruits -= ship_crew(reg, cmd.unit_type);
+
+            const entity_id sid = w.create_entity();
+            sea_ship s;
+            s.owner       = cmd.corp;
+            s.home_port   = port;
+            s.tile        = port_mouth_tile(w, port);
+            s.type        = cmd.unit_type;
+            s.muster_days = cs.muster_days;
+            w.ships.emplace(sid, std::move(s));
+            if (out_building)
+                *out_building = sid;
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::assign_sea_mission:
+        {
+            std::vector<uint32_t> set;
+            const corp_command_result r =
+                sea_mission_check(w, reg, cmd.corp, cmd.subject, cmd.order, cmd.air_provinces.data(),
+                                  cmd.air_provinces.size(), &set);
+            if (r != corp_command_result::applied)
+                return r;
+            set_ship_mission(w, w.ships.at(cmd.subject), static_cast<sea_mission>(cmd.order), std::move(set));
             return corp_command_result::applied;
         }
 

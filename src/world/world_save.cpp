@@ -9,6 +9,7 @@
 #include "state_industry.hpp"
 #include "unit_designs.hpp" // BL-1434: the designs section's range checks
 #include "air_combat.hpp"   // BL-1449: air_roster_table — the air section's range checks
+#include "sea_combat.hpp"   // BL-1430: ship_roster_table, the ship section's bound
 #include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
 #include "war.hpp"         // BL-1459: the war section
 #include "hex_neighbors.hpp" // BL-1502: a front key across the line
@@ -2081,6 +2082,60 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
                 w_id(out, c.lane_head);
             }
     }
+
+    // world_save_version 80 (BL-1430, MILITARY.md § Sea): THE SHIPS, the last section. Every
+    // ship ascending id. NOT pruned on a lost home port, unlike a wing: a wing with no base
+    // is disbanded anyway, but the upkeep pass re-homes a ship or refunds its hire, so a
+    // prune here would change the game between an erase and the next quarter.
+    if (version >= k_world_save_version_ships)
+    {
+        const auto ship_ok = [&](const sea_ship& s) { return w.nations.count(s.owner) != 0; };
+        uint32_t live = 0;
+        for (const auto& [sid, s] : w.ships)
+            live += ship_ok(s) ? 1u : 0u;
+        w_u32(out, live);
+        for (const auto& [sid, s] : w.ships)
+        {
+            if (!ship_ok(s))
+                continue;
+            w_id(out, sid);
+            w_id(out, s.owner);
+            w_id(out, s.home_port);
+            w_id(out, s.tile);
+            w_u16(out, s.type);
+            w_i32(out, s.hp_ppm);
+            w_i32(out, s.morale_permille);
+            w_i32(out, s.supply_factor_permille);
+            w_i32(out, s.muster_days);
+            w_i32(out, s.sail_bank_permille);
+            w_u8(out, s.returning ? 1 : 0);
+            for (const uint8_t v : s.kit.fit) w_u8(out, v);
+            w_u8(out, static_cast<uint8_t>(s.mission));
+            w_u32(out, static_cast<uint32_t>(s.provinces.size()));
+            for (const uint32_t p : s.provinces) w_u32(out, p);
+            w_u32(out, static_cast<uint32_t>(s.route.size()));
+            for (const entity_id t : s.route) w_id(out, t);
+        }
+    }
+}
+
+void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1430): the v79 stream shape - no ship section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_ships);
+}
+
+std::size_t world_save_ships_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [sid, s] : w.ships)
+    {
+        if (w.nations.count(s.owner) == 0)
+            continue;
+        n += 4 * 3 + 2 + 4 * 5 + 1 + sizeof(s.kit.fit) + 1
+             + 4 + 4 * s.provinces.size() + 4 + 4 * s.route.size() + 4;
+    }
+    return n;
 }
 
 void write_world_snapshot_pre_defend(const world& w, std::ostream& out)
@@ -2472,7 +2527,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_airframes    // BL-1436: v75, arrays 54 wide
             && version != k_world_save_version_pre_contributors // BL-1470: v76, no provenance
             && version != k_world_save_version_pre_occupation // BL-1502: v77, nothing occupied
-            && version != k_world_save_version_pre_defend))   // BL-1504: v78, no defend orders
+            && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
+            && version != k_world_save_version_pre_ships))    // BL-1430: v79, no ships
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -4200,6 +4256,98 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             if (cursor == s.convoys.size())
                 return false;
             s.convoys[cursor++].lane_head = head;
+        }
+    }
+
+    // v80 (BL-1430): the ships. Untrusted: ids strictly ascending and no other entity's; the
+    // owner a nation; the home a port of the stream, or an id it no longer holds (torn down
+    // since, for the upkeep pass to resolve) but never another kind of building; the tile
+    // sea; the route a contiguous sea path from it; the zone non-land provinces ascending;
+    // the mission one the class works; every number in its domain. Refused whole otherwise.
+    // A v79 (and older) stream ends before it: no ship.
+    if (version >= k_world_save_version_ships)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > 1000000u)
+            return false;
+        entity_id prev = null_entity;
+        const auto water = [&](entity_id t) {
+            const auto it = s.tiles.find(t);
+            return it != s.tiles.end() && is_sea(it->second.substrate);
+        };
+        const auto adjacent = [&](entity_id from, entity_id to) {
+            const tile_component& a = s.tiles.at(from);
+            const tile_component& b = s.tiles.at(to);
+            const auto bit = s.bodies.find(a.body);
+            if (a.body != b.body || bit == s.bodies.end())
+                return false;
+            const int gw = bit->second.grid_width;
+            if (gw <= 0)
+                return false;
+            for (int side = 0; side < 6; ++side)
+            {
+                const hex_neighbors::coord n = hex_neighbors::neighbour(a.grid_x, a.grid_y, side);
+                if (n.gy == b.grid_y && ((n.gx % gw) + gw) % gw == b.grid_x)
+                    return true;
+            }
+            return false;
+        };
+        const sea_params ship_rules = mil != nullptr ? mil->sea : default_sea_params();
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id sid = null_entity;
+            sea_ship sh;
+            uint8_t returning = 0, mission = 0;
+            uint32_t n = 0, steps = 0;
+            if (!r_id(in, sid) || (k > 0 && sid <= prev)
+                || !r_id(in, sh.owner) || !r_id(in, sh.home_port) || !r_id(in, sh.tile)
+                || !r_u16(in, sh.type) || !r_i32(in, sh.hp_ppm) || !r_i32(in, sh.morale_permille)
+                || !r_i32(in, sh.supply_factor_permille) || !r_i32(in, sh.muster_days)
+                || !r_i32(in, sh.sail_bank_permille) || !r_u8(in, returning))
+                return false;
+            for (uint8_t& v : sh.kit.fit)
+                if (!r_u8(in, v) || v != 0) // one base design until the ship designer's kit
+                    return false;
+            if (!r_u8(in, mission) || !r_u32(in, n))
+                return false;
+            prev = sid;
+            const auto port = s.buildings.find(sh.home_port);
+            if (sid == null_entity || sid >= next_entity || s.units.count(sid) != 0 || s.buildings.count(sid) != 0
+                || s.nations.count(sid) != 0 || s.tiles.count(sid) != 0 || s.markets.count(sid) != 0
+                || s.bodies.count(sid) != 0 || s.wings.count(sid) != 0
+                || s.nations.count(sh.owner) == 0
+                || sh.home_port == null_entity || sh.home_port >= next_entity
+                || (port != s.buildings.end() && port->second.type != building_type::port)
+                || !water(sh.tile)
+                || sh.type >= ship_roster_table().size()
+                || sh.hp_ppm <= 0 || sh.hp_ppm > k_ship_hp_full
+                || sh.morale_permille < 0 || sh.morale_permille > 1000
+                || sh.supply_factor_permille < 0 || sh.supply_factor_permille > 1000
+                || sh.muster_days < 0 || sh.muster_days > 3650
+                || sh.sail_bank_permille < 0 || sh.sail_bank_permille > 100000
+                || returning > 1 || mission >= static_cast<uint8_t>(sea_mission_count)
+                || n > k_sea_mission_provinces_max || ((mission == 0) != (n == 0)))
+                return false;
+            if (mission != 0
+                && (ship_rules.cls[static_cast<std::size_t>(ship_roster_table()[sh.type].cls)].missions
+                    & sea_mission_bit(static_cast<sea_mission>(mission))) == 0)
+                return false;
+            sh.returning = returning != 0;
+            sh.mission   = static_cast<sea_mission>(mission);
+            sh.provinces.resize(n);
+            for (uint32_t i = 0; i < n; ++i)
+                if (!r_u32(in, sh.provinces[i]) || s.provinces.find(sh.provinces[i]) == nullptr
+                    || province_kind_of(s, sh.provinces[i]) == province_kind::land
+                    || (i > 0 && sh.provinces[i] <= sh.provinces[i - 1]))
+                    return false;
+            if (!r_u32(in, steps) || steps > s.tiles.size())
+                return false;
+            sh.route.resize(steps);
+            for (uint32_t i = 0; i < steps; ++i)
+                if (!r_id(in, sh.route[i]) || !water(sh.route[i])
+                    || !adjacent(i == 0 ? sh.tile : sh.route[i - 1], sh.route[i]))
+                    return false;
+            s.ships.emplace(sid, std::move(sh));
         }
     }
 

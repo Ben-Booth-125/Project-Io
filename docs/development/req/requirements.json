@@ -7667,6 +7667,61 @@
      "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
     }
    ]
+  },
+  {
+   "brief": "sea-theatre",
+   "title": "BL-1430 - Ships exist: the four classes, the port door, sailing, the daily detect-and-hit pass",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1430 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "End to end through the seam: a nation hires each class at its port, spending credits, goods and sea recruits; a ship musters, sails tile by tile over water to a zone, works it, is recalled and sails home.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness R1 and R7: each class hired through the seam, mustered, sailed by water, worked, recalled, home; wired through run_military_day and run_economy_step. 117 checks, 0 failures."
+    },
+    {
+     "id": "R2",
+     "text": "Hostile ships fight only once detected, by the target mask: a capital ship cannot hit a submarine, a submarine no destroyer has found is never hit, and hostility gates all of it.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness R2 series: target mask, detection, directed hostility, recon and air share. 117 checks, 0 failures."
+    },
+    {
+     "id": "R3",
+     "text": "A ship breaks off past its floors, sails home, refits by drawing goods and sails again; a sunk ship is gone; the orphan and dropped-hire rules hold.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness R3 series: floors, sail home, refit by goods, sinking, orphan re-home by water or disband, dropped hire refund, no mending on station."
+    },
+    {
+     "id": "R4",
+     "text": "Replay determinism: the same world run twice is digest-identical, and a world with no ship hashes and plays exactly as before.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "Replay digests equal in sea_theatre_harness; world_determinism ALL PASS. rebless_shape_probe on seeds 0, 46, 28: every ROW and MIX line identical to base e53fefd2. Snapshot-byte digests move with the v80 stream, as a new section must; D_search unmoved."
+    },
+    {
+     "id": "R5",
+     "text": "Save round trip at v80; v79 reads as no ship; the reader refuses a ship outside its domain, whole.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "save_roundtrip OK; sea_theatre_harness R5 series refuses each out-of-domain ship whole; v79 reads as no ship; the end-offset harnesses (fronts, recruits, save_roundtrip) pass on the new tail."
+    },
+    {
+     "id": "R6",
+     "text": "Every illegal hire and assignment is refused and mutates nothing, on the seam the wire uses; the app builds with the Lua numbers equal to the C++ defaults.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness refusal table mutates nothing; agent_seam_harness 23, 0 failures; app BUILD_OK; recruits_harness R0 asserts the Lua sea table equals default_sea_params field by field."
+    }
+   ],
+   "resolved": "2026-11-06"
   }
  ]
 }

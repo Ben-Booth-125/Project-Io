@@ -10,6 +10,7 @@
 #include "space_assets.hpp"    // BL-1327: space_asset_params — launch, reach, travel and upkeep dials
 #include "nation_tax.hpp"       // BL-1335: tax_params — the tax tiers and Discontent dials
 #include "air_params.hpp"  // BL-1449: air_params — the air theatre's authored numbers
+#include "sea_params.hpp"  // BL-1430: sea_params — the sea theatre's authored numbers
 #include "land_recon_params.hpp" // BL-1453: land_recon_params — land recon's authored rates
 #include "recruit_params.hpp" // BL-1463: recruit_params — what bases make and a refill costs
 #include "unit_roster.hpp" // BL-454: unit_upkeep_params — per-type unit data lives with the roster
@@ -859,6 +860,10 @@ struct military_capability_params
     /// BL-1449 (MILITARY.md § Air): the six air classes and the air rules' dials,
     /// authored under `economy.military.air`. Defaults equal the Lua values.
     air_params air = default_air_params();
+
+    /// BL-1430 (MILITARY.md § Sea): the sea theatre's numbers, authored under
+    /// `economy.military.sea`. Defaults equal the Lua values.
+    sea_params sea = default_sea_params();
 
     /// BL-1453 (MILITARY.md § Recon): the rates a battle's recon points are built
     /// from, authored under `economy.military.recon`. Defaults equal the Lua values.

@@ -604,6 +604,33 @@ uint64_t world::state_hash(int tick) const
             for (const uint32_t p : wg.provinces) fnv1a_u32(h, p);
         }
     }
+    // BL-1430 (MILITARY.md § Sea): folded only when non-empty, so a world with no ship
+    // hashes exactly as before.
+    if (!ships.empty())
+    {
+        fnv1a_u32(h, 0x53484950u); // "SHIP"
+        fnv1a_u32(h, static_cast<uint32_t>(ships.size()));
+        for (const auto& [sid, s] : ships) // std::map: ascending id
+        {
+            fnv1a_u32(h, sid);
+            fnv1a_u32(h, s.owner);
+            fnv1a_u32(h, s.home_port);
+            fnv1a_u32(h, s.tile);
+            fnv1a_u32(h, s.type);
+            fnv1a_i32(h, s.hp_ppm);
+            fnv1a_i32(h, s.morale_permille);
+            fnv1a_i32(h, s.supply_factor_permille);
+            fnv1a_i32(h, s.muster_days);
+            fnv1a_i32(h, s.sail_bank_permille);
+            fnv1a_u32(h, s.returning ? 1u : 0u);
+            for (const uint8_t v : s.kit.fit) fnv1a_u32(h, v);
+            fnv1a_u32(h, static_cast<uint32_t>(s.mission));
+            fnv1a_u32(h, static_cast<uint32_t>(s.provinces.size()));
+            for (const uint32_t p : s.provinces) fnv1a_u32(h, p);
+            fnv1a_u32(h, static_cast<uint32_t>(s.route.size()));
+            for (const entity_id t : s.route) fnv1a_u32(h, t);
+        }
+    }
     if (!air_superiority.empty())
     {
         fnv1a_u32(h, 0x41535550u); // "ASUP"

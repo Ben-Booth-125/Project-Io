@@ -75,7 +75,7 @@ and/or a version goal (v0.1.1 etc.).
 Build under test: build_rel at 8af285f7. A UI item needs a live click before it is complete. BL-1522 (offshore drilling) is filed but parked for the naval system.
 
 ### Sprint 64 — The war at sea
-*Gated · Ben (2026-11-05)*
+*Open · opened 2026-11-06 · Ben (2026-11-05)*
 
 **Goal.** Ships patrol, escort, raid, blockade and land armies, for the player and every rival, so that a war can be won or lost on the water.
 
@@ -175,7 +175,7 @@ BL-1522 (offshore drilling) stays out of this sprint (Ben, 2026-11-05). BL-1431 
 | 61 | diplomacy and war | CLOSED 2026-11-05, no version cut (v0.3.0 still needs the naval system and a war playtest). Wars are records with goals, a score, exhaustion and a peace that may cede ground; rivals declare, answer, impose peace and embargo; Alarm is the third sentiment dimension; the Diplomacy ledger is slot 9. Military kit, recruits, refit, bunkers and the kit in the age tree. Seed library re-curated. Three re-pins. |
 | 62 | equal starts for majors | CLOSED 2026-11-04, no version cut (sprint 61 targets v0.3.0). Every major opens on the Rich-core kit, 12,000 credits and a fixed eight-unit army; the logistics cap keeps the nodes that cover the kit and re-sites what it strands; the kit stocks its processors' inputs. Treasury spread at 20:4 21x -> 1.63x; men spread 1.00x; no major loses money; 569 of 578 kit processors run. Wizard default 30 nations. Three re-pins. |
 | 63 | UI, QOL and the opening | OPEN 2026-11-05. Ben's playtest list: 29 items in three waves. The opening balance leads: a mine costs six months of net, easing over 10-20 years, and every major starts play on the same credits. |
-| 64 | The war at sea | GATED 2026-11-05 on sprint 63's economy wave, because fleet upkeep and raid value are read against its money. Design settled by Ben's form; written into MILITARY.md § Sea. |
+| 64 | The war at sea | OPEN 2026-11-06 (Ben: start delivering). Beside sprint 63. The core has no money dependency, so it starts now; the sea trade reading and the tuning still wait on 63's economy wave. |
 
 **Next up.** SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.
 
