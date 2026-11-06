@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*213 entries — 53 gameplay · 36 canvas · 15 lens · 74 ledger · 35 chrome.*
+*214 entries — 53 gameplay · 37 canvas · 15 lens · 74 ledger · 35 chrome.*
 
 ---
 
@@ -1453,6 +1453,18 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Hostile target: each unit marches onto the tile (a front-assigned unit is unassigned once its march is accepted). Status line: 'N attacking', 'N attacking, M refused', or 'Can't attack there.'. Not hostile: the declaration opens with the attack attached; its 'Declare' (ledger.diplomacy_declare) first checks every unit's march read-only (march_check, reading the nation as hostile already) and declares nothing if none would be accepted, then sends declare_war with the chosen goals (answer_war when that nation declared on the player and the player has not answered), then the marches, in one frame. Cancel or Escape sends nothing.
 
 **Reason to select.** Attack an enemy stack directly from the map.
+
+### `canvas.unit_press_marching` — The Planetary canvas: a marching unit's counter, drawn apart from its tile's stack on the hop it is walking (BL-1507; MILITARY.md § Land — on the canvas).
+
+**Press.** Left-click the marching counter where it is drawn.
+
+**Valid when:**
+- A unit holds a march and is not held by a battle.
+- No lens is active (under a lens a press resolves to the lens's structure).
+
+**Expected output.** Selects that counter's lowest-id unit, with its card on the Selection band. The counter's units stand apart from the stack on the tile they are leaving. No world state changes.
+
+**Reason to select.** Reach a unit already on the move, to redirect it.
 
 ### `canvas.air_designer_slot_pick` — The unit designer opened on an air class (full canvas; the same designer as the land classes', with the slots Airframe, Armament and Avionics): a slot's box, and the item list it opens beside it.
 

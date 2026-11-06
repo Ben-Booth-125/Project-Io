@@ -20,6 +20,7 @@
 #include "shell_metrics.hpp"     // right chrome column + minimap rect (BL-533 legend home)
 #include "ground_bake.hpp"      // k_tilt_sy: the one camera angle (BL-1246)
 #include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
+#include "world/economy_system.hpp" // march_hop_fraction: the glide reads the march's own bank (BL-1507)
 #include "world/hex_neighbors.hpp"   // canonical odd-r neighbour offsets (BL-363)
 #include "world/logistics.hpp"       // intra_body_path (convoy vision beam, BL-152)
 #include "world/logistic_points.hpp" // BL-1352: the Throughput lens reads the REAL sources
@@ -43,6 +44,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <set>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -3013,10 +3015,71 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the DEFENDED TILE — BL-1443 — and draws on its `ground_tile`, read per
     // frame below.)
     static std::unordered_map<entity_id, std::vector<unit_marker_summary>> tile_units;
+
+    // THE MARCHING COUNTERS (BL-1507; MILITARY.md § Land — on the canvas: "travelling from
+    // tile centre to tile centre, at the pace the march is actually banking"). A unit with
+    // a next hop draws APART from its tile's stack, gliding along the hop; the sim still
+    // resolves the march tile by tile (`run_unit_march`). Read per frame, never written back.
+    // A unit in a live battle holds (its order waits), so it stands with its stack. Units
+    // on one hop at one pace are one counter, or a marching stack would read as a lone unit.
+    state.unit_glides.clear();
+    std::unordered_set<entity_id> gliding;
+    std::uint64_t glide_sig = 0; // order-independent: what the cached stacks exclude
+    {
+        const float day_frac = static_cast<float>(
+            std::max(0.0, state.sim_now_days) - std::floor(std::max(0.0, state.sim_now_days)));
+        std::vector<entity_id> marching;
+        for (const auto& [uid, uc] : w.units)
+            if (uc.count > 0 && uc.order.dest != null_entity)
+                marching.push_back(uid);
+        if (!marching.empty())
+        {
+            std::sort(marching.begin(), marching.end());
+            const std::set<entity_id> fighting = units_in_live_battles(w);
+            for (const entity_id uid : marching)
+            {
+                const unit_component& uc = w.units.at(uid);
+                if (fighting.count(uid) != 0)
+                    continue;
+                const auto here = w.tiles.find(uc.position);
+                if (here == w.tiles.end() || here->second.body != state.active_body
+                    || w.provinces.province_of(uc.position) == 0)
+                    continue;
+                const float t = march_hop_fraction(w, reg, uc, day_frac);
+                if (t < 0.0f)
+                    continue;
+                const entity_id next = uc.order.path[uc.order.next_index];
+                gliding.insert(uid);
+                glide_sig += (static_cast<std::uint64_t>(uid) + 1u)
+                           * (static_cast<std::uint64_t>(next) + 1u);
+                constexpr float k_same_pace = 0.03f;
+                unit_glide* same = nullptr;
+                for (unit_glide& g : state.unit_glides)
+                    if (g.owner == uc.owner && g.from == uc.position && g.to == next
+                        && std::fabs(g.t - t) <= k_same_pace)
+                    { same = &g; break; }
+                if (same != nullptr)
+                {
+                    same->ids.push_back(uid);
+                    continue;
+                }
+                unit_glide g;
+                g.ids.push_back(uid);
+                g.owner = uc.owner;
+                g.from  = uc.position;
+                g.to    = next;
+                g.t     = t;
+                state.unit_glides.push_back(std::move(g));
+            }
+        }
+    }
+    static std::uint64_t s_glide_sig = 0;
+
     const body_frame_stamp marker_stamp = make_body_frame_stamp(w, state.active_body);
-    if (!(marker_stamp == s_marker_stamp))
+    if (!(marker_stamp == s_marker_stamp) || glide_sig != s_glide_sig)
     {
         s_marker_stamp = marker_stamp;
+        s_glide_sig    = glide_sig;
         built_tiles.clear();
         tile_to_bld.clear();
         tile_to_corp.clear();
@@ -3081,6 +3144,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     continue;
                 if (w.provinces.province_of(uc.position) == 0)
                     continue;
+                if (gliding.count(uid) != 0)
+                    continue; // BL-1507: it draws apart, on its hop
                 std::vector<unit_marker_summary>& groups = tile_units[uc.position];
                 auto grp_it = std::find_if(groups.begin(), groups.end(),
                     [&](const unit_marker_summary& g) { return g.owner == uc.owner; });
@@ -6402,6 +6467,77 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.hovered_structure_kind = sk;
     }
 
+    // --- MARCHING COUNTERS (BL-1507) --- drawn over the tile pass, each at its point on
+    // the hop, with the counter's own anchor below the centre so a march starts and ends
+    // on the spot a standing counter holds. The hit zone follows the drawn point. A march
+    // past the survey is not drawn. Where its own side still stands on the tile it left,
+    // the counter opens a third of a hop ahead so the two never sit one on the other.
+    if (draw_r >= 6.0f)
+    {
+        const float local_period = static_cast<float>(gw) * col_step;
+        const float ur = std::max(9.0f, draw_r * 0.36f);
+        for (unit_glide& g : state.unit_glides)
+        {
+            const auto ta = w.tiles.find(g.from);
+            const auto tb = w.tiles.find(g.to);
+            if (ta == w.tiles.end() || tb == w.tiles.end())
+                continue;
+            if (!(survey_tile_visible(body.survey, gw, gh, ta->second.grid_x, ta->second.grid_y)
+                  || god_view_lift))
+                continue;
+            bool stack_behind = false;
+            if (const auto st = tile_units.find(g.from); st != tile_units.end())
+                for (const unit_marker_summary& s : st->second)
+                    if (s.owner == g.owner) stack_behind = true;
+            const float t = stack_behind ? 0.35f + 0.65f * g.t : g.t;
+            const ImVec2 a = hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size);
+            ImVec2       b = hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size);
+            // The hop across the seam goes the short way round the cylinder.
+            if (b.x - a.x > local_period * 0.5f)       b.x -= local_period;
+            else if (a.x - b.x > local_period * 0.5f)  b.x += local_period;
+            const ImVec2 sc = to_screen({ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t });
+            const float  uy = sc.y + draw_r * 0.50f;
+            if (uy < grid_area_origin.y - ur * 2.0f
+                || uy > grid_area_origin.y + grid_area_size.y + ur * 2.0f)
+                continue;
+            int men = 0;
+            long long est = 0, ready = 0;
+            for (const entity_id uid : g.ids)
+            {
+                const unit_component& uc = w.units.at(uid);
+                men   += uc.count;
+                est   += unit_establishment(uc);
+                ready += static_cast<long long>(uc.count) * uc.readiness_permille;
+            }
+            const float hp = est > 0 ? static_cast<float>(men) / static_cast<float>(est) : 0.0f;
+            const float rd = men > 0 ? static_cast<float>(ready) / static_cast<float>(men) / 1000.0f : 0.0f;
+            const bool hovered = state.overlay == overlay_mode::none
+                              && state.hovered_entity == g.ids.front();
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const ImVec2 mpos{ sc.x + static_cast<float>(k) * period_px, uy };
+                icons::unit_counter(dl, mpos, ur, corp_identity(g.owner),
+                                    static_cast<int>(g.ids.size()), hp, rd,
+                                    /*show_bars=*/g.owner == player_owner, hovered);
+                marker_hit_zone hz;
+                hz.id     = g.ids.front();
+                hz.kind   = marker_hit_zone::kind::unit;
+                hz.centre = mpos;
+                hz.radius = ur * 1.3f;
+                state.marker_hit_zones.push_back(hz);
+                if (k == k_min)
+                {
+                    g.x = mpos.x;
+                    g.y = tilt_pivot + (mpos.y - tilt_pivot) * tilt_sy; // the camera's squash: a screen point
+                }
+            }
+        }
+    }
+
     // --- FRONTS (BL-1427; MILITARY.md § Fronts, SELECTION.md § The front element) ---
     // The PLAYER's fronts: a line along every shared hex edge between a span tile
     // and the neighbour's ground, in the colour of the player's stance toward that
@@ -8392,6 +8528,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // A press on a counter opens the GROUP it draws (Ben, 2026-10-27;
                 // SELECTION.md § The unit group element); one unit, its card.
                 state.selection_unit_group = w.units.count(state.selected_entity) != 0;
+                // BL-1507: a marching counter stands for its own units, not the stack
+                // it has left on the tile.
+                for (const unit_glide& g : state.unit_glides)
+                    if (g.ids.front() == state.selected_entity)
+                        state.selection_unit_group = false;
                 // BL-598: the mirror, not a rival selection. A click that lands
                 // on the TILE carries its province (the tile element has the
                 // sections that read it); a marker hit does not, because a

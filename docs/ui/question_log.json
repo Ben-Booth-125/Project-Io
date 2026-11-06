@@ -645,7 +645,7 @@
   "unit_marker": {
    "surface": "Unit counter (Planetary canvas, one per tile and owner)",
    "answers": "Whose forces stand on this tile, how many units, and — for mine — how hurt and how spent are they?",
-   "because": "MILITARY.md § Land — on the canvas (Ben, 2026-10-26): a land unit is a rectangle within its tile showing the number of units on that tile, their HP and their readiness. The two quantities the land round ends a unit on — HP (men; 0 dies) and readiness (0 retreats) — are what a player watches a front by, and a card per unit cannot show a line of them at once. So the counter carries both as two VERTICAL bars at its right edge, filling bottom-up — HP green, readiness orange (Ben, 2026-10-27) — in the colours the unit card uses for the same numbers, beside the owner's colour and the unit count. The pointer on a counter rings it in the shared hover colour, so the player knows the press will take the counter and not the ground under it; a press on a counter of several units opens their group (selection_unit_group). It groups per (tile, owner), replacing BL-575's per-province marker that drew a whole province's force on one tile. The bars are the player's own units' only: a rival's internals stay private (BL-068, the battle card's precedent), so a rival's counter shows owner and count (NR-1088 asks Ben whether to widen that). Sized to stay inside its hex below the centre, clear of the battle glyph that claims the centre when a fight is live.",
+   "because": "MILITARY.md § Land — on the canvas (Ben, 2026-10-26): a land unit is a rectangle within its tile showing the number of units on that tile, their HP and their readiness. The two quantities the land round ends a unit on — HP (men; 0 dies) and readiness (0 retreats) — are what a player watches a front by, and a card per unit cannot show a line of them at once. So the counter carries both as two VERTICAL bars at its right edge, filling bottom-up — HP green, readiness orange (Ben, 2026-10-27) — in the colours the unit card uses for the same numbers, beside the owner's colour and the unit count. The pointer on a counter rings it in the shared hover colour, so the player knows the press will take the counter and not the ground under it; a press on a counter of several units opens their group (selection_unit_group). It groups per (tile, owner), replacing BL-575's per-province marker that drew a whole province's force on one tile. The bars are the player's own units' only: a rival's internals stay private (BL-068, the battle card's precedent), so a rival's counter shows owner and count (NR-1088 asks Ben whether to widen that). Sized to stay inside its hex below the centre, clear of the battle glyph that claims the centre when a fight is live. A marching unit draws apart from its tile's stack and glides from tile centre to tile centre at the pace its march banks (Ben, 2026-11-05; MILITARY.md § Land — on the canvas), so a march reads as motion on the map rather than a jump a day; units on one hop at one pace are one counter, and its press follows what is drawn. BL-1507.",
    "backlog_item": [
     "BL-1425",
     "BL-1421",
@@ -656,7 +656,8 @@
     "src/ui/icons.cpp",
     "src/ui/icons.hpp",
     "src/ui/ui_state.hpp",
-    "src/ui/presentation.hpp"
+    "src/ui/presentation.hpp",
+    "src/world/economy_system.cpp"
    ],
    "status": "drafted"
   },

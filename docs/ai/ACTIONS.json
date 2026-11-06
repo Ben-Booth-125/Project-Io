@@ -3052,6 +3052,19 @@
    "reason_to_select": "Attack an enemy stack directly from the map."
   },
   {
+   "id": "canvas.unit_press_marching",
+   "family": "canvas",
+   "surface": "The Planetary canvas: a marching unit's counter, drawn apart from its tile's stack on the hop it is walking (BL-1507; MILITARY.md § Land — on the canvas).",
+   "press": "Left-click the marching counter where it is drawn.",
+   "args": [],
+   "preconditions": [
+    "A unit holds a march and is not held by a battle.",
+    "No lens is active (under a lens a press resolves to the lens's structure)."
+   ],
+   "expected_output": "Selects that counter's lowest-id unit, with its card on the Selection band. The counter's units stand apart from the stack on the tile they are leaving. No world state changes.",
+   "reason_to_select": "Reach a unit already on the move, to redirect it."
+  },
+  {
    "id": "gameplay.hire_wing",
    "family": "gameplay",
    "surface": "The Military ledger's air rows (nav rail slot 7, Recruit tab, Air theatre tab; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too.",

@@ -169,6 +169,21 @@ struct structure_hit_zone
 /// now a unit's command grain (BL-511's march_unit retarget; corp_command.hpp),
 /// exactly as the existing building "+N" stack badge already groups several
 /// buildings sharing one tile.
+/// One counter marching between two tiles, as this frame drew it (BL-1507;
+/// MILITARY.md § Land — on the canvas). Rebuilt every frame by the Planetary canvas;
+/// the `ids` are the units walking together on the same hop at the same pace, ascending,
+/// so `ids.front()` is the counter's hit-zone id. View state only.
+struct unit_glide
+{
+    std::vector<entity_id> ids;
+    entity_id owner = null_entity;
+    entity_id from  = null_entity; ///< The tile the march still stands on (the sim's position).
+    entity_id to    = null_entity; ///< The next hop.
+    float     t     = 0.0f;        ///< March fraction of the hop, 0..1: the bank over the hop's price.
+    float     x     = -1.0f;       ///< Where the counter drew (screen, first wrap copy); -1 off screen.
+    float     y     = -1.0f;
+};
+
 struct unit_marker_summary
 {
     entity_id owner       = null_entity; ///< The corp/nation entity owning this group.
@@ -1773,6 +1788,7 @@ struct ui_state
     /// the top of body_surface_canvas each frame and rebuilt during the draw pass
     /// so click/hover handling can hit-test in priority order. See marker_hit_zone.
     std::vector<marker_hit_zone> marker_hit_zones;
+    std::vector<unit_glide> unit_glides; ///< BL-1507: this frame's marching counters.
 
     /// Per-frame list of on-canvas STRUCTURE boundaries (national borders today).
     /// Cleared and rebuilt with `marker_hit_zones`, and hit-tested after it: a

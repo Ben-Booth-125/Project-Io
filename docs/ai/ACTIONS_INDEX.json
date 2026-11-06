@@ -702,6 +702,10 @@
    "The Planetary canvas, with the player's own unit or unit group selected, hovering another nation's stack (BL-1443; SELECTION.md § Right-click orders)."
   ],
   [
+   "canvas.unit_press_marching",
+   "The Planetary canvas: a marching unit's counter, drawn apart from its tile's stack on the hop it is walking (BL-1507; MILITARY.md § Land — on the canvas)."
+  ],
+  [
    "gameplay.hire_wing",
    "The Military ledger's air rows (nav rail slot 7, Recruit tab, Air theatre tab; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too."
   ],

@@ -2051,6 +2051,22 @@
     "military_ledger",
     "air_ui"
    ]
+  },
+  {
+   "id": "UI-135",
+   "name": "Marching unit counter",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/military/MILITARY.md § Land — on the canvas",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "summary": "A unit with a next hop draws apart from its tile's stack, gliding from tile centre to tile centre: its bank plus the day's fraction of its movement, over the hop's own price (march_hop_fraction, the price run_unit_march spends). Units on one hop at one pace are one counter. Its hit zone follows the drawn point, and a press selects those units. Presentation only: the march still resolves tile by tile.",
+   "interesting_question": "Can the drawn point ever disagree with the march it shows?",
+   "resolution": "Not on price: the canvas and run_unit_march read one helper. The tile the counter is leaving stays the sim's position until the day's walk steps it, so the drawn point leads the sim's tile by at most one hop.",
+   "checks": [
+    "unit_glide"
+   ]
   }
  ]
 }

@@ -6768,6 +6768,28 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1507: the marching counters the canvas drew last frame: the units on each, the
+    // hop fraction and the counter's screen point. Nothing the screen does not show.
+    v.set_function("unit_glides", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const unit_glide& g : m_ui.unit_glides)
+        {
+            sol::table row = st.create_table();
+            sol::table ids = st.create_table();
+            int k = 1;
+            for (const entity_id id : g.ids)
+                ids[k++] = static_cast<unsigned int>(id);
+            row["ids"] = ids;
+            row["t"]   = g.t;
+            row["x"]   = g.x;
+            row["y"]   = g.y;
+            out[i++] = row;
+        }
+        return out;
+    });
+
     // BL-1265: `place_sell_order` retired with the order book (the verb is
     // rejected; there is no verify call for it).
 
