@@ -862,10 +862,13 @@ a station or a port where it is wanted. The field is therefore a slope away from
 blanket, and an outlying hub reads as a deliberate reach into thin ground.
 
 **Logistics serves the armies from generation (Ben, 2026-10-29).** The seeding counts every
-garrison post — the capital's and each border post facing a neighbour — as a request beside the
-producing buildings, so the sources it stands reach the ground the nation's armies open on, within
-the 8-tile off-road draw (§ A unit draws off the road). A nation opens with its army fed; where it
-marches next is the player's to supply.
+garrison post standing as it runs — the capital's and each border post facing a neighbour — as a
+request beside the producing buildings, so the sources it stands reach those posts within the 8-tile
+off-road draw (§ A unit draws off the road). A major's fixed army is posted after the seeding, by the
+same post rules but not always on the same tiles, so the seeding's service does not bind where that
+army stands. At the handoff each garrison is posted where the network feeds it whole (`../military/MILITARY.md` § Nation garrisons), so a post the chain reaches
+only at its fade gives way to the nearest ground it reaches in full. A nation opens with its army fed;
+where it marches next is the player's to supply.
 
 Three things follow, and each is a check rather than a preference:
 
@@ -875,6 +878,8 @@ Three things follow, and each is a check rather than a preference:
   overturning the 2026-10-22 dark exception):** the one source standing on a nation's capital carries
   no upkeep bill and the funding gate never idles it, so a capital is never dark however poor its
   nation. Every other source, a second hub stacked on the capital included, is billed as before.
+  It counts toward the capital tile's stack cap like any building (`PRODUCTION.md`, Ben,
+  2026-11-05), so what generation lays before it leaves it room.
 - **The capital is the peak of its own nation's field.** No other tile of that nation may hold more
   points than its capital at generation. A later build may overtake it — that is the player's doing
   and is allowed — but the world does not start that way.

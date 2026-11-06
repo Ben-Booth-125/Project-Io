@@ -1700,12 +1700,30 @@ lp_seed_report seed_logistics_sources(world& w)
         if (net == lp_network::road)
             hub_tiles.insert(b.tile);
     }
+    // BL-1500 (PRODUCTION.md, Ben 2026-11-05: generation obeys the cap with no exemptions):
+    // what stands on each tile as the seeding starts, kept current as it lays sources. A
+    // lookup only, never iterated, so its layout decides nothing; a count kept rather than
+    // walked, because `placeable` is asked once per tile of a field per chain step.
+    std::unordered_map<entity_id, int> stack_used;
+    for (const entity_id bid : in.ids)
+    {
+        const building_component& b = w.buildings.at(bid);
+        if (b.type != building_type::extraction_site)
+            ++stack_used[b.tile];
+    }
+    const auto has_stack_room = [&](entity_id t) {
+        const tile_component& tc = w.tiles.at(t);
+        const auto it = stack_used.find(t);
+        return (it != stack_used.end() ? it->second : 0)
+            < placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover);
+    };
     // BL-1356: coverage is ROUTED - the same rule the resolver serves by, so a hub
     // generation places counts only where the economy will let it deliver.
     lp_reach_memo memo;
     const auto coverage_of = [&](entity_id nation, entity_id body, entity_id tile) {
         return lp_route_to(w, memo, nation, body, tile).cover;
     };
+    std::set<entity_id> refused_sources; // the tiles a source was refused on for want of room
     const auto place_source = [&](entity_id nation, entity_id tile, entity_id consumer_owner,
                                   building_type type) {
         entity_id owner = null_entity;
@@ -1715,6 +1733,13 @@ lp_seed_report seed_logistics_sources(world& w)
             owner = consumer_owner;
         if (owner == null_entity)
             return false;
+        if (!has_stack_room(tile))
+        {
+            // Sources, not attempts: a full tile is asked for again by each later consumer.
+            refused_sources.insert(tile);
+            rep.sources_refused_cap = static_cast<int>(refused_sources.size());
+            return false;
+        }
         const entity_id bid = w.create_entity();
         building_component bc;
         bc.tile               = tile;
@@ -1732,6 +1757,7 @@ lp_seed_report seed_logistics_sources(world& w)
         memo.sources.erase({nation, body}); // the new source joins the list; old fields stand
         memo.connected.clear();             // and may extend a chain
         hub_tiles.insert(tile);             // no second network node on this tile
+        ++stack_used[tile];                 // and one slot of the tile's cap taken
         if (type == building_type::port)
         {
             // A port the seeding lands lays its lanes as it stands (Ben, 2026-10-25): a
@@ -1763,7 +1789,7 @@ lp_seed_report seed_logistics_sources(world& w)
     //    Every choice takes the least key with a tile-id tie-break: order-independent.
     const auto placeable = [&](entity_id t, entity_id nation) {
         return host_nation(w, t) == nation && hub_tiles.count(t) == 0
-            && !is_water(w.tiles.at(t).substrate);
+            && !is_water(w.tiles.at(t).substrate) && has_stack_room(t);
     };
     // Steps from @p target over the nation's own dry ground (4-neighbour, columns wrap):
     // what the chain is steered by. A grid distance steered it across water or round the
@@ -2223,6 +2249,26 @@ lp_seed_report seed_logistics_sources(world& w)
             }
             if (!holds && placeable(cap, nid))
                 place_source(nid, cap, owner, building_type::inland_logistics_hub);
+            else if (!holds && host_nation(w, cap) == nid && !is_water(w.tiles.at(cap).substrate)
+                     && !has_stack_room(cap))
+            {
+                // BL-1500: full, and nothing moved to make room. Named, so what the rule
+                // refused can be read: this capital opens with no source.
+                ++rep.capital_source_refused;
+                const tile_component& ctc = w.tiles.at(cap);
+                std::printf("[lp] stack cap: capital tile %u of nation %u (%zu tile(s), cap %d) has no room "
+                            "for its source; it holds:",
+                            static_cast<unsigned>(cap), static_cast<unsigned>(nid),
+                            w.nations.at(nid).tiles.size(),
+                            placement_rules::non_extraction_stack_cap(ctc.substrate, ctc.cover));
+                for (const entity_id bid : in.ids)
+                {
+                    const building_component& b = w.buildings.at(bid);
+                    if (b.tile == cap && b.type != building_type::extraction_site)
+                        std::printf(" type%d", static_cast<int>(b.type));
+                }
+                std::printf("\n");
+            }
         }
         std::vector<entity_id> mids;
         for (const auto& [mid, mc] : w.markets)
@@ -2436,10 +2482,28 @@ lp_seed_report seed_logistics_sources(world& w)
                 {
                     // No capital on this body: every source passes, the placement stands.
                     if (at == null_entity || host_nation(w, at) != r.nation
-                        || is_water(w.tiles.at(at).substrate) || hub_tiles.count(at) != 0)
+                        || is_water(w.tiles.at(at).substrate) || hub_tiles.count(at) != 0
+                        || !has_stack_room(at))
                         at = b.tile;
                     if (hub_tiles.count(at) != 0 || is_water(w.tiles.at(at).substrate))
                         continue;
+                    // BL-1500: a source with a choice of ground goes next door when its tile
+                    // is full: the nearest placeable own tile over dry ground, ties to the
+                    // lowest id. None within reach, and the source is refused and counted.
+                    if (!has_stack_room(at))
+                    {
+                        entity_id next = null_entity;
+                        int next_d = 0;
+                        for (const auto& [t2, d] : own_steps(r.nation, body, at))
+                            if (placeable(t2, r.nation)
+                                && (next == null_entity || d < next_d || (d == next_d && t2 < next)))
+                            {
+                                next   = t2;
+                                next_d = d;
+                            }
+                        if (next != null_entity)
+                            at = next;
+                    }
                 }
                 else
                 {
@@ -2660,6 +2724,9 @@ void print_lp_seed_report(const lp_seed_report& r)
                 "%d refused by the stack cap, %d by funding\n",
                 r.hubs_stacked_capital, r.hubs_stacked_centre, r.stacked_tiles,
                 r.stack_refused_cap, r.stack_refused_funds);
+    std::printf("[lp] stack cap: %d source(s) refused on a full tile, %d capital(s) left without "
+                "a source by it\n",
+                r.sources_refused_cap, r.capital_source_refused);
     std::printf("[lp] seeding: %d hubs placed; sources road %d rail %d sea %d (%d more the funding "
                 "gate idles); %d consumers "
                 "(%d full, %d partial, %d uncovered, %d on nobody's ground; %d no hub could connect, %d of them cut off; "

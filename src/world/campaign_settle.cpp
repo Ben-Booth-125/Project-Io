@@ -134,7 +134,24 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // on its post is re-chosen on covered ground. Inside the lap, so a digest after it
     // sees the posted world. A no-op on a world with no generation record (a load).
     if (econ_step == k_campaign_settle_ticks - 1 && !w.gen_garrisons.empty())
+    {
         print_garrison_repost(repost_garrisons_on_cover(w, &reg.military()));
+        // BL-1501: THE SHARE THE FIRST QUARTER LIVES ON. The daily pass reads
+        // `lp_share_permille` (`stocks_after_day`) for the ninety days before the first live
+        // economy tick resolves and writes its own (`run_nation_garrison_upkeep`), so what the
+        // handoff leaves there is what every unit eats for a quarter. The last settle tick's
+        // shares were read before the repost moved anyone and before the pool's order changed
+        // with it, so every unit is read again here off the pure resolver, on the same claims
+        // and by upkeep's rule: no row asked for nothing, and is whole.
+        const lp_tick handoff = resolve_logistic_points(w, collect_supply_claims(w, reg));
+        for (auto& [uid, u] : w.units) // keyed writes: order-free
+        {
+            if (w.nations.count(u.owner) == 0)
+                continue;
+            const auto it = handoff.supply_share.find(uid);
+            u.lp_share_permille = it != handoff.supply_share.end() ? std::clamp(it->second, 0, 1000) : 1000;
+        }
+    }
     // BL-1504 (MILITARY.md § Defend province): a major opens defending its capital
     // province, from the posts just chosen.
     if (econ_step == k_campaign_settle_ticks - 1)

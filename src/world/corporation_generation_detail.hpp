@@ -14,6 +14,7 @@
 #include "components.hpp"
 #include "placement_rules.hpp"
 #include "recipe_registry.hpp"
+#include "world.hpp"
 
 #include <array>
 #include <cstddef>
@@ -21,6 +22,7 @@
 #include <map>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -37,7 +39,8 @@ namespace corpgen
 /// deposit's richness-bound `stack_capacity`, and every other building together,
 /// against `non_extraction_stack_cap`. `count` keeps the old reading (does the
 /// tile hold any building at all) for the passes that are not a charter's — the
-/// muster base and the Marketplace retrofit keep one building per empty tile.
+/// muster base and the Marketplace retrofit keep one building per empty tile, and
+/// ask `has_room` as well, because an empty capital on a one-slot tile is held.
 class gen_occupancy
 {
 public:
@@ -51,6 +54,20 @@ public:
             ++s.extraction[static_cast<std::size_t>(b.target_resource)];
         else
             ++s.non_extraction;
+        s.hubs += b.type == building_type::inland_logistics_hub ? 1 : 0;
+    }
+
+    /// BL-1500 (PRODUCTION.md, Ben 2026-11-05): THE CAPITAL'S SOURCE HOLDS ITS SLOT. Every
+    /// capital on its own nation's ground keeps one non-extraction slot for an inland hub
+    /// until a hub stands there, so nothing a generation pass lays can leave a capital with
+    /// no room for its source. Every pass that fills this occupancy calls this. A membership
+    /// set, never iterated, so its layout decides nothing.
+    void hold_capital_slots(const world& w)
+    {
+        for (const auto& [nid, nc] : w.nations)
+            if (const auto own = w.tile_to_nation.find(nc.capital_tile);
+                own != w.tile_to_nation.end() && own->second == nid)
+                m_held.insert(nc.capital_tile);
     }
 
     void remove(const building_component& b)
@@ -66,6 +83,8 @@ public:
         }
         else if (s.non_extraction > 0)
             --s.non_extraction;
+        if (b.type == building_type::inland_logistics_hub && s.hubs > 0)
+            --s.hubs;
         if (--s.total <= 0)
             m_tiles.erase(it);
     }
@@ -82,18 +101,22 @@ public:
 
     /// May one more building of @p type (extracting @p target) stand on @p tile?
     /// Validity (terrain, deposit) is `placement_rules::can_place`'s; this is the
-    /// stack's room alone.
+    /// stack's room alone, the capital's held slot counted (`hold_capital_slots`).
     bool has_room(const tile_component& tc, entity_id tile, building_type type,
                   resource_type target) const
     {
         const auto it = m_tiles.find(tile);
-        if (it == m_tiles.end())
+        const bool held = type != building_type::extraction_site
+                       && type != building_type::inland_logistics_hub
+                       && m_held.count(tile) != 0
+                       && (it == m_tiles.end() || it->second.hubs == 0);
+        if (it == m_tiles.end() && !held)
             return true;
-        const tile_stack& s = it->second;
         if (type == building_type::extraction_site)
-            return s.extraction[static_cast<std::size_t>(target)]
+            return it->second.extraction[static_cast<std::size_t>(target)]
                  < placement_rules::stack_capacity(tc, type, target);
-        return s.non_extraction < placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover);
+        return (it != m_tiles.end() ? it->second.non_extraction : 0) + (held ? 1 : 0)
+             < placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover);
     }
 
 private:
@@ -101,9 +124,11 @@ private:
     {
         int total = 0;
         int non_extraction = 0;
+        int hubs = 0; ///< of `non_extraction`: inland hubs, which end a capital's hold
         std::array<int, resource_count> extraction{};
     };
     std::unordered_map<entity_id, tile_stack> m_tiles;
+    std::unordered_set<entity_id> m_held; ///< capitals keeping a slot for their source
 };
 
 /// Four-cardinal network walk over @p body from @p seeds, as the Logistic Point

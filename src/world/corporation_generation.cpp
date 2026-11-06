@@ -2912,8 +2912,8 @@ entity_id capital_base_site_pass(const world& w, entity_id nation, const gen_occ
         const resource_type tgt = placement_rules::richest_extractable(tc, any);
         if (!placement_rules::can_place(tc, building_type::military_base, tgt))
             continue;
-        if (stack && (!occupied.has_room(tc, tid, building_type::military_base, tgt)
-                      || placement_rules::tile_has_site_under_construction(w, tid)))
+        if (!occupied.has_room(tc, tid, building_type::military_base, tgt)
+            || (stack && placement_rules::tile_has_site_under_construction(w, tid)))
             continue;
         long long dx = std::llabs(static_cast<long long>(tc.grid_x) - pt->second.grid_x);
         if (gw > 0 && dx > gw - dx)
@@ -3076,6 +3076,7 @@ capital_base_report seed_capital_military_bases(world& w)
     occupied.reserve(w.buildings.size() * 2);
     for (const auto& [bid, bc] : w.buildings)
         occupied.add(bc);
+    occupied.hold_capital_slots(w);
     for (const entity_id nid : ids)
     {
         nation_component& nc = w.nations.at(nid);
@@ -3156,6 +3157,7 @@ void arm_rivals(world& w)
     occupied.reserve(w.buildings.size() * 2);
     for (const auto& [bid, bc] : w.buildings)
         occupied.add(bc);
+    occupied.hold_capital_slots(w);
     for (const auto& [cid, _] : rivals)
         if (!corporation_has_opening_force(w, cid))
             seed_starting_military(w, cid, occupied);
@@ -3174,6 +3176,7 @@ void arm_corporation(world& w, entity_id corp)
     occupied.reserve(w.buildings.size() * 2);
     for (const auto& [bid, bc] : w.buildings)
         occupied.add(bc);
+    occupied.hold_capital_slots(w);
     seed_starting_military(w, corp, occupied);
 }
 
@@ -3640,6 +3643,7 @@ std::vector<entity_id> generate_corporations(
     occupied_tiles.reserve(w.buildings.size() * 2);
     for (const auto& kv : w.buildings)
         occupied_tiles.add(kv.second);
+    occupied_tiles.hold_capital_slots(w);
 
     // corp_assets[c] = building entity ids placed for corp c (a clustered set).
     std::vector<std::vector<entity_id>> corp_assets(static_cast<std::size_t>(corp_count));
@@ -4541,6 +4545,7 @@ chain_roster_enforcement enforce_chain_feasible_roster(world& w, const recipe_re
     occupied.reserve(w.buildings.size() * 2);
     for (const auto& kv : w.buildings)
         occupied.add(kv.second);
+    occupied.hold_capital_slots(w);
     chain_reach cr = make_chain_reach(w, reg);
     // The roster's processors, in (corp id, asset order) — the order every
     // step below walks.
@@ -6735,6 +6740,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
     occupied.reserve(w.buildings.size() * 2);
     for (const auto& kv : w.buildings)
         occupied.add(kv.second);
+    occupied.hold_capital_slots(w);
 
     // BL-1146: each province's centre rung, read ONCE — the walk charters
     // buildings, never centres, so no rung moves under it.
@@ -8056,6 +8062,7 @@ marketplace_retrofit_report retrofit_marketplaces(world& w, const recipe_registr
     gen_occupancy occupied;
     for (const auto& [bid, bc] : w.buildings)
         occupied.add(bc);
+    occupied.hold_capital_slots(w);
     struct site { long long d2; entity_id tile; };
     std::map<entity_id, std::vector<site>> sites;
     std::map<entity_id, std::pair<int, int>> centre_xy;
@@ -8115,7 +8122,9 @@ marketplace_retrofit_report retrofit_marketplaces(world& w, const recipe_registr
         {
             if (placed >= n)
                 break;
-            if (occupied.count(s.tile) != 0)
+            if (occupied.count(s.tile) != 0
+                || !occupied.has_room(w.tiles.at(s.tile), s.tile, building_type::planetary_marketplace,
+                                      resource_type::iron_ore))
                 continue;
             // BL-1407: the placement rules ask an OWNER's nation (own ground); a
             // charter is no owner, so it is asked as its home nation — the
@@ -8437,6 +8446,7 @@ major_reconciliation_report reconcile_majors(world& w, const recipe_registry& re
         occupied.reserve(w.buildings.size() * 2);
         for (const auto& kv : w.buildings)
             occupied.add(kv.second);
+        occupied.hold_capital_slots(w);
         chain_reach chain = make_chain_reach(w, reg);
         const champion_floor champ_floor = make_champion_floor(w, reg); // BL-1298 / BL-1283
 
