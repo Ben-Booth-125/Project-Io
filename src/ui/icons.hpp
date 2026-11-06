@@ -680,7 +680,7 @@ void value_mark(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
 /// Draw a railway-line glyph — two parallel rails on a diagonal crossed by
 /// sleepers (BL-1255). Distinct from the railway station (the hub node): this
-/// is the LINE, the track a tile carries. Used in the road ladder's Track row.
+/// is the LINE, the track a tile carries. Used in the Road fold's Railroad row.
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Glyph centre, screen pixels.

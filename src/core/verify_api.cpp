@@ -5433,6 +5433,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             sol::table e = st.create_table();
             e["name"]     = o.name;
             e["category"] = o.category;
+            // The recipe's group: the name the door's row for it shows.
+            const recipe* orc = (o.type == building_type::processing_facility)
+                                    ? m_registry.get_recipe(o.recipe) : nullptr;
+            e["group"]    = orc != nullptr ? orc->group : std::string();
             out[++n] = e;
         }
         return out;
@@ -5478,6 +5482,24 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["ties_covered"]     = sf.ties_covered;
         out["picker_x"]     = sf.picker_x;
         out["picker_y"]     = sf.picker_y;
+        {
+            sol::table pr = st.create_table();
+            int pn = 0;
+            for (const site_finder_state::picker_row& o : sf.picker_rows)
+            {
+                sol::table e = st.create_table();
+                e["name"]     = o.name;
+                e["category"] = o.category;
+                e["glyph_r"]  = o.glyph_r;
+                e["need"]     = o.need;
+                e["have"]     = o.have;
+                e["x"]        = o.x;
+                e["y"]        = o.y;
+                pr[++pn] = e;
+            }
+            out["picker_rows"]   = pr;
+            out["n_picker_rows"] = pn;
+        }
         int valid = 0, flagged = 0;
         for (const std::uint8_t c : sf.cls)
         {
@@ -5503,6 +5525,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["market"]  = r.market_name;
             row["place"]   = r.place;
             row["near"]    = r.place_near;
+            // What the row's Net hover says, in the same figures.
+            row["starved"]         = r.starved;
+            row["runway_warn"]     = r.runway_warn;
+            row["runway_text"]     = r.runway_text;
             rows[++rn] = row;
         }
         out["rows"]   = rows;
@@ -5515,6 +5541,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["tile"] = static_cast<unsigned>(d.tile);
             row["x"]    = d.x;
             row["y"]    = d.y;
+            row["net_text"] = d.net_text;
             drawn[++dn] = row;
         }
         out["drawn"]   = drawn;
@@ -5554,10 +5581,14 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const auto& c   = m_ui.construction_ui;
         sol::table  rows = st.create_table();
         int         n    = 0;
+        out["fold_x"] = c.road_fold_x;
+        out["fold_y"] = c.road_fold_y;
         for (const construction_controls::road_row& r : c.road_rows)
         {
             sol::table row = st.create_table();
             row["tier"]      = static_cast<int>(r.tier);
+            row["fold"]      = r.fold;
+            row["h"]         = r.h;
             row["name"]      = r.name;
             row["x"]         = r.x;
             row["y"]         = r.y;
@@ -6176,6 +6207,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // and `name_elided` is the failure the two-line row exists to remove.
             row["name_lines"]  = r.name_lines;
             row["name_elided"] = r.name_elided;
+            row["fold"]        = r.fold;
             sol::table cols = st.create_table();
             int        cn   = 0;
             for (const ui_grid_col& gc : r.cols)
@@ -6210,6 +6242,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // and `name_elided` is the failure the two-line row exists to remove.
             row["name_lines"]  = r.name_lines;
             row["name_elided"] = r.name_elided;
+            row["fold"]        = r.fold;
             sol::table cols = st.create_table();
             int        cn   = 0;
             for (const ui_grid_col& gc : r.cols)
@@ -6831,6 +6864,42 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["population_y"]      = c.population_y;
         out["province_scroll_max"] = c.province_scroll_max;
         out["status"]            = c.status;
+        out["recipe_drawn"]      = c.recipe_drawn;
+        out["recipe_reported"]   = c.recipe_reported;
+        out["recipe_heading"]    = c.recipe_heading;
+        out["card_scroll_max"]   = c.card_scroll_max;
+        {
+            sol::table rr = st.create_table();
+            int rrn = 0;
+            for (const ui_state::tile_card_recipe_row& r : c.recipe_rows)
+            {
+                sol::table e = st.create_table();
+                e["good"]   = r.good;
+                e["id"]     = r.id;
+                e["input"]  = r.input;
+                e["figure"] = r.figure;
+                e["shelf"]  = r.shelf;
+                e["mark"]   = r.mark;
+                sol::table cols = st.create_table();
+                int cn = 0;
+                for (const ui_grid_col& gc : r.cols)
+                {
+                    sol::table col = st.create_table();
+                    col["key"]  = gc.key;
+                    col["text"] = gc.text;
+                    col["x"]    = gc.x;
+                    col["y"]    = gc.y;
+                    cols[++cn]  = col;
+                }
+                e["cols"] = cols;
+                rr[++rrn] = e;
+            }
+            out["recipe_rows"]   = rr;
+            out["recipe_hover_cards"] = c.recipe_hover_cards;
+            out["recipe_hover_who"]   = c.recipe_hover_who;
+            out["recipe_hover_text"]  = c.recipe_hover_text;
+            out["n_recipe_rows"] = rrn;
+        }
         out["back_x"]            = c.back_x;
         out["back_y"]            = c.back_y;
         out["province_standing"] = c.province_standing;
@@ -7439,6 +7508,43 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // bought off its own market's shelf) where the world's shelves are bare.
     // Refuses an unknown market, an unknown good, or a non-finite / non-positive
     // quantity, mutating nothing.
+    // Sprint 63 (building_recipe_rows.lua): a STAGING fixture that WRITES one building's row of
+    // the LAST economy report, a view record the card reads, nothing the sim reads back. The
+    // verify world's staged buildings get no labour, so no check could otherwise read a report
+    // that ran. Takes the output, the labour applied and the run, with an optional limiting
+    // good; returns whether the building had a row. Verify-only, behind --verify.
+    v.set_function("stage_building_report", [this](int col, int row, double output, double labour, double run,
+                                                   sol::optional<std::string> limiting) -> bool {
+        for (const auto& [bid, bc] : m_world.buildings)
+        {
+            const auto tit = m_world.tiles.find(bc.tile);
+            if (tit == m_world.tiles.end() || tit->second.body != m_ui.active_body
+                || tit->second.grid_x != col || tit->second.grid_y != row)
+                continue;
+            const auto rit = m_last_econ_report.building_row.find(bid);
+            if (rit == m_last_econ_report.building_row.end() || rit->second >= m_last_econ_report.buildings.size())
+                return false;
+            building_report& rp = m_last_econ_report.buildings[rit->second];
+            rp.output_quantity     = static_cast<float>(output);
+            rp.effective_workforce = static_cast<float>(labour);
+            rp.run                 = static_cast<float>(run);
+            rp.active              = output > 0.0;
+            rp.idle                = !(output > 0.0);
+            rp.exhausted           = false;
+            rp.has_limiting        = false;
+            if (limiting)
+            {
+                bool ok = false;
+                const resource_type r = resource_names::resource_from_name(*limiting, ok);
+                if (!ok)
+                    return false;
+                rp.has_limiting   = true;
+                rp.limiting_input = r;
+            }
+            return true;
+        }
+        return false;
+    });
     v.set_function("stock_market", [this](unsigned market, const std::string& res, double qty) {
         bool ok = false;
         const resource_type r = resource_names::resource_from_name(res, ok);
@@ -7447,6 +7553,34 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             return false;
         mit->second.inventory[static_cast<std::size_t>(r)] += static_cast<float>(qty);
         return true;
+    });
+
+    // Sprint 63 (shelf_runway_warning.lua): a STAGING fixture that WRITES the shelf of every
+    // recipe input of the site finder's option @p name on market @p market, power apart.
+    // `stock_market` only adds, and the check needs a low shelf to aim at. Returns how many
+    // goods it wrote and nothing else; refuses an unknown name, an unknown market or a
+    // negative quantity, mutating nothing.
+    v.set_function("set_input_shelf", [this](const std::string& name, unsigned market, double qty) -> int {
+        const auto mit = m_world.markets.find(static_cast<entity_id>(market));
+        if (mit == m_world.markets.end() || !std::isfinite(qty) || qty < 0.0 || qty > 1.0e9)
+            return 0;
+        for (const site_option& o : ui::site_options(m_world, m_registry))
+        {
+            const recipe* rc = (o.name == name && o.type == building_type::processing_facility)
+                                   ? m_registry.get_recipe(o.recipe) : nullptr;
+            if (rc == nullptr)
+                continue;
+            int wrote = 0;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (rc->inputs[r] > 0.0f && !grid_good_crosses_markets(r))
+                {
+                    mit->second.inventory[r] = static_cast<float>(qty);
+                    ++wrote;
+                }
+            ui::invalidate_site_evaluation();
+            return wrote;
+        }
+        return 0;
     });
 
     // Verify-only: give the PLAYER a completed, staffed Planetary Marketplace in

@@ -196,7 +196,7 @@ cycling: **Scarcity, Reach, Supply-routes**.
 | Action | Control |
 |---|---|
 | Build | Select a tile → **Construct Buildings** → pick a candidate |
-| Build a road | Same panel, below the building candidates: Track / Road / Highway |
+| Build a road | Same panel, the Road fold below the building folds: Track / Road / Highway / Railroad |
 | Manage a building | Select it, then the gear icon on the Selection band |
 | Change recipe | The production-method combo on the band |
 | Set workforce | The workforce slider (0–200% of nominal) |
