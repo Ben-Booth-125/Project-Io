@@ -1732,6 +1732,9 @@ struct ui_state
         bool        recipe_drawn    = false; ///< The recipe rows drew (the player's own, with a recipe or a target).
         bool        recipe_reported = false; ///< They read a quarter's report.
         std::string recipe_heading;          ///< The heading as drawn.
+        int         recipe_hover_cards = 0;  ///< Recipe-row cards opened this frame: one, or a row bled.
+        std::string recipe_hover_who;        ///< The row (or "heading") whose card opened.
+        std::string recipe_hover_text;       ///< That card's text.
         std::vector<tile_card_recipe_row> recipe_rows;
         float       card_scroll_max = 0.0f;  ///< The expanded card's scroll range (the card is laid out to fit).
         /// BL-1368: the EXPANDED site row's per-column explainers (the under-

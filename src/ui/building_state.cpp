@@ -199,12 +199,36 @@ building_recipe_read read_building_recipe(const world& w, const recipe_registry&
 
     if (b.type == building_type::extraction_site)
     {
-        building_recipe_row o;
-        o.good       = b.target_resource;
-        o.input      = false;
-        o.has_figure = out.reported;
-        o.per_qtr    = out.reported ? row->output_quantity : 0.0f;
-        out.rows.push_back(o);
+        // A SITE YIELDS A BASKET (economy_system.cpp, run_extraction): capacity is shared
+        // across every deposit on its tile by richness, and a spent deposit gives nothing.
+        // The report has one total, so the split is this file's mirror of that rule, and
+        // is an estimate wherever there is more than one good to split it between. A
+        // depositless site (a well, a wharf) lifts its one good.
+        std::vector<std::pair<resource_type, float>> yields;
+        const auto tit = w.tiles.find(b.tile);
+        if (tit != w.tiles.end() && !placement_rules::is_depositless_site(w, b.tile, b.target_resource))
+            for (const resource_type r : placement_rules::k_extractable)
+            {
+                const std::size_t rr = static_cast<std::size_t>(r);
+                if (tit->second.resource_deposit[rr] > 0.0f && tit->second.resource_remaining[rr] > 0.0f)
+                    yields.emplace_back(r, tit->second.resource_deposit[rr]);
+            }
+        if (yields.empty())
+            yields.emplace_back(b.target_resource, 1.0f);
+        float rich_total = 0.0f;
+        for (const auto& y : yields)
+            rich_total += y.second;
+        for (const auto& y : yields)
+        {
+            building_recipe_row o;
+            o.good       = y.first;
+            o.input      = false;
+            o.has_figure = out.reported;
+            o.estimated  = yields.size() > 1;
+            o.per_qtr    = out.reported ? row->output_quantity * y.second / rich_total : 0.0f;
+            o.total      = out.reported ? row->output_quantity : 0.0f;
+            out.rows.push_back(o);
+        }
         return out;
     }
     const recipe* rc = (b.type == building_type::processing_facility) ? reg.get_recipe(b.recipe) : nullptr;
@@ -216,8 +240,24 @@ building_recipe_read read_building_recipe(const world& w, const recipe_registry&
         m = &mit->second;
     const float res_mult = reg.price_band().reservation_mult;
     const float batches  = judged_batches(reg, b);
-    // A mothballed plant draws nothing, so nothing it would draw reads as short.
-    const bool  draws    = !b.decommissioned;
+    // WHERE THE SIM WOULD RUN NO BATCH, THE ROWS SAY SO (run_processing's own gates).
+    // judged_batches cannot answer this: it reads an unstaffed building at its authored
+    // staffing, never at zero, because that is the question a scorer asks of a new plant.
+    if (b.decommissioned)
+        out.no_draw = "It is mothballed, so it draws nothing.";
+    else if (b.state_idle)
+        out.no_draw = "It stands idle, so it draws nothing.";
+    else if (rc->retired)
+        out.no_draw = "Its recipe is retired, so it draws nothing.";
+    else if (m == nullptr)
+        out.no_draw = "No market stands under it, so it draws nothing.";
+    else if (b.workforce_assigned <= 0.0f || b.workforce_target <= 0)
+        out.no_draw = "It has no staff, so it draws nothing.";
+    else if (building_supply_scalar(b) <= 0.0f)
+        out.no_draw = "It is unsupplied, so it draws nothing.";
+    else if (row != nullptr && row->effective_workforce <= 0.0f)
+        out.no_draw = "No labour reached it last quarter, so it drew nothing.";
+    const bool  draws    = out.no_draw == nullptr;
 
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -225,7 +265,8 @@ building_recipe_read read_building_recipe(const world& w, const recipe_registry&
             continue;
         building_recipe_row in;
         in.good      = static_cast<resource_type>(r);
-        in.per_qtr   = rc->inputs[r] * batches;
+        in.has_figure = draws;
+        in.per_qtr   = draws ? rc->inputs[r] * batches : 0.0f;
         in.grid_good = grid_good_crosses_markets(r);
         in.shelf     = m != nullptr ? std::max(0.0f, m->inventory[r]) : 0.0f;
         in.binding   = draws && row != nullptr && row->has_limiting && row->limiting_input == in.good
@@ -235,7 +276,8 @@ building_recipe_read read_building_recipe(const world& w, const recipe_registry&
             const float admitted = (m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/true)) ? in.shelf : 0.0f;
             in.short_mirror = admitted < in.per_qtr;
         }
-        if (in.binding || in.short_mirror)
+        // Power comes off the grid: a market's empty shelf is not why it fell short.
+        if ((in.binding || in.short_mirror) && !in.grid_good)
             in.cause = input_cause_of(w, &reg, b, in.good);
         out.rows.push_back(in);
     }

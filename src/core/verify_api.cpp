@@ -6879,6 +6879,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 rr[++rrn] = e;
             }
             out["recipe_rows"]   = rr;
+            out["recipe_hover_cards"] = c.recipe_hover_cards;
+            out["recipe_hover_who"]   = c.recipe_hover_who;
+            out["recipe_hover_text"]  = c.recipe_hover_text;
             out["n_recipe_rows"] = rrn;
         }
         out["back_x"]            = c.back_x;

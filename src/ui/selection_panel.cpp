@@ -3047,6 +3047,20 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
         shelf_w = std::max(shelf_w, ImGui::CalcTextSize(shelf_text(row).c_str()).x);
     }
     const float line_h = ImGui::GetTextLineHeight();
+    // THESE ROWS ARE ONE LINE TALL. construction_cell makes a two-line rect for the build
+    // grid's rows; left so here, a row's rect covers the row below and one point opens two
+    // cards. A card is reported to the readout so a check can say which row answered.
+    const auto one_line = [line_h](std::vector<grid_explainer>& cs) {
+        for (grid_explainer& e : cs)
+            e.mx.y = e.mn.y + line_h;
+    };
+    const auto note_card = [&ui](int hit, const char* who, const std::vector<grid_explainer>& cs) {
+        if (hit < 0)
+            return;
+        ++ui.tile_card.recipe_hover_cards;
+        ui.tile_card.recipe_hover_who  = who;
+        ui.tile_card.recipe_hover_text = cs[static_cast<std::size_t>(hit)].text;
+    };
     const std::string heading = rd.reported ? "Recipe" : "Recipe, no quarter yet";
     ui.tile_card.recipe_heading = heading;
     // The empty report is the one thing here that must read whole, and the good column
@@ -3062,6 +3076,7 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
         fit_text(text_box::table_cell, "selection.building.recipe.head", heading.c_str(), hw);
         ImGui::PopStyleColor();
         head_cells.push_back(construction_cell("heading", hp, hw, std::string(k_no_quarter_hover)));
+        head_cells.back().mn.y = hp.y; // read outside the table's cell padding
     }
     constexpr ImGuiTableFlags flags = ImGuiTableFlags_NoPadInnerX | ImGuiTableFlags_SizingFixedFit;
     ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {construction_grid::pad, 0.0f});
@@ -3105,7 +3120,8 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
         head_cells.push_back(construction_cell("shelf_head", hp, shelf_w,
                                                std::string("What this building's market holds on its shelf now.")));
     }
-    construction_column_card("Recipe", head_cells);
+    one_line(head_cells);
+    note_card(construction_column_card("Recipe", head_cells), "heading", head_cells);
 
     ImDrawList* dl = ImGui::GetWindowDrawList();
     for (const building_recipe_row& row : rd.rows)
@@ -3134,10 +3150,17 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
             const std::string fig = figure_text(row);
             ImGui::TextUnformatted(fig.c_str());
             char buf[240];
-            if (row.input)
+            if (row.input && !row.has_figure)
+                std::snprintf(buf, sizeof buf, "%s", rd.no_draw != nullptr ? rd.no_draw : "It draws nothing.");
+            else if (row.input)
                 std::snprintf(buf, sizeof buf,
                               "About %.1f a quarter, worked out from the recipe at this building's "
                               "staffing. An estimate, not a report.", static_cast<double>(row.per_qtr));
+            else if (row.has_figure && row.estimated)
+                std::snprintf(buf, sizeof buf,
+                              "About %.1f a quarter: an estimate. The reported total is %.1f, and this "
+                              "share of it is worked out by how rich each deposit on the tile is.",
+                              static_cast<double>(row.per_qtr), static_cast<double>(row.total));
             else if (row.has_figure)
                 std::snprintf(buf, sizeof buf, "About %.1f a quarter, from the last quarter's reported output.",
                               static_cast<double>(row.per_qtr));
@@ -3197,6 +3220,8 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
                                   "one binding input is reported.%s",
                                   static_cast<double>(row.per_qtr), cause);
                 }
+                else if (rd.no_draw != nullptr)
+                    std::snprintf(buf, sizeof buf, "%s", rd.no_draw);
                 else
                     std::snprintf(buf, sizeof buf, "Not short, by the shelf and the recipe's estimate.");
                 if (ink != 0u)
@@ -3204,7 +3229,8 @@ void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const
                 cells.push_back(construction_cell("mark", p, construction_grid::state, buf, ink));
             }
         }
-        construction_column_card(good.c_str(), cells);
+        one_line(cells);
+        note_card(construction_column_card(good.c_str(), cells), good.c_str(), cells);
         ImGui::PopID();
 
         ui_state::tile_card_recipe_row pub;
