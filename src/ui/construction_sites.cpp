@@ -276,13 +276,8 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
         if (bp.has_data && !sq.starved)
             if (const shelf_runway sr = shelf_runway_for(w, reg, tid, c.type, c.recipe, r.cover); sr.warn)
             {
-                r.runway_warn     = true;
-                r.runway_good     = sr.good;
-                r.runway_quarters = sr.quarters;
-                r.runway_use      = sr.plant_use;
-                r.runway_drain    = sr.drain;
-                r.runway_known    = sr.drain_known;
-                r.runway_text     = shelf_runway_text(sr);
+                r.runway_warn = true;
+                r.runway_text = shelf_runway_text(sr);
             }
         r.profit_full_cover = (r.cover >= 1.0f)
             ? r.profit
@@ -523,6 +518,8 @@ std::string shelf_runway_text(const shelf_runway& s)
     char lead[120];
     if (s.quarters < 1.0f)
         std::snprintf(lead, sizeof lead, "Under a quarter of %s left on this market's shelf", good.c_str());
+    else if (s.quarters < 2.0f)
+        std::snprintf(lead, sizeof lead, "Only about 1 quarter of %s left on this market's shelf", good.c_str());
     else
         std::snprintf(lead, sizeof lead, "Only about %.0f quarters of %s left on this market's shelf",
                       std::floor(s.quarters), good.c_str());
@@ -530,8 +527,12 @@ std::string shelf_runway_text(const shelf_runway& s)
     if (s.drain > 0.0f)
         std::snprintf(tail, sizeof tail, ": it would use %.1f a quarter, and the shelf is already falling %.1f.",
                       static_cast<double>(s.plant_use), static_cast<double>(s.drain));
-    else
+    else if (s.drain_known)
         std::snprintf(tail, sizeof tail, " at the %.1f a quarter it would use.", static_cast<double>(s.plant_use));
+    else // An unread trail is not a flat shelf, so the sentence does not read as one.
+        std::snprintf(tail, sizeof tail,
+                      " at the %.1f a quarter it would use. That is its own use alone: this shelf has no "
+                      "trail read yet, so a fall would not show.", static_cast<double>(s.plant_use));
     std::string out = std::string(lead) + tail;
     if (s.others > 0)
         out += s.others == 1 ? " One more input is close too." : " More inputs are close too.";

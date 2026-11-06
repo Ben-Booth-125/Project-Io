@@ -5509,11 +5509,6 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // What the row's Net hover says, in the same figures.
             row["starved"]         = r.starved;
             row["runway_warn"]     = r.runway_warn;
-            row["runway_good"]     = r.runway_warn ? std::string(ui::resource_name(r.runway_good)) : std::string();
-            row["runway_quarters"] = r.runway_quarters;
-            row["runway_use"]      = r.runway_use;
-            row["runway_drain"]    = r.runway_drain;
-            row["runway_known"]    = r.runway_known;
             row["runway_text"]     = r.runway_text;
             rows[++rn] = row;
         }

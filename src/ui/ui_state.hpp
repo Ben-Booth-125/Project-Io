@@ -869,11 +869,6 @@ struct site_row
     resource_type short_of = resource_type::iron_ore; ///< The first such input, when starved.
     /// `shelf_runway_for`'s warning, for a row that is not already starved.
     bool          runway_warn = false;
-    resource_type runway_good = resource_type::iron_ore;
-    float         runway_quarters = 0.0f;
-    float         runway_use   = 0.0f;
-    float         runway_drain = 0.0f;
-    bool          runway_known = false;
     std::string   runway_text;
     float         profit   = 0.0f;  ///< Est. net / qtr, Logistic Point cover applied.
     float         profit_full_cover = 0.0f; ///< The same estimate at cover 1.

@@ -85,14 +85,16 @@ already have the state mark's stall reading. In the ledger the row's Net figure 
 mark, and the sentence opens that column's hover; in the door it opens the bar column's hover. A row
 already reading *would likely stand idle* carries no second warning, and a tile with no Logistic Point
 cover carries none either: at no cover the plant would not run, so it draws nothing down. The hover
-reads amber while it warns, however good the net beneath it. A shelf that is rising earns no credit
+reads amber while it warns, however good the net beneath it. A door row folds a group to its best recipe
+and the ledger reads the recipe chosen there, so the two can differ on one tile; the door's sentence
+names the recipe it quotes. A shelf that is rising earns no credit
 against the plant's own use.
 
 **The net drain's source.** No market flow field nets to the shelf: `demand` is what was bid, not what
 was drawn. So the drain is measured on the shelf itself: the economy tick samples `inventory` into the
 market history's `shelf` series, and the drain is the fall over the last four quarters at most, per
 quarter. The series is a view record and is not saved, so a loaded game, or a campaign's first quarter,
-has no trail: the reading is then the plant's own use alone, and the sentence claims no fall. Power
+has no trail. An unread trail is unknown, not flat: the reading is the plant's own use alone, and the sentence says it knows only that. A hover whose own use leaves the shelf past the threshold stays silent, since the warning fires on what is known and an unread fall is not known. Power
 comes off the grid, so one market's shelf is not its reading and it takes no warning.
 
 **The table.** One row per tile of the player's **own ground** on the active body that the **Build

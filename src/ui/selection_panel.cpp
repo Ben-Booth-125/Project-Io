@@ -5499,6 +5499,12 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             if (c.group == 0 && !c.starved)
                 bar_text = shelf_runway_text(
                     shelf_runway_for(w, reg, tile_id, c.type, c.recipe, lp_cover));
+            // THIS ROW QUOTES ONE RECIPE of a group, its best net here, and the site ledger
+            // reads whichever recipe was chosen there. Saying which keeps the two honest.
+            if (!bar_text.empty())
+                if (const recipe* qr = reg.get_recipe(c.recipe);
+                    qr != nullptr && qr->display_name != c.name)
+                    bar_text = "Quoted for " + qr->display_name + ", this row's best recipe here. " + bar_text;
             char nbuf[260];
             if (c.group == 0 && c.starved)
                 std::snprintf(nbuf, sizeof nbuf,

@@ -12,7 +12,8 @@
 --   W3  the door and the finder say the same sentence, on one shared helper.
 --   W4  a shelf past the threshold does not warn.
 --   W5  the drain comes from the shelf's own trail: a shelf that fell says so.
---   W6  a load has no trail: the reading is the plant's use alone, and claims no fall.
+--   W6  a load has no trail: the reading is the plant's use alone, and it says so.
+--   W7  one quarter is singular.
 --
 -- Run with: ProjectIo --verify scripts/verify/shelf_runway_warning.lua
 
@@ -25,7 +26,22 @@ verify.frames(3)
 local k_threshold = 4.0 -- k_shelf_runway_warn_quarters, the default Ben reads live
 
 local function has(text, part) return text:find(part, 1, true) ~= nil end
-local function near(a, b) return math.abs(a - b) <= math.max(0.02, 0.01 * math.abs(b)) end
+
+-- What the sentence says. The reading is checked against the drawn figures, so nothing
+-- about the shelf reaches this script that the player cannot read.
+local function read_sentence(t)
+    local use = tonumber(t:match("it would use ([%d%.]+) a quarter")) or tonumber(t:match("at the ([%d%.]+) a quarter"))
+    local drain = tonumber((t:match("already falling ([%d]+%.?%d?)"))) or 0.0
+    local good = t:match("quarters? of (.-) left on")
+    local whole = tonumber(t:match("about (%d+) quarter"))
+    return { use = use or 0.0, drain = drain, good = good or "", whole = whole, under = has(t, "Under a quarter") }
+end
+-- The quarters the sentence states agree with shelf / (use + drain), to its rounding.
+local function agrees(s, shelf)
+    local q = shelf / math.max(0.001, s.use + s.drain)
+    if s.under then return q < 1.1 end
+    return s.whole ~= nil and q >= s.whole - 0.2 and q < s.whole + 1.2
+end
 
 verify.econ_step(1)
 verify.frames(2)
@@ -115,14 +131,13 @@ verify.expect(picked ~= nil, "a staged low shelf warned on some option")
 if picked == nil then return end
 
 local r = reading
+local said = read_sentence(r.runway_text)
 print(string.format("shelf_runway_warning: %s: %s", picked.option.name, r.runway_text))
-verify.expect(r.runway_quarters < k_threshold,
-              string.format("W1: the warning is under the threshold (%.2f)", r.runway_quarters))
-verify.expect(near(r.runway_quarters, k_stage / (r.runway_use + r.runway_drain)),
-              string.format("W1: quarters = shelf / (use + drain): %.3f vs %.3f / (%.3f + %.3f)",
-                            r.runway_quarters, k_stage, r.runway_use, r.runway_drain))
-verify.expect(has(r.runway_text, r.runway_good), "W1: the sentence names the good: " .. r.runway_text)
-verify.expect(has(r.runway_text, "quarter"), "W1: the sentence names the quarters: " .. r.runway_text)
+verify.expect(said.good ~= "", "W1: the sentence names the good: " .. r.runway_text)
+verify.expect(said.under or (said.whole ~= nil and said.whole < k_threshold),
+              "W1: the warning is under the threshold: " .. r.runway_text)
+verify.expect(said.use > 0.0, "W1: the sentence states the plant's use: " .. r.runway_text)
+verify.expect(agrees(said, k_stage), "W1: quarters = shelf / (use + drain): " .. r.runway_text)
 verify.expect(has(r.runway_text, "shelf"), "W1: the sentence says shelf: " .. r.runway_text)
 
 -- The row as drawn: aim the sort at it by reading what the ledger drew.
@@ -176,7 +191,7 @@ for _, c in ipairs(candidates) do
                 verify.site_pick(o.name)
                 verify.frames(2)
                 local fr = row_at(c.row.x, c.row.y)
-                if fr ~= nil and fr.runway_warn then sentences[#sentences + 1] = fr.runway_text end
+                if fr ~= nil and fr.runway_warn then sentences[#sentences + 1] = { text = fr.runway_text, name = o.name } end
             end
         end
         verify.select_tile(c.row.x, c.row.y)
@@ -188,7 +203,14 @@ for _, c in ipairs(candidates) do
                 verify.expect(not has(bar.text, "left on this market's shelf"), "W3: the door does not double-warn a starved row")
             elseif has(bar.text, "left on this market's shelf") then
                 for _, t in ipairs(sentences) do
-                    if has(bar.text, t) then matched = true end
+                    if has(bar.text, t.text) then
+                        matched = true
+                        -- A door row quotes one recipe of its group, and says which.
+                        if t.name ~= c.option.group then
+                            verify.expect(has(bar.text, "Quoted for " .. t.name),
+                                          "W3: the door names the recipe it quotes: " .. bar.text)
+                        end
+                    end
                 end
                 verify.expect(matched, "W3: the door's sentence is one of the finder's for this group: " .. bar.text)
                 print("shelf_runway_warning: door bar: " .. bar.text)
@@ -215,15 +237,26 @@ verify.site_pick(picked.option.name)
 verify.frames(2)
 
 -- W4: a shelf just past the threshold does not warn on this good.
-local past = (r.runway_use + r.runway_drain) * (k_threshold + 0.5)
+local past = (said.use + said.drain) * (k_threshold + 0.5)
 verify.set_input_shelf(picked.option.name, picked.market, past)
 verify.frames(2)
 local after = row_at(picked.x, picked.y)
 verify.expect(after ~= nil, "the row is still listed")
 if after ~= nil then
-    verify.expect(not (after.runway_warn and after.runway_good == r.runway_good),
+    verify.expect(not (after.runway_warn and read_sentence(after.runway_text).good == said.good),
                   string.format("W4: %.1f units, %.1f quarters, no warning on %s: %s", past, k_threshold + 0.5,
-                                r.runway_good, after.runway_text))
+                                said.good, after.runway_text))
+end
+
+-- W7: one quarter is singular.
+verify.set_input_shelf(picked.option.name, picked.market, said.use * 1.5)
+verify.frames(2)
+local single = row_at(picked.x, picked.y)
+verify.expect(single ~= nil and single.runway_warn, "W7: a quarter and a half warns")
+if single ~= nil and single.runway_warn then
+    print("shelf_runway_warning: single: " .. single.runway_text)
+    verify.expect(not has(single.runway_text, "1 quarters"), "W7: no '1 quarters': " .. single.runway_text)
+    verify.expect(has(single.runway_text, "about 1 quarter of"), "W7: 'about 1 quarter': " .. single.runway_text)
 end
 
 -- W5: a falling shelf, staged down a step a tick so the whole trail reads the fall.
@@ -237,19 +270,19 @@ local falling = row_at(picked.x, picked.y)
 verify.expect(falling ~= nil, "the row is still listed after the ticks")
 if falling ~= nil and falling.runway_warn then
     print("shelf_runway_warning: falling: " .. falling.runway_text)
-    verify.expect(falling.runway_known, "W5: the row has read the shelf's trail")
-    verify.expect(falling.runway_drain > 0.0, string.format("W5: the trail reads a fall (%.2f a quarter)", falling.runway_drain))
     verify.expect(has(falling.runway_text, "already falling"), "W5: the sentence says the shelf is falling")
-    verify.expect(near(falling.runway_quarters, k_stage / (falling.runway_use + falling.runway_drain)),
-                  "W5: the drain counts in the quarters")
+    verify.expect(not has(falling.runway_text, "alone"), "W5: a read trail does not say it knows the use alone")
+    verify.expect(agrees(read_sentence(falling.runway_text), k_stage), "W5: the drain counts in the quarters")
 else
     print("shelf_runway_warning: W5's row does not warn after the ticks: starved=" .. tostring(falling and falling.starved))
     verify.expect(falling ~= nil and falling.starved, "W5: the only reason not to warn is that it starved")
 end
 
--- W6: a load has no trail.
+-- W6: a load has no trail, and the sentence says it knows only the plant's own use.
 local path = "shelf_runway_warning.save"
-if verify.save(path) then
+local saved = verify.save(path)
+verify.expect(saved, "W6: the save is written")
+if saved then
     verify.expect(verify.load(path), "the save loads")
     verify.show_panel("build", true)
     verify.site_pick(picked.option.name)
@@ -257,17 +290,13 @@ if verify.save(path) then
     verify.set_input_shelf(picked.option.name, picked.market, k_stage)
     verify.frames(2)
     local loaded = row_at(picked.x, picked.y)
+    verify.expect(loaded ~= nil and loaded.runway_warn, "W6: the staged shelf warns after the load")
     if loaded ~= nil and loaded.runway_warn then
         print("shelf_runway_warning: after load: " .. loaded.runway_text)
-        verify.expect(not loaded.runway_known, "W6: a load has no shelf trail")
-        verify.expect(loaded.runway_drain == 0.0, "W6: and reads no fall")
-        verify.expect(not has(loaded.runway_text, "already falling"), "W6: and the sentence claims none")
-        verify.expect(near(loaded.runway_quarters, k_stage / loaded.runway_use), "W6: the reading is the plant's use alone")
-    else
-        print("shelf_runway_warning: W6's row does not warn after the load; went unexercised")
+        verify.expect(not has(loaded.runway_text, "already falling"), "W6: the sentence claims no fall")
+        verify.expect(has(loaded.runway_text, "its own use alone"), "W6: and says it knows only the plant's use")
+        verify.expect(agrees(read_sentence(loaded.runway_text), k_stage), "W6: the reading is the plant's use alone")
     end
-else
-    print("shelf_runway_warning: verify.save refused; W6 went unexercised")
 end
 
 verify.site_clear()
