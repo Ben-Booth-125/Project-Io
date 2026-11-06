@@ -345,7 +345,14 @@ inline constexpr uint32_t save_game_magic =
 /// so every resource_count-wide envelope array is one element longer. v24 stays readable
 /// with every such array read 54 wide (`k_resource_count_pre_airframes`), airframes empty;
 /// v23 and v22 still 49 wide.
-inline constexpr uint32_t save_game_version = 25; // BL-1436: the market history 55 series wide
+/// LAYOUT 26 (BL-1527, the seventh kit good, ship hulls): `resource_count` moved 55 -> 56, so
+/// every resource_count-wide envelope array is one element longer. v25 stays readable with
+/// every such array read 55 wide (`k_resource_count_pre_ship_hulls`), ship hulls empty.
+inline constexpr uint32_t save_game_version = 26; // BL-1527: the market history 56 series wide
+/// BL-1527: the first layout whose market history is 56 series wide.
+inline constexpr uint32_t save_game_version_ship_hulls = 26;
+/// BL-1527: v25, the v26 layout with the market history 55 series wide.
+inline constexpr uint32_t save_game_version_pre_ship_hulls = 25;
 /// BL-1436: the first layout whose market history is 55 series wide.
 inline constexpr uint32_t save_game_version_airframes = 25;
 /// BL-1436: v24, the v25 layout with the market history 54 series wide.

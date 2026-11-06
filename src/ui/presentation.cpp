@@ -170,6 +170,7 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Guided Weapons",     "GW",  IM_COL32(196, 104, 120, 255) }, // rose: electronics meets ordnance
     { "Drones",             "Drn", IM_COL32(128, 140, 170, 255) }, // slate blue
     { "Airframes",          "Afr", IM_COL32(150, 160, 176, 255) }, // BL-1436: aluminium grey, a hull's skin
+    { "Ship hulls",         "Shl", IM_COL32(112, 128, 144, 255) }, // BL-1527: naval grey
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the

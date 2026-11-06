@@ -1191,6 +1191,7 @@ void item(ImDrawList* dl, ImVec2 centre, float r, resource_type res)
         case resource_type::guided_weapons:        item_guided_weapons(dl, c, r, fill); return;
         case resource_type::drones:                item_drones(dl, c, r, fill);         return;
         case resource_type::airframes:             aircraft(dl, c, r, fill, true);      return; // the airbase's own shape
+        case resource_type::ship_hulls:            anchor(dl, c, r, fill);              return; // BL-1527: the port's own shape
         // RETIRED SLOT: nothing produces it and no market prices it, so no row
         // draws this. The crane is honest if an old save's shelf ever surfaces it.
         case resource_type::construction_capacity: under_construction(dl, c, r, fill); return;

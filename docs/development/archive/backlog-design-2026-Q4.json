@@ -14434,6 +14434,9 @@
         "title",
         "design"
       ]
+    },
+    "BL-1527": {
+      "design": "MILITARY.md § Sea, the kit; RESOURCES.md § The kit goods. One live design per class on the existing designer. Ship hulls is a new terminal good at the Arms Works, priced by the margin anchor. Refit at the home port. New good moves the recipe table, so read PRODUCTION.md first."
     }
   }
 }

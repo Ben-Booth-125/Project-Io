@@ -194,6 +194,9 @@ world_gen = {
             -- BL-1436, the sixth kit good, derived the same way: airframes
             -- 2 x (85 + 30.5 + 20.8 + 0.75) + 0.1.
             airframes              = 274.2,
+            -- BL-1527, the seventh kit good, derived the same way: ship hulls
+            -- 2 x (16.1 + 42.5 + 30.5 + 0.75) + 0.1.
+            ship_hulls             = 179.8,
         },
 
         -- Nation tradeable-resource concentration gates (BL-096): a nation

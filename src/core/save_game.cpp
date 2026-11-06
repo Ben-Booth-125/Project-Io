@@ -881,6 +881,7 @@ std::size_t envelope_resource_width(uint32_t version)
 {
     return version < save_game_version_kit_goods    ? k_resource_count_pre_kit_goods
          : version < save_game_version_airframes    ? k_resource_count_pre_airframes
+         : version < save_game_version_ship_hulls   ? k_resource_count_pre_ship_hulls
                                                     : resource_count;
 }
 
@@ -1001,7 +1002,8 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
     // the matching shape - for v23/v22, a v73 world snapshot (every per-resource array 49
     // wide) and an envelope whose endowments and market history are 49 wide (and, for
     // v22, no nation targets). The game writes only `write_save_game`.
-    if (version != save_game_version && version != save_game_version_pre_airframes
+    if (version != save_game_version && version != save_game_version_pre_ship_hulls
+        && version != save_game_version_pre_airframes
         && version != save_game_version_pre_kit_goods
         && version != save_game_version_prefix_compatible)
         return false;
@@ -1014,6 +1016,8 @@ bool write_save_game_at(const std::string& path, const world& w, const save_enve
         write_world_snapshot_pre_kit_goods(w, out);
     else if (version < save_game_version_airframes)
         write_world_snapshot_pre_airframes(w, out); // BL-1436: v24 carries a v75 world
+    else if (version < save_game_version_ship_hulls)
+        write_world_snapshot_pre_ship_kit(w, out); // BL-1527: v25 carries a v80 world
     else
         write_world_snapshot(w, out);
     w_envelope(out, env, version);
@@ -1035,7 +1039,8 @@ bool read_save_game(const std::string& path, world& w, save_envelope& env,
 
     uint32_t version = 0;
     if (!r_u32(in, version)
-        || (version != save_game_version && version != save_game_version_pre_airframes
+        || (version != save_game_version && version != save_game_version_pre_ship_hulls
+            && version != save_game_version_pre_airframes
             && version != save_game_version_pre_kit_goods
             && version != save_game_version_prefix_compatible))
         return false; // LAYOUT 25: v24 reads 54 wide (BL-1436); v23 and v22 49 wide (BL-1422)

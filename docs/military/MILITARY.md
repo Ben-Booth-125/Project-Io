@@ -675,7 +675,13 @@ design per class (§ The kit), refitting at the home port as kit arrives. The sl
 and sensors**, and a transport has no armament. Hull sets HP, speed, stealth and a transport's capacity,
 and draws ship hulls (`../economy/RESOURCES.md` § The kit goods). Armament sets attack and target mask,
 and draws artillery pieces or guided weapons. Sensors set detection, and draw electronics. Ship kit opens
-in the **Naval** research branch (`../economy/tech/DIGITISATION_TREE.md` § Naval).
+in the **Naval** research branch (`../economy/tech/DIGITISATION_TREE.md` § Naval). Armament may widen a
+class's mask, never so far that a capital ship can hit a submarine. Base kit draws nothing beyond the
+class's hire goods. A ship keeps the kit it recorded until it **refits**: lying at its home port with no
+mission, it buys each changed slot's goods and is out of action for its class's muster days. Its hull
+share is kept, so a ship refitted while damaged is still damaged. In refit it is in dock: it neither
+fights nor can be hit, still draws its quarterly supply, and does not mend. It is a fielded ship, not a
+hire: lose its port and it takes up another by the rule above, finishing the refit before it sails.
 
 **A ship sails, then works a zone (Ben, 2026-11-05).** A ship stands on one water tile, on coast and
 ocean alike, and moves tile by tile at its class's pace on the same day step as the march. It is drawn

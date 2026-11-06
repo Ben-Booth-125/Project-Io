@@ -1855,8 +1855,9 @@ int main()
         // BL-1436 (Ben, 2026-11-03, kit tree form ruling 6): a sixth kit good, airframes,
         // follows the five at v76 - the five stay five values past 49, airframes one more.
         static_assert(k_resource_count_pre_airframes == k_resource_count_pre_kit_goods + 5
-                          && resource_count == k_resource_count_pre_airframes + 1,
-                      "PK: the kit goods are five appended values, then airframes (BL-1436)");
+                          && k_resource_count_pre_ship_hulls == k_resource_count_pre_airframes + 1
+                          && resource_count == k_resource_count_pre_ship_hulls + 1,
+                      "PK: the kit goods are five appended values, then airframes (BL-1436), then ship hulls (BL-1527)");
         world k = w;
         entity_id mid = null_entity;
         for (const auto& [id, m] : k.markets)
@@ -1935,6 +1936,7 @@ int main()
         table[static_cast<std::size_t>(resource_type::guided_weapons)]    = 240.6f;
         table[dr] = 169.8f;
         table[static_cast<std::size_t>(resource_type::airframes)] = 274.2f; // BL-1436: the sixth
+        table[static_cast<std::size_t>(resource_type::ship_hulls)] = 179.8f; // BL-1527: the seventh
         world priced;
         bool priced_ok = false;
         {
@@ -2018,7 +2020,7 @@ int main()
             ok75 = m0.inventory[af] == 0.0f && m0.price[af] == 0.0f
                 && m0.price[st] == mk.price[st] && m0.inventory[st] == mk.inventory[st]
                 && old.tiles.size() == k.tiles.size() && b76.size() > b75.size()
-                && b76.size() - b75.size() == world_save_airframes_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_ships_section_bytes(k);
+                && b76.size() - b75.size() == world_save_airframes_bytes(k) + world_save_ship_hulls_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_ships_section_bytes(k);
         }
         check(ok75, "PA a v75 stream (arrays 54 wide) reads, airframes zero and the rest as written");
         std::string bad = b75;
@@ -2091,7 +2093,7 @@ int main()
         const bool ok76 = stamped == k_world_save_version_pre_contributors && from_bytes(b76, old)
             && old.sentiment.pairs == k.sentiment.pairs && old.sentiment.contributions.empty()
             && old.sentiment.seeds.empty()
-            && b77.size() - b76.size() == world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_ships_section_bytes(k);
+            && b77.size() - b76.size() == world_save_ship_hulls_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k) + world_save_ships_section_bytes(k);
         check(ok76, "PC a v76 stream reads, its rows whole and no provenance; v77 is v76 plus the section");
 
         // A share naming no row: splice the tail -- change the first share row's

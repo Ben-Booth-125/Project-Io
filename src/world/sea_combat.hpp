@@ -58,6 +58,19 @@ std::vector<uint16_t> available_ship_rows(const world& w, entity_id nation);
 /// A ship's class; `transport` for a row the table does not hold.
 ship_class ship_class_of(const sea_ship& s);
 
+/// BL-1527: what a ship fights with: its class's numbers plus the kit it recorded.
+struct ship_live_stats
+{
+    int     hp        = 1;
+    int     attack    = 0;
+    int     detection = 0;
+    int     stealth   = 0;
+    int     days_per_tile_permille = 1;
+    int     capacity  = 0;
+    uint8_t targets   = 0;
+};
+ship_live_stats ship_stats(const recipe_registry& reg, const sea_ship& s);
+
 /// The sea recruits a hire of @p row spends; 0 for a row the table does not hold.
 int ship_crew(const recipe_registry& reg, uint16_t row);
 
@@ -107,6 +120,19 @@ corp_command_result sea_mission_check(const world& w, const recipe_registry& reg
                                       entity_id nation, entity_id ship, uint32_t mission,
                                       const uint32_t* provinces, std::size_t n,
                                       std::vector<uint32_t>* out_set = nullptr);
+
+/// BL-1527: every check `set_ship_design` makes, READ-ONLY: the seat's nation alone
+/// (rejected_not_owner; no grant lets a rival design); the class, slot and item exist and
+/// fit (rejected_invalid); the item is researched (rejected_tech_locked); the slot does
+/// not already hold it (rejected_state).
+corp_command_result ship_design_check(const world& w, entity_id nation, uint32_t cls,
+                                      uint16_t slot, uint16_t item);
+
+/// BL-1527: every check `refit_ship` makes, READ-ONLY, in its order: the ship exists
+/// (rejected_invalid) and is @p nation's (rejected_not_owner); its kit differs from the
+/// live design, it is raised, and it has no mission to leave (rejected_state); it lies at
+/// its home port's mouth with no course (rejected_placement). The payment is the seam's.
+corp_command_result refit_ship_check(const world& w, entity_id nation, entity_id ship);
 
 /// Write a checked mission onto @p s and set its course: to the zone's nearest tile, or
 /// home for `none`. A ship that has broken off keeps its course home and takes the new

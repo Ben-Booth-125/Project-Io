@@ -456,6 +456,8 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::assign_air_mission: return "air mission"; // BL-1449
         case corp_verb::hire_ship:       return "hire ship";      // BL-1430
         case corp_verb::assign_sea_mission: return "sea mission"; // BL-1430
+        case corp_verb::set_ship_design: return "ship design";    // BL-1527: never issued by a rival
+        case corp_verb::refit_ship:      return "ship refit";     // BL-1527
         case corp_verb::set_air_design:  return "air design";     // BL-1449: never issued by a rival
         case corp_verb::declare_war:     return "war declaration"; // BL-1459
         case corp_verb::answer_war:      return "war answer";      // BL-1459

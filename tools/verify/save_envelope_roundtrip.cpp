@@ -1021,7 +1021,7 @@ int main()
     // world a v75 snapshot, reads whole: the first 54 slots as written, airframes 0.
     // -----------------------------------------------------------------------
     {
-        static_assert(save_game_version == 25 && save_game_version_pre_airframes == 24,
+        static_assert(save_game_version_airframes == 25 && save_game_version_pre_airframes == 24,
                       "S9c pins v25 as airframes' envelope layout");
         world w = make_world();
         save_envelope env = make_envelope();
@@ -1062,6 +1062,54 @@ int main()
         be.speed = 77;
         check(!read_save_game(k_path, bw, be) && be.speed == 77,
               "S9c a 54-wide file stamped v25 is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // S9d -- BL-1527 (save_game_version 26): a v25 envelope, its arrays 55 wide and its
+    // world a v80 snapshot, reads whole: the first 55 slots as written, ship hulls 0.
+    // -----------------------------------------------------------------------
+    {
+        static_assert(save_game_version == 26 && save_game_version_pre_ship_hulls == 25,
+                      "S9d pins v26 as ship hulls' envelope layout");
+        world w = make_world();
+        save_envelope env = make_envelope();
+        if (!env.report.bodies.empty())
+        {
+            auto& st = env.report.bodies[0].state.endowment;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                st[r] = 1.0f + 0.125f * static_cast<float>(r);
+            env.report.bodies[0].undrawn.endowment = st;
+        }
+        check(write_save_game_at(k_path, w, env, save_game_version_pre_ship_hulls),
+              "S9d the verification writer wrote a v25 file");
+        world         lw;
+        save_envelope le;
+        const bool ok = read_save_game(k_path, lw, le);
+        bool endow = ok && !le.report.bodies.empty();
+        if (endow)
+        {
+            const auto& got = le.report.bodies[0].state.endowment;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float want = r < k_resource_count_pre_ship_hulls ? 1.0f + 0.125f * static_cast<float>(r) : 0.0f;
+                endow = endow && got[r] == want;
+            }
+        }
+        check(endow && same_market_history(le.market_history, env.market_history)
+                  && le.planetary_pan_y == env.planetary_pan_y
+                  && le.params.major_target == env.params.major_target,
+              "S9d a v25 file reads whole: its 55 endowment slots as written, ship hulls 0, everything after intact");
+        {
+            std::fstream f(k_path, std::ios::binary | std::ios::in | std::ios::out);
+            f.seekp(4, std::ios::beg);
+            const uint32_t v26 = save_game_version_ship_hulls;
+            f.write(reinterpret_cast<const char*>(&v26), sizeof(v26));
+        }
+        world         bw;
+        save_envelope be;
+        be.speed = 77;
+        check(!read_save_game(k_path, bw, be) && be.speed == 77,
+              "S9d a 55-wide file stamped v26 is REFUSED, destination untouched");
     }
 
     // -----------------------------------------------------------------------

@@ -900,6 +900,14 @@
   [
    "gameplay.assign_sea_mission",
    "A corp_verb (corp_verb::assign_sea_mission, 56) on the command seam."
+  ],
+  [
+   "gameplay.set_ship_design",
+   "A corp_verb (corp_verb::set_ship_design, 57) on the command seam."
+  ],
+  [
+   "gameplay.refit_ship",
+   "A corp_verb (corp_verb::refit_ship, 58) on the command seam."
   ]
  ]
 }

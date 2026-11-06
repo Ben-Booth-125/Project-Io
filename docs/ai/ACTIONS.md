@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*225 entries — 56 gameplay · 39 canvas · 15 lens · 75 ledger · 40 chrome.*
+*227 entries — 58 gameplay · 39 canvas · 15 lens · 75 ledger · 40 chrome.*
 
 ---
 
@@ -1052,9 +1052,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - unit_type names a sea row (rejected_invalid otherwise) the nation's shelves can field now, by the land rows' binary gate (rejected_invalid otherwise).
 - tile is a tile (rejected_invalid) carrying the actor's own completed port with water at its mouth (rejected_placement).
 - The nation's sea pool holds the class's crew (rejected_no_recruits).
-- Its uncommitted treasury covers the class's credits and hire goods, and its shelves hold those goods (rejected_funds).
+- Its uncommitted treasury covers the class's credits with the hire goods and its live design's kit goods, and its shelves hold those goods (rejected_funds).
 
-**Expected output.** The credits, goods and crew are spent and the ship is created at the port's mouth with the class's muster days to run, doing nothing until they end. Its id returns through out_building. Saved (world_save_version 80).
+**Expected output.** The credits, goods and crew are spent and the ship is created at the port's mouth with the class's muster days to run, doing nothing until they end. Its id returns through out_building. The ship records the class's live design. Saved (world_save_version 80).
 
 **Reason to select.** Raise a ship: submarines to raid, destroyers to find them, capital ships to hold water, transports to carry an army.
 
@@ -1079,6 +1079,44 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The ship sets its course: it sails tile by tile to the zone's nearest tile and works it, its day spread over the provinces; on none it sails home. A ship that has broken off keeps its course home and takes the mission up once mended. Saved (world_save_version 80).
 
 **Reason to select.** Put a raised ship to work: hunt hostile ships, cover or raid sea lanes, or stand off a hostile port.
+
+### `gameplay.set_ship_design` — A corp_verb (corp_verb::set_ship_design, 57) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=57 order=<ship class> recipe=<slot> unit_type=<ship kit id>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `order` | `uint32 ship_class` | 0 submarine, 1 destroyer, 2 capital ship, 3 transport. |
+| `recipe` | `uint16 slot` | The slot: 0 hull, 1 armament, 2 sensors. A transport has no armament. |
+| `unit_type` | `uint16 ship kit id` | A ship_kit_catalogue() id (src/world/unit_designs.hpp) that fits that class and slot; the slot's base item puts it back to base kit. |
+
+**Valid when:**
+- The actor is the seat's nation (rejected_not_owner otherwise): no grant lets a rival design, so rivals sail base kit.
+- The class, slot and item exist and the item fits that class and slot (rejected_invalid otherwise).
+- The item is researched (rejected_tech_locked otherwise); base kit always is.
+- The slot does not already hold it (rejected_state otherwise). A refusal mutates nothing.
+
+**Expected output.** The class's live ship design holds the item (nation_component::ship_design_kit). The next ship hired of that class records the design and buys its kit goods; ships already at sea keep their kit until refitted. Saved (world_save_version 81).
+
+**Reason to select.** Field better ships as research opens new hulls, armament and sensors.
+
+### `gameplay.refit_ship` — A corp_verb (corp_verb::refit_ship, 58) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=58 subject=<ship id>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (ship)` | The ship to refit to its class's live design. |
+
+**Valid when:**
+- The ship exists (rejected_invalid) and is the actor's (rejected_not_owner).
+- Its kit differs from the live design, it is not raising or refitting, and it holds no mission, a broken-off ship's included (rejected_state).
+- It lies at the mouth of its home port, still its nation's standing port, with no course (rejected_placement).
+- Its uncommitted treasury covers the changed slots' goods and its shelves hold them (rejected_funds). A refusal mutates nothing.
+
+**Expected output.** The goods of each changed slot are spent, the ship records the live design, and it is out of action for its class's muster days. Its hull share is kept.
+
+**Reason to select.** Bring a ship in port up to the design research has opened since it was raised.
 
 ---
 

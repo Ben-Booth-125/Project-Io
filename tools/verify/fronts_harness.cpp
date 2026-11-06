@@ -1305,7 +1305,7 @@ int main()
             const std::string v77 = o.str();
             world old;
             check(from_bytes(v77, old) && old.tile_occupier.empty()
-                      && v77.size() + world_save_occupation_section_bytes(clean) + world_save_defend_section_bytes(clean) + world_save_ships_section_bytes(clean) == to_bytes(clean).size(),
+                      && v77.size() + world_save_occupation_section_bytes(clean) + world_save_defend_section_bytes(clean) + world_save_ships_section_bytes(clean) + world_save_ship_hulls_bytes(clean) /* BL-1527 */ == to_bytes(clean).size(),
                   "F11n a v77 stream reads as nothing occupied; v78 is v77 plus the section");
         }
         // A world saved on the day a tile fell replays as the unbroken one does.
@@ -1454,7 +1454,7 @@ int main()
             write_world_snapshot_pre_defend(f.w, o);
             world old;
             check(from_bytes(o.str(), old) && old.units.at(d).defend_province == no_province
-                      && o.str().size() + world_save_defend_section_bytes(f.w) + world_save_ships_section_bytes(f.w) == b.size(),
+                      && o.str().size() + world_save_defend_section_bytes(f.w) + world_save_ships_section_bytes(f.w) + world_save_ship_hulls_bytes(f.w) /* BL-1527 */ == b.size(),
                   "F12u a v78 stream reads as nobody defending; v79 is v78 plus the section");
         }
 

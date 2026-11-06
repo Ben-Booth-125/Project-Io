@@ -109,6 +109,8 @@ const VERBS = [
   'defend_province',                                   // BL-1504 -- unit subject defends province (a province id); no province clears the order
   'hire_ship',                                         // BL-1430 -- raise a ship of sea row unit_type at the actor's own port on tile
   'assign_sea_mission',                                // BL-1430 -- give ship subject mission order (0 none, 1 patrol, 2 escort, 3 raid, 4 blockade) over provinces (1-8 sea provinces; none for order 0)
+  'set_ship_design',                                   // BL-1527 -- the seat's nation fits ship kit item unit_type into slot recipe (0 hull, 1 armament, 2 sensors) of ship class order
+  'refit_ship',                                        // BL-1527 -- ship subject, at its home port with no mission, refits to its class's live design
 ];
 
 // io::dg::node_count (src/world/digitisation_tree_data.hpp, generated from

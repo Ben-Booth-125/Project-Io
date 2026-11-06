@@ -348,6 +348,7 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::assign_air_mission: // BL-1449: a nation's own wing
         case corp_verb::hire_ship:          // BL-1430: a nation's own port
         case corp_verb::assign_sea_mission: // BL-1430: a nation's own ship
+        case corp_verb::refit_ship:         // BL-1527: a nation's own ship
         case corp_verb::place_road:
         case corp_verb::set_trade:
         case corp_verb::clear_trade:
@@ -511,6 +512,28 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
                                }),
                 v.end());
         if (air_kit_variant_of(cmd.unit_type) != 0)
+            v.insert(std::lower_bound(v.begin(), v.end(), cmd.unit_type), cmd.unit_type);
+        return corp_command_result::applied;
+    }
+
+    // BL-1527 (MILITARY.md § Sea): the seat fits one ship kit item into one slot of its
+    // live ship design, as set_air_design does for an air class. Every check first.
+    if (cmd.verb == corp_verb::set_ship_design)
+    {
+        const corp_command_result r =
+            ship_design_check(w, nation, cmd.order, cmd.recipe, cmd.unit_type);
+        if (r != corp_command_result::applied)
+            return r;
+        const std::vector<ship_kit_item>& cat = ship_kit_catalogue();
+        const ship_kit_item& it = cat[cmd.unit_type];
+        std::vector<uint16_t>& v = w.nations.at(nation).ship_design_kit;
+        v.erase(std::remove_if(v.begin(), v.end(),
+                               [&](uint16_t id) {
+                                   return id < cat.size() && cat[id].cls == it.cls
+                                       && cat[id].slot == it.slot;
+                               }),
+                v.end());
+        if (ship_kit_variant_of(cmd.unit_type) != 0)
             v.insert(std::lower_bound(v.begin(), v.end(), cmd.unit_type), cmd.unit_type);
         return corp_command_result::applied;
     }
@@ -1146,14 +1169,19 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 return r;
             const ship_class cls = ship_roster_table()[cmd.unit_type].cls;
             const ship_class_stats& cs = reg.military().sea.cls[static_cast<std::size_t>(cls)];
-            // Both legs checked before either is taken.
+            // Both legs checked before either is taken: the class's credits, and its
+            // hire goods with its live ship design's kit goods (BL-1527), off the shelves.
             if (purse_room_of(w, cmd.corp) < cs.hire_cost)
                 return corp_command_result::rejected_funds;
-            if (!hire_goods_affordable(w, cmd.corp, nullptr, cs.hire_goods))
+            const unit_design design = ship_design_of(w, cmd.corp, cls);
+            std::array<float, resource_count> goods = ship_kit_goods(cls, design);
+            for (std::size_t g = 0; g < resource_count; ++g)
+                goods[g] += cs.hire_goods[g];
+            if (!hire_goods_affordable(w, cmd.corp, nullptr, goods))
                 return corp_command_result::rejected_funds;
-            if (purse_room_of(w, cmd.corp) < cs.hire_cost + hire_goods_price_bound(w, cmd.corp, cs.hire_goods))
+            if (purse_room_of(w, cmd.corp) < cs.hire_cost + hire_goods_price_bound(w, cmd.corp, goods))
                 return corp_command_result::rejected_funds;
-            debit_kit_goods(w, cmd.corp, cs.hire_goods);
+            debit_kit_goods(w, cmd.corp, goods);
             *purse_of(w, cmd.corp) -= cs.hire_cost;
             w.nations.at(cmd.corp).sea_recruits -= ship_crew(reg, cmd.unit_type);
 
@@ -1164,6 +1192,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             s.tile        = port_mouth_tile(w, port);
             s.type        = cmd.unit_type;
             s.muster_days = cs.muster_days;
+            s.kit         = design;
             w.ships.emplace(sid, std::move(s));
             if (out_building)
                 *out_building = sid;
@@ -1179,6 +1208,28 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (r != corp_command_result::applied)
                 return r;
             set_ship_mission(w, w.ships.at(cmd.subject), static_cast<sea_mission>(cmd.order), std::move(set));
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::refit_ship:
+        {
+            // BL-1527 (MILITARY.md § Sea): at the home port, for the changed slots' goods,
+            // out of action for its class's muster days. Every check before anything is taken.
+            const corp_command_result r = refit_ship_check(w, cmd.corp, cmd.subject);
+            if (r != corp_command_result::applied)
+                return r;
+            sea_ship& s = w.ships.at(cmd.subject);
+            const ship_class cls = ship_class_of(s);
+            const unit_design live = ship_design_of(w, cmd.corp, cls);
+            const std::array<float, resource_count> goods = ship_kit_refit_goods(cls, s.kit, live);
+            if (!hire_goods_affordable(w, cmd.corp, nullptr, goods))
+                return corp_command_result::rejected_funds;
+            if (purse_room_of(w, cmd.corp) < hire_goods_price_bound(w, cmd.corp, goods))
+                return corp_command_result::rejected_funds;
+            debit_kit_goods(w, cmd.corp, goods);
+            s.kit = live;
+            s.muster_days = reg.military().sea.cls[static_cast<std::size_t>(cls)].muster_days;
+            s.refitting = true;
             return corp_command_result::applied;
         }
 

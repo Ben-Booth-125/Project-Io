@@ -1085,7 +1085,7 @@
    "design": "MEASURE FIRST. Raiding and blockade are worth only what crosses the water. Per library seed and per major: the share of landed cargo value on a sea leg, the same for a nation's imports, and how many ports carry it. Goldens cannot see trade, so this is a harness reading on the shipped start. If the share is small, that is a finding to raise with Ben before patrol, escort and raid are tuned. Run after sprint 63's economy wave."
   },
   {
-   "status": "proposed",
+   "status": "complete",
    "glyph": "○",
    "sprint": "64",
    "version_goal": "v0.3.0",
@@ -1108,7 +1108,9 @@
     "scripts/economy.lua"
    ],
    "title": "Ship designs: hull, armament and sensor slots, and the ship hulls good",
-   "design": "MILITARY.md § Sea, the kit; RESOURCES.md § The kit goods. One live design per class on the existing designer. Ship hulls is a new terminal good at the Arms Works, priced by the margin anchor. Refit at the home port. New good moves the recipe table, so read PRODUCTION.md first."
+   "resolved": "2026-11-06",
+   "design": "@docs/development/archive/backlog-design-2026-Q4.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
    "status": "proposed",
@@ -1214,7 +1216,7 @@
     "src/world/fronts.cpp"
    ],
    "title": "Transports embark land units and land them on a coast, gated by sea control",
-   "design": "MILITARY.md § Sea, landings; § Domains and traversal. Embark, carried supplies aboard, loss with a sunk transport, the landing door, the attacker's opening penalty, and life on carried supplies until the network reaches. Read Fronts and Occupation first: a landed unit's front and a taken port's effect on reach are the seams. Live click required."
+   "design": "MILITARY.md § Sea, landings; § Domains and traversal. Embark, carried supplies aboard, loss with a sunk transport, the landing door, the attacker's opening penalty, and life on carried supplies until the network reaches. Read Fronts and Occupation first: a landed unit's front and a taken port's effect on reach are the seams. Live click required. A ship class has no base capacity yet: this item adds it, and is the first reader of ship_live_stats::capacity, which a transport hull already moves."
   },
   {
    "status": "proposed",
@@ -1296,7 +1298,7 @@
     "docs/ui/ICONS.md"
    ],
    "title": "The Sea tab, ships on the canvas, the mission right-click, and landing presses",
-   "design": "ledgers/military.md; MILITARY.md § Sea. Replace the stub tab, draw ships on water with class and owner, and add mission assignment by right-click, embark and land presses, a closed-port mark on the map, and raid causes in the Convoys ledger. Every control updates ACTIONS.json and every surface the question log. Every press needs a live click."
+   "design": "ledgers/military.md; MILITARY.md § Sea. Replace the stub tab, draw ships on water with class and owner, and add mission assignment by right-click, embark and land presses, a closed-port mark on the map, and raid causes in the Convoys ledger. Every control updates ACTIONS.json and every surface the question log. Every press needs a live click. The ship classes join the existing unit designer (set_ship_design), and a refit press sits on a ship at its home port (refit_ship): both verbs are on the seam with no player surface until this item."
   },
   {
    "status": "proposed",

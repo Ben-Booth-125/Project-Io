@@ -621,6 +621,7 @@ uint64_t world::state_hash(int tick) const
             fnv1a_i32(h, s.morale_permille);
             fnv1a_i32(h, s.supply_factor_permille);
             fnv1a_i32(h, s.muster_days);
+            fnv1a_u32(h, s.refitting ? 1u : 0u);
             fnv1a_i32(h, s.sail_bank_permille);
             fnv1a_u32(h, s.returning ? 1u : 0u);
             for (const uint8_t v : s.kit.fit) fnv1a_u32(h, v);
@@ -672,6 +673,25 @@ uint64_t world::state_hash(int tick) const
             for (const entity_id nid : designed)
             {
                 const std::vector<uint16_t>& v = nations.at(nid).air_design_kit;
+                fnv1a_u32(h, nid);
+                fnv1a_u32(h, static_cast<uint32_t>(v.size()));
+                for (const uint16_t r : v) fnv1a_u32(h, r);
+            }
+        }
+    }
+    {
+        // BL-1527: folded only when a nation holds one, as the air designs are.
+        std::vector<entity_id> designed;
+        for (const auto& [nid, nc] : nations)
+            if (!nc.ship_design_kit.empty())
+                designed.push_back(nid);
+        if (!designed.empty())
+        {
+            std::sort(designed.begin(), designed.end());
+            fnv1a_u32(h, 0x53445347u); // "SDSG"
+            for (const entity_id nid : designed)
+            {
+                const std::vector<uint16_t>& v = nations.at(nid).ship_design_kit;
                 fnv1a_u32(h, nid);
                 fnv1a_u32(h, static_cast<uint32_t>(v.size()));
                 for (const uint16_t r : v) fnv1a_u32(h, r);

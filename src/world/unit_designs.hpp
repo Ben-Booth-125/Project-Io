@@ -225,3 +225,90 @@ std::array<float, resource_count> air_kit_goods(air_class c, const unit_design& 
 
 /// Is @p d a design @p c can hold (each variant inside its slot's list)? The save loader's check.
 bool air_design_valid(air_class c, const unit_design& d);
+
+// ===========================================================================
+// BL-1527 — SHIP designs (MILITARY.md § Sea: "one live design per class ... The
+// slots are hull, armament and sensors, and a transport has no armament")
+// ===========================================================================
+// The ship classes' own catalogue, on the air catalogue's rules. Hull sets HP, pace,
+// stealth and a transport's capacity; armament sets attack and widens the target mask;
+// sensors set detection. A nation's live ship designs are `nation_component::
+// ship_design_kit`; a ship records the design it was raised or refitted to
+// (`sea_ship::kit`). Each later item names a node of the age tree's Naval branch.
+
+/// A ship kit item's ADDITION to its class's numbers (ship_class_stats, Lua).
+struct ship_combat_stats
+{
+    int     hp        = 0;
+    int     attack    = 0;
+    int     detection = 0;
+    int     stealth   = 0;
+    int     days_per_tile_permille = 0; ///< Negative is faster.
+    int     capacity  = 0; ///< Land units carried (a transport's hull).
+    uint8_t targets   = 0; ///< Bits (1 << ship_class) the item adds to the target mask.
+};
+
+inline constexpr int k_ship_kit_slot_count = 3; ///< Hull · Armament · Sensors.
+
+struct ship_kit_item
+{
+    const char*       id;
+    const char*       name;          ///< Mechanism name. Never an Earth proper noun.
+    ship_class        cls;
+    uint8_t           slot;          ///< < k_ship_kit_slot_count.
+    ship_combat_stats delta;
+    std::array<kit_good, k_kit_goods_max> goods;
+    uint8_t           goods_count;
+    const char*       research_node; ///< nullptr for base kit.
+};
+
+/// Every ship kit item, in id order (the id is the index).
+const std::vector<ship_kit_item>& ship_kit_catalogue();
+
+/// nullptr when the ship catalogue is well-formed, else the first rule it breaks. On top
+/// of the air rules: a transport's armament slot holds no item, and no capital ship item
+/// adds submarines to the mask (a capital ship cannot hit one).
+const char* ship_kit_catalogue_first_error();
+
+/// "Hull", "Armament", "Sensors"; "" out of range.
+const char* ship_kit_slot_name(int slot);
+
+/// The ship catalogue ids fitting (@p c, @p slot), base first. Empty out of range and
+/// for a transport's armament.
+const std::vector<uint16_t>& ship_kit_items_for(ship_class c, int slot);
+
+/// The ship catalogue id of variant @p variant of (@p c, @p slot), or k_no_kit_item.
+uint16_t ship_kit_item_at(ship_class c, int slot, uint8_t variant);
+
+/// The ship catalogue id with string id @p id, or k_no_kit_item.
+uint16_t ship_kit_item_by_id(std::string_view id);
+
+/// The variant of ship catalogue item @p item within its slot; 0 for an unknown item.
+uint8_t ship_kit_variant_of(uint16_t item);
+
+/// The lock rule: base always; a later item when @p nation holds its research node (or
+/// the harness waiver is on). A node not in the tree is held by nobody.
+bool ship_kit_item_researched(const world& w, entity_id nation, uint16_t item);
+
+/// @p nation's live ship design for @p c (base kit except where `ship_design_kit` names an item).
+unit_design ship_design_of(const world& w, entity_id nation, ship_class c);
+
+/// The ship catalogue id fitted in @p slot of @p nation's live design for @p c, or
+/// k_no_kit_item for a slot the class lacks.
+uint16_t ship_design_fitted(const world& w, entity_id nation, ship_class c, int slot);
+
+/// The sum of design @p d's kit deltas for @p c; `targets` the union. A variant out of
+/// range reads as base.
+ship_combat_stats ship_kit_delta(ship_class c, const unit_design& d);
+
+/// The goods of every non-base item of @p d: what a ship hire to it buys.
+std::array<float, resource_count> ship_kit_goods(ship_class c, const unit_design& d);
+
+/// The goods a refit from @p from to @p to buys: each slot whose item changes buys the
+/// new item's goods (a slot going back to base buys nothing).
+std::array<float, resource_count> ship_kit_refit_goods(ship_class c, const unit_design& from,
+                                                       const unit_design& to);
+
+/// Is @p d a design @p c can hold (each variant inside its slot's list, 0 for a slot the
+/// class lacks)? The save loader's check.
+bool ship_design_valid(ship_class c, const unit_design& d);

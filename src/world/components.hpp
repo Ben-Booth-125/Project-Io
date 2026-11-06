@@ -280,7 +280,14 @@ enum class resource_type : uint8_t
     // widens 54 -> 55, and a v74/v75 stream is read 54 wide
     // (`k_resource_count_pre_airframes`), an older one 49 wide, the new good zero.
     airframes              = 54, ///< Arms Works, from alloys + machinery + electronics. Manned airframes.
-    count                  = 55
+
+    // --- The seventh kit good (BL-1527; Ben, 2026-11-05, MILITARY.md § Sea) ---
+    //
+    // Ship hulls: what every later ship hull item draws. Made from steel, alloys and
+    // machinery at the Arms Works. world_save_version bumped 80 -> 81 for this append: a
+    // v76..v80 stream is read 55 wide (`k_resource_count_pre_ship_hulls`), the new good zero.
+    ship_hulls             = 55, ///< Arms Works, from steel + alloys + machinery. Later ship hulls.
+    count                  = 56
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);
@@ -292,6 +299,10 @@ static constexpr std::size_t k_resource_count_pre_kit_goods = 49;
 /// BL-1436: the roster's width before airframes was appended (v74 and v75 streams carry
 /// per-resource arrays this wide).
 static constexpr std::size_t k_resource_count_pre_airframes = 54;
+
+/// BL-1527: the roster's width before ship hulls was appended (v76..v80 streams carry
+/// per-resource arrays this wide).
+static constexpr std::size_t k_resource_count_pre_ship_hulls = 55;
 
 // ===========================================================================
 // BL-762 — where a resource CAME FROM
@@ -407,6 +418,7 @@ constexpr resource_origin resource_origin_of(resource_type r)
         case resource_type::guided_weapons:
         case resource_type::drones:
         case resource_type::airframes:
+        case resource_type::ship_hulls:
             return resource_origin::manufactured;
 
         case resource_type::count:
@@ -2198,6 +2210,7 @@ struct sea_ship
     int32_t   morale_permille        = 1000; ///< Scales its attack.
     int32_t   supply_factor_permille = 1000; ///< Steered by its upkeep draw, as a unit's.
     int32_t   muster_days = 0;         ///< Days left raising it; it does nothing until 0.
+    bool      refitting = false;       ///< Those days are a refit's: a fielded ship, not a hire.
     int32_t   sail_bank_permille = 0;  ///< Part of a tile sailed, per-mille of a day.
     bool      returning = false;       ///< Broken off: making for home until mended.
     unit_design kit{};                 ///< The design it was raised to (hull/armament/sensors).
@@ -2744,6 +2757,10 @@ struct nation_component
     /// of every non-base item fitted, at most one per (air class, slot), ascending.
     /// Written only by `set_air_design`. Saved (world_save_version 65).
     std::vector<uint16_t> air_design_kit;
+    /// BL-1527 (MILITARY.md § Sea): the ship kit catalogue ids of the NON-BASE items of
+    /// this nation's live ship designs (unit_designs.hpp `ship_kit_catalogue`), ascending,
+    /// at most one per (class, slot). Written only by `set_ship_design`. Saved (v81).
+    std::vector<uint16_t> ship_design_kit;
 
     /// BL-1463 (MILITARY.md § Recruits, Ben 2026-10-30): the nation's ONE land pool and
     /// ONE air pool of recruits, in heads. Filled each quarter by its bases

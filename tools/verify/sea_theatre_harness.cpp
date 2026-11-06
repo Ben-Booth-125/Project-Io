@@ -18,6 +18,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/sea_combat.hpp"
 #include "world/stance.hpp"
+#include "world/unit_designs.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 
@@ -88,7 +89,9 @@ entity_id add_market(fixture& f, int c, int r, float shelf)
     mc.centre_tile = tile(f, c, r);
     for (const resource_type g : {resource_type::steel, resource_type::machinery, resource_type::alloys,
                                   resource_type::electronics, resource_type::refined_fuel,
-                                  resource_type::iron_ore, resource_type::petroleum})
+                                  resource_type::iron_ore, resource_type::petroleum,
+                                  resource_type::ship_hulls, resource_type::guided_weapons,
+                                  resource_type::artillery_pieces})
     {
         const std::size_t i = static_cast<std::size_t>(g);
         mc.base_price[i] = 10.0f; mc.price[i] = 10.0f; mc.inventory[i] = shelf;
@@ -180,6 +183,11 @@ entity_id add_ship(fixture& f, entity_id owner, entity_id port, uint16_t row, in
     s.owner = owner; s.home_port = port; s.type = row; s.tile = tile(f, c, r);
     f.w.ships.emplace(id, std::move(s));
     return id;
+}
+
+const sea_ship& add_ship_ref(fixture& f, entity_id owner, entity_id port, uint16_t row, int c, int r)
+{
+    return f.w.ships.at(add_ship(f, owner, port, row, c, r));
 }
 
 void days(fixture& f, const recipe_registry& reg, int n, int from = 0)
@@ -701,8 +709,8 @@ int main()
 
         std::ostringstream o(std::ios::binary);
         write_world_snapshot_pre_ships(f.w, o);
-        check(o.str().size() + world_save_ships_section_bytes(f.w) == b.size(),
-              "R5f v79 is a strict prefix of v80, the section its measured size");
+        check(o.str().size() + world_save_ships_section_bytes(f.w) + world_save_ship_hulls_bytes(f.w) == b.size(),
+              "R5f v79 is v81 less the tail and ship hulls' column, each its measured size");
         world older;
         std::istringstream in(o.str(), std::ios::binary);
         check(read_world_snapshot(older, in) && older.ships.empty(), "R5g v79 reads as no ship");
@@ -734,7 +742,7 @@ int main()
         check(corrupt(34, 0xFFFFFFFFu) && corrupt(34, 3651u), "R5r a muster out of domain is refused");
         check(corrupt(38, 0xFFFFFFFFu), "R5s a negative sail bank is refused");
         check(corrupt_n(42, 2u, 1), "R5t a returning flag past 1 is refused");
-        check(corrupt_n(43, 1u, 1), "R5u a kit fit before the ship designer is refused");
+        check(corrupt_n(43, 9u, 1), "R5u a kit variant the class lacks is refused");
         check(corrupt_n(43 + K, 9u, 1), "R5v an unknown mission is refused");
         check(corrupt(44 + K, 0u) && corrupt(44 + K, 9u), "R5w a zone empty under a mission, or past eight, is refused");
         check(corrupt(48 + K, strip(f, 0)), "R5x a land province as a zone is refused");
@@ -766,6 +774,254 @@ int main()
         run_ship_upkeep(f.w, reg, r1);
         run_ship_upkeep(loaded, reg, r2);
         check(r1.ship_upkeep.rehomed == r2.ship_upkeep.rehomed && to_bytes(loaded) == to_bytes(f.w), "R5ag the quarter plays the same either side");
+    }
+
+
+    // ---- BL-1527: the ship kit (MILITARY.md § Sea) ------------------------------------
+    {
+        check(ship_kit_catalogue_first_error() == nullptr && ship_kit_catalogue().size() == 33,
+              "K1 the catalogue is well-formed, 33 items");
+        check(ship_kit_items_for(ship_class::transport, 1).empty() && ship_kit_items_for(ship_class::transport, 0).size() == 3,
+              "K1b a transport has no armament, and a hull");
+        bool cap_never = true;
+        for (const ship_kit_item& it : ship_kit_catalogue())
+            if (it.cls == ship_class::capital && (it.delta.targets & ship_class_bit(ship_class::submarine)))
+                cap_never = false;
+        check(cap_never, "K1c no capital item can hit a submarine");
+        bool hulls_draw = true;
+        for (const uint16_t id : ship_kit_items_for(ship_class::destroyer, 0))
+        {
+            const ship_kit_item& it = ship_kit_catalogue()[id];
+            if (it.research_node != nullptr && it.goods[0].res != resource_type::ship_hulls)
+                hulls_draw = false;
+        }
+        check(hulls_draw && std::string(ship_kit_slot_name(0)) == "Hull" && std::string(ship_kit_slot_name(2)) == "Sensors",
+              "K1d later hulls draw ship hulls; slots are named");
+    }
+    {
+        // The designer's refusals, on the seam. The lock first: no waiver.
+        const recipe_registry reg = make_registry();
+        fixture f; build(f);
+        const uint16_t gas = ship_kit_item_by_id("des.hull.gas_turbine");
+        const auto fit = [&](entity_id actor, uint32_t cls, uint16_t slot, uint16_t item) {
+            corp_command c;
+            c.tick = 1; c.corp = actor; c.verb = corp_verb::set_ship_design;
+            c.order = cls; c.recipe = slot; c.unit_type = item;
+            return apply_corp_command(f.w, reg, c);
+        };
+        const uint32_t D = static_cast<uint32_t>(ship_class::destroyer);
+        const uint32_t T = static_cast<uint32_t>(ship_class::transport);
+        refused(f, [&] { return fit(f.a, D, 0, gas); }, corp_command_result::rejected_tech_locked, "K2 a later item is locked until researched");
+        set_kit_research_waived_for_harness(true);
+        refused(f, [&] { return fit(f.b, D, 0, gas); }, corp_command_result::rejected_not_owner, "K2b a rival cannot design");
+        refused(f, [&] { return fit(f.a, 9, 0, gas); }, corp_command_result::rejected_invalid, "K2c no such class");
+        refused(f, [&] { return fit(f.a, D, 9, gas); }, corp_command_result::rejected_invalid, "K2d no such slot");
+        refused(f, [&] { return fit(f.a, D, 1, gas); }, corp_command_result::rejected_invalid, "K2e the item fits another slot");
+        refused(f, [&] { return fit(f.a, D, 0, 60000); }, corp_command_result::rejected_invalid, "K2f no such item");
+        refused(f, [&] { return fit(f.a, T, 1, ship_kit_item_by_id("des.armament.rocket")); }, corp_command_result::rejected_invalid, "K2g a transport takes no armament");
+        refused(f, [&] { return fit(f.a, D, 0, ship_kit_item_by_id("des.hull.flush_deck")); }, corp_command_result::rejected_state, "K2h the slot already holds base");
+        const std::uint64_t h0 = f.w.state_hash(1);
+        check(fit(f.a, D, 0, gas) == corp_command_result::applied && ship_design_fitted(f.w, f.a, ship_class::destroyer, 0) == gas,
+              "K3 a researched item fits");
+        check(f.w.state_hash(1) != h0, "K3b the design is in the digest");
+        refused(f, [&] { return fit(f.a, D, 0, gas); }, corp_command_result::rejected_state, "K3c fitting it twice is refused");
+
+        // The hire records the design and buys its kit.
+        const std::size_t SH = static_cast<std::size_t>(resource_type::ship_hulls);
+        const float sh0 = f.w.markets.at(f.a_market).inventory[SH];
+        entity_id d = null_entity;
+        check(hire(f, reg, f.a, tile(f, 7, 3), DES, &d) == corp_command_result::applied
+                  && f.w.ships.at(d).kit.fit[0] == ship_kit_variant_of(gas),
+              "K4 a hire records the live design");
+        check(f.w.markets.at(f.a_market).inventory[SH] < sh0, "K4b the hire draws ship hulls");
+        const ship_live_stats base = ship_stats(reg, add_ship_ref(f, f.b, f.b_port, DES, 40, 3));
+        const ship_live_stats kitted = ship_stats(reg, f.w.ships.at(d));
+        const ship_class_stats& cs = reg.military().sea.cls[static_cast<std::size_t>(ship_class::destroyer)];
+        check(base.hp == cs.hp && base.days_per_tile_permille == cs.days_per_tile_permille && base.attack == cs.attack
+                  && base.detection == cs.detection && base.stealth == cs.stealth && base.targets == cs.targets,
+              "K5 base kit fights on the class's numbers");
+        check(kitted.hp == cs.hp + 10 && kitted.days_per_tile_permille == cs.days_per_tile_permille - 50, "K5b kit moves HP and pace");
+
+        // A later design does not reach a ship already built, until it refits.
+        const uint16_t quiet = ship_kit_item_by_id("des.hull.quiet");
+        check(fit(f.a, D, 0, quiet) == corp_command_result::applied && f.w.ships.at(d).kit.fit[0] == ship_kit_variant_of(gas),
+              "K6 a ship keeps the kit it recorded");
+        const auto refit = [&](entity_id actor, entity_id ship) {
+            corp_command c;
+            c.tick = 1; c.corp = actor; c.verb = corp_verb::refit_ship; c.subject = ship;
+            return apply_corp_command(f.w, reg, c);
+        };
+        refused(f, [&] { return refit(f.a, 999999); }, corp_command_result::rejected_invalid, "K7 no such ship");
+        refused(f, [&] { return refit(f.b, d); }, corp_command_result::rejected_not_owner, "K7b not your ship");
+        refused(f, [&] { return refit(f.a, d); }, corp_command_result::rejected_state, "K7c a ship still raising cannot refit");
+        f.w.ships.at(d).muster_days = 0;
+        f.w.ships.at(d).mission = sea_mission::patrol;
+        refused(f, [&] { return refit(f.a, d); }, corp_command_result::rejected_state, "K7d a ship on a mission cannot refit");
+        f.w.ships.at(d).returning = true; // broken off, home, and still holding the mission
+        refused(f, [&] { return refit(f.a, d); }, corp_command_result::rejected_state, "K7d2 a broken-off ship still holds its mission");
+        f.w.ships.at(d).returning = false;
+        f.w.ships.at(d).mission = sea_mission::none;
+        const entity_id mouth = f.w.ships.at(d).tile;
+        f.w.ships.at(d).tile = tile(f, 40, 3);
+        refused(f, [&] { return refit(f.a, d); }, corp_command_result::rejected_placement, "K7e a ship away from its port cannot refit");
+        f.w.ships.at(d).tile = mouth;
+        const float keep = f.w.markets.at(f.a_market).inventory[SH];
+        f.w.markets.at(f.a_market).inventory[SH] = 0.0f;
+        refused(f, [&] { return refit(f.a, d); }, corp_command_result::rejected_funds, "K7f no hulls on the shelf");
+        f.w.markets.at(f.a_market).inventory[SH] = keep;
+        f.w.buildings.at(f.w.ships.at(d).home_port).decommissioned = true;
+        refused(f, [&] { return refit(f.a, d); }, corp_command_result::rejected_placement, "K7g a port no longer standing refits nothing");
+        f.w.buildings.at(f.w.ships.at(d).home_port).decommissioned = false;
+        f.w.ships.at(d).hp_ppm = k_ship_hp_full / 2;
+        check(refit(f.a, d) == corp_command_result::applied && f.w.ships.at(d).kit.fit[0] == ship_kit_variant_of(quiet),
+              "K8 a refit takes the live design");
+        check(f.w.markets.at(f.a_market).inventory[SH] < keep && f.w.ships.at(d).muster_days == cs.muster_days
+                  && f.w.ships.at(d).hp_ppm == k_ship_hp_full / 2,
+              "K8b it buys the goods, stands out of action, and stays damaged");
+        check(f.w.ships.at(d).refitting, "K8d it is marked as a refit, not a hire");
+        refused(f, [&] { return refit(f.a, d); }, corp_command_result::rejected_state, "K8e a refit under way cannot be ordered again");
+        {
+            // A fielded ship in dock: supplied, not mended, and it survives losing its port.
+            fixture g = f;
+            const entity_id old_port = g.w.ships.at(d).home_port;
+            const entity_id second = add_building(g, g.a, 7, 6, building_type::port);
+            const float fuel0 = g.w.markets.at(g.a_market).inventory[static_cast<std::size_t>(resource_type::refined_fuel)];
+            const int32_t hp0 = g.w.ships.at(d).hp_ppm;
+            const int pool0 = g.w.nations.at(g.a).sea_recruits;
+            economy_report rep;
+            run_ship_upkeep(g.w, reg, rep);
+            check(g.w.ships.at(d).hp_ppm == hp0
+                      && g.w.markets.at(g.a_market).inventory[static_cast<std::size_t>(resource_type::refined_fuel)] < fuel0,
+                  "K8f in dock it draws its supply and does not mend");
+            g.w.buildings.erase(old_port);
+            run_ship_upkeep(g.w, reg, rep);
+            check(g.w.ships.count(d) == 1 && g.w.ships.at(d).home_port == second && g.w.ships.at(d).refitting
+                      && g.w.nations.at(g.a).sea_recruits == pool0,
+                  "K8g a refit whose port is lost takes up another, no crew refunded");
+            const int left = g.w.ships.at(d).muster_days;
+            for (int day = 0; day < left; ++day)
+                run_sea_day(g.w, reg, 2 + day);
+            check(g.w.ships.at(d).muster_days == 0 && !g.w.ships.at(d).refitting, "K8h the refit ends with its days");
+        }
+
+        // The save: v81 round trips designs and kit; v80 reads as no design; a bad section refuses whole.
+        const std::string b = to_bytes(f.w);
+        world loaded;
+        check(from_bytes(b, loaded) && loaded.nations.at(f.a).ship_design_kit == f.w.nations.at(f.a).ship_design_kit
+                  && loaded.ships.at(d).kit.fit == f.w.ships.at(d).kit.fit && loaded.ships.at(d).refitting
+                  && to_bytes(loaded) == b && loaded.state_hash(1) == f.w.state_hash(1),
+              "K9 v81 round trips the designs and a ship's kit");
+        const std::size_t sec = b.size() - 14; // count, nation, n, one id
+        const auto spoil = [&](std::size_t off, uint32_t v, int width) {
+            std::string c = b;
+            for (int i = 0; i < width; ++i)
+                c[sec + off + static_cast<std::size_t>(i)] = static_cast<char>((v >> (8 * i)) & 0xFF);
+            world x;
+            return from_bytes(c, x);
+        };
+        check(spoil(12, ship_kit_item_by_id("des.hull.quiet"), 2), "K9b (control) the id is where the walk says");
+        check(!spoil(12, 60000, 2), "K9c an unknown item is refused");
+        check(!spoil(12, ship_kit_item_by_id("des.hull.flush_deck"), 2), "K9d a base item stored is refused");
+        check(!spoil(4, 999999, 4), "K9e a nation the stream lacks is refused");
+        check(!spoil(0, 99999999, 4), "K9f a count past the nations is refused");
+        {
+            std::string c = b;
+            const std::size_t kit_at = b.size() - world_save_ships_section_bytes(f.w) + 4 + 4 * 4 + 2 + 4 * 5 + 1;
+            // The first ship is the destroyer; a variant its slot lacks refuses the whole stream.
+            c[kit_at] = static_cast<char>(9);
+            world x;
+            check(!from_bytes(c, x), "K9g a kit variant the class lacks is refused");
+        }
+        std::ostringstream o80(std::ios::binary);
+        write_world_snapshot_pre_ship_kit(f.w, o80);
+        world old;
+        std::istringstream in80(o80.str(), std::ios::binary);
+        check(read_world_snapshot(old, in80) && old.nations.at(f.a).ship_design_kit.empty()
+                  && old.markets.at(f.a_market).inventory[SH] == 0.0f,
+              "K10 a v80 stream reads 55 wide: no design, no ship hulls");
+        check(old.ships.at(d).kit.fit == unit_design{}.fit && !old.ships.at(d).refitting, "K10b its ships hold base kit, none in refit");
+        {
+            // The v80 tail is today's less the design section (14 bytes here) and each ship's refit byte.
+            std::string c = o80.str();
+            const std::size_t tail = world_save_ships_section_bytes(f.w) - 14 - f.w.ships.size();
+            c[c.size() - tail + 4 + 4 * 4 + 2 + 4 * 5 + 1] = static_cast<char>(1);
+            std::istringstream in(c, std::ios::binary);
+            world x;
+            check(!read_world_snapshot(x, in), "K10c a v80 stream holding later kit is refused whole");
+        }
+        {
+            // The refit byte closes the last ship's record, just before the 14-byte design section.
+            std::string c = b;
+            c[b.size() - 14 - 1] = static_cast<char>(2);
+            world x;
+            check(!from_bytes(c, x), "K9h a refit flag out of domain is refused");
+        }
+        set_kit_research_waived_for_harness(false);
+    }
+    {
+        // Armament widens the mask; the fight reads it.
+        const recipe_registry reg = make_registry();
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        const entity_id a = add_ship(f, f.a, f.a_port, SUB, 40, 3);
+        check((ship_stats(reg, f.w.ships.at(a)).targets & ship_class_bit(ship_class::submarine)) == 0, "K11 a base submarine cannot hit a submarine");
+        f.w.ships.at(a).kit.fit[1] = 2; // Wire-guided hunter torpedoes
+        const ship_live_stats k = ship_stats(reg, f.w.ships.at(a));
+        check((k.targets & ship_class_bit(ship_class::submarine)) != 0
+                  && k.attack == reg.military().sea.cls[0].attack + 1500, "K11b hunter torpedoes can, and hit harder");
+        const entity_id t = add_ship(f, f.b, f.b_port, SUB, 40, 3);
+        f.w.ships.at(a).kit.fit[2] = 2;
+        int hit_day = -1;
+        for (int d = 0; d < 400 && hit_day < 0; ++d)
+        {
+            run_sea_day(f.w, reg, d);
+            if (f.w.ships.count(t) == 0 || f.w.ships.at(t).hp_ppm < k_ship_hp_full)
+                hit_day = d;
+        }
+        check(hit_day >= 0, "K11c the widened mask lands on a submarine in the daily pass");
+    }
+    {
+        // The daily pass reads kit: pace on a course, HP against the same fire.
+        const recipe_registry reg = make_registry();
+        const auto tiles_sailed = [&](uint8_t hull) {
+            fixture f; build(f);
+            const entity_id s = add_ship(f, f.a, f.a_port, DES, 8, 3);
+            f.w.ships.at(s).kit.fit[0] = hull;
+            for (int c = 9; c <= 38; ++c)
+                f.w.ships.at(s).route.push_back(tile(f, c, 3));
+            const std::size_t n = f.w.ships.at(s).route.size();
+            for (int day = 0; day < 8; ++day)
+                run_sea_day(f.w, reg, day);
+            return n - f.w.ships.at(s).route.size();
+        };
+        check(tiles_sailed(1) > tiles_sailed(0), "K13 a faster hull sails further in the daily pass");
+        const auto damage_taken = [&](uint8_t hull) {
+            fixture f; build(f);
+            declare_hostile(f.w, f.a, f.b);
+            const entity_id t = add_ship(f, f.a, f.a_port, DES, 40, 3);
+            f.w.ships.at(t).kit.fit[0] = hull;
+            add_ship(f, f.b, f.b_port, DES, 40, 3);
+            for (int day = 0; day < 6 && f.w.ships.count(t) != 0; ++day)
+                run_sea_day(f.w, reg, day);
+            return f.w.ships.count(t) == 0 ? k_ship_hp_full : k_ship_hp_full - f.w.ships.at(t).hp_ppm;
+        };
+        const int taken_base = damage_taken(0);
+        check(taken_base > 0 && damage_taken(1) < taken_base, "K13b more hull loses less of itself to the same fire");
+    }
+    {
+        // A sensor raises a side's detection; a stealth hull lowers the odds of being found.
+        const recipe_registry reg = make_registry();
+        fixture f; build(f);
+        const entity_id s = add_ship(f, f.a, f.a_port, SUB, 40, 3);
+        const ship_class_stats& cs = reg.military().sea.cls[0];
+        f.w.ships.at(s).kit.fit = {2, 0, 2};
+        const ship_live_stats k = ship_stats(reg, f.w.ships.at(s));
+        check(k.stealth == cs.stealth + 150 && k.detection == cs.detection + 60
+                  && k.days_per_tile_permille == cs.days_per_tile_permille - 200 && k.hp == cs.hp + 20,
+              "K12 hull and sensors add up on the class");
+        const entity_id tr = add_ship(f, f.a, f.a_port, TRA, 41, 3);
+        f.w.ships.at(tr).kit.fit = {2, 0, 0};
+        check(ship_stats(reg, f.w.ships.at(tr)).capacity == 2, "K12b a transport's hull sets its capacity");
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

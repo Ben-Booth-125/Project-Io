@@ -241,6 +241,8 @@ enum class corp_verb : uint8_t
     // ships. No scorer issues them until the fleet grant's item (AI_OPPONENT.md § 11).
     hire_ship,            ///< Raise a ship of sea roster row `unit_type` (ship_roster_table) at the actor's own completed port on `tile`. Pays the class's hire credits and goods off the shelves, both legs checked first, and its crew from the sea pool; the ship is created at once, with the class's muster days to run, at the port's mouth, and returned through `out_building`. rejected_invalid (unknown row, a row the nation's shelves cannot field, unknown tile) / rejected_placement (no such port, or no water at its mouth) / rejected_no_recruits / rejected_funds — see `hire_ship_check`.
     assign_sea_mission,   ///< Assign ship `subject` mission `order` (0 none, 1 patrol, 2 escort, 3 raid, 4 blockade) over the sea provinces in `air_provinces` (unused slots `no_province`; any order). It sails there and works the zone; `none` recalls it home. rejected_invalid (no such ship, a mission its class does not work, none with provinces or a mission with none, an unknown or repeated province) / rejected_not_owner / rejected_placement (a province that is land, out of range over water of an own port, or that this ship cannot reach) / rejected_state (no change) — see `sea_mission_check`.
+    set_ship_design,      ///< BL-1527: the seat's nation fits ship kit item `unit_type` (a ship kit id, unit_designs.hpp) into slot `recipe` (0 hull, 1 armament, 2 sensors) of ship class `order`; its slot's base item puts it back to base kit. Ships already at sea keep their kit until refitted.
+    refit_ship,           ///< BL-1527: ship `subject`, lying at its home port with no mission, refits to the live design of its class: buys the goods of each changed slot and is out of action for its class's muster days.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -250,7 +252,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::assign_sea_mission) + 1;
+    static_cast<uint8_t>(corp_verb::refit_ship) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

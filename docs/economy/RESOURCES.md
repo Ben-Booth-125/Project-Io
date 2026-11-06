@@ -339,7 +339,7 @@ Products are the highest-value goods and the primary driver of market price dive
 | Guided weapons | Electronics + ordnance | Arms Works | 240.6 |
 | Drones | Electronics + alloys | Arms Works | 169.8 |
 | Airframes | Alloys + machinery + electronics | Arms Works | 274.2 |
-| Ship hulls | Steel + alloys + machinery | Arms Works | set by the margin anchor (`PRODUCTION.md`) |
+| Ship hulls | Steel + alloys + machinery | Arms Works | 179.8 |
 
 The margin ladder widens up the tiers — spacecraft components sits 123× iron ore — which is the
 value gradient the space-equipment premise rests on. Propellant and spacecraft components are the

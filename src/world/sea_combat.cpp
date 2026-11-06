@@ -6,6 +6,7 @@
 #include "province.hpp"
 #include "recipe_registry.hpp"
 #include "stance.hpp"          // is_hostile
+#include "unit_designs.hpp"    // BL-1527: the ship kit
 #include "world.hpp"
 
 #include <algorithm>
@@ -51,6 +52,61 @@ ship_class ship_class_of(const sea_ship& s)
 {
     const auto& t = ship_roster_table();
     return s.type < t.size() ? t[s.type].cls : ship_class::transport;
+}
+
+ship_live_stats ship_stats(const recipe_registry& reg, const sea_ship& s)
+{
+    const ship_class c = ship_class_of(s);
+    const ship_class_stats& b = reg.military().sea.cls[static_cast<std::size_t>(c)];
+    const ship_combat_stats k = ship_kit_delta(c, s.kit);
+    ship_live_stats o;
+    o.hp        = std::max(1, b.hp + k.hp);
+    o.attack    = std::max(0, b.attack + k.attack);
+    o.detection = std::max(0, b.detection + k.detection);
+    o.stealth   = std::max(0, b.stealth + k.stealth);
+    o.days_per_tile_permille = std::max(1, b.days_per_tile_permille + k.days_per_tile_permille);
+    o.capacity  = std::max(0, k.capacity);
+    o.targets   = static_cast<uint8_t>(b.targets | k.targets);
+    return o;
+}
+
+corp_command_result ship_design_check(const world& w, entity_id nation, uint32_t cls,
+                                      uint16_t slot, uint16_t item)
+{
+    if (w.nations.find(nation) == w.nations.end() || nation != player_nation(w))
+        return corp_command_result::rejected_not_owner;
+    if (cls >= static_cast<uint32_t>(ship_class_count) || slot >= k_ship_kit_slot_count)
+        return corp_command_result::rejected_invalid;
+    const ship_class c = static_cast<ship_class>(cls);
+    const std::vector<ship_kit_item>& cat = ship_kit_catalogue();
+    if (item >= cat.size() || cat[item].cls != c || cat[item].slot != slot)
+        return corp_command_result::rejected_invalid;
+    if (!ship_kit_item_researched(w, nation, item))
+        return corp_command_result::rejected_tech_locked;
+    if (ship_design_fitted(w, nation, c, slot) == item)
+        return corp_command_result::rejected_state;
+    return corp_command_result::applied;
+}
+
+corp_command_result refit_ship_check(const world& w, entity_id nation, entity_id ship)
+{
+    const auto it = w.ships.find(ship);
+    if (it == w.ships.end())
+        return corp_command_result::rejected_invalid;
+    const sea_ship& s = it->second;
+    if (s.owner != nation)
+        return corp_command_result::rejected_not_owner;
+    if (s.kit.fit == ship_design_of(w, nation, ship_class_of(s)).fit)
+        return corp_command_result::rejected_state; // already the live design
+    if (s.muster_days > 0 || s.mission != sea_mission::none)
+        return corp_command_result::rejected_state; // raising, or still holding a mission
+    if (!s.route.empty() || s.tile == null_entity || s.tile != port_mouth_tile(w, s.home_port))
+        return corp_command_result::rejected_placement;
+    // Its home must still be its nation's standing port, the rule a hire meets.
+    const auto port = w.buildings.find(s.home_port);
+    if (port == w.buildings.end() || own_port_at(w, nation, port->second.tile) != s.home_port)
+        return corp_command_result::rejected_placement;
+    return corp_command_result::applied;
 }
 
 int ship_crew(const recipe_registry& reg, uint16_t row)
@@ -463,7 +519,8 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
     if (w.ships.empty())
         return out;
     const sea_params& sp = reg.military().sea;
-    const auto stats = [&](const sea_ship& s) -> const ship_class_stats& {
+    const auto stats = [&](const sea_ship& s) { return ship_stats(reg, s); }; // BL-1527: class + kit
+    const auto rules = [&](const sea_ship& s) -> const ship_class_stats& {
         return sp.cls[static_cast<std::size_t>(ship_class_of(s))];
     };
 
@@ -473,6 +530,8 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
         if (s.muster_days > 0)
         {
             --s.muster_days;
+            if (s.muster_days == 0)
+                s.refitting = false;
             continue;
         }
         if (s.route.empty())
@@ -577,7 +636,7 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
             const sea_ship& a = w.ships.at(pa.ship);
             if (a.returning)
                 continue;
-            const ship_class_stats& as = stats(a);
+            const ship_live_stats as = stats(a);
             const auto fit = found.find(a.owner);
             if (as.attack <= 0 || fit == found.end())
                 continue;
@@ -651,7 +710,7 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
             sunk.push_back(sid);
             continue;
         }
-        const ship_class_stats& cs = stats(s);
+        const ship_class_stats& cs = rules(s);
         if (!s.returning
             && (s.hp_ppm / (k_ship_hp_full / 1000) < cs.break_hp_permille
                 || s.morale_permille < cs.break_morale_permille))
@@ -709,7 +768,7 @@ ship_upkeep_tick run_ship_upkeep(world& w, const recipe_registry& reg, economy_r
         const bool home_ok = std::find(ports.begin(), ports.end(), s.home_port) != ports.end();
         if (!home_ok)
         {
-            if (s.muster_days > 0)
+            if (s.muster_days > 0 && !s.refitting)
             {
                 // A dropped hire refunds its crew, not its credits (§ Recruits). Not held
                 // to the pool's cap, so nothing is discarded.
@@ -748,7 +807,7 @@ ship_upkeep_tick run_ship_upkeep(world& w, const recipe_registry& reg, economy_r
                 plot_course(w, s);
         }
         ++out.ships;
-        if (s.muster_days > 0)
+        if (s.muster_days > 0 && !s.refitting)
             continue;
         const entity_id port_tile = w.buildings.at(s.home_port).tile;
         const int share = draw_goods_at_tile(w, reg, report, s.owner, port_tile, sp.ship_upkeep_goods);
@@ -757,7 +816,7 @@ ship_upkeep_tick run_ship_upkeep(world& w, const recipe_registry& reg, economy_r
         s.supply_factor_permille = step_unit_supply_toward(s.supply_factor_permille, share, up);
 
         // Lying at home damaged, it refits by drawing goods.
-        if (s.hp_ppm < k_ship_hp_full && s.route.empty()
+        if (s.muster_days <= 0 && s.hp_ppm < k_ship_hp_full && s.route.empty()
             && (s.returning || s.mission == sea_mission::none)
             && s.tile == port_mouth_tile(w, s.home_port))
         {

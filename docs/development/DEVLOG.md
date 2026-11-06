@@ -10,6 +10,30 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-06 — BL-1527 (ship kit): ship designs and the ship hulls good
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** One live design per class on hull, armament and sensors: 33 catalogue items checked
+at compile time. Ship hulls, the seventh kit good, made at the Arms Works and priced by the margin
+anchor at 179.8. `ship_stats` puts kit on the class numbers for the daily pass. Verbs
+`set_ship_design` and `refit_ship`. Save v81, envelope v26.
+
+**Decisions.** Four refit calls logged as NR-1145. Later kit stays locked until BL-1528 (naval branch)
+adds its research nodes.
+
+**Review.** The cold review caught a real ship-destroying bug: a refit reused the muster clock, so a lost
+port erased a refitting ship as a dropped hire. Hence `sea_ship::refitting`, saved and validated. It also
+caught the envelope harness no longer compiling and so proving nothing, a refit on a broken-off ship, a
+refit on a port no longer standing, and a v80 reader weakened by the new rule. All fixed, with checks.
+
+**Left open.** Capacity has no reader until BL-1531 (troop landings). The designer and refit press belong to
+BL-1534 (sea UI), noted on that item. Not changed: a free refit on a negative purse is refused, as a land
+design refit is. `chain_depth` stays on its known red and `nation_tech_harness` R0h/R0i on pacing, both
+equally on base. Digest pins stay stale for the wave's one re-bless; shape is identical to base.
+
+---
+
 ## 2026-11-06 — BL-1430 (sea theatre): ships exist
 
 **Runtime:** one session, Delivery Full on the naval worktree, after the sprint 64 design form.

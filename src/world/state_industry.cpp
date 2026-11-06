@@ -67,7 +67,8 @@ strategic_sector strategic_sector_of(const recipe_registry& reg, building_type t
     if (makes(resource_type::ordnance) || makes(resource_type::small_arms)
         || makes(resource_type::armoured_vehicles) || makes(resource_type::artillery_pieces)
         || makes(resource_type::guided_weapons) || makes(resource_type::drones)
-        || makes(resource_type::airframes)) // BL-1436: the sixth kit good
+        || makes(resource_type::airframes)  // BL-1436: the sixth kit good
+        || makes(resource_type::ship_hulls)) // BL-1527: the seventh
         return strategic_sector::arms;
     if (makes(resource_type::spacecraft_components) || makes(resource_type::propellant))
         return strategic_sector::space;

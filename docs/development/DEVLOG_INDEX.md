@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 241 entries across 2 volume(s).
+One line per session, newest first — 242 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-11-06 | [BL-1527 (ship kit): ship designs and the ship hulls good](DEVLOG.md) | BL-1527 BL-1528 BL-1531 BL-1534 | DEVLOG.md |
 | 2026-11-06 | [BL-1430 (sea theatre): ships exist](DEVLOG.md) | BL-1430 | DEVLOG.md |
 | 2026-11-05 | [Sprint 61: diplomacy and war](DEVLOG.md) | BL-1413 BL-1414 BL-1422 BL-1423 BL-1426 BL-1428 BL-1432 BL-1436 BL-1442 BL-1454 BL-1458 BL-1459 BL-1460 BL-1461 BL-1462 BL-1463 BL-1470 BL-1478 BL-1479 BL-1480 BL-1481 BL-1482 BL-1485 BL-1486 BL-1490 BL-1491 BL-1492 BL-1493 BL-1494 | DEVLOG.md |
 | 2026-11-04 | [Sprint 62: equal starts for majors](DEVLOG.md) | BL-1436 BL-1473 BL-1474 BL-1475 BL-1476 BL-1487 | DEVLOG.md |

@@ -7722,6 +7722,61 @@
     }
    ],
    "resolved": "2026-11-06"
+  },
+  {
+   "brief": "ship-kit",
+   "title": "BL-1527 - Ship designs: hull, armament and sensor slots, the ship hulls good, refit at the home port",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1527 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "One live design per class on hull, armament and sensor slots; a transport has no armament, no capital item hits a submarine; the catalogue is checked at compile time.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness K1 series, K2 refusals, K11; ship_first_error is a static_assert over the 33 items. 170 checks, 0 failures."
+    },
+    {
+     "id": "R2",
+     "text": "Ship hulls is a seventh kit good made at the Arms Works, priced by the margin anchor, drawn only by later ship kit; recipe_margin and chain_depth accept it.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "recipe_margin ALL PASS at 179.8. chain_depth: ship_hulls passes; its one failure is the known-red exemption guard on trade_goods_misc, tools and rigging, and is the same failure on base 298dfc7a."
+    },
+    {
+     "id": "R3",
+     "text": "A hire records the live design and buys its kit goods; kit moves HP, pace, stealth, attack, the target mask and detection in the daily pass and carries capacity for landings; base kit fights exactly on the class numbers.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "K4 hire records and draws; K5 base kit on all class numbers; K5b, K11b, K12 stats; K11c mask, K13 pace, K13b HP in run_sea_day. Text narrowed at close: capacity is carried, BL-1531 (troop landings) is its first reader."
+    },
+    {
+     "id": "R4",
+     "text": "A ship keeps its kit until a refit at its home port with no mission, which buys the changed slots, stands it out for its muster days and keeps its hull share. Every refusal mutates nothing, on the seam the wire uses.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "K6, K7 series through apply_corp_command with the mutate-nothing table, K7d2 broken-off, K7g port not standing, K8 series, K8f in dock, K8g lost port re-homes with no refund, K8h ends. agent_seam_harness 23, 0 failures."
+    },
+    {
+     "id": "R5",
+     "text": "Save v81: the resource arrays 56 wide and the designs as a last section, refused whole out of domain; v76..v80 read 55 wide with no design; envelope v26 reads v25.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "K9 series, K9g, K9h, K10, K10b, K10c; save_roundtrip OK; save_envelope_roundtrip S9d v25 reads whole and a 55-wide file stamped v26 is refused; fronts 140, war 172, air 86, recruits 116, all 0 failures."
+    },
+    {
+     "id": "R6",
+     "text": "A world with no ship and no design plays as before: shape identical to base on seeds 0, 46 and 28, given a recipe appended that nothing asks for.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "rebless_shape_probe seeds 0, 46, 28: every ROW and MIX line identical to base 298dfc7a. world_determinism ALL PASS."
+    }
+   ],
+   "resolved": "2026-11-06"
   }
  ]
 }
