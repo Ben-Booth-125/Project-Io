@@ -3006,6 +3006,7 @@ void app::render()
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::set_quote_report(&m_last_econ_report);
+    ui::set_quote_history(&m_market_history);
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     // Market ledger — Goods and Trades. It takes a NON-CONST world and the recipe
     // registry because the Trades tab's potential-trade read prices real trade

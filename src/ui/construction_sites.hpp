@@ -20,12 +20,14 @@
 // (it needs a mutable one only for the Logistic Point memo, the same reason
 // `update_body_throughput` does) and publishes into `ui_state::site_finder`.
 
+#include "plot_history.hpp"
 #include "ui_state.hpp"
 #include "world/site_quote.hpp"
 
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include <string>
 #include <vector>
 
 namespace ui {
@@ -57,6 +59,44 @@ void set_quote_report(const economy_report* report);
 /// frame stamp moves, because the door asks for every candidate on every frame.
 site_quote quote_for_tile(world& w, const recipe_registry& reg, entity_id tile, building_type type,
                           resource_type target, std::uint16_t recipe, float lp_cover);
+
+/// Under this many quarters of a recipe input on the market's shelf, the door and the
+/// finder warn (Ben, 2026-11-05; the default he reads live; construction.md § The site
+/// ledger).
+inline constexpr float k_shelf_runway_warn_quarters = 4.0f;
+/// How many quarters of the shelf's own trail the net drain averages over.
+inline constexpr int k_shelf_trail_quarters = 4;
+
+/// THE reading behind both warnings: a recipe input the plant would run through soon.
+/// For each input, quarters = shelf / (the plant's use + the market's net drain, where
+/// the shelf is already falling). Power is the grid's, so one shelf is not its reading.
+/// Recipe inputs only: construction materials have their own stall reading.
+struct shelf_runway
+{
+    bool          warn        = false;
+    resource_type good        = resource_type::iron_ore; ///< The soonest input.
+    float         quarters    = 0.0f;
+    float         shelf       = 0.0f;
+    float         plant_use   = 0.0f; ///< Units a quarter this plant would add, at its cover.
+    bool          drain_known = false; ///< The shelf's trail has two samples. False after a load.
+    float         drain       = 0.0f; ///< Units a quarter the shelf is falling, 0 if it is not.
+    int           others      = 0;    ///< How many more inputs are under the threshold.
+};
+
+/// The market history whose shelf trail the runway reads. Must outlive the UI.
+void set_quote_history(const market_plot_history* history);
+
+/// Forget every cached quote, runway and finder evaluation, for a verify fixture that
+/// writes a shelf: nothing in play moves a shelf between the stamps the cache keys on.
+void invalidate_site_evaluation();
+
+/// The runway of a building on @p tile at @p lp_cover, cached with the quote so the door
+/// and the finder read one figure. Never warns for a plant that would not run at all.
+shelf_runway shelf_runway_for(const world& w, const recipe_registry& reg, entity_id tile,
+                              building_type type, std::uint16_t recipe, float lp_cover);
+
+/// The warning's sentence, naming the good and the quarters. "" when it does not warn.
+std::string shelf_runway_text(const shelf_runway& s);
 
 /// Rebuild the finder's evaluation when its key moves (the chosen building, the
 /// active body, the frame stamp, the treasury, the reach budget), and mark it live

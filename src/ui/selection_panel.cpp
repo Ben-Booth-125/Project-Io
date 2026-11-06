@@ -5468,13 +5468,18 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             // The bar explains THE ESTIMATE, caveat included: the figure the bar
             // no longer prints (38 px holds a magnitude or a number, not both),
             // and the staffing assumption the caption above the list carries.
+            // ONE WARNING TO A ROW: a starved row already says it would stand idle.
+            std::string bar_text;
+            if (c.group == 0 && !c.starved)
+                bar_text = shelf_runway_text(
+                    shelf_runway_for(w, reg, tile_id, c.type, c.recipe, lp_cover));
             char nbuf[260];
             if (c.group == 0 && c.starved)
                 std::snprintf(nbuf, sizeof nbuf,
                               "It would likely stand idle: this market cannot get it %s at a price it will "
                               "pay. Est. net %+d cr / qtr is its upkeep alone. The bar is that figure "
                               "against the best row in this list.",
-                              resource_names::name_of(c.short_of).c_str(), static_cast<int>(c.profit.net()));
+                              resource_name(c.short_of), static_cast<int>(c.profit.net()));
             else if (c.group == 0)
                 std::snprintf(nbuf, sizeof nbuf,
                               "Est. net %+d cr / qtr once its output is selling here, at 50%% staffing "
@@ -5490,10 +5495,15 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             else
                 std::snprintf(nbuf, sizeof nbuf,
                               "No estimate for this row yet, so the column is empty.");
-            cells.push_back(construction_cell("bar", bp, construction_grid::bar, nbuf,
-                                              c.group == 0
-                                                  ? value_colour(static_cast<double>(c.profit.net()))
-                                                  : 0u));
+            // A warning reads amber on its card, however good the net beneath it is.
+            const bool bar_warns = !bar_text.empty();
+            bar_text += (bar_text.empty() ? "" : " ");
+            bar_text += nbuf;
+            cells.push_back(construction_cell(
+                "bar", bp, construction_grid::bar, bar_text,
+                bar_warns ? ImGui::ColorConvertFloat4ToU32(construction_rate_colour(0.5f))
+                : c.group == 0 ? value_colour(static_cast<double>(c.profit.net()))
+                               : 0u));
         }
 
         // ── Column 7: THE PRESS ──

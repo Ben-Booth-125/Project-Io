@@ -867,6 +867,14 @@ struct site_row
     bool          priced   = false; ///< The quote's `has_data` (`quote_for_tile`).
     bool          starved  = false; ///< An input cannot be had here, so it would stand idle.
     resource_type short_of = resource_type::iron_ore; ///< The first such input, when starved.
+    /// `shelf_runway_for`'s warning, for a row that is not already starved.
+    bool          runway_warn = false;
+    resource_type runway_good = resource_type::iron_ore;
+    float         runway_quarters = 0.0f;
+    float         runway_use   = 0.0f;
+    float         runway_drain = 0.0f;
+    bool          runway_known = false;
+    std::string   runway_text;
     float         profit   = 0.0f;  ///< Est. net / qtr, Logistic Point cover applied.
     float         profit_full_cover = 0.0f; ///< The same estimate at cover 1.
     float         capex    = 0.0f;  ///< `construction_capex` - what the press charges.
@@ -935,7 +943,7 @@ struct site_finder_state
     /// where the row's press is.
     struct picker_row { std::string name, category; float glyph_r = 0.0f, need = 0.0f, have = 0.0f, x = -1.0f, y = -1.0f; };
     std::vector<picker_row> picker_rows;
-    struct drawn_row { entity_id tile = null_entity; float x = -1.0f, y = -1.0f; };
+    struct drawn_row { entity_id tile = null_entity; float x = -1.0f, y = -1.0f; std::string net_text; };
     std::vector<drawn_row> drawn;   ///< Visible rows, in drawn order.
     int           map_marks = 0;    ///< No-logistics marks the canvas drew this frame.
     /// The class the canvas WASHED the selected tile with this frame (-1: it is

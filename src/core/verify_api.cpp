@@ -5506,6 +5506,15 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["market"]  = r.market_name;
             row["place"]   = r.place;
             row["near"]    = r.place_near;
+            // What the row's Net hover says, in the same figures.
+            row["starved"]         = r.starved;
+            row["runway_warn"]     = r.runway_warn;
+            row["runway_good"]     = r.runway_warn ? std::string(ui::resource_name(r.runway_good)) : std::string();
+            row["runway_quarters"] = r.runway_quarters;
+            row["runway_use"]      = r.runway_use;
+            row["runway_drain"]    = r.runway_drain;
+            row["runway_known"]    = r.runway_known;
+            row["runway_text"]     = r.runway_text;
             rows[++rn] = row;
         }
         out["rows"]   = rows;
@@ -5518,6 +5527,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["tile"] = static_cast<unsigned>(d.tile);
             row["x"]    = d.x;
             row["y"]    = d.y;
+            row["net_text"] = d.net_text;
             drawn[++dn] = row;
         }
         out["drawn"]   = drawn;
@@ -7487,6 +7497,34 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             return false;
         mit->second.inventory[static_cast<std::size_t>(r)] += static_cast<float>(qty);
         return true;
+    });
+
+    // Sprint 63 (shelf_runway_warning.lua): a STAGING fixture that WRITES the shelf of every
+    // recipe input of the site finder's option @p name on market @p market, power apart.
+    // `stock_market` only adds, and the check needs a low shelf to aim at. Returns how many
+    // goods it wrote and nothing else; refuses an unknown name, an unknown market or a
+    // negative quantity, mutating nothing.
+    v.set_function("set_input_shelf", [this](const std::string& name, unsigned market, double qty) -> int {
+        const auto mit = m_world.markets.find(static_cast<entity_id>(market));
+        if (mit == m_world.markets.end() || !std::isfinite(qty) || qty < 0.0 || qty > 1.0e9)
+            return 0;
+        for (const site_option& o : ui::site_options(m_world, m_registry))
+        {
+            const recipe* rc = (o.name == name && o.type == building_type::processing_facility)
+                                   ? m_registry.get_recipe(o.recipe) : nullptr;
+            if (rc == nullptr)
+                continue;
+            int wrote = 0;
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (rc->inputs[r] > 0.0f && !grid_good_crosses_markets(r))
+                {
+                    mit->second.inventory[r] = static_cast<float>(qty);
+                    ++wrote;
+                }
+            ui::invalidate_site_evaluation();
+            return wrote;
+        }
+        return 0;
     });
 
     // Verify-only: give the PLAYER a completed, staffed Planetary Marketplace in
