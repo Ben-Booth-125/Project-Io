@@ -80,7 +80,7 @@ bool any_selection(const ui_state& state)
     return state.selected_entity != null_entity || state.selected_province != 0u
         || state.has_battle_selection() || state.has_front_selection()
         || state.has_deposit_selection() || state.has_plate_selection()
-        || state.selection_unit_group;
+        || state.selection_unit_group || state.selected_convoy != 0;
 }
 
 void clear_selection_to_resting(ui_state& state)
