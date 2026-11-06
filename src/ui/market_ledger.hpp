@@ -177,6 +177,10 @@ struct trade_points_record
 /// The trade-points read as last drawn.
 const trade_points_record& trade_points_read();
 
+/// The player's trade points, read from the live world (the alert strip asks with the
+/// Trades tab shut, when `trade_points_read` holds nothing).
+trade_points_record collect_trade_points(const world& w);
+
 /// One row of the potential-trades DERIVATION — read 3, and the only one with no
 /// store behind it.
 ///

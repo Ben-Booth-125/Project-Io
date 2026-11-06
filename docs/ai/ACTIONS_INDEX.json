@@ -406,6 +406,10 @@
    "Keyboard, in-game only"
   ],
   [
+   "chrome.alert_press",
+   "Alert strip, top centre of the canvas area just below the header. Each alert is one press; the strip draws nothing with nothing to say."
+  ],
+  [
    "chrome.f10_options",
    "Keyboard; opens the centred Options window"
   ],

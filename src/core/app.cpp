@@ -35,6 +35,7 @@
 #include "ui/generation_preview.hpp" // the wizard's painted right pane
 #include "ui/format.hpp"
 #include "ui/frame_stats.hpp" // frame-budget HUD (BL-249, v0.1.0 quality audit)
+#include "ui/alerts.hpp"
 #include "ui/header_panel.hpp"
 #include "ui/foldout_column.hpp" // shell_column_width — permanent left shell column (BL-122)
 #include "ui/shell_metrics.hpp"  // the shell's rect algebra, one owner (BL-216)
@@ -2924,6 +2925,9 @@ void app::render()
         // the top band that carried the mistake.
         const float header_right = ui::right_chrome_left(disp);
         ui::draw_header_panel(m_world, m_registry, m_balance_history, m_last_econ_report, header_left, header_right);
+        // The alert strip (BL-1515; LAYOUT.md § Alert strip): centred under the header.
+        ui::draw_alert_strip(m_world, m_registry, m_balance_history, m_last_econ_report, m_ui,
+                             header_left, header_right);
     }
 
     // Comms chat log (BL-205) — BL-227 re-homed it from the right chrome column

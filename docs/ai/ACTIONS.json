@@ -1803,6 +1803,24 @@
    "reason_to_select": "The universal step-out key: close the Menu, then the Ledger, then the Selection, one press at a time - or, with nothing open, reach the escape menu."
   },
   {
+   "id": "chrome.alert_press",
+   "family": "chrome",
+   "surface": "Alert strip, top centre of the canvas area just below the header. Each alert is one press; the strip draws nothing with nothing to say.",
+   "press": "Click an alert.",
+   "args": [
+    {
+     "name": "alert",
+     "type": "one of the alerts on the strip",
+     "meaning": "Research not set; N idle buildings; At war / N wars; Runway Nq; N sites stalled; N deposits exhausted; Trades exceed trade points."
+    }
+   ],
+   "preconditions": [
+    "App is in game; the alert is on the strip. Recomputed from the live world: an alert leaves when its cause does, and cannot be dismissed."
+   ],
+   "expected_output": "Opens the surface that answers the alert, closing any other ledger: Research not set opens Research; idle buildings and exhausted deposits open the Construction ledger on Buildings; a stalled site opens it on Construction; a war opens the Diplomacy ledger on Wars; low runway (under 8 quarters) opens the Budget; trades exceeding trade points opens the Market ledger on Trades, arming its lens. Nothing is acted on: the press only opens a surface. Hovering says why it is up.",
+   "reason_to_select": "To go straight from what wants attention to where it is answered. Offers of peace or friendship are not alerts (Ben, 2026-11-05)."
+  },
+  {
    "id": "chrome.f10_options",
    "family": "chrome",
    "surface": "Keyboard; opens the centred Options window",

@@ -165,6 +165,11 @@ attention, and **each alert clicks through** to the surface that answers it. It 
 - **Deposit exhausted**
 - **Trades exceed trade points**
 
+It says only what is true now: an alert leaves when its cause does and cannot be dismissed, and the
+strip draws nothing with nothing to say. One press stands for each kind, its count in its words, so
+a dozen idle mines are one alert. It wraps rather than clips. Low runway is the header's own red bar,
+under 8 quarters (`HEADER.md` § Contents).
+
 ---
 
 ## Canvas area — centre

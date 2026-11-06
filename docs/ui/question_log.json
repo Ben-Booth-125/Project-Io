@@ -1244,6 +1244,19 @@
    ],
    "status": "drafted"
   },
+  "alert_strip": {
+   "surface": "Alert strip: top centre of the canvas area, just below the header; one press per thing that wants attention",
+   "answers": "What wants my attention right now?",
+   "because": "The conditions that need acting on were each true somewhere, in a ledger a player had to think to open: an empty research queue, a stalled site, a spent deposit. A player in a 16x campaign finds out from the damage. The strip earns the top centre because it is the one surface that names a problem before the player asks, and it stays honest about its size: it draws nothing with nothing to say, so it costs no canvas in a healthy nation. Each alert is a press to the surface that answers it, because knowing a thing is wrong and being one click from why are the same need; and it never acts, because the player decides (CONCEPT.md § Player identity). The list is seven, each a cause with an answer on the rail: research not set, idle buildings, wars, low runway, construction stalled, deposit exhausted, trades exceeding trade points. Offers were left off (Ben, 2026-11-05). It is not dismissable, because it says only what is true now and leaves when the cause does; a dismissed alert would be a true thing the screen had stopped saying.",
+   "backlog_item": "BL-1515",
+   "files": [
+    "src/ui/alerts.cpp",
+    "src/ui/header_panel.cpp",
+    "src/ui/market_ledger.cpp",
+    "src/core/app.cpp"
+   ],
+   "status": "drafted"
+  },
   "escape_menu": {
    "surface": "Escape menu: the full-canvas pause screen behind the gear and Esc, with Save, Options, Exit to Menu and Exit Game; and Load on the main menu",
    "answers": "How do I stop, keep what I have, and leave?",

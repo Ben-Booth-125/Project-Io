@@ -2054,6 +2054,22 @@
     "military_ledger",
     "air_ui"
    ]
+  },
+  {
+   "id": "UI-135",
+   "name": "Alert strip",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/LAYOUT.md § Alert strip",
+    "src/ui/alerts.cpp"
+   ],
+   "summary": "Top centre of the canvas area, just below the header: one press per thing that wants attention - research not set, idle buildings, wars, low runway, construction stalled, deposit exhausted, trades exceeding trade points. Each opens the surface that answers it; it wraps rather than clips, and draws nothing with nothing to say.",
+   "interesting_question": "A nation with a dozen idle mines has one alert, not twelve. How many does a player need before the strip stops being read, and should the count be the alert?",
+   "resolution": "Aggregated: one press per KIND, the count in its words, the ledger the press opens carrying the rows. Seven kinds is the ceiling, so the strip's worst case is one wrap at the 1280 floor. Not dismissable, by default: it says only what is true now.",
+   "checks": [
+    "alert_strip"
+   ]
   }
  ]
 }

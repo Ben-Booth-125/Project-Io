@@ -77,6 +77,11 @@ struct header_recruits_record
 };
 const header_recruits_record& header_recruits_drawn();
 
+/// The runway the header shows: whole quarters the treasury lasts at last quarter's
+/// burn, or -1 while it is not burning (HEADER.md § Contents, Runway). The alert strip
+/// reads this one, so the two surfaces cannot disagree.
+int player_runway_quarters(const world& w, const std::vector<float>& balance_history);
+
 /// Height of the header strip in pixels. Matches the identity card
 /// (profile_panel_height, 92) so the balance bar and the identity tile read as one
 /// level top band across the window; the strip's content is vertically centred.

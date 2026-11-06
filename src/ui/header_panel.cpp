@@ -229,6 +229,18 @@ void draw_recruit_readouts(const recruit_readout (&r)[3], int fit, float right, 
 
 const header_recruits_record& header_recruits_drawn() { return recruits_record(); }
 
+int player_runway_quarters(const world& w, const std::vector<float>& balance_history)
+{
+    float burn = 0.0f;
+    if (!ledger_burn(w, burn))
+        burn = balance_history.size() >= 2
+                   ? balance_history.back() - balance_history[balance_history.size() - 2]
+                   : 0.0f;
+    if (burn >= 0.0f)
+        return -1;
+    return static_cast<int>(std::max(0.0f, player_treasury(w)) / -burn);
+}
+
 // Declared in header_panel.hpp; shared with the Budget ledger (BL-171) so both the
 // header strip's CARGO figure and the ledger's Cargo Value use one valuation.
 float player_cargo_value(const world& w)

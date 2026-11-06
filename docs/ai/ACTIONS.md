@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*217 entries — 53 gameplay · 36 canvas · 15 lens · 74 ledger · 39 chrome.*
+*218 entries — 53 gameplay · 36 canvas · 15 lens · 74 ledger · 40 chrome.*
 
 ---
 
@@ -2804,6 +2804,21 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Exactly one rung fires, highest first (SELECTION.md § Layout & chrome): (1) an exit warning backs out; (2) an open escape menu closes, restoring the remembered speed; (3) an open declaration backs out; (4) a drilled roll-up returns to the roll-up; (5) a full-canvas overlay folds up; (6) an armed tool disarms (a road's two presses, a march awaiting its tile); (7) the open ledger closes; (8) the Selection clears to the resting nation; (9) with nothing open, the escape menu opens and pauses. One press never does two of these.
 
 **Reason to select.** The universal step-out key: close the Menu, then the Ledger, then the Selection, one press at a time - or, with nothing open, reach the escape menu.
+
+### `chrome.alert_press` — Alert strip, top centre of the canvas area just below the header. Each alert is one press; the strip draws nothing with nothing to say.
+
+**Press.** Click an alert.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `alert` | `one of the alerts on the strip` | Research not set; N idle buildings; At war / N wars; Runway Nq; N sites stalled; N deposits exhausted; Trades exceed trade points. |
+
+**Valid when:**
+- App is in game; the alert is on the strip. Recomputed from the live world: an alert leaves when its cause does, and cannot be dismissed.
+
+**Expected output.** Opens the surface that answers the alert, closing any other ledger: Research not set opens Research; idle buildings and exhausted deposits open the Construction ledger on Buildings; a stalled site opens it on Construction; a war opens the Diplomacy ledger on Wars; low runway (under 8 quarters) opens the Budget; trades exceeding trade points opens the Market ledger on Trades, arming its lens. Nothing is acted on: the press only opens a surface. Hovering says why it is up.
+
+**Reason to select.** To go straight from what wants attention to where it is answered. Offers of peace or friendship are not alerts (Ben, 2026-11-05).
 
 ### `chrome.f10_options` — Keyboard; opens the centred Options window
 

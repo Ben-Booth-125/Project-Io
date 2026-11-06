@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**77 surfaces** — 4 settled, 73 awaiting Ben's wording.
+**78 surfaces** — 4 settled, 74 awaiting Ben's wording.
 
 ---
 
@@ -27,6 +27,14 @@ alphabetical order.
 **Because:** military.md § Grouped by theatre: Design lists the air classes beside the land ones and each opens the same full-canvas designer with its own slots (airframe, armament, avionics; MILITARY.md § Air, on the one-live-design rule). It IS the same designer: one machine over a theatre adapter, so the land designer's rules hold unchanged - the class centred, one box per slot with a leader line, a box's press listing the slot's kit base first with locked kit readable and its research node named, and a pick that DRAFTS (military.md § The designer, NR-1096): the box marked changed, Save sending set_air_design per changed slot, Revert, a close with an unsaved draft asking Save / Discard / Keep editing, a refused slot staying drafted with the seam's message beside it. One draft at a time across both theatres, so opening a land class over an air draft is a close like any other. Only what differs is the theatre's: the summary carries the numbers a wing fights with (HP, air attack, soft and hard attack, strategic, recon, range), goods are per wing, it counts wings flying an older design, and picks are greyed by air_design_check. There is no air art yet, so the image is the aircraft glyph on the placeholder panel. Its summary is the stat grid at the bottom right too (BL-1454): HP at full under Condition, air attack, soft and hard attack and strategic under Combat, recon and range under Field, each with its signed delta against the live design.
 
 *Demanded by BL-1450, BL-1454 · `src/ui/unit_designer.cpp`, `src/ui/unit_designer.hpp`, `src/ui/detail_level.hpp`, `src/ui/ui_state.hpp`, `src/ui/stat_grid.cpp`, `src/ui/stat_grid.hpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp` · id `air_designer`*
+
+### Alert strip: top centre of the canvas area, just below the header; one press per thing that wants attention
+
+**Answers:** What wants my attention right now?
+
+**Because:** The conditions that need acting on were each true somewhere, in a ledger a player had to think to open: an empty research queue, a stalled site, a spent deposit. A player in a 16x campaign finds out from the damage. The strip earns the top centre because it is the one surface that names a problem before the player asks, and it stays honest about its size: it draws nothing with nothing to say, so it costs no canvas in a healthy nation. Each alert is a press to the surface that answers it, because knowing a thing is wrong and being one click from why are the same need; and it never acts, because the player decides (CONCEPT.md § Player identity). The list is seven, each a cause with an answer on the rail: research not set, idle buildings, wars, low runway, construction stalled, deposit exhausted, trades exceeding trade points. Offers were left off (Ben, 2026-11-05). It is not dismissable, because it says only what is true now and leaves when the cause does; a dismissed alert would be a true thing the screen had stopped saying.
+
+*Demanded by BL-1515 · `src/ui/alerts.cpp`, `src/ui/header_panel.cpp`, `src/ui/market_ledger.cpp`, `src/core/app.cpp` · id `alert_strip`*
 
 ### Balance Ledger
 
