@@ -3776,6 +3776,34 @@ void app::render()
         m_ui.pending_front_order_tile = null_entity; // consume the request
     }
 
+    // Defend this province (BL-1504): the same menu's entry. One `defend_province` per
+    // unit, in the group's ascending id.
+    if (!m_ui.pending_defend_province.empty())
+    {
+        int applied = 0, refused = 0;
+        for (const auto& [unit, province] : m_ui.pending_defend_province)
+        {
+            corp_command cmd;
+            cmd.tick     = static_cast<int>(m_sim_loop.day_tick());
+            cmd.corp     = m_world.player_entity;
+            cmd.verb     = corp_verb::defend_province;
+            cmd.subject  = unit;
+            cmd.province = province;
+            const corp_command_result r = player_command(cmd);
+            (r == corp_command_result::applied || r == corp_command_result::rejected_state
+                 ? applied : refused) += 1;
+        }
+        const bool clearing = m_ui.pending_defend_province.front().second == no_province;
+        if (refused == 0)
+            m_ui.construction.last_message = clearing ? "No longer defending." : "Defending this province.";
+        else if (applied == 0)
+            m_ui.construction.last_message = "Can't defend this province: it holds no ground of yours.";
+        else
+            m_ui.construction.last_message = std::to_string(applied) + " defending, "
+                                           + std::to_string(refused) + " refused.";
+        m_ui.pending_defend_province.clear(); // consume the request
+    }
+
     // Assign to front (BL-1427): the unit card's and the unit group's menu — one
     // `assign_front` per unit, the group's units in ascending id.
     if (!m_ui.pending_front_assign.empty())
@@ -3833,7 +3861,7 @@ void app::render()
                     : (r == corp_command_result::rejected_state)
                         ? "You hold as many trades as a corporation may."
                     : (r == corp_command_result::rejected_placement)
-                        ? "Refused: no route reaches that market from here."
+                        ? "Refused: no route reaches that market from here, or a warring front closes it."
                         : "Refused: it must leave a market where you hold a Marketplace or Port, "
                           "go to a different market, carry a good trade carries, and have points above 0.";
                 break;

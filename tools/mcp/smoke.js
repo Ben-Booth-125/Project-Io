@@ -48,10 +48,20 @@ const EXE_CANDIDATES = [
 
 // corp_command.hpp's corp_verb, in declaration order. Index == enum value.
 const VERBS = [
-  'build', 'demolish', 'set_recipe', 'set_workforce', 'idle', 'resume',
-  'place_road', 'survey', 'hire_unit',
-  'place_sell_order', 'remove_sell_order', 'set_workforce_auto',
-  'request_quote', 'accept_quote', 'cancel_contract',
+  'build', 'demolish', 'set_recipe', 'set_workforce',
+  'idle', 'resume', 'place_road', 'survey',
+  'hire_unit', 'place_sell_order', 'remove_sell_order', 'set_workforce_auto',
+  'request_quote', 'accept_quote', 'cancel_contract', 'dispatch_convoy',
+  'hold_convoy', 'declare_hostile', 'offer_friendship', 'accept_friendship',
+  'return_to_neutral', 'march_unit', 'halt_unit', 'disband_unit',
+  'withdraw_from_battle', 'accept_offer', 'abandon_contract', 'raze_centre',
+  'buy_corporation', 'take_seat', 'set_trade', 'clear_trade',
+  'set_trade_reserve', 'queue_research', 'unqueue_research', 'clear_research',
+  'lay_track', 'set_logistics_shares', 'set_tax_tier', 'set_unit_obsolete',
+  'refit_unit', 'assign_front', 'set_front_order', 'set_unit_design',
+  'hire_wing', 'assign_air_mission', 'set_air_design', 'declare_war',
+  'answer_war', 'offer_peace', 'accept_peace', 'refuse_peace',
+  'impose_peace', 'set_embargo', 'defend_province',
 ];
 
 // Every code corp_command_result declares.

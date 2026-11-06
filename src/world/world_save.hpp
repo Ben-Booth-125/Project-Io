@@ -701,7 +701,30 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// a STRICT PREFIX of v77 and is read too (`k_world_save_version_pre_contributors`), as a
 /// world whose rows name no contributor and no seeded war; so is every older version the
 /// reader already accepted.
-inline constexpr uint32_t world_save_version = 77;
+///
+/// **78 (BL-1502, MILITARY.md § Occupation) — THE OCCUPATION LAYER.** Appended last: after
+/// a u32 count, every occupied tile ascending as (tile, occupier). Each names a tile with
+/// an owner, a nation of the stream that is not that owner, with an open war between the
+/// two; refused whole otherwise. v77 is a STRICT PREFIX of v78 and is read too
+/// (`k_world_save_version_pre_occupation`), as a world with no occupied tile.
+///
+/// **79 (BL-1504, MILITARY.md § Defend province) — THE DEFEND ORDERS.** Appended last: after
+/// a u32 count, every defending unit ascending id as (unit, u32 province, post tile). Each
+/// names a unit of the stream, a province of the stream and a tile of it. Refused whole
+/// otherwise. v78 is a STRICT PREFIX of v79 and is read too, as no unit defending.
+inline constexpr uint32_t world_save_version = 79;
+
+/// BL-1504: the first version carrying the defend-order section.
+inline constexpr uint32_t k_world_save_version_defend = 79;
+
+/// BL-1504: v78, a strict prefix of v79.
+inline constexpr uint32_t k_world_save_version_pre_defend = 78;
+
+/// BL-1502: the first version carrying the occupation section (see above).
+inline constexpr uint32_t k_world_save_version_occupation = 78;
+
+/// BL-1502: v77, a strict prefix of v78.
+inline constexpr uint32_t k_world_save_version_pre_occupation = 77;
 
 /// BL-1470: the first version carrying the sentiment-provenance section (see above).
 inline constexpr uint32_t k_world_save_version_contributors = 77;
@@ -899,6 +922,12 @@ std::size_t world_save_refusals_section_bytes(const world& w);
 /// The LAST section of a v77 stream.
 std::size_t world_save_contributors_section_bytes(const world& w);
 
+/// BL-1502: the bytes v78's occupation section takes for @p w: the count and 8 per tile.
+std::size_t world_save_occupation_section_bytes(const world& w);
+
+/// BL-1504: the bytes v79's defend-order section takes for @p w: the count and 12 a unit.
+std::size_t world_save_defend_section_bytes(const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -1018,6 +1047,12 @@ void write_world_snapshot_pre_airframes(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1470): the v76 stream shape - no sentiment-provenance section.
 void write_world_snapshot_pre_contributors(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1502): the v77 stream shape, no occupation section.
+void write_world_snapshot_pre_occupation(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1504): the v78 stream shape, no defend-order section.
+void write_world_snapshot_pre_defend(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

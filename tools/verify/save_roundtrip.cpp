@@ -603,7 +603,7 @@ int main()
                                        + world_save_alarm_section_bytes(wd)       // BL-1432 (v68), last
                                        + world_save_war_section_bytes(wd)          // BL-1459 (v69)
                                        + world_save_embargo_section_bytes(wd) + world_save_gen_capital_section_bytes(wd)     // BL-1418 (v70)
-                                       + world_save_recruits_section_bytes(wd) + world_save_sea_recruits_section_bytes(wd) + world_save_refusals_section_bytes(wd) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wd) /* BL-1470 (v77), last */;    // BL-1463 (v72), last
+                                       + world_save_recruits_section_bytes(wd) + world_save_sea_recruits_section_bytes(wd) + world_save_refusals_section_bytes(wd) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wd) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(wd) + world_save_defend_section_bytes(wd) /* BL-1502 (v78), last */;    // BL-1463 (v72), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section + world_save_kit_goods_bytes(wd) && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -676,7 +676,7 @@ int main()
                                          + world_save_alarm_section_bytes(wu)       // BL-1432 (v68), last
                                          + world_save_war_section_bytes(wu)          // BL-1459 (v69)
                                          + world_save_embargo_section_bytes(wu) + world_save_gen_capital_section_bytes(wu)     // BL-1418 (v70)
-                                         + world_save_recruits_section_bytes(wu) + world_save_sea_recruits_section_bytes(wu) + world_save_refusals_section_bytes(wu) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wu) /* BL-1470 (v77), last */;    // BL-1463 (v72), last
+                                         + world_save_recruits_section_bytes(wu) + world_save_sea_recruits_section_bytes(wu) + world_save_refusals_section_bytes(wu) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wu) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(wu) + world_save_defend_section_bytes(wu) /* BL-1502 (v78), last */;    // BL-1463 (v72), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section + world_save_kit_goods_bytes(wu),
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
@@ -1910,7 +1910,7 @@ int main()
             // Every narrowed array lost exactly five elements: 4 bytes a float, 1 a bool.
             // BL-1480: today's v75 stream also carries the refusals section past v74.
             ok71 = ok71 && b72.size() > b71.size()
-                && b72.size() - b71.size() == world_save_kit_goods_bytes(k) + world_save_refusals_section_bytes(k) + world_save_contributors_section_bytes(k);
+                && b72.size() - b71.size() == world_save_kit_goods_bytes(k) + world_save_refusals_section_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k);
         }
         check(ok71, "PK a v73 stream (arrays 49 wide) reads, the kit goods zero and the rest as written");
 
@@ -2018,7 +2018,7 @@ int main()
             ok75 = m0.inventory[af] == 0.0f && m0.price[af] == 0.0f
                 && m0.price[st] == mk.price[st] && m0.inventory[st] == mk.inventory[st]
                 && old.tiles.size() == k.tiles.size() && b76.size() > b75.size()
-                && b76.size() - b75.size() == world_save_airframes_bytes(k) + world_save_contributors_section_bytes(k);
+                && b76.size() - b75.size() == world_save_airframes_bytes(k) + world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k);
         }
         check(ok75, "PA a v75 stream (arrays 54 wide) reads, airframes zero and the rest as written");
         std::string bad = b75;
@@ -2091,7 +2091,7 @@ int main()
         const bool ok76 = stamped == k_world_save_version_pre_contributors && from_bytes(b76, old)
             && old.sentiment.pairs == k.sentiment.pairs && old.sentiment.contributions.empty()
             && old.sentiment.seeds.empty()
-            && b77.size() - b76.size() == world_save_contributors_section_bytes(k);
+            && b77.size() - b76.size() == world_save_contributors_section_bytes(k) + world_save_occupation_section_bytes(k) + world_save_defend_section_bytes(k);
         check(ok76, "PC a v76 stream reads, its rows whole and no provenance; v77 is v76 plus the section");
 
         // A share naming no row: splice the tail -- change the first share row's
@@ -2101,7 +2101,7 @@ int main()
         const std::size_t section = world_save_contributors_section_bytes(k);
         if (ok && bad.size() > section)
         {
-            const std::size_t subj_at = bad.size() - section + 4 + 4;
+            const std::size_t subj_at = bad.size() - world_save_occupation_section_bytes(k) - world_save_defend_section_bytes(k) - section + 4 + 4;
             const uint32_t nobody = 0x7FFFFFF0u;
             std::memcpy(&bad[subj_at], &nobody, sizeof nobody);
         }

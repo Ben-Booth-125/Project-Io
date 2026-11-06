@@ -2017,7 +2017,8 @@ void advance_musters(world& w)
         // ground, but another nation's stack may be marching through it. The
         // finished muster waits — at zero days, so it completes the first tick the
         // tile is clear — rather than raise a unit onto a foreign stack.
-        bool foreign = false;
+        // MILITARY.md § Occupation: nor onto its own ground an enemy holds, stack or no stack.
+        bool foreign = w.tile_occupied(bit->second.tile);
         for (const auto& [uid, u] : w.units) // a test: the walk order cannot matter
             foreign = foreign || (u.count > 0 && u.position == bit->second.tile && u.owner != m.owner);
         if (foreign)
@@ -2832,7 +2833,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     continue;
                 const building_component& b = bit->second;
                 if (b.decommissioned || b.ticks_remaining > 0 || b.state_idle
-                    || b.type != building_type::processing_facility)
+                    || b.type != building_type::processing_facility
+                    || w.tile_occupied(b.tile)) // BL-1502: no output, so no claim on a shelf
                     continue;
                 const entity_id body = building_body(w, b);
                 const recipe* rcp = reg.get_recipe(b.recipe);
@@ -2901,6 +2903,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 continue;
             // Still under construction — no production yet (playtest patch, 2026-07-06).
             if (b.ticks_remaining > 0)
+                continue;
+            // BL-1502 (MILITARY.md § Occupation): an occupied tile's output is denied to
+            // its owner and not gained by the occupier. It stands; it only makes nothing.
+            if (w.tile_occupied(b.tile))
                 continue;
 
             switch (b.type)
@@ -4791,6 +4797,7 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
         return out;
     };
     std::vector<tile_attack> attacks;
+    bool occupation_batch = false; // BL-1502: the fronts re-anchor once, after the pass
 
     for (const entity_id id : ids)
     {
@@ -4925,6 +4932,9 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
                     ++occupancy[next_id][u.owner];
                 }
                 u.position = next_id;
+                // BL-1502 (MILITARY.md § Occupation): at war, the ground it enters.
+                if (u.count > 0)
+                    (void)occupy_on_entry(w, u.owner, u.type, next_id, occupation_batch);
                 // BL-1453 (MILITARY.md § Recon): the day it came onto this tile, which
                 // the opening's "only haste attacks blind" test reads.
                 u.tile_since_day = day_tick >= 0 ? day_tick : w.current_day_tick;
@@ -4946,6 +4956,9 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
             ++out.arrived;
         }
     }
+
+    if (occupation_batch)
+        reanchor_fronts(w); // BL-1502: so a save today holds no key on a moved front
 
     // THE ATTACKS THIS PASS REGISTERED open now, after every unit has moved, in
     // (tile, attacker, defender) order — so which battle claims an adjacent stack
@@ -4982,6 +4995,10 @@ bool military_active(const world& w, const recipe_registry& reg, int day_tick)
     for (const auto& [uid, u] : w.units) // a pure any-of: walk order cannot reach it
         if (u.order.dest != null_entity || u.front != null_entity || u.count <= 0)
             return true;
+    // BL-1504: a defender reacts the day a hostile stack stands in its province, or walks
+    // home; at its post in a quiet province it keeps no day walking.
+    if (defenders_awake(w))
+        return true;
     // BL-1445: out-of-contact recovery is daily, so a day with a unit still
     // recovering is a day with something to do (no battle is live here, so every
     // unit is out of contact).
@@ -5014,6 +5031,8 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
         if (u.front != null_entity) { any_front = true; break; }
     if (any_front)
         advance_fronts(w, reg);
+    // BL-1504 (MILITARY.md § Defend province): the same place, the same reason.
+    advance_defenders(w, reg);
 
     // BL-1452: the units in contact at the day's start fight today's rounds, so they
     // spend ammunition and battle-worn equipment today (read before the battles, which

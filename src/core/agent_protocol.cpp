@@ -175,6 +175,7 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::set_unit_obsolete: // BL-1437
         case corp_verb::refit_unit:        // 2026-10-27: the actor's own units
         case corp_verb::assign_front:      // BL-1427
+        case corp_verb::defend_province:   // BL-1504: the actor's own unit; the seam checks the province
         case corp_verb::set_front_order:   // BL-1427
         case corp_verb::set_unit_design:   // BL-1434: the seat's nation; the seam refuses any other
         case corp_verb::hire_wing:          // BL-1449: the actor's own airbase
@@ -335,12 +336,11 @@ host_op service_line(const std::string& line, world& w, const recipe_registry& r
         // every id; whether it names a nation the session may act for is the
         // actor gate below, and whether the corp is its champion the seam's.
         const long long nat_v   = kv_get_checked(kv, "nation", 0, 0, id_max, &ok);
-        // 2026-10-27: NO VERB READS `province` NOW — march_unit's destination and
-        // withdraw_from_battle's battle are TILES, range-checked above as `tile`
-        // (an entity_id; whether it is a real tile is the seam's own check, which
-        // refuses the whole command and mutates nothing). The gate below stays so
-        // an old caller's `province=` still parses rather than failing the line.
-        // BL-511 (history): march_unit's destination province. A province id is NOT an
+        // BL-1504: defend_province reads `province`, and only it; an omitted one clears
+        // the order. march_unit's destination and withdraw_from_battle's battle are
+        // TILES, range-checked above as `tile` (an entity_id; whether it is a real tile
+        // is the seam's own check, which refuses the whole command and mutates nothing).
+        // BL-511 (history): the gate's reasoning. A province id is NOT an
         // entity_id — it is derived from (body rank | block | component)
         // (province.hpp) and lives in its own uint32 domain, so it is gated
         // against uint32's range and NOT against id_max. This gate only

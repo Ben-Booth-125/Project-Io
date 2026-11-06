@@ -168,6 +168,18 @@ float trade_haul_per_unit(world& w, const recipe_registry& reg, const logistics_
     const market_component& mb = w.markets.at(b);
     if (ma.body == mb.body)
     {
+        // BL-1505: a trader at war is not priced on the neutral road it cannot fly.
+        if (const entity_id party = lane_party(w, corp); party != null_entity)
+        {
+            const auto key = std::make_tuple(party, a, b);
+            auto it = memo.at_war.find(key);
+            if (it == memo.at_war.end())
+            {
+                const convoy_leg leg = price_market_leg(w, reg, nodes, a, b, 1.0f, party);
+                it = memo.at_war.emplace(key, leg.viable ? leg.cost : std::nanf("")).first;
+            }
+            return it->second;
+        }
         const auto key = std::make_pair(a, b);
         auto it = memo.intra.find(key);
         if (it == memo.intra.end())
@@ -183,7 +195,8 @@ float trade_haul_per_unit(world& w, const recipe_registry& reg, const logistics_
 
 void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
                        trade_haul_memo& memo, entity_id corp,
-                       const std::vector<entity_id>& sources, std::vector<trade_route_offer>& out)
+                       const std::vector<entity_id>& sources, std::vector<trade_route_offer>& out,
+                       std::vector<std::tuple<entity_id, entity_id, std::size_t>>* no_route_at_war)
 {
     out.clear();
     const trade_params& tp = reg.trade();
@@ -227,7 +240,13 @@ void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nod
                     continue;
                 const float haul = trade_haul_per_unit(w, reg, nodes, memo, corp, a, b, ri);
                 if (!std::isfinite(haul))
+                {
+                    // BL-1505: a route a price would have sent, with no way there. The pass
+                    // asks whether the front is why; an auto route never reaches its door.
+                    if (no_route_at_war != nullptr && lane_party(w, corp) != null_entity)
+                        no_route_at_war->emplace_back(a, b, ri);
                     continue;
+                }
                 const float m = price_b - price_a - haul;
                 if (!(m > margin * price_a))
                     continue;
@@ -310,7 +329,18 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             }
             const convoy_leg leg = price_trade_leg(w, reg, nodes, corp, a, b, ri, units);
             if (!leg.viable)
+            {
+                // BL-1505 (SUPPLY.md): refused with a surfaced reason. The player's is named
+                // for the Trade-flow lens, as the embargo's is above.
+                if (front_closes_lane(w, reg, nodes, corp, a, b))
+                {
+                    if (corp == w.player_entity)
+                        tf.best.emplace(std::make_pair(b, static_cast<std::uint16_t>(ri)),
+                                        trade_refusal::front_closed);
+                    ++out.refused_front;
+                }
                 return 0.0f;
+            }
             bool  refused_lp = false;
             float sent       = 0.0f;
             if (!commit_trade_shipment(w, reg, report, corp, a, b, ri, units, leg,
@@ -399,7 +429,23 @@ trade_tick run_trades(world& w, const recipe_registry& reg, economy_report& repo
             }
             if (sources.empty())
                 continue;
-            rank_trade_routes(w, reg, nodes, haul_memo, corp, sources, cands);
+            std::vector<std::tuple<entity_id, entity_id, std::size_t>> no_route;
+            rank_trade_routes(w, reg, nodes, haul_memo, corp, sources, cands, &no_route);
+            // BL-1505 (SUPPLY.md): the auto route the front closed, surfaced as the door's
+            // refusal is. Ranked, so in a fixed order; one test per market pair this pass.
+            std::map<std::pair<entity_id, entity_id>, bool> closed_pair;
+            for (const auto& [a, b, ri] : no_route)
+            {
+                const auto key = std::make_pair(a, b);
+                auto cit = closed_pair.find(key);
+                if (cit == closed_pair.end())
+                    cit = closed_pair.emplace(key, front_closes_lane(w, reg, nodes, corp, a, b)).first;
+                if (!cit->second)
+                    continue;
+                if (corp == w.player_entity)
+                    tf.best.emplace(std::make_pair(b, static_cast<std::uint16_t>(ri)), trade_refusal::front_closed);
+                ++out.refused_front;
+            }
             for (const trade_route_offer& c : cands)
             {
                 float& auto_pts = mpts.at(c.a);

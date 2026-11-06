@@ -1428,6 +1428,27 @@ void draw_assign_front_popup(const world& w, ui_state& ui, const char* popup_id,
     if (ImGui::MenuItem("Unassign", nullptr, none))
         queue(null_entity);
     ImGui::EndDisabled();
+
+    // BL-1504 (MILITARY.md § Defend province): an ability beside a front assignment, for
+    // ground a front does not cover. Each unit defends the province it stands in; the
+    // entry is checked when they all already do, and pressing it then clears the order
+    // (the toggle rule). A unit that cannot is refused by the verb.
+    bool all_defending = !units.empty();
+    for (const entity_id u : units)
+    {
+        const auto it = w.units.find(u);
+        all_defending = all_defending && it != w.units.end() && it->second.defend_province != no_province
+                     && it->second.defend_province == w.provinces.province_of(it->second.position);
+    }
+    if (ImGui::MenuItem("Defend this province", nullptr, all_defending))
+    {
+        ui.pending_defend_province.clear();
+        for (const entity_id u : units)
+            if (const auto it = w.units.find(u); it != w.units.end())
+                ui.pending_defend_province.emplace_back(
+                    u, all_defending ? no_province : w.provinces.province_of(it->second.position));
+        ImGui::CloseCurrentPopup();
+    }
     ImGui::EndPopup();
 }
 

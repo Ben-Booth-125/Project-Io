@@ -341,6 +341,7 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::halt_unit: // march's stop verb: a nation that may march may halt
         case corp_verb::refit_unit: // Ben, 2026-10-27: a nation refits its own units
         case corp_verb::assign_front:    // BL-1427: a nation's own units and fronts
+        case corp_verb::defend_province: // BL-1504: a nation's own unit
         case corp_verb::set_front_order: // BL-1427
         case corp_verb::hire_wing:          // BL-1449: a nation's own airbase
         case corp_verb::assign_air_mission: // BL-1449: a nation's own wing
@@ -1188,7 +1189,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 const logistics_nodes nodes = collect_logistics_nodes(w);
                 if (!price_trade_leg(w, reg, nodes, cmd.corp, t.from_market, t.to_market,
                                      static_cast<std::size_t>(t.resource), 1.0f).viable)
-                    return corp_command_result::rejected_placement;
+                    return corp_command_result::rejected_placement; // BL-1505: a warring front's refusal too
             }
             // BL-1418 (RELATIONS.md § 3): the destination's nation embargoes the
             // actor, so nothing it ships there may land. CREATING such a trade, or
@@ -1430,6 +1431,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 && std::isfinite(mu.order.progress) && mu.order.progress > 0.0f)
                 mo.progress = mu.order.progress;
             mu.order = mo;
+            // BL-1504: a hand order ends a defend order (ACTIONS.json), or the next day would
+            // reverse it. advance_defenders' own orders put it back (fronts.cpp).
+            mu.defend_province = no_province;
+            mu.defend_post     = null_entity;
             return corp_command_result::applied;
         }
 
@@ -1483,6 +1488,46 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (uit->second.front == key)
                 return corp_command_result::rejected_state; // already so: nothing to change
             uit->second.front = key;
+            // BL-1504: a front and a province to defend exclude each other.
+            if (key != null_entity)
+            {
+                uit->second.defend_province = no_province;
+                uit->second.defend_post     = null_entity;
+            }
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::defend_province:
+        {
+            // BL-1504 (MILITARY.md § Defend province). Every check first; a refusal
+            // mutates nothing. A march to a post outside the province is the next day's
+            // step (advance_defenders), asked of march_check here so it is one it accepts.
+            const auto uit = w.units.find(cmd.subject);
+            if (uit == w.units.end())
+                return corp_command_result::rejected_invalid;
+            unit_component& u = uit->second;
+            if (u.owner != cmd.corp)
+                return corp_command_result::rejected_not_owner;
+            if (cmd.province == no_province)
+            {
+                if (u.defend_province == no_province)
+                    return corp_command_result::rejected_state; // nothing to clear
+                u.defend_province = no_province;
+                u.defend_post     = null_entity;
+                return corp_command_result::applied;
+            }
+            if (u.defend_province == cmd.province)
+                return corp_command_result::rejected_state;
+            const auto& rows = unit_roster_table();
+            if (u.type >= rows.size()
+                || (rows[u.type].domains & domain_bit(traversal_domain::land)) == 0)
+                return corp_command_result::rejected_invalid; // a naval row holds no land post
+            const entity_id post = defend_post_for(w, reg, cmd.subject, cmd.province);
+            if (post == null_entity)
+                return corp_command_result::rejected_invalid;
+            u.defend_province = cmd.province;
+            u.defend_post     = post;
+            u.front           = null_entity;
             return corp_command_result::applied;
         }
 
@@ -1532,6 +1577,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (uit->second.order.dest == null_entity)
                 return corp_command_result::rejected_state; // nothing to halt
             uit->second.order = movement_order{};
+            // BL-1504: a hand order ends a defend order (ACTIONS.json), or the next day
+            // would reverse it. advance_defenders' own orders put it back (fronts.cpp).
+            uit->second.defend_province = no_province;
+            uit->second.defend_post     = null_entity;
             return corp_command_result::applied;
         }
 
