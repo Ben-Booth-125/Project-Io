@@ -131,9 +131,9 @@ names the side that varies (`to Corix`, `from Marur`) and the hover labels both.
 **No item glyph on these tables, unlike the Goods board — measured.** With the glyph reserved,
 five columns left the Good and Holder names ~77 px and ~64 px, drawing `Petrol...` and `Far...`:
 two goods or two firms sharing a prefix become one string, which is the defect the Goods table's
-name column was rebuilt to fix. The glyph is a deliberate placeholder (`ICONS.md` § 2b), and
-reserving width for artwork that does not exist yet at the cost of names that do is the wrong
-trade at this width. The good keeps its identity **colour** on its name.
+name column was rebuilt to fix. A glyph does not earn that cost here, where the Goods
+board has the room and the name column is the only thing telling two rows apart. The good keeps its
+identity **colour** on its name.
 
 **Each long section is bounded and scrolls inside itself.** Measured on the shipped fixture: the
 book runs to 24 rows and the exchange read to 120, so laid out end to end the first fills the

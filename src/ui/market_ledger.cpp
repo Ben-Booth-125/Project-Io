@@ -1473,39 +1473,70 @@ void draw_row_graph(const std::vector<float>& price_series, float base,
     dl->AddRect(p0, {p0.x + size.x, p0.y + size.y}, frame_col, 2.0f);
 }
 
-/// The placeholder item glyph.
-///
-/// PLACEHOLDER BY INSTRUCTION (Ben, 2026-08-29: flags and glyphs are a later
-/// sprint). The settled design is four value-track silhouettes (`ICONS.md` § 2b)
-/// and this is not one of them. Two conditions come with the stand-in and both
-/// are load-bearing:
-///
-///  1. IT MUST LOOK PROVISIONAL, not be learned as meaningful. So it is a dashed
-///     outline square in the resource's identity colour — legibly a slot waiting
-///     for artwork, and deliberately NOT a shape that could be mistaken for one
-///     of the four tracks. The colour carries the only real identity it has.
-///  2. IT RESERVES THE REAL GLYPH'S WIDTH, so landing the real glyph is an
-///     icons.cpp change and not a second table layout.
-void draw_item_glyph_placeholder(ImU32 colour, float box)
+/// The row's item glyph (ICONS.md § 2b): the good's own silhouette, sized off the
+/// font so it follows the UI scale, on the name's line.
+void draw_item_glyph(resource_type res, float box)
 {
-    ImDrawList*  dl = ImGui::GetWindowDrawList();
     const ImVec2 p0 = ImGui::GetCursorScreenPos();
     ImGui::Dummy({box, box});
+    icons::item(ImGui::GetWindowDrawList(), {p0.x + box * 0.5f, p0.y + box * 0.5f}, box * 0.5f, res);
+}
 
-    const float  pad = box * 0.18f;
-    const ImVec2 a{p0.x + pad, p0.y + pad};
-    const ImVec2 b{p0.x + box - pad, p0.y + box - pad};
-    // A dashed square: short strokes per side, so it reads as "unfinished"
-    // rather than as a solid mark with meaning.
-    const float  seg = (b.x - a.x) / 5.0f;
-    for (int i = 0; i < 5; i += 2)
+/// The item-glyph contact sheet (BL-1518), drawn over the whole window while the
+/// verify seam asks for it. No player reaches this: it is the capture Ben reads the
+/// set from, every good at the row's size and at the radii the UI scale can reach.
+std::vector<item_glyph_census_record> g_item_census;
+
+void draw_item_glyph_sheet()
+{
+    g_item_census.clear();
+    ImDrawList*  dl   = ImGui::GetForegroundDrawList();
+    const ImVec2 size = ImGui::GetIO().DisplaySize;
+    dl->AddRectFilled({0.0f, 0.0f}, size, IM_COL32(26, 28, 36, 255));
+
+    constexpr int   cols    = 5;
+    constexpr float sizes[] = {4.0f, 5.0f, 6.0f, 8.0f, 16.0f};
+    const float     cell_w  = size.x / static_cast<float>(cols);
+    const float     cell_h  = size.y / 11.0f;
+    int n = 0;
+    for (std::size_t i = 0; i < resource_count; ++i)
     {
-        const float x = a.x + seg * static_cast<float>(i);
-        dl->AddLine({x, a.y}, {x + seg, a.y}, colour, 1.0f);
-        dl->AddLine({x, b.y}, {x + seg, b.y}, colour, 1.0f);
-        const float y = a.y + seg * static_cast<float>(i);
-        dl->AddLine({a.x, y}, {a.x, y + seg}, colour, 1.0f);
-        dl->AddLine({b.x, y}, {b.x, y + seg}, colour, 1.0f);
+        const resource_type res = static_cast<resource_type>(i);
+        const float x = cell_w * static_cast<float>(n % cols) + 8.0f;
+        const float y = cell_h * static_cast<float>(n / cols) + 4.0f;
+        ++n;
+
+        float gx = x;
+        for (const float r : sizes)
+        {
+            icons::item(dl, {gx + r, y + 18.0f}, r, res);
+            gx += r * 2.0f + 8.0f;
+        }
+        dl->AddText({x, y + 38.0f}, palette::readable_on_chrome(presentation_of(res).colour),
+                    presentation_of(res).name);
+
+        // A fingerprint of the SHAPE alone, drawn off to one side at a fixed size
+        // and relative to its centre, so the check can say no two goods share one
+        // without a colour or a position in it.
+        const ImVec2 probe{size.x * 0.5f, size.y * 0.5f};
+        const int    v0 = dl->VtxBuffer.Size;
+        dl->PushClipRect({0.0f, 0.0f}, {1.0f, 1.0f}, false); // off screen: geometry only
+        icons::item(dl, probe, 32.0f, res);
+        dl->PopClipRect();
+        std::uint64_t hash = 14695981039346656037ull;
+        for (int k = v0; k < dl->VtxBuffer.Size; ++k)
+        {
+            const int px = static_cast<int>(std::lround((dl->VtxBuffer[k].pos.x - probe.x) * 8.0f));
+            const int py = static_cast<int>(std::lround((dl->VtxBuffer[k].pos.y - probe.y) * 8.0f));
+            hash = (hash ^ static_cast<std::uint32_t>(px)) * 1099511628211ull;
+            hash = (hash ^ static_cast<std::uint32_t>(py)) * 1099511628211ull;
+        }
+        item_glyph_census_record rec;
+        rec.resource = res;
+        rec.name     = presentation_of(res).name;
+        rec.vertices = dl->VtxBuffer.Size - v0;
+        rec.shape    = hash;
+        g_item_census.push_back(rec);
     }
 }
 
@@ -1640,7 +1671,7 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
             const float w_vbase = ImGui::CalcTextSize("0.00x").x + pad;
             const float w_graph = em * 3.4f;
 
-            ImGui::TableSetupColumn("##g",    ImGuiTableColumnFlags_WidthFixed, em * 0.9f);
+            ImGui::TableSetupColumn("##g",    ImGuiTableColumnFlags_WidthFixed, em);
             ImGui::TableSetupColumn("Good",   ImGuiTableColumnFlags_WidthStretch, 1.0f);
             ImGui::TableSetupColumn("Price",  ImGuiTableColumnFlags_WidthFixed, w_price);
             if (show_body)
@@ -1675,12 +1706,13 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
                         s.market_ledger_aim_scroll = false;
                     }
                 }
-                draw_item_glyph_placeholder(rp.colour, em * 0.95f);
+                draw_item_glyph(static_cast<resource_type>(r), em);
 
                 ImGui::TableSetColumnIndex(1);
                 const float name_avail  = ImGui::GetContentRegionAvail().x;
                 const float name_needed = ImGui::CalcTextSize(rp.name).x;
-                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(rp.colour));
+                // The name wears what the glyph wears, so the pair still match on the row.
+                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::readable_on_chrome(rp.colour)));
                 ui::fit_text(ui::text_box::table_cell, "market.goods.name", rp.name, name_avail);
                 ImGui::PopStyleColor();
 
@@ -1748,6 +1780,7 @@ const std::vector<goods_row_record>&   goods_rows()   { return g_goods_rows; }
 entity_id                              goods_market() { return g_goods_market; }
 const std::vector<nation_row_record>&  nation_rows()  { return g_nation_rows; }
 const market_top_record&               market_top()   { return g_market_top; }
+const std::vector<item_glyph_census_record>& item_glyph_census() { return g_item_census; }
 
 const std::vector<trade_row_record>&       my_trades()          { return g_my_trades; }
 const std::vector<trade_row_record>&       market_trades()      { return g_market_trades; }
@@ -1767,6 +1800,9 @@ void draw_market_ledger(world& w, const recipe_registry& reg, ui_state& s,
         clear_trade_records();
         return;
     }
+
+    if (s.verify_item_glyph_sheet)
+        draw_item_glyph_sheet();
 
     // Re-hosted into the shell fold-out column (BL-122); closed via the nav rail.
     if (!ui::foldout_begin("Market Ledger"))

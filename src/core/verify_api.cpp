@@ -3942,6 +3942,27 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         m_ui.market_goods_show_body = on;
     });
 
+    // The item-glyph contact sheet (BL-1518; ICONS.md § 2b): the capture Ben reads
+    // the set from, and its census, one fingerprint per good of the shape alone.
+    // Names and vertex counts, nothing of the world.
+    v.set_function("item_glyph_sheet", [this](bool on) {
+        m_ui.verify_item_glyph_sheet = on;
+    });
+    v.set_function("item_glyph_census", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::item_glyph_census_record& r : ui::item_glyph_census())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["name"]     = r.name;
+            row["key"]      = resource_names::name_of(r.resource);
+            row["vertices"] = r.vertices;
+            row["shape"]    = std::to_string(r.shape); // a string: Lua numbers lose the low bits
+            out[i++] = row;
+        }
+        return out;
+    });
+
     // The market top section's nation list as drawn (BL-1317, superseding
     // BL-688's chips) — "no national presence" is a legitimate state that must be
     // distinguishable from "the list is broken", so each row carries the world's

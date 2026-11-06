@@ -242,7 +242,7 @@ alphabetical order.
 
 **Because:** Markets are the public intelligence channel under the BL-068 visibility rule -- a rival's production and stockpiles are private, so price and the order book are the only honest read the player has on a competitor. The stacked-sparkline layout this replaces failed at that in three ways and only one was density: every sparkline was autoscaled to its OWN range, so a good decaying 40% and a good flat to a rounding error drew the same shape and goods could not be compared -- the one thing a price board is for; 'now 0.63' gave no direction; and the scroll hook aimed at the window while the list sat in a child scroller, so no capture, golden or human, had ever seen past the fourth good of 45. One row per good with the 8-quarter graph flattened into it fixes the density; drawing every row against a SHARED price/base axis with a 1.0 baseline fixes the comparison, which was the real defect.
 
-*Demanded by BL-122, BL-159, BL-686 · `src/ui/market_ledger.cpp` · id `market_ledger`*
+*Demanded by BL-122, BL-159, BL-686, BL-1518 · `src/ui/market_ledger.cpp` · id `market_ledger`*
 
 ### Convoys ledger (nav rail slot 6)
 

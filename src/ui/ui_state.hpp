@@ -1568,6 +1568,10 @@ struct ui_state
     /// both numbers on every run.
     bool market_goods_show_body = false;
 
+    /// Verify only (`verify.item_glyph_sheet`): draw the item-glyph contact sheet
+    /// over the window while the Market ledger is open (BL-1518). No control sets it.
+    bool verify_item_glyph_sheet = false;
+
     // --- BL-1239 (tile production section): the Market ledger's AIM ---------
     // A drill-through door (DRILL_THROUGH.md) from the tile element's
     // Production section: a good row opens the Market ledger aimed at the

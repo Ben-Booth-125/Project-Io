@@ -6,6 +6,7 @@
 #include "world/world.hpp"
 
 #include <string>
+#include <cstdint>
 #include <vector>
 
 namespace ui {
@@ -66,6 +67,20 @@ struct goods_row_record
     float         name_avail  = 0.0f;  ///< Px the name column actually offered.
     float         name_needed = 0.0f;  ///< Px the full name needed at this font.
 };
+
+/// One good's item glyph on the verify contact sheet (BL-1518; ICONS.md § 2b):
+/// `shape` fingerprints its geometry alone, so a check can say every good has its
+/// own glyph without reading a colour or a screen position.
+struct item_glyph_census_record
+{
+    resource_type resource{};
+    const char*   name     = "";
+    int           vertices = 0;
+    std::uint64_t shape    = 0;
+};
+
+/// The contact sheet's census, as last drawn. Empty unless the verify seam asked.
+const std::vector<item_glyph_census_record>& item_glyph_census();
 
 /// One row of the market top section's nation list (BL-1317; superseding BL-688's chips).
 struct nation_row_record

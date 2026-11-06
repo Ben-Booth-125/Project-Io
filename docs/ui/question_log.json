@@ -362,7 +362,8 @@
    "backlog_item": [
     "BL-122",
     "BL-159",
-    "BL-686"
+    "BL-686",
+    "BL-1518"
    ],
    "files": [
     "src/ui/market_ledger.cpp"
