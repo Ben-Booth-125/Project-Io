@@ -694,7 +694,7 @@ struct unit_designer_state
 /// VIEW state, not serialised.
 struct construction_controls
 {
-    float     rail_track_x   = -1.0f; ///< BL-1255: the tile list's Track row Build press.
+    float     rail_track_x   = -1.0f; ///< BL-1255: the tile list's Railroad row Build press.
     float     rail_track_y   = -1.0f;
     float     rail_station_x = -1.0f; ///< BL-1255: the Railway Station row's Build press.
     float     rail_station_y = -1.0f;
@@ -797,6 +797,7 @@ struct construction_controls
         std::string  explainer;       ///< The press's own one-or-two-sentence card.
     };
     std::vector<road_row> road_rows;
+    float road_fold_x = -1.0f, road_fold_y = -1.0f; ///< The Road fold's header, for a check to press.
 
     /// BL-1370: the armed targeting state as the CANVAS resolved it this frame —
     /// the tile the crossing starts from, the tier, and the grid position of every

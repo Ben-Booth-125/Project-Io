@@ -5650,6 +5650,16 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
         // with smaller glyphs than the building rows. Railroad draws its own table, as
         // the station does, for the reason rail_tool.cpp gives.
         const bool road_fold = ImGui::TreeNodeEx("Road", ImGuiTreeNodeFlags_DefaultOpen);
+        {
+            const ImVec2 fmn = ImGui::GetItemRectMin();
+            const ImVec2 fmx = ImGui::GetItemRectMax();
+            ui.construction_ui.road_fold_x = fmn.x + 40.0f;
+            ui.construction_ui.road_fold_y = (fmn.y + fmx.y) * 0.5f;
+        }
+        // Closing the fold hides the press that shows the armed state, and that press is
+        // how a player disarms. So the closing press disarms too (the Toggle rule).
+        if (!road_fold && ImGui::IsItemToggledOpen() && ui.construction.road_arm_tile == tile_id)
+            ui.construction.road_arm_tile = null_entity;
         const bool road_grid = road_fold && construction_begin_build_grid("##grid_Road");
         for (const road_tier_affordance& rt : road_tiers)
         {

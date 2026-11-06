@@ -788,7 +788,8 @@
     "tile_card",
     "workforce_step",
     "construction_ledger_tabs",
-    "building_management_shell"
+    "building_management_shell",
+    "building_recipe_rows"
    ]
   },
   {
@@ -1229,7 +1230,9 @@
     "build_door_wide_roster",
     "fresh_start_build",
     "air_gate",
-    "construction_progress"
+    "construction_progress",
+    "construction_folds",
+    "shelf_runway_warning"
    ]
   },
   {
@@ -1904,7 +1907,8 @@
    "interesting_question": "A line is laid one selected tile at a time - is selecting and pressing per tile acceptable for a long line, or does a long line want a run gesture inside the same list idiom?",
    "resolution": "Open - Ben ruled 2026-10-15 that rail is built like anything else from the tile's list; whether long lines later earn a multi-tile press is his call.",
    "checks": [
-    "rail_construction"
+    "rail_construction",
+    "construction_folds"
    ]
   },
   {
@@ -1921,7 +1925,9 @@
    "interesting_question": "Many rows tie on Net where prices are per market; does the ledger want a finer price (province-level) or a second default key?",
    "resolution": "Open - Ben's call on province-level local prices (2026-10-25); the tie share is measured by construction_sites_ties.lua.",
    "checks": [
-    "construction_sites"
+    "construction_sites",
+    "site_picker_glyphs",
+    "shelf_runway_warning"
    ]
   },
   {

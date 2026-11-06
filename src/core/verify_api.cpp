@@ -5562,6 +5562,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         const auto& c   = m_ui.construction_ui;
         sol::table  rows = st.create_table();
         int         n    = 0;
+        out["fold_x"] = c.road_fold_x;
+        out["fold_y"] = c.road_fold_y;
         for (const construction_controls::road_row& r : c.road_rows)
         {
             sol::table row = st.create_table();

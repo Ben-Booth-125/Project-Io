@@ -104,8 +104,21 @@ if live ~= nil then
     verify.click(again.x, again.y)
     verify.frames(3)
     verify.expect(not verify.road_state().armed, "pressing the armed row again disarms it")
+
+    -- CLOSING THE FOLD DISARMS: it hides the press that shows the armed state.
+    verify.click(live.x, live.y)
+    verify.frames(3)
+    local rearmed = verify.road_state()
+    verify.expect(rearmed.armed, "the press arms again, to test the fold")
+    verify.click(rearmed.fold_x, rearmed.fold_y)
+    verify.frames(3)
+    verify.expect(not verify.road_state().armed, "closing the Road fold disarms the armed tier")
+    verify.expect(#verify.road_state().rows == 0, "the closed fold draws no road row")
+    verify.click(rearmed.fold_x, rearmed.fold_y)
+    verify.frames(3)
+    verify.expect(not verify.road_state().armed, "opening the fold again does not re-arm")
 else
-    print("construction_folds: no live road press on this tile; the arm toggle went unexercised")
+    verify.expect(false, "a live road press on this tile, or the arm toggle goes unexercised")
 end
 
 print("construction_folds: done")
