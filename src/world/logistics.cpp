@@ -1167,6 +1167,8 @@ const std::vector<entity_id>& body_active_port_tiles(world& w, entity_id body)
         (void)bid;
         if (bc.type != building_type::port || bc.ticks_remaining > 0 || bc.decommissioned)
             continue;
+        if (w.closed_ports.count(bc.tile) != 0)
+            continue; // BL-1530: a blockaded port loads and unloads no sea leg, for anyone
         const auto tit = w.tiles.find(bc.tile);
         if (tit != w.tiles.end() && tit->second.body == body)
             ports.push_back(bc.tile);

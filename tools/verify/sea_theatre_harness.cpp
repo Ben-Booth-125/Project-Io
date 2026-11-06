@@ -12,6 +12,7 @@
 #include "core/battle_dispatch_text.cpp" // BL-1529: interception_line; the builder compiles only src/world, and this TU reads only the world
 #include "world/campaign_settle.hpp"
 #include "world/market_clearing.hpp"
+#include "world/trade.hpp"
 #include "world/nation_tech.hpp"
 #include "world/supply_system.hpp"
 #include "world/air_combat.hpp"
@@ -29,6 +30,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -966,7 +968,7 @@ int main()
                   && loaded.ships.at(d).kit.fit == f.w.ships.at(d).kit.fit && loaded.ships.at(d).refitting
                   && to_bytes(loaded) == b && loaded.state_hash(1) == f.w.state_hash(1),
               "K9 v81 round trips the designs and a ship's kit");
-        const std::size_t sec = b.size() - 14; // count, nation, n, one id
+        const std::size_t sec = b.size() - 14 - 4; // count, nation, n, one id, then the closed ports' count
         const auto spoil = [&](std::size_t off, uint32_t v, int width) {
             std::string c = b;
             for (int i = 0; i < width; ++i)
@@ -996,9 +998,10 @@ int main()
               "K10 a v80 stream reads 55 wide: no design, no ship hulls");
         check(old.ships.at(d).kit.fit == unit_design{}.fit && !old.ships.at(d).refitting, "K10b its ships hold base kit, none in refit");
         {
-            // The v80 tail is today's less the design section (14 bytes here) and each ship's refit byte.
+            // The v80 tail is today's less the design section (14 bytes here), the closed ports' count
+            // and each ship's refit byte.
             std::string c = o80.str();
-            const std::size_t tail = world_save_ships_section_bytes(f.w) - 14 - f.w.ships.size();
+            const std::size_t tail = world_save_ships_section_bytes(f.w) - 14 - 4 - f.w.ships.size();
             c[c.size() - tail + 4 + 4 * 4 + 2 + 4 * 5 + 1] = static_cast<char>(1);
             std::istringstream in(c, std::ios::binary);
             world x;
@@ -1375,6 +1378,207 @@ int main()
         check(interception_line(f.w, r, f.b).find("Aerie") != std::string::npos, "P14c the raider's side reads whose cargo it was");
         const entity_id third = f.w.create_entity();
         check(interception_line(f.w, r, third).empty(), "P14d a third party's feed stays quiet");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nBL-1530 - sea control and the blockade\n");
+    {
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        const uint32_t p = strip(f, 10);
+        check(sea_control_share_permille(f.w, reg, p, f.a) == 0 && !sea_holds(f.w, reg, p, f.a), "C1 no ship, no share");
+        add_on_station(f, f.a, f.a_port, SUB, sea_mission::raid, {10});
+        check(!sea_holds(f.w, reg, p, f.a), "C2 a submarine holds no water");
+        add_on_station(f, f.a, f.a_port, TRA, sea_mission::none, {10});
+        check(!sea_holds(f.w, reg, p, f.a), "C2b nor does a transport");
+        const entity_id da = add_on_station(f, f.a, f.a_port, DES, sea_mission::patrol, {10});
+        check(sea_control_share_permille(f.w, reg, p, f.a) == 1000 && sea_holds(f.w, reg, p, f.a), "C3 uncontested, a patrol holds all of it");
+        f.w.ships.at(da).route.push_back(tile(f, 42, 3));
+        check(!sea_holds(f.w, reg, p, f.a), "C3b a patrol still sailing holds nothing");
+        f.w.ships.at(da).route.clear();
+        const entity_id db = add_on_station(f, f.b, f.b_port, DES, sea_mission::escort, {10});
+        check(sea_control_share_permille(f.w, reg, p, f.a) == 500 && !sea_holds(f.w, reg, p, f.a) && !sea_holds(f.w, reg, p, f.b),
+              "C4 equal forces split it and neither reaches the bar");
+        add_on_station(f, f.a, f.a_port, CAP, sea_mission::blockade, {10});
+        check(sea_holds(f.w, reg, p, f.a) && !sea_holds(f.w, reg, p, f.b), "C5 a capital ship tips it, and only one side holds");
+        (void)db;
+    }
+    {
+        // A held province reveals hostile surface ships, and never a submarine.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, CAP, sea_mission::patrol, {10});
+        f.w.ships.at(f.w.ships.rbegin()->first).provinces = {strip(f, 10)};
+        // A worn-out holder: its detection is a sliver, so only the hold can find anything daily.
+        f.w.ships.begin()->second.supply_factor_permille = 30;
+        const entity_id ghost = add_ship(f, f.b, f.b_port, TRA, 41, 3);
+        int found_days = 0;
+        for (int d = 0; d < 20; ++d)
+            found_days += run_sea_day(f.w, reg, 3 + d).detections > 0 ? 1 : 0;
+        check(found_days == 20 && f.w.ships.at(ghost).hp_ppm < k_ship_hp_full, "C6 a held province reveals a surface ship every day: " + std::to_string(found_days));
+    }
+    {
+        // Never a submarine: a worn-out destroyer holds the water, and it alone can hit one, so
+        // a day the submarine takes a hit is a day it was found. It stays on its stealth.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, DES, sea_mission::patrol, {10});
+        f.w.ships.begin()->second.supply_factor_permille = 30;
+        add_ship(f, f.b, f.b_port, SUB, 41, 3);
+        int sub_days = 0;
+        for (int d = 0; d < 20; ++d)
+            sub_days += run_sea_day(f.w, reg, 100 + d).hits > 0 ? 1 : 0;
+        check(sea_holds(f.w, reg, strip(f, 10), f.a) && sub_days < 5, "C6b and never a submarine, which stays on its stealth: " + std::to_string(sub_days));
+    }
+    {
+        // Control for C6: no hold, a contested province, and the same sliver finds little.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, CAP, sea_mission::patrol, {10});
+        f.w.ships.begin()->second.supply_factor_permille = 30;
+        add_on_station(f, f.b, f.b_port, CAP, sea_mission::patrol, {10});
+        f.w.ships.rbegin()->second.supply_factor_permille = 30;
+        check(!sea_holds(f.w, reg, strip(f, 10), f.a), "C6c control: an even fight holds nothing");
+    }
+    {
+        // The verb: a blockade only at a hostile port's mouth.
+        fixture f; build(f);
+        const entity_id d = add_ship(f, f.a, f.a_port, DES, 8, 3);
+        const uint32_t mouth = strip(f, 71 / STRIP);
+        refused(f, [&] { return assign(f, reg, f.a, d, sea_mission::blockade, {mouth}); },
+                corp_command_result::rejected_placement, "C14 no declaration, no blockade to assign");
+        declare_hostile(f.w, f.a, f.b);
+        refused(f, [&] { return assign(f, reg, f.a, d, sea_mission::blockade, {strip(f, 5)}); },
+                corp_command_result::rejected_placement, "C14b open water with no port is no blockade");
+    }
+    {
+        // The blockade: closes the port on the holding edge and opens it on the losing one.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        // The field wraps, so a and b touch by land; cut that isthmus so only the water joins them.
+        for (int r = 0; r < GH; ++r)
+            for (const int c : {76, 77, 78, 79, 0, 1, 2, 3})
+                f.w.tiles.at(tile(f, c, r)).substrate = terrain_substrate::ocean;
+        invalidate_logistics_caches(f.w);
+        const std::size_t strip_mouth = 71 / STRIP; // b's port mouth at (71, 3)
+        const entity_id b_port_tile = tile(f, 72, 3);
+        const auto ports = [&] { return body_active_port_tiles(f.w, f.body); };
+        check(ports().size() == 2, "C7 both ports load before any blockade");
+        const convoy_leg open_leg = price_market_leg(f.w, reg, collect_logistics_nodes(f.w), f.a_market, f.b_market, 1.0f, f.a);
+        check(open_leg.viable && open_leg.port_a == tile(f, 7, 3) && open_leg.port_b == tile(f, 72, 3),
+              "C7b control: before the blockade the route prices over water, port to port");
+        const entity_id bl = add_on_station(f, f.a, f.a_port, DES, sea_mission::blockade, {static_cast<int>(strip_mouth)});
+        run_sea_day(f.w, reg, 1);
+        check(f.w.closed_ports.count(b_port_tile) == 1 && ports().size() == 1 && ports()[0] == tile(f, 7, 3),
+              "C8 a blockade held at the mouth closes the port, and the route set reads it as lost the same day");
+        const convoy_leg leg = price_market_leg(f.w, reg, collect_logistics_nodes(f.w), f.a_market, f.b_market, 1.0f, f.a);
+        check(!leg.viable, "C8b the route pricer reads the port as lost: with no land route, no route");
+        recipe_registry treg = reg;
+        trade_params tp = treg.trade();
+        tp.port_points = 10.0f;
+        treg.set_trade(tp);
+        check(market_trade_points(f.w, treg, nullptr, f.b).empty() && !market_trade_points(f.w, treg, nullptr, f.a).empty(),
+              "C8c the blockaded port makes no trade points, and the other still does");
+        // A cargo already at sea finishes its leg.
+        convoy_component& cv = add_crossing(f, f.a, 40.0f);
+        cv.progress_before = 0.4f; cv.progress = 0.5f; cv.arrived = false;
+        const convoy_route lane = convoy_route_tiles(f.w, cv);
+        check(!lane.tiles.empty() && lane.sea_first >= 0, "C9 a convoy at sea keeps its lane through a closed port");
+        const float quay = lane.at[static_cast<std::size_t>(lane.sea_first)];
+        f.w.convoys.clear();
+        {
+            // Bound through b's closed port, ashore: it waits at its quay however fast it goes.
+            convoy_component& ashore = add_crossing(f, f.a, 40.0f);
+            ashore.progress_before = -1.0f; ashore.progress = 0.0f; ashore.speed = 0.3f; ashore.arrived = false;
+            for (int k = 0; k < 8; ++k)
+                advance_convoys(f.w);
+            const convoy_component& w0 = f.w.convoys.back();
+            check(!w0.arrived && w0.progress == quay, "C9b a cargo not yet at sea waits at its loading port");
+            f.w.convoys.clear();
+            // Already past the quay: it finishes, into the closed port, and lands.
+            convoy_component& at_sea = add_crossing(f, f.a, 40.0f);
+            at_sea.progress_before = -1.0f; at_sea.progress = quay + 0.01f; at_sea.speed = 0.4f; at_sea.arrived = false;
+            for (int k = 0; k < 4 && !f.w.convoys.empty(); ++k)
+            {
+                advance_convoys(f.w);
+                credit_arrived_convoys(f.w, k);
+            }
+            check(f.w.convoys.empty() && f.w.landed(f.a, f.b_market, static_cast<std::size_t>(resource_type::steel)) == 40.0f,
+                  "C9c a cargo already at sea finishes its leg and lands");
+            f.w.landed_this_tick.clear();
+        }
+        // Round trip.
+        const std::string saved = to_bytes(f.w);
+        world back;
+        check(from_bytes(saved, back) && back.closed_ports == f.w.closed_ports && to_bytes(back) == saved, "C10 a closed port saves and loads, byte for byte");
+        check(!price_market_leg(back, reg, collect_logistics_nodes(back), f.a_market, f.b_market, 1.0f, f.a).viable
+                  && body_active_port_tiles(back, f.body).size() == 1,
+              "C10a the loaded world reads the port closed before any sea day");
+        {
+            // Untrusted: a closed id that is no tile of the stream.
+            std::string c = saved;
+            const entity_id bare = f.a;
+            std::memcpy(&c[c.size() - 4], &bare, 4);
+            world x;
+            check(!from_bytes(c, x), "C10b a closed id that is no tile is refused");
+        }
+        {
+            // A port idled since the last sea day is a legal state: the save must load.
+            world idled = f.w;
+            idled.buildings.at(f.b_port).state_idle = true;
+            idled.buildings.at(f.b_port).decommissioned = true;
+            const std::string s2 = to_bytes(idled);
+            world x;
+            check(from_bytes(s2, x) && to_bytes(x) == s2, "C10c a port taken out of service while closed still saves and loads");
+        }
+        // Lose the water: the port opens that day, for hostility or for force.
+        const entity_id guard = add_on_station(f, f.b, f.b_port, CAP, sea_mission::patrol, {static_cast<int>(strip_mouth)});
+        (void)guard;
+        run_sea_day(f.w, reg, 2);
+        check(f.w.closed_ports.empty() && ports().size() == 2, "C11 lose the province and the port reopens that day");
+        (void)bl;
+        // Hostility ends: the port opens on the next day.
+        f.w.ships.erase(guard);
+        run_sea_day(f.w, reg, 3);
+        check(f.w.closed_ports.size() == 1, "C11b the guard gone, the blockade closes it again");
+        return_to_neutral(f.w, f.a, f.b);
+        run_sea_day(f.w, reg, 4);
+        check(f.w.closed_ports.empty(), "C11c peace opens it");
+        // The last ship goes while the port is closed, through the real military day.
+        declare_hostile(f.w, f.a, f.b);
+        run_sea_day(f.w, reg, 5);
+        check(f.w.closed_ports.size() == 1, "C11d closed again");
+        f.w.ships.clear();
+        run_military_day(f.w, reg, 2000);
+        check(f.w.closed_ports.empty(), "C11e no ship left: the military day still runs and opens it");
+    }
+    {
+        // Who may blockade.
+        fixture f; build(f);
+        const std::size_t strip_mouth = 71 / STRIP;
+        add_on_station(f, f.a, f.a_port, DES, sea_mission::blockade, {static_cast<int>(strip_mouth)});
+        run_sea_day(f.w, reg, 1);
+        check(f.w.closed_ports.empty(), "C12 no declaration, no blockade");
+        declare_hostile(f.w, f.b, f.a);
+        run_sea_day(f.w, reg, 2);
+        check(f.w.closed_ports.empty(), "C12b the port's nation declaring does not arm the blockader");
+        declare_hostile(f.w, f.a, f.b);
+        f.w.ships.begin()->second.mission = sea_mission::patrol;
+        run_sea_day(f.w, reg, 3);
+        check(f.w.closed_ports.empty(), "C12c holding the water without a blockade closes nothing");
+        f.w.ships.begin()->second.mission = sea_mission::blockade;
+        run_sea_day(f.w, reg, 4);
+        check(f.w.closed_ports.size() == 1, "C12d control: the same ship on blockade closes it");
+        // A blockading ship raids as a raider does.
+        int taken = 0;
+        for (int t = 0; t < 300; ++t)
+        {
+            convoy_component& cv = add_crossing(f, f.b);
+            cv.port_b = tile(f, 72, 3);
+            taken += static_cast<int>(raid_convoys(f.w, reg, t).size());
+            f.w.convoys.clear();
+        }
+        check(taken > 0, "C13 a blockading ship may raid its hostile cargo: " + std::to_string(taken));
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

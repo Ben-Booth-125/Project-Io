@@ -14443,6 +14443,9 @@
     },
     "BL-1529": {
       "design": "MILITARY.md § Sea; LOGISTICS.md § 7; SUPPLY.md, the lane. The seeded daily raid on a sea leg in the zone, the escort share, submarine sink against surface prize, and the announcement with \"an unseen raider\". Must conserve: a sunk cargo is destroyed, a prize lands at the nearest own port. Land interdiction is unchanged. Harness: replay determinism, money and goods conservation, friend immunity, undetected submarine ignores escort."
+    },
+    "BL-1530": {
+      "design": "MILITARY.md § Sea; TRADE.md, ports. The share per province, the holding bar, the reveal. A held port-mouth province stops sea legs and trade points; the route pricer reads the port as lost, and the caches invalidate on both edges. Harness: prices move at the blockaded market, reopening is same-day, a convoy at sea finishes its leg."
     }
   }
 }

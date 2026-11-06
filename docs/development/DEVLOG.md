@@ -10,6 +10,26 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-06 — BL-1530 (sea control and blockade): water can be held, and a port closed
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** A side's share of surface attack per sea province, and the bar that makes it a hold. Holding
+reveals hostile surface ships. A blockader holding a port's mouth closes the port: `world::closed_ports`, rewritten
+at the end of each sea day, dropping the logistics caches on both edges. The pricer, sea lanes, trade points and
+Logistic Points all read it. A cargo not yet at sea waits at its quay. A blockader raids as a raider does. Saved
+inside v81, which has not left this branch.
+
+**Review.** The cold review caught a save its own loader refused, when a closed port was idled before the next day; a
+port shut forever once the last ship was gone, since no military day ran; cargo still sailing through a closed port
+from its land leg; points still made by a closed port; the raid ignoring the reveal; and blockade legal anywhere, so
+it dominated raid. All fixed.
+
+**Left open.** Seven calls in NR-1147. BL-1535 (naval war reading) owes the price actually moving on a real seed: the
+fixture shows only the route and points gone. Shape identical to base.
+
+---
+
 ## 2026-11-06 — BL-1529 (patrol escort raid): raiders take cargo off the sea legs
 
 **Runtime:** one session, Delivery Full on the naval worktree.

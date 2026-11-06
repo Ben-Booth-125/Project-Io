@@ -1170,7 +1170,7 @@
    "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
-   "status": "proposed",
+   "status": "complete",
    "glyph": "○",
    "sprint": "64",
    "version_goal": "v0.3.0",
@@ -1193,7 +1193,9 @@
     "src/world/economy_system.cpp"
    ],
    "title": "Sea control per sea province, and the blockade that closes a port",
-   "design": "MILITARY.md § Sea; TRADE.md, ports. The share per province, the holding bar, the reveal. A held port-mouth province stops sea legs and trade points; the route pricer reads the port as lost, and the caches invalidate on both edges. Harness: prices move at the blockaded market, reopening is same-day, a convoy at sea finishes its leg."
+   "resolved": "2026-11-06",
+   "design": "@docs/development/archive/backlog-design-2026-Q4.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
    "status": "proposed",
@@ -1328,7 +1330,7 @@
     "tools/session/rulings/sprint-64.json"
    ],
    "title": "Close the sprint on a measured war at sea and the one re-bless",
-   "design": "v0.3.0 needs the naval system and a playtest with a few wars. Sweep the library: fleets raised, raids landed, ports closed, landings made, treasuries under fleet upkeep. Then the sprint's one re-bless, described by rebless_shape_probe, ruling-check, and a live war played to a landing."
+   "design": "v0.3.0 needs the naval system and a playtest with a few wars. Sweep the library: fleets raised, raids landed, ports closed, landings made, treasuries under fleet upkeep. Then the sprint's one re-bless, described by rebless_shape_probe, ruling-check, and a live war played to a landing. It also owes the one reading the blockade could not show on a fixture: a clearing price moving at a blockaded market on a real seed."
   }
  ]
 }

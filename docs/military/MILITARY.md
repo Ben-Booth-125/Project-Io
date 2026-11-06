@@ -703,7 +703,7 @@ detected ship in the province as it reaches a land unit (§ Air), and a ship can
 **Sea control is a share (Ben, 2026-11-05).** In a sea province it is each hostile side's share of the
 surface attack on patrol, escort or blockade there, as air superiority is a share of air attack. An
 uncontested side holds all of it. Submarines and transports count for nothing, so submarines deny water
-without ever holding it. The side at or past the authored bar **holds** the province. Holding it reveals
+without ever holding it. A side is one nation: allies do not pool. The side at or past the authored bar **holds** the province. Holding it reveals
 hostile surface ships there, and it is what a blockade and a landing read.
 
 **Patrol** raises its side's detection in the zone, engages whatever it finds, and counts for sea control.
@@ -729,7 +729,8 @@ declared hostile, on the sea province at the port's mouth. **While its side hold
 loads and unloads no sea leg for anyone, and makes no trade points** (`../economy/TRADE.md`). The route
 pricer reads the closed port as it reads a lost one, so trade reroutes or stops, and the cost lands on the
 blockaded market's prices. A convoy already at sea finishes its leg, and a blockading ship may raid its
-hostile cargo as a raider does. Lose the province and the port reopens that day.
+hostile cargo as a raider does. A cargo not yet at sea, bound through a closed port, waits at its loading
+port. A closed port makes no Logistic Points either. Lose the province and the port reopens that day.
 
 **Landings carry armies over the ocean (Ben, 2026-11-05).** Open ocean bars a land unit except aboard a
 transport (§ Domains and traversal). A land unit **embarks** at an own port up to the transport's capacity.

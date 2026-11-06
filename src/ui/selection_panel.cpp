@@ -2963,7 +2963,9 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
             // The market rides the hover (the card's column fits ~30 characters);
             // the figure is the line.
             const float pts = building_trade_points(reg, b, contention, /*upkeep_met=*/true);
-            if (pts > 0.0f)
+            if (b.type == building_type::port && w.closed_ports.count(b.tile) != 0)
+                std::snprintf(buf, sizeof buf, "Blockaded: makes no trade points");
+            else if (pts > 0.0f)
                 std::snprintf(buf, sizeof buf, "Makes %.1f trade points / qtr", static_cast<double>(pts));
             else
                 std::snprintf(buf, sizeof buf, "Makes trade points for %s", market.c_str());

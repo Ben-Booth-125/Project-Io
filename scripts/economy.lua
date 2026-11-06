@@ -1145,6 +1145,7 @@ economy = {
         sea = {
             patrol_detection_permille = 1500,
             raid_take_permille_per_day = 100,
+            sea_hold_share_permille   = 600,
             morale_per_hp_permille    = 1000,
             dock_morale_per_day       = 10,
             resume_hp_permille        = 700,

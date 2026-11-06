@@ -166,6 +166,23 @@ void advance_convoys(world& w)
             convoy.progress = 1.0f;
             convoy.arrived  = true;
         }
+        // BL-1530 (MILITARY.md § Sea, Blockade): a closed port loads no sea leg and unloads
+        // none. A cargo not yet at sea, bound through one, waits at its loading port and costs
+        // nothing further; one already at sea finishes its leg.
+        if (!w.closed_ports.empty() && convoy.port_a != null_entity
+            && (w.closed_ports.count(convoy.port_a) != 0 || w.closed_ports.count(convoy.port_b) != 0))
+        {
+            const convoy_route lane = convoy_route_tiles(w, convoy);
+            if (lane.sea_first >= 0 && static_cast<std::size_t>(lane.sea_first) < lane.at.size())
+            {
+                const float quay = lane.at[static_cast<std::size_t>(lane.sea_first)];
+                if (convoy.progress_before <= quay && convoy.progress > quay)
+                {
+                    convoy.progress = quay;
+                    convoy.arrived  = false;
+                }
+            }
+        }
     }
     note_lane_heads(w);
 }

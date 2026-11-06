@@ -140,6 +140,21 @@ corp_command_result refit_ship_check(const world& w, entity_id nation, entity_id
 /// mission up when it sails again.
 void set_ship_mission(world& w, sea_ship& s, sea_mission m, std::vector<uint32_t> provinces);
 
+// ---- Sea control ------------------------------------------------------------
+
+/// BL-1530 (MILITARY.md § Sea): @p nation's share, per-mille, of the surface attack on patrol,
+/// escort or blockade in @p province against the sides hostile to it either way. Submarines,
+/// transports and ships not on station count for nothing. 1000 when uncontested, 0 with none.
+int sea_control_share_permille(const world& w, const recipe_registry& reg, uint32_t province, entity_id nation);
+
+/// Does @p nation hold @p province: a surface force there, at or past the authored bar?
+bool sea_holds(const world& w, const recipe_registry& reg, uint32_t province, entity_id nation);
+
+/// Recompute `world::closed_ports`: a standing port whose mouth lies in a province held by a
+/// side with a ship on blockade there, hostile by its own declaration to the port's nation.
+/// Drops the logistics caches when the set changes. Run at the end of each sea day.
+void refresh_closed_ports(world& w, const recipe_registry& reg);
+
 // ---- The passes -------------------------------------------------------------
 
 struct sea_day_tick

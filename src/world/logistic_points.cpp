@@ -220,6 +220,8 @@ std::unordered_map<entity_id, float> lp_lane_walk(world& w, entity_id body,
         (void)bid;
         if (b.type != building_type::port || b.ticks_remaining > 0 || b.decommissioned)
             continue;
+        if (w.closed_ports.count(b.tile) != 0)
+            continue; // BL-1530: a blockaded port takes no landing, and makes no points below
         const auto tit = w.tiles.find(b.tile);
         if (tit != w.tiles.end() && tit->second.body == body)
             landings.insert(b.tile);
@@ -495,7 +497,7 @@ lp_tick resolve_logistic_points(world& w, const std::vector<lp_supply_claim>& su
     {
         const building_component& b = w.buildings.at(bid);
         lp_network net;
-        if (!lp_source_network(b.type, net) || !lp_source_running(b))
+        if (!lp_source_network(b.type, net) || !lp_source_running(b) || (b.type == building_type::port && w.closed_ports.count(b.tile) != 0))
             continue;
         const auto tit = w.tiles.find(b.tile);
         if (tit == w.tiles.end())
@@ -856,7 +858,7 @@ const std::vector<lp_source_ref>& memo_sources(world& w, lp_reach_memo& memo, en
     for (const auto& [bid, b] : w.buildings)
     {
         lp_network net;
-        if (!lp_source_network(b.type, net) || !lp_source_running(b))
+        if (!lp_source_network(b.type, net) || !lp_source_running(b) || (b.type == building_type::port && w.closed_ports.count(b.tile) != 0))
             continue;
         const auto st = w.tiles.find(b.tile);
         const auto sn = w.tile_to_nation.find(b.tile);

@@ -4,7 +4,7 @@
 #include "economy_system.hpp"  // draw_goods_at_tile, step_unit_supply_toward, economy_report
 #include "embargo.hpp"         // embargo_refuses
 #include "hex_neighbors.hpp"
-#include "logistics.hpp"       // convoy_route_tiles, econ_tick_days_world
+#include "logistics.hpp"       // convoy_route_tiles, econ_tick_days_world, invalidate_logistics_caches
 #include "market_clearing.hpp" // market_for_tile
 #include "province.hpp"
 #include "recipe_registry.hpp"
@@ -460,6 +460,23 @@ corp_command_result sea_mission_check(const world& w, const recipe_registry& reg
         if (!reachable)
             return corp_command_result::rejected_placement;
     }
+    // BL-1530 (MILITARY.md § Sea, Blockade): a blockade lies at the mouth of a port of a nation
+    // its nation has declared hostile, every province of it. Anywhere else it is a raid.
+    if (m == sea_mission::blockade)
+        for (const uint32_t id : set)
+        {
+            bool mouth = false;
+            for (const auto& [bid, b] : w.buildings) // a pure any-of
+                if (b.type == building_type::port && b.ticks_remaining <= 0 && !b.decommissioned
+                    && owner_nation_of(w, bid) != nation && is_hostile(w, nation, owner_nation_of(w, bid))
+                    && w.provinces.province_of(port_mouth_tile(w, bid)) == id)
+                {
+                    mouth = true;
+                    break;
+                }
+            if (!mouth)
+                return corp_command_result::rejected_placement;
+        }
     if (m == s.mission && set == s.provinces)
         return corp_command_result::rejected_state;
     if (out_set != nullptr)
@@ -570,6 +587,18 @@ std::map<entity_id, int64_t> side_detection(const world& w, const recipe_registr
     return detection;
 }
 
+/// The surface force @p s brings to a province it works, at @p weight: nothing for a class
+/// or a mission that does not count (MILITARY.md § Sea).
+int64_t surface_force(const world& w, const recipe_registry& reg, const sea_ship& s, int weight)
+{
+    const ship_class c = ship_class_of(s);
+    if ((c != ship_class::destroyer && c != ship_class::capital) || !on_station(w, s)
+        || (s.mission != sea_mission::patrol && s.mission != sea_mission::escort
+            && s.mission != sea_mission::blockade))
+        return 0;
+    return static_cast<int64_t>(ship_stats(reg, s).attack) * ship_strength_permille(s) / 1000 * weight / 1000;
+}
+
 /// The market a prize of @p raider's lands on: its nation's nearest own port within its class's
 /// range over water of @p from whose market will take its goods (the embargo holds at this
 /// border as at any). Null with none.
@@ -580,7 +609,8 @@ entity_id prize_market_for(const world& w, const recipe_registry& reg, const sea
     for (const entity_id port : own_ports(w, raider.owner))
     {
         const entity_id market = market_for_tile(w, w.buildings.at(port).tile);
-        if (market == null_entity || embargo_refuses(w, raider.owner, market))
+        if (market == null_entity || embargo_refuses(w, raider.owner, market)
+            || w.closed_ports.count(w.buildings.at(port).tile) != 0)
             continue;
         const entity_id mouth = port_mouth_tile(w, port);
         if (mouth != null_entity && port_at_mouth.emplace(mouth, port).second)
@@ -609,6 +639,80 @@ void set_ship_mission(world& w, sea_ship& s, sea_mission m, std::vector<uint32_t
 }
 
 // ---------------------------------------------------------------------------
+// Sea control
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Each side's surface force in one province today.
+std::map<entity_id, int64_t> surface_forces(const world& w, const recipe_registry& reg, uint32_t province)
+{
+    std::map<entity_id, int64_t> out;
+    for (const auto& [sid, s] : w.ships)
+        if (province_holds(s.provinces, province) && !s.provinces.empty())
+            if (const int64_t f = surface_force(w, reg, s, 1000 / static_cast<int>(s.provinces.size())); f > 0)
+                out[s.owner] += f;
+    return out;
+}
+
+int share_of(const world& w, const std::map<entity_id, int64_t>& sides, entity_id nation)
+{
+    const auto own = sides.find(nation);
+    if (own == sides.end())
+        return 0;
+    int64_t hostile = 0;
+    for (const auto& [side, f] : sides)
+        if (side != nation && hostile_either(w, nation, side))
+            hostile += f;
+    return static_cast<int>(own->second * 1000 / (own->second + hostile));
+}
+
+} // namespace
+
+int sea_control_share_permille(const world& w, const recipe_registry& reg, uint32_t province, entity_id nation)
+{
+    return share_of(w, surface_forces(w, reg, province), nation);
+}
+
+bool sea_holds(const world& w, const recipe_registry& reg, uint32_t province, entity_id nation)
+{
+    const std::map<entity_id, int64_t> sides = surface_forces(w, reg, province);
+    return sides.count(nation) != 0 && share_of(w, sides, nation) >= reg.military().sea.sea_hold_share_permille;
+}
+
+void refresh_closed_ports(world& w, const recipe_registry& reg)
+{
+    std::set<entity_id> closed;
+    std::vector<const sea_ship*> blockaders;
+    for (const auto& [sid, s] : w.ships)
+        if (s.mission == sea_mission::blockade && on_station(w, s))
+            blockaders.push_back(&s);
+    if (!blockaders.empty())
+        for (const auto& [bid, b] : w.buildings)
+        {
+            if (b.type != building_type::port || b.ticks_remaining > 0 || b.decommissioned)
+                continue;
+            const entity_id mouth = port_mouth_tile(w, bid);
+            const uint32_t province = mouth != null_entity ? w.provinces.province_of(mouth) : 0;
+            if (province == 0)
+                continue;
+            const entity_id owner = owner_nation_of(w, bid);
+            for (const sea_ship* s : blockaders)
+                if (s->owner != owner && province_holds(s->provinces, province) && is_hostile(w, s->owner, owner)
+                    && sea_holds(w, reg, province, s->owner))
+                {
+                    closed.insert(b.tile);
+                    break;
+                }
+        }
+    if (closed != w.closed_ports)
+    {
+        w.closed_ports = std::move(closed);
+        invalidate_logistics_caches(w);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // The raid
 // ---------------------------------------------------------------------------
 
@@ -619,7 +723,11 @@ std::vector<interception_record> raid_convoys(world& w, const recipe_registry& r
         return out;
     bool any_raider = false;
     for (const auto& [sid, s] : w.ships) // a pure any-of
-        if (s.mission == sea_mission::raid && on_station(w, s)) { any_raider = true; break; }
+        if ((s.mission == sea_mission::raid || s.mission == sea_mission::blockade) && on_station(w, s))
+        {
+            any_raider = true;
+            break;
+        }
     if (!any_raider)
         return out;
 
@@ -638,7 +746,9 @@ std::vector<interception_record> raid_convoys(world& w, const recipe_registry& r
         for (const presence& pr : ships)
         {
             const sea_ship& r = w.ships.at(pr.ship);
-            if (r.mission != sea_mission::raid || !on_station(w, r) || r.owner == cv.corp
+            // A blockading ship may raid its hostile cargo as a raider does (BL-1530).
+            if ((r.mission != sea_mission::raid && r.mission != sea_mission::blockade)
+                || !on_station(w, r) || r.owner == cv.corp
                 || !is_hostile(w, r.owner, cv.corp) || are_friends(w, r.owner, cv.corp))
                 continue;
             const int64_t attack = force(r, pr);
@@ -655,7 +765,9 @@ std::vector<interception_record> raid_convoys(world& w, const recipe_registry& r
             const auto dit = seen.find(cv.corp);
             const int64_t d = dit == seen.end() ? 0 : dit->second;
             const int64_t st = std::max(0, ship_stats(reg, r).stealth);
-            const bool found = d > 0 && static_cast<int64_t>(mix(mix(day_hash, cv.corp), 1) % 1000) < d * 1000 / (d + st);
+            // BL-1530: water the owner holds reveals a surface raider, as in the daily pass.
+            const bool found = (ship_class_of(r) != ship_class::submarine && sea_holds(w, reg, province_id, cv.corp))
+                               || (d > 0 && static_cast<int64_t>(mix(mix(day_hash, cv.corp), 1) % 1000) < d * 1000 / (d + st));
             // Only an escort whose side found it, and whose mask reaches its class, slows it.
             int64_t guard = 0;
             if (found)
@@ -796,7 +908,11 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
 {
     sea_day_tick out;
     if (w.ships.empty())
+    {
+        if (!w.closed_ports.empty()) // the last ship went: the ports open
+            refresh_closed_ports(w, reg);
         return out;
+    }
     const sea_params& sp = reg.military().sea;
     const auto stats = [&](const sea_ship& s) { return ship_stats(reg, s); }; // BL-1527: class + kit
     const auto rules = [&](const sea_ship& s) -> const ship_class_stats& {
@@ -841,11 +957,14 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
             side_detection(w, reg, province_id, ships, &recon_points);
 
         // Which ships each hostile side finds here today.
+        const std::map<entity_id, int64_t> sides = surface_forces(w, reg, province_id);
         std::map<entity_id, std::vector<const presence*>> found;
         for (const auto& [viewer, d] : detection)
         {
             if (d <= 0)
                 continue;
+            // BL-1530: holding the water reveals every hostile surface ship on it.
+            const bool holds = sides.count(viewer) != 0 && share_of(w, sides, viewer) >= sp.sea_hold_share_permille;
             for (const presence& pc : ships)
             {
                 const sea_ship& t = w.ships.at(pc.ship);
@@ -857,7 +976,8 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
                 h = mix(h, province_id);
                 h = mix(h, viewer);
                 h = mix(h, pc.ship);
-                if (static_cast<int64_t>(h % 1000) < chance)
+                if ((holds && ship_class_of(t) != ship_class::submarine)
+                    || static_cast<int64_t>(h % 1000) < chance)
                 {
                     found[viewer].push_back(&pc);
                     ++out.detections;
@@ -977,6 +1097,8 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
             plot_course(w, s);
         }
     }
+    // BL-1530: last, so a province lost today opens its port today.
+    refresh_closed_ports(w, reg);
     return out;
 }
 

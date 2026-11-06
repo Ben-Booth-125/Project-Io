@@ -413,6 +413,13 @@ struct world
     /// Saved (v80).
     std::map<entity_id, sea_ship> ships;
 
+    /// BL-1530 (MILITARY.md § Sea, Blockade): the tiles of the ports a blockade has closed.
+    /// Rewritten at the end of each sea day, and the logistics caches dropped whenever it
+    /// changes, on both edges. Derived from the ships, but only with the recipe registry
+    /// their kit is read through, which a load does not have: so it is SAVED (v81), or a
+    /// loaded world would price routes through a closed port until the next day.
+    std::set<entity_id> closed_ports;
+
     /// BL-1449: each nation's AIR SUPERIORITY power over each province as the last
     /// air day flew it, keyed (province, nation), milli-HP of air attack a day. The
     /// share it gives (`air_share_permille`) scales a side's bombing, slows its

@@ -7880,6 +7880,68 @@
     }
    ],
    "resolved": "2026-11-06"
+  },
+  {
+   "brief": "sea-control-blockade",
+   "title": "BL-1530 - Sea control per sea province, and the blockade that closes a port",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1530 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Sea control is each side's share of surface attack on patrol, escort or blockade; submarines and transports count for nothing; a side at the bar holds, and holding reveals hostile surface ships, in the daily pass and the raid.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness C1-C5, C6 every day of 20 with a sliver of detection, C6b never a submarine, C6c. 242 checks, 0 failures. The reveal in the raid pass has no check of its own."
+    },
+    {
+     "id": "R2",
+     "text": "A blockade is assigned only at the mouth of a port of a declared-hostile nation. While its side holds the province the port loads no sea leg, makes no trade points and no Logistic Points, and the pricer reads it as lost.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "C7, C7b, C8, C8b no route on an island pair, C8c, C12 series, C14, C14b. The Logistic Point gate is two inert-when-empty tests with no check of its own."
+    },
+    {
+     "id": "R3",
+     "text": "A cargo at sea finishes its leg; one not yet at sea waits at its loading port.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "C9, C9b, C9c through advance and arrivals."
+    },
+    {
+     "id": "R4",
+     "text": "Lose the province, or peace, and the port reopens; a closed port with no ship left still opens through the real military day.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "C11, C11b, C11c, C11d, C11e through run_military_day."
+    },
+    {
+     "id": "R5",
+     "text": "A closed port saves and loads, prices the same loaded, and a port taken out of service while closed does not make a save unloadable.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "C10, C10a, C10b, C10c; save_roundtrip OK; save_envelope_roundtrip PASS."
+    },
+    {
+     "id": "R6",
+     "text": "Prices move at the blockaded market.",
+     "kind": "headless",
+     "status": "pending",
+     "evidence": "Not measured: the fixture shows the route gone and the points gone, not a clearing price moving. Owed by BL-1535 (naval war reading), which now names it."
+    },
+    {
+     "id": "R7",
+     "text": "With no blockade the world does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "rebless_shape_probe seeds 0, 46, 28 identical; world_determinism ALL PASS."
+    }
+   ],
+   "resolved": "2026-11-06"
   }
  ]
 }

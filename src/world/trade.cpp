@@ -60,6 +60,9 @@ std::map<entity_id, float> market_trade_points(const world& w, const recipe_regi
         const auto bit = w.buildings.find(bid);
         if (bit == w.buildings.end() || !trade_building_active(bit->second) || bit->second.state_idle)
             continue;
+        // BL-1530 (TRADE.md): a blockaded port makes no trade points.
+        if (bit->second.type == building_type::port && w.closed_ports.count(bit->second.tile) != 0)
+            continue;
         const entity_id mid = market_for_tile(w, bit->second.tile);
         if (mid == null_entity)
             continue; // no market under it: no shelf to trade from

@@ -632,6 +632,12 @@ uint64_t world::state_hash(int tick) const
             for (const entity_id t : s.route) fnv1a_u32(h, t);
         }
     }
+    if (!closed_ports.empty()) // BL-1530: only when non-empty, as the ships are
+    {
+        fnv1a_u32(h, 0x43504F52u); // "CPOR"
+        for (const entity_id t : closed_ports) // std::set: ascending
+            fnv1a_u32(h, t);
+    }
     if (!air_superiority.empty())
     {
         fnv1a_u32(h, 0x41535550u); // "ASUP"

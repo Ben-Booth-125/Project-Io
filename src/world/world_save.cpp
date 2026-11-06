@@ -2121,8 +2121,8 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         }
     }
 
-    // world_save_version 81 (BL-1527, MILITARY.md § Sea): the live ship designs, the last
-    // section. Each designed nation ascending id; the default (base kit) is stored as nothing.
+    // world_save_version 81 (BL-1527, MILITARY.md § Sea): the live ship designs, then the closed
+    // ports (BL-1530), the last section. Each designed nation ascending id; the default (base kit) is stored as nothing.
     if (version >= k_world_save_version_ship_kit)
     {
         std::vector<entity_id> nids;
@@ -2138,6 +2138,9 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_u32(out, static_cast<uint32_t>(v.size()));
             for (const uint16_t id : v) w_u16(out, id);
         }
+        // BL-1530: the ports a blockade has closed, ascending tile ids.
+        w_u32(out, static_cast<uint32_t>(w.closed_ports.size()));
+        for (const entity_id t : w.closed_ports) w_id(out, t);
     }
 }
 
@@ -2166,7 +2169,8 @@ std::size_t world_save_ship_hulls_bytes(const world& w)
     std::size_t refit_bytes = 0; // v81 closes each ship's record with its refit flag
     for (const auto& [sid, s] : w.ships)
         refit_bytes += w.nations.count(s.owner) != 0 ? 1u : 0u;
-    return wide.str().size() - narrow.str().size() - ship_design_section_bytes(w) - refit_bytes;
+    return wide.str().size() - narrow.str().size() - ship_design_section_bytes(w) - refit_bytes
+           - (4 + 4 * w.closed_ports.size()); // BL-1530: the closed ports close the v81 section
 }
 
 void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
@@ -2178,7 +2182,7 @@ void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
 // BL-1527: the whole tail from the ship section on, the ship designs included.
 std::size_t world_save_ships_section_bytes(const world& w)
 {
-    std::size_t n = 4 + ship_design_section_bytes(w);
+    std::size_t n = 4 + ship_design_section_bytes(w) + 4 + 4 * w.closed_ports.size();
     for (const auto& [sid, s] : w.ships)
     {
         if (w.nations.count(s.owner) == 0)
@@ -4468,6 +4472,22 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                     || !slots.insert({static_cast<int>(scat[v[i]].cls), scat[v[i]].slot}).second)
                     return false;
             nit->second.ship_design_kit = std::move(v);
+        }
+        // BL-1530. Untrusted: ascending, each a tile of the stream. Not refused for holding no
+        // standing port: one idled or torn down since the last sea day is a legal state, the
+        // set is read per port and re-derived that next day.
+        uint32_t closed = 0;
+        if (!r_u32(in, closed) || closed > s.tiles.size())
+            return false;
+        s.closed_ports.clear();
+        entity_id prev_tile = null_entity;
+        for (uint32_t k = 0; k < closed; ++k)
+        {
+            entity_id t = null_entity;
+            if (!r_id(in, t) || (k > 0 && t <= prev_tile) || s.tiles.count(t) == 0)
+                return false;
+            prev_tile = t;
+            s.closed_ports.insert(t);
         }
     }
 
