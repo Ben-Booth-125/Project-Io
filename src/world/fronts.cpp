@@ -1131,8 +1131,11 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
                 const unit_component& u = w.units.at(uid);
                 if (busy(uid, u))
                     continue;
-                if (owner_of(w, u.position) == f->neighbour)
-                    continue; // still the neighbour's ground under it: no war, no occupation
+                // Still the neighbour's ground under it with no war: no occupation, so it
+                // stands. At war it goes on from there, whenever it got there: a unit on
+                // the neighbour's ground the day a war opens advances like any other.
+                if (owner_of(w, u.position) == f->neighbour && !at_war(w, nk.first, f->neighbour))
+                    continue;
                 const entity_id slot = slot_of(i);
                 // The targets in the push's order: weakest stack, then nearest the slot,
                 // then the lower tile id. BL-1455: a target the unit's class cannot
