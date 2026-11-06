@@ -862,10 +862,11 @@ a station or a port where it is wanted. The field is therefore a slope away from
 blanket, and an outlying hub reads as a deliberate reach into thin ground.
 
 **Logistics serves the armies from generation (Ben, 2026-10-29).** The seeding counts every
-garrison post — the capital's and each border post facing a neighbour — as a request beside the
-producing buildings, so the sources it stands reach the ground the nation's armies open on, within
-the 8-tile off-road draw (§ A unit draws off the road). At the handoff each garrison is posted where
-that network feeds it whole (`../military/MILITARY.md` § Nation garrisons), so a post the chain reaches
+garrison post standing as it runs — the capital's and each border post facing a neighbour — as a
+request beside the producing buildings, so the sources it stands reach those posts within the 8-tile
+off-road draw (§ A unit draws off the road). A major's fixed army is posted after the seeding, by the
+same post rules but not always on the same tiles, so the seeding's service does not bind where that
+army stands. At the handoff each garrison is posted where the network feeds it whole (`../military/MILITARY.md` § Nation garrisons), so a post the chain reaches
 only at its fade gives way to the nearest ground it reaches in full. A nation opens with its army fed;
 where it marches next is the player's to supply.
 

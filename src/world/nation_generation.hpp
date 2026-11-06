@@ -541,6 +541,13 @@ struct major_army_report
     int border_posts   = 0; ///< border posts manned, all majors
     int all_at_capital = 0; ///< majors with no border post (the whole army at the capital)
     int no_row         = 0; ///< units skipped: no modern roster row fights as the class
+    // BL-1501: a read for the record. The Logistic Point seeding served the posts these
+    // units replaced, so how far each new post sits from the nearest of them is what the
+    // seeding's service is worth to the army that opens.
+    int posts_measured         = 0;
+    int posts_on_a_served_tile = 0;
+    int post_steps_sum         = 0;
+    int post_steps_max         = 0;
 };
 
 /// BL-1474 — A MAJOR'S OPENING ARMY IS FIXED (MILITARY.md § Nation garrisons, Ben
@@ -621,6 +628,7 @@ struct garrison_repost_report
     int moved_off_province = 0; ///< Province feeds none: re-posted on the nation's nearest tile that does.
     int part_fed           = 0; ///< BL-1501: no tile of the nation's feeds them whole: nearest the draw reaches.
     int uncovered          = 0; ///< No tile of the nation's ground in the draw at all: left where they stood.
+    int foreign_refused    = 0; ///< BL-1501: garrisons whose post another nation's units on the tile changed
     int border_unfaced     = 0; ///< BL-1501: border garrisons re-posted on a tile that faces no ground of the neighbour they guard.
 };
 
@@ -634,9 +642,10 @@ struct garrison_repost_report
 /// tile faces it, the covered tile nearest the rule's post); a capital post the covered
 /// tile nearest its anchor. A province with no covered tile posts on the covered tile
 /// of the nation's own ground nearest the rule's post, ties to the lowest tile id. A
-/// nation whose ground feeds it whole nowhere keeps it where the draw reaches, at the
-/// share that cover grants. A post already fed whole is untouched. Every garrison's road
-/// share is read off the tile it ends on, never assumed, until the next quarter's draw.
+/// nation whose ground feeds it whole nowhere keeps it where the draw reaches. A post
+/// already fed whole is untouched. Never a tile another nation's units stand on (one nation
+/// per tile, MILITARY.md). Placement only: `run_settle_tick` reads each unit's road share off
+/// the resolver afterwards, once every garrison stands.
 /// Ascending unit id; deterministic. Consumes and clears `world::gen_garrisons`.
 /// @p mil, when given, applies BL-1455's class walls: a garrison is never posted on a
 /// tile walled for its class (`class_wall`). A garrison in a live battle is left.

@@ -1388,7 +1388,9 @@ claim's own: the tile the unit pays at (its own, or the closest road within the 
 is the cover where it pays, and a share of a tenth starves a unit within two quarters. A province
 with no such tile posts its garrison on the nearest such tile of the nation's own ground, ties to the
 lowest tile id. A nation whose ground feeds it whole nowhere posts it on the nearest ground the draw
-reaches. A garrison's opening share is read off the tile it ends on, never assumed. A nation's
+reaches. A tile another nation's units stand on is never a post (§ One nation per tile). Once every
+garrison stands, each unit's opening share is read off the resolver's own grant on that world, never
+assumed: it is what the unit eats until the first live quarter's claim. A nation's
 opening army therefore starts fed (§ Carried supplies), for as long as its nation's sources run and
 its pool lasts.
 
