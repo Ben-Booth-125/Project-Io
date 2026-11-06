@@ -603,7 +603,7 @@ int main()
                                        + world_save_alarm_section_bytes(wd)       // BL-1432 (v68), last
                                        + world_save_war_section_bytes(wd)          // BL-1459 (v69)
                                        + world_save_embargo_section_bytes(wd) + world_save_gen_capital_section_bytes(wd)     // BL-1418 (v70)
-                                       + world_save_recruits_section_bytes(wd) + world_save_sea_recruits_section_bytes(wd) + world_save_refusals_section_bytes(wd) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wd) /* BL-1470 (v77), last */;    // BL-1463 (v72), last
+                                       + world_save_recruits_section_bytes(wd) + world_save_sea_recruits_section_bytes(wd) + world_save_refusals_section_bytes(wd) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wd) /* BL-1470 (v77) */ + world_save_research_books_section_bytes(wd) /* BL-1539 (v78), last */;    // BL-1463 (v72), last
         check(have && b57.size() == b56.size() + 8 + 36 * rows + unit_section + world_save_kit_goods_bytes(wd) && rows >= 2,
               "P23 v56 is today's stream less the days section (8 bytes + 36 a row) and the unit section");
 
@@ -676,7 +676,7 @@ int main()
                                          + world_save_alarm_section_bytes(wu)       // BL-1432 (v68), last
                                          + world_save_war_section_bytes(wu)          // BL-1459 (v69)
                                          + world_save_embargo_section_bytes(wu) + world_save_gen_capital_section_bytes(wu)     // BL-1418 (v70)
-                                         + world_save_recruits_section_bytes(wu) + world_save_sea_recruits_section_bytes(wu) + world_save_refusals_section_bytes(wu) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wu) /* BL-1470 (v77), last */;    // BL-1463 (v72), last
+                                         + world_save_recruits_section_bytes(wu) + world_save_sea_recruits_section_bytes(wu) + world_save_refusals_section_bytes(wu) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(wu) /* BL-1470 (v77) */ + world_save_research_books_section_bytes(wu) /* BL-1539 (v78), last */;    // BL-1463 (v72), last
         check(have && b58.size() == b57.size() + 4 + 16 * wu.units.size() + muster_section + world_save_kit_goods_bytes(wu),
               "P24 v57 is v58 less its section (4 bytes + 16 a unit)");
 
@@ -1910,7 +1910,7 @@ int main()
             // Every narrowed array lost exactly five elements: 4 bytes a float, 1 a bool.
             // BL-1480: today's v75 stream also carries the refusals section past v74.
             ok71 = ok71 && b72.size() > b71.size()
-                && b72.size() - b71.size() == world_save_kit_goods_bytes(k) + world_save_refusals_section_bytes(k) + world_save_contributors_section_bytes(k);
+                && b72.size() - b71.size() == world_save_kit_goods_bytes(k) + world_save_refusals_section_bytes(k) + world_save_contributors_section_bytes(k) + world_save_research_books_section_bytes(k);
         }
         check(ok71, "PK a v73 stream (arrays 49 wide) reads, the kit goods zero and the rest as written");
 
@@ -2018,7 +2018,7 @@ int main()
             ok75 = m0.inventory[af] == 0.0f && m0.price[af] == 0.0f
                 && m0.price[st] == mk.price[st] && m0.inventory[st] == mk.inventory[st]
                 && old.tiles.size() == k.tiles.size() && b76.size() > b75.size()
-                && b76.size() - b75.size() == world_save_airframes_bytes(k) + world_save_contributors_section_bytes(k);
+                && b76.size() - b75.size() == world_save_airframes_bytes(k) + world_save_contributors_section_bytes(k) + world_save_research_books_section_bytes(k);
         }
         check(ok75, "PA a v75 stream (arrays 54 wide) reads, airframes zero and the rest as written");
         std::string bad = b75;
@@ -2091,14 +2091,14 @@ int main()
         const bool ok76 = stamped == k_world_save_version_pre_contributors && from_bytes(b76, old)
             && old.sentiment.pairs == k.sentiment.pairs && old.sentiment.contributions.empty()
             && old.sentiment.seeds.empty()
-            && b77.size() - b76.size() == world_save_contributors_section_bytes(k);
+            && b77.size() - b76.size() == world_save_contributors_section_bytes(k) + world_save_research_books_section_bytes(k);
         check(ok76, "PC a v76 stream reads, its rows whole and no provenance; v77 is v76 plus the section");
 
         // A share naming no row: splice the tail -- change the first share row's
         // subject to an id no row holds. The row block starts 8 bytes into the
         // section (count, then observer); the subject is the next u32.
         std::string bad = b77;
-        const std::size_t section = world_save_contributors_section_bytes(k);
+        const std::size_t section = world_save_contributors_section_bytes(k) + world_save_research_books_section_bytes(k);
         if (ok && bad.size() > section)
         {
             const std::size_t subj_at = bad.size() - section + 4 + 4;
@@ -2108,6 +2108,67 @@ int main()
         world sentinel;
         check(ok && !from_bytes(bad, sentinel) && sentinel.tiles.empty(),
               "PC a share naming a row the stream does not hold is REFUSED, destination untouched");
+    }
+
+    // -----------------------------------------------------------------------
+    // PD (BL-1539, research in the return) -- v78 appends the debits the nation step
+    // took that no return has booked, and each return's booked research. They round-trip
+    // by value; a v77 stream reads with none; a corrupt figure is refused whole.
+    // -----------------------------------------------------------------------
+    {
+        static_assert(k_world_save_version_research_books == 78
+                          && world_save_version >= k_world_save_version_research_books,
+                      "PD pins v78 as the research-books version");
+        world k = w;
+        nation_component* subject = nullptr;
+        entity_id subject_id = null_entity;
+        for (auto& [nid, nc] : k.nations)
+            if (!nc.returns.empty()) { subject = &nc; subject_id = nid; break; }
+        bool ok = subject != nullptr;
+        if (ok)
+        {
+            subject->research_unbooked = 1234.5;
+            subject->upkeep_unbooked   = 67.25 + 1.0e-9; // an exact figure no float holds
+            subject->returns.back().research = 321.5f;
+        }
+        const std::string b78 = to_bytes(k);
+        world back;
+        const auto bit = back.nations.end();
+        (void)bit;
+        ok = ok && from_bytes(b78, back) && to_bytes(back) == b78;
+        ok = ok && back.nations.at(subject_id).research_unbooked == 1234.5
+                && back.nations.at(subject_id).upkeep_unbooked == 67.25 + 1.0e-9
+                && back.nations.at(subject_id).returns.back().research == 321.5f;
+        check(ok, "PD v78: unbooked research and upkeep and each return's research round-trip by value (bytes equal)");
+
+        std::string b77;
+        {
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_research_books(k, o);
+            b77 = o.str();
+        }
+        uint32_t stamped = 0;
+        if (b77.size() >= 8)
+            std::memcpy(&stamped, b77.data() + 4, sizeof stamped);
+        world old;
+        const bool ok77 = ok && stamped == k_world_save_version_pre_research_books && from_bytes(b77, old)
+            && old.nations.at(subject_id).research_unbooked == 0.0
+            && old.nations.at(subject_id).upkeep_unbooked == 0.0
+            && old.nations.at(subject_id).returns.back().research == 0.0f
+            && b78.size() - b77.size() == world_save_research_books_section_bytes(k);
+        check(ok77, "PD a v77 stream reads with nothing unbooked and no research booked; v78 is v77 plus the section");
+
+        // A negative unbooked figure: the section's first row is (count, id, f64 ...).
+        std::string bad = b78;
+        const std::size_t section = world_save_research_books_section_bytes(k);
+        if (ok && bad.size() > section)
+        {
+            const double negative = -1.0;
+            std::memcpy(&bad[bad.size() - section + 4 + 4], &negative, sizeof negative);
+        }
+        world sentinel;
+        check(ok && !from_bytes(bad, sentinel) && sentinel.tiles.empty(),
+              "PD a negative unbooked debit is REFUSED, destination untouched");
     }
 
     std::printf("\n");

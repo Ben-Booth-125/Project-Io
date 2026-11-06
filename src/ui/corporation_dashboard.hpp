@@ -68,8 +68,13 @@ struct corp_rollups
     bool  nation     = false;
     float tax_income = 0.0f;
 
-    /// The quarter's net: the budget's, plus a nation's tax income.
-    float net() const { return budget.net() + tax_income; }
+    /// BL-1539 (Ben, 2026-11-05: research counts inside net): what the nation's research
+    /// line spent this quarter. Paid in the nation step, so not a `state_ledger` flow;
+    /// read off `nation_component::research_unbooked` between ticks.
+    float research = 0.0f;
+
+    /// The quarter's net: the budget's, plus a nation's tax income, less its research.
+    float net() const { return budget.net() + tax_income - research; }
 };
 
 /// The Balance card's two columns: what came in, and what went out.
@@ -91,7 +96,7 @@ struct balance_columns
     std::size_t           earning_count = 0;
 
     /// Every outflow `corp_budget::net()` subtracts, each its own segment.
-    charts::stack_segment expenses[7]{}; // BL-1335: + Taxes
+    charts::stack_segment expenses[8]{}; // BL-1335: + Taxes; BL-1539: + Research
     std::size_t           expense_count = 0;
 
     /// Sum of the drawn expense segments — the quarter's real expenditure.
@@ -106,9 +111,9 @@ struct balance_columns
 
 /// Build the Balance card's columns from a measured quarter. Pure. @p refunds is
 /// the quarter's return's `refunds` (BL-1215), drawn as its own earnings segment
-/// when positive and absent otherwise.
+/// when positive and absent otherwise. @p research (BL-1539) likewise, on the expense side.
 balance_columns build_balance_columns(const corp_budget& b, float refunds = 0.0f,
-                                      float tax_income = 0.0f);
+                                      float tax_income = 0.0f, float research = 0.0f);
 
 /// How many cards the ledger draws. One; exposed so a check can assert that
 /// rather than trusting a comment.

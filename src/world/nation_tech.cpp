@@ -1056,7 +1056,12 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         research_accrual row = compute_accrual(
             w, nid, rb, sit != w.nation_tech.end() ? &sit->second : nullptr, nc.treasury, p, price);
         if (row.line_spend > 0.0f)
+        {
+            // BL-1539: booked on the next quarterly return, inside its net.
+            const float before = nc.treasury;
             nc.treasury -= row.line_spend;
+            nc.research_unbooked += static_cast<double>(before) - static_cast<double>(nc.treasury);
+        }
 
         // An entry is created only when there is something to hold, so a world
         // where nothing researches keeps an empty map (and its state_hash).

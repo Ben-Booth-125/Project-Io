@@ -346,8 +346,14 @@ void run_nation_garrison_upkeep(world& w, const recipe_registry& reg, const lp_t
         }
 
         if (paid > 0.0f)
-            nc.treasury -= paid; // a direct expenditure — see the credit-wage
-                                  // precedent in this function's own doc comment
+        {
+            // A direct expenditure — see the credit-wage precedent in this function's
+            // own doc comment. BL-1539: booked on the next quarterly return as its
+            // `upkeep`, inside its net (a standing cost, the same leak as research).
+            const float before = nc.treasury;
+            nc.treasury -= paid;
+            nc.upkeep_unbooked += static_cast<double>(before) - static_cast<double>(nc.treasury);
+        }
 
         // Shortfall reads exactly like run_unit_upkeep's own decay rule, ONE
         // bill for the whole garrison rather than a per-unit draw: bill <= 0

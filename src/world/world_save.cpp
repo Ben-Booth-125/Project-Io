@@ -502,6 +502,17 @@ bool r_return(std::istream& i, quarterly_return& q)
 // BL-1407: the PRE-v56 corporation record — read into scratch and folded away
 // (`legacy_corp_record`, world_save.hpp); written only by the verification
 // writer. The field order is the retired `corporation_component`'s.
+/// BL-1539: a nation carries v78 research-books state worth writing.
+bool nation_has_research_books(const nation_component& nc)
+{
+    if (nc.research_unbooked != 0.0 || nc.upkeep_unbooked != 0.0)
+        return true;
+    for (const quarterly_return& q : nc.returns)
+        if (q.research != 0.0f)
+            return true;
+    return false;
+}
+
 /// BL-1407: a nation carries v56 book state worth writing.
 bool nation_has_books(const nation_component& nc)
 {
@@ -2035,6 +2046,43 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // in the sentiment substrate's own layout so the two seams cannot drift.
     if (version >= k_world_save_version_contributors)
         write_sentiment_provenance(w.sentiment, out);
+
+    // world_save_version 78 (BL-1539): THE RESEARCH BOOKS, the last section. What the
+    // nation step debited that no return has booked, and each return's booked research.
+    if (version >= k_world_save_version_research_books)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [nid, nc] : w.nations)
+            if (nation_has_research_books(nc))
+                ids.push_back(nid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id nid : ids)
+        {
+            const nation_component& nc = w.nations.at(nid);
+            w_id(out, nid);
+            w_f64(out, nc.research_unbooked);
+            w_f64(out, nc.upkeep_unbooked);
+            w_u32(out, static_cast<uint32_t>(nc.returns.size()));
+            for (const quarterly_return& q : nc.returns)
+                w_f32(out, q.research);
+        }
+    }
+}
+
+void write_world_snapshot_pre_research_books(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1539): the v77 stream shape - no research-books section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_research_books);
+}
+
+std::size_t world_save_research_books_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [nid, nc] : w.nations)
+        if (nation_has_research_books(nc))
+            n += 4 + 8 + 8 + 4 + 4 * nc.returns.size();
+    return n;
 }
 
 void write_world_snapshot_pre_contributors(const world& w, std::ostream& out)
@@ -2394,7 +2442,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_kit_goods    // BL-1422: v73, arrays 49 wide
             && version != k_world_save_version_pre_refusals     // BL-1480: v74, no peace refusals
             && version != k_world_save_version_pre_airframes    // BL-1436: v75, arrays 54 wide
-            && version != k_world_save_version_pre_contributors)) // BL-1470: v76, no provenance
+            && version != k_world_save_version_pre_contributors // BL-1470: v76, no provenance
+            && version != k_world_save_version_pre_research_books)) // BL-1539: v77, nothing booked
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -4003,6 +4052,42 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     if (version >= k_world_save_version_contributors
         && !read_sentiment_provenance(s.sentiment, in, s.sentiment.contributions, s.sentiment.seeds))
         return false;
+
+    // v78 (BL-1539): the research books. Untrusted: each row names a nation in the
+    // stream, strictly ascending, never null; its unbooked debits and booked research
+    // finite, never negative, inside float range; its count exactly the returns the
+    // stream gave that nation. Refused whole otherwise. A v77 (and older) stream ends
+    // before it: nothing unbooked, and no return booked research.
+    if (version >= k_world_save_version_research_books)
+    {
+        const auto debit_ok = [](double v) {
+            return std::isfinite(v) && v >= 0.0
+                && v <= static_cast<double>(std::numeric_limits<float>::max());
+        };
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.nations.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id nid = null_entity;
+            if (!r_id(in, nid) || nid == null_entity || (k > 0 && nid <= prev))
+                return false;
+            prev = nid;
+            const auto nit = s.nations.find(nid);
+            if (nit == s.nations.end())
+                return false;
+            nation_component& nc = nit->second;
+            uint32_t n = 0;
+            if (!(r_f64(in, nc.research_unbooked) && r_f64(in, nc.upkeep_unbooked) && r_u32(in, n))
+                || !debit_ok(nc.research_unbooked) || !debit_ok(nc.upkeep_unbooked)
+                || n != nc.returns.size())
+                return false;
+            for (quarterly_return& q : nc.returns)
+                if (!r_f32(in, q.research) || !std::isfinite(q.research) || q.research < 0.0f)
+                    return false;
+        }
+    }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

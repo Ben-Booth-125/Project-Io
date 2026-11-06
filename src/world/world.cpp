@@ -74,6 +74,23 @@ uint64_t world::state_hash(int tick) const
             fnv1a_f32(h, nc.refund_opening);
         }
     }
+    // BL-1539: what the nation step debited that no return has booked yet. An absent
+    // row hashes nothing, so a world that never pays either keeps its hash.
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [nid, nc] : nations)
+            if (nc.research_unbooked != 0.0 || nc.upkeep_unbooked != 0.0)
+                ids.push_back(nid);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id id : ids)
+        {
+            const nation_component& nc = nations.at(id);
+            fnv1a_u32(h, 0xB00C5u);
+            fnv1a_u32(h, id);
+            fnv1a_f32(h, static_cast<float>(nc.research_unbooked));
+            fnv1a_f32(h, static_cast<float>(nc.upkeep_unbooked));
+        }
+    }
 
     // Buildings: every field the AI / economy tick may mutate.
     {

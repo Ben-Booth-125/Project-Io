@@ -289,7 +289,7 @@ profitability, updated each quarter with company balance sheets."*
 |---|---|
 | `income` / `expenditure` | the budget breakdown — the market cash flows from `clear_markets` |
 | `maintenance` / `wages` | the budget breakdown — summed `compute_building_opex` |
-| `upkeep` | the budget breakdown — standing force |
+| `upkeep` | the standing force: the garrison's pay since the last return, booked on the next one. A debit paid in the nation step after the return is written, booked as `research` is |
 | `taxes` | the tier's share of the quarter's wages, returned to the treasury (`NATIONS.md` § Taxes and Discontent) |
 | `research` | Credits the nation's research line spent since its last return, booked on the next one. A debit: research is paid in the nation step, after the return is written (Ben, 2026-11-05: research counts inside net) |
 | `refunds` | Credits refunded to the nation since its last return, booked on the next one — a cancelled construction. A credit: `net` = the flows **+ refunds**, and the return's opening is taken from before the refund so it still telescopes |
@@ -332,9 +332,9 @@ writes it, so the record is a pure downstream observation of the loop and cannot
 ### What a return does not carry — the movers outside the money loop
 
 The money loop is not the only thing that moves a treasury in a quarter. A return records
-`apply_budget` and nothing else: its `net` is the treasury's movement **across that call**, plus the
-one refund it books (above). Every other debit or credit lands elsewhere in the tick and appears in
-**no** return:
+`apply_budget`, and books the three figures above that land elsewhere: its `net` is the treasury's
+movement **across that call**, plus the refund, less the research and garrison pay paid since the last
+return. Every other debit or credit lands elsewhere in the tick and appears in **no** return:
 
 - **Construction** — the build press's charge: the site's whole flat credit cost, paid once at
   placement (Ben, 2026-10-25). (The site's materials are bought at the clear, at the shelf's posted

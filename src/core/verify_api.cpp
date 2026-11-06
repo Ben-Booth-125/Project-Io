@@ -6856,7 +6856,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["refunds"]  = static_cast<double>(r.refunds); // BL-1215
         out["nation"]   = r.nation;                       // BL-1406
 
-        const ui::balance_columns c = ui::build_balance_columns(r.budget, r.refunds, r.tax_income);
+        const ui::balance_columns c = ui::build_balance_columns(r.budget, r.refunds, r.tax_income, r.research);
         const auto emit = [&st](const ui::charts::stack_segment* segs, std::size_t n) {
             sol::table t = st.create_table();
             for (std::size_t i = 0; i < n; ++i)

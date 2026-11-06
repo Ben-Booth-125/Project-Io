@@ -701,7 +701,20 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// a STRICT PREFIX of v77 and is read too (`k_world_save_version_pre_contributors`), as a
 /// world whose rows name no contributor and no seeded war; so is every older version the
 /// reader already accepted.
-inline constexpr uint32_t world_save_version = 77;
+///
+/// Bumped to 78 (BL-1539, research in the return; FINANCE.md § The quarterly return): one
+/// new section after the provenance. After a u32 count, every nation with an unbooked
+/// debit or a return that booked research, ascending id, as (id, f64 research_unbooked,
+/// f64 upkeep_unbooked, u32 n = its return count, n x f32 research in filed order). All
+/// finite and never negative. v77 is a STRICT PREFIX of v78 and is read too
+/// (`k_world_save_version_pre_research_books`), as a world whose returns booked none.
+inline constexpr uint32_t world_save_version = 78;
+
+/// BL-1539: the first version carrying the research-books section (see above).
+inline constexpr uint32_t k_world_save_version_research_books = 78;
+
+/// BL-1539: v77, a strict prefix of v78 (the research-books section is v78's only addition).
+inline constexpr uint32_t k_world_save_version_pre_research_books = 77;
 
 /// BL-1470: the first version carrying the sentiment-provenance section (see above).
 inline constexpr uint32_t k_world_save_version_contributors = 77;
@@ -899,6 +912,10 @@ std::size_t world_save_refusals_section_bytes(const world& w);
 /// The LAST section of a v77 stream.
 std::size_t world_save_contributors_section_bytes(const world& w);
 
+/// BL-1539: the byte length of the v78 research-books section `w` writes - 4, plus 24 +
+/// 4 per return for each nation it lists. The LAST section of a v78 stream.
+std::size_t world_save_research_books_section_bytes(const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -1018,6 +1035,9 @@ void write_world_snapshot_pre_airframes(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1470): the v76 stream shape - no sentiment-provenance section.
 void write_world_snapshot_pre_contributors(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1539): the v77 stream shape - no research-books section.
+void write_world_snapshot_pre_research_books(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

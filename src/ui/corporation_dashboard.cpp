@@ -36,7 +36,7 @@ void balance_body(const corp_rollups& r, float chart_h)
         return;
     }
 
-    const balance_columns c = build_balance_columns(r.budget, r.refunds, r.tax_income);
+    const balance_columns c = build_balance_columns(r.budget, r.refunds, r.tax_income, r.research);
 
     const ImVec2 p  = ImGui::GetCursorScreenPos();
     const float  cw = ImGui::GetContentRegionAvail().x;
@@ -104,7 +104,7 @@ std::size_t corp_card_count()
     return 1;
 }
 
-balance_columns build_balance_columns(const corp_budget& b, float refunds, float tax_income)
+balance_columns build_balance_columns(const corp_budget& b, float refunds, float tax_income, float research)
 {
     balance_columns c;
 
@@ -139,7 +139,7 @@ balance_columns build_balance_columns(const corp_budget& b, float refunds, float
     // `expense_count` mean "segments drawn". Interest is the live case: charged
     // only while the balance is negative, so a solvent corp's stack is one
     // segment shorter than an indebted corp's.
-    const charts::stack_segment all[7] = {
+    const charts::stack_segment all[8] = {
         {b.expenditure, IM_COL32(205, 120, 95, 255),  "Inputs",      nullptr},
         {b.maintenance, IM_COL32(200, 170, 95, 255),  "Maintenance", nullptr},
         {b.wages,       IM_COL32(160, 115, 200, 255), "Wages",       nullptr},
@@ -149,6 +149,9 @@ balance_columns build_balance_columns(const corp_budget& b, float refunds, float
         // BL-1335: the home nation's tax on the quarter's operating profit.
         {b.taxes,       IM_COL32(185, 150, 120, 255), "Taxes",
          "Your home nation's tax tier: its share of this quarter's operating profit"},
+        // BL-1539: the research line, inside the net (Ben, 2026-11-05).
+        {research,      IM_COL32(110, 170, 205, 255), "Research",
+         "What your research line spent this quarter"},
     };
     for (const charts::stack_segment& s : all)
         if (s.value > 0.0f)
@@ -176,6 +179,10 @@ bool fill_nation_rollups(const world& w, entity_id nation, corp_rollups& r)
         r.budget.maintenance = led.maintenance;
         r.budget.wages       = led.wages;
         r.tax_income         = led.taxes;
+        // BL-1539: the nation-step debits, so the net is the money left. Between ticks
+        // these are this quarter's; the next return books them.
+        r.budget.upkeep      = static_cast<float>(nit->second.upkeep_unbooked);
+        r.research           = static_cast<float>(nit->second.research_unbooked);
         r.budget_measured    = true;
     }
     return true;
