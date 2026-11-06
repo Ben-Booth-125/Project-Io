@@ -1304,6 +1304,7 @@
    "interesting_question": "The reads are not equally cheap to know — one corporation record, a filter on the player's own trades, the same list past a gate, a derivation with no store behind it. What stops them collapsing into one table at 380 px, and what makes a potential trade one press from a real one without the ranking becoming the move?",
    "resolution": "Bounded sections keep every head on screen (caps 5 / 5 / 7 / 6 rows). The potential-trade '+' only FILLS the form — the player still picks the points and presses Add, so the ranking stays one input among several (CONCEPT.md § Player identity). The gate on the second read is enforced rather than assumed and is asserted against the world, including its SHUT state.",
    "checks": [
+    "trade_offers_sourced",
     "market_ledger",
     "trades_tab"
    ]

@@ -272,7 +272,7 @@ THE POTENTIAL TRADE IS ONE PRESS FROM A REAL ONE, BUT NOT THE PRESS ITSELF. Its 
 
 THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (both markets must trade the good; the corporation's trades are capped at 64) and a refusal mutates nothing; the player is told why under the form. THE HISTORY COLUMN IS STILL REVENUE, NEVER PROFIT (no cost basis exists anywhere in the model), and an absent counterparty is still the market.
 
-*Demanded by BL-687, BL-1269 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/ui/selection_panel.cpp`, `src/core/app.cpp` · id `market_ledger_trades`*
+*Demanded by BL-1516, BL-687, BL-1269 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/ui/selection_panel.cpp`, `src/core/app.cpp` · id `market_ledger_trades`*
 
 ### Military ledger (nav rail slot 7): Recruit and Design tabs
 

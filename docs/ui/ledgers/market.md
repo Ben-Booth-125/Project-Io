@@ -124,6 +124,14 @@ consider. The order is the pass's own — margin per trade point (per-unit margi
 capacity). The read is cached against the econ tick, the player's asset count and the seat, because
 pricing runs an A\* on a cache miss.
 
+**Offers come only from a market the acting nation can supply (Ben, 2026-11-05).** The gate is the
+nation's trade points at this market (`market_trade_points`) above zero; the nation-wide sum cannot
+gate, because a trade spends the points of the market it leaves. It sits in this surface and not in
+`rank_trade_routes`, which the trade pass and the AI scorer share, and it agrees with what
+`trade_is_valid` asks of a trade's source, so a `+` is never an offer the verb refuses. Shut, the
+section says so in its own line, naming what would open it, because a shut gate and an empty list
+are different answers.
+
 **The `+` fills the form; it does not trade.** A ranked row becomes a trade only when the player
 sets its points and presses Add — points auto would otherwise spend — so the ranking stays one
 input among several (`CONCEPT.md` § Player identity).

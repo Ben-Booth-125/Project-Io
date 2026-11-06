@@ -278,6 +278,10 @@ bool market_trades_open();
 /// where the top row is one input among several, not where it IS the move).
 const std::vector<potential_trade_record>& potential_trades();
 
+/// The acting nation's trade points at the Trades tab's market, the gate on
+/// `potential_trades` (BL-1516; ledgers/market.md § 2b). Zero: no offers.
+float potential_trade_points();
+
 /// The history half — exchanges at the selected market, NEWEST FIRST.
 const std::vector<exchange_row_record>& exchange_rows();
 

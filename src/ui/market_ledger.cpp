@@ -19,6 +19,7 @@
 #include <cstdio>  // std::snprintf
 #include <cstdint>
 #include <cstring> // std::strcmp — the Good column's order
+#include <map>
 #include <string>
 #include <vector>
 
@@ -235,6 +236,7 @@ constexpr std::size_t k_potential_rows = 40;
 std::vector<trade_row_record>       g_my_trades;
 std::vector<trade_row_record>       g_market_trades;
 std::vector<potential_trade_record> g_potential;
+float                               g_potential_points = 0.0f; ///< The acting nation's trade points at this market.
 std::vector<exchange_row_record>    g_exchanges;
 trade_points_record                 g_points;
 bool                                g_market_trades_open = false;
@@ -249,6 +251,7 @@ int         g_cache_tick    = -1;
 std::size_t g_cache_markets = 0;
 std::size_t g_cache_assets  = 0;
 entity_id   g_cache_player  = null_entity; // a seat change re-prices: the haul is the corp's
+bool        g_cache_sourced = false;       // trade points here opened or shut the offers
 
 // The add-trade form's state. Namespace-scope, not function-local, so a potential
 // trade's "+" press can PREFILL it (good, from here, to there) — read 3 answers
@@ -267,6 +270,7 @@ void clear_trade_records()
     g_my_trades.clear();
     g_market_trades.clear();
     g_potential.clear();
+    g_potential_points = 0.0f;
     g_exchanges.clear();
     g_points             = trade_points_record{};
     g_market_trades_open = false;
@@ -276,6 +280,7 @@ void clear_trade_records()
     g_cache_markets      = 0;
     g_cache_assets       = 0;
     g_cache_player       = null_entity;
+    g_cache_sourced      = false;
 }
 
 /// A corporation's display name; "Corp #n" when it has none.
@@ -440,6 +445,12 @@ trade_points_record collect_trade_points(const world& w)
 /// test inside it comes before any path is priced. The rows from THIS market
 /// are kept, re-sorted with the ranking's own order. Cached by the caller
 /// against the econ tick.
+///
+/// THE RANKING ITSELF HAS NO OWNER CHECK AND MUST NOT GROW ONE HERE: the trade pass
+/// and the scorer share it. So the caller asks this only for a market the acting
+/// nation makes trade points in (Ben, 2026-11-05; ledgers/market.md § 2b), which is
+/// also what `trade_is_valid` requires of a trade's source, and a `+` is never an
+/// offer the verb refuses.
 std::vector<potential_trade_record> derive_potential_trades(
     world& w, const recipe_registry& reg, entity_id here_mid)
 {
@@ -1060,16 +1071,29 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
     const std::vector<entity_id>* owned = assets_of(w, player_actor(w)); // BL-1406
     const std::size_t assets = (owned != nullptr) ? owned->size() : 0;
 
+    // THE GATE ON READ 3, read every frame rather than with the cache: a building
+    // going idle or being staffed is a press between econ ticks, and it changes
+    // whether this market can source anything. Null report: each building at its own
+    // assignment, the same structural read the scorer takes.
+    {
+        const std::map<entity_id, float> here = market_trade_points(w, reg, nullptr, player_actor(w));
+        const auto it = here.find(mid);
+        g_potential_points = (it != here.end()) ? it->second : 0.0f;
+    }
+    const bool sourced = g_potential_points > 0.0f;
+
     if (g_cache_market != mid || g_cache_tick != w.current_econ_tick
         || g_cache_markets != w.markets.size() || g_cache_assets != assets
-        || g_cache_player != corp)
+        || g_cache_player != corp || g_cache_sourced != sourced)
     {
+        g_cache_sourced = sourced;
         g_cache_player  = corp;
         g_cache_market  = mid;
         g_cache_tick    = w.current_econ_tick;
         g_cache_markets = w.markets.size();
         g_cache_assets  = assets;
-        g_potential     = derive_potential_trades(w, reg, mid);
+        g_potential     = sourced ? derive_potential_trades(w, reg, mid)
+                                  : std::vector<potential_trade_record>{};
         g_exchanges     = derive_exchange_rows(w, mid);
     }
 
@@ -1157,7 +1181,16 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
 
         // --- READ 3: potential trades -----------------------------------------
         ImGui::SeparatorText("Potential trades");
-        if (g_potential.empty())
+        if (!sourced)
+        {
+            // A shut gate and an empty list are different answers (§ 2b): this one
+            // says what would open it.
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::TextWrapped("You make no trade points here. A working Planetary Marketplace or Port "
+                               "in this market would.");
+            ImGui::PopStyleColor();
+        }
+        else if (g_potential.empty())
         {
             ImGui::TextDisabled("No route from here clears its haulage.");
         }
@@ -1948,6 +1981,7 @@ const std::vector<trade_row_record>&       my_trades()          { return g_my_tr
 const std::vector<trade_row_record>&       market_trades()      { return g_market_trades; }
 bool                                       market_trades_open() { return g_market_trades_open; }
 const std::vector<potential_trade_record>& potential_trades()   { return g_potential; }
+float                                      potential_trade_points() { return g_potential_points; }
 const std::vector<exchange_row_record>&    exchange_rows()      { return g_exchanges; }
 const trade_points_record&                 trade_points_read()  { return g_points; }
 entity_id                                  trades_market()      { return g_trades_market; }

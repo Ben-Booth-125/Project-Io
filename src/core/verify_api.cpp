@@ -61,6 +61,7 @@
 #include "world/state_industry.hpp" // BL-1255: state_uncommitted_treasury (rail_state)
 #include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
+#include "world/trade.hpp"           // BL-1516: market_trade_points, corp_trade_markets - the gate check
 #include "world/placement_rules.hpp"
 #include "world/road_generation.hpp" // BL-1347: lay_site_roads, after this path's own stamper
 #include "world/river_generation.hpp" // BL-1375: hex_side_for_offset - the link-bit audit's own mapping
@@ -4274,6 +4275,23 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["margin_per_point"] = r.margin_per_point; // the ranking key
             out[i++] = row;
         }
+        return out;
+    });
+
+    // The gate on read 3 (BL-1516): the points the surface gated on, beside an
+    // independent read of the same question and of what the trade verb will accept
+    // as a source. Figures the Trades tab already prints; no position.
+    v.set_function("potential_gate", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const entity_id actor = player_actor(m_world);
+        const entity_id mid   = ui::trades_market();
+        const std::map<entity_id, float> pts = market_trade_points(m_world, m_registry, nullptr, actor);
+        const auto it = pts.find(mid);
+        const std::vector<entity_id> src = corp_trade_markets(m_world, actor);
+        out["market"]       = mid;
+        out["points"]       = ui::potential_trade_points();
+        out["world_points"] = (it != pts.end()) ? it->second : 0.0f;
+        out["verb_source"]  = std::binary_search(src.begin(), src.end(), mid);
         return out;
     });
 
