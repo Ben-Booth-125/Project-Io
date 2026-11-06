@@ -365,6 +365,15 @@ construction_result construct_nation(world& w, const recipe_registry& reg,
     const auto nit = w.nations.find(nation);
     if (nit == w.nations.end())
         return construction_result::no_corp;
+    // BL-1500 (PRODUCTION.md, Ben 2026-11-05): a founding is generation's, and the seeding
+    // comes after it, so it leaves the capital its source's slot (`capital_source_slot_held`).
+    if (founding && type != building_type::extraction_site
+        && type != building_type::inland_logistics_hub)
+        if (const auto tit = w.tiles.find(tile); tit != w.tiles.end()
+            && placement_rules::non_extraction_buildings_on_tile(w, tile)
+                       + placement_rules::capital_source_slot_held(w, tile)
+                   >= placement_rules::non_extraction_stack_cap(tit->second.substrate, tit->second.cover))
+            return construction_result::invalid_tile;
     return construct_for(w, reg, nation, tile, type, target, out_building, recipe,
                          founding ? std::numeric_limits<float>::max()
                                   : state_uncommitted_treasury(w, nation),

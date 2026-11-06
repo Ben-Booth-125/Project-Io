@@ -28,6 +28,16 @@
 // It measures the world at the point the PLAYER first sees it — after
 // generate_background_firms — for the same reason substrate_census does: a
 // measurement taken before the world's real industry exists is simply wrong.
+//
+// BL-1500 (nodes count to cap; PRODUCTION.md, Ben 2026-11-05: generation obeys the
+// cap with no exemptions). One thing here DOES gate: the per-tile OVER-cap counter.
+// Tiles past their own non_extraction_stack_cap must read zero, on the world as
+// generation hands it over and again after the settle (--settle); the exit code
+// says so. Beside it, the reading that names what the rule costs: the network's
+// node census and how much of the nations' own ground it reaches, so a chain that
+// loses a station shows as a number. Everything else stays a report.
+//
+//   build_gen/verify/province_capacity_probe.exe [N] [--seeds a,b,c] [--settle]
 // ---------------------------------------------------------------------------
 
 #include "harness_params.hpp"      // build_app_start_world: the shipped start (BL-1086 review)
@@ -35,6 +45,7 @@
 #include "world/components.hpp"
 #include "world/corporation_generation.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistic_points.hpp"
 #include "world/placement_rules.hpp"
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
@@ -45,19 +56,178 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <map>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 
+namespace {
+
+/// BL-1500: the tiles past their own cap, and the buildings past it, by what they are.
+/// Sorted by the type's value so the line reads the same on every run.
+struct over_cap_reading
+{
+    int tiles  = 0;
+    int excess = 0;
+    std::map<int, int> on_over_cap_tiles; ///< building type -> standing on an over-cap tile
+};
+
+over_cap_reading read_over_cap(const world& w)
+{
+    over_cap_reading out;
+    std::unordered_map<entity_id, int> on_tile;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type != building_type::extraction_site)
+            ++on_tile[b.tile];
+    std::unordered_map<entity_id, bool> over;
+    std::vector<std::pair<entity_id, int>> ascending(on_tile.begin(), on_tile.end());
+    std::sort(ascending.begin(), ascending.end()); // the lines below print in tile order
+    for (const auto& [tid, n] : ascending)
+    {
+        const auto tit = w.tiles.find(tid);
+        if (tit == w.tiles.end())
+            continue;
+        const int cap = placement_rules::non_extraction_stack_cap(tit->second.substrate, tit->second.cover);
+        if (n <= cap)
+            continue;
+        ++out.tiles;
+        out.excess += n - cap;
+        over[tid] = true;
+        // Which tile, and whose: a capital's full tile is the case the rule makes hard.
+        const auto own = w.tile_to_nation.find(tid);
+        const auto nit = own != w.tile_to_nation.end() ? w.nations.find(own->second) : w.nations.end();
+        std::printf("       BL-1500 past the cap: tile %u holds %d, cap %d, %s%s\n",
+                    static_cast<unsigned>(tid), n, cap,
+                    nit == w.nations.end() ? "nobody's ground"
+                                           : (nit->second.is_major ? "a major's ground" : "a minor's ground"),
+                    nit != w.nations.end() && nit->second.capital_tile == tid ? ", ITS CAPITAL" : "");
+    }
+    for (const auto& [bid, b] : w.buildings)
+        if (b.type != building_type::extraction_site && over.count(b.tile) != 0)
+            ++out.on_over_cap_tiles[static_cast<int>(b.type)];
+    return out;
+}
+
+void print_over_cap(const char* when, const over_cap_reading& r)
+{
+    std::printf("       BL-1500 OVER CAP %-7s: %d tile(s), %d building(s) past the cap;", when, r.tiles,
+                r.excess);
+    for (const auto& [type, n] : r.on_over_cap_tiles)
+        std::printf(" type%d x%d", type, n);
+    std::printf("\n");
+}
+
+/// BL-1500: what the network IS, on ground it matters to: the nodes standing, and how
+/// much of each nation's own dry ground its routed cover reaches (the campaign's own
+/// lp_coverage_at, one reach field). Counts and a mean, read in ascending tile id.
+/// BL-1500: every capital holds a RUNNING hub (`lp_source_running`) and stands at full
+/// cover (LOGISTICS.md). Named nation by nation where one does not; no exceptions.
+struct capital_reading
+{
+    int capitals = 0, full = 0, holding = 0;
+};
+
+void print_network_reading(world& w, const char* when, long long* reached_out, long long* stations_out,
+                           long long* hubs_out, long long* ports_out, capital_reading* cap_out = nullptr)
+{
+    int hubs = 0, stations = 0, ports = 0;
+    for (const auto& [bid, b] : w.buildings)
+    {
+        hubs     += b.type == building_type::inland_logistics_hub ? 1 : 0;
+        stations += b.type == building_type::railway_station ? 1 : 0;
+        ports    += b.type == building_type::port ? 1 : 0;
+    }
+    std::vector<entity_id> own;
+    own.reserve(w.tile_to_nation.size());
+    for (const auto& [tid, nid] : w.tile_to_nation)
+    {
+        (void)nid;
+        const auto tit = w.tiles.find(tid);
+        if (tit != w.tiles.end() && !is_water(tit->second.substrate))
+            own.push_back(tid);
+    }
+    std::sort(own.begin(), own.end());
+    lp_reach_memo memo;
+    int reached = 0, full = 0;
+    double cover_sum = 0.0;
+    for (const entity_id t : own)
+    {
+        const float c = lp_coverage_at(w, memo, t);
+        reached += c > 0.0f ? 1 : 0;
+        full    += c >= 1.0f ? 1 : 0;
+        cover_sum += static_cast<double>(c);
+    }
+    int capitals = 0, capitals_full = 0, capitals_holding = 0;
+    std::vector<entity_id> nids;
+    for (const auto& [nid, nc] : w.nations)
+    {
+        (void)nc;
+        nids.push_back(nid);
+    }
+    std::sort(nids.begin(), nids.end());
+    for (const entity_id nid : nids)
+    {
+        const entity_id cap = w.nations.at(nid).capital_tile;
+        if (cap == null_entity || w.tiles.count(cap) == 0)
+            continue;
+        ++capitals;
+        const float cap_cover = lp_coverage_at(w, memo, cap);
+        capitals_full += cap_cover >= 1.0f ? 1 : 0;
+        bool holds = false;
+        for (const auto& [bid, b] : w.buildings)
+            holds = holds || (b.tile == cap && b.type == building_type::inland_logistics_hub
+                              && lp_source_running(b));
+        capitals_holding += holds ? 1 : 0;
+        if (!holds || cap_cover < 1.0f)
+            std::printf("       BL-1500 capital %-7s nation %u tile %u: %s, cover %.3f\n", when,
+                        static_cast<unsigned>(nid), static_cast<unsigned>(cap),
+                        holds ? "holds a running hub" : "NO RUNNING HUB", static_cast<double>(cap_cover));
+    }
+    if (cap_out != nullptr)
+    {
+        cap_out->capitals += capitals;
+        cap_out->full     += capitals_full;
+        cap_out->holding  += capitals_holding;
+    }
+    std::printf("       BL-1500 NETWORK %-7s: hubs %d stations %d ports %d | owned dry tiles %zu: "
+                "reached %d, full cover %d, cover sum %.1f | capitals at full cover %d, holding a hub "
+                "%d, of %d\n",
+                when, hubs, stations, ports, own.size(), reached, full, cover_sum, capitals_full,
+                capitals_holding, capitals);
+    if (reached_out != nullptr) *reached_out += reached;
+    if (stations_out != nullptr) *stations_out += stations;
+    if (hubs_out != nullptr) *hubs_out += hubs;
+    if (ports_out != nullptr) *ports_out += ports;
+}
+
+} // namespace
+
 int main(int argc, char** argv)
 {
     int seed_count = 3;
-    if (argc > 1)
+    std::vector<std::uint32_t> seeds;
+    bool settle = false;
+    for (int i = 1; i < argc; ++i)
     {
-        const int n = std::atoi(argv[1]);
-        if (n > 0) seed_count = n;
+        if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc)
+        {
+            for (const char* p = argv[++i]; *p != '\0';)
+            {
+                seeds.push_back(static_cast<std::uint32_t>(std::atoi(p)));
+                while (*p != '\0' && *p != ',') ++p;
+                if (*p == ',') ++p;
+            }
+        }
+        else if (std::strcmp(argv[i], "--settle") == 0)
+            settle = true;
+        else if (const int n = std::atoi(argv[i]); n > 0)
+            seed_count = n;
     }
+    if (seeds.empty())
+        for (int i = 0; i < seed_count; ++i)
+            seeds.push_back(static_cast<std::uint32_t>(i));
+    seed_count = static_cast<int>(seeds.size());
 
     lua_state lua;
     lua.load("scripts/recipes.lua");
@@ -80,7 +250,7 @@ int main(int argc, char** argv)
 
     std::printf("=== province_capacity_probe - %d seed%s, post-background-firms ===\n",
                 seed_count, seed_count == 1 ? "" : "s");
-    std::printf("REPORTS ONLY. Nothing here gates; the question is whether the cap binds.\n\n");
+    std::printf("REPORTS, but for the one gate BL-1500 added: no tile past its own cap.\n\n");
     std::printf("seed | land  provinces | bldgs | tiles@cap  %%land | prov used/cap  util%% | fullest prov\n");
 
     long long tot_at_cap = 0, tot_land = 0, tot_bldg = 0, tot_cap = 0;
@@ -104,11 +274,16 @@ int main(int argc, char** argv)
     long long tot_firms_placed = 0, tot_prov_at_firm_cap = 0, tot_prov_with_firms = 0;
     double ratio_min = 0.0, ratio_max = 0.0;
     bool ratio_seen = false;
+    // BL-1500: the gate, and the totals that name what the rule costs.
+    long long tot_over_tiles = 0, tot_over_excess = 0, tot_reached = 0, tot_stations = 0, tot_hubs = 0,
+              tot_ports = 0, tot_capitals_refused = 0;
+    capital_reading tot_capitals;
 
-    for (int i = 0; i < seed_count; ++i)
+    for (const std::uint32_t seed_value : seeds)
     {
+        const int i = static_cast<int>(seed_value);
         world_params p;
-        p.seed = static_cast<uint32_t>(i);
+        p.seed = seed_value;
         // THE SHIPPED START (BL-1086 review, 2026-09-26): `build_app_start_world`,
         // the world as the landscape search's winner leaves it, charter budget
         // and both recipe passes — the world the PLAYER first sees, which the
@@ -315,7 +490,34 @@ int main(int argc, char** argv)
         }
         std::printf("       background firms: most on any body = %d%s (anti-runaway bound 200)\n",
                     max_firms, bodies_at_cap ? "  <-- AT THE BOUND" : "");
+        // BL-1500: the gate reading, at the handoff of generation and (--settle) after the
+        // settle's twelve ticks, whose builds come through the one placement door.
+        {
+            const over_cap_reading r = read_over_cap(w);
+            print_over_cap("start", r);
+            std::printf("       BL-1500 REFUSED: %d station(s) at a full city, %d source(s) on a full "
+                        "tile, %d capital(s) left without a source; consumers unconnectable %d "
+                        "(fully covered %d, partly %d, uncovered %d); garrison posts past the draw %d\n",
+                        start->land.rail.stations_refused_cap, start->land.lp.sources_refused_cap,
+                        start->land.lp.capital_source_refused, start->land.lp.unconnectable,
+                        start->land.lp.fully_covered, start->land.lp.partly_covered,
+                        start->land.lp.uncovered, start->land.lp.garrison_posts_short);
+            tot_over_tiles  += r.tiles;
+            tot_over_excess += r.excess;
+            tot_capitals_refused += start->land.lp.capital_source_refused;
+            print_network_reading(w, "start", &tot_reached, &tot_stations, &tot_hubs, &tot_ports, &tot_capitals);
+        }
         std::fflush(stdout);
+        if (settle)
+        {
+            run_app_validation_settle(w, start_reg);
+            const over_cap_reading r = read_over_cap(w);
+            print_over_cap("settled", r);
+            tot_over_tiles  += r.tiles;
+            tot_over_excess += r.excess;
+            print_network_reading(w, "settled", nullptr, nullptr, nullptr, nullptr, &tot_capitals);
+            std::fflush(stdout);
+        }
 
         tot_at_cap += at_cap;
         tot_land   += land;
@@ -358,5 +560,17 @@ int main(int argc, char** argv)
                 " a low %% means it is still nearly inert\n");
     std::printf("\nREAD THIS BEFORE CHANGING A CAP: if tiles-at-cap is ~0, the per-tile ceiling\n"
                 "is refusing nothing, and a province-pooled budget cannot add a single building.\n");
-    return 0;
+    std::printf("\nBL-1500 NETWORK TOTALS at the start: hubs %lld stations %lld ports %lld, owned dry "
+                "tiles reached %lld, %lld buildings standing\n",
+                tot_hubs, tot_stations, tot_ports, tot_reached, tot_bldg);
+    std::printf("%s BL-1500 no tile past its own cap: %lld tile(s), %lld building(s) past it\n",
+                tot_over_tiles == 0 ? "PASS" : "FAIL", tot_over_tiles, tot_over_excess);
+    std::printf("%s BL-1500 no capital left without its source by the cap: %lld\n",
+                tot_capitals_refused == 0 ? "PASS" : "FAIL", tot_capitals_refused);
+    const bool capitals_ok = tot_capitals.capitals > 0 && tot_capitals.holding == tot_capitals.capitals
+                          && tot_capitals.full == tot_capitals.capitals;
+    std::printf("%s BL-1500 every capital holds a running hub at full cover: %d read, %d holding, %d at "
+                "full cover\n", capitals_ok ? "PASS" : "FAIL", tot_capitals.capitals, tot_capitals.holding,
+                tot_capitals.full);
+    return tot_over_tiles == 0 && tot_capitals_refused == 0 && capitals_ok ? 0 : 1;
 }

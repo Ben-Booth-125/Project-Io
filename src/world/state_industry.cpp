@@ -1699,6 +1699,22 @@ rail_handover_report hand_over_rail(world& w)
         }
         if (owner == null_entity)
             continue;
+        // BL-1500 (PRODUCTION.md, Ben 2026-11-05: generation obeys the cap with no
+        // exemptions): a station counts toward its tile's cap like any building. It may
+        // stand only in the city it serves (`can_place`'s rule), so a city with no room
+        // has no elsewhere to send it: it opens without a station, and is counted. A capital's
+        // source holds its slot (seed 25: a one-tile capital of cap 1, its slot taken by a
+        // station, opened with no source at all).
+        {
+            const tile_component& ctc = w.tiles.at(tile);
+            if (placement_rules::non_extraction_buildings_on_tile(w, tile)
+                    + placement_rules::capital_source_slot_held(w, tile)
+                >= placement_rules::non_extraction_stack_cap(ctc.substrate, ctc.cover))
+            {
+                ++out.stations_refused_cap;
+                continue;
+            }
+        }
         // BL-1404 -- A STATION FOLLOWS ITS GROUND (NATIONS.md § Own ground): it
         // stands in a city, and the city is the nation's whose ground it is on,
         // whoever owns the track that reaches it (station 73709 on seed 0 stood
@@ -1731,9 +1747,10 @@ void print_rail_handover(const rail_handover_report& r)
 {
     std::printf("[rail] handover: %d links laid between market cities of %d (%d merged into one, "
                 "%d broken at water); %d track tiles (%d to majors, %d to minors' firms, %d of them "
-                "along the line, %d unowned), %d stations (%d a nation's)\n",
+                "along the line, %d unowned), %d stations (%d a nation's; %d refused by the stack cap)\n",
                 r.links_laid, r.links, r.links_merged, r.links_broken, r.track_tiles, r.to_nations,
-                r.to_firms, r.along_the_line, r.unowned, r.stations, r.station_nations);
+                r.to_firms, r.along_the_line, r.unowned, r.stations, r.station_nations,
+                r.stations_refused_cap);
     std::fflush(stdout);
 }
 

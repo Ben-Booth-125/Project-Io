@@ -797,6 +797,23 @@ int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov)
     return std::max(1, base + mod);
 }
 
+int capital_source_slot_held(const world& w, entity_id tile_id)
+{
+    const auto own = w.tile_to_nation.find(tile_id);
+    if (own == w.tile_to_nation.end())
+        return 0;
+    const auto nit = w.nations.find(own->second);
+    if (nit == w.nations.end() || nit->second.capital_tile != tile_id)
+        return 0;
+    for (const auto& [bid, b] : w.buildings) // an existence test: order-free
+    {
+        (void)bid;
+        if (b.tile == tile_id && b.type == building_type::inland_logistics_hub)
+            return 0;
+    }
+    return 1;
+}
+
 int non_extraction_buildings_on_tile(const world& w, entity_id tile_id)
 {
     // BL-1205: inside a province_ceiling_scope, the scope's one building walk.
