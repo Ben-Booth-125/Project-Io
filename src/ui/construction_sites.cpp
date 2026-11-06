@@ -330,12 +330,19 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
     sf.eval_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 }
 
-const char* category_of(building_type t)
+} // namespace
+
+const char* construction_fold_of(const recipe_registry& reg, building_type t, std::uint16_t recipe_id)
 {
     switch (t)
     {
     case building_type::extraction_site:     return "Extraction";
-    case building_type::processing_facility: return "Processing";
+    case building_type::processing_facility:
+        // Power Generation is infrastructure (Ben, 2026-11-05; SELECTION.md § The tile
+        // construction ledger): a grid is what other plants stand on.
+        if (const recipe* rc = reg.get_recipe(recipe_id); rc != nullptr && rc->group == "Power Generation")
+            return "Infrastructure";
+        return "Processing";
     case building_type::military_base:
     case building_type::airbase:
     case building_type::bunker:              // BL-1426
@@ -343,8 +350,6 @@ const char* category_of(building_type t)
     default:                                 return "Infrastructure";
     }
 }
-
-} // namespace
 
 std::vector<site_option> site_options(const world& w, const recipe_registry& reg)
 {
@@ -358,7 +363,7 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
             out.push_back({building_type::extraction_site, er, no_recipe,
                            er == resource_type::agricultural_produce ? std::string("Farm")
                                                                      : std::string(extraction_building_name(er)),
-                           "Extraction"});
+                           construction_fold_of(reg, building_type::extraction_site, no_recipe)});
     // Processing: one per RECIPE in the era-masked browse order the door walks, with
     // the door's unlock filter.
     if (reg.building_available(building_type::processing_facility))
@@ -369,7 +374,8 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
             if (!recipe_unlocked(w, reg, actor, id))
                 continue;
             out.push_back({building_type::processing_facility, resource_type::iron_ore, id,
-                           browsed.display_name, "Processing"});
+                           browsed.display_name,
+                           construction_fold_of(reg, building_type::processing_facility, id)});
         }
     const std::pair<building_type, const char*> fixed[] = {
         {building_type::port, "Port"},
@@ -383,7 +389,7 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
     };
     for (const auto& [t, name] : fixed)
         if (reg.building_available(t))
-            out.push_back({t, resource_type::iron_ore, no_recipe, name, category_of(t)});
+            out.push_back({t, resource_type::iron_ore, no_recipe, name, construction_fold_of(reg, t, no_recipe)});
     // The door's fold order: category, then name; stable so equal names keep the
     // authored order.
     std::stable_sort(out.begin(), out.end(), [](const site_option& a, const site_option& b) {

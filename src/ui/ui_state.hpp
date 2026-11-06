@@ -761,6 +761,7 @@ struct construction_controls
         /// same height by construction.
         int         name_lines  = 0;
         bool        name_elided = false;
+        std::string fold;          ///< The fold it drew in ("Infrastructure", "Road", ...).
         /// BL-1368: one entry per COLUMN, in drawn order — the hover is per column
         /// now, so a check hovers each cell's own centre and asserts that column's
         /// own explainer. `hover` above stays the union of these, which is the one
@@ -769,7 +770,7 @@ struct construction_controls
     };
     std::vector<grid_row> queue_rows; ///< The in-flight queue's rows.
     std::vector<grid_row> door_rows;  ///< The build list's rows, in drawn order.
-    /// BL-1366: the two RAIL rows (Track, Railway Station) as grid rows. Separate
+    /// BL-1366: the two RAIL rows (Railroad, Railway Station) as grid rows. Separate
     /// from `door_rows` only because they are drawn by rail_tool.cpp outside the
     /// candidate loop; they are the same grid, the same metric and the same
     /// per-column cards, which is the property the check asserts.
@@ -785,6 +786,8 @@ struct construction_controls
     struct road_row
     {
         std::uint8_t tier    = 0;     ///< 1=Track, 2=Road, 3=Highway.
+        std::string  fold;            ///< The fold it drew in ("Road").
+        float        h       = 0.0f;  ///< The row height it drew at.
         std::string  name;            ///< "Track" / "Road" / "Highway".
         float        x       = -1.0f; ///< The Build press's centre, screen px.
         float        y       = -1.0f;

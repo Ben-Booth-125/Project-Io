@@ -219,8 +219,8 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
             ImGui::Dummy({construction_grid::makes, line_h});
             cells.push_back(construction_cell(
                 "makes", pp, construction_grid::makes,
-                rail_glyph ? std::string("Makes no good, so the pip is empty. Track is the line "
-                                         "a railway runs on.")
+                rail_glyph ? std::string("Makes no good, so the pip is empty. A railroad is the "
+                                         "line a railway runs on.")
                            : std::string("Makes no good, so the pip is empty. A station is where "
                                          "the railway loads and unloads.")));
         }
@@ -280,11 +280,18 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
             pressed = true;
         // Published only while the press is on screen: the rows sit in a scrolled
         // list, and a position a click cannot reach is no press. A REFUSED row
-        // publishes nothing, which is the absence a check asserts.
+        // publishes nothing, which is the absence a check asserts. A press half under
+        // the list's edge is visible and still cannot be hit at its centre, so the centre
+        // has to lie inside the list.
         if (refusal == nullptr && ImGui::IsItemVisible())
         {
-            px = ap.x + ImGui::GetItemRectSize().x * 0.5f;
-            py = ap.y + ImGui::GetItemRectSize().y * 0.5f;
+            const float cy = ap.y + ImGui::GetItemRectSize().y * 0.5f;
+            const float top = ImGui::GetWindowPos().y;
+            if (cy > top && cy < top + ImGui::GetWindowHeight())
+            {
+                px = ap.x + ImGui::GetItemRectSize().x * 0.5f;
+                py = cy;
+            }
         }
         ImGui::EndDisabled();
         ImGui::PopStyleVar();
@@ -310,6 +317,7 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
         pub.h           = row_h;
         pub.name_lines  = name_lines;
         pub.name_elided = name_elided;
+        pub.fold        = rail_glyph ? "Road" : "Infrastructure";
         for (const grid_explainer& e : cells)
             pub.cols.push_back({e.key, e.text, (e.mn.x + e.mx.x) * 0.5f, (e.mn.y + e.mx.y) * 0.5f});
         cc.rail_rows.push_back(std::move(pub));
@@ -337,7 +345,9 @@ void draw_rail_rows(const world& w, const recipe_registry& reg, ui_state& ui, en
                 why = "Can't afford it: the treasury cannot cover the track";
         }
         bool pressed = false;
-        grid_row("rail_track##build", "Track", /*rail_glyph=*/true,
+        // The rail Track row reads Railroad (Ben, 2026-11-05): "Track" is the road fold's
+        // first tier, and the two sit in one fold.
+        grid_row("rail_track##build", "Railroad", /*rail_glyph=*/true,
                  std::isfinite(cost) ? cost : 0.0f, steel, reg.rail().track_upkeep_per_tile,
                  w.rail_track.count(tile) != 0 ? 1 : 0, 1, why, pressed,
                  cc.rail_track_x, cc.rail_track_y);

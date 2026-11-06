@@ -5414,6 +5414,10 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             sol::table e = st.create_table();
             e["name"]     = o.name;
             e["category"] = o.category;
+            // The recipe's group: the name the door's row for it shows.
+            const recipe* orc = (o.type == building_type::processing_facility)
+                                    ? m_registry.get_recipe(o.recipe) : nullptr;
+            e["group"]    = orc != nullptr ? orc->group : std::string();
             out[++n] = e;
         }
         return out;
@@ -5557,6 +5561,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         {
             sol::table row = st.create_table();
             row["tier"]      = static_cast<int>(r.tier);
+            row["fold"]      = r.fold;
+            row["h"]         = r.h;
             row["name"]      = r.name;
             row["x"]         = r.x;
             row["y"]         = r.y;
@@ -6175,6 +6181,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // and `name_elided` is the failure the two-line row exists to remove.
             row["name_lines"]  = r.name_lines;
             row["name_elided"] = r.name_elided;
+            row["fold"]        = r.fold;
             sol::table cols = st.create_table();
             int        cn   = 0;
             for (const ui_grid_col& gc : r.cols)
@@ -6209,6 +6216,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // and `name_elided` is the failure the two-line row exists to remove.
             row["name_lines"]  = r.name_lines;
             row["name_elided"] = r.name_elided;
+            row["fold"]        = r.fold;
             sol::table cols = st.create_table();
             int        cn   = 0;
             for (const ui_grid_col& gc : r.cols)

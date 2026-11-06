@@ -30,6 +30,11 @@
 
 namespace ui {
 
+/// THE fold a building sits in, for the Build door and the finder alike ("Extraction",
+/// "Processing", "Infrastructure", "Military"), so the two cannot file one building
+/// twice. A processing facility reads its recipe: Power Generation is Infrastructure.
+const char* construction_fold_of(const recipe_registry& reg, building_type t, std::uint16_t recipe_id);
+
 /// Every building the finder offers, in the Build door's vocabulary and fold order:
 /// one extraction option per extractable good, one per processing RECIPE (the door
 /// prices a recipe, and the recipe is what the profit turns on), then the

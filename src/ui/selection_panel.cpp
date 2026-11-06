@@ -4857,13 +4857,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     // name, so a future rename of "Extraction: X" can't silently drop a row into the
     // wrong group.
     for (candidate& c : cands)
-        c.category = (c.type == building_type::extraction_site)     ? "Extraction"
-                    : (c.type == building_type::processing_facility) ? "Processing"
-                    : (c.type == building_type::military_base)       ? "Military"
-                    : (c.type == building_type::airbase)             ? "Military"
-                    : (c.type == building_type::bunker)              ? "Military"
-                    : (c.type == building_type::research_institute)  ? "Military"
-                                                                      : "Infrastructure";
+        c.category = construction_fold_of(reg, c.type, c.recipe); // the finder's own mapping
 
     for (candidate& c : cands)
     {
@@ -5019,14 +5013,6 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     // place a fact is allowed to go.
     const float row_h = construction_row_height();
 
-    // The road ladder keeps its own TALLER row: its tier glyph box is 56 px, and
-    // the three tiers are an UPGRADE ladder on one tile rather than rows of this
-    // list. The RAIL rows are no longer the exception they were — BL-1366: they
-    // drew a four-line bordered box, so Track and Railway Station sat visibly
-    // taller than the one-line rows above and below them. They now take `row_h`
-    // and `construction_begin_build_grid`'s own columns (rail_tool.cpp).
-    constexpr float img = 56.0f;
-
     ImGui::BeginChild("##build_list", {0.0f, 0.0f}, false,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
     ui::foldout_scroll_child("##build_list"); // verify.scroll_panel("build_list", ...)
@@ -5035,8 +5021,8 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     // whenever the category changes, and close it once its rows
     // are drawn. Defaulted open, matching the fold usage elsewhere in the UI.
     // BL-1255 (LOGISTICS.md 4c): rail is built like anything else - its rows
-    // join their kin (Ben, 2026-10-15): Track closes the road ladder below,
-    // Railway Station closes the Infrastructure fold beside port and hub.
+    // join their kin (Ben, 2026-10-15; 2026-11-05): Railroad closes the Road fold
+    // below, Railway Station closes the Infrastructure fold beside port and hub.
     // The grid itself. ONE TABLE PER CATEGORY FOLD, all of them declaring the
     // SAME fixed column widths (`construction_grid`), so a column is in the same
     // place in every fold and the stretch name column resolves to the same
@@ -5359,66 +5345,11 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             for (const grid_explainer& e : cells)
                 pub.cols.push_back({e.key, e.text, (e.mn.x + e.mx.x) * 0.5f,
                                     (e.mn.y + e.mx.y) * 0.5f});
+            pub.fold = c.category;
             ui.construction_ui.door_rows.push_back(std::move(pub));
         }
     }
     close_category();
-
-    // Hire (BL-324, moved onto the base by BL-325 S2) — the campaign roster
-    // gated on the player corp's OWN stockpile/market access (unit_roster.hpp),
-    // not this tile's deposit or placement rules; the tile now ALSO has to
-    // carry the corp's own completed military_base (S2: hire is no longer
-    // hire-anywhere). Beside Build rather than folded into it: hiring never
-    // touches building slots or terrain validity, so it does not belong in the
-    // candidate loop above.
-    {
-        bool has_muster_base = false;
-        for (const auto& [bid, bc] : w.buildings)
-        {
-            if (bc.tile == tile_id && bc.type == building_type::military_base
-                && bc.ticks_remaining <= 0 && !bc.decommissioned)
-            {
-                // BL-1406: the base must be the player ACTOR's (its nation's once
-                // folded) — `owner_holds` reads either owner's asset list.
-                if (owner_holds(w, player_actor(w), bid))
-                    has_muster_base = true;
-                break;
-            }
-        }
-        const auto& table = unit_roster_table();
-        auto avail = has_muster_base
-            ? available_rows(w, player_actor(w), campaign_roster_band_for(reg.era()))
-            : std::vector<const roster_row*>{};
-        // BL-1437: the tile card hides obsolete types as the Military ledger's Recruit
-        // does (MILITARY.md § Land — the classes).
-        avail.erase(std::remove_if(avail.begin(), avail.end(), [&](const roster_row* r) {
-                        return roster_row_obsolete(w, player_actor(w),
-                                                   static_cast<std::uint16_t>(r - table.data()));
-                    }),
-                    avail.end());
-        if (!avail.empty())
-        {
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Hire");
-            ImGui::BeginChild("##hire_list", {0.0f, row_h * std::min<std::size_t>(avail.size(), 3)},
-                              false, ImGuiWindowFlags_NoSavedSettings);
-            for (const roster_row* row : avail)
-            {
-                const auto idx = static_cast<std::uint16_t>(row - table.data());
-                ImGui::PushID(static_cast<int>(idx));
-                ImGui::TextUnformatted(row->name);
-                ImGui::SameLine(bar_w - style.WindowPadding.x - 70.0f);
-                if (ImGui::Button("Hire", {60.0f, 0.0f}))
-                {
-                    ui.construction.pending_hire_tile      = tile_id;
-                    ui.construction.pending_hire_unit_type = idx;
-                    ui.military.raise_row = -1; // the answer is this card's, not a ledger row's
-                }
-                ImGui::PopID();
-            }
-            ImGui::EndChild();
-            ImGui::Spacing();
-        }
-    }
 
     // Road placement (BL-147 core, BL-172 tier ladder) — a per-tile mutation, not a building, so
     // it takes its own affordances + the pending_road_tile/tier/side path (place_road). Three
@@ -5456,8 +5387,16 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             return tit != w.tiles.end() && tile_has_road(tit->second);
         }();
 
+        // THE ROAD FOLD (Ben, 2026-11-05; SELECTION.md § The tile construction ledger):
+        // Track, Road, Highway and Railroad, in the shared grid at the shared row height,
+        // with smaller glyphs than the building rows. Railroad draws its own table, as
+        // the station does, for the reason rail_tool.cpp gives.
+        const bool road_fold = ImGui::TreeNodeEx("Road", ImGuiTreeNodeFlags_DefaultOpen);
+        const bool road_grid = road_fold && construction_begin_build_grid("##grid_Road");
         for (const road_tier_affordance& rt : road_tiers)
         {
+            if (!road_grid)
+                break;
             ImGui::PushID(static_cast<int>(rt.level)); // unique ImGui ids per tier
 
             const road_economics& re = reg.road_econ(rt.level);
@@ -5482,28 +5421,104 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
                     road_capex += re.resource_build_cost[i] * price(i);
             const bool affordable = balance >= road_capex;
 
-            // Auto-height: a refusal wraps onto a second line rather than clip.
-            ImGui::BeginChild("road##build", {0.0f, 0.0f},
-                              ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY,
-                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-            ImDrawList* cdl = ImGui::GetWindowDrawList();
+            const float line_h = ImGui::GetTextLineHeight();
+            std::vector<grid_explainer> cells;
+            ImGui::TableNextRow(ImGuiTableRowFlags_None, row_h);
 
-            const ImVec2 ip = ImGui::GetCursorScreenPos();
-            const ImVec2 imx = {ip.x + img, ip.y + img};
-            cdl->AddRectFilled(ip, imx, IM_COL32(72, 72, 72, 255), 3.0f);
-            cdl->AddRect(ip, imx, IM_COL32(110, 110, 110, 255), 3.0f);
-            // A short road glyph: a segment across the box, weighted by tier (matches the canvas).
-            cdl->AddLine({ip.x + img * 0.2f, ip.y + img * 0.7f},
-                         {ip.x + img * 0.8f, ip.y + img * 0.3f}, rt.glyph_col, rt.glyph_thick);
-            ImGui::Dummy({img, img});
-            ImGui::SameLine();
+            // Column 0: a short road segment, weighted by tier (matches the canvas),
+            // smaller than a building glyph.
+            ImGui::TableSetColumnIndex(0);
+            const ImVec2 rgp = ImGui::GetCursorScreenPos();
+            {
+                const ImVec2 cg = {rgp.x + construction_grid::glyph * 0.5f, rgp.y + line_h * 0.5f};
+                const float  gr = construction_grid::glyph * 0.32f;
+                cdl->AddLine({cg.x - gr, cg.y + gr * 0.7f}, {cg.x + gr, cg.y - gr * 0.7f}, rt.glyph_col,
+                             rt.glyph_thick * 0.75f);
+                ImGui::Dummy({construction_grid::glyph, line_h});
+            }
 
-            ImGui::BeginGroup();
-            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", rt.name);
+            // Column 1: the name.
+            ImGui::TableSetColumnIndex(1);
+            const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+            ImGui::PushStyleColor(ImGuiCol_Text, palette::selection);
+            construction_grid_text("build.road.name", rt.name, name_w, /*disabled=*/false);
+            ImGui::PopStyleColor();
+            cells.push_back(construction_cell(
+                "name", rgp, construction_grid::glyph + construction_grid::pad * 2.0f + name_w,
+                "Road tier " + std::to_string(static_cast<int>(rt.level))
+                    + " of 3. A road is one crossing between two tiles."));
 
-            // One credit total, materials priced in — the same figure the gate uses.
-            ImGui::TextDisabled("%d cr", static_cast<int>(road_capex));
+            // Column 2: one credit total, materials priced in - the figure the gate uses.
+            ImGui::TableSetColumnIndex(2);
+            const ImVec2 rcp = ImGui::GetCursorScreenPos();
+            ImGui::TextDisabled("%s", fmt::abbreviate(static_cast<double>(road_capex)).c_str());
+            {
+                std::string goods;
+                for (std::size_t i = 0; i < resource_count; ++i)
+                    if (re.resource_build_cost[i] > 0.0f)
+                    {
+                        char qty[24];
+                        std::snprintf(qty, sizeof qty, "%.0f ", static_cast<double>(re.resource_build_cost[i]));
+                        goods += (goods.empty() ? std::string() : std::string(", ")) + qty
+                                 + resource_name(static_cast<resource_type>(i));
+                    }
+                cells.push_back(construction_cell(
+                    "cost", rcp, construction_grid::cost,
+                    "A crossing costs " + std::to_string(static_cast<int>(road_capex)) + " cr"
+                        + (goods.empty() ? std::string(".")
+                                         : ", materials at this market's posted prices. Materials: "
+                                               + goods + ".")));
+            }
 
+            // Columns 3 and 4 stay empty, and say why: a road makes no good, and a
+            // crossing does not stack.
+            ImGui::TableSetColumnIndex(3);
+            {
+                const ImVec2 pp = ImGui::GetCursorScreenPos();
+                ImGui::Dummy({construction_grid::makes, line_h});
+                cells.push_back(construction_cell("makes", pp, construction_grid::makes,
+                                                  std::string("Makes no good, so the pip is empty.")));
+            }
+            ImGui::TableSetColumnIndex(4);
+            {
+                const ImVec2 kp = ImGui::GetCursorScreenPos();
+                ImGui::Dummy({construction_grid::stack, line_h});
+                cells.push_back(construction_cell(
+                    "stack", kp, construction_grid::stack,
+                    "A road does not stack. The rules admit "
+                        + std::to_string(static_cast<int>(targets.size()))
+                        + " crossings from this tile at this tier."));
+            }
+
+            // Column 5: the state mark, red when the ground refuses every side.
+            ImGui::TableSetColumnIndex(5);
+            {
+                const ImVec2 sp = ImGui::GetCursorScreenPos();
+                const bool   refused = targets.empty();
+                const ImU32  mark = refused ? IM_COL32(230, 140, 140, 255) : IM_COL32(110, 116, 128, 255);
+                icons::value_mark(cdl, {sp.x + construction_grid::state * 0.5f, sp.y + line_h * 0.5f},
+                                  3.0f, mark);
+                ImGui::Dummy({construction_grid::state, line_h});
+                cells.push_back(construction_cell(
+                    "state", sp, construction_grid::state,
+                    refused ? std::string("Red: this tile offers no crossing at this tier. The Build "
+                                          "press says why.")
+                            : std::string("The ground offers a crossing at this tier."),
+                    refused ? mark : 0u));
+            }
+
+            // Column 6: no bar. A road earns through what it connects.
+            ImGui::TableSetColumnIndex(6);
+            {
+                const ImVec2 bp = ImGui::GetCursorScreenPos();
+                ImGui::Dummy({construction_grid::bar, line_h});
+                cells.push_back(construction_cell(
+                    "bar", bp, construction_grid::bar,
+                    std::string("No direct revenue: a road earns through what it connects, so the "
+                                "column stays empty.")));
+            }
+
+            ImGui::TableSetColumnIndex(7);
             // THE PRESS ARMS. Always the same control in the same place: enabled
             // when the rules admit a crossing and the balance covers it, disabled
             // (never swapped for a sentence) when they do not. Pressing it while
@@ -5524,7 +5539,12 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             const bool can_arm  = affordable && !targets.empty();
             ImGui::BeginDisabled(!can_arm && !armed);
             const ImVec2 press_p = ImGui::GetCursorScreenPos();
-            if (ImGui::Button(armed ? "Cancel" : "Build"))
+            // "Stop", not "Cancel": the grid's press column is 44 px, and "Cancel" took all
+            // of it before the frame's padding, so its last letter was cut.
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {4.0f, 0.0f});
+            const bool road_pressed = ImGui::Button(armed ? "Stop" : "Build");
+            ImGui::PopStyleVar();
+            if (road_pressed)
             {
                 if (armed)
                 {
@@ -5537,10 +5557,12 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
                 }
             }
             ImGui::EndDisabled();
-            // The press's own rect, read while the button is still the last item
-            // (EndGroup below replaces it with the group's).
+            // The press's own rect, read while the button is still the last item.
             const ImVec2 press_sz  = ImGui::GetItemRectSize();
-            const bool   press_vis = ImGui::IsItemVisible();
+            const float  press_top = ImGui::GetWindowPos().y; // the centre must lie inside the list
+            const bool   press_vis = ImGui::IsItemVisible()
+                                  && press_p.y + press_sz.y * 0.5f > press_top
+                                  && press_p.y + press_sz.y * 0.5f < press_top + ImGui::GetWindowHeight();
             // ONE SHORT EXPLAINER, ON THE PRESS, per construction.md's
             // per-column rule: what the two presses are, or which one thing is
             // missing. THE EXPLAINER IS THE ONLY PLACE THE REASON LIVES — the
@@ -5611,17 +5633,13 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             else
                 why = "Press, then press a highlighted neighbour - a road crosses between two "
                       "tiles, so it has to name which one.";
-            if (construction_row_hovered(press_p,
-                                         {press_p.x + press_sz.x, press_p.y + press_sz.y}))
-                construction_row_card(rt.name, [&]() {
-                    ImGui::PushTextWrapPos(0.0f);
-                    ImGui::TextDisabled("%s", why.c_str());
-                    ImGui::PopTextWrapPos();
-                });
-            ImGui::EndGroup();
+            cells.push_back(construction_cell("act", press_p, construction_grid::act, why));
+            construction_column_card(rt.name, cells);
 
             {
                 construction_controls::road_row pub;
+                pub.fold      = "Road";
+                pub.h         = row_h;
                 pub.tier      = rt.level;
                 pub.name      = rt.name;
                 pub.cost      = road_capex;
@@ -5636,14 +5654,73 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
                 ui.construction_ui.road_rows.push_back(std::move(pub));
             }
 
-            ImGui::EndChild();
-            ImGui::Spacing();
             ImGui::PopID();
         }
-        // BL-1255: rail track is the road ladder's state-industry rung. BL-1366:
-        // it is a GRID row even here, one line in the shared columns, so the
-        // ladder's three boxes are the only tall rows left on the surface.
-        draw_rail_rows(w, reg, ui, tile_id, row_h, rail_row::track);
+        if (road_grid)
+            construction_end_grid();
+        // BL-1255: rail track is the fold's state-industry row, which reads Railroad.
+        if (road_fold)
+        {
+            draw_rail_rows(w, reg, ui, tile_id, row_h, rail_row::track);
+            ImGui::TreePop();
+        }
+    }
+
+
+    // Hire (BL-324, moved onto the base by BL-325 S2) — the campaign roster
+    // gated on the player corp's OWN stockpile/market access (unit_roster.hpp),
+    // not this tile's deposit or placement rules; the tile now ALSO has to
+    // carry the corp's own completed military_base (S2: hire is no longer
+    // hire-anywhere). Beside Build rather than folded into it: hiring never
+    // touches building slots or terrain validity, so it does not belong in the
+    // candidate loop above.
+    {
+        bool has_muster_base = false;
+        for (const auto& [bid, bc] : w.buildings)
+        {
+            if (bc.tile == tile_id && bc.type == building_type::military_base
+                && bc.ticks_remaining <= 0 && !bc.decommissioned)
+            {
+                // BL-1406: the base must be the player ACTOR's (its nation's once
+                // folded) — `owner_holds` reads either owner's asset list.
+                if (owner_holds(w, player_actor(w), bid))
+                    has_muster_base = true;
+                break;
+            }
+        }
+        const auto& table = unit_roster_table();
+        auto avail = has_muster_base
+            ? available_rows(w, player_actor(w), campaign_roster_band_for(reg.era()))
+            : std::vector<const roster_row*>{};
+        // BL-1437: the tile card hides obsolete types as the Military ledger's Recruit
+        // does (MILITARY.md § Land — the classes).
+        avail.erase(std::remove_if(avail.begin(), avail.end(), [&](const roster_row* r) {
+                        return roster_row_obsolete(w, player_actor(w),
+                                                   static_cast<std::uint16_t>(r - table.data()));
+                    }),
+                    avail.end());
+        if (!avail.empty())
+        {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Hire");
+            ImGui::BeginChild("##hire_list", {0.0f, row_h * std::min<std::size_t>(avail.size(), 3)},
+                              false, ImGuiWindowFlags_NoSavedSettings);
+            for (const roster_row* row : avail)
+            {
+                const auto idx = static_cast<std::uint16_t>(row - table.data());
+                ImGui::PushID(static_cast<int>(idx));
+                ImGui::TextUnformatted(row->name);
+                ImGui::SameLine(bar_w - style.WindowPadding.x - 70.0f);
+                if (ImGui::Button("Hire", {60.0f, 0.0f}))
+                {
+                    ui.construction.pending_hire_tile      = tile_id;
+                    ui.construction.pending_hire_unit_type = idx;
+                    ui.military.raise_row = -1; // the answer is this card's, not a ledger row's
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+            ImGui::Spacing();
+        }
     }
 
     ImGui::EndChild();

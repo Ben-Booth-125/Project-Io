@@ -324,7 +324,10 @@ nav-rail construction surface stays a broad overview (`docs/ui/MENU.md`). The eq
 placement-mode canvas click enqueues the same request.
 
 **Two folds were re-cut (Ben, 2026-11-05).** **Power Generation** sits in **Infrastructure**. A **Road**
-fold holds **Track, Road, Highway and Railroad**, with smaller glyphs than the building rows.
+fold holds **Track, Road, Highway and Railroad**, with smaller glyphs than the building rows, in the
+same grid and at the same row height. **Railroad** is the rail track row, in Ben's word: *Track* is the
+first road tier, and the two share the fold. The **Railway Station** stays in Infrastructure. The door
+and the finder read one mapping (`construction_fold_of`), so they cannot file a building twice.
 
 Placeability is gated by `placement_rules::can_place`, and a type's cost is **budget *and*
 materials** (e.g. `100 cr · 20 Steel`, from the registry `build_cost` + `resource_build_cost`).
