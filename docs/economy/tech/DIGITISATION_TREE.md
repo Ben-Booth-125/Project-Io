@@ -173,7 +173,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 
 <!-- BEGIN GENERATED NODES (tools/session/tech_tree_store.js) -->
 
-**193 nodes** — 70 travel (7 joints, 9 masteries), 73 minor, 41 major, 9 quest; 12 placeholder nodes. Whole age: 1423 cost units.
+**194 nodes** — 70 travel (7 joints, 9 masteries), 74 minor, 41 major, 9 quest; 12 placeholder nodes. Whole age: 1427 cost units.
 
 ### Production — what the nation can extract and make
 
@@ -248,6 +248,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-EN-C` | Propellant Synthesis | major | 4 | propellant recipes +20% yield | Cryogenic Storage + Rocket-Fuel Chemistry |
 | `DG-PR-EN-M` | Energy Security | mastery | 4 | -3% fuel draw at every building | Civil Nuclear Power + Propellant Synthesis |
 | `DG-PR-EN-Q` | Propellant at Scale | quest | 4 | propellant output +15%. **Deed:** a propellant plant fully staffed for 8 quarters. **Keys next age:** In-Situ Propellant | Propellant Synthesis |
+| `DG-PR-EN-W` | Wind Power | minor | 2 | unlocks the Wind Turbine: land power with no fuel | Fuel Economy III |
 
 ### Network — how far and fast the nation moves goods and word
 

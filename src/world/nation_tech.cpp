@@ -778,6 +778,14 @@ bool structure_unlocked(const world& w, entity_id corp, building_type type)
     return !named;
 }
 
+std::vector<std::string> research_opened_recipes()
+{
+    std::vector<std::string> out;
+    for (const resolved_unlock& u : tables().recipe_unlocks)
+        out.emplace_back(u.recipe);
+    return out;
+}
+
 bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
                      std::uint16_t recipe_id)
 {

@@ -1147,7 +1147,42 @@ void rows_t2(const recipe_registry& reg)
         bool all_types = true;
         for (std::uint8_t ty = 0; ty < building_type_count; ++ty)
             all_types = all_types && structure_unlocked(f.w, f.corp2, static_cast<building_type>(ty));
-        check(open && all_types, "T2l no recipe or structure unlock is read: propellant and every building type open to every nation");
+        check(open && all_types, "T2l no node names propellant or a structure: propellant and every building type open to every nation");
+    }
+
+    // (e2) Wind Power (Ben, 2026-11-05): the one recipe a node opens. Closed to both
+    // nations, open to the holder alone once held, and the recipe takes no input.
+    {
+        fixture f = make_fixture();
+        const std::uint16_t wind = reg.recipe_id("wind_turbine");
+        const recipe* rc = reg.get_recipe(wind);
+        bool no_input = rc != nullptr && rc->outputs[static_cast<std::size_t>(resource_type::power)] > 0.0f;
+        if (rc != nullptr)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                no_input = no_input && rc->inputs[r] == 0.0f;
+        check(no_input, "T2w the wind turbine makes power from no input");
+        const bool closed = !recipe_unlocked(f.w, reg, f.corp, wind) && !recipe_unlocked(f.w, reg, f.corp2, wind);
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-PR-EN-W")));
+        check(closed && recipe_unlocked(f.w, reg, f.corp, wind) && !recipe_unlocked(f.w, reg, f.corp2, wind),
+              "T2x Wind Power opens the wind turbine to the nation that holds it, and to no other");
+        // The two lists differ by exactly what the tree opens: what the tree names is
+        // what recipes.lua authors, so the two cannot drift apart.
+        const int generation_n = reg.recipe_count(building_type::processing_facility);
+        const int play_n       = reg.play_recipe_count(building_type::processing_facility);
+        bool on_generation_list = false;
+        for (int i = 0; i < generation_n; ++i)
+            on_generation_list = on_generation_list
+                || reg.recipe_at(building_type::processing_facility, i).research_opened;
+        std::vector<std::string> flagged;
+        for (int i = 0; i < play_n; ++i)
+        {
+            const recipe& rc = reg.play_recipe_at(building_type::processing_facility, i);
+            if (rc.research_opened)
+                flagged.push_back(rc.name);
+        }
+        check(!on_generation_list && play_n == generation_n + static_cast<int>(flagged.size())
+                  && flagged == research_opened_recipes(),
+              "T2y the play list is generation's plus exactly the recipes the tree opens");
     }
 
     // (f) Rocketry gates launch: the space_dispatch mechanic.

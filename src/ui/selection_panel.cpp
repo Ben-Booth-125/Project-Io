@@ -639,18 +639,20 @@ std::vector<int> method_grid_candidates(const world& w, const recipe_registry& r
     // active recipe (no resolvable group, e.g. mid-construction) falls back to
     // every era-allowed recipe — the no-group fallback try_switch_recipe uses.
     const recipe* cur = reg.get_recipe(b.recipe);
-    const int total_n = reg.recipe_count(b.type);
+    const int total_n = reg.play_recipe_count(b.type);
     std::vector<int> candidates;
     candidates.reserve(static_cast<std::size_t>(std::max(total_n, 0)));
     for (int i = 0; i < total_n; ++i)
     {
-        const recipe& ri = reg.recipe_at(b.type, i);
+        const recipe& ri = reg.play_recipe_at(b.type, i);
         // The body's air (Ben, 2026-10-09; BL-593, "the door not showing what the
         // gate would refuse"): a route try_switch_recipe refuses as `wrong_air`
         // is never offered. The ACTIVE recipe is always listed, whatever it is.
         const bool is_active = (cur != nullptr && ri.name == cur->name);
         if ((cur == nullptr || ri.group == cur->group)
-            && (is_active || recipe_runs_at_tile(w, ri, b.tile)))
+            && (is_active
+                || (recipe_runs_at_tile(w, ri, b.tile)
+                    && recipe_unlocked(w, reg, player_actor(w), reg.recipe_id(ri.name))))) // same actor as the press
             candidates.push_back(i);
     }
     return candidates;
@@ -761,7 +763,7 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
 
     for (int idx : candidates)
     {
-        const recipe& ri     = reg.recipe_at(b.type, idx);
+        const recipe& ri     = reg.play_recipe_at(b.type, idx);
         const bool    active = (cur != nullptr && ri.name == cur->name);
         ImGui::PushID(idx);
 
@@ -4696,9 +4698,9 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
         cands.push_back({building_type::extraction_site, resource_type::water, "Well"});
     // One processing row per recipe (BL-429: its authored display_name, "Bloomery"
     // rather than "Processing: Iron Blooms"), each priced on its own economics.
-    for (int ri = 0; ri < reg.recipe_count(building_type::processing_facility); ++ri)
+    for (int ri = 0; ri < reg.play_recipe_count(building_type::processing_facility); ++ri)
     {
-        const recipe& browsed = reg.recipe_at(building_type::processing_facility, ri);
+        const recipe& browsed = reg.play_recipe_at(building_type::processing_facility, ri);
         cands.push_back({building_type::processing_facility, resource_type::iron_ore,
                          browsed.display_name,
                          reg.recipe_id(browsed.name)}); // browse -> ABSOLUTE, see candidate::recipe

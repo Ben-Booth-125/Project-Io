@@ -3066,7 +3066,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             own_tiles.erase(std::unique(own_tiles.begin(), own_tiles.end()), own_tiles.end());
             std::sort(tiles_with_processor.begin(), tiles_with_processor.end());
 
-            const int   n_recipes = reg.recipe_count(building_type::processing_facility);
+            const int   n_recipes = reg.play_recipe_count(building_type::processing_facility);
             const float wf        = 0.5f; // construct_building staffs at 0.5, as above
             const float batches   = pe.base_rate * wf;
 
@@ -3155,7 +3155,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 std::map<std::string, std::pair<uint16_t, float>> group_best;
                 for (int i = 0; i < n_recipes; ++i)
                 {
-                    const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+                    const recipe&  rc  = reg.play_recipe_at(building_type::processing_facility, i);
                     const uint16_t rid = reg.recipe_id(rc.name);
                     const recipe*  abs = reg.get_recipe(rid);
                     if (abs == nullptr)
@@ -3889,7 +3889,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 float cur_margin = 0.0f;
                 (void)recipe_margin_obtainable(w, reg, reach(), b.tile, b.recipe, sw_pool,
                                                sw_batches, bid, cur_margin);
-                const int   n          = reg.recipe_count(building_type::processing_facility);
+                const int   n          = reg.play_recipe_count(building_type::processing_facility);
                 uint16_t best_id = b.recipe;
                 float    best_m  = cur_margin;
                 for (int i = 0; i < n; ++i)
@@ -3904,10 +3904,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // neither this era's roster nor the whole registry: it could
                     // propose an out-of-band recipe and could never see one whose
                     // absolute id sits past the browse count.
-                    const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+                    const recipe&  rc  = reg.play_recipe_at(building_type::processing_facility, i);
                     const uint16_t rid = reg.recipe_id(rc.name);
                     if (reg.get_recipe(rid) == nullptr)
                         continue; // the name did not round-trip; never propose it
+                    if (!recipe_unlocked(w, reg, corp, rid))
+                        continue; // the retool door refuses it; never let it take the argmax
                     //
                     // (2) SCALE-BLINDNESS, the same defect as the build candidate
                     // (AI_OPPONENT.md § Selection must be scale-free) — but here it
