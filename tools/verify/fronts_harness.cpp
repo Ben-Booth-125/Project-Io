@@ -1245,11 +1245,10 @@ int main()
               "F11a a bare hostility takes no ground: the unit stands on B's tile, nothing occupied");
         // At war the push occupies and goes on, past the first tile.
         f.w.wars[{ f.A, f.B }] = [&] { war_record r; r.declarer = f.A; r.defender = f.B; r.declarer_goals = { f.block(1) }; return r; }();
+        // The real sequence: the unit is ALREADY on B's ground when the war opens. No hand
+        // on its position: the next day's push must take it on from where it stands.
         const entity_id stood_on = f.w.units.at(u).position;
-        f.w.units.at(u).position = f.at(5, 2); // back over the line: the march must make the entry
-        f.w.units.at(u).order = movement_order{};
-        reanchor_fronts(f.w);
-        (void)cmd_order(f.w, reg, f.A, nation_fronts(f.w, f.A).front().key, 1);
+        (void)declare_hostile(f.w, f.B, f.A);
         step(f.w, reg, 30);
         check(!f.w.tile_occupier.empty(), "F11b at war, the push occupies the tiles it enters");
         check(owner(f.w, f.w.units.at(u).position) == f.B && f.w.tile_controller(f.w.units.at(u).position) == f.A,
