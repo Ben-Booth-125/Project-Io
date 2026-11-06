@@ -810,20 +810,28 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                     ia = i;
             }
             std::size_t jb = stations.size();
-            if (ia < stations.size() && !(have && !(to(ia).per_unit + rfees < best)))
-                for (std::size_t j = 0; j < stations.size(); ++j)
-                {
-                    if (j == ia || steps[ia][j] < 0)
-                        continue;
-                    const end_leg& on = from(j);
-                    if (on.ok && (jb == stations.size() || on.per_unit < from(jb).per_unit))
-                        jb = j;
-                }
-            // BL-1505: a line over a warring front is no candidate; track cannot detour.
-            if (jb < stations.size() && party != null_entity
-                && lane_crosses_warring_front(
-                       w, party, rail_leg_path(w, body, stations[ia], stations[jb], /*respect_cuts=*/true).tiles))
+            // BL-1505: a line over a warring front is no candidate; track cannot detour. The
+            // next egress is tried, cheapest first, ties to the lower station tile.
+            std::vector<char> over_front(stations.size(), 0);
+            for (;;)
+            {
                 jb = stations.size();
+                if (ia < stations.size() && !(have && !(to(ia).per_unit + rfees < best)))
+                    for (std::size_t j = 0; j < stations.size(); ++j)
+                    {
+                        if (j == ia || steps[ia][j] < 0 || over_front[j])
+                            continue;
+                        const end_leg& on = from(j);
+                        if (on.ok && (jb == stations.size() || on.per_unit < from(jb).per_unit))
+                            jb = j;
+                    }
+                if (jb == stations.size() || party == null_entity
+                    || !lane_crosses_warring_front(
+                           w, party,
+                           rail_leg_path(w, body, stations[ia], stations[jb], /*respect_cuts=*/true).tiles))
+                    break;
+                over_front[jb] = 1;
+            }
             if (jb < stations.size())
             {
                 const end_leg& in = to(ia);
