@@ -60,7 +60,7 @@ verify.capture("lens_chrome_resource_reclosed")
 -- is baked and every visible chunk uploaded — so the structures, settlements,
 -- forms and rivers under the wash are in the picture. Plain first, for the eye to
 -- compare against. Captures: lens_wash_<lens>_r<k>.
-local kMinZoom = 1.2531328  -- body_surface_canvas.cpp kMinZoom
+local kMinZoom = 1.06875  -- body_surface_canvas.cpp kMinZoom
 local function poll(pred, limit)
     for i = 1, limit or 20000 do
         verify.frames(1)

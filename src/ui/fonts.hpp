@@ -22,9 +22,11 @@ namespace ui {
 /// before the first frame; the renderer backend uploads the atlas texture on
 /// the next NewFrame.
 ///
-/// @param size_px Font size in pixels.
+/// @param size_px Font size in UI pixels: what layout measures.
+/// @param density Rasterisation density: the UI draw scale (app.hpp, BL-1495), so a
+///                glyph is rasterised at the size it lands on screen.
 /// @return        The loaded font (also set as ImGui's default font).
-ImFont* load_ui_font(float size_px = 16.0f);
+ImFont* load_ui_font(float size_px = 16.0f, float density = 1.0f);
 
 /// Re-load the UI font atlas at a new @p size_px (BL-063 discrete UI-scale
 /// steps — 1.0 / 1.25 / 1.5 — re-render crisper than ImGui's FontGlobalScale).
@@ -32,8 +34,9 @@ ImFont* load_ui_font(float size_px = 16.0f);
 /// responsible for destroying the renderer backend's fonts texture afterwards
 /// so it is rebuilt from the new atlas on the next frame.
 ///
-/// @param size_px Font size in pixels.
+/// @param size_px Font size in UI pixels.
+/// @param density Rasterisation density (see load_ui_font).
 /// @return        The loaded font.
-ImFont* reload_ui_font(float size_px);
+ImFont* reload_ui_font(float size_px, float density = 1.0f);
 
 } // namespace ui

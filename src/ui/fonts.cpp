@@ -7,13 +7,18 @@
 
 namespace ui {
 
-ImFont* load_ui_font(float size_px)
+ImFont* load_ui_font(float size_px, float density)
 {
     ImGuiIO& io = ImGui::GetIO();
 
     ImFontConfig cfg;
     cfg.OversampleH = 3;     // horizontal sub-pixel sampling — removes the label shimmer
-    cfg.OversampleV = 1;
+    // Under a draw scale below 1 a line lands on a fractional screen row, so sample the
+    // height too. At 1 the atlas stays exactly what every capture was taken with.
+    cfg.OversampleV = density < 1.0f ? 2 : 1;
+    // BL-1495: glyphs rasterised at the size they land on screen, metrics unchanged,
+    // so a UI drawn smaller stays sharp rather than minifying a larger atlas.
+    cfg.RasterizerDensity = density;
     cfg.PixelSnapH  = false; // allow fractional horizontal placement so motion stays fluid
 
     // Glyph range (BL-234). Without this ImGui builds its default atlas — Basic
@@ -86,11 +91,11 @@ ImFont* load_ui_font(float size_px)
     return io.Fonts->AddFontDefault(&cfg);
 }
 
-ImFont* reload_ui_font(float size_px)
+ImFont* reload_ui_font(float size_px, float density)
 {
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
-    return load_ui_font(size_px);
+    return load_ui_font(size_px, density);
 }
 
 } // namespace ui

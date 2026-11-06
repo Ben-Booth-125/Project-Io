@@ -55,7 +55,14 @@ Goods and Trades tabs**, and splits left and right:
   Values, not quantities, because a ton of ore and a ton of electronics do not add.
 
 **Goods carries shelf stock and sorts (Ben, 2026-11-05).** Each row shows the good's stock on this
-market's shelf, and the table sorts by every heading.
+market's shelf, and the table sorts by every heading: **Good** by name, **Shelf**, **Price** and
+**v.Base** by their figures, and **8 qtr** by the good's change across the graph's window, last sample
+over first. A press sorts a number high to low first, because the top of the list is the question;
+the next press flips it and the third takes the sort off, back to the roster order the table rests in
+(the toggle rule, on a control whose active state is the arrow). Ties keep roster order, so equal rows
+never swap. The headings stay frozen while the rows scroll, so a sort is one press from anywhere in
+the list. Every column is sized from the live font: the wider of its heading and its widest figure,
+the sort arrow reserved only on the sorted column, and the name takes what is left.
 
 **Default on open:** **Goods**.
 **Cross-cutting selectors (NOT views, toggle-exempt):** the **Body** combo and the **Market**
@@ -68,17 +75,18 @@ stay legible. The graph shrinks with the row; the shared `price / base_price` ax
 
 **`body_average_price` does not survive, and the expectation was wrong.** The column was
 nominated first-to-drop *if* the row would not fit, on the reasoning that the pressure at 384 px
-would be on the graph's width rather than the column count. Measured at 1920x1080 over the real
-45-good roster (`scripts/verify/goods_table.lua` prints both layouts on every run):
+would be on the graph's width rather than the column count. Measured with the Shelf column in the row,
+over the real 54-good roster at 16 px type (`scripts/verify/goods_table.lua` prints both layouts on
+every run):
 
 | Layout | Name column | Names that fit |
 |---|---|---|
-| **with** body average | 42 px | **13 of 45** |
-| **without** body average | 98 px | **36 of 45** |
+| **with** body average | 18 px | **0 of 54** |
+| **without** body average | 72 px | **33 of 54** |
 
-So the column count was the pressure after all — the graph is only ~3.4 em, and dropping one
-text column more than doubles the name width. At 42 px `Iron Ore` and `Iron-Nickel Ore` both
-elide to `Iron ...`, which defeats the one thing a price board is for. It is kept as a one-line
+So the column count was the pressure after all — the graph is only ~2.6 em, and dropping one
+text column quadruples the name width. At 18 px no name survives, and elided names like `Agricultur...`
+that remain at 72 px are carried by the row's own glyph, which is what makes that width livable. It is kept as a one-line
 dial (`ui_state::market_goods_show_body`) rather than deleted, so the call is cheap to revisit.
 
 ## 2b. Trades — five sections, and why they are five
@@ -116,6 +124,14 @@ consider. The order is the pass's own — margin per trade point (per-unit margi
 capacity). The read is cached against the econ tick, the player's asset count and the seat, because
 pricing runs an A\* on a cache miss.
 
+**Offers come only from a market the acting nation can supply (Ben, 2026-11-05).** The gate is the
+nation's trade points at this market (`market_trade_points`) above zero; the nation-wide sum cannot
+gate, because a trade spends the points of the market it leaves. It sits in this surface and not in
+`rank_trade_routes`, which the trade pass and the AI scorer share, and it agrees with what
+`trade_is_valid` asks of a trade's source, so a `+` is never an offer the verb refuses. Shut, the
+section says so in its own line, naming what would open it, because a shut gate and an empty list
+are different answers.
+
 **The `+` fills the form; it does not trade.** A ranked row becomes a trade only when the player
 sets its points and presses Add — points auto would otherwise spend — so the ranking stays one
 input among several (`CONCEPT.md` § Player identity).
@@ -131,9 +147,9 @@ names the side that varies (`to Corix`, `from Marur`) and the hover labels both.
 **No item glyph on these tables, unlike the Goods board — measured.** With the glyph reserved,
 five columns left the Good and Holder names ~77 px and ~64 px, drawing `Petrol...` and `Far...`:
 two goods or two firms sharing a prefix become one string, which is the defect the Goods table's
-name column was rebuilt to fix. The glyph is a deliberate placeholder (`ICONS.md` § 2b), and
-reserving width for artwork that does not exist yet at the cost of names that do is the wrong
-trade at this width. The good keeps its identity **colour** on its name.
+name column was rebuilt to fix. A glyph does not earn that cost here, where the Goods
+board has the room and the name column is the only thing telling two rows apart. The good keeps its
+identity **colour** on its name.
 
 **Each long section is bounded and scrolls inside itself.** Measured on the shipped fixture: the
 book runs to 24 rows and the exchange read to 120, so laid out end to end the first fills the

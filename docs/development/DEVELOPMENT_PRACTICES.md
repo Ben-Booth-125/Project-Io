@@ -775,6 +775,9 @@ merely stated: `SDL_SetWindowMinimumSize(1280·s, 720·s)` on window creation an
 The floor scales with UI scale because BL-063 grows the font without scaling the px chrome — at
 1.5x the same layout honestly needs 1920×1080. The persisted-settings floor clamps to 1280×720;
 the automated overflow check (`scripts/verify/text_overflow_floor.lua`) runs at 1280×720 @ 1.0x.
+The harness draws at a UI draw scale of 1, the tightest layout, while the interactive path draws at
+the shipped constant (`docs/ui/LAYOUT.md` § UI scale); `scripts/verify/ui_scale_down.lua` runs the same
+walk at that constant.
 
 - The window opens at **1280×720** (`window_w`/`window_h` in `src/core/app.cpp`,
   `SDL_WINDOW_RESIZABLE`) and persists its size to **`options.cfg`** in the run directory

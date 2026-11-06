@@ -5,8 +5,8 @@
 --
 -- Run: ProjectIo --verify scripts/verify/header.lua
 -- Inspect: screenshots/header*.png — the strip should read
---   BALANCE <Cr ...>  |  STOCKPILE <Cr ...>  |  NET <±.../qtr> <sparkline>
--- with the balance coloured (red if negative) and the net coloured by direction.
+--   TREASURY <Cr ...> (<±.../qtr>)  |  CARGO <Cr ...>  |  RUNWAY  12q
+-- with the net coloured by direction; the graph is the money figures' tooltip.
 
 -- Land on the home planet so the player's producing assets are in scope.
 verify.goto_surface("home")
@@ -46,3 +46,20 @@ end
 
 -- Textual confirmation of the underlying figures the header summarises.
 verify.dump_economy()
+
+-- BL-1512: hovering a money figure shows the shared tooltip with the graph. The figures
+-- start at the header's left edge, past the shell column; the treasury is first.
+verify.window(1280, 720)
+verify.econ_step(2)
+verify.capture("header_frame")
+local tip_seen = false
+for x = 300, 760, 12 do
+    verify.hover(x, 46, 2)
+    verify.capture("header_frame")
+    if verify.header_recruits().money_tip then
+        tip_seen = true
+        verify.capture("header_money_tooltip")
+        break
+    end
+end
+print(tip_seen and "header: PASS a money figure's tooltip shows the graph" or "header: FAIL no money tooltip")

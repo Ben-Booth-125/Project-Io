@@ -54,6 +54,7 @@ enum class trade_refusal : std::uint8_t
     no_lane,     ///< Another body, and no leg off this one is viable.
     gate,        ///< The destination's price does not clear the margin over the source's.
     no_route,    ///< Same body, and no viable leg reaches it.
+    front_closed, ///< BL-1505: same body, and every leg crosses a front the shipper is at war across.
     costly,      ///< Routed, but the haul eats the margin.
     no_propellant, ///< A space lane, but the pool cannot fuel the launch.
     no_room,     ///< Clears the margin, but cannot absorb more at the landed cost.
@@ -874,6 +875,16 @@ struct world
     std::map<std::tuple<entity_id, entity_id, std::uint8_t>, logistics_flood_field> leg_flood_fields;
     std::map<std::tuple<entity_id, entity_id, entity_id, std::uint8_t>, logistics_path> leg_path_cache;
 
+    /// BL-1505 (SUPPLY.md § A lane does not cross a warring front): the lanes a nation at
+    /// war may fly, keyed (party, body, src, dst, kind), and the closed floods behind the
+    /// detours, keyed (party, body, anchor, kind). Derived caches, on the logistics caches'
+    /// contract, and also stale when a front or a war moves (the two stamps below).
+    /// Pure functions of the tiles, the fronts and the wars; never saved, never hashed.
+    std::map<std::tuple<entity_id, entity_id, entity_id, entity_id, std::uint8_t>, logistics_path> lane_path_cache;
+    std::map<std::tuple<entity_id, entity_id, entity_id, std::uint8_t>, logistics_flood_field> lane_flood_fields;
+    std::uint64_t lane_cache_territory = 0;
+    std::vector<std::pair<entity_id, entity_id>> lane_cache_wars;
+
     /// BL-1186: per body, the tiles carrying a BUILT, ACTIVE Port, ascending and unique —
     /// the candidate ends of a sea leg. Derived; cleared with the logistics caches, whose
     /// contract already covers a port completing, idling or being demolished
@@ -957,6 +968,30 @@ struct world
         tile_to_nation[tile] = nation;
         ++catchment_generation;
         ++territory_generation; // BL-1427: the front cache reads it
+    }
+
+    /// BL-1502 (MILITARY.md § Occupation; Ben, 2026-11-05): who occupies each tile, by
+    /// tile, ascending. Only tiles an enemy holds appear. Legal ownership stays in
+    /// `tile_to_nation`; a front derives from owner OR occupier. Every entry names an
+    /// occupier at war with the tile's owner (`occupy_on_entry`, `clear_occupation_at_peace`;
+    /// the snapshot reader refuses anything else). Saved (v78), hashed when non-empty.
+    std::map<entity_id, entity_id> tile_occupier;
+
+    /// The tile's occupier, else its owner, else null_entity: the map a front reads.
+    /// Anything asking who OWNS a tile still reads `tile_to_nation`.
+    entity_id tile_controller(entity_id tile) const
+    {
+        if (!tile_occupier.empty())
+            if (const auto it = tile_occupier.find(tile); it != tile_occupier.end())
+                return it->second;
+        const auto it = tile_to_nation.find(tile);
+        return it != tile_to_nation.end() ? it->second : null_entity;
+    }
+
+    /// Is this tile held against its owner? Its output is denied (MILITARY.md § Occupation).
+    bool tile_occupied(entity_id tile) const
+    {
+        return !tile_occupier.empty() && tile_occupier.find(tile) != tile_occupier.end();
     }
 
     /// Per-body NEAREST LOGISTIC POINT ANCHOR (BL-1117) — see lp_anchor_field. A

@@ -825,6 +825,8 @@ destination got through those rules, best last:
 - **price gate** — the destination does not pay the margin over the source. The dispatcher
   tests this before it prices a route.
 - **no route** — no road or sea leg reaches it.
+- **front closed** — a route exists, but every way there crosses a front of a war the player is in
+  (`../economy/SUPPLY.md`).
 - **costly** — routed, but the haul eats the margin.
 - **no propellant** — a space lane, but the pool cannot fuel the launch.
 - **no room** — the destination cannot absorb more at the landed price.

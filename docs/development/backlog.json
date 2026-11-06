@@ -979,7 +979,7 @@
    "design": "Ben, 2026-11-05: \"warnings on tooltip for construction when a building's supply has only a few quarters left on that market's stockpile\". READING, to confirm: a building's supply means its recipe inputs at the tile's market. For each input: shelf (market inventory) over the quarterly use this building would add, plus that market's net drain where it is already falling. Under the threshold, the Build door row's tooltip (selection_panel.cpp near :4818) names the good and the quarters left; the site ledger's row carries the same reading from one shared helper. OPEN: the threshold (4 quarters as the default until Ben reads it live), and whether construction materials count too. It serves the search reward in PRODUCTION § What construction costs at the opening: it shows a site that looks profitable today but will starve. The word on screen is shelf (GLOSSARY). UI only. Check: live click, question log."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -995,13 +995,14 @@
    "short_name": "QUOTE_OBTAINABLE",
    "authority_doc": "docs/economy/PRODUCTION.md",
    "files": [
-    "src/world/building_profit.cpp",
+    "src/world/site_quote.hpp",
+    "src/world/site_quote.cpp",
     "src/ui/selection_panel.cpp",
     "src/ui/construction_sites.cpp",
     "tools/verify/build_payback_census.cpp"
    ],
    "title": "The door and the site finder quote what a plant can actually run on",
-   "design": "Found by BL-1496 (build payback census). The door and the finder pass nullptr for input_unit_cost, pricing inputs at the posted price with a full run, so the top rows are goods whose inputs are not there: alloys quoted 4,669 earned 615, electronics 2,332 earned -6. A player trusting the finder is burned, and Ben's ruling rests the whole search reward on these sites (he kept the finder open). The rival scorer already prices through input_reach (BL-1187); the player's quote should use the same obtainable cost plus an expected run from the shelf. That should also open the spread processing lacks (1.1x today), since obtainable cost varies by site: measure it. This is a figure, not a rule, so no sim digest moves if the scorer's call stays byte-identical. Check: census ACTUAL rows, quoted within about 2x of earned on the mirage rows; best-over-median spread for processing reported; live click. Pairs with SHELF_RUNWAY_WARNING."
+   "design": "Found by BL-1496 (build payback census). The door and the finder pass nullptr for input_unit_cost, pricing inputs at the posted price with a full run, so the top rows are goods whose inputs are not there: alloys quoted 4,669 earned 615, electronics 2,332 earned -6. A player trusting the finder is burned, and Ben's ruling rests the whole search reward on these sites (he kept the finder open). The rival scorer already prices through input_reach (BL-1187); the player's quote should use the same obtainable cost plus an expected run from the shelf. That should also open the spread processing lacks (1.1x today), since obtainable cost varies by site: measure it. This is a figure, not a rule, so no sim digest moves if the scorer's call stays byte-identical. Check: census ACTUAL rows, quoted within about 2x of earned on the mirage rows; best-over-median spread for processing reported; live click. Pairs with SHELF_RUNWAY_WARNING. READING 2026-11-06, 16 library seeds, 40 quarters, holdout of 549 processors quoted when ordered and read a year after standing: median |quote - earned| 46.6 old, 24.8 new; right about whether it pays 80% old, 87% new; called idle 58, of which 7 ran above half; extractors steel-free timber 59.5 old, 9.6 new, earned 4.7. Rejected on the same holdout: the scorer's spare-supply test (131 called idle, 95 ran). KNOWN MISS: consumer goods median earned -4.2, quoted 378 (was 4,629), run 0 with inputs apparently available: not explained by the shelf or the bid. The Method lever at selection_panel.cpp:793 still prices at posted."
   },
   {
    "status": "proposed",

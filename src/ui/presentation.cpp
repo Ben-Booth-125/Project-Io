@@ -394,6 +394,20 @@ const char* extraction_building_name(resource_type r)
 
 namespace palette {
 
+ImU32 readable_on_chrome(ImU32 colour)
+{
+    constexpr float k_min_luma = 118.0f;
+    const float cr = static_cast<float>((colour >> IM_COL32_R_SHIFT) & 0xFF);
+    const float cg = static_cast<float>((colour >> IM_COL32_G_SHIFT) & 0xFF);
+    const float cb = static_cast<float>((colour >> IM_COL32_B_SHIFT) & 0xFF);
+    const float luma = 0.299f * cr + 0.587f * cg + 0.114f * cb;
+    if (luma >= k_min_luma)
+        return colour;
+    const float t = (k_min_luma - luma) / (255.0f - luma);
+    const auto  mix = [t](float v) { return static_cast<int>(v + (255.0f - v) * t); };
+    return IM_COL32(mix(cr), mix(cg), mix(cb), (colour >> IM_COL32_A_SHIFT) & 0xFF);
+}
+
 ImU32 corp_colour(int slot)
 {
     const int s = ((slot % corp_slot_count) + corp_slot_count) % corp_slot_count;

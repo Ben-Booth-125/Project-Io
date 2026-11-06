@@ -702,19 +702,44 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// world whose rows name no contributor and no seeded war; so is every older version the
 /// reader already accepted.
 ///
-/// Bumped to 78 (BL-1539, research in the return; FINANCE.md § The quarterly return): one
-/// new section after the provenance. After a u32 count, every nation with an unbooked
-/// debit or a return that booked research, ascending id, as (id, f64 research_unbooked,
-/// f64 upkeep_unbooked, u32 n = its return count, n x f32 research in filed order). All
-/// finite and never negative. v77 is a STRICT PREFIX of v78 and is read too
-/// (`k_world_save_version_pre_research_books`), as a world whose returns booked none.
-inline constexpr uint32_t world_save_version = 78;
+/// **78 (BL-1502, MILITARY.md § Occupation) — THE OCCUPATION LAYER.** Appended last: after
+/// a u32 count, every occupied tile ascending as (tile, occupier). Each names a tile with
+/// an owner, a nation of the stream that is not that owner, with an open war between the
+/// two; refused whole otherwise. v77 is a STRICT PREFIX of v78 and is read too
+/// (`k_world_save_version_pre_occupation`), as a world with no occupied tile.
+///
+/// **79 (BL-1504, MILITARY.md § Defend province) — THE DEFEND ORDERS.** Appended last: after
+/// a u32 count, every defending unit ascending id as (unit, u32 province, post tile). Each
+/// names a unit of the stream, a province of the stream and a tile of it. Refused whole
+/// otherwise. v78 is a STRICT PREFIX of v79 and is read too, as no unit defending.
+///
+/// **80 (BL-1539, FINANCE.md § The quarterly return) — THE RESEARCH BOOKS.** Appended last:
+/// after a u32 count, every nation with an unbooked debit or a return that booked research,
+/// ascending id, as (id, f64 research_unbooked, f64 upkeep_unbooked, u32 n = its return
+/// count, n x f32 research in filed order). All finite and never negative. v79 is a STRICT
+/// PREFIX of v80 and is read too (`k_world_save_version_pre_research_books`), as a world
+/// whose returns booked none. Below v80 a building site's `days_remaining` is on the old
+/// build days, so the reader rescales it (`rescale_site_days_to_research_books`).
+inline constexpr uint32_t world_save_version = 80;
 
 /// BL-1539: the first version carrying the research-books section (see above).
-inline constexpr uint32_t k_world_save_version_research_books = 78;
+inline constexpr uint32_t k_world_save_version_research_books = 80;
 
-/// BL-1539: v77, a strict prefix of v78 (the research-books section is v78's only addition).
-inline constexpr uint32_t k_world_save_version_pre_research_books = 77;
+/// BL-1539: the version before it, a strict prefix of it.
+inline constexpr uint32_t k_world_save_version_pre_research_books =
+    k_world_save_version_research_books - 1;
+
+/// BL-1504: the first version carrying the defend-order section.
+inline constexpr uint32_t k_world_save_version_defend = 79;
+
+/// BL-1504: v78, a strict prefix of v79.
+inline constexpr uint32_t k_world_save_version_pre_defend = 78;
+
+/// BL-1502: the first version carrying the occupation section (see above).
+inline constexpr uint32_t k_world_save_version_occupation = 78;
+
+/// BL-1502: v77, a strict prefix of v78.
+inline constexpr uint32_t k_world_save_version_pre_occupation = 77;
 
 /// BL-1470: the first version carrying the sentiment-provenance section (see above).
 inline constexpr uint32_t k_world_save_version_contributors = 77;
@@ -912,8 +937,14 @@ std::size_t world_save_refusals_section_bytes(const world& w);
 /// The LAST section of a v77 stream.
 std::size_t world_save_contributors_section_bytes(const world& w);
 
-/// BL-1539: the byte length of the v78 research-books section `w` writes - 4, plus 24 +
-/// 4 per return for each nation it lists. The LAST section of a v78 stream.
+/// BL-1502: the bytes v78's occupation section takes for @p w: the count and 8 per tile.
+std::size_t world_save_occupation_section_bytes(const world& w);
+
+/// BL-1504: the bytes v79's defend-order section takes for @p w: the count and 12 a unit.
+std::size_t world_save_defend_section_bytes(const world& w);
+
+/// BL-1539: the byte length of the v80 research-books section `w` writes - 4, plus 24 +
+/// 4 per return for each nation it lists. The LAST section of a v80 stream.
 std::size_t world_save_research_books_section_bytes(const world& w);
 
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
@@ -1036,7 +1067,13 @@ void write_world_snapshot_pre_airframes(const world& w, std::ostream& out);
 /// VERIFICATION ONLY (BL-1470): the v76 stream shape - no sentiment-provenance section.
 void write_world_snapshot_pre_contributors(const world& w, std::ostream& out);
 
-/// VERIFICATION ONLY (BL-1539): the v77 stream shape - no research-books section.
+/// VERIFICATION ONLY (BL-1502): the v77 stream shape, no occupation section.
+void write_world_snapshot_pre_occupation(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1504): the v78 stream shape, no defend-order section.
+void write_world_snapshot_pre_defend(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1539): the v79 stream shape - no research-books section.
 void write_world_snapshot_pre_research_books(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to

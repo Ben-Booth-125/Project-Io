@@ -59,7 +59,7 @@ The selector lists hostile nations first, then by Alarm toward you, highest firs
 
 ### The declaration (RELATIONS § 7)
 
-Pressing Declare war turns the expanded row into the declaration, in place:
+Pressing Declare war turns the chosen nation's detail into the declaration, in place:
 
 - **Goals.** The canvas marks the target's provinces, every one a possible goal, its capital
   included (Ben, 2026-10-30). Clicking one toggles it, to at most three.
@@ -89,7 +89,11 @@ centred bar, each side's exhaustion, and days since it opened. Every war is publ
 
 **Nations (Ben, 2026-11-05).** Opening the ledger's Nations view arms the Nations lens, and closing it
 disarms the lens. A press on a nation with the lens active navigates this ledger to that nation,
-opening it if it is closed (`../LENSES.md` § The Nations lens). The Wars view stays as it is. During
+opening it if it is closed (`../LENSES.md` § The Nations lens). The Wars view stays as it is, so
+leaving Nations for Wars disarms the lens too. The lens paints only on the Planetary canvas: opened on
+Solar or Circumplanetary it stays armed and paints when the player descends, and a press there navigates
+nothing. A press on the player's own nation selects it and moves nothing here, since the selector holds
+only other nations; an open declaration keeps the ledger where it is. During
 the declaration only, the canvas marks the provinces that may be goals,
 and the ones chosen. That is a mode of the declaration flow, as the placement lens is of the build
 flow, not an `overlay_mode`.
@@ -111,7 +115,7 @@ flow, not an `overlay_mode`.
 ## 5. Toggle / close semantics
 
 Standard: the rail icon toggles the ledger; re-clicking the active tab closes it; switching tabs is
-a view change. A row's expander is a toggle. **Declare, Offer peace, Accept and Refuse are presses**:
+a view change. The nation selector is a cross-cutting selector, exempt from the toggle rule. **Declare, Offer peace, Accept and Refuse are presses**:
 they have no active state. **Embargo / Lift is a toggle** — its state is visible, and pressing it
 while active lifts it. Cancel or Escape closes the declaration without effect.
 

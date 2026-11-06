@@ -901,6 +901,9 @@ research_buildings count_research_buildings(const world& w)
             // Ben, 2026-10-10), so a completed one counts unless unstaffed.
             if (b.ticks_remaining > 0 || b.decommissioned || !(b.workforce_assigned > 0.0f))
                 continue;
+            // MILITARY.md § Occupation: an occupied tile's output is denied to its owner.
+            if (w.tile_occupied(b.tile))
+                continue;
             if (b.type == building_type::university)
             {
                 if (const auto tn = w.tile_to_nation.find(b.tile); tn != w.tile_to_nation.end())

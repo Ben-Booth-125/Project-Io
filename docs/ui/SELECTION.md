@@ -314,7 +314,7 @@ panel; `draw_construction_ledger`): a fold-out-column list of every building typ
 on the selected tile, folded by family (Extraction / Processing / Infrastructure / Military —
 Ben rejected a profit-ranked flat list) — each row its type glyph (`icons::building`), full
 cost (budget + materials), a reason-coded validity read (e.g. *"A port must sit on the
-coast"*), an **expected-profit** bar (`estimate_prospective_profit`, one ceiling shared across
+coast"*), an **expected-profit** bar (`quote_site`, `ledgers/construction.md` § What the quote asks, one ceiling shared across
 the list so the bars compare directly), and a **Build** action that enqueues the construction
 on the tile (the `construction.pending_tile` seam `app::render` executes). A processing row
 stands for its group, showing the best-expected-profit recipe (PRODUCTION.md § Sub-facility

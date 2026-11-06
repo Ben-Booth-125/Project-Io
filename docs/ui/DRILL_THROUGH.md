@@ -138,8 +138,9 @@ those codepoints are in the font atlas, and a string literal renders `?`. `draw_
 `draw_open_arrow` in `src/ui/detail_level.cpp` build them through `ImDrawList`. Do not
 introduce them as string literals.
 
-**Esc** closes the takeover, one rung **below** the subject drills: exit-confirm → system
-menu → pop `corp_rollup_drill` → **close the takeover** → open menu. A
+**Esc** closes the takeover, one rung **below** the subject drills: exit warning → escape
+menu → pop `corp_rollup_drill` → **close the takeover** → the ladder's rest
+(`SELECTION.md` § Layout & chrome). A
 single press never both unwinds a drill and closes the view hosting it. Esc **does not**
 collapse in-place expansions: that is a reading preference, the kind of state Esc has never
 collapsed, and putting it on the ladder would make Esc unpredictable (sometimes leaving a

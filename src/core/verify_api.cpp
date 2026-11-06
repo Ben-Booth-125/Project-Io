@@ -31,6 +31,7 @@
 #include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
 #include "ui/selection_panel.hpp"
 #include "ui/stat_grid.hpp"      // BL-1454: verify.stat_grids, the grids on screen
+#include "ui/alerts.hpp"        // BL-1515: verify.alerts
 #include "ui/header_panel.hpp"   // BL-1472: verify.header_recruits, the header's readouts
 #include "ui/corporation_dashboard.hpp"
 // BL-1406: ui/corporation_panel.hpp retired with the corporation stance table.
@@ -61,6 +62,7 @@
 #include "world/state_industry.hpp" // BL-1255: state_uncommitted_treasury (rail_state)
 #include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
+#include "world/trade.hpp"           // BL-1516: market_trade_points, corp_trade_markets - the gate check
 #include "world/placement_rules.hpp"
 #include "world/road_generation.hpp" // BL-1347: lay_site_roads, after this path's own stamper
 #include "world/river_generation.hpp" // BL-1375: hex_side_for_offset - the link-bit audit's own mapping
@@ -3114,6 +3116,21 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["wars"]           = static_cast<int>(m_world.wars.size());
         out["message"]        = d.message;
         out["peace_with"]     = static_cast<unsigned>(d.peace_with);
+        // BL-1511: the selector as drawn, and its open list's items.
+        out["combo_x"] = d.combo_x;
+        out["combo_y"] = d.combo_y;
+        {
+            sol::table items = st.create_table();
+            int ci = 0;
+            for (const auto& it : d.combo_items)
+            {
+                sol::table e = st.create_table();
+                e["nation"] = static_cast<unsigned>(it.nation);
+                e["x"] = it.x; e["y"] = it.y;
+                items[++ci] = e;
+            }
+            out["combo_items"] = items;
+        }
         sol::table rows = st.create_table();
         int k = 0;
         for (const auto& r : d.rows)
@@ -3278,6 +3295,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["fit"]   = r.fit;
         out["runway"] = r.runway; out["room"] = r.room; out["money_used"] = r.money_used;
         out["runway_full"] = r.runway_full; out["runway_value"] = r.runway_value;
+        out["money_tip"] = r.money_tip_frame >= 0 && r.money_tip_frame == r.frame; // BL-1512
         static const char* const k_theatres[3] = {"land", "air", "sea"};
         for (int t = 0; t < 3; ++t)
         {
@@ -3593,8 +3611,77 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // Process-global, never saved; the script turns it back off. Verify-only.
     v.set_function("waive_kit_research", [](bool on) { set_kit_research_waived_for_harness(on); });
 
+    // BL-1519: the escape menu as drawn. Each press's centre, for verify.click; the
+    // clock's speed under it; whether the menu and its exit warning are up. x = -1 on
+    // a press not drawn this frame. All of it is on screen.
+    v.set_function("escape_menu", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        out["open"]    = m_ui.show_system_menu;
+        out["warning"] = m_ui.confirm_exit_pending;
+        out["speed"]   = m_sim_loop.speed();
+        out["options_open"] = m_show_options;
+        static const char* const k_names[ui_state::esc_press_count] = {
+            "save", "options", "exit_menu", "exit_game", "warn_confirm", "warn_cancel", "gear", "main_load"};
+        for (int i = 0; i < ui_state::esc_press_count; ++i)
+        {
+            sol::table p = st.create_table();
+            p["x"] = m_ui.escape_drawn[i].x;
+            p["y"] = m_ui.escape_drawn[i].y;
+            out[k_names[i]] = p;
+        }
+        return out;
+    });
+    // BL-1495: draw this run at a UI scale. No argument: the shipped constant, so a
+    // check never restates the number. Verify otherwise runs at 1, the tightest layout.
+    v.set_function("ui_draw_scale", [this](sol::optional<float> s) {
+        m_ui_draw_scale = s.value_or(shipped_ui_draw_scale());
+        apply_ui_scale();
+    });
+
+    // BL-1515: the alert strip as drawn: each alert's words and press. All on screen.
+    v.set_function("alerts", [this](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 0;
+        for (const ui::alert_drawn& a : ui::alerts_drawn())
+        {
+            sol::table row = lua.create_table();
+            row["kind"] = static_cast<int>(a.kind);
+            row["text"] = a.text;
+            row["x"] = a.x;
+            row["y"] = a.y;
+            out[++i] = row;
+        }
+        return out;
+    });
+    // BL-1515: which ledger stands open, so a check can read where a click-through led.
+    v.set_function("open_ledgers", [this](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["research"]     = m_ui.show_tech_tree;
+        out["construction"] = m_ui.show_construction_panel;
+        out["view"]         = m_ui.construction.panel_view;
+        out["diplomacy"]    = m_ui.show_diplomacy_ledger;
+        out["budget"]       = m_ui.show_balance_ledger;
+        out["market"]       = m_ui.show_market_ledger;
+        return out;
+    });
+
+    // BL-1520: what the Esc queue has still to close.
+    v.set_function("escape_queue", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["ledger"]    = ui::any_panel_open(m_ui);
+        out["selection"] = ui::any_selection(m_ui);
+        return out;
+    });
+    v.set_function("set_speed", [this](int speed) {
+        m_prev_speed = speed > 0 ? speed : m_prev_speed;
+        m_sim_loop.set_speed(speed);
+    });
+
     // Press Escape through the app's own key handler (its precedence ladder: exit
-    // confirm, system menu, roll-up drill, the takeover's fold, the menu), so a
+    // warning, escape menu, roll-up drill, the takeover's fold, the menu), so a
     // check drives the real Escape rung rather than calling fold() itself.
     v.set_function("press_escape", [this]() {
         SDL_KeyboardEvent k{};
@@ -3913,6 +4000,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             sol::table row = m_lua.state().create_table();
             row["name"]        = r.name;
             // As DRAWN by the surface.
+            row["shelf"]       = r.shelf;
+            row["change"]      = r.change;
             row["price"]       = r.price;
             row["base_price"]  = r.base_price;
             row["body_avg"]    = r.body_avg;
@@ -3926,6 +4015,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // As the WORLD holds it, read independently right now.
             if (mit != m_world.markets.end() && ri < resource_count)
             {
+                row["world_shelf"] = mit->second.inventory[ri];
                 row["world_price"] = mit->second.price[ri];
                 row["world_base"]  = mit->second.base_price[ri];
             }
@@ -3940,6 +4030,51 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // both layouts and report the name column's fit under each.
     v.set_function("goods_body_column", [this](bool on) {
         m_ui.market_goods_show_body = on;
+    });
+
+    // The Goods table's headings (BL-1517), for real presses and the fit, and the
+    // sort they have set.
+    v.set_function("goods_headers", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::goods_header_record& h : ui::goods_headers())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["name"] = h.name;
+            row["x"]    = h.x;
+            row["y"]    = h.y;
+            row["need"] = h.need;
+            row["have"] = h.have;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("goods_sort", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["col"]  = m_ui.market_goods_sort_col;
+        out["desc"] = m_ui.market_goods_sort_desc;
+        return out;
+    });
+
+    // The item-glyph contact sheet (BL-1518; ICONS.md § 2b): the capture Ben reads
+    // the set from, and its census, one fingerprint per good of the shape alone.
+    // Names and vertex counts, nothing of the world.
+    v.set_function("item_glyph_sheet", [this](bool on) {
+        m_ui.verify_item_glyph_sheet = on;
+    });
+    v.set_function("item_glyph_census", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::item_glyph_census_record& r : ui::item_glyph_census())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["name"]     = r.name;
+            row["key"]      = resource_names::name_of(r.resource);
+            row["vertices"] = r.vertices;
+            row["shape"]    = std::to_string(r.shape); // a string: Lua numbers lose the low bits
+            out[i++] = row;
+        }
+        return out;
     });
 
     // The market top section's nation list as drawn (BL-1317, superseding
@@ -4226,6 +4361,23 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["margin_per_point"] = r.margin_per_point; // the ranking key
             out[i++] = row;
         }
+        return out;
+    });
+
+    // The gate on read 3 (BL-1516): the points the surface gated on, beside an
+    // independent read of the same question and of what the trade verb will accept
+    // as a source. Figures the Trades tab already prints; no position.
+    v.set_function("potential_gate", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const entity_id actor = player_actor(m_world);
+        const entity_id mid   = ui::trades_market();
+        const std::map<entity_id, float> pts = market_trade_points(m_world, m_registry, nullptr, actor);
+        const auto it = pts.find(mid);
+        const std::vector<entity_id> src = corp_trade_markets(m_world, actor);
+        out["market"]       = mid;
+        out["points"]       = ui::potential_trade_points();
+        out["world_points"] = (it != pts.end()) ? it->second : 0.0f;
+        out["verb_source"]  = std::binary_search(src.begin(), src.end(), mid);
         return out;
     });
 
@@ -6768,6 +6920,129 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1506: the convoy markers the canvas drew last frame (the convoy a press on each
+    // would select, its screen point, whether it is the player's, how many share its
+    // tile), and the Selection's convoy channel. Nothing the screen does not show.
+    v.set_function("convoy_markers", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const ui_state::convoy_zone& z : m_ui.convoy_zones)
+        {
+            sol::table row = st.create_table();
+            row["id"]    = z.id;
+            row["x"]     = z.x;
+            row["y"]     = z.y;
+            row["mine"]  = z.mine;
+            row["count"] = z.count;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("selected_convoy", [this]() -> unsigned { return m_ui.selected_convoy; });
+
+    // BL-1508: a left drag through the real input path, the press, the motion and the
+    // release each their own frames, Shift held if asked; and the dragged group it left.
+    v.set_function("drag", [this](float x0, float y0, float x1, float y1, sol::optional<bool> shift) {
+        const bool sh = shift.value_or(false);
+        inject_move(x0, y0, 1);
+        if (sh)
+        {
+            m_inject_shift = 1;
+            render();
+        }
+        m_inject_button = ImGuiMouseButton_Left;
+        m_inject_down   = true;
+        render();
+        for (int s = 1; s <= 4; ++s)
+        {
+            m_inject_button = ImGuiMouseButton_Left;
+            m_inject_down   = true;
+            inject_move(x0 + (x1 - x0) * static_cast<float>(s) / 4.0f,
+                        y0 + (y1 - y0) * static_cast<float>(s) / 4.0f, 1);
+        }
+        m_inject_button = ImGuiMouseButton_Left;
+        m_inject_down   = false;
+        render();
+        if (sh)
+        {
+            m_inject_shift = 0;
+            render();
+        }
+    });
+    // Every unit counter the canvas drew last frame: its target unit, its screen point,
+    // whether it is the player's. What the screen shows, for aiming a band across tiles
+    // (verify.tile_screen centres the view on its tile, so it can aim at only one).
+    v.set_function("unit_counters", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const marker_hit_zone& hz : m_ui.marker_hit_zones)
+        {
+            if (hz.kind != marker_hit_zone::kind::unit)
+                continue;
+            const auto uit = m_world.units.find(hz.id);
+            if (uit == m_world.units.end())
+                continue;
+            sol::table e = st.create_table();
+            e["id"]     = static_cast<unsigned int>(hz.id);
+            e["x"]      = hz.centre.x;
+            e["y"]      = m_ui.marker_tilt_pivot + (hz.centre.y - m_ui.marker_tilt_pivot) * m_ui.marker_tilt_sy;
+            e["player"] = uit->second.owner == player_actor(m_world) || uit->second.owner == m_world.player_entity;
+            out[i++] = e;
+        }
+        return out;
+    });
+    v.set_function("selected_units", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const entity_id id : m_ui.selected_units)
+            out[i++] = static_cast<unsigned int>(id);
+        return out;
+    });
+
+    // BL-1509: the Nation overview's Standing rows as last drawn: the label, the player's
+    // figure, the leader's, the rank. Public figures only, as the card shows them.
+    v.set_function("nation_standing", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const auto& r : m_ui.diplomacy.standing)
+        {
+            sol::table e = st.create_table();
+            e["label"]  = std::string(r.label);
+            e["value"]  = r.value;
+            e["leader"] = r.leader;
+            e["rank"]   = r.rank;
+            e["of"]     = r.of;
+            out[i++] = e;
+        }
+        return out;
+    });
+
+    // BL-1507: the marching counters the canvas drew last frame: the units on each, the
+    // hop fraction and the counter's screen point. Nothing the screen does not show.
+    v.set_function("unit_glides", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const unit_glide& g : m_ui.unit_glides)
+        {
+            sol::table row = st.create_table();
+            sol::table ids = st.create_table();
+            int k = 1;
+            for (const entity_id id : g.ids)
+                ids[k++] = static_cast<unsigned int>(id);
+            row["ids"] = ids;
+            row["t"]   = g.t;
+            row["x"]   = g.x;
+            row["y"]   = g.y;
+            out[i++] = row;
+        }
+        return out;
+    });
+
     // BL-1265: `place_sell_order` retired with the order book (the verb is
     // rejected; there is no verify call for it).
 
@@ -7569,6 +7844,62 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             cv.corp           = m_world.player_entity;
             cv.speed          = 0.1f;
             m_world.convoys.push_back(cv);
+        });
+
+    // BL-1506: STAGE a land convoy with a real id on the player's own ground, between the
+    // two market centres nearest the player's lowest-id unit on the active body, at
+    // `progress`, for the player or (rival = true) the lowest-id other nation. Returns
+    // its id, 0 when two anchored markets are not there; never a position.
+    v.set_function("seed_lane_convoy",
+        [this](const std::string& res_name, float qty, float progress, sol::optional<bool> rival) -> unsigned
+        {
+            const entity_id me = player_actor(m_world);
+            // The anchor is the player's lowest-id unit here: a script frames it through
+            // verify.units(), so the staging takes no position to hand back.
+            const tile_component* anchor = nullptr;
+            entity_id anchor_unit = null_entity;
+            for (const auto& [uid, u] : m_world.units)
+            {
+                if (u.owner != me || u.count <= 0 || (anchor_unit != null_entity && uid > anchor_unit))
+                    continue;
+                const auto tit = m_world.tiles.find(u.position);
+                if (tit != m_world.tiles.end() && tit->second.body == m_ui.active_body)
+                {
+                    anchor = &tit->second;
+                    anchor_unit = uid;
+                }
+            }
+            if (anchor == nullptr)
+                return 0u;
+            std::vector<std::pair<int, entity_id>> by_dist;
+            for (const auto& [mid, mc] : m_world.markets)
+            {
+                if (mc.body != m_ui.active_body)
+                    continue;
+                const auto ct = m_world.tiles.find(mc.centre_tile);
+                if (ct != m_world.tiles.end())
+                    by_dist.emplace_back(std::abs(ct->second.grid_x - anchor->grid_x)
+                                          + std::abs(ct->second.grid_y - anchor->grid_y), mid);
+            }
+            if (by_dist.size() < 2)
+                return 0u;
+            std::sort(by_dist.begin(), by_dist.end());
+            convoy_component cv{};
+            cv.source_market  = by_dist[0].second;
+            cv.dest_market    = by_dist[1].second;
+            cv.cargo_resource = resource_from_name(res_name);
+            cv.cargo_qty      = qty;
+            cv.mode           = convoy_mode::land;
+            cv.progress       = progress;
+            cv.speed          = 0.1f;
+            cv.corp           = me;
+            if (rival.value_or(false))
+                for (const auto& [nid, nc] : m_world.nations)
+                    if (nid != me && (cv.corp == me || nid < cv.corp))
+                        cv.corp = nid;
+            cv.id = m_world.allocate_convoy_id();
+            m_world.convoys.push_back(cv);
+            return cv.id;
         });
 
     // Set a body's survey state deterministically for capture (BL-067). regions_done

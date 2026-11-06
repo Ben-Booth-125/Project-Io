@@ -482,6 +482,518 @@ void coiled_rope(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
     dl->AddLine({c.x + r * 0.80f, c.y}, {c.x + r * 1.05f, c.y - r * 0.30f}, fill, 2.2f);
 }
 
+// --- BL-1518: the item glyphs — one shape per good --------------------------
+// ICONS.md § 2b (Ben, 2026-11-05). Nineteen goods already had a shape as a
+// building's identity (above) and `item` reuses it; the rest are drawn here. A
+// Goods row is about one em tall, so each is built to hold at a radius of 5 px:
+// one bold silhouette, at most a little dark interior detail, strokes that scale
+// with r and never fall under a pixel.
+
+/// Under this radius a 1 px dark edge eats more of a silhouette than it separates:
+/// four pixels of shard is two of colour. So a small item glyph drops its edge and
+/// lets the silhouette carry it, on chrome that is dark anyway. The rows sit below
+/// it at 16 px type and the larger UI scales clear it.
+constexpr float k_item_edge_min_r = 8.5f;
+
+/// A stroke width that scales with the glyph and survives the smallest row.
+float item_stroke(float r, float share = 0.24f)
+{
+    return std::max(1.0f, r * share);
+}
+
+/// One point of a glyph, in units of r from its centre.
+ImVec2 at(ImVec2 c, float r, float x, float y)
+{
+    return {c.x + r * x, c.y + r * y};
+}
+
+/// A convex outline in r units, filled and given the family's dark edge.
+void item_poly(ImDrawList* dl, ImVec2 c, float r, const ImVec2* unit, int n, ImU32 fill)
+{
+    ImVec2 v[16];
+    n = std::min(n, 16);
+    for (int i = 0; i < n; ++i)
+        v[i] = at(c, r, unit[i].x, unit[i].y);
+    dl->AddConvexPolyFilled(v, n, fill);
+    if (r >= k_item_edge_min_r)
+        dl->AddPolyline(v, n, outline, ImDrawFlags_Closed, 1.0f);
+}
+
+void item_iron_ore(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // One upright pick, its curved head wide across the top. The building's crossed
+    // picks and the timber's crossed logs are one X at a row's size.
+    constexpr float pi = 3.14159265f;
+    dl->AddLine(at(c, r, 0.0f, -0.6f), at(c, r, 0.0f, 1.0f), fill, item_stroke(r, 0.3f));
+    dl->PathClear();
+    dl->PathArcTo(at(c, r, 0.0f, 0.55f), r * 1.3f, pi * 1.2f, pi * 1.8f, 10);
+    dl->PathStroke(fill, 0, item_stroke(r, 0.34f));
+}
+
+void item_steel(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // The building's ingot, taller: at its own proportions a row's size draws a dash.
+    const ImVec2 u[4] = {{-1.0f, 0.62f}, {-0.62f, -0.62f}, {0.62f, -0.62f}, {1.0f, 0.62f}};
+    item_poly(dl, c, r, u, 4, fill);
+}
+
+void item_coal(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A heaped mine cart: the only glyph on wheels but the truck, so coal never
+    // joins the family of bare rocks.
+    const ImVec2 heap[5] = {{-0.72f, -0.15f}, {-0.38f, -0.72f}, {0.08f, -0.95f}, {0.56f, -0.62f}, {0.76f, -0.15f}};
+    item_poly(dl, c, r, heap, 5, fill);
+    const ImVec2 bed[4] = {{-1.0f, -0.15f}, {1.0f, -0.15f}, {0.7f, 0.55f}, {-0.7f, 0.55f}};
+    item_poly(dl, c, r, bed, 4, fill);
+    dl->AddCircleFilled(at(c, r, -0.42f, 0.78f), r * 0.22f, fill);
+    dl->AddCircleFilled(at(c, r, 0.42f, 0.78f), r * 0.22f, fill);
+}
+
+void item_petroleum(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A derrick: an open lattice, the one tower in the set you can see through.
+    const float t = item_stroke(r);
+    dl->AddLine(at(c, r, -0.62f, 1.0f), at(c, r, -0.14f, -1.0f), fill, t);
+    dl->AddLine(at(c, r, 0.62f, 1.0f), at(c, r, 0.14f, -1.0f), fill, t);
+    dl->AddLine(at(c, r, -0.26f, -1.0f), at(c, r, 0.26f, -1.0f), fill, t);
+    dl->AddLine(at(c, r, -0.38f, -0.05f), at(c, r, 0.38f, -0.05f), fill, t);
+    dl->AddLine(at(c, r, -0.92f, 1.0f), at(c, r, 0.92f, 1.0f), fill, t);
+}
+
+void item_silica(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // Quartz points: three pointed shards standing together.
+    const ImVec2 left[5]  = {{-0.92f, 1.0f}, {-0.92f, 0.1f}, {-0.64f, -0.3f}, {-0.36f, 0.1f}, {-0.36f, 1.0f}};
+    const ImVec2 right[5] = {{0.36f, 1.0f}, {0.36f, 0.35f}, {0.64f, -0.05f}, {0.92f, 0.35f}, {0.92f, 1.0f}};
+    const ImVec2 mid[5]   = {{-0.32f, 1.0f}, {-0.32f, -0.5f}, {0.0f, -1.0f}, {0.32f, -0.5f}, {0.32f, 1.0f}};
+    item_poly(dl, c, r, left, 5, fill);
+    item_poly(dl, c, r, right, 5, fill);
+    item_poly(dl, c, r, mid, 5, fill);
+}
+
+void item_rare_earth(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A rock shot through with specks: the deposit is the flecks, not the stone.
+    const ImVec2 rock[7] = {{-0.5f, -0.88f}, {0.42f, -0.92f}, {0.95f, -0.25f}, {0.82f, 0.55f},
+                            {0.1f, 0.95f}, {-0.72f, 0.72f}, {-0.98f, -0.1f}};
+    item_poly(dl, c, r, rock, 7, fill);
+    const float speck = std::max(1.0f, r * 0.17f);
+    dl->AddCircleFilled(at(c, r, -0.35f, -0.28f), speck, outline);
+    dl->AddCircleFilled(at(c, r, 0.38f, -0.1f), speck, outline);
+    dl->AddCircleFilled(at(c, r, -0.08f, 0.48f), speck, outline);
+}
+
+void item_iron_nickel(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A falling meteorite: a round body low on the left, streaks trailing up to
+    // the right. The only glyph with a direction of travel and no arrow.
+    const float t = item_stroke(r);
+    dl->AddLine(at(c, r, -0.05f, -0.28f), at(c, r, 0.35f, -1.0f), fill, t);
+    dl->AddLine(at(c, r, 0.15f, 0.0f), at(c, r, 1.0f, -0.92f), fill, t);
+    dl->AddLine(at(c, r, 0.28f, 0.32f), at(c, r, 1.0f, -0.25f), fill, t);
+    dl->AddCircleFilled(at(c, r, -0.32f, 0.36f), r * 0.64f, fill);
+    if (r >= k_item_edge_min_r)
+        dl->AddCircle(at(c, r, -0.32f, 0.36f), r * 0.64f, outline, 0, 1.0f);
+}
+
+void item_platinum(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A cut stone, table up: the flat top is what keeps it off the resource pip's
+    // diamond (ICONS.md § Settled collisions, 1).
+    const ImVec2 gem[5] = {{-0.6f, -0.76f}, {0.6f, -0.76f}, {1.0f, -0.2f}, {0.0f, 1.0f}, {-1.0f, -0.2f}};
+    item_poly(dl, c, r, gem, 5, fill);
+    dl->AddLine(at(c, r, -1.0f, -0.2f), at(c, r, 1.0f, -0.2f), outline, 1.0f);
+    dl->AddLine(at(c, r, -0.32f, -0.2f), at(c, r, 0.0f, 1.0f), outline, 1.0f);
+    dl->AddLine(at(c, r, 0.32f, -0.2f), at(c, r, 0.0f, 1.0f), outline, 1.0f);
+}
+
+void item_regolith(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // Loose rubble, three-two-one: separate grains with nothing binding them.
+    const float g = r * 0.3f;
+    const ImVec2 grains[6] = {{-0.68f, 0.68f}, {0.0f, 0.68f}, {0.68f, 0.68f},
+                              {-0.34f, 0.05f}, {0.34f, 0.05f}, {0.0f, -0.58f}};
+    for (const ImVec2& p : grains)
+        dl->AddCircleFilled(at(c, r, p.x, p.y), g, fill);
+}
+
+void item_tobacco(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A broad pointed leaf on the diagonal, with a dark midrib and a stem.
+    const ImVec2 leaf[8] = {{-0.78f, 0.78f}, {-0.72f, 0.05f}, {-0.35f, -0.42f}, {0.28f, -0.72f},
+                            {0.96f, -0.96f}, {0.72f, -0.28f}, {0.42f, 0.35f}, {-0.05f, 0.72f}};
+    dl->AddLine(at(c, r, -0.78f, 0.78f), at(c, r, -1.0f, 1.0f), fill, item_stroke(r));
+    item_poly(dl, c, r, leaf, 8, fill);
+    dl->AddLine(at(c, r, -0.72f, 0.72f), at(c, r, 0.62f, -0.62f), outline, 1.0f);
+}
+
+void item_spices(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A mortar with its pestle standing in it.
+    dl->AddLine(at(c, r, 0.08f, 0.1f), at(c, r, 0.72f, -0.95f), fill, item_stroke(r, 0.34f));
+    const ImVec2 bowl[6] = {{-0.9f, -0.08f}, {0.9f, -0.08f}, {0.76f, 0.38f}, {0.36f, 0.72f}, {-0.36f, 0.72f}, {-0.76f, 0.38f}};
+    item_poly(dl, c, r, bowl, 6, fill);
+    const ImVec2 foot[4] = {{-0.42f, 0.72f}, {0.42f, 0.72f}, {0.52f, 1.0f}, {-0.52f, 1.0f}};
+    item_poly(dl, c, r, foot, 4, fill);
+}
+
+void item_coffee(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A bean: a fat tilted oval split by an S-curve.
+    constexpr int  n     = 14;
+    constexpr float tilt = -0.65f;
+    const float ct = std::cos(tilt), st = std::sin(tilt);
+    ImVec2 v[n];
+    for (int i = 0; i < n; ++i)
+    {
+        const float a = 6.2831853f * static_cast<float>(i) / static_cast<float>(n);
+        const float x = 0.98f * std::cos(a), y = 0.68f * std::sin(a);
+        v[i] = {x * ct - y * st, x * st + y * ct};
+    }
+    item_poly(dl, c, r, v, n, fill);
+    const float t = item_stroke(r, 0.17f);
+    const auto  p = [&](float x, float y) { return at(c, r, x * ct - y * st, x * st + y * ct); };
+    dl->AddLine(p(-0.9f, 0.0f), p(-0.3f, -0.2f), outline, t);
+    dl->AddLine(p(-0.3f, -0.2f), p(0.3f, 0.2f), outline, t);
+    dl->AddLine(p(0.3f, 0.2f), p(0.9f, 0.0f), outline, t);
+}
+
+void item_furs(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A paw print: four toes over a pad. Reads as the animal, where a pelt shape
+    // would read as the raw hide beside it.
+    dl->AddCircleFilled(at(c, r, 0.0f, 0.42f), r * 0.54f, fill);
+    dl->AddCircleFilled(at(c, r, -0.76f, -0.06f), r * 0.24f, fill);
+    dl->AddCircleFilled(at(c, r, -0.3f, -0.66f), r * 0.26f, fill);
+    dl->AddCircleFilled(at(c, r, 0.3f, -0.66f), r * 0.26f, fill);
+    dl->AddCircleFilled(at(c, r, 0.76f, -0.06f), r * 0.24f, fill);
+}
+
+void item_refined_fuel(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A jerrycan: a slab with a chamfered shoulder and a spout.
+    const ImVec2 spout[4] = {{0.18f, -1.0f}, {0.58f, -1.0f}, {0.58f, -0.55f}, {0.18f, -0.55f}};
+    item_poly(dl, c, r, spout, 4, fill);
+    const ImVec2 can[5] = {{-0.72f, -0.2f}, {-0.3f, -0.6f}, {0.72f, -0.6f}, {0.72f, 1.0f}, {-0.72f, 1.0f}};
+    item_poly(dl, c, r, can, 5, fill);
+    dl->AddLine(at(c, r, -0.42f, 0.05f), at(c, r, 0.42f, 0.72f), outline, 1.0f);
+    dl->AddLine(at(c, r, 0.42f, 0.05f), at(c, r, -0.42f, 0.72f), outline, 1.0f);
+}
+
+void item_propellant(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A tank on a nozzle, burning: the good is what comes out of the bell.
+    const ImVec2 flame[3] = {{-0.3f, 0.66f}, {0.3f, 0.66f}, {0.0f, 1.0f}};
+    item_poly(dl, c, r, flame, 3, fill);
+    const ImVec2 bell[4] = {{-0.2f, 0.2f}, {0.2f, 0.2f}, {0.52f, 0.66f}, {-0.52f, 0.66f}};
+    item_poly(dl, c, r, bell, 4, fill);
+    const ImVec2 lo = at(c, r, -0.52f, -1.0f), hi = at(c, r, 0.52f, 0.2f);
+    dl->AddRectFilled(lo, hi, fill, r * 0.34f);
+    if (r >= k_item_edge_min_r)
+        dl->AddRect(lo, hi, outline, r * 0.34f, 0, 1.0f);
+}
+
+void item_silicon(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A wafer: a disc with its flat cut, ruled into dies.
+    constexpr int n = 16;
+    ImVec2 v[n];
+    for (int i = 0; i < n; ++i)
+    {
+        const float a = 6.2831853f * static_cast<float>(i) / static_cast<float>(n);
+        v[i] = {0.96f * std::cos(a), std::min(0.74f, 0.96f * std::sin(a))};
+    }
+    item_poly(dl, c, r, v, n, fill);
+    // The ruling thins with the radius: a single cross still says "dies" in a row.
+    if (r < k_item_edge_min_r)
+    {
+        dl->AddLine(at(c, r, 0.0f, -0.9f), at(c, r, 0.0f, 0.74f), outline, 1.0f);
+        dl->AddLine(at(c, r, -0.9f, 0.0f), at(c, r, 0.9f, 0.0f), outline, 1.0f);
+        return;
+    }
+    const float k = 0.3f;
+    dl->AddLine(at(c, r, -k, -0.85f), at(c, r, -k, 0.74f), outline, 1.0f);
+    dl->AddLine(at(c, r, k, -0.85f), at(c, r, k, 0.74f), outline, 1.0f);
+    dl->AddLine(at(c, r, -0.9f, -k), at(c, r, 0.9f, -k), outline, 1.0f);
+    dl->AddLine(at(c, r, -0.9f, k), at(c, r, 0.9f, k), outline, 1.0f);
+}
+
+void item_refined_copper(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A spool of wire: two flanges and a wound core.
+    const ImVec2 core[4] = {{-0.66f, -0.58f}, {0.66f, -0.58f}, {0.66f, 0.58f}, {-0.66f, 0.58f}};
+    item_poly(dl, c, r, core, 4, fill);
+    if (r >= k_item_edge_min_r)
+    {
+        dl->AddLine(at(c, r, -0.22f, -0.58f), at(c, r, -0.22f, 0.58f), outline, 1.0f);
+        dl->AddLine(at(c, r, 0.22f, -0.58f), at(c, r, 0.22f, 0.58f), outline, 1.0f);
+    }
+    const ImVec2 lf[4] = {{-1.0f, -1.0f}, {-0.66f, -1.0f}, {-0.66f, 1.0f}, {-1.0f, 1.0f}};
+    const ImVec2 rf[4] = {{0.66f, -1.0f}, {1.0f, -1.0f}, {1.0f, 1.0f}, {0.66f, 1.0f}};
+    item_poly(dl, c, r, lf, 4, fill);
+    item_poly(dl, c, r, rf, 4, fill);
+}
+
+void item_ree_alloy(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A horseshoe magnet, which is what the alloy is for; dark bands mark the poles.
+    constexpr float pi = 3.14159265f;
+    const float t = item_stroke(r, 0.44f);
+    dl->PathClear();
+    dl->PathLineTo(at(c, r, -0.68f, -1.0f));
+    dl->PathArcTo(at(c, r, 0.0f, 0.25f), r * 0.68f, pi, 0.0f, 12);
+    dl->PathLineTo(at(c, r, 0.68f, -1.0f));
+    dl->PathStroke(fill, 0, t);
+    dl->AddLine(at(c, r, -0.92f, -0.52f), at(c, r, -0.44f, -0.52f), outline, 1.0f);
+    dl->AddLine(at(c, r, 0.44f, -0.52f), at(c, r, 0.92f, -0.52f), outline, 1.0f);
+}
+
+void item_machinery(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A gear: eight teeth around a dark bore.
+    constexpr int teeth = 8;
+    for (int i = 0; i < teeth; ++i)
+    {
+        const float a  = 6.2831853f * static_cast<float>(i) / static_cast<float>(teeth);
+        const float ca = std::cos(a), sa = std::sin(a);
+        dl->AddLine(at(c, r, 0.55f * ca, 0.55f * sa), at(c, r, ca, sa), fill, item_stroke(r, 0.34f));
+    }
+    dl->AddCircleFilled(c, r * 0.68f, fill);
+    dl->AddCircleFilled(c, r * 0.27f, outline);
+}
+
+void item_alloys(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // Stacked ingots, two under one: several metals in one good, against steel's
+    // single bar.
+    const auto ingot = [&](float cx, float cy) {
+        const ImVec2 u[4] = {{cx - 0.5f, cy + 0.36f}, {cx - 0.32f, cy - 0.36f}, {cx + 0.32f, cy - 0.36f}, {cx + 0.5f, cy + 0.36f}};
+        item_poly(dl, c, r, u, 4, fill);
+    };
+    ingot(-0.5f, 0.56f);
+    ingot(0.5f, 0.56f);
+    ingot(0.0f, -0.2f);
+}
+
+void item_electronics(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A chip: a square body with pins on all four sides and a dark die.
+    const float t = item_stroke(r, 0.14f);
+    for (const float k : {-0.4f, 0.4f})
+    {
+        dl->AddLine(at(c, r, k, -1.0f), at(c, r, k, 1.0f), fill, t);
+        dl->AddLine(at(c, r, -1.0f, k), at(c, r, 1.0f, k), fill, t);
+    }
+    const ImVec2 body[4] = {{-0.68f, -0.68f}, {0.68f, -0.68f}, {0.68f, 0.68f}, {-0.68f, 0.68f}};
+    item_poly(dl, c, r, body, 4, fill);
+    dl->AddRectFilled(at(c, r, -0.28f, -0.28f), at(c, r, 0.28f, 0.28f), outline);
+}
+
+void item_spacecraft(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A satellite: a small bus between two solar wings, an antenna on top.
+    const float t = item_stroke(r, 0.17f);
+    dl->AddLine(at(c, r, -0.5f, 0.15f), at(c, r, 0.5f, 0.15f), fill, t);
+    dl->AddLine(at(c, r, 0.0f, -0.2f), at(c, r, 0.0f, -0.78f), fill, t);
+    dl->AddCircleFilled(at(c, r, 0.0f, -0.82f), r * 0.18f, fill);
+    const ImVec2 bus[4] = {{-0.3f, -0.2f}, {0.3f, -0.2f}, {0.3f, 0.5f}, {-0.3f, 0.5f}};
+    item_poly(dl, c, r, bus, 4, fill);
+    const ImVec2 lw[4] = {{-1.0f, -0.25f}, {-0.48f, -0.25f}, {-0.48f, 0.55f}, {-1.0f, 0.55f}};
+    const ImVec2 rw[4] = {{0.48f, -0.25f}, {1.0f, -0.25f}, {1.0f, 0.55f}, {0.48f, 0.55f}};
+    item_poly(dl, c, r, lw, 4, fill);
+    item_poly(dl, c, r, rw, 4, fill);
+}
+
+void item_clean_water(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A tap with a drop falling from it: the water that has been through a plant,
+    // against the raw good's bare teardrop.
+    const float t = item_stroke(r, 0.3f);
+    dl->AddLine(at(c, r, -1.0f, -0.32f), at(c, r, 0.42f, -0.32f), fill, t);
+    dl->AddLine(at(c, r, 0.42f, -0.46f), at(c, r, 0.42f, 0.02f), fill, t);
+    dl->AddLine(at(c, r, -0.28f, -0.32f), at(c, r, -0.28f, -0.82f), fill, item_stroke(r, 0.2f));
+    dl->AddLine(at(c, r, -0.68f, -0.88f), at(c, r, 0.12f, -0.88f), fill, item_stroke(r, 0.24f));
+    dl->AddCircleFilled(at(c, r, 0.42f, 0.72f), r * 0.28f, fill);
+    const ImVec2 cap[3] = {at(c, r, 0.42f, 0.2f), at(c, r, 0.67f, 0.64f), at(c, r, 0.17f, 0.64f)};
+    dl->AddConvexPolyFilled(cap, 3, fill);
+}
+
+void item_consumer_goods(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A carrier bag: a flaring body under a looped handle.
+    constexpr float pi = 3.14159265f;
+    dl->PathClear();
+    dl->PathArcTo(at(c, r, 0.0f, -0.42f), r * 0.42f, pi, 2.0f * pi, 10);
+    dl->PathStroke(fill, 0, item_stroke(r, 0.2f));
+    const ImVec2 bag[4] = {{-0.66f, -0.42f}, {0.66f, -0.42f}, {0.86f, 1.0f}, {-0.86f, 1.0f}};
+    item_poly(dl, c, r, bag, 4, fill);
+}
+
+void item_medical(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A filled Greek cross. The stat grid's HP is the same cross as an outline,
+    // and a stroke glyph and a filled one do not meet on one surface.
+    const float k = 0.34f;
+    const ImVec2 u[12] = {{-k, -1.0f}, {k, -1.0f}, {k, -k}, {1.0f, -k}, {1.0f, k}, {k, k},
+                          {k, 1.0f}, {-k, 1.0f}, {-k, k}, {-1.0f, k}, {-1.0f, -k}, {-k, -k}};
+    ImVec2 v[12];
+    for (int i = 0; i < 12; ++i)
+        v[i] = at(c, r, u[i].x, u[i].y);
+    dl->AddRectFilled(at(c, r, -k, -1.0f), at(c, r, k, 1.0f), fill);
+    dl->AddRectFilled(at(c, r, -1.0f, -k), at(c, r, 1.0f, k), fill);
+    if (r >= k_item_edge_min_r)
+        dl->AddPolyline(v, 12, outline, ImDrawFlags_Closed, 1.0f);
+}
+
+void item_ordnance(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A shell standing on its base: an ogive nose on a straight case, one driving
+    // band. A filled solid, where the stat grid's ammunition is a pair of outlines.
+    const ImVec2 shell[7] = {{-0.46f, 1.0f}, {-0.46f, -0.15f}, {-0.32f, -0.6f}, {0.0f, -1.0f},
+                             {0.32f, -0.6f}, {0.46f, -0.15f}, {0.46f, 1.0f}};
+    item_poly(dl, c, r, shell, 7, fill);
+    dl->AddLine(at(c, r, -0.46f, 0.18f), at(c, r, 0.46f, 0.18f), outline, item_stroke(r, 0.16f));
+}
+
+void item_ceramics(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A two-handled amphora: the fired counterpart of raw clay's plain vessel, and
+    // the handles are the difference.
+    const float t = item_stroke(r, 0.18f);
+    dl->AddLine(at(c, r, 0.2f, -0.78f), at(c, r, 0.82f, -0.62f), fill, t);
+    dl->AddLine(at(c, r, 0.82f, -0.62f), at(c, r, 0.52f, -0.1f), fill, t);
+    dl->AddLine(at(c, r, -0.2f, -0.78f), at(c, r, -0.82f, -0.62f), fill, t);
+    dl->AddLine(at(c, r, -0.82f, -0.62f), at(c, r, -0.52f, -0.1f), fill, t);
+    const ImVec2 neck[4] = {{-0.3f, -1.0f}, {0.3f, -1.0f}, {0.22f, -0.5f}, {-0.22f, -0.5f}};
+    item_poly(dl, c, r, neck, 4, fill);
+    const ImVec2 body[7] = {{-0.26f, -0.5f}, {0.26f, -0.5f}, {0.62f, -0.12f}, {0.42f, 0.55f},
+                            {0.16f, 1.0f}, {-0.16f, 1.0f}, {-0.42f, 0.55f}};
+    ImVec2 full[8];
+    for (int i = 0; i < 7; ++i)
+        full[i] = body[i];
+    full[7] = {-0.62f, -0.12f};
+    item_poly(dl, c, r, full, 8, fill);
+}
+
+void item_dressed_stone(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A squared block seen from above a corner, shaded by face: the one glyph drawn
+    // in three tones, because being CUT is what the good is.
+    const auto shade = [&](float k) {
+        const ImU32 rc = (fill >> IM_COL32_R_SHIFT) & 0xFF;
+        const ImU32 gc = (fill >> IM_COL32_G_SHIFT) & 0xFF;
+        const ImU32 bc = (fill >> IM_COL32_B_SHIFT) & 0xFF;
+        return IM_COL32(static_cast<int>(static_cast<float>(rc) * k),
+                        static_cast<int>(static_cast<float>(gc) * k),
+                        static_cast<int>(static_cast<float>(bc) * k),
+                        (fill >> IM_COL32_A_SHIFT) & 0xFF);
+    };
+    const ImVec2 top[4]   = {{0.0f, -1.0f}, {0.9f, -0.5f}, {0.0f, 0.0f}, {-0.9f, -0.5f}};
+    const ImVec2 left[4]  = {{-0.9f, -0.5f}, {0.0f, 0.0f}, {0.0f, 1.0f}, {-0.9f, 0.5f}};
+    const ImVec2 right[4] = {{0.9f, -0.5f}, {0.9f, 0.5f}, {0.0f, 1.0f}, {0.0f, 0.0f}};
+    item_poly(dl, c, r, left, 4, shade(0.72f));
+    item_poly(dl, c, r, right, 4, shade(0.5f));
+    item_poly(dl, c, r, top, 4, fill);
+}
+
+void item_planks(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // Three sawn boards leaning together: long, straight and parallel, against the
+    // peat cutting's short level bricks.
+    for (const float x : {-0.58f, 0.0f, 0.58f})
+    {
+        const ImVec2 u[4] = {{x + 0.04f, -1.0f}, {x + 0.42f, -1.0f}, {x - 0.04f, 1.0f}, {x - 0.42f, 1.0f}};
+        item_poly(dl, c, r, u, 4, fill);
+    }
+}
+
+void item_tools(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A hammer: one handle, one square head, so it never joins the crossed-pick X.
+    dl->AddLine(at(c, r, -0.88f, 0.88f), at(c, r, 0.3f, -0.3f), fill, item_stroke(r, 0.28f));
+    const ImVec2 head[4] = {{-0.28f, -0.66f}, {0.2f, -1.0f}, {0.98f, -0.2f}, {0.62f, 0.26f}};
+    item_poly(dl, c, r, head, 4, fill);
+}
+
+void item_power(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A lightning bolt.
+    const ImVec2 upper[3] = {at(c, r, 0.38f, -1.0f), at(c, r, -0.62f, 0.18f), at(c, r, 0.12f, 0.18f)};
+    const ImVec2 lower[3] = {at(c, r, -0.38f, 1.0f), at(c, r, 0.62f, -0.18f), at(c, r, -0.12f, -0.18f)};
+    dl->AddConvexPolyFilled(upper, 3, fill);
+    dl->AddConvexPolyFilled(lower, 3, fill);
+    if (r >= k_item_edge_min_r)
+    {
+        const ImVec2 edge[6] = {upper[0], upper[1], upper[2], lower[0], lower[1], lower[2]};
+        dl->AddPolyline(edge, 6, outline, ImDrawFlags_Closed, 1.0f);
+    }
+}
+
+void item_small_arms(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A rifle in profile, muzzle right: long barrel, a body, a stock dropping behind.
+    dl->AddLine(at(c, r, -0.1f, -0.22f), at(c, r, 1.0f, -0.22f), fill, item_stroke(r, 0.2f));
+    const ImVec2 body[4] = {{-0.5f, -0.4f}, {0.28f, -0.4f}, {0.28f, 0.02f}, {-0.5f, 0.02f}};
+    item_poly(dl, c, r, body, 4, fill);
+    const ImVec2 stock[4] = {{-0.5f, -0.3f}, {-0.5f, 0.02f}, {-1.0f, 0.5f}, {-1.0f, 0.1f}};
+    item_poly(dl, c, r, stock, 4, fill);
+    dl->AddLine(at(c, r, 0.02f, 0.02f), at(c, r, -0.1f, 0.58f), fill, item_stroke(r, 0.22f));
+}
+
+void item_armoured_vehicles(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A tank in profile: a gun, a turret, a hull, and a track with rounded ends.
+    dl->AddLine(at(c, r, 0.1f, -0.42f), at(c, r, 1.0f, -0.42f), fill, item_stroke(r, 0.18f));
+    const ImVec2 turret[4] = {{-0.45f, -0.72f}, {0.22f, -0.72f}, {0.36f, -0.12f}, {-0.55f, -0.12f}};
+    item_poly(dl, c, r, turret, 4, fill);
+    const ImVec2 lo = at(c, r, -1.0f, 0.3f), hi = at(c, r, 1.0f, 0.86f);
+    const ImVec2 hull[4] = {{-0.82f, -0.12f}, {0.82f, -0.12f}, {0.96f, 0.3f}, {-0.96f, 0.3f}};
+    item_poly(dl, c, r, hull, 4, fill);
+    dl->AddRectFilled(lo, hi, fill, r * 0.28f);
+    if (r >= k_item_edge_min_r)
+        dl->AddRect(lo, hi, outline, r * 0.28f, 0, 1.0f);
+}
+
+void item_artillery(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A field gun: a long barrel raised to the right, one spoked wheel, a trail
+    // running back to the ground.
+    dl->AddLine(at(c, r, -0.28f, 0.28f), at(c, r, 1.0f, -0.9f), fill, item_stroke(r, 0.3f));
+    dl->AddLine(at(c, r, -0.1f, 0.42f), at(c, r, -1.0f, 0.92f), fill, item_stroke(r, 0.24f));
+    dl->AddCircleFilled(at(c, r, 0.0f, 0.5f), r * 0.5f, fill);
+    if (r >= k_item_edge_min_r)
+        dl->AddCircle(at(c, r, 0.0f, 0.5f), r * 0.5f, outline, 0, 1.0f);
+    dl->AddCircleFilled(at(c, r, 0.0f, 0.5f), std::max(1.0f, r * 0.16f), outline);
+}
+
+void item_guided_weapons(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A missile in flight: a slim body on the diagonal, swept fins at the tail and
+    // a smaller pair at the waist. Ordnance's shell stands upright and has no fins.
+    const ImVec2 finA[3] = {{-0.82f, 0.82f}, {-0.98f, 0.2f}, {-0.42f, 0.42f}};
+    const ImVec2 finB[3] = {{-0.82f, 0.82f}, {-0.2f, 0.98f}, {-0.42f, 0.42f}};
+    item_poly(dl, c, r, finA, 3, fill);
+    item_poly(dl, c, r, finB, 3, fill);
+    dl->AddLine(at(c, r, -0.08f, -0.08f), at(c, r, -0.32f, -0.42f), fill, item_stroke(r, 0.18f));
+    dl->AddLine(at(c, r, 0.08f, 0.08f), at(c, r, 0.42f, 0.32f), fill, item_stroke(r, 0.18f));
+    const ImVec2 body[5] = {{-0.82f, 0.56f}, {0.42f, -0.68f}, {1.0f, -1.0f}, {0.68f, -0.42f}, {-0.56f, 0.82f}};
+    item_poly(dl, c, r, body, 5, fill);
+}
+
+void item_drones(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    // A quadcopter from above: four rotor rings on a crossed frame. The rings are
+    // what no other X in the set has.
+    const float t = item_stroke(r, 0.18f);
+    const float k = 0.62f;
+    dl->AddLine(at(c, r, -k, -k), at(c, r, k, k), fill, t);
+    dl->AddLine(at(c, r, -k, k), at(c, r, k, -k), fill, t);
+    dl->AddCircleFilled(c, r * 0.24f, fill);
+    for (const float x : {-k, k})
+        for (const float y : {-k, k})
+            dl->AddCircle(at(c, r, x, y), r * 0.36f, fill, 0, t);
+}
+
 } // namespace
 
 void building(ImDrawList* dl, ImVec2 centre, float r, building_type type,
@@ -593,6 +1105,97 @@ void stack_ring(ImDrawList* dl, ImVec2 centre, float r, const ImU32* kind_colour
 void resource(ImDrawList* dl, ImVec2 centre, float r, resource_type res)
 {
     diamond(dl, centre, r, presentation_of(res).colour);
+}
+
+/// BL-1518 (ICONS.md § 2b): the item glyph. One shape per good; the identity colour
+/// is the resource's own, as for the pip.
+void item(ImDrawList* dl, ImVec2 centre, float r, resource_type res)
+{
+    const ImU32 fill = palette::readable_on_chrome(presentation_of(res).colour);
+    const ImVec2 c   = centre;
+
+    // A shape borrowed from a building carries that family's dark edge, drawn into
+    // the function it shares with the canvas. Under the radius above, recolour what
+    // it just drew: the edge becomes the fill, which fattens the silhouette where it
+    // would have eaten it, and the building glyph itself is untouched.
+    const int  v0   = dl->VtxBuffer.Size;
+    const auto seed = [&](auto draw) {
+        draw(dl, c, r, fill);
+        if (r >= k_item_edge_min_r)
+            return;
+        const ImU32 edge_rgb = outline & ~IM_COL32_A_MASK;
+        const ImU32 fill_rgb = fill & ~IM_COL32_A_MASK;
+        for (int k = v0; k < dl->VtxBuffer.Size; ++k)
+        {
+            ImU32& col = dl->VtxBuffer[k].col;
+            if ((col & ~IM_COL32_A_MASK) == edge_rgb)
+                col = fill_rgb | (col & IM_COL32_A_MASK);
+        }
+    };
+    // NO DEFAULT: a good appended to the roster warns here until it has a shape.
+    switch (res)
+    {
+        // The goods with a building identity, the same shape on both surfaces.
+        case resource_type::stone:                 seed(quarry_stone);      return;
+        case resource_type::timber:                seed(woodcutter_timber); return;
+        case resource_type::sand:                  seed(sand_pit);          return;
+        case resource_type::clay:                  seed(clay_pit);          return;
+        case resource_type::peat:                  seed(peat_cutting);      return;
+        case resource_type::iron_ore:              item_iron_ore(dl, c, r, fill);     return;
+        case resource_type::copper_ore:            seed(copper_mine);       return;
+        case resource_type::water:                 seed(water_extractor);   return;
+        case resource_type::agricultural_produce:  seed(farm);              return;
+        case resource_type::hides:                 seed(hide_stretch);      return;
+        case resource_type::fibre:                 seed(fibre_sheaf);       return;
+        case resource_type::charcoal:              seed(charcoal_kiln);     return;
+        case resource_type::iron_blooms:           seed(bloomery);          return;
+        case resource_type::steel:                 item_steel(dl, c, r, fill);        return;
+        case resource_type::trade_goods_misc:      seed(goods_bundle);      return;
+        case resource_type::food_rations:          seed(ration_pack);       return;
+        case resource_type::leather:               seed(tanned_hide);       return;
+        case resource_type::cloth:                 seed(folded_cloth);      return;
+        case resource_type::rigging:               seed(coiled_rope);       return;
+        // The rest, drawn for the item glyph.
+        case resource_type::coal:                  item_coal(dl, c, r, fill);           return;
+        case resource_type::petroleum:             item_petroleum(dl, c, r, fill);      return;
+        case resource_type::silica:                item_silica(dl, c, r, fill);         return;
+        case resource_type::rare_earth_ore:        item_rare_earth(dl, c, r, fill);     return;
+        case resource_type::iron_nickel_ore:       item_iron_nickel(dl, c, r, fill);    return;
+        case resource_type::platinum_group_metals: item_platinum(dl, c, r, fill);       return;
+        case resource_type::regolith:              item_regolith(dl, c, r, fill);       return;
+        case resource_type::tobacco:               item_tobacco(dl, c, r, fill);        return;
+        case resource_type::spices:                item_spices(dl, c, r, fill);         return;
+        case resource_type::coffee:                item_coffee(dl, c, r, fill);         return;
+        case resource_type::furs:                  item_furs(dl, c, r, fill);           return;
+        case resource_type::refined_fuel:          item_refined_fuel(dl, c, r, fill);   return;
+        case resource_type::propellant:            item_propellant(dl, c, r, fill);     return;
+        case resource_type::silicon:               item_silicon(dl, c, r, fill);        return;
+        case resource_type::refined_copper:        item_refined_copper(dl, c, r, fill); return;
+        case resource_type::ree_alloy:             item_ree_alloy(dl, c, r, fill);      return;
+        case resource_type::machinery:             item_machinery(dl, c, r, fill);      return;
+        case resource_type::alloys:                item_alloys(dl, c, r, fill);         return;
+        case resource_type::electronics:           item_electronics(dl, c, r, fill);    return;
+        case resource_type::spacecraft_components: item_spacecraft(dl, c, r, fill);     return;
+        case resource_type::clean_water:           item_clean_water(dl, c, r, fill);    return;
+        case resource_type::consumer_goods:        item_consumer_goods(dl, c, r, fill); return;
+        case resource_type::medical_supplies:      item_medical(dl, c, r, fill);        return;
+        case resource_type::ordnance:              item_ordnance(dl, c, r, fill);       return;
+        case resource_type::ceramics:              item_ceramics(dl, c, r, fill);       return;
+        case resource_type::dressed_stone:         item_dressed_stone(dl, c, r, fill);  return;
+        case resource_type::planks:                item_planks(dl, c, r, fill);         return;
+        case resource_type::tools:                 item_tools(dl, c, r, fill);          return;
+        case resource_type::power:                 item_power(dl, c, r, fill);          return;
+        case resource_type::small_arms:            item_small_arms(dl, c, r, fill);     return;
+        case resource_type::armoured_vehicles:     item_armoured_vehicles(dl, c, r, fill); return;
+        case resource_type::artillery_pieces:      item_artillery(dl, c, r, fill);      return;
+        case resource_type::guided_weapons:        item_guided_weapons(dl, c, r, fill); return;
+        case resource_type::drones:                item_drones(dl, c, r, fill);         return;
+        case resource_type::airframes:             aircraft(dl, c, r, fill, true);      return; // the airbase's own shape
+        // RETIRED SLOT: nothing produces it and no market prices it, so no row
+        // draws this. The crane is honest if an old save's shelf ever surfaces it.
+        case resource_type::construction_capacity: under_construction(dl, c, r, fill); return;
+        case resource_type::count:                 break;
+    }
 }
 
 void under_construction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
@@ -767,6 +1370,23 @@ void opportunity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     const float a = r * 0.5f;
     dl->AddLine({ centre.x - a, centre.y }, { centre.x + a, centre.y }, colour, 1.5f);
     dl->AddLine({ centre.x, centre.y - a }, { centre.x, centre.y + a }, colour, 1.5f);
+}
+
+void gear(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A ring with eight short teeth: the session control, stroke only, so it does
+    // not read as any filled building or resource glyph.
+    constexpr int   teeth = 8;
+    constexpr float tau   = 6.2831853f;
+    dl->AddCircle(centre, r * 0.62f, colour, 0, 1.5f);
+    for (int i = 0; i < teeth; ++i)
+    {
+        const float a  = tau * static_cast<float>(i) / static_cast<float>(teeth);
+        const float cx = std::cos(a);
+        const float sy = std::sin(a);
+        dl->AddLine({ centre.x + cx * r * 0.62f, centre.y + sy * r * 0.62f },
+                    { centre.x + cx * r, centre.y + sy * r }, colour, 2.0f);
+    }
 }
 
 void production(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)

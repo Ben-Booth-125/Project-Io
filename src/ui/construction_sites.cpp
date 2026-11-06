@@ -7,6 +7,7 @@
 #include "presentation.hpp"       // palette, extraction_building_name, value_colour
 #include "text_fit.hpp"           // fitted - the market column
 
+#include "world/resource_names.hpp"
 #include "world/building_profit.hpp"  // estimate_prospective_profit - THE profit figure (no second estimator)
 #include "world/construction.hpp"     // construction_capex / construction_site_multiplier
 #include "world/logistic_points.hpp"  // lp_route_to - the routed cover
@@ -15,6 +16,8 @@
 #include "world/nation_tech.hpp"      // recipe_unlocked - the door's recipe filter
 #include "world/placement_rules.hpp"  // can_place_in_world, k_extractable, is_depositless_site
 
+#include <tuple>
+#include <optional>
 #include <imgui.h>
 
 #include <algorithm>
@@ -59,6 +62,28 @@ struct cover_cache
 cover_cache& covers()
 {
     static cover_cache c;
+    return c;
+}
+
+/// The quotes asked for since the stamp last moved: an economy tick, a building placed
+/// or demolished, a road. A mothball or recipe switch while paused is read at the next
+/// quarter, as prices are; the door and the finder stay stale together, so they agree.
+struct quote_cache
+{
+    lp_stamp                          stamp;
+    std::optional<site_quote_context> cx;
+    std::map<std::tuple<entity_id, int, int, int, float>, site_quote> at;
+};
+
+const economy_report*& quote_report()
+{
+    static const economy_report* r = nullptr;
+    return r;
+}
+
+quote_cache& quotes()
+{
+    static quote_cache c;
     return c;
 }
 
@@ -232,15 +257,16 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
         r.no_logistics = !(r.cover > 0.0f);
 
         // THE PROFIT IS THE DOOR'S FIGURE, never a second estimator: the same
-        // function, the same arguments, the tile's cover applied.
-        const building_profit bp = estimate_prospective_profit(
-            w, reg, tid, c.type, c.target, c.recipe, nullptr, nullptr, r.cover);
+        // quote, the tile's cover applied.
+        const site_quote sq = quote_for_tile(w, reg, tid, c.type, c.target, c.recipe, r.cover);
+        const building_profit& bp = sq.profit;
         r.priced = bp.has_data;
         r.profit = bp.net();
+        r.starved  = sq.starved;
+        r.short_of = sq.short_of;
         r.profit_full_cover = (r.cover >= 1.0f)
             ? r.profit
-            : estimate_prospective_profit(w, reg, tid, c.type, c.target, c.recipe,
-                                          nullptr, nullptr, 1.0f).net();
+            : quote_for_tile(w, reg, tid, c.type, c.target, c.recipe, 1.0f).profit.net();
 
         r.market = market_for_tile(w, tid);
         if (r.market != null_entity)
@@ -260,10 +286,12 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
             // Yield is the estimate's own revenue at the price it was valued at, so
             // it can never be a different reading of the tile from the profit beside it.
             const float p = market_price(w, r.market, c.target);
-            if (bp.has_data && p > 0.0f)
+            // The price the quote settled at: the forecast the revenue was valued at.
+            const float settled = p * sq.price_share;
+            if (bp.has_data && settled > 0.0f)
             {
                 r.has_yield = true;
-                r.yield     = bp.revenue / p;
+                r.yield     = bp.revenue / settled;
             }
         }
 
@@ -364,6 +392,32 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
         return a.name < b.name;
     });
     return out;
+}
+
+void set_quote_report(const economy_report* report)
+{
+    quote_report() = report;
+}
+
+site_quote quote_for_tile(world& w, const recipe_registry& reg, entity_id tile, building_type type,
+                          resource_type target, std::uint16_t recipe, float lp_cover)
+{
+    const economy_report* report = quote_report();
+    quote_cache& qc = quotes();
+    const lp_stamp now = make_lp_stamp(w);
+    if (!(now == qc.stamp) || !qc.cx.has_value())
+    {
+        qc.stamp = now;
+        qc.at.clear();
+        qc.cx.emplace(make_site_quote_context(w, reg, report));
+    }
+    const auto key = std::make_tuple(tile, static_cast<int>(type), static_cast<int>(target),
+                                     static_cast<int>(recipe), lp_cover);
+    if (const auto it = qc.at.find(key); it != qc.at.end())
+        return it->second;
+    site_quote q = quote_site(w, reg, *qc.cx, tile, type, target, recipe, lp_cover);
+    qc.at.emplace(key, q);
+    return q;
 }
 
 float site_lp_cover(world& w, entity_id tile, bool* blocked)
@@ -689,6 +743,12 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 char buf[240];
                 if (!r.priced)
                     std::snprintf(buf, sizeof buf, "No market prices this tile, so there is no estimate.");
+                else if (r.starved)
+                    std::snprintf(buf, sizeof buf,
+                                  "It would likely stand idle: this market cannot get it %s at a price it "
+                                  "will pay. Est. net %+d cr / qtr is its upkeep alone.",
+                                  resource_names::name_of(r.short_of).c_str(),
+                                  static_cast<int>(std::lround(r.profit)));
                 else if (r.cover < 1.0f)
                     std::snprintf(buf, sizeof buf,
                                   "Est. net %+d cr / qtr: it would run at %d%% while its Logistic "
@@ -699,7 +759,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                                   static_cast<int>(std::lround(r.profit_full_cover)));
                 else
                     std::snprintf(buf, sizeof buf,
-                                  "Est. net %+d cr / qtr at today's local prices, fully served.",
+                                  "Est. net %+d cr / qtr once its output is selling here, fully served.",
                                   static_cast<int>(std::lround(r.profit)));
                 const ImU32 ink = r.priced ? value_colour(static_cast<double>(r.profit)) : 0u;
                 cell("profit", w_net, buf, ink);

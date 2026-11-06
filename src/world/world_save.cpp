@@ -11,6 +11,7 @@
 #include "air_combat.hpp"   // BL-1449: air_roster_table — the air section's range checks
 #include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
 #include "war.hpp"         // BL-1459: the war section
+#include "hex_neighbors.hpp" // BL-1502: a front key across the line
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <sstream>
@@ -1045,6 +1046,9 @@ void clear_derived_state(world& w)
     w.logistics_flood_fields.clear();
     w.leg_flood_fields.clear(); // BL-1186: the leg-confined floods, same footing
     w.leg_path_cache.clear();
+    w.lane_path_cache.clear();   // BL-1505: the warring lanes, same footing
+    w.lane_flood_fields.clear();
+    w.lane_cache_wars.clear();
     w.body_port_tiles.clear();
     w.rail_networks.clear(); // BL-1255: the rail network, same footing
     w.body_reach_cost.clear();
@@ -2047,7 +2051,49 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     if (version >= k_world_save_version_contributors)
         write_sentiment_provenance(w.sentiment, out);
 
-    // world_save_version 78 (BL-1539): THE RESEARCH BOOKS, the last section. What the
+    // world_save_version 78 (BL-1502): THE OCCUPATION LAYER, after the
+    // provenance. Every occupied tile ascending, as (tile, occupier).
+    if (version >= k_world_save_version_occupation)
+    {
+        w_u32(out, static_cast<uint32_t>(w.tile_occupier.size()));
+        for (const auto& [tile, occupier] : w.tile_occupier)
+        {
+            w_id(out, tile);
+            w_id(out, occupier);
+        }
+    }
+
+    // world_save_version 79 (BL-1504): THE DEFEND ORDERS. Every defending
+    // unit ascending id, as (unit, province, post).
+    if (version >= k_world_save_version_defend)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [uid, u] : w.units)
+            if (u.defend_province != no_province)
+                ids.push_back(uid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id uid : ids)
+        {
+            w_id(out, uid);
+            w_u32(out, w.units.at(uid).defend_province);
+            w_id(out, w.units.at(uid).defend_post);
+        }
+        // BL-1505, the same version: where each convoy of a nation at war stands, in the
+        // convoys' own order, as (convoy id, tile).
+        uint32_t heads = 0;
+        for (const convoy_component& c : w.convoys)
+            heads += c.lane_head != null_entity ? 1u : 0u;
+        w_u32(out, heads);
+        for (const convoy_component& c : w.convoys)
+            if (c.lane_head != null_entity)
+            {
+                w_u32(out, c.id);
+                w_id(out, c.lane_head);
+            }
+    }
+
+    // world_save_version 80 (BL-1539): THE RESEARCH BOOKS, the last section. What the
     // nation step debited that no return has booked, and each return's booked research.
     if (version >= k_world_save_version_research_books)
     {
@@ -2070,9 +2116,39 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     }
 }
 
+void write_world_snapshot_pre_defend(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1504): the v78 stream shape - no defend-order section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_defend);
+}
+
+std::size_t world_save_defend_section_bytes(const world& w)
+{
+    std::size_t n = 0;
+    for (const auto& [uid, u] : w.units)
+        if (u.defend_province != no_province)
+            ++n;
+    std::size_t heads = 0; // BL-1505: the lane heads share the section (v79)
+    for (const convoy_component& c : w.convoys)
+        if (c.lane_head != null_entity)
+            ++heads;
+    return 4 + 12 * n + 4 + 8 * heads;
+}
+
+void write_world_snapshot_pre_occupation(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1502): the v77 stream shape - no occupation section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_occupation);
+}
+
+std::size_t world_save_occupation_section_bytes(const world& w)
+{
+    return 4 + 8 * w.tile_occupier.size();
+}
+
 void write_world_snapshot_pre_research_books(const world& w, std::ostream& out)
 {
-    // VERIFICATION ONLY (BL-1539): the v77 stream shape - no research-books section.
+    // VERIFICATION ONLY (BL-1539): the v79 stream shape - no research-books section.
     write_world_snapshot_at(w, out, k_world_save_version_pre_research_books);
 }
 
@@ -2443,7 +2519,9 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_refusals     // BL-1480: v74, no peace refusals
             && version != k_world_save_version_pre_airframes    // BL-1436: v75, arrays 54 wide
             && version != k_world_save_version_pre_contributors // BL-1470: v76, no provenance
-            && version != k_world_save_version_pre_research_books)) // BL-1539: v77, nothing booked
+            && version != k_world_save_version_pre_occupation // BL-1502: v77, nothing occupied
+            && version != k_world_save_version_pre_defend     // BL-1504: v78, no defend orders
+            && version != k_world_save_version_pre_research_books)) // BL-1539: v79, nothing booked
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -3251,12 +3329,23 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // strictly ascending by (nation, key), each nation in the stream, each key a tile it
     // holds, each order push (hold is never stored). Refused whole otherwise. A v61 (and
     // older) stream ends before it: no unit is assigned and every front holds.
+    // BL-1502: a front key is a tile of the nation's OWN SIDE of the line, which since v78
+    // can be ground it occupies, or (a span wholly claimed, fronts.hpp) a tile across it.
+    // The occupation section reads last, so a v78 key its nation does not own is held
+    // back and judged once the layer is in (below).
+    std::vector<std::pair<entity_id, entity_id>> front_keys_to_judge; // (tile, nation)
     if (version >= k_world_save_version_pre_tile)
     {
         const auto held_by = [&](entity_id tile, entity_id nation) {
             const auto it = s.tile_to_nation.find(tile);
-            return nation != null_entity && s.tiles.count(tile) != 0
-                && it != s.tile_to_nation.end() && it->second == nation;
+            if (nation == null_entity || s.tiles.count(tile) == 0)
+                return false;
+            if (it != s.tile_to_nation.end() && it->second == nation)
+                return true;
+            if (version < k_world_save_version_occupation)
+                return false;
+            front_keys_to_judge.emplace_back(tile, nation);
+            return true;
         };
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.units.size())
@@ -4053,10 +4142,120 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
         && !read_sentiment_provenance(s.sentiment, in, s.sentiment.contributions, s.sentiment.seeds))
         return false;
 
-    // v78 (BL-1539): the research books. Untrusted: each row names a nation in the
+    // v78 (BL-1502): the occupation layer. Untrusted: tiles strictly ascending, each with
+    // an owner in the stream, its occupier a different nation of the stream with an open
+    // war against that owner. Refused whole otherwise. A v77 (and older) stream ends
+    // before it: nothing is occupied.
+    if (version >= k_world_save_version_occupation)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.tiles.size())
+            return false;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id tile = null_entity, occupier = null_entity;
+            if (!r_id(in, tile) || !r_id(in, occupier))
+                return false;
+            const auto own = s.tile_to_nation.find(tile);
+            const auto occupied_tile = s.tiles.find(tile); // water is taken only where a road crosses it
+            if (occupied_tile == s.tiles.end()
+                || (is_water(occupied_tile->second.substrate) && !tile_has_road(occupied_tile->second))
+                || own == s.tile_to_nation.end() || own->second == occupier
+                || s.nations.count(occupier) == 0
+                || (s.wars.count({ occupier, own->second }) == 0
+                    && s.wars.count({ own->second, occupier }) == 0)
+                || (!s.tile_occupier.empty() && !(s.tile_occupier.rbegin()->first < tile)))
+                return false;
+            s.tile_occupier.emplace(tile, occupier);
+        }
+
+        // The front keys held back above: each is a tile its nation holds, or one with a
+        // hex side onto ground it holds. Refused whole otherwise.
+        if (!front_keys_to_judge.empty())
+        {
+            std::map<std::tuple<entity_id, int, int>, entity_id> at;
+            for (const auto& [tid, tc] : s.tiles) // one writer per cell: order cannot reach it
+                at[std::make_tuple(tc.body, tc.grid_x, tc.grid_y)] = tid;
+            for (const auto& [tile, nation] : front_keys_to_judge)
+            {
+                bool ok = s.tile_controller(tile) == nation;
+                const tile_component& tc = s.tiles.at(tile);
+                const auto bit = s.bodies.find(tc.body);
+                const int gw = bit != s.bodies.end() ? bit->second.grid_width : 0;
+                for (int side = 0; side < 6 && !ok && gw > 0; ++side)
+                {
+                    hex_neighbors::coord c = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+                    c.gx = ((c.gx % gw) + gw) % gw;
+                    const auto n = at.find(std::make_tuple(tc.body, c.gx, c.gy));
+                    ok = n != at.end() && s.tile_controller(n->second) == nation;
+                }
+                if (!ok)
+                    return false;
+            }
+        }
+    }
+
+    // v79 (BL-1504): the defend orders. Untrusted: units strictly ascending, each in the
+    // stream, each province in the stream, each post a tile of it. Refused whole otherwise.
+    // A v78 (and older) stream ends before it: no unit defends.
+    if (version >= k_world_save_version_defend)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity, post = null_entity;
+            uint32_t prov = 0;
+            if (!r_id(in, uid) || !r_u32(in, prov) || !r_id(in, post))
+                return false;
+            const auto uit = s.units.find(uid);
+            const province* pr = s.provinces.find(prov);
+            if (uit == s.units.end() || (k > 0 && uid <= prev) || pr == nullptr
+                || std::find(pr->tiles.begin(), pr->tiles.end(), post) == pr->tiles.end())
+                return false;
+            // What the verb refuses (corp_verb::defend_province, defend_post_for): a row that
+            // holds no land post, a unit on a front, a post on no ground of its nation's, or
+            // on water with no road. A cession ends the order with the ground (war.cpp).
+            const auto& rows = unit_roster_table();
+            const auto post_tile = s.tiles.find(post);
+            const auto post_own  = s.tile_to_nation.find(post);
+            if (uit->second.type >= rows.size()
+                || (rows[uit->second.type].domains & domain_bit(traversal_domain::land)) == 0
+                || uit->second.front != null_entity
+                || post_tile == s.tiles.end() || post_own == s.tile_to_nation.end()
+                || post_own->second != uit->second.owner
+                || (is_water(post_tile->second.substrate) && !tile_has_road(post_tile->second)))
+                return false;
+            prev = uid;
+            uit->second.defend_province = prov;
+            uit->second.defend_post     = post;
+        }
+        // BL-1505: the lane heads. Each names a convoy of the stream, in the stream's order,
+        // and a tile on the body the stream holds. Refused whole otherwise.
+        uint32_t heads = 0;
+        if (!r_u32(in, heads) || heads > s.convoys.size())
+            return false;
+        std::size_t cursor = 0;
+        for (uint32_t k = 0; k < heads; ++k)
+        {
+            uint32_t id = 0;
+            entity_id head = null_entity;
+            if (!r_u32(in, id) || !r_id(in, head) || head == null_entity || s.tiles.count(head) == 0)
+                return false;
+            while (cursor < s.convoys.size() && s.convoys[cursor].id != id)
+                ++cursor;
+            if (cursor == s.convoys.size())
+                return false;
+            s.convoys[cursor++].lane_head = head;
+        }
+    }
+
+    // v80 (BL-1539): the research books. Untrusted: each row names a nation in the
     // stream, strictly ascending, never null; its unbooked debits and booked research
     // finite, never negative, inside float range; its count exactly the returns the
-    // stream gave that nation. Refused whole otherwise. A v77 (and older) stream ends
+    // stream gave that nation. Refused whole otherwise. A v79 (and older) stream ends
     // before it: nothing unbooked, and no return booked research.
     if (version >= k_world_save_version_research_books)
     {

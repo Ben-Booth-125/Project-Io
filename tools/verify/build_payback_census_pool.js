@@ -13,12 +13,14 @@ const parse = (line) => Object.fromEntries(line.trim().split(/\s+/).slice(1).map
   return [k, Number.isNaN(n) ? v : n];
 }));
 const site = [], qtr = [], laps = [], actual = [];
+const holdout = [];
 for (const f of files)
   for (const l of fs.readFileSync(f, 'utf8').split(/\r?\n/)) {
     if (l.startsWith('SITE ')) site.push(parse(l));
     else if (l.startsWith('QTR ')) qtr.push(parse(l));
     else if (l.startsWith('LAPS ')) laps.push(parse(l));
     else if (l.startsWith('ACTUAL ')) actual.push(parse(l));
+    else if (l.startsWith('HOLDOUT ')) holdout.push(parse(l));
   }
 const med = (a) => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
 const pct = (a, p) => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(s.length * p))]; };
@@ -73,6 +75,27 @@ if (laps.length) {
 if (actual.length) {
   const by = new Map();
   for (const a of actual) { const k = a.q + ' ' + a.name; if (!by.has(k)) by.set(k, []); by.get(k).push(a); }
-  console.log('\nq recipe | plants | idled | run | actual net/q | quoted net/q');
+  console.log('\nq recipe | plants | idled | run | earned net/q | old quote');
   for (const [k, v] of [...by.entries()].sort()) console.log(`${k.padEnd(36)} ${String(v.length).padStart(4)} ${String(v.filter(x => x.idled).length).padStart(4)} ${med(v.map(x => x.run)).toFixed(2).padStart(6)} ${f1(med(v.map(x => x.actual))).padStart(9)} ${f1(med(v.map(x => x.quoted))).padStart(9)}`);
+}
+
+// The new quote's spread: does the site matter for a processor now?
+for (const kind of ['extract', 'process']) {
+  const pr = site.filter(x => x.kind === kind && x.qbest > 0 && x.qmed > 0);
+  if (pr.length) console.log(`\nnew quote, ${kind}, best over median: median ${f1(med(pr.map(x => x.qbest / x.qmed)))}  p90 ${f1(pct(pr.map(x => x.qbest / x.qmed), .9))}  rows ${pr.length}`);
+  const st = site.filter(x => x.kind === kind);
+  if (st.length) console.log(`  share of sites that would stand starved: ${f0(100 * st.reduce((n, x) => n + (x.starved || 0), 0) / Math.max(1, st.reduce((n, x) => n + x.sites, 0)))}%`);
+}
+
+// The holdout: quoted when ordered, earned a year after standing. Is the new figure nearer?
+if (holdout.length) {
+  const abs = (f) => med(holdout.map((x) => Math.abs(f(x) - x.earned)));
+  const sign = (f) => holdout.filter((x) => (f(x) > 0) === (x.earned > 0)).length / holdout.length;
+  console.log(`\nHOLDOUT ${holdout.length} buildings. median |quote - earned|: old ${f1(abs((x) => x.old))}  new ${f1(abs((x) => x.new))}`);
+  console.log(`  right about whether it pays: old ${f0(100 * sign((x) => x.old))}%  new ${f0(100 * sign((x) => x.new))}%`);
+  const by = new Map();
+  for (const h of holdout) { if (!by.has(h.name)) by.set(h.name, []); by.get(h.name).push(h); }
+  console.log('name | n | run | earned | old quote | new quote | share | starved');
+  for (const [k, v] of [...by.entries()].sort((a, b) => b[1].length - a[1].length))
+    console.log(`${k.padEnd(26)} ${String(v.length).padStart(4)} ${med(v.map((x) => x.run)).toFixed(2).padStart(5)} ${f1(med(v.map((x) => x.earned))).padStart(8)} ${f1(med(v.map((x) => x.old))).padStart(8)} ${f1(med(v.map((x) => x.new))).padStart(8)} ${med(v.map((x) => x.share)).toFixed(2).padStart(5)} ${String(v.filter((x) => x.starved).length).padStart(3)}`);
 }

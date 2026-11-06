@@ -106,6 +106,16 @@ void draw_stacked_columns(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                           const char* right_caption = nullptr,
                           bool tight_axis = false);
 
+/// Draw two stacked HORIZONTAL bars inside [@p mn, @p mx], sharing a left edge and one
+/// axis (tight_ceil over the longer bar's total): the Nation overview's Earnings over its
+/// Expenses (BL-1509; ledgers/corporation.md § Slot 1). The same rules as the columns: a
+/// zero segment is absent, and each segment names itself and its figure on hover. Each
+/// bar's caption stands in a left gutter and its total at its right end.
+void draw_stacked_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                       const stack_segment* top,    std::size_t top_count,
+                       const stack_segment* bottom, std::size_t bottom_count,
+                       const char* top_caption, const char* bottom_caption);
+
 /// Where a chart's swatch legend sits (BL-215). The narrow-host mode is a CALLER
 /// opt-in, never a width test inside draw_bars — an internal test would move the
 /// goldened tile-selection graphs (host width ~238 px at 1280).

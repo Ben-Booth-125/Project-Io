@@ -342,6 +342,10 @@
    "Market Ledger, view tab strip at the top"
   ],
   [
+   "ledger.market_goods_sort",
+   "Market Ledger, Goods view, the table headings (Good, Shelf, Price, v.Base, 8 qtr)"
+  ],
+  [
    "ledger.nav_budget",
    "Nav rail, slot 2 (Budget icon)"
   ],
@@ -406,6 +410,10 @@
    "Keyboard, in-game only"
   ],
   [
+   "chrome.alert_press",
+   "Alert strip, top centre of the canvas area just below the header. Each alert is one press; the strip draws nothing with nothing to say."
+  ],
+  [
    "chrome.f10_options",
    "Keyboard; opens the centred Options window"
   ],
@@ -435,7 +443,7 @@
   ],
   [
    "chrome.gear_toggle",
-   "In-game chrome, top-right gear button just left of the time column"
+   "In-game chrome, the gear at the right end of the time panel's speed row, right of the speed buttons"
   ],
   [
    "chrome.menu_new_game",
@@ -443,7 +451,11 @@
   ],
   [
    "chrome.menu_quick_start",
-   "Main menu, primary button column, between New Game and Quit"
+   "Main menu, primary button column, between New Game and Load"
+  ],
+  [
+   "chrome.menu_load",
+   "Main menu, primary button column, between Quick Start and Quit"
   ],
   [
    "chrome.menu_quit",
@@ -470,24 +482,32 @@
    "Options window, Display section"
   ],
   [
-   "chrome.sysmenu_exit",
-   "System menu popup, below the separator"
+   "chrome.escape_exit_menu",
+   "Escape menu, third press"
   ],
   [
-   "chrome.sysmenu_exit_cancel",
-   "System menu popup, armed exit confirmation"
+   "chrome.escape_exit_game",
+   "Escape menu, fourth press"
   ],
   [
-   "chrome.sysmenu_exit_confirm",
-   "System menu popup, armed exit confirmation"
+   "chrome.escape_exit_cancel",
+   "Escape menu, exit warning"
   ],
   [
-   "chrome.sysmenu_pause",
-   "System menu popup, top button"
+   "chrome.escape_exit_confirm",
+   "Escape menu, exit warning"
+  ],
+  [
+   "chrome.escape_save",
+   "Escape menu, first press"
+  ],
+  [
+   "chrome.escape_options",
+   "Escape menu, second press"
   ],
   [
    "chrome.sysmenu_god_view",
-   "System menu popup, spectate-only checkbox"
+   "Escape menu, spectate-only checkbox beneath the presses"
   ],
   [
    "chrome.wizard_back",
@@ -531,15 +551,15 @@
   ],
   [
    "gameplay.offer_friendship",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Offer friendship' press (ledger.diplomacy_offer_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Offer friendship' press (ledger.diplomacy_offer_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing."
   ],
   [
    "gameplay.accept_friendship",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Accept friendship' press, shown when that nation has offered (ledger.diplomacy_accept_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Accept friendship' press, shown when that nation has offered (ledger.diplomacy_accept_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing."
   ],
   [
    "gameplay.return_to_neutral",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Withdraw' press, shown while a friendship or the player's own offer stands (ledger.diplomacy_withdraw). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Withdraw' press, shown while a friendship or the player's own offer stands (ledger.diplomacy_withdraw). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing."
   ],
   [
    "gameplay.march_unit",
@@ -650,6 +670,10 @@
    "Assign to front on the unit card (and the stack panel for a stack) in the Selection element, for the player's own unit: the fronts of its nation, each named by its neighbour and span. Also a corp_verb (corp_verb::assign_front, 41) on the command seam."
   ],
   [
+   "gameplay.defend_province",
+   "Defend this province in the Assign to front menu on the unit card (and the stack panel for a stack) in the Selection element, for the player's own unit. Also a corp_verb (corp_verb::defend_province, 54) on the command seam."
+  ],
+  [
    "gameplay.set_front_order",
    "The front card's Hold and Push presses in the Selection element, after clicking one of the player's fronts on the canvas. Also a corp_verb (corp_verb::set_front_order, 42) on the command seam."
   ],
@@ -702,6 +726,18 @@
    "The Planetary canvas, with the player's own unit or unit group selected, hovering another nation's stack (BL-1443; SELECTION.md § Right-click orders)."
   ],
   [
+   "canvas.unit_press_marching",
+   "The Planetary canvas: a marching unit's counter, drawn apart from its tile's stack on the hop it is walking (BL-1507; MILITARY.md § Land — on the canvas)."
+  ],
+  [
+   "canvas.convoy_select",
+   "The Planetary canvas: a convoy marker at a lane's head, a chevron on a dark disc in the owner's colour, with a count when several share the tile (BL-1506; SELECTION.md § The convoy element)."
+  ],
+  [
+   "canvas.unit_drag_select",
+   "The Planetary canvas, with no lens and nothing armed (BL-1508; SELECTION.md § The dragged group)."
+  ],
+  [
    "gameplay.hire_wing",
    "The Military ledger's air rows (nav rail slot 7, Recruit tab, Air theatre tab; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too."
   ],
@@ -739,7 +775,7 @@
   ],
   [
    "gameplay.set_embargo",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117)."
   ],
   [
    "ledger.military_theatre_tab",
@@ -748,6 +784,10 @@
   [
    "chrome.header_recruit_hover",
    "The header strip's top right (HEADER.md § Contents, Recruits): three recruit readouts, land, air and sea in that order - each the theatre's glyph (soldier, aircraft, anchor), the nation's recruits held against the pool's cap ('120 / 750') and a thin bar of held over cap beneath. A narrow window shows the held figure alone, then the glyph and bar only (HEADER.md § Fit and degradation); the bars never drop."
+  ],
+  [
+   "chrome.header_money_hover",
+   "Header strip: TREASURY and its figure, the net in brackets beside it, CARGO and its figure"
   ],
   [
    "ledger.military_air_raise",
@@ -798,12 +838,12 @@
    "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), the 'Nations' / 'Wars' tab strip."
   ],
   [
-   "ledger.diplomacy_expand_row",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, a row's expander at its right edge (a down caret, an up caret while open)."
+   "ledger.diplomacy_choose_nation",
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the nation dropdown at the head of the view. A cross-cutting selector, exempt from the toggle rule. A press on a nation under the Nations lens makes the same choice."
   ],
   [
    "ledger.diplomacy_declare_open",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Declare war' press. The canvas right-click attack on a nation the player is not hostile to opens the same declaration (canvas.unit_right_click_attack)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Declare war' press. The canvas right-click attack on a nation the player is not hostile to opens the same declaration (canvas.unit_right_click_attack)."
   ],
   [
    "canvas.diplomacy_goal_pick",
@@ -819,19 +859,19 @@
   ],
   [
    "ledger.diplomacy_offer_friendship",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Offer friendship' press (neither friends nor an offer either way)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Offer friendship' press (neither friends nor an offer either way)."
   ],
   [
    "ledger.diplomacy_withdraw",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Withdraw' press (you are friends, or your offer is pending)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Withdraw' press (you are friends, or your offer is pending)."
   ],
   [
    "ledger.diplomacy_accept_friendship",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Accept friendship' press (they have offered)."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Accept friendship' press (they have offered)."
   ],
   [
    "ledger.diplomacy_embargo",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift press - a toggle (diplomacy.md § 5): it reads 'Embargo' while none stands, and 'Lift' in the active button colour while your embargo of that nation stands."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's Embargo / Lift press - a toggle (diplomacy.md § 5): it reads 'Embargo' while none stands, and 'Lift' in the active button colour while your embargo of that nation stands."
   ],
   [
    "ledger.diplomacy_answer",

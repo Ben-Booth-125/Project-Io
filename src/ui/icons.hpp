@@ -65,6 +65,17 @@ void stack_ring(ImDrawList* dl, ImVec2 centre, float r,
 /// @param res    Resource whose identity colour to use.
 void resource(ImDrawList* dl, ImVec2 centre, float r, resource_type res);
 
+/// Draw a good's **item glyph** — its own silhouette, one per good across the whole
+/// roster, in the resource's identity colour (ICONS.md § 2b, Ben 2026-11-05). For a
+/// surface that names goods in rows, where a pip would be one shape forty-eight
+/// times. Built to hold at r = 5 px. The pip above stays the deposit and strip mark.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param res    The good to depict; supplies the colour too.
+void item(ImDrawList* dl, ImVec2 centre, float r, resource_type res);
+
 /// Draw an under-construction marker — a crane silhouette — in @p colour. Drawn
 /// IN PLACE OF a building's type silhouette while `ticks_remaining > 0` (BL-327,
 /// replacing the BL-323 S4 desaturation treatment: dimming read as "faded", not
@@ -165,6 +176,15 @@ void country(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param r      Half-extent of the glyph, screen pixels.
 /// @param colour Stroke colour.
 void opportunity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the session gear — a toothed ring (BL-1519). For the time panel's escape
+/// menu control.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void gear(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
 /// Draw the Production-lens glyph — a filled upward triangle over a baseline
 /// (output / throughput rising). For the overlay-lens control strip.

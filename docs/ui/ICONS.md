@@ -258,43 +258,74 @@ curation question and not an icon one.
 ### 2b. The item glyph — one shape per good
 
 **One glyph per good, the full set (Ben, 2026-11-05, overturning the four track silhouettes of
-2026-08-29).** Every good in the roster has its own item glyph, in its identity colour. The record of
-the overturned design follows, for its reasoning: its placeholder conditions and its pip rule stand,
-and its four-silhouette conclusion does not.
+2026-08-29).** Every good in the roster has its own item glyph, `item(dl, centre, r, resource_type)`,
+in its identity colour (derived, like the pip). Forty-two identical marks beside forty-two names say
+nothing the names do not, and the column earns its width by letting the eye find a good without
+reading. The 2026-08-29 design held that a per-good set was more than a player could keep in mind; Ben
+overturned that, so a set of four shapes that discriminated by value track is not what this is.
 
-> **PLACEHOLDERS UNTIL A LATER SPRINT** (Ben, 2026-08-29: *"For flags and glyphs, use
-> placeholders. We will come to that in a different sprint later."*). The four track silhouettes
-> and the nation chips below are the **settled design**; the Market rework ships against
-> placeholders and does not wait on the art. Two conditions on that, both from the
-> honest-placeholder idiom (NR-249): a placeholder must be *visibly* provisional rather than a
-> shape a player would learn as meaning something, and the column must not be sized to the
-> placeholder — reserve the width the real glyph will need, or the table gets re-laid out twice.
-> The existing `resource` pip is the natural stand-in for the item glyph, since it is already
-> colour-keyed and already means "a resource"; it simply does not yet discriminate.
+**The pip is not replaced.** `resource(…, resource_type)` stays the deposit marker and the resource
+strip's mark, where one small colour-keyed dot is exactly right. The item glyph is a table-column
+glyph and a second entry, on the same rule that gave `readout` its own shape rather than a second
+borrow of `strategy`.
 
-The Market ledger's Goods table takes an **item glyph** column (Ben, 2026-08-29:
-*"item_glyph; name; price; body_average_price; price_relative_to_base_price;
-six_month_price_graph"*). What exists today is `resource(…, resource_type)` — a small filled
-**diamond in the resource's identity colour**, one shape for every good. Drawn as a table column
-across ~42 rows that is forty-two identical diamonds, discriminating by hue alone, immediately
-beside the resource's own name in that same hue. It would be decoration duplicating the column
-next to it.
+**Built to read at a row's height.** A Goods row names its good at about one em, so a glyph is drawn
+at a radius of about half an em, 5 to 8 px, and scales with the font. Each is one bold silhouette with
+at most a little dark interior detail, and its strokes scale with `r` and never fall under a pixel.
+**Under r = 8.5 a glyph drops its dark edge**, since four pixels of shard with a 1 px edge each side
+is two pixels of colour, and on dark chrome the edge separates nothing. **A near-black identity is
+raised for chrome** (`palette::readable_on_chrome`, hue kept, to a luma of 118): Coal, Peat and
+Charcoal are near-black on purpose and all but vanish on a ledger row, and the row's name wears the
+same raised colour so the pair still match. The
+`item_glyphs` check draws the set on a contact sheet at r = 4, 5, 6, 8 and 16 and fails if two goods
+share a shape.
 
-**The overturned 2026-08-29 design: four silhouettes keyed to the VALUE TRACK.** `RESOURCES.md`
-§ Resource categories already divides the roster into **Industrial / Ambient / Habitability /
-Mercantile**, and that division is a real thing a player acts on — it says what a good is *for*.
-Four shapes in the resource's identity colour give a glyph that discriminates at row height and
-teaches a distinction the game already has, where forty-two would be a bank of art nobody can
-hold in mind and a colour-only pip would say nothing the name does not.
+**The goods with a building identity (§ 1c) wear that same shape**, so a Quarry and the stone it cuts
+agree. Two do not, because their building shape fails at a row's size. The rest:
 
-**Production tier is the shading, if anything.** The three tiers (raw / refined / product) are an
-ordered axis, so they belong on an ordered channel — fill weight, not silhouette. Optional; the
-track alone is the load-bearing half.
+| Good | Shape |
+|---|---|
+| Iron Ore | One upright pick with a curved head. The building's crossed picks and the timber's crossed logs are one X in a row |
+| Steel | The building's ingot, taller. At its own proportions a row's size draws a dash |
+| Coal | A heaped mine cart on two wheels |
+| Petroleum | A derrick: an open lattice tower on a base line |
+| Silica | Three quartz points standing together |
+| Rare Earth Ore | A rock with three dark specks |
+| Iron-Nickel Ore | A meteorite: a round body low on the left, streaks trailing up to the right |
+| Platinum Group | A cut stone, flat table up, with a girdle line and two facets. The flat top keeps it off the pip's diamond |
+| Regolith | Loose rubble: six separate grains, three-two-one |
+| Tobacco | A broad pointed leaf on the diagonal, dark midrib, a stem |
+| Spices | A mortar with its pestle standing in it |
+| Coffee | A bean: a fat tilted oval split by an S-curve |
+| Furs | A paw print: four toes over a pad |
+| Refined Fuel | A jerrycan: a slab with a chamfered shoulder, a spout and a struck X |
+| Propellant | A tank on a nozzle bell, burning |
+| Silicon | A wafer: a disc with its flat cut, ruled into dies |
+| Refined Copper | A spool of wire: two flanges and a wound core |
+| REE Alloy | A horseshoe magnet with dark pole bands |
+| Machinery | A gear: eight teeth around a dark bore |
+| Alloys | Three ingots stacked two under one, against steel's single bar |
+| Electronics | A chip: a square body, pins on all four sides, a dark die |
+| Spacecraft Components | A satellite: a small bus between two solar wings, an antenna on top |
+| Clean Water | A tap with a drop falling from it, against water's bare teardrop |
+| Consumer Goods | A carrier bag: a flaring body under a looped handle |
+| Medical Supplies | A filled Greek cross. The stat grid's HP is the same cross in outline, and the two never share a surface |
+| Ordnance | A shell standing on its base, one driving band. The stat grid's ammunition is a pair of outlines |
+| Ceramics | A two-handled amphora, against clay's plain vessel |
+| Dressed Stone | A squared block seen from above a corner, its three faces shaded |
+| Planks | Three sawn boards leaning together, against peat's short level bricks |
+| Tools | A hammer: one handle, one square head |
+| Power | A lightning bolt |
+| Small Arms | A rifle in profile, muzzle right |
+| Armoured Vehicles | A tank in profile: gun, turret, hull, a track with rounded ends |
+| Artillery Pieces | A field gun: a raised barrel, one wheel, a trail to the ground |
+| Guided Weapons | A missile on the diagonal with swept fins. Ordnance's shell stands upright and has none |
+| Drones | A quadcopter from above: four rotor rings on a crossed frame |
+| Airframes | The `aircraft` (§ 1, Airbase), the airbase's own shape |
+| Construction Capacity | The `under_construction` crane. A retired slot no market prices; drawn only so no id is left blank |
 
-The existing `resource` pip is **not** replaced: it stays the deposit-marker and resource-strip
-mark, where one small colour-keyed dot is exactly right and no track distinction is wanted. The
-item glyph is a table-column glyph and a second entry, on the same rule that gave `readout` its
-own shape rather than a second borrow of `strategy`.
+A good's building (§ 1c) keeps its generic ore chunk or processing square where it has no bespoke
+shape: the item set does not change what the `building` glyph draws.
 
 **No nation flags exist, and the presence row must not imply otherwise.** A "list of nations who
 operate in that market" (Ben, same day) has `nation_colour(entity_id)` behind it — a per-nation
@@ -351,6 +382,7 @@ canvas, so the outline rule does not apply.
 | **Corporation** | `corporation(…, colour)` | Filled square + dark inner dot ("seal") | Caller fill | `overlay_mode::corporation` |
 | **Resource** | `resource(…, colour)` | Three stacked horizontal strata, widening + deepening top-to-bottom (gradient / density motif) | Caller fill (per-stratum alpha) | `overlay_mode::resource` |
 | **Population** | `population(…, colour)` | Small figure: round head over a tapered torso (people / habitability motif) | Caller fill | `overlay_mode::population` |
+| **Session gear** | `gear(…, colour)` | A ring with eight short teeth (stroke only) — the session control | Caller stroke | The time panel's escape menu control (`MENU.md`) |
 | **Opportunity** | `opportunity(…, colour)` | Open circle with an inner "+" (stroke only) — a "potential gain / margin" motif (where value could be made) | Caller stroke | `overlay_mode::opportunity` |
 | **Production** | `production(…, colour)` | Filled upward-pointing triangle over a short baseline (output / throughput rising motif); distinct from the market bars and the scarcity hollow down-triangle | Caller fill | `overlay_mode::production` |
 | **Scarcity** | `scarcity(…, colour)` | Hollow downward-pointing triangle (empty / depleted motif; inverse of the filled resource pip) | Caller stroke | `overlay_mode::scarcity` |
