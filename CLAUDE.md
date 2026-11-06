@@ -84,7 +84,7 @@ owning doc(s) for a source file, ranked by how often work on it cited each — t
 | `docs/economy/POPULATION.md` | Population centres, agglomeration, habitability, labour supply and contention. |
 | `docs/economy/ERAS.md` | The era ladder and the gate into space. |
 | `docs/economy/RESEARCH.md` | **Technology**: the nation holds it, every nation starts equal, research points, the grammar of every age's tree (travel/minor/major/quest, requirement groups, pairs, quests that key the next age, placeholders), the research queue. |
-| `docs/economy/tech/DIGITISATION_TREE.md` → `digitisation_tree.json` | The first age's tree: 160 nodes in three trees of three branches. **The store is canonical; query or check it with `node tools/session/tech_tree_store.js [--check]`, which also renders the doc's tables.** |
+| `docs/economy/tech/DIGITISATION_TREE.md` → `digitisation_tree.json` | The first age's tree: 211 nodes in three trees of ten branches. **The store is canonical; query or check it with `node tools/session/tech_tree_store.js [--check]`, which also renders the doc's tables.** |
 | `docs/economy/SPACE_ASSETS.md` | Off-body assets (stub). |
 
 ### Military, politics, relations

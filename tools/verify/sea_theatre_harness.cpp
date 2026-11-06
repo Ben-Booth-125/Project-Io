@@ -9,6 +9,7 @@
 //
 // Run: node tools/verify/build_harness.js sea_theatre_harness --run
 
+#include "world/nation_tech.hpp"
 #include "world/air_combat.hpp"
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
@@ -979,6 +980,18 @@ int main()
                 hit_day = d;
         }
         check(hit_day >= 0, "K11c the widened mask lands on a submarine in the daily pass");
+    }
+    {
+        // BL-1528 (naval branch): the tree's own node opens the item, with no waiver.
+        fixture f; build(f);
+        set_kit_research_waived_for_harness(false);
+        const uint16_t turbine = ship_kit_item_by_id("des.hull.gas_turbine");
+        const uint16_t quiet = ship_kit_item_by_id("des.hull.quiet");
+        const int a1 = io::dg::find_node("DG-ST-NV-A1");
+        check(a1 >= 0 && !ship_kit_item_researched(f.w, f.a, turbine), "K14 the Naval node exists and its item starts locked");
+        f.w.nation_tech[f.a].held.set(static_cast<std::size_t>(a1));
+        check(ship_kit_item_researched(f.w, f.a, turbine) && !ship_kit_item_researched(f.w, f.a, quiet),
+              "K14b holding the node opens its item and no other");
     }
     {
         // The daily pass reads kit: pace on a course, HP against the same fire.

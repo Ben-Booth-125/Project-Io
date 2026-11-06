@@ -14437,6 +14437,9 @@
     },
     "BL-1527": {
       "design": "MILITARY.md § Sea, the kit; RESOURCES.md § The kit goods. One live design per class on the existing designer. Ship hulls is a new terminal good at the Arms Works, priced by the margin anchor. Refit at the home port. New good moves the recipe table, so read PRODUCTION.md first."
+    },
+    "BL-1528": {
+      "design": "DIGITISATION_TREE.md § Naval. Author the nodes in the store and render with tech_tree_store.js. The ring and the research panel assume three branches per tree (ST gains ST-NA), so the store check and the panel's sector layout both change. Its quest and joint are authored here. The panel needs a live click."
     }
   }
 }

@@ -10,6 +10,25 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-06 — BL-1528 (naval branch): State's fourth research branch
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** Eighteen nodes appended to the store: Naval's seventeen and the joint Coastal Security.
+Nine kit nodes open the ships' 22 later items. The tree is 211 nodes in ten branches. The panel's ring lays
+out three, three and four branches rather than assuming three per tree. `ship_first_error` now refuses a
+node the tree does not hold.
+
+**Review.** The cold review caught the MCP server's literal node count of 160, which refused every kit and
+Naval node; it now reads the store. It also moved the joint off Force | Naval, so Force's espionage arm
+keeps its empty boundary, and caught glyph collisions from the arm offset.
+
+**Left open.** The panel's live click is owed and carried on BL-1534 (sea UI), with the rim label overlaps.
+Every Naval travel effect waits on ship strength, unread so far. BL-1533 (rival fleets) must raise whether
+the scorer may read its own ships and ports. Shape is identical to base; nation_tech R0h/R0i stay red as on base.
+
+---
+
 ## 2026-11-06 — BL-1527 (ship kit): ship designs and the ship hulls good
 
 **Runtime:** one session, Delivery Full on the naval worktree.

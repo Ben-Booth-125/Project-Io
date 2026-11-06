@@ -7777,6 +7777,54 @@
     }
    ],
    "resolved": "2026-11-06"
+  },
+  {
+   "brief": "naval-branch",
+   "title": "BL-1528 - The Naval research branch: State's fourth, authored in the store",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1528 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "The eighteen nodes are appended, no existing index moves, the grammar holds, and the store, header and doc tables agree.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "tech_tree_store.js --check clean; nation_tech_harness T1 series including T1g ten quests."
+    },
+    {
+     "id": "R2",
+     "text": "Nine kit nodes open the ships' 22 later items, one node each way, checked at compile time and by the store tool; a held node opens its item with no waiver.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "ship_first_error refuses a node the tree does not hold; unit_designs_harness U1h, 50/50; sea_theatre_harness K14, K14b, 172 checks, 0 failures."
+    },
+    {
+     "id": "R3",
+     "text": "An older held set reads its tail as unheld, with no save version move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "save_roundtrip OK. The held set carries a count prefix; no version bump in this diff."
+    },
+    {
+     "id": "R4",
+     "text": "The research panel draws ten branches in three sectors, and a press on a Naval node is reachable in the live app.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Capture only: tech_tree_panel.lua 0 failures, tech_tree_hover_naval reads Reactor Propulsion. Live click owed, carried on BL-1534 (sea UI)."
+    },
+    {
+     "id": "R5",
+     "text": "Research plays on with the new nodes and world shape does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "world_determinism ALL PASS; rebless_shape_probe seeds 0, 46, 28 identical; nation_tech_harness fails only R0h and R0i pacing, equally on base."
+    }
+   ],
+   "resolved": "2026-11-06"
   }
  ]
 }

@@ -436,7 +436,7 @@ constexpr std::string_view k_unread_systems[] = {
     "fertiliser recipe", "holding losses by nation", "household demand by nation",
     "launch draw by nation", "microchip recipe", "muster time",
     "national stock and demand ledger", "offshore placement", "plastics recipe", "politics",
-    "port handling by nation", "province building ceiling by type", "roads", "sentiment",
+    "port handling by nation", "province building ceiling by type", "roads", "sea control", "sentiment", "ship muster time", "ship strength",
     "survey reach", "tariffs", "tax yield", "trade partners by nation", "trade points",
     "trade settlement timing", "travel time by nation", "unit movement", "unit strength",
     "unit unlock", "unit_upkeep", "unrest", "wage_floor", "war outcomes",

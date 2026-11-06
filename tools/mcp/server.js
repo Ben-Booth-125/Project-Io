@@ -114,8 +114,10 @@ const VERBS = [
 ];
 
 // io::dg::node_count (src/world/digitisation_tree_data.hpp, generated from
-// docs/economy/tech/digitisation_tree.json): the research verbs' `order` range.
-const RESEARCH_NODE_COUNT = 160;
+// docs/economy/tech/digitisation_tree.json): the research verbs' `order` range. Read from
+// the store, the header's own source: a second literal went stale once already.
+const RESEARCH_NODE_COUNT = JSON.parse(fs.readFileSync(
+  path.join(__dirname, '..', '..', 'docs', 'economy', 'tech', 'digitisation_tree.json'), 'utf8')).nodes.length;
 
 // ---------------------------------------------------------------------------
 // The ProjectIo --serve child process

@@ -290,13 +290,17 @@ int main()
                 const char* nid = io::dg::nodes[static_cast<std::size_t>(e.node)].id;
                 const uint16_t li = kit_item_by_id(e.target);
                 const uint16_t ai = air_kit_item_by_id(e.target);
+                const uint16_t si = ship_kit_item_by_id(e.target); // BL-1528 (naval branch)
                 const char* named = li != k_no_kit_item ? cat[li].research_node
-                                  : ai != k_no_kit_item ? air_kit_catalogue()[ai].research_node : nullptr;
+                                  : ai != k_no_kit_item ? air_kit_catalogue()[ai].research_node
+                                  : si != k_no_kit_item ? ship_kit_catalogue()[si].research_node : nullptr;
                 if (named == nullptr || std::strcmp(named, nid) != 0) ++bad;
             }
             int air_later = 0;
             for (const air_kit_item& it : air_kit_catalogue()) if (it.research_node != nullptr) ++air_later;
-            check(bad == 0 && rows == later + air_later,
+            int ship_later = 0;
+            for (const ship_kit_item& it : ship_kit_catalogue()) if (it.research_node != nullptr) ++ship_later;
+            check(bad == 0 && rows == later + air_later + ship_later && ship_later == 22,
                   "U1h the tree's " + std::to_string(rows) + " unlock_kit rows are exactly the catalogue's later items, each on its own node");
         }
         check(cat.size() < k_no_kit_item && kit_item_by_id("inf.weapon.assault_rifle") != k_no_kit_item

@@ -942,6 +942,8 @@ constexpr const char* ship_first_error()
         }
         if (it.goods_count > k_kit_goods_max)
             return "a ship item names too many goods";
+        if (it.research_node != nullptr && io::dg::find_node(it.research_node) < 0)
+            return "a ship item names a node the tree does not hold";
         if (it.research_node == nullptr)
         {
             if (!ship_zero(it.delta) || it.goods_count != 0)

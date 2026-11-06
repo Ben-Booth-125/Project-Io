@@ -1113,7 +1113,7 @@
    "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
-   "status": "proposed",
+   "status": "complete",
    "glyph": "○",
    "sprint": "64",
    "version_goal": "v0.3.0",
@@ -1136,7 +1136,9 @@
     "src/ui/"
    ],
    "title": "The Naval research branch: State's fourth, authored in the store",
-   "design": "DIGITISATION_TREE.md § Naval. Author the nodes in the store and render with tech_tree_store.js. The ring and the research panel assume three branches per tree (ST gains ST-NA), so the store check and the panel's sector layout both change. Its quest and joint are authored here. The panel needs a live click."
+   "resolved": "2026-11-06",
+   "design": "@docs/development/archive/backlog-design-2026-Q4.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
    "status": "proposed",
@@ -1270,7 +1272,7 @@
     "src/world/corp_command.cpp"
    ],
    "title": "Rival nations raise ships and assign every mission by the scorer",
-   "design": "AI_OPPONENT.md § 11, the fleet grant. Hire, design, mission and landing verbs through corp_command, and no reading of undetected ships. A sunk cargo must score above zero or a rival submarine never raids. Validate each new verb as an untrusted input at the seam. The next-verb bound applies: an invasion is a sequence of separately scored verbs, so measure whether rivals actually land."
+   "design": "AI_OPPONENT.md § 11, the fleet grant. Hire, design, mission and landing verbs through corp_command, and no reading of undetected ships. A sunk cargo must score above zero or a rival submarine never raids. Validate each new verb as an untrusted input at the seam. The next-verb bound applies: an invasion is a sequence of separately scored verbs, so measure whether rivals actually land. The research scorer has no notion of ships or ports: it counts w.units only and pays ship kit per row with no port test, so a landlocked rival buys Naval kit late and uses none. Whether it may read a nation's own ships and ports is part of this grant; raise it."
   },
   {
    "status": "proposed",
@@ -1298,7 +1300,7 @@
     "docs/ui/ICONS.md"
    ],
    "title": "The Sea tab, ships on the canvas, the mission right-click, and landing presses",
-   "design": "ledgers/military.md; MILITARY.md § Sea. Replace the stub tab, draw ships on water with class and owner, and add mission assignment by right-click, embark and land presses, a closed-port mark on the map, and raid causes in the Convoys ledger. Every control updates ACTIONS.json and every surface the question log. Every press needs a live click. The ship classes join the existing unit designer (set_ship_design), and a refit press sits on a ship at its home port (refit_ship): both verbs are on the seam with no player surface until this item."
+   "design": "ledgers/military.md; MILITARY.md § Sea. Replace the stub tab, draw ships on water with class and owner, and add mission assignment by right-click, embark and land presses, a closed-port mark on the map, and raid causes in the Convoys ledger. Every control updates ACTIONS.json and every surface the question log. Every press needs a live click. The ship classes join the existing unit designer (set_ship_design), and a refit press sits on a ship at its home port (refit_ship): both verbs are on the seam with no player surface until this item. The live click owed by the Naval research branch goes with this pass: open the research panel, shift-click a Naval node, see it queue. Some rim labels overlap on the ten-branch ring (Order with Mass Surveillance, Anti-Ship Missiles with Long-Range Precision Strike): look at them there, at zoom."
   },
   {
    "status": "proposed",
