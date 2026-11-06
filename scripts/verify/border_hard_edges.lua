@@ -19,7 +19,7 @@
 --
 -- Run: ProjectIo --verify scripts/verify/border_hard_edges.lua
 
-local kMinZoom = 1.2531328  -- body_surface_canvas.cpp kMinZoom
+local kMinZoom = 1.06875  -- body_surface_canvas.cpp kMinZoom
 
 local function settle()
     verify.frames(3)

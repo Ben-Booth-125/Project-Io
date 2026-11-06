@@ -258,7 +258,7 @@ surfaces as interaction feedback:
   rungs, not baked: the master is one image for every zoom, and a baked seam would darken
   the far zooms where it would read as a grid. Below the close rungs the seam is absent
   and the ground is continuous, as before. **The values:** drawn where the drawn hex
-  radius is **at least 40 px** (between rung 2, ~27 px, and rung 3, ~55 px, at the
+  radius is **at least 40 px** (between rung 2, ~24 px, and rung 3, ~48 px, at the
   reference 1720×1080 window); a **1 px anti-aliased black stroke at 16% alpha**, so it is
   exactly the ground beneath darkened by a sixth and has no hue of its own. It lies over
   the ground and under every lens wash and stroke, one segment per shared edge.
@@ -548,7 +548,7 @@ takes the light, the grade and the lens wash like the ground does:
   a box round each piece's painted reach and nothing more — the routes did not move, so no
   tree, town block or cluster is re-boxed (§ Chunks, cache and invalidation).
   **Only what the lens shows close is re-baked.** While the lens is up, a ready chunk the
-  flip dirtied re-bakes only when it is **under the view at a drawn level of 32 px a hex or
+  flip dirtied re-bakes only when it is **under the view at a drawn level of 24 px a hex or
   finer** (`k_unpaint_max_level`); coarser, a painted road is under a pixel and the chunk
   keeps its pixels until the view comes close, and the far page is not re-baked at all.
   A chunk never re-baked keeps the painted hash, so disarming the lens re-bakes only what
@@ -615,7 +615,7 @@ both draw by one rule:
   through a lens** (LENSES.md § Logistics lens draws the road network at full weight, at
   the old 1 : 1.5 : 2 weights).
 - **LOD** (the drawn curve — the Logistics lens's network): below a **20 px drawn radius** (`k_route_lod_radius_px` — between the
-  second rung, ~13 px, and the third, ~27 px) a curve is **one stroke**, its two
+  second rung, ~12 px, and the third, ~24 px) a curve is **one stroke**, its two
   halves joined in a single path, with no round joint at the apex, and each half is
   tessellated at **two segments**; at the coarse fill (drawn radius ≤ 7 px) at one —
   its two chords. A curve whose halves fog differently is two strokes, still
@@ -657,13 +657,13 @@ been a fresh, expensive bake, and that bake was the lag.
   the one camera angle (§ One angle), whole-body, in 512 px chunks. Everything the
   player sees at any rung is this image: the close-tier features (trees, crags, strata,
   structures) are always in it and simply grow small with distance.
-- **Every other zoom is a downsample.** A **mip chain** — 64, 32, 16 and 8 px per hex
+- **Every other zoom is a downsample.** A **mip chain** — 48, 24, 12 and 6 px per hex
   — is box-downsampled from the master, chunk by chunk, in milliseconds. A rung
   draws the level at or above its drawn radius, minified by at most 2:1, so no step
   shimmers (`SDL_Renderer` has no mipmaps; the chain is ours). Detail never changes
   with zoom; only scale does.
 - **The master is held in RAM; the GPU holds what is on screen.** The master and its
-  chain live in system memory (about 5 GB for an Earth-sized body, opaque chunks as RGB); each frame uploads
+  chain live in system memory (about 2.9 GB for an Earth-sized body, opaque chunks as RGB); each frame uploads
   the visible chunks of the level in use, within a per-frame upload budget so a pan
   never hitches, and keeps an LRU of uploaded textures.
 - **Pre-baked during generation.** The home body's master bakes while the player watches
@@ -673,7 +673,7 @@ been a fresh, expensive bake, and that bake was the lag.
   rest behind it. A RAM budget drops the masters of the least-recently-visited bodies,
   keeping their far pages.
 - **The bake is pooled.** All baking runs on the worker pool (§ Chunks, cache and
-  invalidation); the home body's master is about 5,200 chunks (5,244 at 261×121), work
+  invalidation); the home body's master is about 3,000 chunks (2,975 at 261×121), work
   only a pool can carry. Its cost is a measurement, not an estimate:
   `ground_bake_check --master` times the whole master, surveyed and masked, at 1× and 2×,
   and with each pass switched off in turn.

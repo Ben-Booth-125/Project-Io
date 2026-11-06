@@ -9,40 +9,40 @@
 -- zoom change settles with verify.frames(2) before its capture.
 --
 -- BL-1246 (one master): every capture reads one level of the body's ONE
--- 128 px/hex master, at the one camera angle (22.5 degrees, every rung, every
+-- 96 px/hex master, at the one camera angle (22.5 degrees, every rung, every
 -- lens). Zooms below sit on (or near) the stepped x2 ladder's rungs —
--- kMinZoom * 2^k, k = 0..4 — so each capture reads one level: 8, 16, 32, 64
--- and 128 px/hex, every rung minified (the top one ~1.16:1).
+-- kMinZoom * 2^k, k = 0..4 — so each capture reads one level: 6, 12, 24, 48
+-- and 96 px/hex, each at about 1:1.
 
 verify.goto_surface("home")
 verify.set_overlay("none")
 
--- Rung 0, whole grid: the 8 px level. The wrap seam falls inside this frame;
+-- Rung 0, whole grid: the 6 px level. The wrap seam falls inside this frame;
 -- nothing may mark it. Border band now the muted single-tile ring.
-verify.set_zoom(1.26)
+verify.set_zoom(1.07)
 verify.frames(2)
 verify.capture("ground_bake_wide")
 
--- Rung 1 (~13 px hexes): the 16 px level.
-verify.set_zoom(2.5)
+-- Rung 1 (~12 px hexes): the 12 px level.
+verify.set_zoom(2.14)
 verify.frames(2)
 verify.capture("ground_bake_mid")
 
--- Rung 2 (~27 px hexes): the 32 px level — the working play view.
-verify.set_zoom(5)
+-- Rung 2 (~24 px hexes): the 24 px level — the working play view.
+verify.set_zoom(4.28)
 verify.frames(2)
 verify.capture("ground_bake_play")
 
--- Rung 3 (~51 px hexes): the 64 px level, minified. The bake's own grain
+-- Rung 3 (~48 px hexes): the 48 px level. The bake's own grain
 -- carries the ground; the vector texture pass must NOT be drawing.
-verify.set_zoom(10)
+verify.set_zoom(8.55)
 verify.frames(2)
 verify.capture("ground_bake_close")
 
--- Rung 4 (~102 px hexes): the 128 px master, minified, the top of the ladder:
+-- Rung 4 (~96 px hexes): the 96 px master, the top of the ladder:
 -- height-displaced hills, standing trees, squashed chrome — at the same
 -- 22.5 degrees as every other rung.
-verify.set_zoom(20)
+verify.set_zoom(17.1)
 verify.frames(2)
 verify.capture("ground_bake_closest")
 
@@ -63,7 +63,7 @@ verify.capture("ground_bake_seam")
 -- so the ground is judged against it3 C-F without the chrome.
 verify.add_pan(2600, 0)
 verify.set_border_band(false)
-verify.set_zoom(1.26)
+verify.set_zoom(1.07)
 verify.frames(2)
 verify.capture("ground_bake_bare_wide")
 verify.set_zoom(5)
@@ -86,7 +86,7 @@ verify.set_overlay("none")
 -- every recipe group, every other placeable type, a construction site, a rival
 -- plant, a four-stack tile — and steps the six nearest population centres to a
 -- settlement ladder (scale 1-5) plus a ruin. C++ picks the ground; the script
--- learns only where it staged. Captured at EVERY rung, the 8 px level included, with
+-- learns only where it staged. Captured at EVERY rung, the 6 px level included, with
 -- the border band off so the structures are judged on bare ground.
 verify.set_overlay("none")
 verify.set_border_band(false)
@@ -94,7 +94,7 @@ local g = verify.stage_gallery()
 verify.expect(g.staged >= 35, "stage_gallery staged the whole roster (" .. tostring(g.staged) .. ")")
 verify.expect(g.centres == 6, "stage_gallery stepped six centres to the ladder (" .. tostring(g.centres) .. ")")
 
-local rungs = { { 1.26, "far" }, { 2.5, "mid" }, { 5, "play" }, { 10, "close" }, { 20, "closest" } }
+local rungs = { { 1.07, "far" }, { 2.14, "mid" }, { 4.28, "play" }, { 8.55, "close" }, { 17.1, "closest" } }
 for _, r in ipairs(rungs) do
     verify.center_tile(g.col, g.row, r[1])
     verify.frames(3)

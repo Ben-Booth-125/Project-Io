@@ -46,7 +46,7 @@ local function settle()
     verify.frames(4)
 end
 
-local kMinZoom = 1.2531328 -- body_surface_canvas.cpp kMinZoom
+local kMinZoom = 1.06875 -- body_surface_canvas.cpp kMinZoom
 
 -- The roads city (roads_painted.lua's framing): its body is the home body.
 local city = { 103, 72 }

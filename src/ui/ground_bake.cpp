@@ -1355,7 +1355,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     // painterly at the 24 px tier read as plain blur up close — a colour field
     // 1.4 tiles soft is 70 px soft at 48. As the bake resolution grows past
     // the play tier, tighten the field and lift the detail: res_t is 0 at
-    // 24 px/r and 1 from 72 (so the 128 px master takes it whole).
+    // 24 px/r and 1 from 72 (so the 96 px master takes it whole).
     const float  res_t = static_cast<float>(std::clamp((nominal_s(g) - 24.0) / 48.0, 0.0, 1.0));
     const double R     = p.blend_radius * (1.0 - 0.22 * res_t); // stays > 1 (corner coverage)
     const double R2    = R * R;
@@ -1398,7 +1398,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     const double fine_cell = periodic_cell(0.155, fine_cells);
     const bool   fine_on   = nominal_s(g) >= 40.0;
     // BL-1254 (ground crisper): the crisp key, nominal-keyed — 0 below 40 px
-    // per hex (the far page bakes as before), full from 80 px (the 128 px
+    // per hex (the far page bakes as before), full from 80 px (the 96 px
     // master). A fleck lattice of ~6 px at the master: sub-tile marks, close only.
     const float  ck = p.crisp * static_cast<float>(std::clamp((nominal_s(g) - 40.0) / 40.0, 0.0, 1.0));
     int fleck_cells = 1;
@@ -4191,7 +4191,7 @@ int choose_level(double draw_r)
     for (int k = k_level_count - 1; k > 0; --k)
         if (k_level_ppr[k] >= draw_r)
             return k;
-    return 0; // the master: minified up to 2:1, or magnified past 128 px
+    return 0; // the master: minified up to 2:1, or magnified past 96 px
 }
 
 void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* dst)

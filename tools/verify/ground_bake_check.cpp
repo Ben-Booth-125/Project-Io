@@ -303,7 +303,8 @@ void pool_row(const bake_source& src, const body_component& hb, int land_i, cons
 /// § Level of detail): every 512 px chunk of the master at @p ss, then its
 /// mip pieces. Returns the bake wall ms; prints the reading. @p ppr other
 /// than the master's bakes a master-shaped image (aligned alike) at that
-/// resolution — the 96-vs-128 comparison reading (Ben, 2026-10-10).
+/// resolution — the comparison reading against the 128 px master this replaced
+/// (Ben, 2026-11-05).
 double master_bake(const bake_source& src, const bake_params& p, int ss, const char* tag,
                    double ppr = k_master_ppr)
 {
@@ -375,7 +376,7 @@ double master_bake(const bake_source& src, const bake_params& p, int ss, const c
 /// the master geometry is aligned so every level is whole pixels and keeps
 /// the wrap; the chain built chunk by chunk equals the chain of the whole
 /// image; and the level chooser reads the coarsest level at or above the
-/// drawn radius (never past 2:1 minified; the master magnified past 128).
+/// drawn radius (never past 2:1 minified; the master magnified past 96).
 void master_row(const bake_source& src, const body_component& hb, int land_i, const bake_params& p)
 {
     const geometry m = make_master_geometry(hb.grid_width, hb.grid_height);
@@ -445,14 +446,14 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
               "a flat run (lock fill, open sea) downsamples byte-exact");
     }
 
-    // The chooser. Rung radii at 1720x1080 (drawn: 6.93 / 13.87 / 27.73 /
-    // 55.47 / 110.66) and 3840x2160 (14.0 ... 223.41). The 128 px ladder
-    // (Ben, 2026-10-10): 8 / 16 / 32 / 64 / 128, so the reference window's
-    // five rungs read levels 4 / 3 / 2 / 1 / 0, every one minified.
+    // The chooser. Rung radii at 1720x1080 (drawn: 5.91 / 11.83 / 23.66 /
+    // 47.31 / 94.61) and 3840x2160 (11.94 ... 191.0). The 96 px ladder
+    // (Ben, 2026-11-05): 6 / 12 / 24 / 48 / 96, so the reference window's
+    // five rungs read levels 4 / 3 / 2 / 1 / 0, each at about 1:1, none magnified.
     const struct { double r; int want; } rows[] = {
-        { 3.0, 4 }, { 6.93, 4 }, { 8.0, 4 }, { 8.01, 3 }, { 13.87, 3 }, { 16.0, 3 }, { 16.5, 2 },
-        { 27.73, 2 }, { 28.0, 2 }, { 32.0, 2 }, { 32.5, 1 }, { 55.47, 1 }, { 64.0, 1 },
-        { 64.5, 0 }, { 110.66, 0 }, { 128.0, 0 }, { 223.41, 0 },
+        { 3.0, 4 }, { 5.91, 4 }, { 6.0, 4 }, { 6.01, 3 }, { 11.83, 3 }, { 12.0, 3 }, { 12.5, 2 },
+        { 23.66, 2 }, { 24.0, 2 }, { 24.5, 1 }, { 47.31, 1 }, { 48.0, 1 },
+        { 48.5, 0 }, { 94.61, 0 }, { 96.0, 0 }, { 191.0, 0 },
     };
     bool all = true;
     for (const auto& row : rows)
@@ -469,10 +470,10 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
         if (ppr / r < 1.0) never_mag = false;
         if (ppr / r > 2.0) within_2 = false;
     }
-    check(never_mag && within_2, "P22", "every radius from 8 to 128 px reads a level minified by 1:1 to 2:1");
+    check(never_mag && within_2, "P22", "every radius from 6 to 96 px reads a level minified by 1:1 to 2:1");
     // RENDERING.md § Level of detail: no rung magnifies at the reference window.
     bool ref_min = true;
-    for (const double r : { 6.93, 13.87, 27.73, 55.47, 110.66 })
+    for (const double r : { 5.91, 11.83, 23.66, 47.31, 94.61 })
         ref_min = ref_min && k_level_ppr[choose_level(r)] >= r;
     check(ref_min, "P22", "no rung of the reference 1720x1080 window magnifies (its top rung reads the master minified)");
 }
@@ -3177,6 +3178,14 @@ int main(int argc, char** argv)
     // must add at most 15 s): the home body's master on the pool's thread
     // count, 1x and 2x, under the survey mask as play opens and fully
     // revealed (the worst case), plus P22. A reading; only P22 can fail.
+    // --master-res: the 96-against-128 reading alone (BL-1523), without the
+    // long 2x and pass-off rows --master goes on to.
+    if (argc > 1 && std::strcmp(argv[1], "--master-res") == 0)
+    {
+        master_bake(src, p, 1, "revealed");
+        master_bake(src, p, 1, "revealed@128", 128.0);
+        return 0;
+    }
     if (argc > 1 && std::strcmp(argv[1], "--master") == 0)
     {
         master_row(src, hb, land_i, p);
@@ -3184,9 +3193,9 @@ int main(int argc, char** argv)
         const bake_source masked = prepare_source(w, home, /*reveal_all=*/false);
         master_bake(masked, p, 1, "masked");
         master_bake(src, p, 1, "revealed");
-        // The 96 px master this replaced, same pool and alignment (a reading).
-        master_bake(masked, p, 1, "masked@96", 96.0);
-        master_bake(src, p, 1, "revealed@96", 96.0);
+        // The 128 px master this replaced, same pool and alignment (a reading).
+        master_bake(masked, p, 1, "masked@128", 128.0);
+        master_bake(src, p, 1, "revealed@128", 128.0);
         // An unsurveyed body: every tile the lock fill.
         for (const auto& [id, bd] : w.bodies)
             if (bd.grid_width > 0 && bd.survey.phase == survey_phase::hidden)

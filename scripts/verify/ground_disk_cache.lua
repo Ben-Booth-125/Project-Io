@@ -19,7 +19,7 @@
 -- Run: ProjectIo --verify scripts/verify/ground_disk_cache.lua
 -- (the live pool path's timings are ground_disk_cache_bench.lua's).
 
-local kMinZoom = 1.2531328 -- body_surface_canvas.cpp kMinZoom
+local kMinZoom = 1.06875 -- body_surface_canvas.cpp kMinZoom
 
 local function counters() return verify.ground_bake_counters() end
 local function digest() return verify.ground_master_digest() end
