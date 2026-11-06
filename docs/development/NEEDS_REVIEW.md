@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*23 entries — 23 open, 0 resolved.*
+*23 entries — 22 open, 1 resolved.*
 
 ---
 
@@ -270,6 +270,13 @@ Ben ruled the master at 96 px and the top rung lowered to about 96 px. Written b
 
 **Why it matters.** Halving lowers every zoom level, not only the closest, and 4K play looks softer than the accepted figure.
 
+---
+
+## Resolved
+
+Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
+answer has landed in an authority doc.
+
 ### NR-1143 — Research spends outside net: should it count, and how does it share with construction?
 *question · raised 2026-11-05 · from BUILD_PAYBACK_CENSUS (BL-1496)*
 
@@ -277,10 +284,5 @@ The research line takes a weighted share of the treasury, up to what the queue o
 
 **Why it matters.** A player with a research queue may have little left for construction under the new prices, and a share of treasury shrinks as the opening treasury falls. This sets how research and construction compete at the opening.
 
----
-
-## Resolved
-
-Kept, not pruned: the reasoning is the point. Prune only in a deliberate sweep, once the
-answer has landed in an authority doc.
+> **RESOLVED.** Ben: "Yes, count research." Research counts inside net; written into FINANCE § The quarterly return; the work is BL-1539 (research in return).
 

@@ -83,7 +83,7 @@
     "BL-1495 (UI scale down): smaller elements, so the UI stops clipping.",
     "BL-1490 (province resource clip): re-clicked after BL-1495.",
     "MEASURE FIRST: BL-1496 (build payback census), with the counters inside BL-1500 (nodes count to cap), BL-1501 (units start supplied).",
-    "ECONOMY, one shared re-bless: BL-1536 (quote obtainable, first), BL-1497 (opening cost curve), BL-1498 (flat handoff treasury), BL-1499 (build days scaled), BL-1500 (nodes count to cap), BL-1501 (units start supplied), BL-1521 (wind turbine).",
+    "ECONOMY, one shared re-bless: BL-1536 (quote obtainable, first), BL-1539 (research in return, before the cost curve), BL-1497 (opening cost curve), BL-1498 (flat handoff treasury), BL-1499 (build days scaled), BL-1500 (nodes count to cap), BL-1501 (units start supplied), BL-1521 (wind turbine).",
     "WAR: BL-1502 (occupation moves front), BL-1503 (hold not into water), BL-1504 (defend province), BL-1505 (convoy reroutes fronts).",
     "UI AND ART, parallel: BL-1519 (escape menu), BL-1520 (escape queue), BL-1515 (alert strip), BL-1506 (convoys on map), BL-1507 (unit smooth march), BL-1508 (drag select units), BL-1509 (nation standing bars), BL-1510 (finder building glyphs), BL-1511 (diplomacy nation selector), BL-1512 (header net brackets), BL-1513 (construction folds), BL-1514 (building recipe rows), BL-1516 (trade offers sourced), BL-1517 (goods table stock sort), BL-1518 (resource glyphs), BL-1523 (tile res 96), BL-1524 (pointed trees), BL-1525 (playtest doc drift), BL-1538 (shelf runway warning), BL-1537 (tileset lighter)."
    ],

@@ -399,10 +399,12 @@
    "title": "Research spends outside net: should it count, and how does it share with construction?",
    "raised": "2026-11-05",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "BUILD_PAYBACK_CENSUS (BL-1496)",
    "what": "The research line takes a weighted share of the treasury, up to what the queue owes, as a direct expenditure the quarterly return does not carry. Mean 1,644 credits a major-quarter over 20 years, against net of 1,000-2,500. So the header NET and the Earnings chart overstate free cash, and \"a mine costs six months of net\" means different things before and after research. Recommended: book research in the return, so NET is the money left; the mine target then reads net after research.",
-   "why_it_matters": "A player with a research queue may have little left for construction under the new prices, and a share of treasury shrinks as the opening treasury falls. This sets how research and construction compete at the opening."
+   "why_it_matters": "A player with a research queue may have little left for construction under the new prices, and a share of treasury shrinks as the opening treasury falls. This sets how research and construction compete at the opening.",
+   "resolved": "2026-11-05",
+   "resolution": "Ben: \"Yes, count research.\" Research counts inside net; written into FINANCE § The quarterly return; the work is BL-1539 (research in return)."
   }
  ]
 }

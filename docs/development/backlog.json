@@ -259,7 +259,8 @@
    "author": "main session (Ben, 2026-11-05: playtest list and design form)",
    "requires": [
     "BL-1496",
-    "BL-1536"
+    "BL-1536",
+    "BL-1539"
    ],
    "category": "Economy",
    "priority": "A",
@@ -1027,6 +1028,31 @@
    ],
    "title": "A lighter colour palette across the tileset",
    "design": "Ben, 2026-11-05, on the rendering pass: a lighter palette across the tileset. TODAY (RENDERING § Art direction and palette): the bake is held to luminance p10 about 26, p50 about 55, p90 about 106, p99 about 155; median ground about (55, 56, 51), khaki fields about (100, 83, 53), forest about (41-51, 43-54, 27-35), deep sea about (21, 42, 50). OPEN, for Ben at a live look (Rule 0b): how much lighter, whether water and shadow lift too, and whether the map lifts by base colours or by the grade pass. Base entries live in palette::ground_tile_colour; the near-future grade is a separable final pass, so a grade trial is cheap. Do alongside TILE_RES_96 and POINTED_TREES so it is judged once, at the real resolution. GLOBAL_STYLE_SHEET (Joe's) carries the visual-language exploration. Check: new percentile targets in ground_bake_check, goldens, live look."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-06",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: \"Yes, count research\", NR-1143)",
+   "requires": [],
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1539",
+   "short_name": "RESEARCH_IN_RETURN",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/nation_tech.cpp",
+    "src/world/components.hpp",
+    "src/world/economy_tick.cpp",
+    "src/world/serialisation.cpp"
+   ],
+   "title": "Research counts inside the quarterly return, so NET is the money left",
+   "design": "Ben's ruling, in FINANCE § The quarterly return: research counts inside net. Today nation_tech.cpp:1059 takes it from the treasury after the return is written, a mean of 1,644 credits a major-quarter by BL-1496 (build payback census), against net of 1,000-2,500, so NET overstates free cash. Book it as refunds are booked: a running figure the nation step adds to, drained into the next return, with the return's opening taken so net still telescopes. Check garrison pay at nation_step.cpp:349 at the same time: any other direct spend outside the return makes NET lie the same way, and the census's resid column should read zero after this. quarterly_return is asserted sizeof 56 and hashed raw, so it is a save bump and moves the return digest: goes in the ECONOMY wave's shared re-bless. Do before BL-1497 (opening cost curve) sets the mine at six months of net, since that target now reads net after research. Check: census resid near zero; the retain property (returns replay onto the treasury) still holds; save round trip."
   }
  ]
 }
