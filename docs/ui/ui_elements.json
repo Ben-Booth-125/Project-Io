@@ -2102,6 +2102,24 @@
    "checks": [
     "drag_select"
    ]
+  },
+  {
+   "id": "UI-138",
+   "name": "Nation overview Standing",
+   "kind": "sub-element",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/corporation.md § Slot 1",
+    "docs/ui/MENU.md",
+    "src/ui/corporation_dashboard.cpp",
+    "src/ui/charts.cpp"
+   ],
+   "summary": "Under Balance in the Nation overview: the nation's rank among nations on GDP, market share, reach and total force, each a bar of its own figure against the leader's, with the rank at the right and the leader named on hover. Balance's chart is two horizontal bars, Earnings over stacked Expenses.",
+   "interesting_question": "What may be ranked without opening a rival's books?",
+   "resolution": "GDP, market share and reach are public (the Diplomacy ledger already shows them), and total force counts only the units the map's counters show. A rival's treasury is never read.",
+   "checks": [
+    "corp_dashboard"
+   ]
   }
  ]
 }

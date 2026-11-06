@@ -1355,6 +1355,12 @@ void drop_orphan_declaration(const world& w, ui_state& s)
 
 } // namespace
 
+void refresh_nation_gdp(const world& w, const recipe_registry& reg, const economy_report& rep,
+                        ui_state& s)
+{
+    refresh_gdp(w, reg, rep, s.diplomacy);
+}
+
 void navigate_diplomacy_to(const world& w, ui_state& s, entity_id nation)
 {
     if (nation == me_of(w) || w.nations.count(nation) == 0

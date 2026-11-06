@@ -208,7 +208,7 @@
   "corporation_dashboard": {
    "surface": "Nation overview (rail slot 1; formerly the Corporation ledger)",
    "answers": "How well is my nation doing?",
-   "because": "ONE card, Balance: the quarter's earnings against its stacked expenses, about the player's NATION (re-subjected, BL-1406; Ben, 2026-10-23 - the corporation is retired and a building's money is its nation's treasury's, ledgers/corporation.md § Slot 1). The verdict line reads '+X/qtr, treasury Y'; the chart is the nation's own row of the state ledger - Income (its buildings' sales onto the shelf) and Taxes (the tier's share of its buildings' wages, back to the treasury) on the left, Inputs, Maintenance and Wages on the right. There is no Interest, Levies or Subsidies segment for a nation: it never runs into debt, the levy retired, and no nation pays another's industry. The card earns its column because it shows its chart AT REST rather than a verdict line over an empty column, and because the chart is the quarter's whole arithmetic. It is the same ui::charts drawer the building card's Revenue/Expenses graph uses, at a different grain. Its overlap with the Budget ledger is explicitly ACCEPTED (Ben, 2026-08-29), and wider now both read the one treasury.",
+   "because": "ONE card, Balance: the quarter's earnings against its stacked expenses, about the player's NATION (re-subjected, BL-1406; Ben, 2026-10-23 - the corporation is retired and a building's money is its nation's treasury's, ledgers/corporation.md § Slot 1). The verdict line reads '+X/qtr, treasury Y'; the chart is the nation's own row of the state ledger - Income (its buildings' sales onto the shelf) and Taxes (the tier's share of its buildings' wages, back to the treasury) on the left, Inputs, Maintenance and Wages on the right. There is no Interest, Levies or Subsidies segment for a nation: it never runs into debt, the levy retired, and no nation pays another's industry. The card earns its column because it shows its chart AT REST rather than a verdict line over an empty column, and because the chart is the quarter's whole arithmetic. It is the same ui::charts drawer the building card's Revenue/Expenses graph uses, at a different grain. Its overlap with the Budget ledger is explicitly ACCEPTED (Ben, 2026-08-29), and wider now both read the one treasury. BL-1509 (Ben, 2026-11-05; ledgers/corporation.md § Slot 1, MENU.md): the chart is two horizontal bars sharing a left edge, Earnings over the stacked Expenses, and under it a Standing section ranks the nation among nations on GDP, market share, reach and total force, each a bar against the leader. 'How well am I doing?' has no answer without 'compared with whom?', and a rival's treasury stays private, so the ranking stands on the four public readings. Total force is the unit count the map's counters already show: all of the player's own, and a rival's on ground the player has surveyed.",
    "backlog_item": [
     "BL-081",
     "BL-214",
@@ -218,7 +218,8 @@
    ],
    "files": [
     "src/ui/corporation_dashboard.cpp",
-    "src/ui/charts.cpp"
+    "src/ui/charts.cpp",
+    "src/ui/diplomacy_ledger.cpp"
    ],
    "status": "settled"
   },

@@ -523,6 +523,14 @@ struct diplomacy_ledger_state
     std::uint64_t                   owners_catchment  = ~std::uint64_t{0};
     std::map<uint32_t, entity_id>   province_owners;  ///< province -> political owner.
     std::map<entity_id, int>        provinces_owned;  ///< nation -> provinces it owns.
+    /// BL-1509: the Nation overview's Standing rows as drawn, for verify.
+    struct standing_row
+    {
+        const char* label = "";
+        double      value = 0.0, leader = 0.0;
+        int         rank = 0, of = 0;
+    };
+    std::vector<standing_row> standing;
     /// GDP per nation per year, recomputed once per econ tick.
     int                             gdp_tick = -1;
     std::map<entity_id, double>     gdp_year;

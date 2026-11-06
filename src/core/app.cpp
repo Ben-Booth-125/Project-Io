@@ -2907,7 +2907,7 @@ void app::render()
     // live and untouched.
     // The Nation overview (BL-248; re-subjected to the nation by BL-1406) — nav
     // slot 1: how well the player's nation is doing, read off its treasury.
-    ui::draw_corporation_dashboard(m_world, m_registry, m_last_econ_report, m_ui,
+    ui::draw_corporation_dashboard(m_world, m_registry, m_last_econ_report, m_last_corp_standings, m_ui,
                                    m_ui.show_corporation_panel);
 
 

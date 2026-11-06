@@ -12,6 +12,7 @@
 --   R3  interest is ABSENT from the stack while the corp is solvent and
 --       PRESENT once it is in debt (the variable segment count)
 --   R4  the full-canvas takeover still opens
+--   R5  Standing ranks the nation on GDP, market share, reach and total force
 --
 -- CAPTURED AT 1920x1080 DELIBERATELY. The void this item exists to fix — four
 -- verdict lines over ~700 px of empty column — was only visible at Ben's own
@@ -23,6 +24,28 @@
 -- captures are looked at instead.
 
 verify.window(1920, 1080)
+
+-- R5a (BL-1509): Total force at the opening, before any step. Six econ_steps leave no unit
+-- on the --verify world, so the later R5 reads a real zero; this one must read the garrisons.
+verify.show_panel("corporation", true)
+verify.frames(2)
+do
+    local own = 0
+    for _, u in ipairs(verify.units()) do
+        if u.player and u.count > 0 then own = own + 1 end
+    end
+    for _, r in ipairs(verify.nation_standing()) do
+        if r.label == "Total force" then
+            print(string.format("corp_dashboard: opening force %.0f of leader %.0f, rank %d of %d",
+                                r.value, r.leader, r.rank, r.of))
+            verify.expect(own > 0 and r.value == own, "R5a Total force counts the player's units: " .. own)
+            verify.expect(r.leader >= r.value, "R5a the leader's force is at least the player's")
+        end
+    end
+    shot("corp_dashboard_opening_force")
+end
+verify.show_panel("corporation", false)
+
 verify.econ_step(6)
 verify.show_panel("corporation", true)
 verify.fold()
@@ -92,5 +115,20 @@ shot("corp_dashboard_in_debt")
 verify.fold("corp_rollup", 0)
 shot("corp_rollup_balance")
 verify.fold()
+
+-- ── R5 (BL-1509): Standing ranks the nation on four public readings, each a real rank
+--    against a real leader, and the card shows them at rest. ──
+local rows = verify.nation_standing()
+verify.expect(#rows == 4, string.format("R5 Standing carries four rows: %d", #rows))
+local wanted = { GDP = true, ["Market share"] = true, Reach = true, ["Total force"] = true }
+for _, r in ipairs(rows) do
+    print(string.format("corp_dashboard: %s value %.2f leader %.2f rank %d of %d",
+                        r.label, r.value, r.leader, r.rank, r.of))
+    verify.expect(wanted[r.label] == true, "R5 a named reading: " .. r.label)
+    verify.expect(r.of >= 2, "R5 ranked among more than one nation: " .. r.label)
+    verify.expect(r.rank >= 1 and r.rank <= r.of, "R5 the rank lies in the field: " .. r.label)
+    verify.expect(r.value <= r.leader + 1e-3, "R5 no figure exceeds its leader's: " .. r.label)
+end
+shot("corp_dashboard_standing")
 
 verify.show_panel("corporation", false)

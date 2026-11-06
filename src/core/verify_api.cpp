@@ -6865,6 +6865,25 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1509: the Nation overview's Standing rows as last drawn: the label, the player's
+    // figure, the leader's, the rank. Public figures only, as the card shows them.
+    v.set_function("nation_standing", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const auto& r : m_ui.diplomacy.standing)
+        {
+            sol::table e = st.create_table();
+            e["label"]  = std::string(r.label);
+            e["value"]  = r.value;
+            e["leader"] = r.leader;
+            e["rank"]   = r.rank;
+            e["of"]     = r.of;
+            out[i++] = e;
+        }
+        return out;
+    });
+
     // BL-1507: the marching counters the canvas drew last frame: the units on each, the
     // hop fraction and the counter's screen point. Nothing the screen does not show.
     v.set_function("unit_glides", [this]() {
