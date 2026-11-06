@@ -51,6 +51,12 @@ enum class interception_outcome : std::uint8_t
     /// BL-1505: a front left it no lane on and none back, and it is lost. `interceptor_corp`
     /// is null and `tile` is where it stood.
     lost_behind_front = 4,
+    /// BL-1529: a raider took it on a sea leg and sank it, or took a prize with no own
+    /// port in range: nothing credited anywhere. `interceptor_ship` names the raider.
+    raid_sunk = 5,
+    /// BL-1529: a surface raider took it as a prize: landed and sold for its nation at
+    /// its nearest own port in range (`prize_market`).
+    raid_prize = 6,
 };
 
 /// One interception, as it happened. Returned by `intercept_convoys` for the
@@ -67,10 +73,16 @@ struct interception_record
     float                cargo_qty        = 0.0f;
     interception_outcome outcome          = interception_outcome::captured;
     int                  tick             = 0;
+    /// BL-1529: the raider, when a ship took it; `interceptor_unit` is then null.
+    entity_id            interceptor_ship = null_entity;
+    /// BL-1529: the owner had not detected the raider, so it is named as an unseen raider.
+    bool                 unseen           = false;
+    entity_id            prize_market     = null_entity;
 };
 
 /// Cut every convoy standing on a tile held by a unit whose owner has declared
-/// hostility toward the convoy's corp. The cargo credits the interceptor's
+/// hostility toward the convoy's corp. A sea tile of a sea leg is exempt: on the water a
+/// raid decides instead (`raid_convoys`, sea_combat.hpp). The cargo credits the interceptor's
 /// pool at the interception tile's market (BL-1003), or — if the interceptor is
 /// neither a corporation nor a nation (BL-1402), or the tile resolves to no body —
 /// is destroyed. The convoy is

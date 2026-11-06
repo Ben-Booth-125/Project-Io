@@ -242,6 +242,11 @@ std::vector<interception_record> intercept_convoys(world& w, int tick)
         const auto occ = units_on_tile.find(tile);
         if (occ == units_on_tile.end())
             continue;
+        // BL-1529 (LOGISTICS.md § 7): on the water a raid decides, never a unit on the tile.
+        // A bridge on a land leg stays land, so this reads the leg as well as the substrate.
+        if (lane.on_sea_leg(li))
+            if (const auto ot = w.tiles.find(tile); ot != w.tiles.end() && is_sea(ot->second.substrate))
+                continue;
         for (const entity_id uid : occ->second)
         {
             const unit_component& uc = w.units.at(uid);

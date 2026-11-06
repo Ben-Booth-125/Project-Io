@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 243 entries across 2 volume(s).
+One line per session, newest first — 244 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-11-06 | [BL-1529 (patrol escort raid): raiders take cargo off the sea legs](DEVLOG.md) | BL-1526 BL-1529 BL-1533 BL-1534 | DEVLOG.md |
 | 2026-11-06 | [BL-1528 (naval branch): State's fourth research branch](DEVLOG.md) | BL-1528 BL-1533 BL-1534 | DEVLOG.md |
 | 2026-11-06 | [BL-1527 (ship kit): ship designs and the ship hulls good](DEVLOG.md) | BL-1527 BL-1528 BL-1531 BL-1534 | DEVLOG.md |
 | 2026-11-06 | [BL-1430 (sea theatre): ships exist](DEVLOG.md) | BL-1430 | DEVLOG.md |

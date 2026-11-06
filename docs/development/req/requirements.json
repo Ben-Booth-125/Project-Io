@@ -7825,6 +7825,61 @@
     }
    ],
    "resolved": "2026-11-06"
+  },
+  {
+   "brief": "patrol-escort-raid",
+   "title": "BL-1529 - Patrol, escort and raid: the sea leg stops being cut by a unit on its tile",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1529 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "A raider on station takes hostile cargo crossing its zone at a seeded daily chance, directed hostility only, never a friend, and replays.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness P1, P1b, P1c (the friend-and-declared sequence), P2, P3, P5 with its control, P12, P17. 208 checks, 0 failures."
+    },
+    {
+     "id": "R2",
+     "text": "Only escorts whose side detected the raider and whose mask reaches its class slow it; an undetected submarine is not slowed.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "P9, P10 capital escort, P11, P11b, P11c roll by roll on one cargo."
+    },
+    {
+     "id": "R3",
+     "text": "A submarine sinks; a surface raider lands a prize at its nearest own port in range that will take its goods, and sinks it with none. Goods conserve through the real pass order.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "P6, P6b, P7, P7a, P7b, P8; P16 advance, raid, arrivals: 291 prizes and 9 arrivals, each landing exactly once. The embargo filter on the prize port has no check of its own."
+    },
+    {
+     "id": "R4",
+     "text": "On a sea leg a land unit on the tile cuts nothing; a land leg, bridges included, is cut as before, and lane order decides between a land cut and a raid.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "P13, P13a, P13b, P15, P15b; interdiction_harness ALL PASS, convoy_fronts 25, convoy_command 61. A bridged land leg is covered by the span test, not by its own fixture."
+    },
+    {
+     "id": "R5",
+     "text": "Every interception reaches the tick report and a Field line; an undetected raider reads as an unseen raider.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "P14 series on the text, P18 off real takes, P19 through run_settle_tick; the app compiles the post. The line has not been seen live: no rival raids until BL-1533 (rival fleets)."
+    },
+    {
+     "id": "R6",
+     "text": "With no ship on a raid the world does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "rebless_shape_probe seeds 0, 46, 28 identical; world_determinism ALL PASS; save_roundtrip OK."
+    }
+   ],
+   "resolved": "2026-11-06"
   }
  ]
 }

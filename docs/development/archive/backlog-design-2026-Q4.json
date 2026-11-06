@@ -14440,6 +14440,9 @@
     },
     "BL-1528": {
       "design": "DIGITISATION_TREE.md § Naval. Author the nodes in the store and render with tech_tree_store.js. The ring and the research panel assume three branches per tree (ST gains ST-NA), so the store check and the panel's sector layout both change. Its quest and joint are authored here. The panel needs a live click."
+    },
+    "BL-1529": {
+      "design": "MILITARY.md § Sea; LOGISTICS.md § 7; SUPPLY.md, the lane. The seeded daily raid on a sea leg in the zone, the escort share, submarine sink against surface prize, and the announcement with \"an unseen raider\". Must conserve: a sunk cargo is destroyed, a prize lands at the nearest own port. Land interdiction is unchanged. Harness: replay determinism, money and goods conservation, friend immunity, undetected submarine ignores escort."
     }
   }
 }

@@ -10,6 +10,31 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-06 — BL-1529 (patrol escort raid): raiders take cargo off the sea legs
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** `raid_convoys` runs between the convoys' advance and their arrivals, over the sea tiles
+of the tick's sweep, a day's rolls per province. A submarine sinks; a surface raider lands a prize at its
+nearest own port in range. A land unit no longer cuts a sea leg. `convoy_route` reports its sea span. The tick
+report now carries interceptions, and `post_interceptions` voices them on the Field channel. Patrol's raised
+detection and the daily engagement were already in the sea pass.
+
+**Found on the way.** The live tick dropped every interception record, so LOGISTICS.md § 7's announcement
+never fired, on land either. It does now. `embargo_harness` R9c and R9e were stale on the save's tail, missing
+four later sections; fixed.
+
+**Review.** The cold review caught a bridge on a land leg read as sea by the substrate alone, which let a raid sink
+cargo on a road and let a port convoy pass a held bridge. Hence the span. It also caught a raid beating an
+earlier land cut in the same sweep, a friend raided through a hole in the stance verbs, a prize ignoring
+the embargo, and checks with no control. All fixed, with checks except the embargo filter and a bridge fixture.
+
+**Left open.** Eight calls in NR-1146. The ledger's stated cause and the tile mark go with BL-1534 (sea UI). The
+reading BL-1526 (sea trade reading) was to precede this waits on sprint 63's wave, so the take chance is a first cut;
+one raider takes about 97% of whole crossings in the harness field. No rival raids until BL-1533 (rival fleets).
+
+---
+
 ## 2026-11-06 — BL-1528 (naval branch): State's fourth research branch
 
 **Runtime:** one session, Delivery Full on the naval worktree.

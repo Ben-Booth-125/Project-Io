@@ -766,8 +766,8 @@ player did it. **Capture gives the scorer a number.**
 It also earns BL-315's (armed house conflict spine) third name. Army, mercenary and pirate are three
 *derived* readings of one company; taking cargo is what makes "pirate" the honest one.
 
-**An interception is announced in the same change that resolves it.** A comms message names the
-lane and the interceptor, the convoy's row leaves the Convoys ledger (BL-453, convoys ledger) with
+**An interception is announced in the same change that resolves it.** A comms message on the Field
+channel names the cargo and the interceptor, the convoy's row leaves the Convoys ledger (BL-453, convoys ledger) with
 a stated cause, and the tile is marked for a few ticks. An interception is the most consequential
 thing that can happen to a player's economy without them pressing anything, so silence is the
 wrong default (NR-407).

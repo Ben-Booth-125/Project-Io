@@ -2,14 +2,19 @@
 
 #include "air_combat.hpp"      // air_wing_flies, wing_stats, wing_strength_permille, air_tile_distance
 #include "economy_system.hpp"  // draw_goods_at_tile, step_unit_supply_toward, economy_report
+#include "embargo.hpp"         // embargo_refuses
 #include "hex_neighbors.hpp"
+#include "logistics.hpp"       // convoy_route_tiles, econ_tick_days_world
+#include "market_clearing.hpp" // market_for_tile
 #include "province.hpp"
 #include "recipe_registry.hpp"
 #include "stance.hpp"          // is_hostile
+#include "supply_system.hpp"   // interception_record
 #include "unit_designs.hpp"    // BL-1527: the ship kit
 #include "world.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <deque>
 #include <limits>
 #include <map>
@@ -500,6 +505,100 @@ uint64_t mix(uint64_t h, uint64_t v)
     return h ^ (h >> 31);
 }
 
+/// Is @p s raised and at work in its zone: not broken off, no course left, in a province of it?
+bool on_station(const world& w, const sea_ship& s)
+{
+    return s.muster_days <= 0 && !s.returning && s.mission != sea_mission::none && s.route.empty()
+           && province_holds(s.provinces, w.provinces.province_of(s.tile));
+}
+
+/// Who is where today. A ship on station is spread over its zone at 1/N each; any other
+/// raised ship is in the province under it. Ascending ship id inside each province.
+std::map<uint32_t, std::vector<presence>> sea_presence(const world& w)
+{
+    std::map<uint32_t, std::vector<presence>> present;
+    for (const auto& [sid, s] : w.ships)
+    {
+        if (s.muster_days > 0)
+            continue;
+        if (on_station(w, s))
+        {
+            const int weight = 1000 / static_cast<int>(s.provinces.size());
+            for (const uint32_t p : s.provinces)
+                present[p].push_back({sid, weight});
+        }
+        else if (const uint32_t here = w.provinces.province_of(s.tile); here != 0)
+        {
+            present[here].push_back({sid, 1000});
+        }
+    }
+    return present;
+}
+
+/// Each side's detection in @p province_id: its ships', a patrol's raised, plus its recon wings'.
+std::map<entity_id, int64_t> side_detection(const world& w, const recipe_registry& reg, uint32_t province_id,
+                                            const std::vector<presence>& ships,
+                                            std::map<entity_id, int64_t>* recon_points)
+{
+    const sea_params& sp = reg.military().sea;
+    std::map<entity_id, int64_t> detection;
+    for (const presence& pc : ships)
+    {
+        const sea_ship& s = w.ships.at(pc.ship);
+        int64_t d = static_cast<int64_t>(ship_stats(reg, s).detection) * ship_strength_permille(s) / 1000
+                    * pc.weight / 1000;
+        // Raised only on station: a patrol in transit reads as any other ship.
+        if (s.mission == sea_mission::patrol && on_station(w, s))
+            d = d * sp.patrol_detection_permille / 1000;
+        detection[s.owner] += d;
+    }
+    for (const auto& [wid, wg] : w.wings)
+    {
+        if (wg.mission != air_mission::recon || !air_wing_flies(w, wg)
+            || !std::binary_search(wg.provinces.begin(), wg.provinces.end(), province_id))
+            continue;
+        const int64_t rp = static_cast<int64_t>(wing_stats(reg, wg).recon)
+                           * wing_strength_permille(reg, wg) / 1000
+                           / static_cast<int64_t>(wg.provinces.size());
+        if (rp > 0)
+        {
+            detection[wg.owner] += rp;
+            if (recon_points != nullptr)
+                (*recon_points)[wg.owner] += rp;
+        }
+    }
+    return detection;
+}
+
+/// The market a prize of @p raider's lands on: its nation's nearest own port within its class's
+/// range over water of @p from whose market will take its goods (the embargo holds at this
+/// border as at any). Null with none.
+entity_id prize_market_for(const world& w, const recipe_registry& reg, const sea_ship& raider, entity_id from)
+{
+    std::vector<entity_id> mouths;
+    std::map<entity_id, entity_id> port_at_mouth; // the lowest port id at each mouth
+    for (const entity_id port : own_ports(w, raider.owner))
+    {
+        const entity_id market = market_for_tile(w, w.buildings.at(port).tile);
+        if (market == null_entity || embargo_refuses(w, raider.owner, market))
+            continue;
+        const entity_id mouth = port_mouth_tile(w, port);
+        if (mouth != null_entity && port_at_mouth.emplace(mouth, port).second)
+            mouths.push_back(mouth);
+    }
+    if (mouths.empty())
+        return null_entity;
+    bool reachable = false;
+    const std::vector<entity_id> path = sea_route(w, from, mouths, &reachable);
+    if (!reachable)
+        return null_entity;
+    const int range = reg.military().sea.cls[static_cast<std::size_t>(ship_class_of(raider))].range;
+    if (static_cast<int>(path.size()) > range)
+        return null_entity;
+    const entity_id at = path.empty() ? from : path.back();
+    return market_for_tile(w, w.buildings.at(port_at_mouth.at(at)).tile);
+}
+
 } // namespace
 
 void set_ship_mission(world& w, sea_ship& s, sea_mission m, std::vector<uint32_t> provinces)
@@ -507,6 +606,186 @@ void set_ship_mission(world& w, sea_ship& s, sea_mission m, std::vector<uint32_t
     s.mission   = m;
     s.provinces = std::move(provinces);
     plot_course(w, s);
+}
+
+// ---------------------------------------------------------------------------
+// The raid
+// ---------------------------------------------------------------------------
+
+std::vector<interception_record> raid_convoys(world& w, const recipe_registry& reg, int tick)
+{
+    std::vector<interception_record> out;
+    if (w.convoys.empty() || w.ships.empty())
+        return out;
+    bool any_raider = false;
+    for (const auto& [sid, s] : w.ships) // a pure any-of
+        if (s.mission == sea_mission::raid && on_station(w, s)) { any_raider = true; break; }
+    if (!any_raider)
+        return out;
+
+    const std::map<uint32_t, std::vector<presence>> present = sea_presence(w);
+    std::map<uint32_t, std::map<entity_id, int64_t>> detection_at;
+    const sea_params& sp = reg.military().sea;
+    const uint64_t seed = static_cast<uint64_t>(w.provinces.seed);
+    const auto force = [&](const sea_ship& s, const presence& pc) {
+        return static_cast<int64_t>(ship_stats(reg, s).attack) * ship_strength_permille(s) / 1000
+               * pc.weight / 1000;
+    };
+
+    // One day's rolls: the taker, or null. Lowest ship id first, by the ordered walk.
+    const auto roll_day = [&](const convoy_component& cv, uint32_t province_id,
+                              const std::vector<presence>& ships, int day, bool* unseen) -> entity_id {
+        for (const presence& pr : ships)
+        {
+            const sea_ship& r = w.ships.at(pr.ship);
+            if (r.mission != sea_mission::raid || !on_station(w, r) || r.owner == cv.corp
+                || !is_hostile(w, r.owner, cv.corp) || are_friends(w, r.owner, cv.corp))
+                continue;
+            const int64_t attack = force(r, pr);
+            if (attack <= 0)
+                continue;
+            uint64_t day_hash = mix(seed, static_cast<uint64_t>(static_cast<int64_t>(tick)));
+            day_hash = mix(day_hash, static_cast<uint64_t>(day));
+            day_hash = mix(day_hash, province_id);
+            day_hash = mix(day_hash, pr.ship);
+            // Has the owner's side found this raider today? One answer for all its cargo.
+            if (detection_at.find(province_id) == detection_at.end())
+                detection_at[province_id] = side_detection(w, reg, province_id, ships, nullptr);
+            const auto& seen = detection_at.at(province_id);
+            const auto dit = seen.find(cv.corp);
+            const int64_t d = dit == seen.end() ? 0 : dit->second;
+            const int64_t st = std::max(0, ship_stats(reg, r).stealth);
+            const bool found = d > 0 && static_cast<int64_t>(mix(mix(day_hash, cv.corp), 1) % 1000) < d * 1000 / (d + st);
+            // Only an escort whose side found it, and whose mask reaches its class, slows it.
+            int64_t guard = 0;
+            if (found)
+                for (const presence& pe : ships)
+                {
+                    const sea_ship& e = w.ships.at(pe.ship);
+                    if (e.owner == cv.corp && e.mission == sea_mission::escort && on_station(w, e)
+                        && (ship_stats(reg, e).targets & ship_class_bit(ship_class_of(r))))
+                        guard += force(e, pe);
+                }
+            const int64_t ppm = int64_t{sp.raid_take_permille_per_day} * pr.weight * attack / (attack + guard);
+            if (static_cast<int64_t>(mix(mix(day_hash, cv.id), 2) % 1000000) < ppm)
+            {
+                *unseen = !found;
+                return pr.ship;
+            }
+        }
+        return null_entity;
+    };
+
+    // Lane order decides between a land cut and a raid: `intercept_convoys` runs after this,
+    // so a cargo cut on the land leg before the water must not reach the water here. A sorted
+    // walk, though only an any-of is ever asked of it.
+    std::map<entity_id, std::vector<entity_id>> owners_on_tile;
+    for (const auto& [uid, uc] : w.units)
+        if (uc.position != null_entity && uc.owner != null_entity && uc.count > 0)
+            owners_on_tile[uc.position].push_back(uc.owner);
+    const auto land_cut_at = [&](const convoy_component& cv, entity_id t) {
+        const auto it = owners_on_tile.find(t);
+        if (it == owners_on_tile.end())
+            return false;
+        for (const entity_id o : it->second)
+            if (o != cv.corp && is_hostile(w, o, cv.corp))
+                return true;
+        return false;
+    };
+
+    std::vector<uint32_t> taken;
+    for (const convoy_component& cv : w.convoys)
+    {
+        if (cv.port_a == null_entity || cv.port_b == null_entity || cv.corp == null_entity)
+            continue; // no sea leg; a market's own export can be named by no declaration
+        const convoy_route lane = convoy_route_tiles(w, cv);
+        const int head = convoy_lane_index(lane.at, cv.progress);
+        if (head < 0)
+            continue;
+        const int before = cv.progress_before >= 0.0f ? convoy_lane_index(lane.at, cv.progress_before) : head;
+        const int first = before < head ? before + 1 : head;
+
+        // The sweep, as runs of one province. A held cargo sits on its tile the whole tick.
+        struct crossing { uint32_t province; entity_id tile; float days; };
+        std::vector<crossing> runs;
+        for (int li = first; li <= head; ++li)
+        {
+            const entity_id t = lane.tiles[static_cast<std::size_t>(li)];
+            const bool at_sea = lane.on_sea_leg(li) && is_sea_tile_id(w, t);
+            if (!at_sea)
+            {
+                if (land_cut_at(cv, t))
+                    break; // cut here first, by the land pass
+                continue;
+            }
+            const uint32_t p = w.provinces.province_of(t);
+            if (p == 0)
+                continue;
+            if (runs.empty() || runs.back().province != p)
+                runs.push_back({p, t, 0.0f});
+            if (li > 0)
+                runs.back().days += (lane.at[static_cast<std::size_t>(li)] - lane.at[static_cast<std::size_t>(li - 1)])
+                                    * lane.days;
+        }
+        if (cv.held && !runs.empty())
+            runs.back().days = static_cast<float>(econ_tick_days_world);
+
+        entity_id taker = null_entity;
+        entity_id where = null_entity;
+        bool unseen = false;
+        for (const crossing& run : runs)
+        {
+            const auto pit = present.find(run.province);
+            if (pit == present.end())
+                continue;
+            const int days = std::clamp(static_cast<int>(std::lround(run.days)), 1, econ_tick_days_world);
+            for (int day = 0; day < days && taker == null_entity; ++day)
+                taker = roll_day(cv, run.province, pit->second, day, &unseen);
+            if (taker != null_entity)
+            {
+                where = run.tile;
+                break;
+            }
+        }
+        if (taker == null_entity)
+            continue;
+
+        const sea_ship& r = w.ships.at(taker);
+        interception_record rec;
+        rec.convoy_id        = cv.id;
+        rec.victim_corp      = cv.corp;
+        rec.interceptor_corp = r.owner;
+        rec.interceptor_ship = taker;
+        rec.tile             = where;
+        rec.body             = w.tiles.at(where).body;
+        rec.cargo_resource   = cv.cargo_resource;
+        rec.cargo_qty        = cv.cargo_qty;
+        rec.tick             = tick;
+        rec.unseen           = unseen;
+        rec.outcome          = interception_outcome::raid_sunk;
+        // A submarine sinks what it takes. A surface raider lands a prize, or sinks it with no
+        // own port in range: the goods left their source at dispatch, so neither path mints.
+        if (ship_class_of(r) != ship_class::submarine && assets_of(w, r.owner) != nullptr
+            && std::isfinite(cv.cargo_qty))
+        {
+            const entity_id market = prize_market_for(w, reg, r, where);
+            if (market != null_entity)
+            {
+                w.land_goods(r.owner, market, static_cast<std::size_t>(cv.cargo_resource), cv.cargo_qty);
+                rec.outcome      = interception_outcome::raid_prize;
+                rec.prize_market = market;
+            }
+        }
+        out.push_back(rec);
+        taken.push_back(cv.id);
+    }
+    if (!taken.empty())
+        w.convoys.erase(std::remove_if(w.convoys.begin(), w.convoys.end(),
+                                       [&taken](const convoy_component& c) {
+                                           return std::find(taken.begin(), taken.end(), c.id) != taken.end();
+                                       }),
+                        w.convoys.end());
+    return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -549,60 +828,17 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
             s.sail_bank_permille = 0;
     }
 
-    // 2. Presence, per province. Ascending ship id inside each, by the ordered walk.
-    std::map<uint32_t, std::vector<presence>> present;
-    for (const auto& [sid, s] : w.ships)
-    {
-        if (s.muster_days > 0)
-            continue;
-        const uint32_t here = w.provinces.province_of(s.tile);
-        const bool working = !s.returning && s.mission != sea_mission::none && s.route.empty()
-                             && province_holds(s.provinces, here);
-        if (working)
-        {
-            const int weight = 1000 / static_cast<int>(s.provinces.size());
-            for (const uint32_t p : s.provinces)
-                present[p].push_back({sid, weight});
-        }
-        else if (here != 0)
-        {
-            present[here].push_back({sid, 1000});
-        }
-    }
+    // 2. Presence, per province.
+    const std::map<uint32_t, std::vector<presence>> present = sea_presence(w);
 
     // 3. Detect and hit, from the day's starting strength. Damage in ppm of full HP.
     std::map<entity_id, int64_t> damage;
     const uint64_t seed = static_cast<uint64_t>(w.provinces.seed);
     for (const auto& [province_id, ships] : present)
     {
-        // Each side's detection here: its ships', a patrol's raised, plus its recon wings'.
-        std::map<entity_id, int64_t> detection;
-        for (const presence& pc : ships)
-        {
-            const sea_ship& s = w.ships.at(pc.ship);
-            int64_t d = static_cast<int64_t>(stats(s).detection) * ship_strength_permille(s) / 1000
-                        * pc.weight / 1000;
-            // Raised only on station: a patrol in transit reads as any other ship.
-            if (s.mission == sea_mission::patrol && !s.returning && s.route.empty()
-                && province_holds(s.provinces, w.provinces.province_of(s.tile)))
-                d = d * sp.patrol_detection_permille / 1000;
-            detection[s.owner] += d;
-        }
         std::map<entity_id, int64_t> recon_points; // the air pass's own arithmetic
-        for (const auto& [wid, wg] : w.wings)
-        {
-            if (wg.mission != air_mission::recon || !air_wing_flies(w, wg)
-                || !std::binary_search(wg.provinces.begin(), wg.provinces.end(), province_id))
-                continue;
-            const int64_t rp = static_cast<int64_t>(wing_stats(reg, wg).recon)
-                               * wing_strength_permille(reg, wg) / 1000
-                               / static_cast<int64_t>(wg.provinces.size());
-            if (rp > 0)
-            {
-                detection[wg.owner] += rp;
-                recon_points[wg.owner] += rp;
-            }
-        }
+        const std::map<entity_id, int64_t> detection =
+            side_detection(w, reg, province_id, ships, &recon_points);
 
         // Which ships each hostile side finds here today.
         std::map<entity_id, std::vector<const presence*>> found;

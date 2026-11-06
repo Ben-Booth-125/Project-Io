@@ -5,6 +5,7 @@
 #include "battle_system.hpp" // battle_dispatch (BL-467/BL-468)
 #include "air_combat.hpp"    // air_day_tick, wing_upkeep_tick (BL-1449)
 #include "sea_combat.hpp"    // sea_day_tick, ship_upkeep_tick (BL-1430)
+#include "supply_system.hpp" // interception_record (BL-1529)
 #include "carried_supplies.hpp" // BL-1452: carried_supplies_day, the daily stock step
 #include "nation_ai.hpp"     // nation_scorer_report (BL-542; Sprint N3 T4)
 #include "nation_budget.hpp" // budget_claim, national_budget_tick (BL-537; Sprint N3 T4)
@@ -351,6 +352,10 @@ struct economy_report
     /// longer holds — the aftermath is the line a player most needs and it
     /// describes something already erased.
     std::vector<battle_dispatch> battle_dispatches;
+
+    /// BL-1529: convoys cut, raided or lost this tick, on land and sea, for the
+    /// presentation layer to voice (LOGISTICS.md § 7: an interception is announced).
+    std::vector<interception_record> interceptions;
 
     /// BL-1449 (air combat): what this tick's air days and the wing upkeep did.
     air_day_tick     air;

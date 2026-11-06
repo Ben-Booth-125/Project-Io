@@ -447,6 +447,17 @@
    "source": "SHIP_KIT (BL-1527)",
    "what": "Taken so the item could land; each is small to change. (1) A refitting ship is in dock: it neither fights nor can be hit. A land refit fights on its old kit, so this differs, and a ship can dodge fire by refitting, at the price of goods and its muster days. The alternative is hittable in dock. (2) In dock it still draws quarterly supply and does not mend. (3) A broken-off ship must be recalled to no mission before it can refit, as MILITARY.md says. (4) Base kit draws nothing beyond the hire goods, mirroring airframes, so ship hulls have no demand until the naval branch (BL-1528) opens later kit.",
    "why_it_matters": "Call (1) sets how a blockaded fleet can behave once BL-1530 (sea control) counts presence: a docked ship would not count, and could not be sunk at its mouth."
+  },
+  {
+   "id": "NR-1146",
+   "title": "Raid: calls taken inside BL-1529 (patrol escort raid)",
+   "raised": "2026-11-06",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "SHIP_KIT (BL-1527)",
+   "what": "Taken so the item could land; each is small to change. (1) A refitting ship is in dock: it neither fights nor can be hit. A land refit fights on its old kit, so this differs, and a ship can dodge fire by refitting, at the price of goods and its muster days. The alternative is hittable in dock. (2) In dock it still draws quarterly supply and does not mend. (3) A broken-off ship must be recalled to no mission before it can refit, as MILITARY.md says. (4) Base kit draws nothing beyond the hire goods, mirroring airframes, so ship hulls have no demand until the naval branch (BL-1528) opens later kit.",
+   "why_it_matters": "Call (1) sets how a blockaded fleet can behave once BL-1530 (sea control) counts presence: a docked ship would not count, and could not be sunk at its mouth.",
+   "detail": "1. Each raider rolls on its own against the whole escort force reaching it, rather than all raiders pooling attack against all escorts, and a zone of N provinces scales its chance by 1/N. MILITARY.md § Sea was reworded to say so. Alternative: pool them, so raiders share one roll. 2. An escort counts as having detected a raider when its SIDE has, patrols and recon included, as the daily pass reads detection. Alternative: the escort's own detection only. 3. A raid rolls its own detection, one answer per raider, day and owner, apart from the sea pass, so a raider fought that quarter can still read as unseen. 4. A cargo held at sea in a raider's zone rolls all 90 days of the tick, so holding there nearly always loses it. 5. The Field line names the cargo and the interceptor, not the lane, since a market has no name; LOGISTICS.md § 7 was reworded. It now also voices land cuts, embargo refusals and front losses, which were dropped silently before, so a player at war will see more lines. 6. Friendship hole, older than this work: a declares on b, b offers, a accepts, and both states stand, against stance.hpp's invariant. The raid refuses a friend either way; the land interdiction does not. Should accept clear the declaration, or be refused? 7. Land capture does not read the embargo, though a prize now does. Left as it was. 8. The take chance is a first cut, 100 per mille a day, before BL-1526 (sea trade reading)."
   }
  ]
 }

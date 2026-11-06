@@ -66,6 +66,10 @@ void post_battle_dispatches(const world& w, const economy_report& report,
 void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& dispatches,
                             ui::chat_state& chat, int day_tick);
 
+/// BL-1529 (LOGISTICS.md § 7): a line on the Field channel for each convoy of the player's
+/// cut, raided or lost this tick, and each the player took. Presentation only.
+void post_interceptions(const world& w, const economy_report& report, ui::chat_state& chat, int day_tick);
+
 /// War dispatches (BL-1480; Ben, 2026-11-03, NR-1120; RELATIONS.md § 7): every
 /// declaration and peace the player's nation is party to, raised as one line on the
 /// Field channel. Read from the world history log's `war` entries - one per party,

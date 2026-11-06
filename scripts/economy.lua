@@ -1144,6 +1144,7 @@ economy = {
         -- default_sea_params (sea_params.hpp). A first cut; the sprint's closing reading tunes it.
         sea = {
             patrol_detection_permille = 1500,
+            raid_take_permille_per_day = 100,
             morale_per_hp_permille    = 1000,
             dock_morale_per_day       = 10,
             resume_hp_permille        = 700,

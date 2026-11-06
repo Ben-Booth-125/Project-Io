@@ -55,6 +55,9 @@ struct sea_params
 
     /// A patrol's detection counts at this per-mille of its class's value.
     int patrol_detection_permille = 1500;
+    /// BL-1529: the chance per-mille that a raider on station alone in the province takes a
+    /// cargo in one day of its crossing, before its zone's 1/N and the escorts it meets.
+    int raid_take_permille_per_day = 100;
     /// Morale lost per per-mille of full HP lost, per-mille: 1000 loses them equally.
     int morale_per_hp_permille = 1000;
     /// Morale a ship regains a day lying at its home port.

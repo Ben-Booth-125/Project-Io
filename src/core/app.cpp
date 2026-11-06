@@ -2105,6 +2105,7 @@ void app::step_economy()
         // through here (it runs inside the worker, BL-1085), so nothing
         // pre-game posts lines the player never saw.
         session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
+        session_history::post_interceptions(m_world, m_last_econ_report, m_chat, day); // BL-1529
         // BL-1480 (NR-1120): a declaration or peace the player is party to - the rival's
         // pass above, or the player's own press since the last step.
         session_history::post_war_dispatches(m_world, m_war_log_cursor, m_chat, day);

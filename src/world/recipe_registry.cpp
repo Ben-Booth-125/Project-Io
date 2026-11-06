@@ -1019,6 +1019,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             };
             sol::table at = *sea;
             read_int(at, "patrol_detection_permille", 0, 10000, ap.patrol_detection_permille, "");
+            read_int(at, "raid_take_permille_per_day", 0, 1000, ap.raid_take_permille_per_day, "");
             read_int(at, "morale_per_hp_permille", 0, 10000, ap.morale_per_hp_permille, "");
             read_int(at, "dock_morale_per_day", 0, 1000, ap.dock_morale_per_day, "");
             read_int(at, "resume_hp_permille", 0, 1000, ap.resume_hp_permille, "");

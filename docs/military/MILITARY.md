@@ -714,9 +714,10 @@ It counts for sea control, and engages a raider it has detected.
 
 **Raid (Ben, 2026-11-05).** A raider acts on a convoy (`../economy/SUPPLY.md`) whose sea leg crosses its
 zone and whose owner its nation has declared hostile; a friend is never raided
-(`../economy/LOGISTICS.md` § 7). On each day of that crossing the cargo is taken at a seeded chance set
-by the raiders' attack against the attack of the escorts in the province **that have detected them**. An
-unescorted convoy is the easy kill, and a submarine no escort has found is not slowed at all.
+(`../economy/LOGISTICS.md` § 7). On each day of that crossing each raider takes the cargo at a seeded chance set
+by its attack against the attack of the escorts in the province **that have detected it and whose mask
+reaches its class**, and scaled by its share of its zone. An unescorted convoy is the easy kill, and a
+submarine no escort has found is not slowed at all, so a capital escort never slows one.
 **A submarine sinks what it takes. A surface raider takes a prize:** the cargo lands on the market at its
 nearest own port in range and is sold there for its nation, and with no such port it is sunk. Either way
 the goods were committed when the shipment left, so the owner has lost them, and either way it is announced

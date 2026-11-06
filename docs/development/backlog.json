@@ -1082,7 +1082,7 @@
     "tools/verify/"
    ],
    "title": "Measure how much trade crosses water, per seed and per nation, before any raid number is set",
-   "design": "MEASURE FIRST. Raiding and blockade are worth only what crosses the water. Per library seed and per major: the share of landed cargo value on a sea leg, the same for a nation's imports, and how many ports carry it. Goldens cannot see trade, so this is a harness reading on the shipped start. If the share is small, that is a finding to raise with Ben before patrol, escort and raid are tuned. Run after sprint 63's economy wave."
+   "design": "MEASURE FIRST. Raiding and blockade are worth only what crosses the water. Per library seed and per major: the share of landed cargo value on a sea leg, the same for a nation's imports, and how many ports carry it. Goldens cannot see trade, so this is a harness reading on the shipped start. If the share is small, that is a finding to raise with Ben before patrol, escort and raid are tuned. Run after sprint 63's economy wave. Patrol, escort and raid were built ahead of this reading, on a first-cut raid_take_permille_per_day of 100: in the harness field one raider takes about 97% of whole crossings. Read that against real lanes here and tune in BL-1535 (naval war reading)."
   },
   {
    "status": "complete",
@@ -1141,7 +1141,7 @@
    "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
-   "status": "proposed",
+   "status": "complete",
    "glyph": "○",
    "sprint": "64",
    "version_goal": "v0.3.0",
@@ -1165,7 +1165,9 @@
     "src/world/economy_system.cpp"
    ],
    "title": "Patrol, escort and raid: the sea leg stops being cut by a unit on its tile",
-   "design": "MILITARY.md § Sea; LOGISTICS.md § 7; SUPPLY.md, the lane. The seeded daily raid on a sea leg in the zone, the escort share, submarine sink against surface prize, and the announcement with \"an unseen raider\". Must conserve: a sunk cargo is destroyed, a prize lands at the nearest own port. Land interdiction is unchanged. Harness: replay determinism, money and goods conservation, friend immunity, undetected submarine ignores escort."
+   "resolved": "2026-11-06",
+   "design": "@docs/development/archive/backlog-design-2026-Q4.json",
+   "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
    "status": "proposed",
@@ -1300,7 +1302,7 @@
     "docs/ui/ICONS.md"
    ],
    "title": "The Sea tab, ships on the canvas, the mission right-click, and landing presses",
-   "design": "ledgers/military.md; MILITARY.md § Sea. Replace the stub tab, draw ships on water with class and owner, and add mission assignment by right-click, embark and land presses, a closed-port mark on the map, and raid causes in the Convoys ledger. Every control updates ACTIONS.json and every surface the question log. Every press needs a live click. The ship classes join the existing unit designer (set_ship_design), and a refit press sits on a ship at its home port (refit_ship): both verbs are on the seam with no player surface until this item. The live click owed by the Naval research branch goes with this pass: open the research panel, shift-click a Naval node, see it queue. Some rim labels overlap on the ten-branch ring (Order with Mass Surveillance, Anti-Ship Missiles with Long-Range Precision Strike): look at them there, at zoom."
+   "design": "ledgers/military.md; MILITARY.md § Sea. Replace the stub tab, draw ships on water with class and owner, and add mission assignment by right-click, embark and land presses, a closed-port mark on the map, and raid causes in the Convoys ledger. Every control updates ACTIONS.json and every surface the question log. Every press needs a live click. The ship classes join the existing unit designer (set_ship_design), and a refit press sits on a ship at its home port (refit_ship): both verbs are on the seam with no player surface until this item. The live click owed by the Naval research branch goes with this pass: open the research panel, shift-click a Naval node, see it queue. Some rim labels overlap on the ten-branch ring (Order with Mass Surveillance, Anti-Ship Missiles with Long-Range Precision Strike): look at them there, at zoom. LOGISTICS.md § 7 also owes two surfaces no interception has yet: the Convoys ledger row leaving with a stated cause, and the tile marked for a few ticks. Both read economy_report::interceptions, on land and at sea."
   },
   {
    "status": "proposed",

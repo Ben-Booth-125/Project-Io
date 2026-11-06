@@ -37,6 +37,7 @@
 
 struct world;
 struct economy_report;
+struct interception_record;
 class recipe_registry;
 
 // ---- The sea roster ---------------------------------------------------------
@@ -152,6 +153,17 @@ struct sea_day_tick
 
 /// Run ONE day (see the file comment). @p day_tick seeds its rolls.
 sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick);
+
+/// BL-1529 (MILITARY.md § Sea, Raid): take cargo off the sea legs this tick's convoys
+/// crossed. Runs between `advance_convoys` and `credit_arrived_convoys`, which spends the
+/// sweep it reads. For each day of a crossing, each raider on station in the province whose
+/// nation has declared the cargo's owner hostile rolls, lowest ship id first: its take chance
+/// per day x its share of the zone x its attack / (its attack + the attack of the owner's
+/// escorts there that can hit its class), the escorts counting only on a day the owner's side
+/// detects it. A submarine sinks what it takes; a surface raider lands a prize at its nearest
+/// own port in range, and sinks it with none. The goods left their source at dispatch, so
+/// neither path mints. The rolls are pure hashes; nothing is saved.
+std::vector<interception_record> raid_convoys(world& w, const recipe_registry& reg, int tick);
 
 struct ship_upkeep_tick
 {

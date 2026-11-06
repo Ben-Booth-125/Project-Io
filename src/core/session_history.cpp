@@ -60,6 +60,22 @@ void post_battle_dispatches(const world& w, const std::vector<battle_dispatch>& 
     }
 }
 
+void post_interceptions(const world& w, const economy_report& report, ui::chat_state& chat, int day_tick)
+{
+    if (report.interceptions.empty())
+        return;
+    const int field = (static_cast<int>(chat.channels.size()) > ui::chat_state::k_field_channel)
+                          ? ui::chat_state::k_field_channel
+                          : ui::chat_state::k_public_channel;
+    const entity_id me = player_nation(w);
+    for (const interception_record& r : report.interceptions)
+    {
+        const std::string line = interception_line(w, r, me);
+        if (!line.empty())
+            ui::chat_post(chat, day_tick, w.player_entity, field, line);
+    }
+}
+
 void post_war_dispatches(const world& w, std::size_t& cursor, ui::chat_state& chat, int day_tick)
 {
     if (cursor > w.history_log.size())

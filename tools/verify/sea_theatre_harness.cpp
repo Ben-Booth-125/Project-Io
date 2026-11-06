@@ -9,7 +9,11 @@
 //
 // Run: node tools/verify/build_harness.js sea_theatre_harness --run
 
+#include "core/battle_dispatch_text.cpp" // BL-1529: interception_line; the builder compiles only src/world, and this TU reads only the world
+#include "world/campaign_settle.hpp"
+#include "world/market_clearing.hpp"
 #include "world/nation_tech.hpp"
+#include "world/supply_system.hpp"
 #include "world/air_combat.hpp"
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
@@ -204,6 +208,56 @@ void refused(fixture& f, F press, corp_command_result want, const std::string& w
     const std::string before = to_bytes(f.w);
     const corp_command_result r = press();
     check(r == want && to_bytes(f.w) == before, what);
+}
+
+/// BL-1529: a cargo of @p owner's whose sweep this tick crosses the whole sea lane.
+convoy_component& add_crossing(fixture& f, entity_id owner, float qty = 100.0f)
+{
+    convoy_component cv;
+    cv.source_market = f.a_market; cv.dest_market = f.b_market;
+    cv.cargo_resource = resource_type::steel; cv.cargo_qty = qty;
+    cv.corp = owner; cv.id = f.w.allocate_convoy_id();
+    cv.origin_tile = tile(f, 5, 3);
+    cv.port_a = tile(f, 7, 3); cv.port_b = tile(f, 72, 3);
+    cv.progress_before = 0.0f; cv.progress = 1.0f; cv.speed = 0.5f; cv.arrived = true;
+    f.w.convoys.push_back(cv);
+    return f.w.convoys.back();
+}
+
+/// A ship on station over @p strips, direct (fixture).
+entity_id add_on_station(fixture& f, entity_id owner, entity_id port, uint16_t row, sea_mission m,
+                         std::vector<int> strips)
+{
+    const entity_id id = add_ship(f, owner, port, row, strips.front() * STRIP + 1, 3);
+    sea_ship& s = f.w.ships.at(id);
+    s.mission = m;
+    for (const int k : strips)
+        s.provinces.push_back(strip(f, k));
+    std::sort(s.provinces.begin(), s.provinces.end());
+    return id;
+}
+
+/// How many of @p n cargoes of b's, each sweeping the ONE tile of its lane in column @p col,
+/// a's fleet takes, one tick each. One tile is few enough rolls to read a rate from.
+int takes(fixture& f, const recipe_registry& reg, int n, int col = 41, int tick0 = 100)
+{
+    int taken = 0;
+    for (int i = 0; i < n; ++i)
+    {
+        convoy_component& cv = add_crossing(f, f.b);
+        const convoy_route lane = convoy_route_tiles(f.w, cv);
+        for (std::size_t li = 1; li < lane.tiles.size(); ++li)
+            if (f.w.tiles.at(lane.tiles[li]).grid_x == col)
+            {
+                cv.progress_before = lane.at[li - 1];
+                cv.progress = lane.at[li];
+                cv.arrived = false;
+                break;
+            }
+        taken += static_cast<int>(raid_convoys(f.w, reg, tick0 + i).size());
+        f.w.convoys.clear();
+    }
+    return taken;
 }
 
 } // namespace
@@ -1035,6 +1089,292 @@ int main()
         const entity_id tr = add_ship(f, f.a, f.a_port, TRA, 41, 3);
         f.w.ships.at(tr).kit.fit = {2, 0, 0};
         check(ship_stats(reg, f.w.ships.at(tr)).capacity == 2, "K12b a transport's hull sets its capacity");
+    }
+
+    // -----------------------------------------------------------------------
+    std::printf("\nBL-1529 - the raid\n");
+    {
+        fixture f; build(f);
+        add_on_station(f, f.a, f.a_port, SUB, sea_mission::raid, {10});
+        check(takes(f, reg, 300) == 0, "P1 no declaration, no raid");
+        declare_hostile(f.w, f.b, f.a);
+        check(takes(f, reg, 300) == 0, "P1b hostility is directed: the victim's declaration does not arm the raider");
+        {
+            // A friend is never raided, even by the one sequence that leaves a friendship
+            // and a declaration standing together: a declares, b offers, a accepts.
+            fixture g; build(g);
+            add_on_station(g, g.a, g.a_port, SUB, sea_mission::raid, {10});
+            declare_hostile(g.w, g.a, g.b);
+            offer_friendship(g.w, g.b, g.a); accept_friendship(g.w, g.b, g.a);
+            check(are_friends(g.w, g.a, g.b) && is_hostile(g.w, g.a, g.b) && takes(g, reg, 300) == 0, "P1c a friend's cargo is not raided");
+        }
+        declare_hostile(f.w, f.a, f.b);
+        fixture g = f;
+        const int alone = takes(f, reg, 1000);
+        check(alone > 60, "P2 an unescorted cargo is taken, 1000 one-tile sweeps: " + std::to_string(alone));
+        check(takes(g, reg, 1000) == alone, "P3 the same seed, day and cargo roll the same");
+        add_crossing(f, f.a);
+        check(raid_convoys(f.w, reg, 7).empty() && f.w.convoys.size() == 1, "P4 a raider leaves its own nation's cargo alone");
+        f.w.convoys.clear();
+    }
+    {
+        // Mission and station gates.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        const entity_id s = add_on_station(f, f.a, f.a_port, DES, sea_mission::raid, {10});
+        check(takes(f, reg, 300) > 0, "P5 control: on station, the same raider takes");
+        f.w.ships.at(s).returning = true;
+        check(takes(f, reg, 300) == 0, "P5 a broken-off raider takes nothing");
+        f.w.ships.at(s).returning = false;
+        f.w.ships.at(s).mission = sea_mission::patrol;
+        check(takes(f, reg, 300) == 0, "P5b a patrol takes nothing");
+        f.w.ships.at(s).mission = sea_mission::raid;
+        f.w.ships.at(s).route.push_back(tile(f, 42, 3));
+        check(takes(f, reg, 300) == 0, "P5c a raider still sailing takes nothing");
+    }
+    {
+        // Sink and prize, and that neither mints.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, SUB, sea_mission::raid, {10});
+        std::vector<interception_record> cuts;
+        for (int t = 0; t < 400 && cuts.empty(); ++t)
+        {
+            add_crossing(f, f.b, 40.0f);
+            cuts = raid_convoys(f.w, reg, t);
+            if (cuts.empty()) f.w.convoys.clear();
+        }
+        check(cuts.size() == 1 && cuts[0].outcome == interception_outcome::raid_sunk && f.w.convoys.empty(),
+              "P6 a submarine sinks what it takes, and the convoy is gone");
+        check(f.w.landed_this_tick.empty(), "P6b a sunk cargo lands nowhere");
+        check(cuts.size() == 1 && cuts[0].unseen, "P6c no ship of the owner's in the province, so an unseen raider");
+    }
+    {
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, DES, sea_mission::raid, {3});
+        std::vector<interception_record> cuts;
+        for (int t = 0; t < 400 && cuts.empty(); ++t)
+        {
+            add_crossing(f, f.b, 40.0f);
+            cuts = raid_convoys(f.w, reg, t);
+            if (cuts.empty()) f.w.convoys.clear();
+        }
+        const entity_id m = cuts.empty() ? null_entity : cuts[0].prize_market;
+        check(cuts.size() == 1 && cuts[0].outcome == interception_outcome::raid_prize && m == market_for_tile(f.w, tile(f, 7, 3)),
+              "P7 a surface raider lands a prize at the market of its nearest own port");
+        check(f.w.convoys.empty(), "P7a a taken prize's convoy is gone, so it cannot also arrive");
+        check(m != null_entity && f.w.landed(f.a, m, static_cast<std::size_t>(resource_type::steel)) == 40.0f && f.w.landed_this_tick.size() == 1,
+              "P7b the whole cargo lands there for the raider's nation, no more and no less");
+    }
+    {
+        // A prize with no own port in range is sunk. Strip 16 is 57+ steps from a's port; range 25.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, DES, sea_mission::raid, {16});
+        std::vector<interception_record> cuts;
+        for (int t = 0; t < 400 && cuts.empty(); ++t)
+        {
+            add_crossing(f, f.b, 40.0f);
+            cuts = raid_convoys(f.w, reg, t);
+            if (cuts.empty()) f.w.convoys.clear();
+        }
+        check(cuts.size() == 1 && cuts[0].outcome == interception_outcome::raid_sunk && f.w.landed_this_tick.empty(),
+              "P8 a surface raider with no own port in range sinks its prize");
+    }
+    {
+        // The escort: only one that found the raider, and whose mask reaches it.
+        fixture base; build(base);
+        declare_hostile(base.w, base.a, base.b);
+        add_on_station(base, base.a, base.a_port, DES, sea_mission::raid, {10});
+        fixture lone = base;
+        const int unescorted = takes(lone, reg, 2000);
+        fixture guarded = base;
+        for (int i = 0; i < 4; ++i)
+            add_on_station(guarded, guarded.b, guarded.b_port, CAP, sea_mission::escort, {10});
+        const int escorted = takes(guarded, reg, 2000);
+        std::printf("  (raider alone %d, with four capital escorts %d, of 2000)\n", unescorted, escorted);
+        check(escorted * 2 < unescorted, "P9 escorts slow a raider they find: " + std::to_string(unescorted) + " to " + std::to_string(escorted));
+
+        fixture sub; build(sub);
+        declare_hostile(sub.w, sub.a, sub.b);
+        add_on_station(sub, sub.a, sub.a_port, SUB, sea_mission::raid, {10});
+        fixture sub_lone = sub;
+        const int sub_alone = takes(sub_lone, reg, 2000);
+        fixture sub_cap = sub;
+        for (int i = 0; i < 4; ++i)
+            add_on_station(sub_cap, sub_cap.b, sub_cap.b_port, CAP, sea_mission::escort, {10});
+        check(takes(sub_cap, reg, 2000) == sub_alone, "P10 a capital escort cannot hit a submarine, so it does not slow one");
+        fixture sub_blind = sub;
+        for (int i = 0; i < 4; ++i)
+            add_on_station(sub_blind, sub_blind.b, sub_blind.b_port, DES, sea_mission::escort, {10});
+        const int sub_escorted = takes(sub_blind, reg, 2000);
+        check(sub_escorted < sub_alone, "P11 destroyers that find a submarine do slow it: " + std::to_string(sub_alone) + " to " + std::to_string(sub_escorted));
+        check(sub_escorted > sub_alone / 8, "P11b it is not stopped, since most days they do not find it");
+        {
+            // Roll by roll on one cargo: an unfound submarine rolls exactly as it does alone.
+            fixture one_a = sub, one_b = sub;
+            for (int i = 0; i < 4; ++i)
+                add_on_station(one_b, one_b.b, one_b.b_port, DES, sea_mission::escort, {10});
+            int unseen_takes = 0, not_taken_alone = 0;
+            for (int t = 0; t < 2000; ++t)
+            {
+                add_crossing(one_a, one_a.b);
+                add_crossing(one_b, one_b.b);
+                const auto ca = raid_convoys(one_a.w, reg, 5000 + t);
+                const auto cb = raid_convoys(one_b.w, reg, 5000 + t);
+                one_a.w.convoys.clear();
+                one_b.w.convoys.clear();
+                for (const interception_record& r : cb)
+                {
+                    unseen_takes += r.unseen ? 1 : 0;
+                    not_taken_alone += ca.empty() ? 1 : 0;
+                }
+            }
+            check(unseen_takes > 0 && not_taken_alone == 0,
+                  "P11c an undetected submarine ignores the escort; an escort never adds a take: " + std::to_string(unseen_takes) + " unseen");
+        }
+
+        fixture wide = base;
+        wide.w.ships.begin()->second.provinces = {strip(wide, 10), strip(wide, 30)};
+        std::sort(wide.w.ships.begin()->second.provinces.begin(), wide.w.ships.begin()->second.provinces.end());
+        const int spread = takes(wide, reg, 2000);
+        check(spread < unescorted * 3 / 4 && spread > 0, "P12 a raider spread over two provinces takes less in each: " + std::to_string(unescorted) + " to " + std::to_string(spread));
+    }
+    {
+        // A hostile land unit on a sea tile cuts nothing; the same cargo on land is unchanged (interdiction harness).
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        unit_component u{};
+        u.owner = f.a; u.count = 100; u.position = tile(f, 40, 3);
+        f.w.units[f.w.create_entity()] = u;
+        add_crossing(f, f.b);
+        f.w.convoys.back().arrived = false;
+        const convoy_route lane = convoy_route_tiles(f.w, f.w.convoys.back());
+        check(std::find(lane.tiles.begin(), lane.tiles.end(), u.position) != lane.tiles.end(), "P13 control: the unit stands on the lane");
+        check(lane.sea_first > 0 && lane.tiles[static_cast<std::size_t>(lane.sea_first)] == tile(f, 7, 3)
+                  && lane.tiles[static_cast<std::size_t>(lane.sea_last)] == tile(f, 72, 3),
+              "P13a the lane reports its sea leg, port to port");
+        check(intercept_convoys(f.w, 3).empty() && f.w.convoys.size() == 1, "P13b a unit on a sea leg's tile cuts nothing");
+    }
+    {
+        // Lane order: a hostile unit on the land leg before the water cuts it before a raider can.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, SUB, sea_mission::raid, {10, 11, 12, 13, 14});
+        unit_component u{};
+        u.owner = f.a; u.count = 100;
+        add_crossing(f, f.b);
+        f.w.convoys.back().arrived = false;
+        const convoy_route lane = convoy_route_tiles(f.w, f.w.convoys.back());
+        u.position = lane.tiles[1];
+        const bool on_land = lane.sea_first > 1;
+        f.w.units[f.w.create_entity()] = u;
+        int raided = 0;
+        for (int t = 0; t < 200; ++t)
+        {
+            f.w.convoys.back().progress_before = 0.0f;
+            raided += static_cast<int>(raid_convoys(f.w, reg, t).size());
+        }
+        check(on_land && raided == 0, "P15 a cargo cut on the land leg first never reaches the raider");
+        const auto cuts = intercept_convoys(f.w, 3);
+        check(cuts.size() == 1 && cuts[0].interceptor_unit != null_entity, "P15b the land pass cuts it, on a convoy with ports");
+    }
+    {
+        // The real order, advance -> raid -> arrivals: every cargo lands once, or not at all.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, DES, sea_mission::raid, {3});
+        const std::size_t steel = static_cast<std::size_t>(resource_type::steel);
+        int prizes = 0, arrivals = 0, wrong = 0;
+        for (int t = 0; t < 300; ++t)
+        {
+            f.w.landed_this_tick.clear();
+            convoy_component& cv = add_crossing(f, f.b, 40.0f);
+            cv.progress_before = -1.0f; cv.progress = 0.0f; cv.speed = 2.0f; cv.arrived = false;
+            advance_convoys(f.w);
+            std::vector<interception_record> cuts = raid_convoys(f.w, reg, t);
+            credit_arrived_convoys(f.w, t, &cuts);
+            const float home = f.w.landed(f.b, f.b_market, steel);
+            float prize = 0.0f;
+            for (const auto& [key, stock] : f.w.landed_this_tick)
+                if (key.first == f.a) prize += stock.quantities[steel];
+            if (cuts.empty()) { ++arrivals; wrong += home == 40.0f && prize == 0.0f ? 0 : 1; }
+            else { ++prizes; wrong += home == 0.0f && prize == 40.0f ? 0 : 1; }
+            wrong += f.w.convoys.empty() ? 0 : 1;
+        }
+        check(prizes > 0 && arrivals > 0 && wrong == 0, "P16 through the real pass order each cargo lands exactly once: " + std::to_string(prizes) + " prizes, " + std::to_string(arrivals) + " arrivals");
+    }
+    {
+        // A held cargo sits the whole tick on its tile: in the zone it is exposed, out of it not.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, SUB, sea_mission::raid, {10});
+        const auto held_takes = [&](int col) {
+            int n = 0;
+            for (int t = 0; t < 100; ++t)
+            {
+                convoy_component& cv = add_crossing(f, f.b);
+                const convoy_route lane = convoy_route_tiles(f.w, cv);
+                for (std::size_t li = 1; li < lane.tiles.size(); ++li)
+                    if (f.w.tiles.at(lane.tiles[li]).grid_x == col)
+                    {
+                        cv.progress = lane.at[li];
+                        cv.progress_before = lane.at[li];
+                        break;
+                    }
+                cv.held = true; cv.arrived = false;
+                n += static_cast<int>(raid_convoys(f.w, reg, t).size());
+                f.w.convoys.clear();
+            }
+            return n;
+        };
+        check(held_takes(41) > 90 && held_takes(60) == 0, "P17 a cargo held at sea in the zone is exposed all tick, and out of the zone not at all");
+    }
+    {
+        // Who reads as seen, off a real detected take: the owner's destroyers find a destroyer.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, DES, sea_mission::raid, {10});
+        add_on_station(f, f.b, f.b_port, DES, sea_mission::escort, {10});
+        int named = 0, unseen = 0;
+        for (int t = 0; t < 2000; ++t)
+        {
+            add_crossing(f, f.b);
+            for (const interception_record& r : raid_convoys(f.w, reg, t))
+                (r.unseen ? unseen : named) += 1;
+            f.w.convoys.clear();
+        }
+        check(named > 0 && named > unseen, "P18 a raider the owner's side has found is named: " + std::to_string(named) + " named, " + std::to_string(unseen) + " unseen");
+    }
+    {
+        // The real tick carries the record to the report the app posts from.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        add_on_station(f, f.a, f.a_port, SUB, sea_mission::raid, {10, 11, 12, 13, 14});
+        std::size_t reported = 0;
+        for (int t = 0; t < 40 && reported == 0; ++t)
+        {
+            convoy_component& cv = add_crossing(f, f.b, 40.0f);
+            cv.progress_before = -1.0f; cv.progress = 0.0f; cv.speed = 2.0f; cv.arrived = false;
+            reported = run_settle_tick(f.w, reg, t, t, false).report.interceptions.size();
+        }
+        check(reported > 0, "P19 run_settle_tick reports the raid on the tick's report");
+    }
+    {
+        // The announcement.
+        fixture f; build(f);
+        interception_record r;
+        r.victim_corp = f.a; r.interceptor_corp = f.b; r.cargo_resource = resource_type::steel; r.cargo_qty = 40.0f;
+        r.outcome = interception_outcome::raid_sunk; r.unseen = true;
+        const std::string seen_not = interception_line(f.w, r, f.a);
+        check(seen_not.find("an unseen raider") != std::string::npos && seen_not.find("Bastion") == std::string::npos,
+              "P14 an undetected raider is named as an unseen raider, not by its nation: " + seen_not);
+        r.unseen = false;
+        check(interception_line(f.w, r, f.a).find("Bastion") != std::string::npos, "P14b a detected one is named");
+        check(interception_line(f.w, r, f.b).find("Aerie") != std::string::npos, "P14c the raider's side reads whose cargo it was");
+        const entity_id third = f.w.create_entity();
+        check(interception_line(f.w, r, third).empty(), "P14d a third party's feed stays quiet");
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);
