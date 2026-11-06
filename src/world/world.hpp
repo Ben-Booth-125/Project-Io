@@ -959,6 +959,30 @@ struct world
         ++territory_generation; // BL-1427: the front cache reads it
     }
 
+    /// BL-1502 (MILITARY.md § Occupation; Ben, 2026-11-05): who occupies each tile, by
+    /// tile, ascending. Only tiles an enemy holds appear. Legal ownership stays in
+    /// `tile_to_nation`; a front derives from owner OR occupier. Every entry names an
+    /// occupier at war with the tile's owner (`occupy_on_entry`, `clear_occupation_at_peace`;
+    /// the snapshot reader refuses anything else). Saved (v78), hashed when non-empty.
+    std::map<entity_id, entity_id> tile_occupier;
+
+    /// The tile's occupier, else its owner, else null_entity: the map a front reads.
+    /// Anything asking who OWNS a tile still reads `tile_to_nation`.
+    entity_id tile_controller(entity_id tile) const
+    {
+        if (!tile_occupier.empty())
+            if (const auto it = tile_occupier.find(tile); it != tile_occupier.end())
+                return it->second;
+        const auto it = tile_to_nation.find(tile);
+        return it != tile_to_nation.end() ? it->second : null_entity;
+    }
+
+    /// Is this tile held against its owner? Its output is denied (MILITARY.md § Occupation).
+    bool tile_occupied(entity_id tile) const
+    {
+        return !tile_occupier.empty() && tile_occupier.find(tile) != tile_occupier.end();
+    }
+
     /// Per-body NEAREST LOGISTIC POINT ANCHOR (BL-1117) — see lp_anchor_field. A
     /// derived cache on the same footing as the three above: built lazily by
     /// `nearest_lp_anchor`, cleared by invalidate_logistics_caches and by

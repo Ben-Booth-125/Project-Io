@@ -3,6 +3,7 @@
 
 #include "air_combat.hpp" // air_land_recon_milli: the air's recon over a battle (BL-1453)
 #include "carried_supplies.hpp" // BL-1452: the round's supply term and the recovery step
+#include "fronts.hpp" // BL-1502: occupy_on_entry, reanchor_fronts (the advance occupies)
 #include "logistics.hpp" // road_edge_neighbour: the retreat step (BL-1421)
 #include "placement_rules.hpp"
 #include "province.hpp"
@@ -1159,6 +1160,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
     // supplies the class terrain rows (BL-1455): the fight scale and the retreat's walls,
     // and land recon's rates (BL-1453, the air's share of the attacker's recon).
     const campaign_battle_params params{};
+    bool occupation_batch = false; // BL-1502: the fronts re-anchor once, after the pass
 
     // `tick` is today's day stamp: a battle's seed was folded when it opened, and the
     // day stamps the tiles units retreat or advance onto (BL-1453).
@@ -1420,6 +1422,9 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                             it->second.position       = b.tile;
                             it->second.order          = movement_order{};
                             it->second.tile_since_day = tick; // BL-1453: it advanced today
+                            // BL-1502 (MILITARY.md § Occupation): the won tile is occupied.
+                            (void)occupy_on_entry(w, it->second.owner, it->second.type, b.tile,
+                                                  occupation_batch);
                         }
                 }
             }
@@ -1427,6 +1432,9 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
             out.dispatches.push_back(d);
         }
     }
+
+    if (occupation_batch)
+        reanchor_fronts(w); // BL-1502: the won tiles moved the fronts
 
     // -----------------------------------------------------------------------
     // 4. RETIRE

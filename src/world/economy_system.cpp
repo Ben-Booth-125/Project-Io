@@ -2832,7 +2832,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     continue;
                 const building_component& b = bit->second;
                 if (b.decommissioned || b.ticks_remaining > 0 || b.state_idle
-                    || b.type != building_type::processing_facility)
+                    || b.type != building_type::processing_facility
+                    || w.tile_occupied(b.tile)) // BL-1502: no output, so no claim on a shelf
                     continue;
                 const entity_id body = building_body(w, b);
                 const recipe* rcp = reg.get_recipe(b.recipe);
@@ -2901,6 +2902,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                 continue;
             // Still under construction — no production yet (playtest patch, 2026-07-06).
             if (b.ticks_remaining > 0)
+                continue;
+            // BL-1502 (MILITARY.md § Occupation): an occupied tile's output is denied to
+            // its owner and not gained by the occupier. It stands; it only makes nothing.
+            if (w.tile_occupied(b.tile))
                 continue;
 
             switch (b.type)
@@ -4746,6 +4751,7 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
         return out;
     };
     std::vector<tile_attack> attacks;
+    bool occupation_batch = false; // BL-1502: the fronts re-anchor once, after the pass
 
     for (const entity_id id : ids)
     {
@@ -4899,6 +4905,9 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
                     ++occupancy[next_id][u.owner];
                 }
                 u.position = next_id;
+                // BL-1502 (MILITARY.md § Occupation): at war, the ground it enters.
+                if (u.count > 0)
+                    (void)occupy_on_entry(w, u.owner, u.type, next_id, occupation_batch);
                 // BL-1453 (MILITARY.md § Recon): the day it came onto this tile, which
                 // the opening's "only haste attacks blind" test reads.
                 u.tile_since_day = day_tick >= 0 ? day_tick : w.current_day_tick;
@@ -4920,6 +4929,9 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
             ++out.arrived;
         }
     }
+
+    if (occupation_batch)
+        reanchor_fronts(w); // BL-1502: so a save today holds no key on a moved front
 
     // THE ATTACKS THIS PASS REGISTERED open now, after every unit has moved, in
     // (tile, attacker, defender) order — so which battle claims an adjacent stack

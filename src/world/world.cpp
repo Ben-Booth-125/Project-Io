@@ -431,6 +431,19 @@ uint64_t world::state_hash(int tick) const
         }
     }
 
+    // BL-1502 (MILITARY.md § Occupation): the occupation layer, ascending tile, folded
+    // only when a tile is occupied, so a world at peace hashes as it did.
+    if (!tile_occupier.empty())
+    {
+        fnv1a_u32(h, 0x544F4343u); // "TOCC"
+        fnv1a_u32(h, static_cast<uint32_t>(tile_occupier.size()));
+        for (const auto& [tile, occupier] : tile_occupier)
+        {
+            fnv1a_u32(h, tile);
+            fnv1a_u32(h, occupier);
+        }
+    }
+
     // BL-1437: each nation's obsolete-row flips, folded only for a nation that has
     // any (sorted walk; nations is unordered), so a world nobody touched hashes as
     // it did.

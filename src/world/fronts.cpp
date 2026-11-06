@@ -8,6 +8,7 @@
 #include "recipe_registry.hpp" // BL-1455: the class terrain rows a front's slot and target read
 #include "stance.hpp"        // is_hostile
 #include "unit_roster.hpp"   // unit_strength
+#include "war.hpp"           // at_war (BL-1502: occupation)
 #include "world.hpp"
 
 #include <algorithm>
@@ -79,10 +80,11 @@ entity_id neighbour_of(const world& w, raster_source& rs, const tile_component& 
                 + static_cast<std::size_t>(c.gx)];
 }
 
+/// BL-1502: the nation a front reads as holding a tile, owner OR occupier. Every front
+/// walk in this file reads this; legal ownership is `tile_to_nation`'s, read by no front.
 entity_id owner_of(const world& w, entity_id tile)
 {
-    const auto it = w.tile_to_nation.find(tile);
-    return it != w.tile_to_nation.end() ? it->second : null_entity;
+    return w.tile_controller(tile);
 }
 
 /// Hex steps between two tiles on one body (odd-r offset -> axial, the cylinder
@@ -515,7 +517,7 @@ std::vector<front> derive_fronts(const world& w, entity_id nation)
 {
     std::vector<entity_id> owned;
     for (const auto& [tile, n] : w.tile_to_nation)
-        if (n == nation)
+        if (w.tile_controller(tile) == nation) // BL-1502: owner or occupier
             owned.push_back(tile);
     std::sort(owned.begin(), owned.end());
     raster_source rs{ w, {} };
@@ -526,8 +528,8 @@ std::map<entity_id, std::vector<front>> derive_all_fronts(const world& w)
 {
     std::map<entity_id, std::vector<entity_id>> owned;
     for (const auto& [tile, n] : w.tile_to_nation)
-        if (n != null_entity)
-            owned[n].push_back(tile);
+        if (const entity_id holder = w.tile_controller(tile); holder != null_entity) // BL-1502
+            owned[holder].push_back(tile);
     raster_source rs{ w, {} };
     std::map<entity_id, std::vector<front>> out;
     for (auto& [nation, tiles] : owned)
@@ -670,6 +672,56 @@ void reanchor_fronts(world& w)
         });
         w.front_orders = std::move(next);
     }
+}
+
+bool occupy_on_entry(world& w, entity_id nation, uint16_t type, entity_id tile, bool& batch_open)
+{
+    if (w.wars.empty())
+        return false; // at peace nothing is taken, and the layer is empty
+    const auto tit = w.tiles.find(tile);
+    const auto& rows = unit_roster_table();
+    if (tit == w.tiles.end() || type >= rows.size()
+        || (rows[type].domains & domain_bit(traversal_domain::land)) == 0)
+        return false; // a naval row takes no ground
+    if (is_water(tit->second.substrate) && !tile_has_road(tit->second))
+        return false; // water is not ground; a bridge is a road
+    const auto own = w.tile_to_nation.find(tile);
+    if (own == w.tile_to_nation.end() || own->second == null_entity)
+        return false; // no one's tile
+    const entity_id holder = w.tile_controller(tile);
+    if (holder == nation || !at_war(w, nation, holder))
+        return false;
+    if (!batch_open)
+    {
+        reanchor_fronts(w); // the old fronts, before the first write (fronts.hpp)
+        batch_open = true;
+    }
+    // The layer's one invariant: an occupier is at war with the tile's OWNER. A nation
+    // driving out a third party it has no war with the owner of hands the tile home.
+    if (nation != own->second && at_war(w, nation, own->second))
+        w.tile_occupier[tile] = nation;
+    else
+        w.tile_occupier.erase(tile);
+    ++w.territory_generation; // the front cache reads it; ownership and catchment did not move
+    return true;
+}
+
+void clear_occupation_at_peace(world& w)
+{
+    std::vector<entity_id> ending; // ascending: the map is
+    for (const auto& [tile, occupier] : w.tile_occupier)
+    {
+        const auto own = w.tile_to_nation.find(tile);
+        if (own == w.tile_to_nation.end() || !at_war(w, occupier, own->second))
+            ending.push_back(tile);
+    }
+    if (ending.empty())
+        return;
+    reanchor_fronts(w); // the old fronts, before the first erase (fronts.hpp)
+    for (const entity_id tile : ending)
+        w.tile_occupier.erase(tile);
+    ++w.territory_generation;
+    reanchor_fronts(w);
 }
 
 bool front_may_push(const world& w, const front& f)
@@ -868,8 +920,10 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
             // PUSH: each unit marches onto the neighbour's land tile with a hex side
             // onto the span whose standing stack is weakest (an empty tile weakest of
             // all), nearest its own slot, ties to the lower tile id. Marching onto a
-            // held tile is an attack (run_unit_march). A unit already standing on the
-            // neighbour's ground holds what it took.
+            // held tile is an attack (run_unit_march). At war a tile entered is occupied
+            // and the front moves past it, so the push goes on from the new span
+            // (BL-1502; MILITARY.md § Occupation). Under a bare hostility nothing is
+            // occupied: a unit on the neighbour's ground stands on it, and holds there.
             raster_source rs{ w, {} };
             const std::map<entity_id, int64_t> held =
                 push_strengths(w, nk.first, push_candidates(w, rs, *f));
@@ -880,7 +934,7 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
                 if (busy(uid, u))
                     continue;
                 if (owner_of(w, u.position) == f->neighbour)
-                    continue; // on the neighbour's ground: it holds what it took
+                    continue; // still the neighbour's ground under it: no war, no occupation
                 const entity_id slot = slot_of(i);
                 // The targets in the push's order: weakest stack, then nearest the slot,
                 // then the lower tile id. BL-1455: a target the unit's class cannot

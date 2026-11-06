@@ -139,6 +139,8 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
     constexpr int k_days = 90;
     std::set<std::pair<entity_id, entity_id>> embargo_prev = w.nation_embargoes; // BL-1481
     std::set<entity_id> rival_bunkers_seen, player_bunkers_flagged; // BL-1426
+    std::size_t occupied_max = 0, push_orders_max = 0; // BL-1502
+    int occupied_ticks = 0;
     for (int step = k_campaign_settle_ticks, k = 1; step <= last_tick; ++step, ++k)
     {
         advance_orbits(w, static_cast<double>(k_days));
@@ -158,6 +160,10 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
             if (w.nation_embargoes.count(e) == 0)
                 ++r.embargo_repealed;
         embargo_prev = w.nation_embargoes;
+        // BL-1502: the ground held against its owners, at each tick's end, and the pushes.
+        occupied_max = std::max(occupied_max, w.tile_occupier.size());
+        occupied_ticks += w.tile_occupier.empty() ? 0 : 1;
+        push_orders_max = std::max(push_orders_max, w.front_orders.size());
         // BL-1479 (NR-1104): how often grievance holds - every ordered pair of distinct
         // nations, its observer's Trust toward the subject at or below the edge.
         for (const auto& [a, na] : w.nations)
@@ -253,6 +259,9 @@ seed_result run_seed(std::uint32_t seed, int last_tick, bool print_trace)
         std::printf("  FAIL  seed %u: %d bunker(s) built for the player's nation\n", seed, r.built_for_player);
         player_clean = false;
     }
+    // BL-1502 (MILITARY.md § Occupation): the ground held against its owners at the end.
+    std::printf("  seed %u: occupied tiles at the end %zu, at most %zu, on %d tick(s); at most %zu push order(s)\n", seed,
+                w.tile_occupier.size(), occupied_max, occupied_ticks, push_orders_max);
     r.hash      = w.state_hash(0);
     r.war_bytes = war_tables(w);
     r.trace     = std::move(trace);

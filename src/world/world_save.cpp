@@ -11,6 +11,7 @@
 #include "air_combat.hpp"   // BL-1449: air_roster_table — the air section's range checks
 #include "carried_supplies.hpp" // BL-1452: k_starvation_days — the stocks section's range check
 #include "war.hpp"         // BL-1459: the war section
+#include "hex_neighbors.hpp" // BL-1502: a front key across the line
 #include "unit_roster.hpp" // BL-1437: unit_roster_table — the obsolete flips' range check // BL-1407: fold_legacy_firms -- a pre-v56 stream's corporations
 
 #include <sstream>
@@ -2035,6 +2036,29 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
     // in the sentiment substrate's own layout so the two seams cannot drift.
     if (version >= k_world_save_version_contributors)
         write_sentiment_provenance(w.sentiment, out);
+
+    // world_save_version 78 (BL-1502): THE OCCUPATION LAYER, the last section, after the
+    // provenance. Every occupied tile ascending, as (tile, occupier).
+    if (version >= k_world_save_version_occupation)
+    {
+        w_u32(out, static_cast<uint32_t>(w.tile_occupier.size()));
+        for (const auto& [tile, occupier] : w.tile_occupier)
+        {
+            w_id(out, tile);
+            w_id(out, occupier);
+        }
+    }
+}
+
+void write_world_snapshot_pre_occupation(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1502): the v77 stream shape - no occupation section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_occupation);
+}
+
+std::size_t world_save_occupation_section_bytes(const world& w)
+{
+    return 4 + 8 * w.tile_occupier.size();
 }
 
 void write_world_snapshot_pre_contributors(const world& w, std::ostream& out)
@@ -2394,7 +2418,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_kit_goods    // BL-1422: v73, arrays 49 wide
             && version != k_world_save_version_pre_refusals     // BL-1480: v74, no peace refusals
             && version != k_world_save_version_pre_airframes    // BL-1436: v75, arrays 54 wide
-            && version != k_world_save_version_pre_contributors)) // BL-1470: v76, no provenance
+            && version != k_world_save_version_pre_contributors // BL-1470: v76, no provenance
+            && version != k_world_save_version_pre_occupation)) // BL-1502: v77, nothing occupied
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -3202,12 +3227,23 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     // strictly ascending by (nation, key), each nation in the stream, each key a tile it
     // holds, each order push (hold is never stored). Refused whole otherwise. A v61 (and
     // older) stream ends before it: no unit is assigned and every front holds.
+    // BL-1502: a front key is a tile of the nation's OWN SIDE of the line, which since v78
+    // can be ground it occupies, or (a span wholly claimed, fronts.hpp) a tile across it.
+    // The occupation section reads last, so a v78 key its nation does not own is held
+    // back and judged once the layer is in (below).
+    std::vector<std::pair<entity_id, entity_id>> front_keys_to_judge; // (tile, nation)
     if (version >= k_world_save_version_pre_tile)
     {
         const auto held_by = [&](entity_id tile, entity_id nation) {
             const auto it = s.tile_to_nation.find(tile);
-            return nation != null_entity && s.tiles.count(tile) != 0
-                && it != s.tile_to_nation.end() && it->second == nation;
+            if (nation == null_entity || s.tiles.count(tile) == 0)
+                return false;
+            if (it != s.tile_to_nation.end() && it->second == nation)
+                return true;
+            if (version < k_world_save_version_occupation)
+                return false;
+            front_keys_to_judge.emplace_back(tile, nation);
+            return true;
         };
         uint32_t count = 0;
         if (!r_u32(in, count) || count > s.units.size())
@@ -4003,6 +4039,56 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
     if (version >= k_world_save_version_contributors
         && !read_sentiment_provenance(s.sentiment, in, s.sentiment.contributions, s.sentiment.seeds))
         return false;
+
+    // v78 (BL-1502): the occupation layer. Untrusted: tiles strictly ascending, each with
+    // an owner in the stream, its occupier a different nation of the stream with an open
+    // war against that owner. Refused whole otherwise. A v77 (and older) stream ends
+    // before it: nothing is occupied.
+    if (version >= k_world_save_version_occupation)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.tiles.size())
+            return false;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id tile = null_entity, occupier = null_entity;
+            if (!r_id(in, tile) || !r_id(in, occupier))
+                return false;
+            const auto own = s.tile_to_nation.find(tile);
+            if (own == s.tile_to_nation.end() || own->second == occupier
+                || s.nations.count(occupier) == 0
+                || (s.wars.count({ occupier, own->second }) == 0
+                    && s.wars.count({ own->second, occupier }) == 0)
+                || (!s.tile_occupier.empty() && !(s.tile_occupier.rbegin()->first < tile)))
+                return false;
+            s.tile_occupier.emplace(tile, occupier);
+        }
+
+        // The front keys held back above: each is a tile its nation holds, or one with a
+        // hex side onto ground it holds. Refused whole otherwise.
+        if (!front_keys_to_judge.empty())
+        {
+            std::map<std::tuple<entity_id, int, int>, entity_id> at;
+            for (const auto& [tid, tc] : s.tiles) // one writer per cell: order cannot reach it
+                at[std::make_tuple(tc.body, tc.grid_x, tc.grid_y)] = tid;
+            for (const auto& [tile, nation] : front_keys_to_judge)
+            {
+                bool ok = s.tile_controller(tile) == nation;
+                const tile_component& tc = s.tiles.at(tile);
+                const auto bit = s.bodies.find(tc.body);
+                const int gw = bit != s.bodies.end() ? bit->second.grid_width : 0;
+                for (int side = 0; side < 6 && !ok && gw > 0; ++side)
+                {
+                    hex_neighbors::coord c = hex_neighbors::neighbour(tc.grid_x, tc.grid_y, side);
+                    c.gx = ((c.gx % gw) + gw) % gw;
+                    const auto n = at.find(std::make_tuple(tc.body, c.gx, c.gy));
+                    ok = n != at.end() && s.tile_controller(n->second) == nation;
+                }
+                if (!ok)
+                    return false;
+            }
+        }
+    }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct
     // standing markets, and holds an id below the next one to be issued, all

@@ -16,8 +16,9 @@ class recipe_registry;
 // A front is one contiguous span of a nation's border with one neighbour. A
 // nation's border tiles toward neighbour B are its own tiles with a hex side onto
 // B's ground; those tiles, joined wherever two touch, fall into spans, and each
-// span is a front. Fronts are DERIVED from `world::tile_to_nation`, never stored:
-// the same territory map always gives the same fronts in the same order.
+// span is a front. Fronts are DERIVED from owner or occupier (`world::tile_controller`,
+// BL-1502; MILITARY.md § Occupation), never stored: the same map always gives the same
+// fronts in the same order.
 //
 // What is stored is what the player (or a rival's scorer) chose: a unit's
 // assignment (`unit_component::front`) and each front's order (`world::front_orders`).
@@ -107,6 +108,21 @@ std::vector<front> current_fronts(const world& w, entity_id nation);
 /// Called at the start and end of every economy tick and before `advance_fronts`;
 /// cheap when nothing moved (the generation stamp matches).
 void reanchor_fronts(world& w);
+
+/// BL-1502 (MILITARY.md § Occupation; Ben, 2026-11-05): a land unit of @p nation has
+/// come onto @p tile. At war with the tile's holder, it takes it: it occupies the tile,
+/// or, where it is the owner or is not at war with the owner, the tile returns to its
+/// owner. Water is not taken (a bridge is a road, and is). Legal ownership never moves.
+/// True when the layer changed. @p batch_open starts false for a pass: the first write
+/// re-anchors the fronts first, so the old fronts a key remaps against exist on a world
+/// fresh from a load as on an unbroken run. A pass with @p batch_open true at its end
+/// must call `reanchor_fronts`.
+bool occupy_on_entry(world& w, entity_id nation, uint16_t type, entity_id tile, bool& batch_open);
+
+/// BL-1502: every occupied tile whose occupier is no longer at war with its owner returns
+/// to that owner, and the fronts re-anchor. `conclude_peace` calls it once the war record
+/// has closed; a ceded tile's new owner is its occupier, so it clears by the same test.
+void clear_occupation_at_peace(world& w);
 
 /// True iff the front's nation may push across it: it has declared hostility
 /// toward the neighbour (`is_hostile(nation, neighbour)`, the battle trigger's

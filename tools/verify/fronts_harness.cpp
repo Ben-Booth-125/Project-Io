@@ -46,6 +46,7 @@
 #include "world/survey_system.hpp"
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
+#include "world/war.hpp"
 #include "world/world_save.hpp"
 
 #include <algorithm>
@@ -919,7 +920,7 @@ int main()
                                      - world_save_alarm_section_bytes(f.w) // BL-1432 (v68)
                                      - world_save_war_section_bytes(f.w) // BL-1459 (v69)
                                      - world_save_embargo_section_bytes(f.w) - world_save_gen_capital_section_bytes(f.w) // BL-1418 (v70)
-                                     - world_save_recruits_section_bytes(f.w) - world_save_sea_recruits_section_bytes(f.w) - world_save_refusals_section_bytes(f.w) /* BL-1480 (v75), last */, // BL-1463: v72's recruits, last
+                                     - world_save_recruits_section_bytes(f.w) - world_save_sea_recruits_section_bytes(f.w) - world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ - world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ - world_save_occupation_section_bytes(f.w) /* BL-1502 (v78), last */,
               "F7c a v61 stream (the section's 33 bytes, v63's 4-byte stack count and v64's 12-byte designs section shorter) reads as no fronts");
 
         // A row naming nothing: the first assignment's key -> a ghost tile.
@@ -929,7 +930,7 @@ int main()
                                + world_save_alarm_section_bytes(f.w)       // BL-1432: v68's Alarm, last
                                + world_save_war_section_bytes(f.w)          // BL-1459: v69's wars
                                + world_save_embargo_section_bytes(f.w) + world_save_gen_capital_section_bytes(f.w)     // BL-1418: v70's embargoes
-                               + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_refusals_section_bytes(f.w) /* BL-1480 (v75), last */;    // BL-1463: v72's recruits, last
+                               + world_save_recruits_section_bytes(f.w) + world_save_sea_recruits_section_bytes(f.w) + world_save_refusals_section_bytes(f.w) /* BL-1480 (v75) */ + world_save_contributors_section_bytes(f.w) /* BL-1470 (v77) */ + world_save_occupation_section_bytes(f.w) /* BL-1502 (v78), last */;
         const std::size_t key0 = bytes.size() - tail - (4 + 9) - 2 * 8 + 4;
         const entity_id ghost = 0x7FFFFFF0u;
         std::memcpy(&bad[key0], &ghost, sizeof ghost);
@@ -1218,6 +1219,146 @@ int main()
         const entity_id slot = expected_slots(fr, 1)[0];
         step(f.w, reg, 16);
         check(f.w.units.at(u).position == slot, "F10e a bridged water slot is taken: a bridge is a road");
+    }
+
+    // -----------------------------------------------------------------------
+    // F11 - BL-1502 (MILITARY.md § Occupation; Ben, 2026-11-05). At war, marching past a
+    // front occupies ground and moves the front. Ownership moves only at a ceding peace.
+    std::printf("\nF11 - occupation moves the front\n");
+    const auto open_war = [](fixture& f) { // the record and both hostility rows
+        war_record rec; rec.declarer = f.A; rec.defender = f.B; rec.declarer_goals = { f.block(1) };
+        f.w.wars[{ f.A, f.B }] = rec;
+        (void)declare_hostile(f.w, f.A, f.B);
+        (void)declare_hostile(f.w, f.B, f.A);
+    };
+    {
+        fixture f; build(f);
+        reanchor_fronts(f.w);
+        const entity_id u = add_unit(f, f.A, f.at(5, 0));
+        (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+        const entity_id legal = owner(f.w, f.at(6, 3));
+        // Bare hostility is the old rule: nothing is occupied (the ruling says "at war").
+        (void)declare_hostile(f.w, f.A, f.B);
+        (void)cmd_order(f.w, reg, f.A, nation_fronts(f.w, f.A).front().key, 1);
+        step(f.w, reg, 10);
+        check(f.w.tile_occupier.empty() && owner(f.w, f.w.units.at(u).position) == f.B,
+              "F11a a bare hostility takes no ground: the unit stands on B's tile, nothing occupied");
+        // At war the push occupies and goes on, past the first tile.
+        f.w.wars[{ f.A, f.B }] = [&] { war_record r; r.declarer = f.A; r.defender = f.B; r.declarer_goals = { f.block(1) }; return r; }();
+        const entity_id stood_on = f.w.units.at(u).position;
+        f.w.units.at(u).position = f.at(5, 2); // back over the line: the march must make the entry
+        f.w.units.at(u).order = movement_order{};
+        reanchor_fronts(f.w);
+        (void)cmd_order(f.w, reg, f.A, nation_fronts(f.w, f.A).front().key, 1);
+        step(f.w, reg, 30);
+        check(!f.w.tile_occupier.empty(), "F11b at war, the push occupies the tiles it enters");
+        check(owner(f.w, f.w.units.at(u).position) == f.B && f.w.tile_controller(f.w.units.at(u).position) == f.A,
+              "F11c tile_to_nation does not move: the unit stands on B's tile, occupied by A");
+        check(owner(f.w, f.at(6, 3)) == legal, "F11d legal ownership of the ground is untouched");
+        (void)stood_on;
+        // The push kept going: it reached past B's first row.
+        const int row = f.w.tiles.at(f.w.units.at(u).position).grid_y;
+        check(row >= 4, "F11e the push went on past the first tile (the front moved with it)");
+        // The front now runs through occupied ground, and B's front faces it.
+        bool span_on_occupied = false;
+        for (const front& fr : nation_fronts(f.w, f.A))
+            for (const entity_id t : fr.span)
+                span_on_occupied = span_on_occupied || f.w.tile_occupied(t);
+        check(span_on_occupied, "F11f A's front runs along occupied ground (owner or occupier)");
+        bool all_span_b = true;
+        for (const front& fr : nation_fronts(f.w, f.B))
+            for (const entity_id t : fr.span)
+                all_span_b = all_span_b && f.w.tile_controller(t) == f.B;
+        check(all_span_b, "F11g no front of B's holds a tile A occupies");
+        check(f.w.units.at(u).front != null_entity, "F11h the unit's assignment followed the moving front");
+        // Saved mid-occupation: by value, hash and bytes.
+        const std::string b = to_bytes(f.w);
+        world back;
+        check(from_bytes(b, back) && back.tile_occupier == f.w.tile_occupier && to_bytes(back) == b
+                  && back.state_hash(7) == f.w.state_hash(7),
+              "F11i the layer round-trips by value, bytes and hash");
+        world drop = f.w;
+        drop.tile_occupier.clear();
+        check(drop.state_hash(7) != f.w.state_hash(7), "F11j state_hash reads the layer");
+        // Ghost rows are refused whole.
+        {
+            const std::size_t at = b.size() - world_save_occupation_section_bytes(f.w) + 4;
+            std::string ghost = b;
+            const entity_id nobody = 0x7FFFFFF0u;
+            std::memcpy(&ghost[at], &nobody, sizeof nobody);
+            world s1; check(!from_bytes(ghost, s1) && s1.units.empty(), "F11k a row naming no tile is REFUSED");
+            std::string ghost2 = b;
+            std::memcpy(&ghost2[at + 4], &nobody, sizeof nobody);
+            world s2; check(!from_bytes(ghost2, s2) && s2.units.empty(), "F11l a row naming no occupier is REFUSED");
+            std::string own = b;
+            const entity_id bn = f.B;
+            std::memcpy(&own[at + 4], &bn, sizeof bn);
+            world s3; check(!from_bytes(own, s3) && s3.units.empty(), "F11m a row occupying its own owner's tile is REFUSED");
+        }
+        {
+            // A real v77 world has no layer, so no key stands on occupied ground.
+            world clean = f.w;
+            clean.tile_occupier.clear();
+            clean.front_orders.clear();
+            for (auto& [id, cu] : clean.units) cu.front = null_entity;
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_occupation(clean, o);
+            const std::string v77 = o.str();
+            world old;
+            check(from_bytes(v77, old) && old.tile_occupier.empty()
+                      && v77.size() + world_save_occupation_section_bytes(clean) == to_bytes(clean).size(),
+                  "F11n a v77 stream reads as nothing occupied; v78 is v77 plus the section");
+        }
+        // A world saved on the day a tile fell replays as the unbroken one does.
+        world replay;
+        (void)from_bytes(b, replay);
+        fixture twin_holder;
+        twin_holder.w = f.w;
+        step(replay, reg, 6);
+        step(twin_holder.w, reg, 6);
+        check(replay.state_hash(9) == twin_holder.w.state_hash(9),
+              "F11o saved and loaded, six more days replay to the same hash as the unbroken run");
+        // Peace clears it, and the ground goes home.
+        clear_occupation_at_peace(f.w); // still at war: nothing clears
+        const bool kept = !f.w.tile_occupier.empty();
+        f.w.wars.clear();
+        clear_occupation_at_peace(f.w);
+        check(kept && f.w.tile_occupier.empty(), "F11p occupation stands while the war does, and clears at peace");
+        bool home = true;
+        for (const front& fr : nation_fronts(f.w, f.A))
+            for (const entity_id t : fr.span)
+                home = home && owner(f.w, t) == f.A;
+        check(home, "F11q at peace A's fronts are back on A's own ground");
+    }
+    {
+        // The advance occupies, the owner's entry liberates, and water is not taken.
+        fixture f; build(f);
+        open_war(f);
+        reanchor_fronts(f.w);
+        bool batch = false;
+        const uint16_t rifle = static_cast<uint16_t>(row_named("Rifle Infantry"));
+        const entity_id t = f.at(4, 3);
+        check(occupy_on_entry(f.w, f.A, rifle, t, batch) && f.w.tile_controller(t) == f.A,
+              "F11r entry occupies an empty enemy tile");
+        check(!occupy_on_entry(f.w, f.A, rifle, t, batch), "F11s a second entry changes nothing");
+        check(occupy_on_entry(f.w, f.B, rifle, t, batch) && !f.w.tile_occupied(t) && f.w.tile_controller(t) == f.B,
+              "F11t the owner marching back on liberates it");
+        f.w.tiles.at(f.at(5, 3)).substrate = terrain_substrate::coast;
+        check(!occupy_on_entry(f.w, f.A, rifle, f.at(5, 3), batch), "F11u water is not ground");
+        f.w.tiles.at(f.at(5, 3)).road_edges = road_edges_on_every_side(1);
+        check(occupy_on_entry(f.w, f.A, rifle, f.at(5, 3), batch), "F11v a bridge is a road, and is taken");
+        check(!occupy_on_entry(f.w, f.C, rifle, f.at(6, 3), batch), "F11w a third nation at war with nobody takes nothing");
+        // A third party at war with the occupier only hands the tile home.
+        war_record ca; ca.declarer = f.C; ca.defender = f.A; ca.declarer_goals = { f.block(1) };
+        f.w.wars[{ f.C, f.A }] = ca;
+        check(occupy_on_entry(f.w, f.A, rifle, f.at(7, 3), batch) && occupy_on_entry(f.w, f.C, rifle, f.at(7, 3), batch)
+                  && f.w.tile_controller(f.at(7, 3)) == f.B,
+              "F11x C drives A off B's tile, with no war on B: the tile goes home to B");
+        reanchor_fronts(f.w);
+        bool front_b = false;
+        for (const front& fr : nation_fronts(f.w, f.A))
+            front_b = front_b || std::find(fr.span.begin(), fr.span.end(), f.at(5, 3)) != fr.span.end();
+        check(front_b, "F11y the occupied tile is in A's fronts");
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

@@ -511,8 +511,9 @@ nation's **border tiles** toward neighbour B are its own tiles with at least one
 ground. Those tiles, joined wherever two of them touch, fall into one or more **spans**; each span
 is a front. **Every neighbour has fronts (Ben, 2026-10-27)** — at peace as at war; a front toward a
 neighbour the nation is not hostile to can only **hold**. A border that runs unbroken is one front; a border that the sea or a third nation cuts
-in two is two. Fronts are **derived** from the territory map (`world::tile_to_nation`) and
-re-derived whenever it changes, so a front follows a border as provinces change hands.
+in two is two. Fronts are **derived** from the territory map (`world::tile_to_nation`) read through
+the occupation layer (§ Occupation), and re-derived whenever either changes, so a front follows a
+border as provinces change hands and as armies take ground.
 
 **A front lives on the canvas**, not in a ledger (Ben, 2026-10-27): drawn as a line along the shared
 border edges of its span, coloured by the stance toward its neighbour, with the number of units
@@ -1328,7 +1329,11 @@ new owner (`../politics/RELATIONS.md` § 7) and every other tile returns to its 
 as they did, and the province holder stays the narrower military fact above.
 
 **Default details, for Ben's review (2026-11-05).** An empty tile is occupied on entry. An occupied
-tile's output is denied to its owner and not gained by the occupier.
+tile's output is denied to its owner and not gained by the occupier; the owner still pays its wages.
+Occupation needs a war: a bare hostility, unanswered by a declaration, occupies nothing. The occupier
+is always at war with the tile's owner. An owner re-entering its own ground frees it. A third party at
+war only with the occupier hands the tile back to its owner rather than taking it. Water is taken only
+where a road or bridge crosses it; a naval row takes nothing.
 
 ### Dispatches and the card
 

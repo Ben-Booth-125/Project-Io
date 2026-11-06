@@ -868,6 +868,9 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
     w.peace_refusals.erase({ war.declarer, war.defender }); // cooldowns end with the war
     w.peace_refusals.erase({ war.defender, war.declarer });
     w.wars.erase(key);
+    // BL-1502 (MILITARY.md § Occupation): occupation clears at peace. A ceded province
+    // keeps its new owner (done above); every other tile returns to its owner.
+    clear_occupation_at_peace(w);
     w.truces[canonical_pair(war.declarer, war.defender)] = w.current_econ_tick + k_war_truce_ticks;
     for (const sentiment_event& e : events)
         queue_conduct(w, e.observer, e.subject, e.kind, e.magnitude);

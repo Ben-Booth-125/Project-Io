@@ -26,12 +26,6 @@ struct fronts_cache
     std::vector<front_view> views;
 };
 
-entity_id nation_of_tile(const world& w, entity_id tile)
-{
-    const auto it = w.tile_to_nation.find(tile);
-    return it != w.tile_to_nation.end() ? it->second : null_entity;
-}
-
 // The span's mean grid position — what "north" and "south" are said of.
 void span_centre(const world& w, const front& f, float& col, float& row)
 {
@@ -84,7 +78,8 @@ void build_views(const world& w, entity_id nation, std::vector<front_view>& out)
                     continue;
                 const int ncol = ((nc.gx % gw) + gw) % gw; // the east-west cylinder
                 const entity_id nb = raster[static_cast<std::size_t>(nc.gy) * gw + ncol];
-                if (nb == null_entity || nation_of_tile(w, nb) != f.neighbour)
+                // BL-1502: the far side as the front reads it, owner or occupier.
+                if (nb == null_entity || w.tile_controller(nb) != f.neighbour)
                     continue;
                 // Keep the UNWRAPPED neighbour column: the canvas draws the edge
                 // from the span tile's own copy, so the far side must sit beside it.
