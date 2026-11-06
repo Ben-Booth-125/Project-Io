@@ -435,7 +435,7 @@
   ],
   [
    "chrome.gear_toggle",
-   "In-game chrome, top-right gear button just left of the time column"
+   "In-game chrome, the gear at the right end of the time panel's speed row, right of the speed buttons"
   ],
   [
    "chrome.menu_new_game",
@@ -443,7 +443,11 @@
   ],
   [
    "chrome.menu_quick_start",
-   "Main menu, primary button column, between New Game and Quit"
+   "Main menu, primary button column, between New Game and Load"
+  ],
+  [
+   "chrome.menu_load",
+   "Main menu, primary button column, between Quick Start and Quit"
   ],
   [
    "chrome.menu_quit",
@@ -470,24 +474,32 @@
    "Options window, Display section"
   ],
   [
-   "chrome.sysmenu_exit",
-   "System menu popup, below the separator"
+   "chrome.escape_exit_menu",
+   "Escape menu, third press"
   ],
   [
-   "chrome.sysmenu_exit_cancel",
-   "System menu popup, armed exit confirmation"
+   "chrome.escape_exit_game",
+   "Escape menu, fourth press"
   ],
   [
-   "chrome.sysmenu_exit_confirm",
-   "System menu popup, armed exit confirmation"
+   "chrome.escape_exit_cancel",
+   "Escape menu, exit warning"
   ],
   [
-   "chrome.sysmenu_pause",
-   "System menu popup, top button"
+   "chrome.escape_exit_confirm",
+   "Escape menu, exit warning"
+  ],
+  [
+   "chrome.escape_save",
+   "Escape menu, first press"
+  ],
+  [
+   "chrome.escape_options",
+   "Escape menu, second press"
   ],
   [
    "chrome.sysmenu_god_view",
-   "System menu popup, spectate-only checkbox"
+   "Escape menu, spectate-only checkbox beneath the presses"
   ],
   [
    "chrome.wizard_back",

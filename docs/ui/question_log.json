@@ -301,7 +301,7 @@
    "status": "drafted"
   },
   "god_view_toggle": {
-   "surface": "System menu — God view checkbox (spectate only)",
+   "surface": "Escape menu — God view checkbox (spectate only)",
    "answers": "Am I watching honestly or omnisciently?",
    "because": "The lift must be a visible, deliberate state, never ambient — a watcher who forgets which mode they are in draws wrong conclusions about what the AI could see. Rendered only under spectate, so a played session cannot reach it by construction.",
    "backlog_item": [
@@ -1241,6 +1241,19 @@
     "src/ui/nav_pane.cpp",
     "src/ui/body_surface_canvas.cpp",
     "src/core/app.cpp"
+   ],
+   "status": "drafted"
+  },
+  "escape_menu": {
+   "surface": "Escape menu: the full-canvas pause screen behind the gear and Esc, with Save, Options, Exit to Menu and Exit Game; and Load on the main menu",
+   "answers": "How do I stop, keep what I have, and leave?",
+   "because": "A player must be able to reach save, settings and the way out without knowing a hotkey (BL-070), and leaving a campaign has to be a thing the game can do short of closing the window: until this surface a campaign had no way back to the main menu, and the save it could write had no door on the screen a player would look for it on. It takes the whole canvas rather than a corner popup because it is the pause screen (Ben, 2026-11-05): the world under it has stopped, so the map earns nothing while it is up. It says when the campaign was last saved, because that is the one fact the choice in front of the player turns on. Both exits warn every time, not only when the world moved, because a paused player can still place a build and 'nothing changed' is a claim the surface cannot make. The main menu gains Load because Exit to Menu must not strand a save (STARTUP.md § Main menu).",
+   "backlog_item": "BL-1519",
+   "files": [
+    "src/ui/time_panel.cpp",
+    "src/ui/startup_screens.cpp",
+    "src/core/app.cpp",
+    "src/ui/icons.cpp"
    ],
    "status": "drafted"
   }

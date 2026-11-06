@@ -3593,8 +3593,34 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // Process-global, never saved; the script turns it back off. Verify-only.
     v.set_function("waive_kit_research", [](bool on) { set_kit_research_waived_for_harness(on); });
 
+    // BL-1519: the escape menu as drawn. Each press's centre, for verify.click; the
+    // clock's speed under it; whether the menu and its exit warning are up. x = -1 on
+    // a press not drawn this frame. All of it is on screen.
+    v.set_function("escape_menu", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        out["open"]    = m_ui.show_system_menu;
+        out["warning"] = m_ui.confirm_exit_pending;
+        out["speed"]   = m_sim_loop.speed();
+        out["options_open"] = m_show_options;
+        static const char* const k_names[ui_state::esc_press_count] = {
+            "save", "options", "exit_menu", "exit_game", "warn_confirm", "warn_cancel", "gear", "main_load"};
+        for (int i = 0; i < ui_state::esc_press_count; ++i)
+        {
+            sol::table p = st.create_table();
+            p["x"] = m_ui.escape_drawn[i].x;
+            p["y"] = m_ui.escape_drawn[i].y;
+            out[k_names[i]] = p;
+        }
+        return out;
+    });
+    v.set_function("set_speed", [this](int speed) {
+        m_prev_speed = speed > 0 ? speed : m_prev_speed;
+        m_sim_loop.set_speed(speed);
+    });
+
     // Press Escape through the app's own key handler (its precedence ladder: exit
-    // confirm, system menu, roll-up drill, the takeover's fold, the menu), so a
+    // warning, escape menu, roll-up drill, the takeover's fold, the menu), so a
     // check drives the real Escape rung rather than calling fold() itself.
     v.set_function("press_escape", [this]() {
         SDL_KeyboardEvent k{};

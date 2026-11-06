@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**76 surfaces** — 4 settled, 72 awaiting Ben's wording.
+**77 surfaces** — 4 settled, 73 awaiting Ben's wording.
 
 ---
 
@@ -148,6 +148,14 @@ alphabetical order.
 
 *Demanded by BL-031, BL-145 · `src/ui/entity_summary.cpp` · id `entity_summary`*
 
+### Escape menu: the full-canvas pause screen behind the gear and Esc, with Save, Options, Exit to Menu and Exit Game; and Load on the main menu
+
+**Answers:** How do I stop, keep what I have, and leave?
+
+**Because:** A player must be able to reach save, settings and the way out without knowing a hotkey (BL-070), and leaving a campaign has to be a thing the game can do short of closing the window: until this surface a campaign had no way back to the main menu, and the save it could write had no door on the screen a player would look for it on. It takes the whole canvas rather than a corner popup because it is the pause screen (Ben, 2026-11-05): the world under it has stopped, so the map earns nothing while it is up. It says when the campaign was last saved, because that is the one fact the choice in front of the player turns on. Both exits warn every time, not only when the world moved, because a paused player can still place a build and 'nothing changed' is a claim the surface cannot make. The main menu gains Load because Exit to Menu must not strand a save (STARTUP.md § Main menu).
+
+*Demanded by BL-1519 · `src/ui/time_panel.cpp`, `src/ui/startup_screens.cpp`, `src/core/app.cpp`, `src/ui/icons.cpp` · id `escape_menu`*
+
 ### Field channel (comms dock)
 
 **Answers:** What happened in my fights while I was looking somewhere else?
@@ -196,7 +204,7 @@ alphabetical order.
 
 *Demanded by BL-408 · `src/ui/selection_panel.cpp`, `src/ui/hover_content.cpp`, `src/ui/body_surface_canvas.cpp` · id `god_view_readouts`*
 
-### System menu — God view checkbox (spectate only)
+### Escape menu — God view checkbox (spectate only)
 
 **Answers:** Am I watching honestly or omnisciently?
 

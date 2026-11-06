@@ -668,6 +668,20 @@ private:
     /// Pending `--load` target, consumed by run() before the frame loop.
     std::string m_pending_load;
     bool       m_quit_requested = false;  ///< Set by the menu's Quit button; breaks the run() loop.
+    // --- The escape menu (BL-1519; MENU.md § Application / system menu) ---
+    bool       m_exit_to_menu_requested = false; ///< Pressed inside a frame; acted on at the next frame's head.
+    bool       m_menu_was_open   = false; ///< The escape menu's open state last seen, for its open and close edges.
+    bool       m_menu_paused_it  = false; ///< The menu's open edge is what stopped the clock, so its close restarts it.
+    long long  m_last_save_day   = -1;    ///< day_tick of this session's last save or load; -1 before either.
+    std::string m_menu_message;           ///< The main menu's Load refusal, said where the press was.
+
+    /// Leave the campaign for the main menu: the teardown behind Exit to Menu. Joins
+    /// the workers, closes the play log and the agent seam, drops the world and every
+    /// presentation record of it, so a new game or a load starts clean.
+    void exit_to_menu();
+    /// Pause on the escape menu's open edge, restore on its close edge. Taken on the
+    /// edge so every route that opens or closes it behaves alike (gear, Esc, a check).
+    void sync_escape_menu_pause();
 
     SDL_Window*   m_window   = nullptr;
     SDL_Renderer* m_renderer = nullptr;

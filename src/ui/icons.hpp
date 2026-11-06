@@ -166,6 +166,15 @@ void country(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void opportunity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the session gear — a toothed ring (BL-1519). For the time panel's escape
+/// menu control.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void gear(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the Production-lens glyph — a filled upward triangle over a baseline
 /// (output / throughput rising). For the overlay-lens control strip.
 ///

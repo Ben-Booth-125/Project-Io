@@ -492,6 +492,7 @@ int app::run(autostart_mode autostart)
                     if (m_sim_loop.speed() > 0)
                         m_prev_speed = m_sim_loop.speed();
                     m_sim_loop.set_speed(0);
+                    m_menu_paused_it = false; // the clock is the agent's: an open menu's close leaves it stopped
                 }
                 if (ev.detached)
                 {
@@ -2293,13 +2294,12 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     if (m_screen != app_screen::in_game)
         return;
 
-    // Esc toggles the in-app system menu (BL-070) — cheap keyboard parity with the
-    // corner gear button. Handled before the ImGui keyboard guard so it works even
-    // while the popup (or another panel) holds focus. Precedence, highest first: an
-    // armed exit-confirm backs out; an open system menu closes; an open fold
-    // overlay folds up (BL-214);
-    // otherwise the menu opens. The Selection band never hides (BL-266) — its
-    // former hide rung is gone, so the system menu is the terminal rung.
+    // Esc reaches the escape menu (BL-070, BL-1519) — keyboard parity with the gear.
+    // Handled before the ImGui keyboard guard so it works even while a panel holds
+    // focus. Precedence, highest first: an armed exit warning backs out; an open
+    // escape menu closes; an open fold overlay folds up (BL-214); otherwise the menu
+    // opens. The Selection band never hides (BL-266) — its former hide rung is gone,
+    // so the escape menu is the terminal rung.
     //
     // The fold rung is a deliberate departure from BL-214's Decision 10, which kept
     // depth off this ladder. That decision reasoned about an in-place stepper, where
@@ -2320,6 +2320,7 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
             ui::fold(m_ui);                                   // fold the full-screen overlay
         else
             m_ui.show_system_menu = true;                     // terminal rung (BL-266): the band never hides
+        sync_escape_menu_pause();
         return;
     }
 
@@ -2332,6 +2333,12 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     {
         if (key.scancode == b.scancode && shift == b.shift)
         {
+            // The escape menu is the pause screen: under it the map does not pan and
+            // the clock does not start. Saving and the two windows still answer.
+            if (m_ui.show_system_menu && b.cmd != ui::canvas_command::quick_save
+                && b.cmd != ui::canvas_command::help_toggle
+                && b.cmd != ui::canvas_command::options_toggle)
+                return;
             dispatch_action(b.cmd);
             return;
         }
@@ -2450,6 +2457,8 @@ bool app::save_game_to(const std::string& path)
     }
 
     const bool ok = write_save_game(path, m_world, env);
+    if (ok)
+        m_last_save_day = static_cast<long long>(m_sim_loop.day_tick());
 
     ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
                   ui::chat_state::k_field_channel,
@@ -2553,8 +2562,92 @@ bool app::load_game_from(const std::string& path)
     ui::chat_post(m_chat, static_cast<int>(env.day_tick), null_entity,
                   ui::chat_state::k_field_channel, "Loaded " + path);
     m_war_log_cursor = m_world.history_log.size(); // BL-1480: a loaded log's wars are past
+    m_last_save_day  = static_cast<long long>(env.day_tick);
+    m_menu_message.clear();
 
     return true;
+}
+
+void app::sync_escape_menu_pause()
+{
+    const bool open = m_ui.show_system_menu;
+    if (open == m_menu_was_open)
+        return;
+    m_menu_was_open = open;
+    if (open)
+    {
+        // The Options window is a press on this menu now; left open it would stand
+        // behind the menu with no way to reach it.
+        m_show_options = false;
+        // Already paused (by Space, or by an attached agent's clock gate): nothing
+        // to restore, so a close leaves it paused.
+        m_menu_paused_it = !m_sim_loop.paused();
+        if (m_menu_paused_it)
+            dispatch_action(ui::canvas_command::pause_toggle);
+    }
+    else
+    {
+        m_ui.confirm_exit_pending = false;
+        if (m_menu_paused_it && m_sim_loop.paused())
+            dispatch_action(ui::canvas_command::pause_toggle);
+        m_menu_paused_it = false;
+    }
+}
+
+void app::exit_to_menu()
+{
+    // Off-screen join: on_screen ends the process, and this session goes on.
+    join_workers(/*on_screen=*/false);
+
+    // The agent seam and the play log belong to the campaign being left. Both open
+    // again with the next one (run()'s seam block, open_play_log).
+    if (!m_agent_seam.transcript().empty())
+        m_agent_seam.write_transcript("agent_transcript.log");
+    m_agent_seam.shutdown();
+    m_play_log.close();
+
+    m_ground.forget_world();
+    m_ground_prebake_wizard = false;
+    m_ground_world_live     = false;
+    m_world                 = world{};
+    m_generation_report     = {};
+
+    // The load path's reset list, and the series a load would have replaced.
+    m_last_econ_report = economy_report{};
+    m_last_corp_standings.clear();
+    m_balance_history.clear();
+    m_income_history.clear();
+    m_expenditure_history.clear();
+    m_market_history.clear();
+    m_building_rank_hist.clear();
+    m_chat = ui::chat_state{};
+
+    // Every ledger, selection and takeover: a fresh session opens with ledgers closed
+    // (MENU.md § Policy). What the launch set and the player's F11 stay.
+    const bool spectating = m_ui.spectating;
+    const bool frame_hud  = m_ui.show_frame_hud;
+    m_ui = ui_state{};
+    m_ui.spectating     = spectating;
+    m_ui.show_frame_hud = frame_hud;
+    ui::reset_unit_designer(m_ui);
+    ui::reset_wing_ui(m_ui);
+    ui::reset_diplomacy_ui(m_ui);
+
+    m_sim_loop        = sim_loop();
+    m_prev_speed      = 1;
+    m_last_econ_tick  = 0;
+    m_econ_steps      = 0;
+    m_last_orbit_days = 0.0;
+    m_last_survey_day = 0;
+    m_war_log_cursor  = 0;
+    m_show_options    = false;
+    m_show_help       = false;
+    m_menu_was_open   = false;
+    m_menu_paused_it  = false;
+    m_last_save_day   = -1;
+    m_menu_message.clear();
+
+    m_screen = app_screen::menu;
 }
 
 void app::render()
@@ -2565,6 +2658,15 @@ void app::render()
     // well as this function; see ui/frame_stats.hpp § Sampling model.
     ui::frame_stats& s_frame_stats = frame_stats_instance();
     s_frame_stats.begin_frame();
+
+    // BL-1519: the press came from inside last frame's menu; the teardown runs here,
+    // between frames, where nothing on the stack holds the world.
+    if (m_exit_to_menu_requested)
+    {
+        m_exit_to_menu_requested = false;
+        exit_to_menu();
+    }
+    sync_escape_menu_pause();
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
@@ -2796,10 +2898,6 @@ void app::render()
     // (BL-361). Shares m_prev_speed with the keyboard speed bindings so pause
     // restores whichever tier was last active, wherever it was set.
     ui::draw_time_panel(m_ui, m_sim_loop, m_prev_speed, disp);
-
-    // In-app system menu (BL-070) — the corner gear + popup, extracted to
-    // ui::draw_system_menu (BL-361). Esc toggles the same popup (handle_key_down).
-    ui::draw_system_menu(m_ui, m_sim_loop, m_prev_speed, m_quit_requested, disp);
 
     // Corporation profile — top-left corner, above the navigation pane.
     ui::draw_profile_panel(m_world);
@@ -3809,13 +3907,50 @@ void app::render()
         ImGui::End();
     }
 
+    // The escape menu (BL-1519): over everything the canvas region holds, and under
+    // the Options window it opens.
+    {
+        std::string last_saved = "Not saved this session";
+        if (m_last_save_day >= 0)
+        {
+            const ui::fmt::calendar_date d =
+                ui::fmt::date_from_day(static_cast<uint64_t>(m_last_save_day));
+            last_saved = "Last saved " + std::to_string(d.year) + " " + ui::fmt::month_abbrev(d.month)
+                       + " " + ui::fmt::ordinal_day(d.day);
+        }
+        const ui::escape_menu_press press =
+            ui::draw_escape_menu(m_ui, m_show_options, last_saved.c_str());
+        if (press.save)
+            save_game_to(quick_save_path());
+        if (press.options)
+            m_show_options = !m_show_options;
+        if (press.exit_to_menu)
+            m_exit_to_menu_requested = true;
+        if (press.exit_game)
+            m_quit_requested = true;
+    }
+
     // F10 display / options window (BL-076). Self-contained; changes apply live to
     // the SDL window and persist to options.cfg immediately.
     if (m_show_options)
     {
-        ImGui::SetNextWindowPos(
-            ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
-        ImGui::SetNextWindowSize(ImVec2{320.0f, 0.0f}, ImGuiCond_Appearing);
+        // Opened from the escape menu it stands beside the menu's presses rather than
+        // on them, so the press that opened it can close it (the toggle rule).
+        if (m_ui.show_system_menu)
+        {
+            const ui::foldout_rect canvas = ui::canvas_rect();
+            ImGui::SetNextWindowPos(
+                ImVec2{canvas.x + canvas.w * 0.5f - 156.0f, canvas.y + canvas.h * 0.5f},
+                ImGuiCond_Appearing, ImVec2{1.0f, 0.5f});
+            // No size set: the right-edge pivot reads the window's real width. A set
+            // width would seat it from that width on every reopening, over the presses.
+        }
+        else
+        {
+            ImGui::SetNextWindowPos(
+                ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
+            ImGui::SetNextWindowSize(ImVec2{320.0f, 0.0f}, ImGuiCond_Appearing);
+        }
         if (ImGui::Begin("Options", &m_show_options,
                          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
         {

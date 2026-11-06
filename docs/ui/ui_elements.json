@@ -984,17 +984,20 @@
   },
   {
    "id": "UI-061",
-   "name": "System menu (session-control popup)",
+   "name": "Escape menu (full-canvas pause screen)",
    "kind": "control",
    "parent": null,
    "source": [
-    "docs/ui/MENU.md § Application / system menu — session control (BL-070)"
+    "docs/ui/MENU.md § Application / system menu — session control (BL-070)",
+    "docs/ui/TIME_CONTROLS.md § The escape menu",
+    "src/ui/time_panel.cpp"
    ],
-   "summary": "A top-right corner-gear popup: Pause/Resume and Exit (with an inline 'Really quit?' confirm, since there is no save); Esc toggles it, sharing the pause hotkey's flag.",
-   "interesting_question": "Exit is destructive with no save path in the prototype, so the inline confirm is the only guard against an accidental quit — is a single inline confirm proportionate for a truly unrecoverable action?",
-   "resolution": "Accepted as the prototype minimum, not a final answer: MENU.md frames this as 'Option B... rejected [a centred pause-modal] for the prototype minimum — the centred modal is the right long-term home once a title screen lands,' i.e. the current guard is explicitly interim.",
+   "summary": "Behind the gear at the right end of the time panel, and Esc with nothing open: a full-canvas menu that pauses the game, with Save, Options, Exit to Menu and Exit Game, the last save's date above them. Each exit raises an unsaved-progress warning first. God view sits beneath the presses while spectating.",
+   "interesting_question": "A paused player can still place a build, so can the warning ever honestly be skipped because nothing moved since the last save?",
+   "resolution": "No: both exits warn every time and the date of the last save stands beside the warning, so the player judges what would be lost. The corner popup and the rejection of a centred modal were overturned (Ben, 2026-11-05).",
    "checks": [
-    "shell_pass"
+    "shell_pass",
+    "escape_menu"
    ]
   },
   {
