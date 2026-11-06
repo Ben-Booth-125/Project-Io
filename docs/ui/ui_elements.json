@@ -2085,6 +2085,23 @@
    "checks": [
     "convoy_map"
    ]
+  },
+  {
+   "id": "UI-137",
+   "name": "Drag-select units",
+   "kind": "control",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/SELECTION.md § The dragged group",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "summary": "A left drag on the Planetary canvas draws a box; every counter of the player's inside joins the group, across tiles, and the band opens the group element. Shift adds to the group held; a shift-press with no drag adds the counter under it. Any plain press retires it. Armed picks (placement, road, March) and the declaration's goal pick outrank it, and a lens collapses selection to one tier, so neither ever drags.",
+   "interesting_question": "The press already selects on its way down. What does a drag do to what the press took?",
+   "resolution": "A plain press still selects at once, so a click is unchanged. A band that gathers own units replaces that selection, and one over nothing of the player's leaves it standing. A shift-press selects nothing itself: the group it adds to must survive to the release.",
+   "checks": [
+    "drag_select"
+   ]
   }
  ]
 }

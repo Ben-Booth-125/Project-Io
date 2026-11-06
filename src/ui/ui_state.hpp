@@ -1228,6 +1228,23 @@ struct ui_state
     /// the band draws that unit's card whatever this says.
     bool selection_unit_group = false;
 
+    /// THE DRAGGED GROUP (BL-1508; SELECTION.md § The dragged group): the player's own
+    /// units a left drag gathered, ascending, across tiles; at least two, or empty for
+    /// none. `selected_entity` stays one of them, so every reader of the selection still
+    /// has its entity, and the band, a right-click and Assign to front read this list.
+    /// Pruned each frame of the fallen, and retired by any other selection.
+    std::vector<entity_id> selected_units;
+    /// The left press that may become that drag: where it went down (screen), whether
+    /// Shift held at the press, and whether it has moved far enough to be a band.
+    struct unit_drag_gesture
+    {
+        bool  pressed = false;
+        bool  shift   = false;
+        bool  band    = false;
+        float x0 = 0.0f, y0 = 0.0f;
+    };
+    unit_drag_gesture unit_drag;
+
     /// The province the CURRENT SELECTION stands in, or 0 when the selection is
     /// not a tile. A DERIVED MIRROR, not a selection channel (BL-598).
     ///
@@ -1796,6 +1813,8 @@ struct ui_state
     /// so click/hover handling can hit-test in priority order. See marker_hit_zone.
     std::vector<marker_hit_zone> marker_hit_zones;
     std::vector<unit_glide> unit_glides; ///< BL-1507: this frame's marching counters.
+    float marker_tilt_sy    = 1.0f; ///< BL-1508: the camera's squash, so a zone's ground point has a screen point.
+    float marker_tilt_pivot = 0.0f;
 
     /// Per-frame list of on-canvas STRUCTURE boundaries (national borders today).
     /// Cleared and rebuilt with `marker_hit_zones`, and hit-tested after it: a

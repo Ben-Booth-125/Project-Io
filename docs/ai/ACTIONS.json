@@ -3026,7 +3026,7 @@
    "press": "Hover a land tile: it outlines green and the cursor line reads 'Right-click: move'. Right-click it. Every unit of the selection (one unit, or the whole group) is sent gameplay.march_unit to that tile, in ascending id; once a unit's march is accepted, a unit assigned to a front is then sent gameplay.assign_front with a null tile (unassigned) — a hand order overrides the front. A refused march leaves the unit on its front.",
    "args": [],
    "preconditions": [
-    "The player's own unit is selected (its card), or the group of the player's units on one tile (the unit group element). A rival's unit or group, or no unit, orders nothing.",
+    "The player's own unit is selected (its card), the group of the player's units on one tile (the unit group element), or a dragged group across tiles (canvas.unit_drag_select). A rival's unit or group, or no unit, orders nothing.",
     "The tile is land, and not the tile the units already stand on (water and the units' own tile show no outline and the press does nothing).",
     "No other nation's units stand on the tile (else canvas.unit_right_click_attack).",
     "The March cell is not armed (an armed March pick takes the left-click instead).",
@@ -3078,6 +3078,20 @@
    ],
    "expected_output": "Selects the convoy. The Selection band shows its card: the player's own (or under the spectator's god view) with cargo and quantity, owner, route and an arrival bar in quarters; another nation's with its owner and mode, and 'Its cargo and route are private.' A press elsewhere retires it, and it clears itself on arrival. No world state changes; a counter under the pointer outranks the marker.",
    "reason_to_select": "See what a shipment on the map is carrying and when it lands."
+  },
+  {
+   "id": "canvas.unit_drag_select",
+   "family": "canvas",
+   "surface": "The Planetary canvas, with no lens and nothing armed (BL-1508; SELECTION.md § The dragged group).",
+   "press": "Press the left button on the canvas, drag past six pixels, release. Hold Shift at the press to add to the group held; a shift-press with no drag adds the counter under it.",
+   "args": [],
+   "preconditions": [
+    "No lens is active.",
+    "Placement mode, an armed road, the armed March pick and an open declaration are off: each takes the press itself.",
+    "At least one of the player's counters lies inside the box (a drag over nothing of the player's leaves what the press selected)."
+   ],
+   "expected_output": "The player's own units inside the box become the selection: two or more show the unit group element with the number of tiles they span, and their counters carry the selection outline. One is that unit's card. A rival's units are never gathered. canvas.unit_right_click_move, canvas.unit_right_click_attack and the group card's Assign to front then act on every unit in it. Any plain press retires the group; a group row opens one unit and its '< Group' press returns. No world state changes.",
+   "reason_to_select": "Order a line of units across tiles in one gesture."
   },
   {
    "id": "gameplay.hire_wing",

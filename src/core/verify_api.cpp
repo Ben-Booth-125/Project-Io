@@ -6789,6 +6789,67 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     });
     v.set_function("selected_convoy", [this]() -> unsigned { return m_ui.selected_convoy; });
 
+    // BL-1508: a left drag through the real input path, the press, the motion and the
+    // release each their own frames, Shift held if asked; and the dragged group it left.
+    v.set_function("drag", [this](float x0, float y0, float x1, float y1, sol::optional<bool> shift) {
+        const bool sh = shift.value_or(false);
+        inject_move(x0, y0, 1);
+        if (sh)
+        {
+            m_inject_shift = 1;
+            render();
+        }
+        m_inject_button = ImGuiMouseButton_Left;
+        m_inject_down   = true;
+        render();
+        for (int s = 1; s <= 4; ++s)
+        {
+            m_inject_button = ImGuiMouseButton_Left;
+            m_inject_down   = true;
+            inject_move(x0 + (x1 - x0) * static_cast<float>(s) / 4.0f,
+                        y0 + (y1 - y0) * static_cast<float>(s) / 4.0f, 1);
+        }
+        m_inject_button = ImGuiMouseButton_Left;
+        m_inject_down   = false;
+        render();
+        if (sh)
+        {
+            m_inject_shift = 0;
+            render();
+        }
+    });
+    // Every unit counter the canvas drew last frame: its target unit, its screen point,
+    // whether it is the player's. What the screen shows, for aiming a band across tiles
+    // (verify.tile_screen centres the view on its tile, so it can aim at only one).
+    v.set_function("unit_counters", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const marker_hit_zone& hz : m_ui.marker_hit_zones)
+        {
+            if (hz.kind != marker_hit_zone::kind::unit)
+                continue;
+            const auto uit = m_world.units.find(hz.id);
+            if (uit == m_world.units.end())
+                continue;
+            sol::table e = st.create_table();
+            e["id"]     = static_cast<unsigned int>(hz.id);
+            e["x"]      = hz.centre.x;
+            e["y"]      = m_ui.marker_tilt_pivot + (hz.centre.y - m_ui.marker_tilt_pivot) * m_ui.marker_tilt_sy;
+            e["player"] = uit->second.owner == player_actor(m_world) || uit->second.owner == m_world.player_entity;
+            out[i++] = e;
+        }
+        return out;
+    });
+    v.set_function("selected_units", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const entity_id id : m_ui.selected_units)
+            out[i++] = static_cast<unsigned int>(id);
+        return out;
+    });
+
     // BL-1507: the marching counters the canvas drew last frame: the units on each, the
     // hop fraction and the counter's screen point. Nothing the screen does not show.
     v.set_function("unit_glides", [this]() {

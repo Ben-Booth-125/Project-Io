@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*215 entries — 53 gameplay · 38 canvas · 15 lens · 74 ledger · 35 chrome.*
+*216 entries — 53 gameplay · 39 canvas · 15 lens · 74 ledger · 35 chrome.*
 
 ---
 
@@ -1429,7 +1429,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Press.** Hover a land tile: it outlines green and the cursor line reads 'Right-click: move'. Right-click it. Every unit of the selection (one unit, or the whole group) is sent gameplay.march_unit to that tile, in ascending id; once a unit's march is accepted, a unit assigned to a front is then sent gameplay.assign_front with a null tile (unassigned) — a hand order overrides the front. A refused march leaves the unit on its front.
 
 **Valid when:**
-- The player's own unit is selected (its card), or the group of the player's units on one tile (the unit group element). A rival's unit or group, or no unit, orders nothing.
+- The player's own unit is selected (its card), the group of the player's units on one tile (the unit group element), or a dragged group across tiles (canvas.unit_drag_select). A rival's unit or group, or no unit, orders nothing.
 - The tile is land, and not the tile the units already stand on (water and the units' own tile show no outline and the press does nothing).
 - No other nation's units stand on the tile (else canvas.unit_right_click_attack).
 - The March cell is not armed (an armed March pick takes the left-click instead).
@@ -1479,6 +1479,19 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Selects the convoy. The Selection band shows its card: the player's own (or under the spectator's god view) with cargo and quantity, owner, route and an arrival bar in quarters; another nation's with its owner and mode, and 'Its cargo and route are private.' A press elsewhere retires it, and it clears itself on arrival. No world state changes; a counter under the pointer outranks the marker.
 
 **Reason to select.** See what a shipment on the map is carrying and when it lands.
+
+### `canvas.unit_drag_select` — The Planetary canvas, with no lens and nothing armed (BL-1508; SELECTION.md § The dragged group).
+
+**Press.** Press the left button on the canvas, drag past six pixels, release. Hold Shift at the press to add to the group held; a shift-press with no drag adds the counter under it.
+
+**Valid when:**
+- No lens is active.
+- Placement mode, an armed road, the armed March pick and an open declaration are off: each takes the press itself.
+- At least one of the player's counters lies inside the box (a drag over nothing of the player's leaves what the press selected).
+
+**Expected output.** The player's own units inside the box become the selection: two or more show the unit group element with the number of tiles they span, and their counters carry the selection outline. One is that unit's card. A rival's units are never gathered. canvas.unit_right_click_move, canvas.unit_right_click_attack and the group card's Assign to front then act on every unit in it. Any plain press retires the group; a group row opens one unit and its '< Group' press returns. No world state changes.
+
+**Reason to select.** Order a line of units across tiles in one gesture.
 
 ### `canvas.air_designer_slot_pick` — The unit designer opened on an air class (full canvas; the same designer as the land classes', with the slots Airframe, Armament and Avionics): a slot's box, and the item list it opens beside it.
 

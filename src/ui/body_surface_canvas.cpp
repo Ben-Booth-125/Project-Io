@@ -1972,6 +1972,11 @@ std::vector<entity_id> order_units_of(const world& w, const ui_state& state)
     const auto it = w.units.find(state.selected_entity);
     if (it == w.units.end() || !is_player_side(w, it->second.owner))
         return out;
+    // BL-1508: the dragged group, while the band shows it (the units are pruned each frame).
+    if (state.selection_unit_group && !state.selected_units.empty()
+        && std::find(state.selected_units.begin(), state.selected_units.end(), state.selected_entity)
+               != state.selected_units.end())
+        return state.selected_units;
     if (!state.selection_unit_group)
     {
         out.push_back(state.selected_entity);
@@ -3015,6 +3020,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // A selection made elsewhere (a group row, a ledger) is ONE unit's card.
         state.selection_unit_group = false;
         state.province_sync_entity = state.selected_entity;
+        // BL-1508: a group row opens one unit of the group, and "< Group" comes back to
+        // it; anything outside the group retires it.
+        if (std::find(state.selected_units.begin(), state.selected_units.end(), state.selected_entity)
+            == state.selected_units.end())
+            state.selected_units.clear();
+    }
+    // BL-1508: a fallen unit leaves the group; a group of one is only that unit.
+    if (!state.selected_units.empty())
+    {
+        auto& su = state.selected_units;
+        su.erase(std::remove_if(su.begin(), su.end(), [&](entity_id u) {
+                     const auto uit = w.units.find(u);
+                     return uit == w.units.end() || uit->second.count <= 0;
+                 }), su.end());
+        if (su.size() < 2)
+            su.clear();
+        else if (std::find(su.begin(), su.end(), state.selected_entity) == su.end())
+        {
+            state.selected_entity      = su.front();
+            state.province_sync_entity = su.front();
+        }
     }
 
     // Clip to the grid area so hexes don't overdraw the title bar or the solar canvas.
@@ -3632,6 +3658,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const float  tilt_pivot = canvas_centre.y;
     const ImVec2 mouse_g    = { mouse.x,
                                 tilt_pivot + (mouse.y - tilt_pivot) / tilt_sy };
+    state.marker_tilt_sy    = tilt_sy;
+    state.marker_tilt_pivot = tilt_pivot;
 
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
     // overlap, and the cylinder draws several wrap copies of each tile, so more
@@ -6691,6 +6719,45 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // The units one counter stands for (BL-1508): the marching counter's own, or the
+    // owner's standing units on the tile. Ascending.
+    const auto counter_units = [&](entity_id sample) {
+        std::vector<entity_id> out;
+        for (const unit_glide& g : state.unit_glides)
+            if (g.ids.front() == sample)
+                return g.ids;
+        const auto sit = w.units.find(sample);
+        if (sit == w.units.end())
+            return out;
+        for (const auto& [uid, uc] : w.units)
+            if (uc.count > 0 && uc.position == sit->second.position
+                && uc.owner == sit->second.owner && gliding.count(uid) == 0)
+                out.push_back(uid);
+        std::sort(out.begin(), out.end());
+        return out;
+    };
+
+    // THE DRAGGED GROUP, ON THE MAP (BL-1508): every counter holding one of its units
+    // carries the selection's outline, so a group across tiles reads where it stands.
+    if (!state.selected_units.empty())
+    {
+        for (const marker_hit_zone& hz : state.marker_hit_zones)
+        {
+            if (hz.kind != marker_hit_zone::kind::unit || w.units.count(hz.id) == 0)
+                continue;
+            bool lit = false;
+            for (const entity_id uid : counter_units(hz.id))
+                lit = lit || std::binary_search(state.selected_units.begin(),
+                                                state.selected_units.end(), uid);
+            if (!lit)
+                continue;
+            const float ur = hz.radius / 1.3f;
+            dl->AddRect({ hz.centre.x - ur * 1.1f - 2.0f, hz.centre.y - ur * 0.75f - 2.0f },
+                        { hz.centre.x + ur * 1.1f + 2.0f, hz.centre.y + ur * 0.75f + 2.0f },
+                        palette::selection, 2.0f, 0, 2.0f);
+        }
+    }
+
     // --- FRONTS (BL-1427; MILITARY.md § Fronts, SELECTION.md § The front element) ---
     // The PLAYER's fronts: a line along every shared hex edge between a span tile
     // and the neighbour's ground, in the colour of the player's stance toward that
@@ -7923,6 +7990,72 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // justifications and the price before anything is sent - rather than a
     // one-line confirm that declared blind. See the right-click block below.
 
+    // THE DRAG (BL-1508; SELECTION.md § The dragged group). The press that opens it is in
+    // the click path below; here it is drawn and ended, ahead of the input gate, so a band
+    // let go over a panel still ends. Every own counter inside the box joins the group;
+    // Shift adds to the group already held, and a shift-press with no drag adds the own
+    // counter under it. A drag over nothing of the player's leaves what the press selected.
+    if (state.unit_drag.pressed)
+    {
+        const ImVec2 g0{ state.unit_drag.x0,
+                         tilt_pivot + (state.unit_drag.y0 - tilt_pivot) / tilt_sy };
+        const float mdx = mouse.x - state.unit_drag.x0, mdy = mouse.y - state.unit_drag.y0;
+        if (mdx * mdx + mdy * mdy > 36.0f)
+            state.unit_drag.band = true; // six pixels: a shaky press stays a press
+        const ImVec2 bmin{ std::min(g0.x, mouse_g.x), std::min(g0.y, mouse_g.y) };
+        const ImVec2 bmax{ std::max(g0.x, mouse_g.x), std::max(g0.y, mouse_g.y) };
+        if (state.unit_drag.band)
+        {
+            dl->AddRectFilled(bmin, bmax, IM_COL32(120, 190, 255, 36));
+            dl->AddRect(bmin, bmax, palette::selection, 0.0f, 0, 1.5f);
+        }
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        {
+            std::set<entity_id> gathered;
+            bool any = false;
+            for (const marker_hit_zone& hz : state.marker_hit_zones)
+            {
+                if (hz.kind != marker_hit_zone::kind::unit)
+                    continue;
+                const auto uit = w.units.find(hz.id);
+                if (uit == w.units.end() || !is_player_side(w, uit->second.owner))
+                    continue;
+                bool in = false;
+                if (state.unit_drag.band)
+                    in = hz.centre.x >= bmin.x && hz.centre.x <= bmax.x
+                      && hz.centre.y >= bmin.y && hz.centre.y <= bmax.y;
+                else if (state.unit_drag.shift)
+                {
+                    const float dx = mouse_g.x - hz.centre.x, dy = mouse_g.y - hz.centre.y;
+                    in = dx * dx + dy * dy <= hz.radius * hz.radius;
+                }
+                if (!in)
+                    continue;
+                any = true;
+                const std::vector<entity_id> members = counter_units(hz.id);
+                gathered.insert(members.begin(), members.end());
+            }
+            if (any)
+            {
+                if (state.unit_drag.shift)
+                    for (const entity_id uid : order_units_of(w, state))
+                        gathered.insert(uid);
+                state.clear_battle_selection();
+                state.clear_lens_region_selection();
+                state.clear_front_selection();
+                state.selected_province    = 0u;
+                state.selection_cycle_tile = null_entity;
+                state.selected_units.assign(gathered.begin(), gathered.end());
+                state.selected_entity      = state.selected_units.front();
+                state.selection_unit_group = state.selected_units.size() > 1;
+                state.province_sync_entity = state.selected_entity;
+                if (state.selected_units.size() < 2)
+                    state.selected_units.clear();
+            }
+            state.unit_drag = {};
+        }
+    }
+
     if (!input_enabled)
     {
         apply_camera();
@@ -8255,8 +8388,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.pending_march_dest_tile = hovered_tile;
             }
         }
+        else if (!state.construction.active && ImGui::GetIO().KeyShift
+                 && state.overlay == overlay_mode::none && !declaring)
+        {
+            // BL-1508: a shift-press holds the selection for the drag or the add to
+            // come, at the release above. It selects nothing itself.
+            state.unit_drag = { true, true, false, mouse.x, mouse.y };
+        }
         else if (!state.construction.active)
         {
+            // BL-1508: any press retires the dragged group, and may open the next drag.
+            // Armed picks took their branches above, and a lens collapses selection to
+            // one tier, so neither ever gathers units.
+            state.selected_units.clear();
+            if (state.overlay == overlay_mode::none && !declaring)
+                state.unit_drag = { true, false, false, mouse.x, mouse.y };
+
             // WHICH RULE APPLIES IS DECIDED FIRST (BL-664, Ben 2026-08-28),
             // because these are two different resolutions rather than one with an
             // exception. SELECTION.md § A lens collapses selection to ONE TIER is

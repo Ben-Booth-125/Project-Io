@@ -58,6 +58,7 @@
 #include <cfloat>    // FLT_MAX (net-profit PlotLines auto-scale)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
 #include <string>    // ticks_label / construction_status
+#include <set>
 #include <vector>    // top-decile production sample (top_decile_production)
 
 namespace ui {
@@ -1793,7 +1794,13 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
                            owner_name != nullptr ? owner_name : "\xe2\x80\x94");
         ImGui::SameLine();
-        if (const auto tit = w.tiles.find(head.position); tit != w.tiles.end())
+        // BL-1508: a dragged group may span tiles, and then names how many.
+        std::set<entity_id> group_tiles;
+        for (const entity_id uid : group)
+            group_tiles.insert(w.units.at(uid).position);
+        if (group_tiles.size() > 1)
+            ImGui::TextDisabled("%d units \xc2\xb7 %d tiles", n, static_cast<int>(group_tiles.size()));
+        else if (const auto tit = w.tiles.find(head.position); tit != w.tiles.end())
             ImGui::TextDisabled("%d units \xc2\xb7 tile %d, %d", n,
                                 tit->second.grid_x, tit->second.grid_y);
         else
@@ -1808,7 +1815,7 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
             if (ImGui::Button("Assign to front##unit_group_front", {bw, frame_h}))
                 ImGui::OpenPopup("unit_group_front_menu");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Assign every unit here to one front");
+                ImGui::SetTooltip("Assign every unit of this group to one front");
             draw_assign_front_popup(w, ui, "unit_group_front_menu", group);
         }
         ImGui::SameLine(bar_w - frame_h);
@@ -4304,7 +4311,10 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     std::vector<entity_id> unit_group;
     if (kind == selection_kind::unit)
     {
-        unit_group = unit_group_of(w, ui.selected_entity);
+        // BL-1508: the dragged group, across tiles, when this unit is one of it.
+        unit_group = std::find(ui.selected_units.begin(), ui.selected_units.end(), ui.selected_entity)
+                         != ui.selected_units.end()
+                         ? ui.selected_units : unit_group_of(w, ui.selected_entity);
         if (ui.selection_unit_group && unit_group.size() > 1)
         {
             draw_unit_group_selection(w, reg, ui, unit_group);
@@ -4362,7 +4372,7 @@ void draw_selection_content(world& w, const recipe_registry& reg,
             if (ImGui::Button(back, {back_w, btn}))
                 ui.selection_unit_group = true;
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Back to the %d units on this tile", static_cast<int>(unit_group.size()));
+                ImGui::SetTooltip("Back to the group of %d units", static_cast<int>(unit_group.size()));
         }
 
         ImGui::SameLine(bar_w - btn);
