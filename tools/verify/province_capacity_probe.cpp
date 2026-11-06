@@ -81,7 +81,9 @@ over_cap_reading read_over_cap(const world& w)
         if (b.type != building_type::extraction_site)
             ++on_tile[b.tile];
     std::unordered_map<entity_id, bool> over;
-    for (const auto& [tid, n] : on_tile)
+    std::vector<std::pair<entity_id, int>> ascending(on_tile.begin(), on_tile.end());
+    std::sort(ascending.begin(), ascending.end()); // the lines below print in tile order
+    for (const auto& [tid, n] : ascending)
     {
         const auto tit = w.tiles.find(tid);
         if (tit == w.tiles.end())
@@ -119,8 +121,15 @@ void print_over_cap(const char* when, const over_cap_reading& r)
 /// BL-1500: what the network IS, on ground it matters to: the nodes standing, and how
 /// much of each nation's own dry ground its routed cover reaches (the campaign's own
 /// lp_coverage_at, one reach field). Counts and a mean, read in ascending tile id.
+/// BL-1500: every capital holds a RUNNING hub (`lp_source_running`) and stands at full
+/// cover (LOGISTICS.md). Named nation by nation where one does not; no exceptions.
+struct capital_reading
+{
+    int capitals = 0, full = 0, holding = 0;
+};
+
 void print_network_reading(world& w, const char* when, long long* reached_out, long long* stations_out,
-                           long long* hubs_out, long long* ports_out)
+                           long long* hubs_out, long long* ports_out, capital_reading* cap_out = nullptr)
 {
     int hubs = 0, stations = 0, ports = 0;
     for (const auto& [bid, b] : w.buildings)
@@ -163,11 +172,23 @@ void print_network_reading(world& w, const char* when, long long* reached_out, l
         if (cap == null_entity || w.tiles.count(cap) == 0)
             continue;
         ++capitals;
-        capitals_full += lp_coverage_at(w, memo, cap) >= 1.0f ? 1 : 0;
+        const float cap_cover = lp_coverage_at(w, memo, cap);
+        capitals_full += cap_cover >= 1.0f ? 1 : 0;
         bool holds = false;
         for (const auto& [bid, b] : w.buildings)
-            holds = holds || (b.tile == cap && b.type == building_type::inland_logistics_hub);
+            holds = holds || (b.tile == cap && b.type == building_type::inland_logistics_hub
+                              && lp_source_running(b));
         capitals_holding += holds ? 1 : 0;
+        if (!holds || cap_cover < 1.0f)
+            std::printf("       BL-1500 capital %-7s nation %u tile %u: %s, cover %.3f\n", when,
+                        static_cast<unsigned>(nid), static_cast<unsigned>(cap),
+                        holds ? "holds a running hub" : "NO RUNNING HUB", static_cast<double>(cap_cover));
+    }
+    if (cap_out != nullptr)
+    {
+        cap_out->capitals += capitals;
+        cap_out->full     += capitals_full;
+        cap_out->holding  += capitals_holding;
     }
     std::printf("       BL-1500 NETWORK %-7s: hubs %d stations %d ports %d | owned dry tiles %zu: "
                 "reached %d, full cover %d, cover sum %.1f | capitals at full cover %d, holding a hub "
@@ -256,6 +277,7 @@ int main(int argc, char** argv)
     // BL-1500: the gate, and the totals that name what the rule costs.
     long long tot_over_tiles = 0, tot_over_excess = 0, tot_reached = 0, tot_stations = 0, tot_hubs = 0,
               tot_ports = 0, tot_capitals_refused = 0;
+    capital_reading tot_capitals;
 
     for (const std::uint32_t seed_value : seeds)
     {
@@ -483,7 +505,7 @@ int main(int argc, char** argv)
             tot_over_tiles  += r.tiles;
             tot_over_excess += r.excess;
             tot_capitals_refused += start->land.lp.capital_source_refused;
-            print_network_reading(w, "start", &tot_reached, &tot_stations, &tot_hubs, &tot_ports);
+            print_network_reading(w, "start", &tot_reached, &tot_stations, &tot_hubs, &tot_ports, &tot_capitals);
         }
         std::fflush(stdout);
         if (settle)
@@ -493,7 +515,7 @@ int main(int argc, char** argv)
             print_over_cap("settled", r);
             tot_over_tiles  += r.tiles;
             tot_over_excess += r.excess;
-            print_network_reading(w, "settled", nullptr, nullptr, nullptr, nullptr);
+            print_network_reading(w, "settled", nullptr, nullptr, nullptr, nullptr, &tot_capitals);
             std::fflush(stdout);
         }
 
@@ -545,5 +567,10 @@ int main(int argc, char** argv)
                 tot_over_tiles == 0 ? "PASS" : "FAIL", tot_over_tiles, tot_over_excess);
     std::printf("%s BL-1500 no capital left without its source by the cap: %lld\n",
                 tot_capitals_refused == 0 ? "PASS" : "FAIL", tot_capitals_refused);
-    return tot_over_tiles == 0 && tot_capitals_refused == 0 ? 0 : 1;
+    const bool capitals_ok = tot_capitals.capitals > 0 && tot_capitals.holding == tot_capitals.capitals
+                          && tot_capitals.full == tot_capitals.capitals;
+    std::printf("%s BL-1500 every capital holds a running hub at full cover: %d read, %d holding, %d at "
+                "full cover\n", capitals_ok ? "PASS" : "FAIL", tot_capitals.capitals, tot_capitals.holding,
+                tot_capitals.full);
+    return tot_over_tiles == 0 && tot_capitals_refused == 0 && capitals_ok ? 0 : 1;
 }

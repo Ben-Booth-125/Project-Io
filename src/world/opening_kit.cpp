@@ -831,15 +831,7 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
     // the seeding reached it). So the kit lays around one held slot, and goes next door for
     // what it cannot fit: the occupancy counts the source before it stands. Local to the
     // kit's own count; nothing is added to the world.
-    for (const major_kit& mk : kits)
-    {
-        if (placement_rules::capital_source_slot_held(w, mk.g.capital) == 0)
-            continue;
-        building_component held;
-        held.tile = mk.g.capital;
-        held.type = building_type::inland_logistics_hub;
-        L.occ.add(held);
-    }
+    L.occ.hold_capital_slots(w);
     const std::vector<const recipe*> planned = planned_recipes(reg, kit);
 
     for (std::size_t k = 0; k < kits.size(); ++k)
@@ -1127,6 +1119,7 @@ void resite_uncovered_kit(world& w, const recipe_registry& reg, opening_kit_repo
     gen_occupancy occ;
     for (const auto& [bid, b] : w.buildings) // additive counts: order-free
         occ.add(b);
+    occ.hold_capital_slots(w);
     lp_reach_memo memo; // the sources do not change below: one memo for the pass
     const auto covered_at = [&](entity_id tid) { return lp_coverage_at(w, memo, tid); };
 

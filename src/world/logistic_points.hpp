@@ -602,7 +602,7 @@ struct lp_seed_report
     /// A source's tile choice is steered off a full tile (`placeable`), so most of the rule's
     /// effect is a hub standing next door. These count what could NOT be steered: a source
     /// asked for by name on a tile with no room, and a capital left without its source.
-    int   sources_refused_cap    = 0;
+    int   sources_refused_cap    = 0; // distinct tiles a source was refused on: full
     int   capital_source_refused = 0;
 };
 

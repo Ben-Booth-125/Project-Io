@@ -1723,6 +1723,7 @@ lp_seed_report seed_logistics_sources(world& w)
     const auto coverage_of = [&](entity_id nation, entity_id body, entity_id tile) {
         return lp_route_to(w, memo, nation, body, tile).cover;
     };
+    std::set<entity_id> refused_sources; // the tiles a source was refused on for want of room
     const auto place_source = [&](entity_id nation, entity_id tile, entity_id consumer_owner,
                                   building_type type) {
         entity_id owner = null_entity;
@@ -1734,7 +1735,9 @@ lp_seed_report seed_logistics_sources(world& w)
             return false;
         if (!has_stack_room(tile))
         {
-            ++rep.sources_refused_cap;
+            // Sources, not attempts: a full tile is asked for again by each later consumer.
+            refused_sources.insert(tile);
+            rep.sources_refused_cap = static_cast<int>(refused_sources.size());
             return false;
         }
         const entity_id bid = w.create_entity();
@@ -2479,10 +2482,28 @@ lp_seed_report seed_logistics_sources(world& w)
                 {
                     // No capital on this body: every source passes, the placement stands.
                     if (at == null_entity || host_nation(w, at) != r.nation
-                        || is_water(w.tiles.at(at).substrate) || hub_tiles.count(at) != 0)
+                        || is_water(w.tiles.at(at).substrate) || hub_tiles.count(at) != 0
+                        || !has_stack_room(at))
                         at = b.tile;
                     if (hub_tiles.count(at) != 0 || is_water(w.tiles.at(at).substrate))
                         continue;
+                    // BL-1500: a source with a choice of ground goes next door when its tile
+                    // is full: the nearest placeable own tile over dry ground, ties to the
+                    // lowest id. None within reach, and the source is refused and counted.
+                    if (!has_stack_room(at))
+                    {
+                        entity_id next = null_entity;
+                        int next_d = 0;
+                        for (const auto& [t2, d] : own_steps(r.nation, body, at))
+                            if (placeable(t2, r.nation)
+                                && (next == null_entity || d < next_d || (d == next_d && t2 < next)))
+                            {
+                                next   = t2;
+                                next_d = d;
+                            }
+                        if (next != null_entity)
+                            at = next;
+                    }
                 }
                 else
                 {

@@ -115,8 +115,9 @@ counts toward its tile's cap. Hubs, stations, ports and the capital's source cou
 building. A building with a choice of ground goes next door; one that may stand only where it is
 asked for (a station in the city it serves) is not placed, and the fold counts it. No count is
 clamped after the fact, and `tools/verify/province_capacity_probe.cpp` reads tiles past their cap
-as a failure. The capital's source may stand nowhere else, so what generation lays on a capital
-before the seeding (a kit, a station, a harbour) leaves it its slot.
+as a failure. The capital's source may stand nowhere else, so every placer that runs before the
+seeding (a charter, a founding, the opening force's base, a retrofit marketplace, a kit, a station,
+a harbour) leaves a capital that slot until a hub stands there.
 
 Implementation: the constants and the rank helpers live in
 `src/world/placement_rules.{hpp,cpp}` (`stack_output_scalar`, which is 1 at every rank,
