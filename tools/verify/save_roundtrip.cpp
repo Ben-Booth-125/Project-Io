@@ -576,7 +576,7 @@ int main()
         if (ok56)
         {
             const building_component& s3 = old.buildings.at(bids[0]);
-            ok56 = s3.ticks_remaining == 2 && s3.days_remaining == 2 * 90 - 22
+            ok56 = s3.ticks_remaining == 2 && s3.days_remaining == 105
                 && old.construction_quarter_day == 0;
             for (const auto& [bid, b] : old.buildings)
                 ok56 = ok56 && (b.ticks_remaining > 0
@@ -584,7 +584,7 @@ int main()
                                     : b.days_remaining == 0);
         }
         check(ok56, "P23 a v56 stream reads, each site's days derived from its ticks (2 qtrs less "
-                    "a quarter of one = 158 days), the cursor 0");
+                    "a quarter of one = 158 days, x2/3 for the v80 build days = 105), the cursor 0");
         std::size_t rows = 0; // the buildings the v57 section carries
         for (const auto& [bid, b] : wd.buildings)
             rows += canonical_construction_days(b).any() ? 1 : 0;
@@ -2157,6 +2157,41 @@ int main()
             && old.nations.at(subject_id).returns.back().research == 0.0f
             && b80.size() - b79.size() == world_save_research_books_section_bytes(k);
         check(ok79, "PD a v79 stream reads with nothing unbooked and no research booked; v80 is v79 plus the section");
+
+        // A site in flight on an old stream: its days move with the build days (x2/3),
+        // or the material rate, which reads the new duration, overcharges it by half.
+        {
+            world sites = k;
+            std::vector<entity_id> ids;
+            for (const auto& [bid, b] : sites.buildings)
+                ids.push_back(bid);
+            std::sort(ids.begin(), ids.end());
+            bool have_two = ids.size() >= 2;
+            if (have_two)
+            {
+                building_component& whole = sites.buildings.at(ids[0]);
+                whole.ticks_remaining = 2;
+                whole.days_remaining = 180;
+                whole.build_arrears_milli = 3000;
+                building_component& last_day = sites.buildings.at(ids[1]);
+                last_day.ticks_remaining = 1;
+                last_day.days_remaining = 1;
+            }
+            std::ostringstream o(std::ios::binary);
+            write_world_snapshot_pre_research_books(sites, o);
+            world old_sites, new_sites;
+            const bool read_old = have_two && from_bytes(o.str(), old_sites);
+            const bool read_new = have_two && from_bytes(to_bytes(sites), new_sites);
+            check(read_old && old_sites.buildings.at(ids[0]).days_remaining == 120
+                      && old_sites.buildings.at(ids[0]).ticks_remaining == 2
+                      && old_sites.buildings.at(ids[0]).build_arrears_milli == 2000
+                      && old_sites.buildings.at(ids[1]).days_remaining == 1
+                      && old_sites.buildings.at(ids[1]).ticks_remaining == 1,
+                  "PD a v79 site's 180 days read as 120 and its 3000 milli-days owed as 2000; a last day stays one");
+            check(read_new && new_sites.buildings.at(ids[0]).days_remaining == 180
+                      && new_sites.buildings.at(ids[0]).build_arrears_milli == 3000,
+                  "PD a v80 site's days are already on the new scale and read unchanged");
+        }
 
         // A negative unbooked figure: the section's first row is (count, id, f64 ...).
         std::string bad = b80;

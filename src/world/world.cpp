@@ -79,16 +79,25 @@ uint64_t world::state_hash(int tick) const
     {
         std::vector<entity_id> ids;
         for (const auto& [nid, nc] : nations)
-            if (nc.research_unbooked != 0.0 || nc.upkeep_unbooked != 0.0)
+        {
+            bool booked = nc.research_unbooked != 0.0 || nc.upkeep_unbooked != 0.0;
+            for (const quarterly_return& q : nc.returns)
+                booked = booked || q.research != 0.0f;
+            if (booked)
                 ids.push_back(nid);
+        }
         std::sort(ids.begin(), ids.end());
         for (const entity_id id : ids)
         {
             const nation_component& nc = nations.at(id);
             fnv1a_u32(h, 0xB00C5u);
             fnv1a_u32(h, id);
-            fnv1a_f32(h, static_cast<float>(nc.research_unbooked));
-            fnv1a_f32(h, static_cast<float>(nc.upkeep_unbooked));
+            fnv1a_bytes(h, &nc.research_unbooked, sizeof nc.research_unbooked);
+            fnv1a_bytes(h, &nc.upkeep_unbooked, sizeof nc.upkeep_unbooked);
+            // The rest of a return stays unhashed: that gap is older than this field.
+            fnv1a_u32(h, static_cast<uint32_t>(nc.returns.size()));
+            for (const quarterly_return& q : nc.returns)
+                fnv1a_f32(h, q.research);
         }
     }
 

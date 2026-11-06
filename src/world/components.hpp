@@ -2361,8 +2361,9 @@ struct quarterly_return
     /// BL-1539 (Ben, 2026-11-05: research counts inside net; FINANCE.md § The quarterly
     /// return): the credits the nation's research line spent since its last return. A
     /// debit, paid in the nation step AFTER the return is written and booked on the
-    /// next one, as a refund is, so `net` = the flows - research + refunds and it is
-    /// what the nation has left to build with. `upkeep` above is booked the same way
+    /// next one, as a refund is, so `net` = the flows - research + refunds. Other debits
+    /// land outside it (FINANCE.md § What a return does not carry), so a nation can lose
+    /// treasury at a positive `net`. `upkeep` above is booked the same way
     /// (garrison pay, also a nation-step debit). SERIALISED in the v80 section.
     float research    = 0.0f;
 

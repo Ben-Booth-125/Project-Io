@@ -17,8 +17,10 @@
 //
 //   2. QTR rows, over N play quarters with nobody seated: the treasury's movement
 //      beside the quarterly return's flows and the buildings and men it bought.
-//      `resid` is the treasury's delta less the return's net: credits that moved
-//      outside the return.
+//      `resid` is the movement between two consecutive return closes less the later
+//      return's net: credits that moved outside the return. It reads closes and not
+//      `delta`, the end-of-tick treasury's, because a return books last quarter's
+//      research and garrison pay, which `delta` holds a quarter earlier.
 //
 // Usage: build_gen/verify/build_payback_census.exe [--seeds a,b] [--pairs 30:4]
 //                                                  [--quarters N] [--no-sites]
@@ -361,13 +363,16 @@ int main(int argc, char** argv)
                     else ++built;
                 }
                 const double delta = static_cast<double>(n.treasury) - last[nid];
+                const double resid = n.returns.size() >= 2
+                    ? static_cast<double>(r.balance) - n.returns[n.returns.size() - 2].balance - r.net
+                    : 0.0;
                 last[nid] = n.treasury;
                 const auto f = force.find(nid);
                 std::printf("QTR seed=%d nation=%llu q=%d treasury=%.1f delta=%.1f net=%.1f resid=%.1f income=%.1f"
                             " expenditure=%.1f maintenance=%.1f wages=%.1f upkeep=%.1f taxes=%.1f refunds=%.1f"
                             " built=%d constructing=%d idled=%d units=%d men=%ld\n",
                             seed, static_cast<unsigned long long>(nid), k, static_cast<double>(n.treasury), delta, r.net,
-                            delta - r.net, r.income, r.expenditure, r.maintenance, r.wages, r.upkeep, r.taxes, r.refunds,
+                            resid, r.income, r.expenditure, r.maintenance, r.wages, r.upkeep, r.taxes, r.refunds,
                             built, constructing, idled, f == force.end() ? 0 : f->second.first,
                             f == force.end() ? 0L : f->second.second);
             }

@@ -232,7 +232,7 @@ int main()
     const float prev_close = x.w.nations.at(x.s).returns.back().balance; // tick 1's return
     const quarterly_return* q = tick(x.w, reg, x.s, 2);
     const double rebuilt = q ? static_cast<double>(q->income) - q->expenditure - q->maintenance
-                                   - q->wages - q->interest - q->levies - q->upkeep + q->refunds
+                                   - q->wages - q->interest - q->levies - q->upkeep - q->research + q->refunds
                              : 0.0;
     std::printf("  next return: refunds %.4f net %.4f rebuilt %.4f\n", q ? q->refunds : 0.0f,
                 q ? q->net : 0.0f, rebuilt);

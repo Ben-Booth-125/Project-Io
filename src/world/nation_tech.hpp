@@ -346,6 +346,12 @@ std::vector<std::string> research_opened_recipes();
 /// home nation holds the node. Only Wind Power names one today: the propellant
 /// routes are open to every nation (Ben, 2026-10-10 — Propellant Synthesis is a
 /// yield bonus), and fertiliser, plastics and microchips are unread.
+/// What a door may LIST for @p viewer. `recipe_unlocked` reads a null actor as open, for
+/// a caller with no nation to ask after. A viewer with none (a spectator: nobody is
+/// seated) holds no node, so what research opens is not offered to it.
+bool recipe_offered(const world& w, const recipe_registry& reg, entity_id viewer,
+                    std::uint16_t recipe_id);
+
 bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
                      std::uint16_t recipe_id);
 

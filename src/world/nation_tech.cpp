@@ -786,6 +786,17 @@ std::vector<std::string> research_opened_recipes()
     return out;
 }
 
+bool recipe_offered(const world& w, const recipe_registry& reg, entity_id viewer,
+                    std::uint16_t recipe_id)
+{
+    if (viewer == null_entity)
+    {
+        const recipe* rc = reg.get_recipe(recipe_id);
+        return rc == nullptr || !rc->research_opened;
+    }
+    return recipe_unlocked(w, reg, viewer, recipe_id);
+}
+
 bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
                      std::uint16_t recipe_id)
 {

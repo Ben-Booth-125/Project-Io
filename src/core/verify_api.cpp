@@ -11,6 +11,7 @@
 #include <chrono>
 #include <thread>
 #include "app.hpp"
+#include "world/nation_tech.hpp"
 #include "world/economy_system.hpp" // BL-1453: advance_quarter_to for day_step
 #include "core/session_history.hpp" // BL-1453: day_step posts battle dispatches
 
@@ -5111,8 +5112,26 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             if (b.tile != tile) continue;
             const int n = m_registry.play_recipe_count(b.type);
             if (n <= 0) return std::string("");
-            const int i = std::clamp(index, 0, n - 1);
+            int i = std::clamp(index, 0, n - 1);
+            // An index past the list means "the last one": the last one this nation may
+            // run, so the clamp never lands on a recipe research has not opened. One it
+            // asked for by position and may not run is refused below.
+            const entity_id owner = building_owner_of(m_world, bid).id;
+            const building_type type = b.type;
+            const auto open_at = [&](int at) {
+                return recipe_offered(m_world, m_registry, owner,
+                                      m_registry.recipe_id(m_registry.play_recipe_at(type, at).name));
+            };
+            if (index >= n)
+                while (i > 0 && !open_at(i))
+                    --i;
             const recipe& r = m_registry.play_recipe_at(b.type, i);
+            if (!open_at(i))
+            {
+                SDL_Log("verify.set_building_recipe: tile=%u index=%d recipe=%s REFUSED (tech_locked)",
+                        tile_u, i, r.name.c_str());
+                return std::string("");
+            }
             // The body's air (Ben, 2026-10-09): a route the tile's body cannot run
             // is refused here as at every other door — nothing written, "" back.
             if (!recipe_runs_at_tile(m_world, r, tile))

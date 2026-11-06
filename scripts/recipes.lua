@@ -919,8 +919,8 @@ recipes = {
     -- is the price of no fuel bill, and it clears the fixed cost at the floor
     -- (recipe_margin M2 needs 1.78 or more). Re-derive it if a base price moves.
     --
-    -- It is a small unit, so the seeder's gap scorer, which ranks on output, still
-    -- provisions the fuel plants first. Opened by Wind Power (DG-PR-EN-W).
+    -- `research_opened` keeps it off the list generation walks, so the seeder never
+    -- sees it and no nation opens with one. Opened by Wind Power (DG-PR-EN-W).
     {
         name         = "wind_turbine",
         display_name = "Wind Turbine",

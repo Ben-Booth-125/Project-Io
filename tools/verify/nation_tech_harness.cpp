@@ -103,6 +103,8 @@
 #include <exception>
 #include <fstream>
 #include <initializer_list>
+#include "world/site_quote.hpp"
+
 #include <limits>
 #include <map>
 #include <memory>
@@ -1216,6 +1218,27 @@ bool rows_t2_live(std::uint32_t seed, bool overland_rows)
     world& w = start->w;
     const recipe_registry& reg = start->reg;
     run_app_validation_settle(w, start->reg);
+    if (overland_rows)
+    {
+        // What the door quotes for wind: no input, so never starved and nothing to buy.
+        // Power prices on a grid wider than the market, so it keeps its post.
+        entity_id quoted_tile = null_entity;
+        for (const auto& [mid, m] : w.markets)
+            if (m.centre_tile != null_entity && (quoted_tile == null_entity || m.centre_tile < quoted_tile))
+                quoted_tile = m.centre_tile;
+        bool quoted = quoted_tile != null_entity;
+        if (quoted)
+        {
+            site_quote_context cx = make_site_quote_context(w, reg, nullptr);
+            const site_quote q = quote_site(w, reg, cx, quoted_tile, building_type::processing_facility,
+                                            resource_type::iron_ore, reg.recipe_id("wind_turbine"), 1.0f);
+            std::printf("  wind quote: starved %d share %.3f revenue %.3f inputs %.3f\n", q.starved ? 1 : 0,
+                        q.price_share, q.profit.revenue, q.profit.input_cost);
+            quoted = !q.starved && q.profit.input_cost == 0.0f && q.price_share == 1.0f && q.profit.revenue > 0.0f;
+        }
+        check(quoted, "T2z the door quotes the wind turbine as running, buying nothing, selling at the post");
+    }
+
     const logistics_nodes nodes = collect_logistics_nodes(w);
     const std::size_t ri = static_cast<std::size_t>(resource_type::steel);
     const float qty = 10.0f;

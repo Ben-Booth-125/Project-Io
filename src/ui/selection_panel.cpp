@@ -655,7 +655,7 @@ std::vector<int> method_grid_candidates(const world& w, const recipe_registry& r
         if ((cur == nullptr || ri.group == cur->group)
             && (is_active
                 || (recipe_runs_at_tile(w, ri, b.tile)
-                    && recipe_unlocked(w, reg, player_actor(w), reg.recipe_id(ri.name))))) // same actor as the press
+                    && recipe_offered(w, reg, player_actor(w), reg.recipe_id(ri.name))))) // same actor as the press
             candidates.push_back(i);
     }
     return candidates;
@@ -4826,9 +4826,8 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     // Ben's ruling (2026-08-24, the same shape as the era precedent above, not
     // a new one): filtered out, not shown-and-locked — "the door not showing
     // what the gate would refuse" is the standing argument, unchanged by this
-    // item. Since BL-1273 no node locks a recipe (E0-EC-03's lock on
-    // `refined_copper` retired with the per-corp gates, NR-1022), so this
-    // branch removes nothing until the effect pass gives a node an unlock.
+    // item. Wind Power is the one node that locks a recipe today (E0-EC-03's lock
+    // on `refined_copper` retired with the per-corp gates, NR-1022).
     cands.erase(std::remove_if(cands.begin(), cands.end(),
                                [&w, &reg, tile_id, actor](const candidate& c)
                                {
@@ -4842,7 +4841,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
                                        if (const recipe* rc = reg.get_recipe(c.recipe);
                                            rc != nullptr && !recipe_runs_at_tile(w, *rc, tile_id))
                                            return true;
-                                   return !recipe_unlocked(w, reg, actor, c.recipe);
+                                   return !recipe_offered(w, reg, actor, c.recipe);
                                }),
                 cands.end());
 

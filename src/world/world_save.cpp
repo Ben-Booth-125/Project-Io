@@ -504,6 +504,28 @@ bool r_return(std::istream& i, quarterly_return& q)
 // (`legacy_corp_record`, world_save.hpp); written only by the verification
 // writer. The field order is the retired `corporation_component`'s.
 /// BL-1539: a nation carries v78 research-books state worth writing.
+/// The build days went x2/3 at v80 (BL-1499; PRODUCTION.md § Construction is measured in
+/// days), and a site's material rate reads the new duration, so a site in flight keeps
+/// its days on the old scale and draws half as much again unless they move with it.
+/// Same rounding as a new site's days: nearest day, floored at one, the quarters they
+/// span. Materials owed in arrears are milli-days at the same rate, so they move too.
+void rescale_site_days_to_research_books(world& w)
+{
+    const int q = k_construction_quarter_days;
+    for (auto& [bid, b] : w.buildings) // each site alone: order cannot reach it
+    {
+        if (b.ticks_remaining > 0)
+        {
+            const int days = std::max(1, static_cast<int>(std::lround(construction_days_left(b) * 2.0 / 3.0)));
+            b.days_remaining        = days;
+            b.ticks_remaining       = (days + q - 1) / q;
+            b.construction_progress = 0.0f;
+        }
+        if (b.build_arrears_milli > 0)
+            b.build_arrears_milli = static_cast<int>(std::lround(b.build_arrears_milli * 2.0 / 3.0));
+    }
+}
+
 bool nation_has_research_books(const nation_component& nc)
 {
     if (nc.research_unbooked != 0.0 || nc.upkeep_unbooked != 0.0)
@@ -4286,6 +4308,10 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 if (!r_f32(in, q.research) || !std::isfinite(q.research) || q.research < 0.0f)
                     return false;
         }
+    }
+    else
+    {
+        rescale_site_days_to_research_books(s);
     }
 
     // BL-1266 (v46): every manual trade names a live owner and two distinct

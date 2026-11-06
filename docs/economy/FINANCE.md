@@ -293,7 +293,7 @@ profitability, updated each quarter with company balance sheets."*
 | `taxes` | the tier's share of the quarter's wages, returned to the treasury (`NATIONS.md` § Taxes and Discontent) |
 | `research` | Credits the nation's research line spent since its last return, booked on the next one. A debit: research is paid in the nation step, after the return is written (Ben, 2026-11-05: research counts inside net) |
 | `refunds` | Credits refunded to the nation since its last return, booked on the next one — a cancelled construction. A credit: `net` = the flows **+ refunds**, and the return's opening is taken from before the refund so it still telescopes |
-| `net` | The difference of two consecutive treasuries across the money loop, research included — see below. It is what the nation has left to build with: construction stays outside it, and the header's NET and every price quoted in months of net read after research |
+| `net` | The difference of two consecutive treasuries across the money loop, research included — see below. Construction, hiring, retooling and the other movers listed below debit the treasury outside it, so a nation at +100 net can still lose treasury. The header's NET and every price quoted in months of net read after research |
 | `treasury` | the closing `nation_component::treasury` |
 | `holdings` | the nation's building count |
 | `book_value` | Sum of `build_cost` over the holdings, from the recipe registry — historical cost, deliberately **not** what the build press charges |
@@ -347,7 +347,8 @@ return. Every other debit or credit lands elsewhere in the tick and appears in *
   clear and *is* in `expenditure`), and the **import tariff** a nation's goods pay on entering a
   foreign nation's market, credited to that market's nation (`NATIONS.md` § The import tariff).
 - **The national budget** — what `run_nation_step` spends on the nation's priority lines, after
-  `apply_budget` (`NATIONS.md` § 3).
+  `apply_budget` (`NATIONS.md` § 3). The academic-research line and garrison pay are the two it
+  books, as above (Ben, 2026-11-05: research counts inside net).
 
 So a return explains the money loop's movement exactly and the **quarter's** only partly. That is
 right for reading the profitability of a nation's industry.
