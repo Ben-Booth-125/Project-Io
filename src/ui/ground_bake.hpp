@@ -107,7 +107,7 @@ struct bake_params
     float noise_strength  = 0.05f;  ///< Fine grain amplitude.
     // Close-tier feature stamps (the "individual trees" ruling, Ben
     // 2026-09-01: the closest rungs must render individual trees and sharper
-    // hills). Active at bake resolutions >= 40 px/r, i.e. the 128 px master.
+    // hills). Active at bake resolutions >= 40 px/r, i.e. the 96 px master.
     float tree_density    = 1.0f;   ///< Global multiplier on per-tile tree counts.
     float ridge_strength  = 0.75f;  ///< How far mountain detail mixes toward ridged noise.
     float rock_exposure   = 0.5f;   ///< Slope-driven rock colour on steep ground.
@@ -475,18 +475,21 @@ inline constexpr double k_tilt_sy = 0.92387953251128674; ///< cos(22.5 deg)
 /// THE ONE MASTER (RENDERING.md § Level of detail, Ben 2026-10-09): every
 /// body's ground is baked ONCE, whole-body, at k_master_ppr px per hex at the
 /// one angle, in 512 px chunks; every other zoom is a box-downsample of it.
-/// Level 0 is the master; level k is the master halved k times — 128, 64, 32,
-/// 16 and 8 px per hex (Ben, 2026-10-10: 128 over 96). The master's W and H are multiples of
+/// Level 0 is the master; level k is the master halved k times — 96, 48, 24,
+/// 12 and 6 px per hex (Ben, 2026-11-05, overturning 128). The master's W and H are multiples of
 /// k_master_align (= 2^(k_level_count - 1)), so every level is a whole number
 /// of pixels, every master chunk halves exactly at every level, and a level's
 /// wrap period is still exactly its width.
-inline constexpr double k_master_ppr   = 128.0;
+inline constexpr double k_master_ppr   = 96.0;
 inline constexpr int    k_level_count  = 5;
 inline constexpr int    k_master_align = 1 << (k_level_count - 1);
-inline constexpr double k_level_ppr[k_level_count] = { 128.0, 64.0, 32.0, 16.0, 8.0 };
+inline constexpr double k_level_ppr[k_level_count] = { 96.0, 48.0, 24.0, 12.0, 6.0 };
 /// The fallback page a not-yet-baked body is drawn from: a direct whole-body
 /// bake at 6 px per hex (one job), shown until the master's levels cover the
-/// view. Same angle as the master.
+/// view. Same angle as the master. It matches level 4's 6 px but is not that
+/// level: the far page bakes directly with no master behind it (one job, a
+/// body's first frame), and level 4 is a downsample that exists only once the
+/// master's chunks do.
 inline constexpr double k_far_ppr = 6.0;
 /// Pixel side of one chunk, at every level.
 inline constexpr int    k_chunk_px = 512;
@@ -501,9 +504,9 @@ geometry level_geometry(const geometry& master, int level);
 
 /// The level a drawn hex radius reads (RENDERING.md § Level of detail): the
 /// COARSEST level whose px per hex is at or above @p draw_r, so it is drawn
-/// minified by at most 2:1; above the master's 128 px the master is drawn
-/// magnified (no rung at the reference window: its top rung draws ~110 px;
-/// a 4K-height window's top rung reads it ~1.7x, accepted).
+/// minified by at most 2:1; above the master's 96 px the master is drawn
+/// magnified (no rung at the reference window: its top rung draws ~94.6 px;
+/// a 4K-height window's top rung reads it ~2x).
 int choose_level(double draw_r);
 
 /// Box-downsample @p src (@p sw x @p sh, both even) to half size into @p dst

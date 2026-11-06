@@ -20,7 +20,7 @@
 -- meter's canvas split is the same either way (PLANETARY.md § Draw-loop cost model).
 -- CSVs: canvas_still_ and canvas_pan_<lens>_rung<k>.csv; captures: screenshots/canvas_<lens>_rung<k>.png
 
-local kMinZoom = 1.2531328  -- body_surface_canvas.cpp kMinZoom (~1.253)
+local kMinZoom = 1.06875  -- body_surface_canvas.cpp kMinZoom (1.06875)
 
 local function poll(pred, limit)
     for i = 1, limit or 20000 do

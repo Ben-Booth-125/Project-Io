@@ -47,7 +47,7 @@ local function near_centre(x, y, radius)
     return nil
 end
 
-local kMinZoom = 1.2531328 -- body_surface_canvas.cpp kMinZoom
+local kMinZoom = 1.06875 -- body_surface_canvas.cpp kMinZoom
 local framings = {
     { name = "city_roads", col = 103, row = 72, city = { 103, 72 } },
     { name = "lane_port",  col = 111, row = 91, city = { 110, 92 } },

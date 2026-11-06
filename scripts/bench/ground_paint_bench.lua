@@ -16,7 +16,7 @@ verify.window(1720, 1080)
 verify.goto_surface("home")
 verify.set_overlay("none")
 -- The top rung first, so the frame below bakes only a handful of chunks.
-verify.set_zoom(20)
+verify.set_zoom(17.1)
 verify.frames(2)
 local r = verify.ground_paint_bench(3)
 print(string.format("GROUND_PAINT_BENCH ok=%s first bake %.1f s, re-bake %.1f s (%d of %d chunks moved; %d installations dropped)",

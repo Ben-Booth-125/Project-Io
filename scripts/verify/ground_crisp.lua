@@ -18,7 +18,7 @@
 -- Run: ProjectIo --verify scripts/verify/ground_crisp.lua (Release: the home
 -- master pre-bakes on the pool before the first capture).
 
-local kMinZoom = 1.2531328  -- body_surface_canvas.cpp kMinZoom (~1.253)
+local kMinZoom = 1.06875  -- body_surface_canvas.cpp kMinZoom (1.06875)
 
 verify.window(1720, 1080)
 verify.clear_selection()
