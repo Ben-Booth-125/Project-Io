@@ -2294,12 +2294,12 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     if (m_screen != app_screen::in_game)
         return;
 
-    // Esc reaches the escape menu (BL-070, BL-1519) — keyboard parity with the gear.
+    // Esc closes what is open in a queue, Menu then Ledger then Selection, and with
+    // nothing open reaches the escape menu (BL-1520; SELECTION.md § Layout & chrome).
     // Handled before the ImGui keyboard guard so it works even while a panel holds
-    // focus. Precedence, highest first: an armed exit warning backs out; an open
-    // escape menu closes; an open fold overlay folds up (BL-214); otherwise the menu
-    // opens. The Selection band never hides (BL-266) — its former hide rung is gone,
-    // so the escape menu is the terminal rung.
+    // focus. One press, one rung: exit warning; escape menu; declaration; drill; fold
+    // overlay (BL-214); an armed tool; the ledger; the selection, back to the resting
+    // nation; then the menu. The band itself never hides (BL-266).
     //
     // The fold rung is a deliberate departure from BL-214's Decision 10, which kept
     // depth off this ladder. That decision reasoned about an in-place stepper, where
@@ -2318,6 +2318,14 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
             m_ui.corp_rollup_drill = -1;                      // back to the roll-up (BL-248)
         else if (ui::any_expanded(m_ui))
             ui::fold(m_ui);                                   // fold the full-screen overlay
+        else if (m_ui.construction.road_arm_tile != null_entity)
+            m_ui.construction.road_arm_tile = null_entity;    // an armed tool disarms before its ledger goes
+        else if (m_ui.pending_march_unit != null_entity)
+            m_ui.pending_march_unit = null_entity;
+        else if (ui::any_panel_open(m_ui))
+            ui::close_all_panels(m_ui);                       // the Ledger rung
+        else if (ui::any_selection(m_ui))
+            ui::clear_selection_to_resting(m_ui);             // the Selection rung: the band rests on the nation
         else
             m_ui.show_system_menu = true;                     // terminal rung (BL-266): the band never hides
         sync_escape_menu_pause();

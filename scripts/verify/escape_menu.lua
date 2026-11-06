@@ -1,9 +1,10 @@
--- BL-1519 (escape menu): the session menu, through its
+-- BL-1519 (escape menu) and BL-1520 (escape queue): the session menu, through its
 -- real presses.
 --
 -- Esc and the gear open it and stop the clock; closing it restores the remembered
 -- speed, and a clock already stopped stays stopped. Exit to Menu warns, drops the
--- campaign to the main menu, and Load opens the save again, twice over.
+-- campaign to the main menu, and Load opens the save again, twice over. The Esc queue
+-- closes Menu, then Ledger, then Selection, one press a rung.
 --
 -- Run:     ProjectIo --verify scripts/verify/escape_menu.lua
 -- Writes:  a quicksave beside the exe. Captures: esc_*.png.
@@ -95,6 +96,30 @@ for round = 1, 2 do
     verify.econ_step(1)
     verify.capture("esc_07_stepped_" .. round)
 end
+
+-- 6. The queue (BL-1520): Menu, then Ledger, then Selection, one press a rung.
+verify.select_tile(70, 38)
+verify.show_panel("balance", true)
+verify.capture("esc_frame")
+verify.press_escape()                                   -- nothing on the menu rung: the ledger
+verify.capture("esc_08_queue_ledger")
+local q = verify.escape_queue()
+check(not q.ledger and q.selection and not verify.escape_menu().open, "Esc closes the ledger, the selection stands")
+verify.press_escape()
+verify.capture("esc_09_queue_selection")
+q = verify.escape_queue()
+check(not q.selection and not verify.escape_menu().open, "Esc clears the selection to the resting nation")
+verify.press_escape()
+verify.capture("esc_frame")
+check(verify.escape_menu().open, "with nothing open, Esc opens the menu")
+verify.show_panel("balance", true)
+verify.select_tile(70, 38)
+verify.capture("esc_frame")
+verify.press_escape()
+verify.capture("esc_frame")
+q = verify.escape_queue()
+check(not verify.escape_menu().open and q.ledger and q.selection, "the menu closes first, ledger and selection standing")
+verify.show_panel("balance", false)
 
 if failed > 0 then error("escape_menu: " .. failed .. " failed") end
 print("escape_menu: OK")

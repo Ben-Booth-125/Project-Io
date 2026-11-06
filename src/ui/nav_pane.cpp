@@ -75,6 +75,26 @@ void close_all_panels(ui_state& state)
     state.show_tech_tree         = false;
 }
 
+bool any_selection(const ui_state& state)
+{
+    return state.selected_entity != null_entity || state.selected_province != 0u
+        || state.has_battle_selection() || state.has_front_selection()
+        || state.has_deposit_selection() || state.has_plate_selection()
+        || state.selection_unit_group;
+}
+
+void clear_selection_to_resting(ui_state& state)
+{
+    state.selected_entity      = null_entity;
+    state.selected_province    = 0u;
+    state.province_sync_entity = null_entity;
+    state.selection_cycle_tile = null_entity;
+    state.selection_unit_group = false;
+    state.clear_battle_selection();
+    state.clear_front_selection();
+    state.clear_lens_region_selection();
+}
+
 bool any_panel_open(const ui_state& state)
 {
     return state.show_corporation_panel ||

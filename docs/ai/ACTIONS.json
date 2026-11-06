@@ -1799,8 +1799,8 @@
     "App is in game. On the main menu and the wizard, Esc does nothing (the key handler returns before Esc handling on those screens).",
     "Works even while an ImGui panel holds keyboard focus — Esc is handled before the ImGui keyboard guard."
    ],
-   "expected_output": "Exactly one rung of this precedence ladder fires, highest first: (1) an armed exit-confirm backs out (Really quit? disarms); (2) an open system menu closes; (3) if the sticky selection card is open and has a drill stack, one drill level unwinds; (4) if the corporation roll-up is drilled into a constituent, it returns to the roll-up; (5) if a fold overlay is expanded full-screen, it folds up; (6) an open sticky card hides (hidden for this selection, not destroyed); (7) otherwise the system menu opens. One press never does two of these — e.g. Esc reaches the menu only once the card is fully closed.",
-   "reason_to_select": "The universal step-out key: back out of a confirmation, close the menu, unwind a drill, fold an overlay, dismiss the card — or, with nothing open, reach the session menu."
+   "expected_output": "Exactly one rung fires, highest first (SELECTION.md § Layout & chrome): (1) an exit warning backs out; (2) an open escape menu closes, restoring the remembered speed; (3) an open declaration backs out; (4) a drilled roll-up returns to the roll-up; (5) a full-canvas overlay folds up; (6) an armed tool disarms (a road's two presses, a march awaiting its tile); (7) the open ledger closes; (8) the Selection clears to the resting nation; (9) with nothing open, the escape menu opens and pauses. One press never does two of these.",
+   "reason_to_select": "The universal step-out key: close the Menu, then the Ledger, then the Selection, one press at a time - or, with nothing open, reach the escape menu."
   },
   {
    "id": "chrome.f10_options",

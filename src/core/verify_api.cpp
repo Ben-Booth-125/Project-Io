@@ -3614,6 +3614,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         return out;
     });
+    // BL-1520: what the Esc queue has still to close.
+    v.set_function("escape_queue", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["ledger"]    = ui::any_panel_open(m_ui);
+        out["selection"] = ui::any_selection(m_ui);
+        return out;
+    });
     v.set_function("set_speed", [this](int speed) {
         m_prev_speed = speed > 0 ? speed : m_prev_speed;
         m_sim_loop.set_speed(speed);

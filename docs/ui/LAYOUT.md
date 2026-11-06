@@ -413,7 +413,7 @@ A few cross-cutting notes:
 
 Beyond the persistent chrome, the UI uses **transient popup elements** — context menus, confirmation dialogs, hover cards, and action prompts that appear in response to a click or hover and dismiss on action or click-away. Examples: right-clicking a unit for an order menu, a "confirm purchase" dialog.
 
-The **hover card** is the glance-then-stick card on the Planetary surface, framed by `draw_hover_card` (`src/ui/hover_card.cpp`) with lens-keyed content from `hover_content.cpp` — [`TOOLTIP.md`](TOOLTIP.md) is its spec. The system menu and its inline exit-confirm, and the confirm popups on Dismantle and Withdraw (SELECTION.md), are the popup dialogs. Context menus float above every region without belonging to any one of them, which the layout accounts for.
+The **hover card** is the glance-then-stick card on the Planetary surface, framed by `draw_hover_card` (`src/ui/hover_card.cpp`) with lens-keyed content from `hover_content.cpp` — [`TOOLTIP.md`](TOOLTIP.md) is its spec. The confirm popups on Dismantle and Withdraw (SELECTION.md), are the popup dialogs. Context menus float above every region without belonging to any one of them, which the layout accounts for.
 
 ---
 
