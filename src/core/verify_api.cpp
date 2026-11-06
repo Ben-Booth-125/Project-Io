@@ -3616,6 +3616,13 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         }
         return out;
     });
+    // BL-1495: draw this run at a UI scale. No argument: the shipped constant, so a
+    // check never restates the number. Verify otherwise runs at 1, the tightest layout.
+    v.set_function("ui_draw_scale", [this](sol::optional<float> s) {
+        m_ui_draw_scale = s.value_or(shipped_ui_draw_scale());
+        apply_ui_scale();
+    });
+
     // BL-1515: the alert strip as drawn: each alert's words and press. All on screen.
     v.set_function("alerts", [this](sol::this_state ts) {
         sol::state_view lua(ts);

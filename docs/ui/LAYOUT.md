@@ -172,6 +172,20 @@ under 8 quarters (`HEADER.md` § Contents).
 
 ---
 
+## UI scale (Ben, 2026-11-05)
+
+The whole UI draws smaller than the pixels it is laid out in, so **each element is smaller** and
+text stops clipping: text, hard-coded chrome, the canvases and hit-testing all move together, by one
+constant (`k_ui_draw_scale`, `src/core/app.cpp`). A window lays out at its size divided by that
+constant, so the 1280 x 720 floor gains room as well as shrinking. Glyphs are rasterised at the size
+they land on screen, so the text stays sharp. The Options window's UI Scale steps grow the font on
+top of this; they do not move it.
+
+A layout checked at a draw scale of 1 is therefore the tightest case: the headless harness runs
+there unless a script asks otherwise, and whatever fits at 1 fits below it.
+
+---
+
 ## Canvas area — centre
 **Spec: `CANVASES.md`**
 

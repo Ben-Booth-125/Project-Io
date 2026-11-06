@@ -2986,7 +2986,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - Options window open.
 
-**Expected output.** UI scale applies live and persists to options.cfg immediately.
+**Expected output.** UI scale applies live and persists to options.cfg immediately. These steps grow the font on top of the UI draw scale (LAYOUT.md § UI scale), which is one constant and has no control.
 
 **Reason to select.** To make the interface legible on dense or high-DPI displays.
 

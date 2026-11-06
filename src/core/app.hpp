@@ -556,8 +556,21 @@ private:
     void save_settings() const;
     /// Apply m_settings to the live SDL window + renderer (size, fullscreen, vsync).
     void apply_display_settings();
-    /// Re-load the UI font atlas at the size for m_settings.ui_scale_step (BL-063).
+    /// Re-load the UI font atlas at the size for m_settings.ui_scale_step (BL-063) and
+    /// the density for m_ui_draw_scale (BL-1495).
     void apply_ui_scale();
+    /// The UI's draw scale (BL-1495; LAYOUT.md § UI scale): every UI pixel lands on this
+    /// many screen pixels. Set to the shipped constant on the interactive path only;
+    /// --verify stays at 1, the tightest layout, unless a script asks (verify.ui_draw_scale).
+    float m_ui_draw_scale = 1.0f;
+    /// Turn this frame's OS window size and pointer events into UI pixels. Between the
+    /// SDL backend's NewFrame and ImGui's, before the harness's injected pointer, which
+    /// is in UI pixels already.
+    void apply_ui_draw_scale_to_frame();
+    /// Draw ImGui's frame through the draw scale.
+    void render_imgui_scaled();
+    /// The constant the interactive path draws at.
+    static float shipped_ui_draw_scale();
 
     /// How many rounds the New World wizard walks (BL-167, extended to five by
     /// BL-816 and to SIX by BL-860). Declared here rather than beside the wizard

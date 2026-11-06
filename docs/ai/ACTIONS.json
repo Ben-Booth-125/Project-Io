@@ -2037,7 +2037,7 @@
    "preconditions": [
     "Options window open."
    ],
-   "expected_output": "UI scale applies live and persists to options.cfg immediately.",
+   "expected_output": "UI scale applies live and persists to options.cfg immediately. These steps grow the font on top of the UI draw scale (LAYOUT.md § UI scale), which is one constant and has no control.",
    "reason_to_select": "To make the interface legible on dense or high-DPI displays."
   },
   {

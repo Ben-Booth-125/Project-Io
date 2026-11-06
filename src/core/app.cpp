@@ -6,6 +6,7 @@
 #include "session_history.hpp" // step_economy's post-step presentation (BL-361)
 
 #include <imgui.h>
+#include <imgui_internal.h> // BL-1495: the queued pointer events the draw scale rewrites
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <SDL3/SDL.h>
@@ -281,12 +282,44 @@ app::app()
 
 namespace {
 constexpr std::array<float, 3> k_ui_scale_px = {16.0f, 20.0f, 24.0f}; ///< BL-063 steps: 1.0 / 1.25 / 1.5 of the 16px base.
+
+/// THE UI SCALE (BL-1495; LAYOUT.md § UI scale; Ben's number to weigh in on). The one
+/// constant: every element, its text and its hard-coded px together, draws at this
+/// share of its size. A 1280 x 720 window lays out as 1463 x 823 UI pixels, and the 16 px
+/// base font lands as 14 screen pixels. Canvases and chrome scale alike.
+constexpr float k_ui_draw_scale = 0.875f;
 } // namespace
+
+float app::shipped_ui_draw_scale() { return k_ui_draw_scale; }
+
+void app::apply_ui_draw_scale_to_frame()
+{
+    if (m_ui_draw_scale == 1.0f)
+        return;
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = {io.DisplaySize.x / m_ui_draw_scale, io.DisplaySize.y / m_ui_draw_scale};
+    // The SDL backend queues the pointer in window pixels, and it has no scale to ask.
+    for (ImGuiInputEvent& e : ImGui::GetCurrentContext()->InputEventsQueue)
+        if (e.Type == ImGuiInputEventType_MousePos && e.MousePos.PosX > -FLT_MAX)
+        {
+            e.MousePos.PosX /= m_ui_draw_scale;
+            e.MousePos.PosY /= m_ui_draw_scale;
+        }
+}
+
+void app::render_imgui_scaled()
+{
+    // The backend defers to a render scale already set, and SDL scales the geometry and
+    // the clip rects with it. Back to 1 straight after: a capture reads whole pixels.
+    SDL_SetRenderScale(m_renderer, m_ui_draw_scale, m_ui_draw_scale);
+    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+    SDL_SetRenderScale(m_renderer, 1.0f, 1.0f);
+}
 
 void app::apply_ui_scale()
 {
     const int step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
-    ui::reload_ui_font(k_ui_scale_px[static_cast<std::size_t>(step)]);
+    ui::reload_ui_font(k_ui_scale_px[static_cast<std::size_t>(step)], m_ui_draw_scale);
     ImGui_ImplSDLRenderer3_DestroyFontsTexture();
 
     // The display floor scales with the font (BL-215): BL-063 grows the atlas
@@ -384,6 +417,7 @@ int app::run(autostart_mode autostart)
     // never touches settings, keeping golden captures at the fixed default size.
     load_settings();
     apply_display_settings();
+    m_ui_draw_scale = k_ui_draw_scale; // BL-1495: interactive only, like the settings above
     apply_ui_scale();
 
     m_lua.load("scripts/init.lua");
@@ -2679,6 +2713,7 @@ void app::render()
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
+    apply_ui_draw_scale_to_frame(); // BL-1495: the frame in UI pixels from here on
     // BL-521: synthetic pointer input, queued LAST so it outranks whatever the SDL
     // backend fed from the OS cursor above (ImGui applies queued events in order,
     // last write wins). A no-op outside the verify harness — see app.hpp
@@ -2719,7 +2754,7 @@ void app::render()
         ImGui::Render();
         SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
         SDL_RenderClear(m_renderer);
-        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+        render_imgui_scaled();
         s_frame_stats.mark_submit_end(*ImGui::GetDrawData());
         if (m_capture_requested)
         {
@@ -4056,7 +4091,7 @@ void app::render()
     ImGui::Render();
     SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
     SDL_RenderClear(m_renderer);
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+    render_imgui_scaled();
     s_frame_stats.mark_submit_end(*ImGui::GetDrawData());
 
     // Capture before present so the screenshot is the exact composited frame.
