@@ -90,6 +90,7 @@ void clear_selection_to_resting(ui_state& state)
     state.province_sync_entity = null_entity;
     state.selection_cycle_tile = null_entity;
     state.selection_unit_group = false;
+    state.selected_units.clear();
     state.clear_battle_selection();
     state.clear_front_selection();
     state.clear_lens_region_selection();
