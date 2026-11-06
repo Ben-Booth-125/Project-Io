@@ -445,8 +445,16 @@ struct diplomacy_ledger_state
 {
     /// 0 = Nations (default), 1 = Wars.
     int       view = 0;
-    /// The nation whose row is expanded in place, or null. A toggle per row.
+    /// The nation the Nations view has chosen in its selector (BL-1511; diplomacy.md § 1).
+    /// Null only until the view first draws, which then takes the selector's first nation.
     entity_id expanded = null_entity;
+    /// Whether the Nations view was open last frame: the edge that arms and disarms the
+    /// Nations lens (diplomacy.md § 3), on every route that opens or closes it.
+    bool      nations_view_was_open = false;
+    /// The selector as drawn, for verify: its centre, and each item of its open list.
+    float     combo_x = -1.0f, combo_y = -1.0f;
+    struct combo_item { entity_id nation = null_entity; float x = 0.0f, y = 0.0f; };
+    std::vector<combo_item> combo_items;
     /// One-shot scroll requests: bring a just-expanded row's head, or a just-opened
     /// declaration's head, to the top of the column so its content is not below
     /// the fold. Consumed when drawn.
@@ -524,7 +532,7 @@ struct diplomacy_ledger_state
     struct drawn_row
     {
         entity_id nation = null_entity;
-        float x = -1.0f, y = -1.0f;   ///< The row's expander.
+        float x = -1.0f, y = -1.0f;   ///< Retired with the row's expander (BL-1511): always absent.
         bool  expanded = false;
         bool  hostile_out = false, hostile_in = false, friends = false, at_war = false, truce = false;
         float access = 0.0f, trust = 0.0f, alarm = 0.0f; ///< Their sentiment toward the player.

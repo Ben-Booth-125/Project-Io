@@ -8719,6 +8719,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     close_all_panels(state);
                     state.show_market_ledger = true;
                 }
+                // BL-1511 (LENSES.md § The Nations lens): under that lens a press on a
+                // nation also navigates the Diplomacy ledger to it, opening it if closed.
+                if (struct_kind == structure_kind::nation && state.overlay == overlay_mode::nations)
+                    navigate_diplomacy_to(w, state, structure_hit);
                 // BL-1406: the corporation and company destinations (the stance
                 // table, the Acquisitions ledger) retired with the firms.
             }

@@ -474,26 +474,6 @@ void chip(const char* text, ImU32 colour)
 
 /// The row expander (DRILL_THROUGH.md: ⌄ becomes ⌃ while open), right-aligned so
 /// every row's control sits in one column. Returns true when pressed.
-bool expander(bool open, float& cx, float& cy)
-{
-    const float h     = ImGui::GetFrameHeight();
-    const float right = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x;
-    ImGui::SameLine(right - h);
-    const bool clicked = ImGui::InvisibleButton("##expand", {h, h});
-    const bool hot     = ImGui::IsItemHovered();
-    const ImVec2 mn    = ImGui::GetItemRectMin();
-    cx = mn.x + h * 0.5f;
-    cy = mn.y + h * 0.5f;
-    const float r  = h * 0.28f;
-    const ImU32 c  = hot ? palette::hover : palette::text_secondary;
-    ImDrawList* dl = ImGui::GetWindowDrawList();
-    if (open) dl->AddTriangleFilled({cx - r, cy + r * 0.5f}, {cx + r, cy + r * 0.5f}, {cx, cy - r * 0.6f}, c);
-    else      dl->AddTriangleFilled({cx - r, cy - r * 0.5f}, {cx + r, cy - r * 0.5f}, {cx, cy + r * 0.6f}, c);
-    if (hot)
-        ImGui::SetTooltip(open ? "Collapse" : "Expand here");
-    return clicked;
-}
-
 /// A press that may be disabled; its reason is the tooltip (never ledger text —
 /// the Military ledger's rule, Ben 2026-10-30). Publishes it for verify.
 bool press(diplomacy_ledger_state& d, const char* label, const char* kind, entity_id nation,
@@ -1014,40 +994,73 @@ void draw_nations(const world& w, const recipe_registry& reg, const std::vector<
     });
 
     if (rows.empty())
-        ImGui::TextDisabled("No other nation holds ground.");
-
-    for (const nation_row& r : rows)
     {
-        ImGui::PushID(static_cast<int>(r.id));
-        const bool open = d.expanded == r.id;
-        if (open && d.scroll_to_row)
-        {
-            // A just-expanded row's head to the column top — unless it already
-            // sits in the top third, where its content has room (the first row
-            // would otherwise scroll the tab strip away for nothing).
-            const float y = ImGui::GetCursorScreenPos().y, top = ImGui::GetWindowPos().y;
-            if (y < top || y > top + ImGui::GetWindowHeight() * 0.35f)
-                ImGui::SetScrollHereY(0.0f);
-            d.scroll_to_row = false;
-        }
+        ImGui::TextDisabled("No other nation holds ground.");
+        return;
+    }
 
-        // Name, then the chips: you -> them, them -> you.
+    // Every nation publishes its sentiment for verify; the chosen one draws.
+    const auto chosen = std::find_if(rows.begin(), rows.end(),
+                                     [&](const nation_row& r) { return r.id == d.expanded; });
+    if (chosen == rows.end())
+        d.expanded = rows.front().id;
+    const nation_row& cur = chosen == rows.end() ? rows.front() : *chosen;
+
+    // THE SELECTOR (BL-1511; diplomacy.md § 1): a cross-cutting selector, so exempt from the
+    // toggle rule. It switches its target and has nothing to undo. Lists hostile first,
+    // then by Alarm toward you (above); each entry names its stance.
+    const auto stance_word = [](const nation_row& r) -> const char* {
+        return r.at_war ? "At war" : r.truce ? "Truce"
+             : (r.hostile_out || r.hostile_in) ? "Hostile"
+             : r.friends ? "Friend" : "";
+    };
+    if (d.scroll_to_row)
+    {
+        ImGui::SetScrollHereY(0.0f);
+        d.scroll_to_row = false;
+    }
+    d.combo_items.clear();
+    ImGui::SetNextItemWidth(-1.0f);
+    const bool combo_open = ImGui::BeginCombo("##diplomacy_nation", name_of(w, cur.id));
+    d.combo_x = (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f;
+    d.combo_y = (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f;
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Choose a nation, or press one on the map under the Nations lens.");
+    if (combo_open)
+    {
+        for (const nation_row& r : rows)
+        {
+            ImGui::PushID(static_cast<int>(r.id));
+            const ImVec2 sw = ImGui::GetCursorScreenPos();
+            const float  th = ImGui::GetTextLineHeight();
+            char label[96];
+            const char* word = stance_word(r);
+            std::snprintf(label, sizeof label, word[0] != '\0' ? "   %s  (%s)" : "   %s", name_of(w, r.id), word);
+            if (ImGui::Selectable(label, r.id == cur.id))
+            {
+                d.expanded = r.id;
+                d.scroll_to_row = true;
+            }
+            d.combo_items.push_back({r.id,
+                                     (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                                     (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
+            ImGui::GetWindowDrawList()->AddRectFilled({sw.x, sw.y + 2.0f}, {sw.x + 6.0f, sw.y + th - 2.0f},
+                                                      palette::nation_colour(r.id));
+            ImGui::PopID();
+        }
+        ImGui::EndCombo();
+    }
+
+    // The chosen nation: its swatch and chips, its sentiment toward you, then its detail.
+    ImGui::PushID(static_cast<int>(cur.id));
+    {
+        const nation_row& r = cur;
         const ImVec2 sw = ImGui::GetCursorScreenPos();
         const float  th = ImGui::GetTextLineHeight();
         ImGui::GetWindowDrawList()->AddRectFilled({sw.x, sw.y + 2.0f}, {sw.x + 4.0f, sw.y + th - 2.0f},
                                                   palette::nation_colour(r.id));
         ImGui::Dummy({6.0f, th});
         ImGui::SameLine();
-        ImGui::TextUnformatted(name_of(w, r.id));
-        float ex = -1.0f, ey = -1.0f;
-        if (expander(open, ex, ey))
-        {
-            d.expanded = open ? null_entity : r.id;
-            d.scroll_to_row = !open;
-            if (open && d.declare_target == r.id && !d.declare_answer)
-                close_declaration(s); // folding the row leaves no trace of its declaration
-        }
-
         if (r.at_war)             { chip("At war", palette::front_hostile); ImGui::SameLine(); }
         else if (r.truce)         { chip("Truce", palette::front_neutral); ImGui::SameLine(); }
         ImGui::TextDisabled("you:");
@@ -1069,15 +1082,18 @@ void draw_nations(const world& w, const recipe_registry& reg, const std::vector<
         std::string access_cause;
         sentiment_block(w, d, sp, r.id, me, war_context(w, r.id, me), &access_at, &access_cause);
 
-        d.rows.push_back({r.id, ex, ey, open, r.hostile_out, r.hostile_in, r.friends, r.at_war, r.truce,
-                          r.toward_me.access, r.toward_me.trust, r.toward_me.alarm,
-                          access_at.x, access_at.y, access_cause});
+        for (const nation_row& each : rows)
+        {
+            const bool is_cur = each.id == r.id;
+            d.rows.push_back({each.id, -1.0f, -1.0f, is_cur, each.hostile_out, each.hostile_in, each.friends,
+                              each.at_war, each.truce, each.toward_me.access, each.toward_me.trust,
+                              each.toward_me.alarm, is_cur ? access_at.x : -1.0f, is_cur ? access_at.y : -1.0f,
+                              is_cur ? access_cause : std::string{}});
+        }
 
-        if (open)
-            draw_expanded(w, reg, standings, s, r, me);
-        ImGui::Separator();
-        ImGui::PopID();
+        draw_expanded(w, reg, standings, s, r, me);
     }
+    ImGui::PopID();
 }
 
 // ── Wars ────────────────────────────────────────────────────────────────────
@@ -1339,6 +1355,21 @@ void drop_orphan_declaration(const world& w, ui_state& s)
 
 } // namespace
 
+void navigate_diplomacy_to(const world& w, ui_state& s, entity_id nation)
+{
+    if (nation == me_of(w) || w.nations.count(nation) == 0
+        || s.diplomacy.declare_target != null_entity)
+        return;
+    if (!s.show_diplomacy_ledger)
+    {
+        close_all_panels(s);
+        s.show_diplomacy_ledger = true;
+    }
+    s.diplomacy.view          = 0;
+    s.diplomacy.expanded      = nation;
+    s.diplomacy.scroll_to_row = true;
+}
+
 void reset_diplomacy_ui(ui_state& s)
 {
     s.diplomacy = diplomacy_ledger_state{};
@@ -1395,7 +1426,22 @@ void draw_diplomacy_ledger(const world& w, const recipe_registry& reg, const eco
     diplomacy_ledger_state& d = s.diplomacy;
     sample_history(w, d); // every frame, open or not: the window fills before it is read
     d.tab_x[0] = d.tab_x[1] = d.tab_y[0] = d.tab_y[1] = -1.0f;
+    d.combo_x = d.combo_y = -1.0f;
     d.rows.clear();
+    // THE PAIRED LENS (BL-1511; diplomacy.md § 3): the Nations view arms the Nations lens
+    // when it opens, and disarms it when it closes, by the ledger or by the Wars tab. On
+    // the edge, so every route is covered and a lens the player picks meanwhile stands.
+    {
+        const bool nations_open = open && d.view == 0;
+        if (nations_open != d.nations_view_was_open)
+        {
+            if (nations_open)
+                s.overlay = overlay_mode::nations;
+            else if (s.overlay == overlay_mode::nations)
+                s.overlay = overlay_mode::none;
+            d.nations_view_was_open = nations_open;
+        }
+    }
     d.presses.clear();
     d.decl_goals = d.decl_candidates = d.decl_observers = 0;
     d.decl_valid = d.decl_justified = false;

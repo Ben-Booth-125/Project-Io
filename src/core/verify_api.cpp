@@ -3114,6 +3114,21 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["wars"]           = static_cast<int>(m_world.wars.size());
         out["message"]        = d.message;
         out["peace_with"]     = static_cast<unsigned>(d.peace_with);
+        // BL-1511: the selector as drawn, and its open list's items.
+        out["combo_x"] = d.combo_x;
+        out["combo_y"] = d.combo_y;
+        {
+            sol::table items = st.create_table();
+            int ci = 0;
+            for (const auto& it : d.combo_items)
+            {
+                sol::table e = st.create_table();
+                e["nation"] = static_cast<unsigned>(it.nation);
+                e["x"] = it.x; e["y"] = it.y;
+                items[++ci] = e;
+            }
+            out["combo_items"] = items;
+        }
         sol::table rows = st.create_table();
         int k = 0;
         for (const auto& r : d.rows)

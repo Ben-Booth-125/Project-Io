@@ -496,9 +496,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Rarely: a bare hostility with no war and no goals. To fight for ground, declare war instead (gameplay.declare_war), which carries goals, a score and a peace.
 
-### `gameplay.offer_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Offer friendship' press (ledger.diplomacy_offer_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
+### `gameplay.offer_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Offer friendship' press (ledger.diplomacy_offer_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
 
-**Press.** Expand a nation's row in the Diplomacy ledger and press 'Offer friendship'.
+**Press.** Choose a nation in the Diplomacy ledger and press 'Offer friendship'.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -513,7 +513,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Court a nation: an accepted friendship raises Access and Trust each way (friendship_accepted) and lowers Alarm.
 
-### `gameplay.accept_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Accept friendship' press, shown when that nation has offered (ledger.diplomacy_accept_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
+### `gameplay.accept_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Accept friendship' press, shown when that nation has offered (ledger.diplomacy_accept_friendship). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
 
 **Press.** Expand the row of a nation whose them-chip reads 'Offer pending' and press 'Accept friendship'.
 
@@ -528,7 +528,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Take a friendship offered: Access and Trust rise each way and Alarm falls.
 
-### `gameplay.return_to_neutral` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Withdraw' press, shown while a friendship or the player's own offer stands (ledger.diplomacy_withdraw). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
+### `gameplay.return_to_neutral` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Withdraw' press, shown while a friendship or the player's own offer stands (ledger.diplomacy_withdraw). In-app only: Over the command seam (--serve COMMAND, the MCP server) the verb is not in the wire allow-list and is refused (rejected_invalid) before the seam, mutating nothing.
 
 **Press.** Expand the row of a nation you are friends with, or have offered friendship to, and press 'Withdraw'.
 
@@ -1000,7 +1000,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** The war is won outright: dictate the terms.
 
-### `gameplay.set_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117).
+### `gameplay.set_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's Embargo / Lift toggle (ledger.diplomacy_embargo). A corp_verb (corp_verb::set_embargo, 53) on the command seam; a rival nation's scorer issues the same verb for itself (score_nation_embargo; AI_OPPONENT.md § 11, Ben 2026-11-03, NR-1117).
 
 **Press.** UI: expand a nation's row and press 'Embargo' (or 'Lift' while one stands). Over the seam: COMMAND corp=<nation> nation=<nation> verb=53 counterparty=<nation> order=<0|1>.
 
@@ -2608,7 +2608,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - In-game
 
-**Expected output.** Toggles the Diplomacy ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Nations (default) and Wars; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change (ledger.diplomacy_tab). NATIONS: one folded row per nation holding ground, hostile first then by Alarm toward you - its colour swatch and name, an 'At war' or 'Truce' chip, the stance chips you -> them (Hostile, Friend, Offer sent, Neutral) and them -> you (Hostile, Friend, Offer pending, Neutral), and its Access, Trust and Alarm toward you as signed bars over [-100, 100] with the figure and a trend arrow over the last four ticks (green when the move is good for you; Alarm's bar is amber above zero). Hovering a bar shows the value, its band (adverse, wary, neutral, favourable, trusted), the four-tick change, its largest cause - the conduct with the largest decayed share of that value on its side, e.g. 'Largest cause: trade (+12.0)' - and, while the row still carries an inherited grudge, the war that seeded it with its region and year ('Seeded by an old war: the seat sacked at <region>, 1196 CE'; RELATIONS.md § Where a grudge lands), then the war that links the pair, if any (the open war, else the last one). A row's expander opens it in place (ledger.diplomacy_expand_row). Closing the ledger by any path closes an open declaration without effect. Explanation is a tooltip: a disabled press says why on hover.
+**Expected output.** Toggles the Diplomacy ledger open in the fold-out column; re-click closes; opening closes any other ledger. Opening on Nations arms the Nations lens, and closing the ledger, or leaving Nations for Wars, disarms it if it is still armed; a lens the player chose meanwhile stands. The lens paints only on the Planetary canvas: on Solar or Circumplanetary it stays armed and paints when the player descends. Two tabs, Nations (default) and Wars; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change (ledger.diplomacy_tab). NATIONS: a dropdown of the nations holding ground, hostile first then by Alarm toward you (ledger.diplomacy_choose_nation), with the chosen nation below it - its colour swatch, an 'At war' or 'Truce' chip, the stance chips you -> them (Hostile, Friend, Offer sent, Neutral) and them -> you (Hostile, Friend, Offer pending, Neutral), and its Access, Trust and Alarm toward you as signed bars over [-100, 100] with the figure and a trend arrow over the last four ticks (green when the move is good for you; Alarm's bar is amber above zero). Hovering a bar shows the value, its band (adverse, wary, neutral, favourable, trusted), the four-tick change, its largest cause - the conduct with the largest decayed share of that value on its side, e.g. 'Largest cause: trade (+12.0)' - and, while the nation still carries an inherited grudge, the war that seeded it with its region and year ('Seeded by an old war: the seat sacked at <region>, 1196 CE'; RELATIONS.md § Where a grudge lands), then the war that links the pair, if any (the open war, else the last one). Its detail and presses follow (ledger.diplomacy_choose_nation). Closing the ledger by any path closes an open declaration without effect. Explanation is a tooltip: a disabled press says why on hover.
 
 **Reason to select.** Answers 'who could I fight, who might fight me, and what would it cost?'. Read it before declaring war, and to see who is alarmed by you.
 
@@ -2627,24 +2627,25 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Wars answers 'who is fighting whom, and how is each war going?'; Nations is the default.
 
-### `ledger.diplomacy_expand_row` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, a row's expander at its right edge (a down caret, an up caret while open).
+### `ledger.diplomacy_choose_nation` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the nation dropdown at the head of the view. A cross-cutting selector, exempt from the toggle rule. A press on a nation under the Nations lens makes the same choice.
 
-**Press.** Click a nation row's expander.
+**Press.** Open the dropdown and click a nation. Or, with the Nations lens active, click a nation's ground or border on the Planetary canvas: this opens the ledger on Nations if it is closed.
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `nation` | `entity_id (nation)` | The row. |
+| `nation` | `entity_id (nation)` | The nation chosen. |
 
 **Valid when:**
-- The Diplomacy ledger is open on Nations.
+- For the dropdown, the Diplomacy ledger is open on Nations.
+- For the canvas press, the Nations lens is active, the nation is not the player's own (that press only selects it), and no declaration is open (a press on a goal province is its pick, and any other leaves the ledger where it is).
 
-**Expected output.** Toggles the row open in place (one row at a time; re-press folds it, and folding a row closes its declaration without effect). Expanded: your Access / Trust / Alarm toward them (the same bars); Power - their reach (bodies with a building), market share and GDP a year beside yours (public figures; a rival's treasury is never shown); front strength - the summed unit strength each side stands on the fronts you share, or 'no border'; trade exposure - the share of your imports landed from them and of your exports landed to them over the last four ticks this session watched ('No ticks watched yet' before two samples); the friendship press (ledger.diplomacy_offer_friendship, ledger.diplomacy_withdraw or ledger.diplomacy_accept_friendship); the Embargo press (ledger.diplomacy_embargo); and Declare war (ledger.diplomacy_declare_open) - or, at war, the war score from your side with 'Offer peace', which opens the Wars tab's composer for that war.
+**Expected output.** Shows the chosen nation (choosing another closes an open declaration on the last one without effect): your Access / Trust / Alarm toward them (the same bars); Power - their reach (bodies with a building), market share and GDP a year beside yours (public figures; a rival's treasury is never shown); front strength - the summed unit strength each side stands on the fronts you share, or 'no border'; trade exposure - the share of your imports landed from them and of your exports landed to them over the last four ticks this session watched ('No ticks watched yet' before two samples); the friendship press (ledger.diplomacy_offer_friendship, ledger.diplomacy_withdraw or ledger.diplomacy_accept_friendship); the Embargo press (ledger.diplomacy_embargo); and Declare war (ledger.diplomacy_declare_open) - or, at war, the war score from your side with 'Offer peace', which opens the Wars tab's composer for that war.
 
 **Reason to select.** Weigh a nation before acting on it: how it feels about you and you about it, what you would face, and what a war would cut.
 
-### `ledger.diplomacy_declare_open` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Declare war' press. The canvas right-click attack on a nation the player is not hostile to opens the same declaration (canvas.unit_right_click_attack).
+### `ledger.diplomacy_declare_open` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Declare war' press. The canvas right-click attack on a nation the player is not hostile to opens the same declaration (canvas.unit_right_click_attack).
 
-**Press.** Expand a nation's row and press 'Declare war'.
+**Press.** Choose a nation and press 'Declare war'.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -2686,7 +2687,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Back out of a declaration.
 
-### `ledger.diplomacy_offer_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Offer friendship' press (neither friends nor an offer either way).
+### `ledger.diplomacy_offer_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Offer friendship' press (neither friends nor an offer either way).
 
 **Press.** Press 'Offer friendship'.
 
@@ -2701,7 +2702,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Court a nation.
 
-### `ledger.diplomacy_withdraw` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Withdraw' press (you are friends, or your offer is pending).
+### `ledger.diplomacy_withdraw` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Withdraw' press (you are friends, or your offer is pending).
 
 **Press.** Press 'Withdraw'.
 
@@ -2716,7 +2717,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** End a friendship or take back an offer.
 
-### `ledger.diplomacy_accept_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's 'Accept friendship' press (they have offered).
+### `ledger.diplomacy_accept_friendship` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's 'Accept friendship' press (they have offered).
 
 **Press.** Press 'Accept friendship'.
 
@@ -2731,7 +2732,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Take a friendship offered.
 
-### `ledger.diplomacy_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, an expanded row's Embargo / Lift press - a toggle (diplomacy.md § 5): it reads 'Embargo' while none stands, and 'Lift' in the active button colour while your embargo of that nation stands.
+### `ledger.diplomacy_embargo` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Nations tab, the chosen nation's Embargo / Lift press - a toggle (diplomacy.md § 5): it reads 'Embargo' while none stands, and 'Lift' in the active button colour while your embargo of that nation stands.
 
 **Press.** Press 'Embargo' to enact; press 'Lift' (the same control, active) to repeal.
 
