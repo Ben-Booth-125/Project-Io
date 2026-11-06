@@ -44,6 +44,13 @@ enum class interception_outcome : std::uint8_t
     /// nothing credited anywhere. `interceptor_corp` names the embargoing nation,
     /// `interceptor_unit` is null, and `tile` is the destination market's centre.
     refused_embargo = 2,
+    /// BL-1505: a front left it no lane on, and it went home to its source market, whole:
+    /// `interceptor_corp` is null and `tile` is the market's centre. The one outcome that
+    /// loses nothing; recorded so a return is not silent.
+    returned_by_front = 3,
+    /// BL-1505: a front left it no lane on and none back, and it is lost. `interceptor_corp`
+    /// is null and `tile` is where it stood.
+    lost_behind_front = 4,
 };
 
 /// One interception, as it happened. Returned by `intercept_convoys` for the

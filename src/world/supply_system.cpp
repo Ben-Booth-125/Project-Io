@@ -98,7 +98,7 @@ void note_lane_heads(world& w)
 /// BL-1505 (SUPPLY.md): cargo with no lane from where it stands. With a lane back to its
 /// source market it returns, and lands there now, the haul already paid. With none, it stands
 /// behind a front with no way on or back, and is lost. Vector order: fixed.
-void resolve_stranded_convoys(world& w)
+void resolve_stranded_convoys(world& w, int tick, std::vector<interception_record>* out_cuts)
 {
     if (w.wars.empty())
         return;
@@ -113,8 +113,28 @@ void resolve_stranded_convoys(world& w)
         back.progress = 0.0f;
         const bool home = c.origin_tile == w.markets.at(c.source_market).centre_tile
                        || !convoy_route_under(w, back, lane_party(w, c.corp)).tiles.empty();
-        if (home)
+        // Home is a landing like any other, so the arrival's embargo reads it: refused, it is
+        // destroyed and the record says whose border did it. Landed, the clear pays its owner.
+        const market_component& source = w.markets.at(c.source_market);
+        const bool refused = home && embargo_refuses(w, c.corp, c.source_market);
+        if (home && !refused)
             w.land_goods(c.corp, c.source_market, static_cast<std::size_t>(c.cargo_resource), c.cargo_qty);
+        if (out_cuts != nullptr)
+        {
+            interception_record rec;
+            rec.convoy_id        = c.id;
+            rec.victim_corp      = c.corp;
+            rec.interceptor_corp = refused ? embargo_market_nation(w, c.source_market) : null_entity;
+            rec.tile             = home ? source.centre_tile : c.origin_tile;
+            rec.body             = source.body;
+            rec.cargo_resource   = c.cargo_resource;
+            rec.cargo_qty        = c.cargo_qty;
+            rec.outcome          = refused ? interception_outcome::refused_embargo
+                                 : home    ? interception_outcome::returned_by_front
+                                           : interception_outcome::lost_behind_front;
+            rec.tick             = tick;
+            out_cuts->push_back(rec);
+        }
         gone.push_back(c.id);
     }
     if (!gone.empty())
@@ -321,7 +341,7 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
     if (out_cuts != nullptr)
         out_cuts->insert(out_cuts->end(), cuts.begin(), cuts.end());
 
-    resolve_stranded_convoys(w);
+    resolve_stranded_convoys(w, tick, out_cuts);
 
     // Credit in insertion order, then erase in one sweep.
     for (const auto& convoy : w.convoys)

@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -392,7 +393,7 @@ int main()
             fp = fp || row.building == free_proc;
         }
         check(fs && !os, "W3e an extraction site on occupied ground is not run; its free twin is");
-        check(fp && !op, "W3f a processor likewise, its shelf claim with it");
+        check(fp && !op, "W3f a processor likewise (its shelf claim needs Lua's recipes: not read here)");
     }
 
     // -----------------------------------------------------------------------
@@ -526,6 +527,55 @@ int main()
         }
         check(landed_at(f.w, f.A, f.mb) == 10.0f, "W7f it lands at its destination, whole");
     }
+    {
+        // Where it stands is saved: a load between two ticks runs on the same.
+        lanes f; build(f);
+        const logistics_nodes nodes = collect_logistics_nodes(f.w);
+        const convoy_leg peace = price_trade_leg(f.w, reg, nodes, f.A, f.ma, f.mb, k_good, 1.0f);
+        f.w.convoys.push_back(shipped(f, peace, f.A, 5, 0.2f));
+        open_war(f);
+        advance_convoys(f.w);
+        check(f.w.convoys[0].lane_head != null_entity, "W7g a convoy of a nation at war keeps where it stands");
+        const std::string b = to_bytes(f.w);
+        world back;
+        check(from_bytes(b, back) && back.convoys[0].lane_head == f.w.convoys[0].lane_head
+                  && to_bytes(back) == b && back.state_hash(3) == f.w.state_hash(3),
+              "W7h it round-trips by value, bytes and hash");
+        world bare = f.w;
+        bare.convoys[0].lane_head = null_entity;
+        check(bare.state_hash(3) != f.w.state_hash(3), "W7i state_hash reads it");
+        advance_convoys(f.w);
+        advance_convoys(back);
+        check(to_bytes(back) == to_bytes(f.w), "W7j the loaded world's next tick is the same bytes");
+        std::string bad = b;
+        const std::uint32_t nobody = 0x7FFFFFF0u;
+        std::memcpy(&bad[bad.size() - 8], &nobody, sizeof nobody);
+        world out;
+        check(!from_bytes(bad, out), "W7k a head naming no convoy is REFUSED");
+    }
+    {
+        // Cut off: it stands in B, and its source and destination are both behind the front.
+        lanes f; build(f);
+        for (int y = 0; y < CH; ++y)
+            for (int x = 6; x <= 9; ++x)
+                f.w.set_tile_nation(f.at(x, y), f.B);
+        f.w.markets.at(f.mb).centre_tile = f.at(4, 3);
+        invalidate_logistics_caches(f.w);
+        const logistics_nodes nodes = collect_logistics_nodes(f.w);
+        const convoy_leg peace = price_trade_leg(f.w, reg, nodes, f.A, f.ma, f.mb, k_good, 1.0f);
+        convoy_component c = shipped(f, peace, f.A, 6, 0.0f);
+        c.origin_tile = f.at(12, 3);
+        c.lane_head   = f.at(12, 3);
+        f.w.convoys.push_back(c);
+        open_war(f);
+        std::vector<interception_record> cuts;
+        advance_convoys(f.w);
+        credit_arrived_convoys(f.w, 1, &cuts);
+        check(f.w.convoys.empty() && landed_at(f.w, f.A, f.ma) == 0.0f && landed_at(f.w, f.A, f.mb) == 0.0f,
+              "W7l with no lane on and none back, nothing lands anywhere");
+        check(cuts.size() == 1 && cuts[0].outcome == interception_outcome::lost_behind_front,
+              "W7m and the loss is recorded");
+    }
 
     // -----------------------------------------------------------------------
     std::printf("\nW8 - a hand order on a defender is obeyed\n");
@@ -603,7 +653,10 @@ int main()
         world home = f.w;
         home.convoys.push_back(shipped(f, peace, f.A, 4, 0.1f));
         advance_convoys(home);
-        credit_arrived_convoys(home, 1);
+        std::vector<interception_record> returned;
+        credit_arrived_convoys(home, 1, &returned);
+        check(returned.size() == 1 && returned[0].outcome == interception_outcome::returned_by_front,
+              "W10h a return is on the record, not silent");
         check(landed_at(home, f.A, f.ma) == 10.0f && home.convoys.empty(), "W10f with no embargo it lands whole on its source");
         const float treasury = home.nations.at(f.A).treasury;
         const auto flows = clear_markets(home, reg, economy_report{});
