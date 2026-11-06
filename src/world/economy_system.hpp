@@ -911,6 +911,21 @@ bool corp_is_mobilised(const world& w, entity_id corp);
 /// applies). <= 0 means the row cannot march on this land table.
 float march_days_per_tile(const military_capability_params& mil, uint16_t type);
 
+/// THE ONE PRICE of a march hop from @p from onto @p to (ids and components of adjacent
+/// tiles), for a unit of @p u's class and owner, in units of traversal cost: the network's
+/// hop price (`edge_traversal_cost`), the class's MOVE row on the destination, and the air
+/// superiority slow. `run_unit_march` spends it and the canvas's glide reads it, so what is
+/// drawn cannot drift from what the march banks. Pure read.
+float march_hop_cost(const world& w, const recipe_registry& reg, const unit_component& u,
+                     const tile_component& to, entity_id to_id, const tile_component& from);
+
+/// How far along its next hop @p u's march stands, in [0, 1]: the bank, plus @p day_fraction
+/// of today's movement, over the hop's price (MILITARY.md § Land — on the canvas: drawn at
+/// the pace the march is actually banking). -1 when it has no next hop on known ground, or
+/// its class cannot march. Presentation only: it reads and writes nothing else.
+float march_hop_fraction(const world& w, const recipe_registry& reg, const unit_component& u,
+                         float day_fraction);
+
 /// ONE DAY of movement (BL-1445, move by days; MILITARY.md § Marching, "Units march by
 /// the day, at their class's speed"). Each marching unit gains 1 / its class's days per
 /// plains tile (`march_days_per_tile`) of movement, banked in `order.progress` in units

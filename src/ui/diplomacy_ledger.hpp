@@ -51,6 +51,17 @@ void open_declaration(const world& w, ui_state& s, entity_id target, entity_id a
 /// Closes the declaration without effect (Cancel, Escape): no goal, no attack, nothing queued.
 void close_declaration(ui_state& s);
 
+/// Bring the GDP-per-nation cache (`diplomacy_ledger_state::gdp_year`) up to this econ
+/// tick: the one public read of a nation's GDP, shared with the Nation overview's Standing.
+void refresh_nation_gdp(const world& w, const recipe_registry& reg, const economy_report& rep,
+                        ui_state& s);
+
+/// A press on @p nation under the Nations lens (BL-1511; diplomacy.md § 3): the ledger's
+/// Nations view chooses it, opening the ledger if it is closed. The player's own nation
+/// has no entry in the selector, and an open declaration keeps the ledger where it is
+/// (a press there is its goal pick), so neither moves anything.
+void navigate_diplomacy_to(const world& w, ui_state& s, entity_id nation);
+
 /// Clears every piece of the ledger's view state and UI-side history — the
 /// declaration, its attack and goals, the peace composer, the trend and trade
 /// ring buffers, the derived caches — for a load or a new campaign, whose world

@@ -3115,6 +3115,21 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["wars"]           = static_cast<int>(m_world.wars.size());
         out["message"]        = d.message;
         out["peace_with"]     = static_cast<unsigned>(d.peace_with);
+        // BL-1511: the selector as drawn, and its open list's items.
+        out["combo_x"] = d.combo_x;
+        out["combo_y"] = d.combo_y;
+        {
+            sol::table items = st.create_table();
+            int ci = 0;
+            for (const auto& it : d.combo_items)
+            {
+                sol::table e = st.create_table();
+                e["nation"] = static_cast<unsigned>(it.nation);
+                e["x"] = it.x; e["y"] = it.y;
+                items[++ci] = e;
+            }
+            out["combo_items"] = items;
+        }
         sol::table rows = st.create_table();
         int k = 0;
         for (const auto& r : d.rows)
@@ -6834,6 +6849,129 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1506: the convoy markers the canvas drew last frame (the convoy a press on each
+    // would select, its screen point, whether it is the player's, how many share its
+    // tile), and the Selection's convoy channel. Nothing the screen does not show.
+    v.set_function("convoy_markers", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const ui_state::convoy_zone& z : m_ui.convoy_zones)
+        {
+            sol::table row = st.create_table();
+            row["id"]    = z.id;
+            row["x"]     = z.x;
+            row["y"]     = z.y;
+            row["mine"]  = z.mine;
+            row["count"] = z.count;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("selected_convoy", [this]() -> unsigned { return m_ui.selected_convoy; });
+
+    // BL-1508: a left drag through the real input path, the press, the motion and the
+    // release each their own frames, Shift held if asked; and the dragged group it left.
+    v.set_function("drag", [this](float x0, float y0, float x1, float y1, sol::optional<bool> shift) {
+        const bool sh = shift.value_or(false);
+        inject_move(x0, y0, 1);
+        if (sh)
+        {
+            m_inject_shift = 1;
+            render();
+        }
+        m_inject_button = ImGuiMouseButton_Left;
+        m_inject_down   = true;
+        render();
+        for (int s = 1; s <= 4; ++s)
+        {
+            m_inject_button = ImGuiMouseButton_Left;
+            m_inject_down   = true;
+            inject_move(x0 + (x1 - x0) * static_cast<float>(s) / 4.0f,
+                        y0 + (y1 - y0) * static_cast<float>(s) / 4.0f, 1);
+        }
+        m_inject_button = ImGuiMouseButton_Left;
+        m_inject_down   = false;
+        render();
+        if (sh)
+        {
+            m_inject_shift = 0;
+            render();
+        }
+    });
+    // Every unit counter the canvas drew last frame: its target unit, its screen point,
+    // whether it is the player's. What the screen shows, for aiming a band across tiles
+    // (verify.tile_screen centres the view on its tile, so it can aim at only one).
+    v.set_function("unit_counters", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const marker_hit_zone& hz : m_ui.marker_hit_zones)
+        {
+            if (hz.kind != marker_hit_zone::kind::unit)
+                continue;
+            const auto uit = m_world.units.find(hz.id);
+            if (uit == m_world.units.end())
+                continue;
+            sol::table e = st.create_table();
+            e["id"]     = static_cast<unsigned int>(hz.id);
+            e["x"]      = hz.centre.x;
+            e["y"]      = m_ui.marker_tilt_pivot + (hz.centre.y - m_ui.marker_tilt_pivot) * m_ui.marker_tilt_sy;
+            e["player"] = uit->second.owner == player_actor(m_world) || uit->second.owner == m_world.player_entity;
+            out[i++] = e;
+        }
+        return out;
+    });
+    v.set_function("selected_units", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const entity_id id : m_ui.selected_units)
+            out[i++] = static_cast<unsigned int>(id);
+        return out;
+    });
+
+    // BL-1509: the Nation overview's Standing rows as last drawn: the label, the player's
+    // figure, the leader's, the rank. Public figures only, as the card shows them.
+    v.set_function("nation_standing", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const auto& r : m_ui.diplomacy.standing)
+        {
+            sol::table e = st.create_table();
+            e["label"]  = std::string(r.label);
+            e["value"]  = r.value;
+            e["leader"] = r.leader;
+            e["rank"]   = r.rank;
+            e["of"]     = r.of;
+            out[i++] = e;
+        }
+        return out;
+    });
+
+    // BL-1507: the marching counters the canvas drew last frame: the units on each, the
+    // hop fraction and the counter's screen point. Nothing the screen does not show.
+    v.set_function("unit_glides", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const unit_glide& g : m_ui.unit_glides)
+        {
+            sol::table row = st.create_table();
+            sol::table ids = st.create_table();
+            int k = 1;
+            for (const entity_id id : g.ids)
+                ids[k++] = static_cast<unsigned int>(id);
+            row["ids"] = ids;
+            row["t"]   = g.t;
+            row["x"]   = g.x;
+            row["y"]   = g.y;
+            out[i++] = row;
+        }
+        return out;
+    });
+
     // BL-1265: `place_sell_order` retired with the order book (the verb is
     // rejected; there is no verify call for it).
 
@@ -7635,6 +7773,62 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             cv.corp           = m_world.player_entity;
             cv.speed          = 0.1f;
             m_world.convoys.push_back(cv);
+        });
+
+    // BL-1506: STAGE a land convoy with a real id on the player's own ground, between the
+    // two market centres nearest the player's lowest-id unit on the active body, at
+    // `progress`, for the player or (rival = true) the lowest-id other nation. Returns
+    // its id, 0 when two anchored markets are not there; never a position.
+    v.set_function("seed_lane_convoy",
+        [this](const std::string& res_name, float qty, float progress, sol::optional<bool> rival) -> unsigned
+        {
+            const entity_id me = player_actor(m_world);
+            // The anchor is the player's lowest-id unit here: a script frames it through
+            // verify.units(), so the staging takes no position to hand back.
+            const tile_component* anchor = nullptr;
+            entity_id anchor_unit = null_entity;
+            for (const auto& [uid, u] : m_world.units)
+            {
+                if (u.owner != me || u.count <= 0 || (anchor_unit != null_entity && uid > anchor_unit))
+                    continue;
+                const auto tit = m_world.tiles.find(u.position);
+                if (tit != m_world.tiles.end() && tit->second.body == m_ui.active_body)
+                {
+                    anchor = &tit->second;
+                    anchor_unit = uid;
+                }
+            }
+            if (anchor == nullptr)
+                return 0u;
+            std::vector<std::pair<int, entity_id>> by_dist;
+            for (const auto& [mid, mc] : m_world.markets)
+            {
+                if (mc.body != m_ui.active_body)
+                    continue;
+                const auto ct = m_world.tiles.find(mc.centre_tile);
+                if (ct != m_world.tiles.end())
+                    by_dist.emplace_back(std::abs(ct->second.grid_x - anchor->grid_x)
+                                          + std::abs(ct->second.grid_y - anchor->grid_y), mid);
+            }
+            if (by_dist.size() < 2)
+                return 0u;
+            std::sort(by_dist.begin(), by_dist.end());
+            convoy_component cv{};
+            cv.source_market  = by_dist[0].second;
+            cv.dest_market    = by_dist[1].second;
+            cv.cargo_resource = resource_from_name(res_name);
+            cv.cargo_qty      = qty;
+            cv.mode           = convoy_mode::land;
+            cv.progress       = progress;
+            cv.speed          = 0.1f;
+            cv.corp           = me;
+            if (rival.value_or(false))
+                for (const auto& [nid, nc] : m_world.nations)
+                    if (nid != me && (cv.corp == me || nid < cv.corp))
+                        cv.corp = nid;
+            cv.id = m_world.allocate_convoy_id();
+            m_world.convoys.push_back(cv);
+            return cv.id;
         });
 
     // Set a body's survey state deterministically for capture (BL-067). regions_done

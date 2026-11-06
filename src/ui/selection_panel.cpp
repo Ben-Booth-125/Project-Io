@@ -60,6 +60,7 @@
 #include <cfloat>    // FLT_MAX (net-profit PlotLines auto-scale)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
 #include <string>    // ticks_label / construction_status
+#include <set>
 #include <vector>    // top-decile production sample (top_decile_production)
 
 namespace ui {
@@ -1795,7 +1796,13 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
                            owner_name != nullptr ? owner_name : "\xe2\x80\x94");
         ImGui::SameLine();
-        if (const auto tit = w.tiles.find(head.position); tit != w.tiles.end())
+        // BL-1508: a dragged group may span tiles, and then names how many.
+        std::set<entity_id> group_tiles;
+        for (const entity_id uid : group)
+            group_tiles.insert(w.units.at(uid).position);
+        if (group_tiles.size() > 1)
+            ImGui::TextDisabled("%d units \xc2\xb7 %d tiles", n, static_cast<int>(group_tiles.size()));
+        else if (const auto tit = w.tiles.find(head.position); tit != w.tiles.end())
             ImGui::TextDisabled("%d units \xc2\xb7 tile %d, %d", n,
                                 tit->second.grid_x, tit->second.grid_y);
         else
@@ -1810,7 +1817,7 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
             if (ImGui::Button("Assign to front##unit_group_front", {bw, frame_h}))
                 ImGui::OpenPopup("unit_group_front_menu");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Assign every unit here to one front");
+                ImGui::SetTooltip("Assign every unit of this group to one front");
             draw_assign_front_popup(w, ui, "unit_group_front_menu", group);
         }
         ImGui::SameLine(bar_w - frame_h);
@@ -2093,6 +2100,63 @@ static void request_neighbourhood_page(const world& w, ui_state& ui, entity_id t
     q.row    = it->second.grid_y;
     q.radius = radius;
     q.valid  = true;
+}
+
+/// The convoy card (BL-1506; SELECTION.md § The convoy element): cargo, owner, route and
+/// arrival. Another nation's convoy names its owner and how it travels; its cargo and
+/// route stay private (DISCOVERY.md). False when the id has arrived or been cut: the
+/// selection clears itself and the element falls through to the ordinary resolution.
+bool draw_convoy_selection(const world& w, ui_state& ui)
+{
+    const convoy_component* cv = nullptr;
+    for (const convoy_component& c : w.convoys)
+        if (c.id == ui.selected_convoy && !c.arrived) { cv = &c; break; }
+    if (cv == nullptr)
+    {
+        ui.selected_convoy = 0;
+        return false;
+    }
+    const convoy_component& c = *cv;
+    const char* mode = c.mode == convoy_mode::sea ? "Sea"
+                     : c.mode == convoy_mode::air ? "Air"
+                     : c.mode == convoy_mode::space ? "Space" : "Land";
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Convoy");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", mode);
+    ImGui::Separator();
+    const bool show_all = is_player_side(w, c.corp) || (ui.spectating && ui.god_view);
+    {
+        const char* owner_name = owner_display_name(w, c.corp);
+        ImGui::Text("Owner: %s", owner_name != nullptr ? owner_name : "-");
+    }
+    if (!show_all)
+    {
+        ImGui::TextDisabled("Its cargo and route are private.");
+        return true;
+    }
+    const resource_presentation& rp = presentation_of(c.cargo_resource);
+    ImGui::TextUnformatted("Cargo:");
+    ImGui::SameLine();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour), "%s", rp.name);
+    ImGui::SameLine();
+    ImGui::Text("x%.1f", static_cast<double>(c.cargo_qty));
+    ImGui::Text("Route: %s -> %s", market_city_name(w, c.source_market).c_str(),
+                market_city_name(w, c.dest_market).c_str());
+    char overlay[48];
+    if (c.held)
+        std::snprintf(overlay, sizeof overlay, "held");
+    else if (!(c.speed > 0.0f))
+        std::snprintf(overlay, sizeof overlay, "%.0f%%  (stalled)",
+                      static_cast<double>(c.progress) * 100.0);
+    else
+    {
+        const int eta = static_cast<int>(std::ceil(std::max(0.0f, 1.0f - c.progress) / c.speed));
+        std::snprintf(overlay, sizeof overlay, "%.0f%%  arrives in %d qtr%s",
+                      static_cast<double>(c.progress) * 100.0, eta, eta == 1 ? "" : "s");
+    }
+    ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, 320.0f));
+    ImGui::ProgressBar(c.progress, ImVec2{std::min(ImGui::GetContentRegionAvail().x, 320.0f), 0.0f}, overlay);
+    return true;
 }
 
 const active_battle* selected_battle(const world& w, ui_state& ui)
@@ -4185,6 +4249,10 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         draw_battle_selection(w, ui);
         return;
     }
+    // BL-1506: a CONVOY, the same non-entity shape — its id in its own field. One that
+    // has landed clears itself and falls through.
+    if (ui.selected_convoy != 0 && draw_convoy_selection(w, ui))
+        return;
 
     // BL-671: the two NON-ENTITY LENS REGIONS resolve next, for the same
     // structural reason the battle and the contract do — a deposit is a resource
@@ -4245,7 +4313,10 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     std::vector<entity_id> unit_group;
     if (kind == selection_kind::unit)
     {
-        unit_group = unit_group_of(w, ui.selected_entity);
+        // BL-1508: the dragged group, across tiles, when this unit is one of it.
+        unit_group = std::find(ui.selected_units.begin(), ui.selected_units.end(), ui.selected_entity)
+                         != ui.selected_units.end()
+                         ? ui.selected_units : unit_group_of(w, ui.selected_entity);
         if (ui.selection_unit_group && unit_group.size() > 1)
         {
             draw_unit_group_selection(w, reg, ui, unit_group);
@@ -4303,7 +4374,7 @@ void draw_selection_content(world& w, const recipe_registry& reg,
             if (ImGui::Button(back, {back_w, btn}))
                 ui.selection_unit_group = true;
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Back to the %d units on this tile", static_cast<int>(unit_group.size()));
+                ImGui::SetTooltip("Back to the group of %d units", static_cast<int>(unit_group.size()));
         }
 
         ImGui::SameLine(bar_w - btn);
