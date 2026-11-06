@@ -782,6 +782,204 @@ bool front_reachable(world& w, const recipe_registry& reg, entity_id unit, const
     return false;
 }
 
+namespace {
+
+/// (province -> tile -> nations standing there), from every living unit on land. Ordered
+/// containers filled from an unordered walk: only their contents are ever read.
+using province_stacks = std::map<uint32_t, std::map<entity_id, std::set<entity_id>>>;
+
+province_stacks stacks_by_province(const world& w)
+{
+    province_stacks out;
+    for (const auto& [uid, u] : w.units)
+        if (u.count > 0 && u.position != null_entity)
+            out[w.provinces.province_of(u.position)][u.position].insert(u.owner);
+    return out;
+}
+
+bool stack_hostile_to(const world& w, entity_id nation, const std::set<entity_id>& owners)
+{
+    for (const entity_id o : owners)
+        if (o != nation && is_hostile(w, nation, o))
+            return true;
+    return false;
+}
+
+} // namespace
+
+entity_id defend_post_for(world& w, const recipe_registry& reg, entity_id unit, uint32_t province)
+{
+    const auto uit = w.units.find(unit);
+    const auto* pr = w.provinces.find(province);
+    if (uit == w.units.end() || pr == nullptr)
+        return null_entity;
+    const entity_id nation = uit->second.owner;
+    const auto mine = [&](entity_id t) {
+        const auto tit = w.tiles.find(t);
+        const auto own = w.tile_to_nation.find(t);
+        return tit != w.tiles.end() && own != w.tile_to_nation.end() && own->second == nation
+            && (!is_water(tit->second.substrate) || tile_has_road(tit->second));
+    };
+    if (uit->second.position != null_entity && w.provinces.province_of(uit->second.position) == province
+        && mine(uit->second.position))
+        return uit->second.position;
+    std::vector<std::pair<int, entity_id>> order;
+    for (const entity_id t : pr->tiles)
+        if (mine(t))
+            order.emplace_back(hex_distance(w, uit->second.position, t), t);
+    std::sort(order.begin(), order.end());
+    for (const auto& [d, t] : order)
+        if (march_check(w, nation, unit, t, null_entity, nullptr, &reg.military())
+            == corp_command_result::applied)
+            return t;
+    return null_entity;
+}
+
+front_step advance_defenders(world& w, const recipe_registry& reg)
+{
+    front_step out;
+    std::vector<entity_id> ids;
+    for (const auto& [uid, u] : w.units)
+        if (u.defend_province != no_province)
+            ids.push_back(uid);
+    if (ids.empty())
+        return out;
+    std::sort(ids.begin(), ids.end());
+    const province_stacks stacks = stacks_by_province(w);
+
+    const auto issue = [&](entity_id uid, entity_id owner, corp_verb verb, entity_id tile) {
+        corp_command cmd;
+        cmd.tick      = w.current_econ_tick;
+        cmd.corp      = owner;
+        cmd.as_nation = owner;
+        cmd.verb      = verb;
+        cmd.subject   = uid;
+        cmd.tile      = tile;
+        const corp_command_result r = apply_corp_command(w, reg, cmd);
+        if (verb == corp_verb::march_unit)
+            ++(r == corp_command_result::applied ? out.marches_applied : out.marches_refused);
+    };
+
+    for (const entity_id uid : ids)
+    {
+        unit_component& u = w.units.at(uid);
+        if (u.count <= 0 || u.position == null_entity || unit_refitting(u) || unit_in_battle(w, uid))
+            continue;
+        const entity_id nation = u.owner;
+
+        // A province with no ground of the nation's left ends the order (a cession).
+        const province* pr = w.provinces.find(u.defend_province);
+        bool any_own = false;
+        if (pr != nullptr)
+            for (const entity_id t : pr->tiles)
+                if (const auto own = w.tile_to_nation.find(t); own != w.tile_to_nation.end() && own->second == nation)
+                {
+                    any_own = true;
+                    break;
+                }
+        if (!any_own)
+        {
+            u.defend_province = no_province;
+            u.defend_post     = null_entity;
+            continue;
+        }
+
+        // The hostile stacks in the province, nearest first, ties to the lower tile id.
+        std::vector<std::pair<int, entity_id>> targets;
+        if (const auto sit = stacks.find(u.defend_province); sit != stacks.end())
+            for (const auto& [t, owners] : sit->second)
+                if (stack_hostile_to(w, nation, owners))
+                    targets.emplace_back(hex_distance(w, u.position, t), t);
+        std::sort(targets.begin(), targets.end());
+
+        bool reacting = false;
+        for (const auto& [d, t] : targets)
+        {
+            if (u.order.dest == t)
+            {
+                reacting = true; // already on its way
+                break;
+            }
+            if (march_check(w, nation, uid, t, null_entity, nullptr, &reg.military())
+                == corp_command_result::applied)
+            {
+                issue(uid, nation, corp_verb::march_unit, t);
+                reacting = true;
+                break;
+            }
+        }
+        if (reacting)
+            continue;
+
+        // Nothing to march on: back to its post, or stand where it is.
+        const entity_id post = u.defend_post;
+        if (u.position == post)
+        {
+            if (u.order.dest != null_entity)
+                issue(uid, nation, corp_verb::halt_unit, null_entity);
+            continue;
+        }
+        if (u.order.dest == post)
+            continue;
+        if (march_check(w, nation, uid, post, null_entity, nullptr, &reg.military())
+            == corp_command_result::applied)
+            issue(uid, nation, corp_verb::march_unit, post);
+        else if (u.order.dest != null_entity)
+            issue(uid, nation, corp_verb::halt_unit, null_entity);
+    }
+    return out;
+}
+
+bool defenders_awake(const world& w)
+{
+    bool any = false;
+    for (const auto& [uid, u] : w.units) // a pure any-of: walk order cannot reach it
+        if (u.defend_province != no_province && u.count > 0)
+        {
+            if (u.position != u.defend_post)
+                return true;
+            any = true;
+        }
+    if (!any || w.corp_hostile_pairs.empty())
+        return false;
+    const province_stacks stacks = stacks_by_province(w);
+    for (const auto& [uid, u] : w.units)
+        if (u.defend_province != no_province && u.count > 0)
+            if (const auto sit = stacks.find(u.defend_province); sit != stacks.end())
+                for (const auto& [t, owners] : sit->second)
+                    if (stack_hostile_to(w, u.owner, owners))
+                        return true;
+    return false;
+}
+
+int open_capital_defence(world& w)
+{
+    std::vector<entity_id> ids;
+    for (const auto& [uid, u] : w.units)
+        ids.push_back(uid);
+    std::sort(ids.begin(), ids.end());
+    int given = 0;
+    const auto& rows = unit_roster_table();
+    for (const entity_id uid : ids)
+    {
+        unit_component& u = w.units.at(uid);
+        const auto nit = w.nations.find(u.owner);
+        if (nit == w.nations.end() || !nit->second.is_major || nit->second.capital_tile == null_entity)
+            continue;
+        if (u.count <= 0 || u.position == null_entity || u.front != null_entity
+            || u.defend_province != no_province || u.type >= rows.size()
+            || (rows[u.type].domains & domain_bit(traversal_domain::land)) == 0)
+            continue;
+        const uint32_t cap = w.provinces.province_of(nit->second.capital_tile);
+        if (cap == 0 || w.provinces.province_of(u.position) != cap) // province_of: 0 is absent
+            continue;
+        u.defend_province = cap;
+        u.defend_post     = u.position;
+        ++given;
+    }
+    return given;
+}
+
 front_step advance_fronts(world& w, const recipe_registry& reg)
 {
     front_step out;

@@ -162,3 +162,36 @@ struct front_step
     int marches_refused = 0; ///< `march_unit` verbs issued and refused (0 by construction).
 };
 front_step advance_fronts(world& w, const recipe_registry& reg);
+
+// ---------------------------------------------------------------------------
+// Defend province (BL-1504; MILITARY.md § Defend province, Ben 2026-11-05).
+//
+// A defending unit reacts only inside its province: it marches to a hostile stack
+// there and otherwise returns to its post. It does not pursue out of the province.
+// "Hostile" is its own nation's directed hostility, the battle trigger's test, since
+// a march onto a stack it is not hostile to is a block and not an attack.
+// ---------------------------------------------------------------------------
+
+/// The post a unit ordered to defend @p province would take: the tile it stands on when
+/// that is land of the province, else the nearest land tile of it the unit's nation owns
+/// that `march_check` accepts (hex steps, ties to the lower id). null_entity when none.
+/// Read-only but for the march path cache.
+entity_id defend_post_for(world& w, const recipe_registry& reg, entity_id unit, uint32_t province);
+
+/// The daily defending step, beside `advance_fronts`: each defending unit, ascending id,
+/// outside a battle and not refitting. The nearest hostile stack in its province (hex
+/// steps from the unit, ties to the lower tile id) takes a march; with none a march can
+/// reach it goes back to its post, or stands. A province it no longer owns any of ends the
+/// order. Every move is a legal `march_unit` or `halt_unit`, asked of `march_check` first.
+front_step advance_defenders(world& w, const recipe_registry& reg);
+
+/// May `advance_defenders` have anything to do today? A defending unit off its post, or
+/// a hostile stack in a defended province. The day-skipping test (`military_active`), so
+/// a garrison at its post in a quiet province keeps no day walking.
+bool defenders_awake(const world& w);
+
+/// BL-1504: the start order. Every unit of a major standing in its capital province, with
+/// no front and no order, defends that province from where it stands. Called once, at the
+/// handoff, after the garrisons are posted. Assigns no front (§ Nation garrisons). Returns
+/// the units given the order.
+int open_capital_defence(world& w);

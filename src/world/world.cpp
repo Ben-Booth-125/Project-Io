@@ -385,6 +385,14 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, 0x46524E54u); // "FRNT"
                 fnv1a_u32(h, u.front);
             }
+            // BL-1504 (defend province): the order and its post, folded only while it
+            // has one, behind its own marker.
+            if (u.defend_province != 0xFFFFFFFFu)
+            {
+                fnv1a_u32(h, 0x44464E44u); // "DFND"
+                fnv1a_u32(h, u.defend_province);
+                fnv1a_u32(h, u.defend_post);
+            }
             // BL-1452 (carried supplies): the three stocks and the starvation carry,
             // folded only off full, behind their own marker, so a world whose units
             // stay full keeps every hash.

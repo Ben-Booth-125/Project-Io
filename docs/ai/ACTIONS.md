@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*213 entries — 53 gameplay · 36 canvas · 15 lens · 74 ledger · 35 chrome.*
+*214 entries — 54 gameplay · 36 canvas · 15 lens · 74 ledger · 35 chrome.*
 
 ---
 
@@ -783,6 +783,25 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The unit stores the front's key (unit_component::front). From the next day the front moves it (fronts issue their orders daily, BL-1445): onto an evenly spaced slot TILE along the span under hold (it is on its slot when it stands on it), or under push onto the neighbour's weakest adjacent land tile (an empty tile weakest, then nearest its slot, ties to the lower tile id — marching onto a held tile is an attack), each move a legal march_unit. TERRAIN AND THE CLASSES (Ben, 2026-10-29; MILITARY.md § Terrain and the classes; BL-1455, terrain class modifiers): a front routes as a march does - a slot or target the unit's land class cannot enter (blocked unless roaded, no road) is never chosen. A walled slot gives way to the nearest unwalled span tile by slot index (ties to the lower index); a unit with no unwalled slot on the span holds where it stands, halted once and not re-ordered daily; under push a walled target, or one every route to which crosses the class's walls (rejected_terrain), gives way to the next in the push's order, and with none left the unit holds its slot. The assignment itself is never refused for the ground. A manual march on an assigned unit is overridden; unassign to march by hand. The assignment follows the front as the border moves and drops when the front is gone. Saved (world_save_version 62). Rival nations' scorers issue it for their own units (AI_OPPONENT.md § 11, 'Rival nations use fronts').
 
 **Reason to select.** Hold a border without placing every unit by hand: the front spreads its units along the span and refills gaps as units die or fall back.
+
+### `gameplay.defend_province` — Defend this province in the Assign to front menu on the unit card (and the stack panel for a stack) in the Selection element, for the player's own unit. Also a corp_verb (corp_verb::defend_province, 54) on the command seam.
+
+**Press.** Select your unit, press Assign to front, and pick Defend this province; the unit defends the province it stands in, and pressing the checked entry clears the order. Over the seam: COMMAND corp=<nation> verb=54 subject=<unit id> province=<province id>; an omitted province clears the order.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id` | The unit: one of the actor's own. |
+| `province` | `uint32 (province id)` | The province to defend. no_province (the omitted default) clears the order. |
+
+**Valid when:**
+- The unit exists (rejected_invalid otherwise) and is the actor's own (rejected_not_owner otherwise).
+- The order changes something: not the same province again, not clearing a unit with no order (rejected_state otherwise).
+- The unit is a land class (rejected_invalid otherwise).
+- The province exists and holds land the actor owns: the tile the unit stands on, or one a march reaches (rejected_invalid otherwise).
+
+**Expected output.** The unit stores the province and its post, and leaves any front. From the next day it reacts inside the province: it marches to the nearest stack there of a nation its own nation is hostile to, and otherwise returns to its post. It does not pursue out of the province. A hand march clears the order, and so does assigning the unit to a front. A major's units in its capital province open on this order at the handoff.
+
+**Reason to select.** Cover ground a front does not, such as a landing from the sea, without watching it: the unit stays home until something hostile stands in the province.
 
 ### `gameplay.set_front_order` — The front card's Hold and Push presses in the Selection element, after clicking one of the player's fronts on the canvas. Also a corp_verb (corp_verb::set_front_order, 42) on the command seam.
 
@@ -2446,7 +2465,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 ### `ledger.selection_assign_front` — Selection band: the unit card's action grid, sixth cell (a flag glyph, tooltip 'Assign to front'), and the unit group's header button 'Assign to front' (the player's own groups only).
 
-**Press.** Click it to open the menu: one entry per front of the unit's own nation, named '<neighbour> - <N> tiles' (with '(north)'/'(south)', '(west)'/'(east)' or '(n of m)' where one neighbour has more than one front), in its stance colour, then 'Unassign'. The current front is checked; pick another to move the unit there, pick the checked one again or 'Unassign' to unassign. From the group, the pick applies to every unit of the stack. Sends one gameplay.assign_front (corp_verb 41) per unit with `subject` = the unit and `tile` = the front's key, or null to unassign.
+**Press.** Click it to open the menu: one entry per front of the unit's own nation, named '<neighbour> - <N> tiles' (with '(north)'/'(south)', '(west)'/'(east)' or '(n of m)' where one neighbour has more than one front), in its stance colour, then 'Unassign'. The current front is checked; pick another to move the unit there, pick the checked one again or 'Unassign' to unassign. The menu's last entry, 'Defend this province', sends gameplay.defend_province per unit for the province it stands in; checked when every unit already defends it, and pressing it then clears the order. From the group, the pick applies to every unit of the stack. Sends one gameplay.assign_front (corp_verb 41) per unit with `subject` = the unit and `tile` = the front's key, or null to unassign.
 
 **Valid when:**
 - A unit of the player nation is selected, or the group of the player's units on one tile.

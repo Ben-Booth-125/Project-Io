@@ -4968,6 +4968,10 @@ bool military_active(const world& w, const recipe_registry& reg, int day_tick)
     for (const auto& [uid, u] : w.units) // a pure any-of: walk order cannot reach it
         if (u.order.dest != null_entity || u.front != null_entity || u.count <= 0)
             return true;
+    // BL-1504: a defender reacts the day a hostile stack stands in its province, or walks
+    // home; at its post in a quiet province it keeps no day walking.
+    if (defenders_awake(w))
+        return true;
     // BL-1445: out-of-contact recovery is daily, so a day with a unit still
     // recovering is a day with something to do (no battle is live here, so every
     // unit is out of contact).
@@ -5000,6 +5004,8 @@ military_day_result run_military_day(world& w, const recipe_registry& reg, int d
         if (u.front != null_entity) { any_front = true; break; }
     if (any_front)
         advance_fronts(w, reg);
+    // BL-1504 (MILITARY.md § Defend province): the same place, the same reason.
+    advance_defenders(w, reg);
 
     // BL-1452: the units in contact at the day's start fight today's rounds, so they
     // spend ammunition and battle-worn equipment today (read before the battles, which

@@ -2008,6 +2008,14 @@ struct unit_component
     /// Set by `assign_front`; kept on its span by `reanchor_fronts`.
     entity_id front = null_entity;
 
+    /// BL-1504 (MILITARY.md § Defend province): the province this unit is ordered to
+    /// defend, or 0xFFFFFFFF (`no_province`, corp_command.hpp: 0 is a real id). Set by
+    /// `defend_province`, and by the start order on a major's capital province. It
+    /// excludes a front: the verb clears `front`, and `assign_front` clears this.
+    uint32_t  defend_province = 0xFFFFFFFFu;
+    /// BL-1504: the tile it returns to with no hostile stack in the province.
+    entity_id defend_post = null_entity;
+
     /// BL-1434 (unit designs): the design the unit was raised or last refitted to —
     /// a SNAPSHOT of its class's live design at that moment, not a reference to it,
     /// so a later change to the live design leaves the unit on its old kit until it

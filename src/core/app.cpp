@@ -3270,6 +3270,17 @@ void app::render()
                 un.tile    = null_entity; // unassign: the hand order wins
                 (void)player_command(un);
             }
+            // BL-1504: the same for a defend order, or the next day walks it home.
+            if (uit != m_world.units.end() && uit->second.defend_province != no_province)
+            {
+                corp_command un;
+                un.tick     = cmd.tick;
+                un.corp     = m_world.player_entity;
+                un.verb     = corp_verb::defend_province;
+                un.subject  = cmd.subject;
+                un.province = no_province;
+                (void)player_command(un);
+            }
         }
         switch (r)
         {
@@ -3394,6 +3405,17 @@ void app::render()
                 // the unit on its front. Both land in this frame, before the next
                 // tick's front step could re-order it.
                 const auto uit = m_world.units.find(unit);
+                // BL-1504: the same for a defend order, or the next day walks it home.
+                if (applied && uit != m_world.units.end() && uit->second.defend_province != no_province)
+                {
+                    corp_command un;
+                    un.tick     = tick;
+                    un.corp     = m_world.player_entity;
+                    un.verb     = corp_verb::defend_province;
+                    un.subject  = unit;
+                    un.province = no_province;
+                    (void)player_command(un);
+                }
                 if (applied && uit != m_world.units.end() && uit->second.front != null_entity)
                 {
                     corp_command un;
@@ -3627,6 +3649,34 @@ void app::render()
                 m_ui.construction.last_message = "No such front."; break;
         }
         m_ui.pending_front_order_tile = null_entity; // consume the request
+    }
+
+    // Defend this province (BL-1504): the same menu's entry. One `defend_province` per
+    // unit, in the group's ascending id.
+    if (!m_ui.pending_defend_province.empty())
+    {
+        int applied = 0, refused = 0;
+        for (const auto& [unit, province] : m_ui.pending_defend_province)
+        {
+            corp_command cmd;
+            cmd.tick     = static_cast<int>(m_sim_loop.day_tick());
+            cmd.corp     = m_world.player_entity;
+            cmd.verb     = corp_verb::defend_province;
+            cmd.subject  = unit;
+            cmd.province = province;
+            const corp_command_result r = player_command(cmd);
+            (r == corp_command_result::applied || r == corp_command_result::rejected_state
+                 ? applied : refused) += 1;
+        }
+        const bool clearing = m_ui.pending_defend_province.front().second == no_province;
+        if (refused == 0)
+            m_ui.construction.last_message = clearing ? "No longer defending." : "Defending this province.";
+        else if (applied == 0)
+            m_ui.construction.last_message = "Can't defend this province: it holds no ground of yours.";
+        else
+            m_ui.construction.last_message = std::to_string(applied) + " defending, "
+                                           + std::to_string(refused) + " refused.";
+        m_ui.pending_defend_province.clear(); // consume the request
     }
 
     // Assign to front (BL-1427): the unit card's and the unit group's menu — one

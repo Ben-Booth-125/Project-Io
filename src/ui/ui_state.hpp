@@ -1319,6 +1319,9 @@ struct ui_state
     /// pair is (unit, a tile of the chosen front's span — or null_entity to
     /// unassign). app::render sends one `assign_front` per pair and clears it.
     std::vector<std::pair<entity_id, entity_id>> pending_front_assign;
+    /// BL-1504: the same menu's Defend this province: (unit, province or `no_province`
+    /// to clear). app::render sends one `defend_province` per pair and clears it.
+    std::vector<std::pair<entity_id, uint32_t>> pending_defend_province;
 
     // --- The selected deposit and plate (BL-659 / BL-660) -----------------
     // Ben, 2026-08-28, choosing option A: follow the battle precedent rather

@@ -2048,6 +2048,39 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_id(out, occupier);
         }
     }
+
+    // world_save_version 79 (BL-1504): THE DEFEND ORDERS, the last section. Every defending
+    // unit ascending id, as (unit, province, post).
+    if (version >= k_world_save_version_defend)
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [uid, u] : w.units)
+            if (u.defend_province != no_province)
+                ids.push_back(uid);
+        std::sort(ids.begin(), ids.end());
+        w_u32(out, static_cast<uint32_t>(ids.size()));
+        for (const entity_id uid : ids)
+        {
+            w_id(out, uid);
+            w_u32(out, w.units.at(uid).defend_province);
+            w_id(out, w.units.at(uid).defend_post);
+        }
+    }
+}
+
+void write_world_snapshot_pre_defend(const world& w, std::ostream& out)
+{
+    // VERIFICATION ONLY (BL-1504): the v78 stream shape - no defend-order section.
+    write_world_snapshot_at(w, out, k_world_save_version_pre_defend);
+}
+
+std::size_t world_save_defend_section_bytes(const world& w)
+{
+    std::size_t n = 0;
+    for (const auto& [uid, u] : w.units)
+        if (u.defend_province != no_province)
+            ++n;
+    return 4 + 12 * n;
 }
 
 void write_world_snapshot_pre_occupation(const world& w, std::ostream& out)
@@ -2419,7 +2452,8 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             && version != k_world_save_version_pre_refusals     // BL-1480: v74, no peace refusals
             && version != k_world_save_version_pre_airframes    // BL-1436: v75, arrays 54 wide
             && version != k_world_save_version_pre_contributors // BL-1470: v76, no provenance
-            && version != k_world_save_version_pre_occupation)) // BL-1502: v77, nothing occupied
+            && version != k_world_save_version_pre_occupation // BL-1502: v77, nothing occupied
+            && version != k_world_save_version_pre_defend))   // BL-1504: v78, no defend orders
         return false; // mismatched version -- refuse rather than misread
 
     // BL-1422: a stream before the kit goods carries every per-resource array 49 wide;
@@ -4087,6 +4121,32 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 if (!ok)
                     return false;
             }
+        }
+    }
+
+    // v79 (BL-1504): the defend orders. Untrusted: units strictly ascending, each in the
+    // stream, each province in the stream, each post a tile of it. Refused whole otherwise.
+    // A v78 (and older) stream ends before it: no unit defends.
+    if (version >= k_world_save_version_defend)
+    {
+        uint32_t count = 0;
+        if (!r_u32(in, count) || count > s.units.size())
+            return false;
+        entity_id prev = null_entity;
+        for (uint32_t k = 0; k < count; ++k)
+        {
+            entity_id uid = null_entity, post = null_entity;
+            uint32_t prov = 0;
+            if (!r_id(in, uid) || !r_u32(in, prov) || !r_id(in, post))
+                return false;
+            const auto uit = s.units.find(uid);
+            const province* pr = s.provinces.find(prov);
+            if (uit == s.units.end() || (k > 0 && uid <= prev) || pr == nullptr
+                || std::find(pr->tiles.begin(), pr->tiles.end(), post) == pr->tiles.end())
+                return false;
+            prev = uid;
+            uit->second.defend_province = prov;
+            uit->second.defend_post     = post;
         }
     }
 

@@ -175,6 +175,7 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::set_unit_obsolete: // BL-1437
         case corp_verb::refit_unit:        // 2026-10-27: the actor's own units
         case corp_verb::assign_front:      // BL-1427
+        case corp_verb::defend_province:   // BL-1504: the actor's own unit; the seam checks the province
         case corp_verb::set_front_order:   // BL-1427
         case corp_verb::set_unit_design:   // BL-1434: the seat's nation; the seam refuses any other
         case corp_verb::hire_wing:          // BL-1449: the actor's own airbase
