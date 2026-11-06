@@ -20,7 +20,7 @@
 -- Run: ProjectIo --verify scripts/verify/ground_master_complete.lua
 --      IO_GROUND_BENCH=1 ProjectIo --verify scripts/verify/ground_master_complete.lua
 
-local kMinZoom   = 1.2531328   -- body_surface_canvas.cpp kMinZoom
+local kMinZoom   = 1.06875   -- body_surface_canvas.cpp kMinZoom
 local kPoolBound = 300         -- s: the pool path's background fill, from any state
 local kSyncBound = 600         -- s: ground_complete_master's own timeout
 

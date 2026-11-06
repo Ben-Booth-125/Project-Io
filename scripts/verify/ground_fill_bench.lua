@@ -20,7 +20,7 @@
 -- IO_GROUND_NO_BACKGROUND keeps the other bodies unbaked, so step 4 is a true
 -- first visit; IO_GROUND_WORKERS overrides the pool size.
 
-local kMinZoom = 1.2531328  -- body_surface_canvas.cpp kMinZoom (~1.253)
+local kMinZoom = 1.06875  -- body_surface_canvas.cpp kMinZoom (1.06875)
 
 -- Poll a frame at a time until pred(stats) holds; returns stats, frames.
 local function poll(pred, limit)

@@ -22,7 +22,7 @@
 //
 // ONE MASTER PER BODY (docs/ui/RENDERING.md § Level of detail, Ben 2026-10-09:
 // "zooming doesn't add more detail"). Each body's ground is baked ONCE, whole
-// body, at 128 px per hex at the one camera angle (22.5 deg), in 512 px chunks
+// body, at 96 px per hex at the one camera angle (22.5 deg), in 512 px chunks
 // held in SYSTEM RAM. As each master chunk lands, the worker that baked it
 // box-downsamples it into its pieces of the 64 / 32 / 16 / 8 px levels — the
 // mip chain — so every level is a chunked RAM image too. Each frame the
@@ -609,7 +609,7 @@ private:
     /// The Logistics lens is up: sources are taken with their routes unpainted
     /// (ui::ground::strip_painted_routes; ground_request::hide_routes).
     bool          m_hide_routes = false;
-    /// The coarsest drawn level (0 = the master, 128 px a hex; 2 = 32 px) at which the
+    /// The coarsest drawn level (0 = the master, 96 px a hex; 2 = 24 px) at which the
     /// Logistics lens's unpainted ground is re-baked under the view. Coarser than this a
     /// painted road is under a pixel, so a dirty chunk keeps its pixels until the view
     /// comes close (feed()'s `deferred`).

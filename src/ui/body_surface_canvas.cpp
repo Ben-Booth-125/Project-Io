@@ -183,23 +183,27 @@ constexpr float kSqrt3 = 1.7320508f;
 constexpr float kPi    = 3.14159265f;
 
 // Zoom is normalised to grid height: at zoom = 1 the grid fills kFitMargin of the
-// canvas height. The zoom floor must therefore be derived from these constants,
-// not guessed — at the minimum the viewport spans kMinZoomHeadroom of the grid
-// height (the full grid plus ~20% headroom), i.e. zoom = 1 / (headroom * margin).
+// canvas height.
 constexpr float kFitMargin       = 0.95f; // grid fills 95% of the canvas height at zoom = 1
-constexpr float kMinZoomHeadroom = 1.2f;  // the old floor's viewport spanned ~120% of the grid height
-// Zoom-out cap (Ben, 2026-08-12): the full-grid view lags on the 3x map — 45,240
-// hexes in one draw pass — so the widest view is restricted to 0.7x the old
-// maximum extent (extent scales as 1/zoom, hence the division below). The
-// default framing (4/3, view_nav.cpp) sits above this floor, so only the last
-// stretch of zoom-out is lost, not any framing the app itself sets.
-constexpr float kMaxViewScale    = 0.7f;
-constexpr float kMaxZoom         = 20.0f;
-constexpr float kMinZoom         = 1.0f / (kMaxViewScale * kMinZoomHeadroom * kFitMargin); // ~1.253
+// The top of the ladder (Ben, 2026-11-05, with the 96 px master): the top rung
+// draws ~94.6 px at the reference 1720x1080 window (5.533 px of radius per unit
+// of zoom), just under the master's 96, so no rung magnifies. The ladder halves
+// from it, so every rung reads its level at about 1:1 (RENDERING.md § Level of
+// detail), and the floor is whatever four halvings leave: ~5.9 px. 17.1 rather
+// than 17.35 (exactly 96) keeps a 4K-height window's low rungs just under a level
+// too (11.17 px per zoom: 11.94, 23.9, 47.8, 95.5), where 17.25 put them just past
+// it, each reading the next level up at 2:1 with twice the chunks on the GPU.
+//
+// That floor is wider than the 2026-08-12 zoom-out cap, which restricted the
+// widest view to 0.7x the old maximum extent (zoom ~1.253) because the full-grid
+// view lagged on the 3x map. As a share of that old extent it is now ~0.82x. The
+// default framing (4/3, view_nav.cpp) still sits above the floor.
+constexpr float kMaxZoom         = 17.1f;
+constexpr float kMinZoom         = kMaxZoom / 16.0f; // 1.06875
 
 /// Rungs on the stepped x2 zoom ladder (Ben, 2026-09-01): kMinZoom * 2^k for
-/// k = 0..k_zoom_rungs-1. kMinZoom * 16 ≈ 20.05, so the top rung clamps to
-/// kMaxZoom and the ladder spans exactly the old continuous range in 5 steps.
+/// k = 0..k_zoom_rungs-1. kMinZoom * 16 == kMaxZoom: the ladder spans its range
+/// in 5 steps.
 constexpr int k_zoom_rungs = 5;
 
 // terrain_colour, hex_vertices, and hex_local_centre now live in ui/hex_render.hpp
@@ -360,8 +364,8 @@ inline ImU32 with_alpha(ImU32 c, float a)
 // --- The close-zoom seam (BL-1251 part 5; RENDERING.md § The grid rule) ---------
 // At the two closest rungs only, a faint line between neighbouring tiles: a
 // low-alpha BLACK stroke, so it is the ground under it darkened, never a colour of
-// its own. Keyed on the drawn radius: 40 px sits between rung 2 (~27 px) and rung 3
-// (~55 px) at the reference 1720x1080 window.
+// its own. Keyed on the drawn radius: 40 px sits between rung 2 (~24 px) and rung 3
+// (~48 px) at the reference 1720x1080 window.
 constexpr float k_seam_min_drawn_r = 40.0f;
 constexpr float k_seam_alpha       = 0.16f;
 

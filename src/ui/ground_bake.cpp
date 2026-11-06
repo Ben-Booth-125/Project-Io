@@ -950,6 +950,21 @@ namespace {
 /// 0 = every tree, no split. With no road near, 1 draws exactly what 0 does.
 enum class tree_set : std::uint8_t { all = 0, clear_of_roads = 1, over_roads = 2 };
 
+/// A forest tree's standing form, in crowns (its crown radius; verticals before
+/// the 1/tilt_sy pre-stretch): a pointed crown, wide at its foot, rising from a
+/// short trunk (Ben, 2026-11-05). Scrub keeps the round form below. stamp_trees,
+/// tree_patch_boxes and the partial re-bake's reach all read these, so the
+/// taller crown stays bounded: the crown's tip stands 3.5 crowns above its root
+/// in the bake, ~3.8 of the tree's own ground north once the pre-stretch is
+/// counted.
+inline constexpr float k_conifer_trunk   = 0.50f; ///< Trunk visible below the crown's middle.
+inline constexpr float k_conifer_foot    = 0.35f; ///< The crown's foot above the root.
+inline constexpr float k_conifer_top     = 3.50f; ///< The crown's tip above the root.
+inline constexpr float k_conifer_halfw   = 1.08f; ///< The crown's half-width at its foot.
+inline constexpr int   k_conifer_tiers   = 3;     ///< Bough tiers: the silhouette's steps.
+/// The round form's top above its root, in crowns (trunk 1.1 + canopy 1.75).
+inline constexpr float k_round_top       = 2.85f;
+
 /// One tree of a tile's stand: its root (tile-relative) and crown radius, and
 /// whether the stand keeps it (a works' cleared ground thins it). stamp_trees
 /// and tree_patch_boxes (BL-1291) share it, so the partial re-bake bounds
@@ -1062,6 +1077,62 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
             }
     };
 
+    // A pointed crown: tip at (bx, tip_y), its foot at base_y, half_w across
+    // there. It narrows to the tip in k_conifer_tiers bough tiers, each flaring
+    // toward its foot, so the silhouette steps like a fir; the foot bows like the
+    // near rim of a disc seen from the camera. Lit from the NW as blob is: the
+    // west flank bright, the east in shade, each tier brighter at its top where
+    // the bough catches the sun. Offsets come from absolute pixel indices, so a
+    // crown's rim agrees across a chunk edge, like blob's.
+    const auto cone = [&](double bx, double tip_y, double base_y, float half_w,
+                          float cr2, float cg2, float cb2, float alpha)
+    {
+        const float span = static_cast<float>(base_y - tip_y);
+        if (span <= 0.0f || half_w <= 0.0f)
+            return;
+        const double lbx = bx - px0;
+        const int x0i = std::max(0, static_cast<int>(std::floor(lbx - half_w - 1.0)));
+        const int x1i = std::min(pw - 1, static_cast<int>(std::ceil(lbx + half_w + 1.0)));
+        const int y0i = std::max(0, static_cast<int>(std::floor(tip_y - py0 - 1.0)));
+        const int y1i = std::min(ph - 1, static_cast<int>(std::ceil(base_y - py0 + 1.0)));
+        const float tiers = static_cast<float>(k_conifer_tiers);
+        for (int py_ = y0i; py_ <= y1i; ++py_)
+        {
+            const float t = static_cast<float>(((py0 + py_ + 0.5) - tip_y) / span);
+            if (t * span < -0.5f)
+                continue;
+            const float tc   = std::clamp(t, 0.0f, 1.0f);
+            const float ft   = tc * tiers;
+            const float tier = ft - std::floor(ft);        // 0 at a tier's top, 1 at its foot
+            const float w    = half_w * tc * (0.80f + 0.20f * tier);
+            for (int px_ = x0i; px_ <= x1i; ++px_)
+            {
+                const std::size_t idx = static_cast<std::size_t>(py_) * pw + px_;
+                if (!tag[idx])
+                    continue; // lock fill / transparent margin stays untouched
+                const float dx = static_cast<float>((px0 + px_ + 0.5) - bx);
+                const float u0 = dx / half_w;
+                const float foot = (1.0f - t) * span - 0.20f * half_w * u0 * u0;
+                const float a_x  = std::clamp(w - std::fabs(dx) + 0.5f, 0.0f, 1.0f);
+                const float a_y  = std::clamp(foot + 0.5f, 0.0f, 1.0f);
+                const float a    = alpha * a_x * a_y;
+                if (a <= 0.0f)
+                    continue;
+                const float u  = std::clamp(dx / std::max(w, 1.0f), -1.0f, 1.0f);
+                const float lt = std::clamp((0.90f - 0.34f * u) * (1.12f - 0.26f * tier) * (1.06f - 0.12f * tc),
+                                            0.55f, 1.28f);
+                std::uint32_t& dst = out[idx];
+                const float ir = static_cast<float>(palette::col_r(dst));
+                const float ig = static_cast<float>(palette::col_g(dst));
+                const float ib = static_cast<float>(palette::col_b(dst));
+                dst = palette::col32(
+                    std::clamp(static_cast<int>(ir + (cr2 * lt - ir) * a + 0.5f), 0, 255),
+                    std::clamp(static_cast<int>(ig + (cg2 * lt - ig) * a + 0.5f), 0, 255),
+                    std::clamp(static_cast<int>(ib + (cb2 * lt - ib) * a + 0.5f), 0, 255), 255);
+            }
+        }
+    };
+
     // Max canopy + shadow reach, canonical units; a tilted bake's standing
     // trees additionally rise by the height displacement plus their own
     // stretched height, so the walk margin grows with them.
@@ -1128,15 +1199,18 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
                 if (which != tree_set::all)
                 {
                     // The ground points the tree's pixels stand over: its root,
-                    // up its standing canopy (~3.1 crowns north once squashed),
-                    // across its crown and down its SE shadow.
+                    // up its standing canopy (~3.1 crowns north once squashed, a
+                    // forest tree's pointed crown ~3.8), across its crown and down
+                    // its SE shadow.
                     bool over = false;
                     for (int sy = 0; sy < 5 && !over; ++sy)
                         for (int sx = 0; sx < 3 && !over; ++sx)
                         {
                             static constexpr double dyk[5] = { -3.1, -2.0, -1.0, 0.0, 0.85 };
                             static constexpr double dxk[3] = { -1.0, 0.0, 1.3 };
-                            over = route_clearance(src, tx + dxk[sx] * cr, ty + dyk[sy] * cr) < 0.0;
+                            const double up = forest && dyk[sy] < 0.0 ? static_cast<double>(k_conifer_top / k_round_top) : 1.0;
+                            const double wd = forest && dxk[sx] < 0.0 ? static_cast<double>(k_conifer_halfw) : 1.0;
+                            over = route_clearance(src, tx + dxk[sx] * wd * cr, ty + dyk[sy] * up * cr) < 0.0;
                         }
                     if (over != (which == tree_set::over_roads))
                         continue;
@@ -1148,9 +1222,12 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
                 // varied per tree so a wood is a crowd, not a pattern.
                 const float vr = 0.86f + 0.28f * hash01(cw, r, 0x7F00u + static_cast<std::uint32_t>(k));
                 // (BL-1256: the leaf a rich green, as it1's stands.)
-                const float cr_ = (palette::col_r(tc) * 0.45f + 24.0f * 0.55f) * vr * (1.0f + 0.10f * v_warm);
-                const float cg_ = (palette::col_g(tc) * 0.45f + 52.0f * 0.55f) * vr * (1.0f + 0.01f * v_warm);
-                const float cb_ = (palette::col_b(tc) * 0.45f + 18.0f * 0.55f) * vr * (1.0f - 0.08f * v_warm);
+                const float ts_ = palette::k_tree_tile_share, ls_ = 1.0f - ts_;
+                const float cr_ = (palette::col_r(tc) * ts_ + palette::k_tree_leaf.r * ls_) * vr * (1.0f + 0.10f * v_warm);
+                const float cg_ = (palette::col_g(tc) * ts_ + palette::k_tree_leaf.g * ls_) * vr * (1.0f + 0.01f * v_warm);
+                const float cb_ = (palette::col_b(tc) * ts_ + palette::k_tree_leaf.b * ls_) * vr * (1.0f - 0.08f * v_warm);
+                const palette::tree_rgb& shd = palette::k_tree_shadow;
+                const palette::tree_rgb& trk = palette::k_tree_trunk;
                 if (g.lift > 0.0)
                 {
                     // OBLIQUE: the tree STANDS. Its ground point rides the
@@ -1160,18 +1237,24 @@ void stamp_trees(const bake_source& src, const geometry& g, const bake_params& p
                     // ground plane — the depth cue that sells the tilt.
                     const float invsy = static_cast<float>(1.0 / g.tilt_sy);
                     const double ygr  = (ty - src.height[i] * g.lift - g.y_min) * g.s;
-                    const float th = pr * 1.1f * invsy; // trunk height, px
+                    const float th = pr * (forest ? k_conifer_trunk : 1.1f) * invsy; // trunk height, px
                     blob(pxc + pr * 0.35f, ygr + pr * 0.22f, pr * 0.95f, pr * 0.62f,
-                         10.0f, 14.0f, 10.0f, 0.30f, false);         // ground shadow
+                         shd.r, shd.g, shd.b, 0.30f, false);         // ground shadow
                     blob(pxc, ygr - th * 0.5f, std::max(1.2f, pr * 0.16f), th * 0.5f,
-                         46.0f, 36.0f, 26.0f, 0.90f, false);         // trunk
-                    blob(pxc, ygr - th - pr * invsy * 0.75f, pr, pr * invsy,
-                         cr_, cg_, cb_, 0.95f, true);                // canopy, upright
+                         trk.r, trk.g, trk.b, 0.90f, false);         // trunk
+                    if (forest)
+                        cone(pxc, ygr - pr * invsy * k_conifer_top, ygr - pr * invsy * k_conifer_foot,
+                             pr * k_conifer_halfw, cr_, cg_, cb_, 0.95f); // pointed crown, upright
+                    else
+                        blob(pxc, ygr - th - pr * invsy * 0.75f, pr, pr * invsy,
+                             cr_, cg_, cb_, 0.95f, true);            // scrub's round head, upright
                 }
                 else
                 {
+                    // A plan view (the Selection band's page) looks straight down
+                    // on a crown, so even a pointed one is round from here.
                     blob(pxc + pr * 0.45f, pyc + pr * 0.42f, pr * 1.0f, pr * 1.0f,
-                         10.0f, 14.0f, 10.0f, 0.30f, false);         // drop shadow, SE
+                         shd.r, shd.g, shd.b, 0.30f, false);         // drop shadow, SE
                     blob(pxc, pyc, pr, pr, cr_, cg_, cb_, 0.94f, true); // canopy, lit NW
                 }
             }
@@ -1355,7 +1438,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     // painterly at the 24 px tier read as plain blur up close — a colour field
     // 1.4 tiles soft is 70 px soft at 48. As the bake resolution grows past
     // the play tier, tighten the field and lift the detail: res_t is 0 at
-    // 24 px/r and 1 from 72 (so the 128 px master takes it whole).
+    // 24 px/r and 1 from 72 (so the 96 px master takes it whole).
     const float  res_t = static_cast<float>(std::clamp((nominal_s(g) - 24.0) / 48.0, 0.0, 1.0));
     const double R     = p.blend_radius * (1.0 - 0.22 * res_t); // stays > 1 (corner coverage)
     const double R2    = R * R;
@@ -1398,7 +1481,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
     const double fine_cell = periodic_cell(0.155, fine_cells);
     const bool   fine_on   = nominal_s(g) >= 40.0;
     // BL-1254 (ground crisper): the crisp key, nominal-keyed — 0 below 40 px
-    // per hex (the far page bakes as before), full from 80 px (the 128 px
+    // per hex (the far page bakes as before), full from 80 px (the 96 px
     // master). A fleck lattice of ~6 px at the master: sub-tile marks, close only.
     const float  ck = p.crisp * static_cast<float>(std::clamp((nominal_s(g) - 40.0) / 40.0, 0.0, 1.0));
     int fleck_cells = 1;
@@ -1922,6 +2005,12 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                     const float sg = static_cast<float>(palette::col_g(pt.col));
                     const float sb = static_cast<float>(palette::col_b(pt.col));
                     double d, ds;
+                    // A fringe tree stepping out of a forest is that forest's
+                    // pointed tree (Ben, 2026-11-05): a crown from 1.7 radii up to
+                    // 0.8 down, its half-width growing to one radius at its foot.
+                    // Scrub's bushes stay round.
+                    const bool   conifer = K.set == bs_forest;
+                    double cw_at = 0.0;
                     if (stone)
                     {
                         const double ca = k_rot8[pt.rot][0], sa = k_rot8[pt.rot][1];
@@ -1936,7 +2025,18 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                         const double sx = ddx - 0.45 * rr, syy = ddy - 0.42 * rr;
                         ds = std::sqrt(sx * sx + syy * syy);
                     }
-                    const float a = static_cast<float>(std::clamp((rr - d) / pxw + 0.5, 0.0, 1.0));
+                    float a;
+                    if (conifer)
+                    {
+                        const double cv = ddy * sy_up;
+                        const double t = std::clamp((cv + 1.7 * rr) / (2.5 * rr), 0.0, 1.0);
+                        cw_at = rr * t;
+                        a = static_cast<float>(std::clamp((cw_at - std::fabs(ddx)) / pxw + 0.5, 0.0, 1.0)
+                                             * std::clamp((0.8 * rr - cv) / pxw + 0.5, 0.0, 1.0)
+                                             * std::clamp((cv + 1.7 * rr) / pxw + 0.5, 0.0, 1.0));
+                    }
+                    else
+                        a = static_cast<float>(std::clamp((rr - d) / pxw + 0.5, 0.0, 1.0));
                     const float s = static_cast<float>(std::clamp((rr - ds) / pxw + 0.5, 0.0, 1.0))
                                   * (stone ? 0.30f : 0.32f);
                     shadow = std::max(shadow, s);
@@ -1947,6 +2047,9 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                         float lt;
                         if (stone)
                             lt = 1.0f + 0.35f * static_cast<float>(std::clamp(-(ddx + ddy) / (2.0 * rr), -1.0, 1.0));
+                        else if (conifer)
+                            lt = std::clamp(0.90f - 0.34f * static_cast<float>(std::clamp(ddx / std::max(cw_at, pxw), -1.0, 1.0)),
+                                            0.55f, 1.28f);
                         else
                         {
                             const double lx = ddx + rr * 0.35, ly = ddy * sy_up + rr * 0.35;
@@ -1957,7 +2060,7 @@ void bake_window(const bake_source& src, const geometry& g, const bake_params& p
                         // rock it fell from, a tree the wood's leaf (the forest
                         // stamps' canopy ink), a bush the scrub's.
                         if (stone)                   { cr = sr * 1.10f * k; cg = sg * 1.10f * k; cb = sb * 1.10f * k; }
-                        else if (K.set == bs_forest) { cr = (sr * 0.55f + 22.0f) * k; cg = (sg * 0.55f + 50.0f) * k; cb = (sb * 0.55f + 20.0f) * k; }
+                        else if (K.set == bs_forest) { cr = (sr * 0.55f + palette::k_fringe_leaf.r) * k; cg = (sg * 0.55f + palette::k_fringe_leaf.g) * k; cb = (sb * 0.55f + palette::k_fringe_leaf.b) * k; }
                         else                         { cr = (sr * 0.70f + 22.0f) * k; cg = (sg * 0.70f + 22.0f) * k; cb = (sb * 0.70f + 10.0f) * k; }
                     }
                 }
@@ -4191,7 +4294,7 @@ int choose_level(double draw_r)
     for (int k = k_level_count - 1; k > 0; --k)
         if (k_level_ppr[k] >= draw_r)
             return k;
-    return 0; // the master: minified up to 2:1, or magnified past 128 px
+    return 0; // the master: minified up to 2:1, or magnified past 96 px
 }
 
 void downsample_half(const std::uint32_t* src, int sw, int sh, std::uint32_t* dst)
@@ -4336,8 +4439,8 @@ bool installation_patch_rects(const bake_source& old_src, const bake_source& new
     // sprites) — and, on a forest or scrub tile whose cleared ground grew or
     // shrank, the trees that clearing removes or restores (stamp_trees:
     // canopies within 0.82 of the centre or pulled to a grove within 0.9,
-    // crown <= 0.16, the SE shadow, an upright canopy 2.85 crowns tall above
-    // its lifted ground point on an oblique bake). Then k_patch_pad pixels for
+    // crown <= 0.16, the SE shadow, a pointed crown 3.5 crowns tall above its
+    // lifted ground point on an oblique bake). Then k_patch_pad pixels for
     // the post passes that read across a pixel.
     const int A = k_patch_align;
     const auto floor_a = [A](int v) { return v >= 0 ? v / A * A : -((-v + A - 1) / A) * A; };
@@ -4384,7 +4487,7 @@ bool installation_patch_rects(const bake_source& old_src, const bake_source& new
             const double hx = kSqrt3 * (t.c + ((t.r & 1) ? 0.5 : 0.0));
             const double hy = 1.5 * t.r;
             const double side = 0.9 + 0.16 * 1.5;
-            const double up   = 0.9 + g.lift + 2.85 * 0.16 / g.tilt_sy;
+            const double up   = 0.9 + g.lift + static_cast<double>(k_conifer_top) * 0.16 / g.tilt_sy;
             const double down = 0.9 + 0.16 * 1.5;
             grow(static_cast<int>(std::floor((hx - side) * g.s)) - 2,
                  static_cast<int>(std::floor((hy - up - g.y_min) * g.s)) - 2,
@@ -4537,9 +4640,10 @@ int tree_patch_boxes(const bake_source& src, const geometry& g, const bake_param
         // A road change moves this tree only if the road's reach band takes
         // its root (within its crown and the 0.02 clearance) or one of the
         // points stamp_trees tests for "over a road" (up to 1.3 crowns
-        // across, 3.1 north and 0.85 south of the root).
+        // across, 3.1 north, a pointed crown 3.8, and 0.85 south of the root).
+        const double north = st.forest ? 3.8 : 3.1;
         if (t.ox < bx0 - 1.3 * cr - 0.02 || t.ox > bx1 + 1.3 * cr + 0.02
-            || t.oy < by0 - cr - 0.02 || t.oy > by1 + 3.1 * cr + 0.02)
+            || t.oy < by0 - cr - 0.02 || t.oy > by1 + north * cr + 0.02)
             continue;
         // The tree's pixels (stamp_trees' blobs): its canopy, trunk and
         // shadow, with the anti-aliased rims.
@@ -4550,9 +4654,9 @@ int tree_patch_boxes(const bake_source& src, const geometry& g, const bake_param
         {
             const double invsy = 1.0 / g.tilt_sy;
             const double ygr = (hy + t.oy - src.height[i] * g.lift - g.y_min) * g.s;
-            x0 = pxc - pr;
+            x0 = pxc - (st.forest ? static_cast<double>(k_conifer_halfw) : 1.0) * pr;
             x1 = pxc + 1.30 * pr;
-            y0 = ygr - (1.1 + 1.75) * pr * invsy;
+            y0 = ygr - (st.forest ? static_cast<double>(k_conifer_top) : static_cast<double>(k_round_top)) * pr * invsy;
             y1 = ygr + 0.84 * pr;
         }
         else
