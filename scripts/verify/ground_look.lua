@@ -12,7 +12,7 @@
 --   cast shadows       the low NW sun throws shadow behind ridges and hills,
 --                      none on flat ground
 --   water              blue-green, glinting; white where a river falls; rocky banks
---   forests            as before (their form is unchanged)
+--   forests            pointed crowns (BL-1524)
 --
 -- Subjects are ground_bake_check `--look`'s aims on the home body (that reading
 -- prints them, with the luminance percentiles the palette is tuned against): a

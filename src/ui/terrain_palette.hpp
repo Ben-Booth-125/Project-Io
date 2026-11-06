@@ -65,6 +65,16 @@ colour32 tile_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t dens
 /// minimap and the generation preview keep. The same substrate -> cover
 /// blend by density; only the endpoints differ. The bake's relief, shadow
 /// and grade passes carry the value range on top of these.
+/// The tree stamps' inks (RENDERING.md § The bake). A leaf is the tile's own
+/// colour pushed toward a deep leaf: rgb = tile * share + leaf * (1 - share) for
+/// a stamped tree; a fringe tree steps out of its wood as source * 0.55 + fringe.
+struct tree_rgb { float r, g, b; };
+inline constexpr float    k_tree_tile_share = 0.45f;
+inline constexpr tree_rgb k_tree_leaf       = { 24.0f, 52.0f, 18.0f };
+inline constexpr tree_rgb k_tree_trunk      = { 46.0f, 36.0f, 26.0f };
+inline constexpr tree_rgb k_tree_shadow     = { 10.0f, 14.0f, 10.0f };
+inline constexpr tree_rgb k_fringe_leaf     = { 22.0f, 50.0f, 20.0f };
+
 colour32 ground_substrate_colour(terrain_substrate sub);
 colour32 ground_cover_endpoint(terrain_cover c);
 colour32 ground_tile_colour(terrain_substrate sub, terrain_cover cov, std::uint8_t density);

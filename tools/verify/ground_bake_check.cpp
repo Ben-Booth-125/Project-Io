@@ -438,7 +438,7 @@ void master_row(const bake_source& src, const body_component& hb, int land_i, co
                         c.data() + static_cast<std::size_t>(y) * cs, static_cast<std::size_t>(cs) * 4u);
     }
     check(chunk_eq_bake, "P22", "a master chunk bakes byte-identical to its quadrant of a 2x2-chunk window (no chunk seam)");
-    check(placed == wl, "P22", "the mip chain built chunk by chunk equals the whole image's chain to the 8 px level");
+    check(placed == wl, "P22", "the mip chain built chunk by chunk equals the whole image's chain to the 6 px level");
     {
         std::vector<std::uint32_t> flat(16, 0xFF204060u), half(4);
         downsample_half(flat.data(), 4, 4, half.data());
@@ -1060,7 +1060,7 @@ void patch_row(const bake_source& src, const bake_params& p)
                 chunk_px ? 100.0 * patch_px / chunk_px : 0.0);
     check(inv_ok, "P24", "windows around installations re-baked and blitted leave a whole-chunk bake byte-identical");
     check(p24_ok, "P24", "a chunk patched by the window rule equals the chunk baked whole after the change");
-    check(p25_ok, "P25", "the windows' own mip pieces, placed, equal the whole chunk's chain at 64/32/16/8");
+    check(p25_ok, "P25", "the windows' own mip pieces, placed, equal the whole chunk's chain at 48/24/12/6");
 }
 
 } // namespace

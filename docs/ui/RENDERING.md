@@ -104,8 +104,11 @@ whose creases shade as ridge lines; and steep slopes shed cover colour toward ba
 procedural stand-ins the authored brushes of the asset pipeline will replace or
 augment, on the same stamp seam.
 
-**Forest trees are pointed (Ben, 2026-11-05)**: a tapering crown, not a bushy round head. Default
-for Ben's review: scrub keeps its round form.
+**Forest trees are pointed (Ben, 2026-11-05)**: a tapering crown, not a bushy round head, rising
+from a short trunk in three bough tiers, its west flank lit. The forest fringe's trees take the same
+form. The form stands 3.5 crown radii above its root before the camera stretch, and its half-width
+at the foot is 1.08 radii. Default for Ben's review: scrub keeps its round form, and a flat plan view
+(the Selection band's neighbourhood page) looks straight down, so its crowns stay round.
 
 **Fallback by coverage.** A pass whose brushes are not yet authored bakes from the
 current vector-fill logic instead (`ui::terrain_colour` becomes the base-ground
@@ -815,7 +818,7 @@ Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedur
   downstream neighbour, full white water by ~0.06.
 - **Towns.** Settlements are **denser and larger**: compact blocks of multi-storey buildings
   with lit roofs, shaded sides, stacks and a street grid, reading as a town from the mid rungs.
-- **Forests** keep their current procedural form for now (Ben did not take the conifer change).
+- **Forests** stand as pointed crowns (§ The bake, Ben 2026-11-05, overturning the earlier call not to take the conifer change).
 
 Truly painterly trees and towns need authored brushes and stamps; that is a later item, on
 the stamp seam that already exists. What the reference owes to its low perspective camera —
