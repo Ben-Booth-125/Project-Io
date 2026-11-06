@@ -3272,17 +3272,6 @@ void app::render()
                 un.tile    = null_entity; // unassign: the hand order wins
                 (void)player_command(un);
             }
-            // BL-1504: the same for a defend order, or the next day walks it home.
-            if (uit != m_world.units.end() && uit->second.defend_province != no_province)
-            {
-                corp_command un;
-                un.tick     = cmd.tick;
-                un.corp     = m_world.player_entity;
-                un.verb     = corp_verb::defend_province;
-                un.subject  = cmd.subject;
-                un.province = no_province;
-                (void)player_command(un);
-            }
         }
         switch (r)
         {
@@ -3407,17 +3396,6 @@ void app::render()
                 // the unit on its front. Both land in this frame, before the next
                 // tick's front step could re-order it.
                 const auto uit = m_world.units.find(unit);
-                // BL-1504: the same for a defend order, or the next day walks it home.
-                if (applied && uit != m_world.units.end() && uit->second.defend_province != no_province)
-                {
-                    corp_command un;
-                    un.tick     = tick;
-                    un.corp     = m_world.player_entity;
-                    un.verb     = corp_verb::defend_province;
-                    un.subject  = unit;
-                    un.province = no_province;
-                    (void)player_command(un);
-                }
                 if (applied && uit != m_world.units.end() && uit->second.front != null_entity)
                 {
                     corp_command un;

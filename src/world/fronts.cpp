@@ -855,7 +855,12 @@ front_step advance_defenders(world& w, const recipe_registry& reg)
         cmd.verb      = verb;
         cmd.subject   = uid;
         cmd.tile      = tile;
+        // The order's own step: the verbs end a defend order for a hand order, not for this.
+        const uint32_t province = w.units.at(uid).defend_province;
+        const entity_id post    = w.units.at(uid).defend_post;
         const corp_command_result r = apply_corp_command(w, reg, cmd);
+        w.units.at(uid).defend_province = province;
+        w.units.at(uid).defend_post     = post;
         if (verb == corp_verb::march_unit)
             ++(r == corp_command_result::applied ? out.marches_applied : out.marches_refused);
     };

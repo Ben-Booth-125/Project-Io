@@ -1431,6 +1431,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 && std::isfinite(mu.order.progress) && mu.order.progress > 0.0f)
                 mo.progress = mu.order.progress;
             mu.order = mo;
+            // BL-1504: a hand order ends a defend order (ACTIONS.json), or the next day would
+            // reverse it. advance_defenders' own orders put it back (fronts.cpp).
+            mu.defend_province = no_province;
+            mu.defend_post     = null_entity;
             return corp_command_result::applied;
         }
 
@@ -1573,6 +1577,10 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             if (uit->second.order.dest == null_entity)
                 return corp_command_result::rejected_state; // nothing to halt
             uit->second.order = movement_order{};
+            // BL-1504: a hand order ends a defend order (ACTIONS.json), or the next day
+            // would reverse it. advance_defenders' own orders put it back (fronts.cpp).
+            uit->second.defend_province = no_province;
+            uit->second.defend_post     = null_entity;
             return corp_command_result::applied;
         }
 

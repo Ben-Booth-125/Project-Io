@@ -546,12 +546,23 @@ int main()
         (void)declare_hostile(f.w, f.B, f.A);
         const entity_id e = add_unit(f, f.A, f.at(5, 3));
         (void)run_military_day(f.w, reg, 2);
-        check(f.w.units.at(g).defend_province == f.block(1) && f.w.units.at(g).order.dest == f.at(5, 3),
-              "W8e the reaction itself keeps the order: run_military_day sends it at the stack");
+        bool fighting = false;
+        for (const active_battle& bt : f.w.battles)
+            fighting = fighting || (bt.tile == f.at(5, 3) && bt.attacker == f.B);
+        check(f.w.units.at(g).defend_province == f.block(1) && f.w.units.at(g).position == f.at(4, 3) && fighting,
+              "W8e the reaction keeps the order: run_military_day walks it onto the stack, a battle");
         (void)e;
+        // Back to a walk home: the fight over and the unit far from its post. The position is
+        // set by hand; the order that follows is the day's own.
+        f.w.battles.clear();
+        f.w.units.erase(e);
+        f.w.units.at(g).position = f.at(5, 5);
+        (void)run_military_day(f.w, reg, 3);
+        check(f.w.units.at(g).defend_province == f.block(1) && f.w.units.at(g).order.dest == f.at(3, 3),
+              "W8f it walks home on the order, still defending");
         check(order_of(f.w, reg, f.B, corp_verb::halt_unit, g, null_entity) == corp_command_result::applied
                   && f.w.units.at(g).defend_province == no_province,
-              "W8f a halt on it clears the order too");
+              "W8g a halt on it clears the order too");
     }
 
     // -----------------------------------------------------------------------
