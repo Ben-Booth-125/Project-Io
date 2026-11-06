@@ -1119,6 +1119,14 @@ void cede_provinces(world& w, entity_id from, entity_id to, const std::vector<ui
     std::sort(moved.begin(), moved.end());
     if (moved.empty())
         return;
+    // BL-1504: a defend order ends with its post's ground. The rest of the order's checks run
+    // on the next military day; this one is an invariant the save reader holds it to.
+    for (auto& [uid, u] : w.units)
+        if (u.defend_province != no_province && std::binary_search(moved.begin(), moved.end(), u.defend_post))
+        {
+            u.defend_province = no_province;
+            u.defend_post     = null_entity;
+        }
     const auto was_ceded = [&](entity_id t) { return std::binary_search(moved.begin(), moved.end(), t); };
 
     // 2. THE NATION'S TILE LIST AND ITS DEPOSIT PROFILE follow: the loser keeps its

@@ -4092,7 +4092,10 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             if (!r_id(in, tile) || !r_id(in, occupier))
                 return false;
             const auto own = s.tile_to_nation.find(tile);
-            if (own == s.tile_to_nation.end() || own->second == occupier
+            const auto occupied_tile = s.tiles.find(tile); // water is taken only where a road crosses it
+            if (occupied_tile == s.tiles.end()
+                || (is_water(occupied_tile->second.substrate) && !tile_has_road(occupied_tile->second))
+                || own == s.tile_to_nation.end() || own->second == occupier
                 || s.nations.count(occupier) == 0
                 || (s.wars.count({ occupier, own->second }) == 0
                     && s.wars.count({ own->second, occupier }) == 0)
@@ -4146,6 +4149,19 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             const province* pr = s.provinces.find(prov);
             if (uit == s.units.end() || (k > 0 && uid <= prev) || pr == nullptr
                 || std::find(pr->tiles.begin(), pr->tiles.end(), post) == pr->tiles.end())
+                return false;
+            // What the verb refuses (corp_verb::defend_province, defend_post_for): a row that
+            // holds no land post, a unit on a front, a post on no ground of its nation's, or
+            // on water with no road. A cession ends the order with the ground (war.cpp).
+            const auto& rows = unit_roster_table();
+            const auto post_tile = s.tiles.find(post);
+            const auto post_own  = s.tile_to_nation.find(post);
+            if (uit->second.type >= rows.size()
+                || (rows[uit->second.type].domains & domain_bit(traversal_domain::land)) == 0
+                || uit->second.front != null_entity
+                || post_tile == s.tiles.end() || post_own == s.tile_to_nation.end()
+                || post_own->second != uit->second.owner
+                || (is_water(post_tile->second.substrate) && !tile_has_road(post_tile->second)))
                 return false;
             prev = uid;
             uit->second.defend_province = prov;
