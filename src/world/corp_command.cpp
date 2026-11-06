@@ -1189,7 +1189,7 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 const logistics_nodes nodes = collect_logistics_nodes(w);
                 if (!price_trade_leg(w, reg, nodes, cmd.corp, t.from_market, t.to_market,
                                      static_cast<std::size_t>(t.resource), 1.0f).viable)
-                    return corp_command_result::rejected_placement;
+                    return corp_command_result::rejected_placement; // BL-1505: a warring front's refusal too
             }
             // BL-1418 (RELATIONS.md § 3): the destination's nation embargoes the
             // actor, so nothing it ships there may land. CREATING such a trade, or

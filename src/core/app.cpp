@@ -3736,7 +3736,7 @@ void app::render()
                     : (r == corp_command_result::rejected_state)
                         ? "You hold as many trades as a corporation may."
                     : (r == corp_command_result::rejected_placement)
-                        ? "Refused: no route reaches that market from here."
+                        ? "Refused: no route reaches that market from here, or a warring front closes it."
                         : "Refused: it must leave a market where you hold a Marketplace or Port, "
                           "go to a different market, carry a good trade carries, and have points above 0.";
                 break;

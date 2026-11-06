@@ -1035,6 +1035,9 @@ void clear_derived_state(world& w)
     w.logistics_flood_fields.clear();
     w.leg_flood_fields.clear(); // BL-1186: the leg-confined floods, same footing
     w.leg_path_cache.clear();
+    w.lane_path_cache.clear();   // BL-1505: the warring lanes, same footing
+    w.lane_flood_fields.clear();
+    w.lane_cache_wars.clear();
     w.body_port_tiles.clear();
     w.rail_networks.clear(); // BL-1255: the rail network, same footing
     w.body_reach_cost.clear();

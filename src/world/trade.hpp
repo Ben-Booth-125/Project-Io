@@ -17,6 +17,7 @@
 
 #include <cstddef>
 #include <map>
+#include <tuple>
 #include <utility>
 #include <map>
 #include <vector>
@@ -32,6 +33,7 @@ struct trade_tick
     int   manual_shipments = 0;    ///< Shipments of manual trades.
     int   auto_shipments   = 0;    ///< Shipments auto trade chose.
     int   refused_no_lp    = 0;    ///< Shipments the passive Logistic Point cap refused outright.
+    int   refused_front    = 0;    ///< BL-1505: shipments refused because every lane crosses a warring front.
     int   refused_embargo  = 0;    ///< BL-1418: shipments refused because the destination's nation embargoes the trader.
     float units_shipped    = 0.0f; ///< Units of every good sent.
 };
@@ -104,6 +106,8 @@ bool trade_is_valid(const world& w, const recipe_registry& reg, const standing_t
 struct trade_haul_memo
 {
     std::map<std::pair<entity_id, entity_id>, float> intra;
+    /// BL-1505: the same for a trader at war, whose lanes are its own: (party, source, dest).
+    std::map<std::tuple<entity_id, entity_id, entity_id>, float> at_war;
 };
 
 /// One route auto trade (and the scorer's trade candidate) can rank: good @p r

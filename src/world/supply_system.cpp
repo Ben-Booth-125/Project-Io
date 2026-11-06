@@ -23,6 +23,26 @@
 
 void advance_convoys(world& w)
 {
+    // BL-1505 (SUPPLY.md § A lane does not cross a warring front): cargo in flight with no
+    // route left returns to its origin: it lands on its source market now, and its owner
+    // has paid the haul. A convoy whose lane another way is left alone: a detour is simply
+    // the lane it reads next. Vector order: fixed.
+    if (!w.wars.empty())
+    {
+        std::vector<std::uint32_t> home;
+        for (const convoy_component& c : w.convoys)
+            if (!c.arrived && w.markets.count(c.source_market) != 0 && convoy_stranded_by_front(w, c))
+            {
+                w.land_goods(c.corp, c.source_market, static_cast<std::size_t>(c.cargo_resource), c.cargo_qty);
+                home.push_back(c.id);
+            }
+        if (!home.empty())
+            w.convoys.erase(std::remove_if(w.convoys.begin(), w.convoys.end(),
+                                           [&](const convoy_component& c) {
+                                               return std::find(home.begin(), home.end(), c.id) != home.end();
+                                           }),
+                            w.convoys.end());
+    }
     for (auto& convoy : w.convoys)
     {
         // BL-1195: where this tick's travel starts — interdiction sweeps from here
@@ -562,8 +582,13 @@ float route_leg_per_unit(const route_leg& l)
 ///
 /// The route-wide `crosses_ocean` refusal (BL-608's "Port at both endpoints") is retired
 /// with this: that bit billed or refused a whole route for the water on any part of it.
+///
+/// BL-1505 (SUPPLY.md § A lane does not cross a warring front): @p party is the trader
+/// when it is at war (`lane_party`), else null. Every path below is read as it may fly
+/// it, on the same functions `convoy_route_tiles` reads, so price and lane are one answer.
 bool route_intra_body(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
-                      entity_id body, entity_id origin, entity_id dest, intra_route& out)
+                      entity_id party, entity_id body, entity_id origin, entity_id dest,
+                      intra_route& out)
 {
     if (origin == null_entity || dest == null_entity)
         return false; // no production anchor / unanchored market: cannot route
@@ -577,7 +602,7 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
     // steps (logistics.cpp, leg_flood_field_for), so a pair the unconfined flood cannot
     // join may still have a port route. No LAND route exists then, though: a land leg
     // walks the same four-way edges and never enters water, so it is a subset.
-    const logistics_path& path = intra_body_path(w, body, origin, dest);
+    const logistics_path& path = lane_path(w, party, body, origin, dest);
 
     bool        have = false;
     float       best = 0.0f;
@@ -597,7 +622,7 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
     }
     else if (path.reachable)
     {
-        const logistics_path& land = intra_body_leg_path(w, body, origin, dest, leg_domain::land);
+        const logistics_path& land = lane_leg_path(w, party, body, origin, dest, leg_domain::land);
         if (land.reachable)
         {
             route.n_legs       = 1;
@@ -632,7 +657,7 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
         std::vector<end_leg> to_port(ports.size());
         for (std::size_t i = 0; i < ports.size(); ++i)
         {
-            const logistics_path& a = intra_body_leg_path(w, body, origin, ports[i], leg_domain::land);
+            const logistics_path& a = lane_leg_path(w, party, body, origin, ports[i], leg_domain::land);
             if (a.reachable)
             {
                 to_port[i].ok       = true;
@@ -651,7 +676,7 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
             {
                 from_done[j] = 1;
                 const logistics_path& b =
-                    intra_body_leg_path(w, body, ports[j], dest, leg_domain::land);
+                    lane_leg_path(w, party, body, ports[j], dest, leg_domain::land);
                 if (b.reachable)
                 {
                     from_port[j].ok       = true;
@@ -680,7 +705,7 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                 if (have && !(to_port[i].per_unit + on.per_unit + fees < best))
                     continue;
                 const logistics_path& s =
-                    intra_body_leg_path(w, body, ports[i], ports[j], leg_domain::sea);
+                    lane_leg_path(w, party, body, ports[i], ports[j], leg_domain::sea);
                 if (!s.reachable)
                     continue;
                 // The sea leg carries no node discount: the BL-148/149 nodes are cities and
@@ -745,7 +770,7 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                 {
                     to_done[i] = 1;
                     const logistics_path& a =
-                        intra_body_leg_path(w, body, origin, stations[i], leg_domain::land);
+                        lane_leg_path(w, party, body, origin, stations[i], leg_domain::land);
                     if (a.reachable)
                     {
                         to_st[i].ok       = true;
@@ -761,7 +786,7 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                 {
                     from_done[j] = 1;
                     const logistics_path& b =
-                        intra_body_leg_path(w, body, stations[j], dest, leg_domain::land);
+                        lane_leg_path(w, party, body, stations[j], dest, leg_domain::land);
                     if (b.reachable)
                     {
                         from_st[j].ok       = true;
@@ -794,6 +819,11 @@ bool route_intra_body(world& w, const recipe_registry& reg, const logistics_node
                     if (on.ok && (jb == stations.size() || on.per_unit < from(jb).per_unit))
                         jb = j;
                 }
+            // BL-1505: a line over a warring front is no candidate; track cannot detour.
+            if (jb < stations.size() && party != null_entity
+                && lane_crosses_warring_front(
+                       w, party, rail_leg_path(w, body, stations[ia], stations[jb], /*respect_cuts=*/true).tiles))
+                jb = stations.size();
             if (jb < stations.size())
             {
                 const end_leg& in = to(ia);
@@ -896,7 +926,7 @@ convoy_leg finish_leg(convoy_mode mode, float unit_cost, float dist, float qty,
 /// the same route and differ only by the trader's held nodes.
 template <typename Haul>
 convoy_leg market_leg_with_haul(world& w, const recipe_registry& reg,
-                                const logistics_nodes& nodes, entity_id src_market,
+                                const logistics_nodes& nodes, entity_id party, entity_id src_market,
                                 entity_id dest_market, float qty, Haul&& haul)
 {
     if (src_market == dest_market || !std::isfinite(qty) || !(qty > 0.0f))
@@ -913,7 +943,7 @@ convoy_leg market_leg_with_haul(world& w, const recipe_registry& reg,
     // (route_intra_body), so a pair this answers viable for is one a convoy can
     // actually run.
     intra_route route;
-    if (!route_intra_body(w, reg, nodes, body, sit->second.centre_tile,
+    if (!route_intra_body(w, reg, nodes, party, body, sit->second.centre_tile,
                           dit->second.centre_tile, route))
         return convoy_leg{};
     convoy_leg leg = finish_route(route, qty, reg.port_handling(), reg.rail().station_handling, haul);
@@ -1025,7 +1055,9 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
         // only one (route_intra_body). The same route `price_market_leg` prices;
         // only the haul part carries the trader's nation's logistics_cost
         // modifiers (BL-1274) — identity for a nation holding none.
-        leg = market_leg_with_haul(w, reg, nodes, src_market, dest_market_id, qty, nation_haul);
+        // BL-1505: a trader at war routes round its fronts; the leg it is refused is refused here.
+        leg = market_leg_with_haul(w, reg, nodes, lane_party(w, corp_id), src_market, dest_market_id,
+                                   qty, nation_haul);
         return leg;
     }
 
@@ -1066,10 +1098,19 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
 
 convoy_leg price_market_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id src_market,
-                            entity_id dest_market, float qty)
+                            entity_id dest_market, float qty, entity_id party)
 {
-    return market_leg_with_haul(w, reg, nodes, src_market, dest_market, qty,
+    return market_leg_with_haul(w, reg, nodes, party, src_market, dest_market, qty,
                                 [](float c) { return c; });
+}
+
+bool front_closes_lane(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                       entity_id owner, entity_id src_market, entity_id dest_market)
+{
+    const entity_id party = lane_party(w, owner);
+    return party != null_entity
+        && !price_market_leg(w, reg, nodes, src_market, dest_market, 1.0f, party).viable
+        && price_market_leg(w, reg, nodes, src_market, dest_market, 1.0f).viable;
 }
 
 namespace {

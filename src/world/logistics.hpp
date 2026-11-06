@@ -232,6 +232,34 @@ enum class leg_domain : std::uint8_t
 const logistics_path& intra_body_leg_path(world& w, entity_id body, entity_id src_tile,
                                           entity_id dst_tile, leg_domain domain);
 
+// ---------------------------------------------------------------------------
+// BL-1505 (SUPPLY.md § A lane does not cross a warring front, Ben 2026-11-05)
+// ---------------------------------------------------------------------------
+// A lane may not cross a front (owner or occupier, `world::tile_controller`) between
+// nations at war. It binds the two parties only: a neutral third nation's convoy is not
+// bound, and neither is a leg with no owner to be at war. THE ROUTE PRICE AND THE LANE ARE
+// ONE ANSWER: the router and `convoy_route_tiles` both read the two functions below.
+
+/// The nation a lane must answer for: @p owner when it is party to a war, else
+/// null_entity. A null party reads the ordinary paths, to the bit.
+entity_id lane_party(const world& w, entity_id owner);
+
+/// Does a hop between these tiles cross a front @p party is at war across?
+bool lane_hop_closed(const world& w, entity_id party, entity_id a, entity_id b);
+
+/// Does this walk cross one? Order does not matter: every consecutive pair is read.
+bool lane_crosses_warring_front(const world& w, entity_id party, const std::vector<entity_id>& tiles);
+
+/// `intra_body_path` as @p party may fly it: the ordinary path while it crosses no warring
+/// front (the cheapest open path is still the cheapest), else the cheapest overland detour.
+/// Not reachable when there is none. A reference into a cache, as intra_body_path's is.
+const logistics_path& lane_path(world& w, entity_id party, entity_id body, entity_id src_tile,
+                                entity_id dst_tile);
+
+/// `intra_body_leg_path` as @p party may fly it, on the same rule.
+const logistics_path& lane_leg_path(world& w, entity_id party, entity_id body, entity_id src_tile,
+                                    entity_id dst_tile, leg_domain domain);
+
 /// BL-1186: the tiles of @p body carrying a BUILT, ACTIVE Port (the sea leg's gate,
 /// SUPPLY.md § Infrastructure gates), ascending and unique. Cached on
 /// world.body_port_tiles; cleared with the logistics caches.
@@ -333,6 +361,8 @@ inline void invalidate_logistics_caches(world& w)
     w.logistics_flood_fields.clear(); // same contract: any traversal/anchor change stales it
     w.leg_flood_fields.clear();       // BL-1186: the leg-confined floods and pairs, and the
     w.leg_path_cache.clear();         // per-body port set (a port completing or idling moves
+    w.lane_path_cache.clear();        // BL-1505: the warring lanes read the same roads and ports
+    w.lane_flood_fields.clear();
     w.body_port_tiles.clear();        // it: building_affects_logistics), on the same contract
     w.rail_networks.clear();          // BL-1255: stations and track move it, same contract
     w.body_reach_cost.clear();
@@ -518,6 +548,11 @@ struct convoy_route
 /// game state is created. (BL-458's design writes this as taking a
 /// `const world&`; that is not achievable without a second, uncached A*.)
 convoy_route convoy_route_tiles(world& w, const convoy_component& cv);
+
+/// BL-1505: does the front alone leave this convoy with no lane? True when its owner is at
+/// war, the convoy is on one body, its lane does not solve for its owner, and the same lane
+/// solves for a neutral. A road or a port lost in transit is not this (SUPPLY.md).
+bool convoy_stranded_by_front(world& w, const convoy_component& cv);
 
 /// BL-1195: the index along a lane of the tile the cargo is on at @p progress (the
 /// fraction of its travel time elapsed), read off the lane's clock

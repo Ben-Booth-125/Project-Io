@@ -54,6 +54,7 @@ enum class trade_refusal : std::uint8_t
     no_lane,     ///< Another body, and no leg off this one is viable.
     gate,        ///< The destination's price does not clear the margin over the source's.
     no_route,    ///< Same body, and no viable leg reaches it.
+    front_closed, ///< BL-1505: same body, and every leg crosses a front the shipper is at war across.
     costly,      ///< Routed, but the haul eats the margin.
     no_propellant, ///< A space lane, but the pool cannot fuel the launch.
     no_room,     ///< Clears the margin, but cannot absorb more at the landed cost.
@@ -873,6 +874,16 @@ struct world
     /// stay theirs. Pure functions of the body's tiles.
     std::map<std::tuple<entity_id, entity_id, std::uint8_t>, logistics_flood_field> leg_flood_fields;
     std::map<std::tuple<entity_id, entity_id, entity_id, std::uint8_t>, logistics_path> leg_path_cache;
+
+    /// BL-1505 (SUPPLY.md § A lane does not cross a warring front): the lanes a nation at
+    /// war may fly, keyed (party, body, src, dst, kind), and the closed floods behind the
+    /// detours, keyed (party, body, anchor, kind). Derived caches, on the logistics caches'
+    /// contract, and also stale when a front or a war moves (the two stamps below).
+    /// Pure functions of the tiles, the fronts and the wars; never saved, never hashed.
+    std::map<std::tuple<entity_id, entity_id, entity_id, entity_id, std::uint8_t>, logistics_path> lane_path_cache;
+    std::map<std::tuple<entity_id, entity_id, entity_id, std::uint8_t>, logistics_flood_field> lane_flood_fields;
+    std::uint64_t lane_cache_territory = 0;
+    std::vector<std::pair<entity_id, entity_id>> lane_cache_wars;
 
     /// BL-1186: per body, the tiles carrying a BUILT, ACTIVE Port, ascending and unique —
     /// the candidate ends of a sea leg. Derived; cleared with the logistics caches, whose

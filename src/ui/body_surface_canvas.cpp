@@ -1633,9 +1633,9 @@ void draw_supply_routes_key(const world& w, const std::vector<supply_edge>& edge
 /// the CORPORATION dispatcher's rules, worst first (LENSES.md § Trade-flow lens).
 /// The market-viability skill's logistics row classifies MARKET SHELF exports, a
 /// different dispatcher with its own order and its own labels; these are not those.
-constexpr int k_trade_refusal_count = 9;
+constexpr int k_trade_refusal_count = 10;
 constexpr const char* k_trade_refusal_name[k_trade_refusal_count] = {
-    "embargoed", "no lane", "price gate", "no route", "costly",
+    "embargoed", "no lane", "price gate", "no route", "front closed", "costly",
     "no propellant", "no room", "no funds", "room",
 };
 static_assert(static_cast<int>(trade_refusal::room) + 1 == k_trade_refusal_count,

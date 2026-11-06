@@ -1,4 +1,5 @@
 #include "logistics.hpp"
+#include "war.hpp" // BL-1505: at_war
 #include "river_generation.hpp"
 #include "hex_neighbors.hpp" // BL-1186: a port reaches its sea across any hex side
 #include "road_generation.hpp" // BL-1230: kMaxCrossingTiles, the strait a road crosses
@@ -815,16 +816,13 @@ namespace {
 ///         (a sea leg may END there — the origin port) but never expanded. So
 ///         every reached land cell is reached across water from the anchor and
 ///         the leg is port -> water -> port, nothing else.
-const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entity_id anchor_tile,
-                                                 leg_domain domain, int gw, int gh,
-                                                 const std::vector<entity_id>& grid,
-                                                 const tile_component& anchor_tc)
+/// The flood itself. @p party, when not null, closes every hop across a front it is at war
+/// across (BL-1505): the one difference between an ordinary field and a warring one, so a
+/// detour is priced on exactly the edges every other path is.
+logistics_flood_field build_leg_flood(world& w, entity_id party, leg_domain domain, int gw, int gh,
+                                      const std::vector<entity_id>& grid,
+                                      const tile_component& anchor_tc)
 {
-    const auto key = std::make_tuple(body, anchor_tile, static_cast<std::uint8_t>(domain));
-    const auto fit = w.leg_flood_fields.find(key);
-    if (fit != w.leg_flood_fields.end())
-        return fit->second;
-
     logistics_flood_field f;
     const int total = gw * gh;
     f.dist.assign(static_cast<std::size_t>(total), 1e30f);
@@ -891,6 +889,11 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
             if (domain == leg_domain::sea && !cur_water && !n_water)
                 continue; // the anchor port leaves by water, never overland
 
+            if (party != null_entity
+                && lane_hop_closed(w, party, grid[static_cast<std::size_t>(idx)],
+                                   grid[static_cast<std::size_t>(nidx)]))
+                continue; // BL-1505
+
             const float edge = flood_edge_cost(*cur_tc, *n_tc, nr, i);
             const float nd   = f.dist[static_cast<std::size_t>(idx)] + edge;
             if (nd < f.dist[static_cast<std::size_t>(nidx)])
@@ -931,6 +934,10 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
                 const bool n_water = wet(*n_tc);
                 if (cur_water == n_water)
                     continue; // only the port <-> water hop
+                if (party != null_entity
+                    && lane_hop_closed(w, party, grid[static_cast<std::size_t>(idx)],
+                                       grid[static_cast<std::size_t>(nidx)]))
+                    continue; // BL-1505
                 // BL-1340: the ONE hop price, as the cardinal hops above — priced from
                 // the neighbour leaving by the side facing back, so a bridge or a river
                 // on that side is read here too.
@@ -947,10 +954,146 @@ const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entit
         }
     }
 
-    return w.leg_flood_fields.emplace(key, std::move(f)).first->second;
+    return f;
+}
+
+const logistics_flood_field& leg_flood_field_for(world& w, entity_id body, entity_id anchor_tile,
+                                                 leg_domain domain, int gw, int gh,
+                                                 const std::vector<entity_id>& grid,
+                                                 const tile_component& anchor_tc)
+{
+    const auto key = std::make_tuple(body, anchor_tile, static_cast<std::uint8_t>(domain));
+    const auto fit = w.leg_flood_fields.find(key);
+    if (fit != w.leg_flood_fields.end())
+        return fit->second;
+    return w.leg_flood_fields
+        .emplace(key, build_leg_flood(w, null_entity, domain, gw, gh, grid, anchor_tc))
+        .first->second;
 }
 
 } // namespace
+
+// ---------------------------------------------------------------------------
+// BL-1505: lanes under a war
+// ---------------------------------------------------------------------------
+
+entity_id lane_party(const world& w, entity_id owner)
+{
+    if (owner == null_entity || w.wars.empty())
+        return null_entity;
+    for (const auto& [key, rec] : w.wars) // a pure any-of
+        if (key.first == owner || key.second == owner)
+            return owner;
+    return null_entity;
+}
+
+bool lane_hop_closed(const world& w, entity_id party, entity_id a, entity_id b)
+{
+    const entity_id ca = w.tile_controller(a), cb = w.tile_controller(b);
+    if (ca == cb || ca == null_entity || cb == null_entity)
+        return false;
+    if (ca == party)
+        return at_war(w, party, cb);
+    return cb == party && at_war(w, party, ca);
+}
+
+bool lane_crosses_warring_front(const world& w, entity_id party, const std::vector<entity_id>& tiles)
+{
+    for (std::size_t i = 1; i < tiles.size(); ++i)
+        if (lane_hop_closed(w, party, tiles[i - 1], tiles[i]))
+            return true;
+    return false;
+}
+
+namespace {
+
+/// The lane caches answer for one map of fronts and one set of wars: past either, drop them.
+void refresh_lane_caches(world& w)
+{
+    std::vector<std::pair<entity_id, entity_id>> wars;
+    wars.reserve(w.wars.size());
+    for (const auto& [key, rec] : w.wars) // std::map: ascending
+        wars.push_back(key);
+    if (w.lane_cache_territory == w.territory_generation && w.lane_cache_wars == wars)
+        return;
+    w.lane_path_cache.clear();
+    w.lane_flood_fields.clear();
+    w.lane_cache_territory = w.territory_generation;
+    w.lane_cache_wars      = std::move(wars);
+}
+
+constexpr std::uint8_t k_lane_kind_unconfined = 0xFF; // beside leg_domain's values
+
+} // namespace
+
+const logistics_path& lane_leg_path(world& w, entity_id party, entity_id body, entity_id src_tile,
+                                    entity_id dst_tile, leg_domain domain)
+{
+    if (party == null_entity)
+        return intra_body_leg_path(w, body, src_tile, dst_tile, domain);
+    refresh_lane_caches(w);
+    const auto kind = static_cast<std::uint8_t>(domain);
+    const auto key  = std::make_tuple(party, body, src_tile, dst_tile, kind);
+    if (const auto it = w.lane_path_cache.find(key); it != w.lane_path_cache.end())
+        return it->second;
+
+    const logistics_path& base = intra_body_leg_path(w, body, src_tile, dst_tile, domain);
+    if (!base.reachable || !lane_crosses_warring_front(w, party, base.tiles))
+        return w.lane_path_cache.emplace(key, base).first->second; // closing edges adds no reach
+
+    // The detour: the same flood with the front's hops closed, read as intra_body_leg_path
+    // reads its field.
+    logistics_path res;
+    const auto bit = w.bodies.find(body);
+    const auto sit = w.tiles.find(src_tile);
+    const auto dit = w.tiles.find(dst_tile);
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    const auto fkey = std::make_tuple(party, body, dst_tile, kind);
+    auto fit = w.lane_flood_fields.find(fkey);
+    if (fit == w.lane_flood_fields.end())
+        fit = w.lane_flood_fields
+                  .emplace(fkey, build_leg_flood(w, party, domain, gw, gh, grid, dit->second))
+                  .first;
+    const logistics_flood_field& field = fit->second;
+    const int src_idx = raster_idx(sit->second.grid_x, sit->second.grid_y, gw);
+    if (field.dist[static_cast<std::size_t>(src_idx)] < 1e30f)
+    {
+        res.reachable     = true;
+        res.cost          = field.dist[static_cast<std::size_t>(src_idx)];
+        res.crosses_ocean = field.crossed[static_cast<std::size_t>(src_idx)] != 0;
+        std::vector<entity_id> seq;
+        for (int i = src_idx; i != -1; i = field.came_from[static_cast<std::size_t>(i)])
+        {
+            const entity_id tid = grid[static_cast<std::size_t>(i)];
+            if (tid != null_entity) seq.push_back(tid);
+            if (i == field.anchor_idx) break;
+        }
+        if (src_tile > dst_tile) // seq runs src -> dst; stored lo -> hi like intra_body_path
+            std::reverse(seq.begin(), seq.end());
+        res.tiles = std::move(seq);
+    }
+    return w.lane_path_cache.emplace(key, std::move(res)).first->second;
+}
+
+const logistics_path& lane_path(world& w, entity_id party, entity_id body, entity_id src_tile,
+                                entity_id dst_tile)
+{
+    if (party == null_entity)
+        return intra_body_path(w, body, src_tile, dst_tile);
+    refresh_lane_caches(w);
+    const auto key = std::make_tuple(party, body, src_tile, dst_tile, k_lane_kind_unconfined);
+    if (const auto it = w.lane_path_cache.find(key); it != w.lane_path_cache.end())
+        return it->second;
+    const logistics_path& base = intra_body_path(w, body, src_tile, dst_tile);
+    if (!base.reachable || !lane_crosses_warring_front(w, party, base.tiles))
+        return w.lane_path_cache.emplace(key, base).first->second;
+    // A front on the cheapest path: the land leg is the road round it (a sea route is the
+    // router's other candidate, priced beside it). Copied first: the emplace below is
+    // into the same map, and std::map nodes stay put, but the two are separate answers.
+    logistics_path detour = lane_leg_path(w, party, body, src_tile, dst_tile, leg_domain::land);
+    return w.lane_path_cache.emplace(key, std::move(detour)).first->second;
+}
 
 const logistics_path& intra_body_leg_path(world& w, entity_id body, entity_id src_tile,
                                           entity_id dst_tile, leg_domain domain)
@@ -1716,10 +1859,11 @@ struct lane_leg
 /// two legs meet at) is written once. Records the leg's start and its travel days
 /// (leg_travel_days on the leg's own path cost, at @p mode's speed — the figure the
 /// haul was priced and timed on). False when the leg has no path.
-bool append_leg(world& w, entity_id body, entity_id from, entity_id to, leg_domain domain,
-                convoy_mode mode, std::vector<entity_id>& out, std::vector<lane_leg>& legs)
+bool append_leg(world& w, entity_id party, entity_id body, entity_id from, entity_id to,
+                leg_domain domain, convoy_mode mode, std::vector<entity_id>& out,
+                std::vector<lane_leg>& legs)
 {
-    const logistics_path& lp = intra_body_leg_path(w, body, from, to, domain);
+    const logistics_path& lp = lane_leg_path(w, party, body, from, to, domain); // BL-1505
     if (!lp.reachable || lp.tiles.empty())
         return false;
     std::vector<entity_id> seq = lp.tiles; // copied: the cache entry stays canonical lo->hi
@@ -1738,7 +1882,7 @@ bool append_leg(world& w, entity_id body, entity_id from, entity_id to, leg_doma
 
 /// BL-1255: append a RAIL leg station @p from -> station @p to (rail_leg_path,
 /// already oriented from -> to), at rail speed. Same shared-tile rule as append_leg.
-bool append_rail_leg(world& w, entity_id body, entity_id from, entity_id to,
+bool append_rail_leg(world& w, entity_id party, entity_id body, entity_id from, entity_id to,
                      std::vector<entity_id>& out, std::vector<lane_leg>& legs)
 {
     // BL-1255 fix round (review 5, one price): the lane runs over the SAME
@@ -1750,6 +1894,9 @@ bool append_rail_leg(world& w, entity_id body, entity_id from, entity_id to,
     if (!lp.reachable || lp.tiles.empty())
         lp = rail_leg_path(w, body, from, to, /*respect_cuts=*/false);
     if (!lp.reachable || lp.tiles.empty())
+        return false;
+    // BL-1505: track runs where it runs. A line over a warring front is no lane for a party.
+    if (party != null_entity && lane_crosses_warring_front(w, party, lp.tiles))
         return false;
     std::size_t k = 0;
     if (!out.empty() && out.back() == lp.tiles.front())
@@ -1836,7 +1983,9 @@ std::vector<float> lane_clock(const world& w, const std::vector<entity_id>& tile
 
 } // namespace
 
-convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
+namespace {
+
+convoy_route convoy_route_for(world& w, const convoy_component& cv, entity_id party)
 {
     convoy_route route;
 
@@ -1888,18 +2037,18 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
         // The rail leg is the path the price used (append_rail_leg), falling back to
         // the physical track only when the line was cut under the cargo, so a
         // hostile unit standing on it intercepts it (§ 7). Track lifted: no lane.
-        if (!append_leg(w, body, st, cv.station_a, leg_domain::land, convoy_mode::land, tiles, legs)
-            || !append_rail_leg(w, body, cv.station_a, cv.station_b, tiles, legs)
-            || !append_leg(w, body, cv.station_b, dt, leg_domain::land, convoy_mode::land, tiles,
+        if (!append_leg(w, party, body, st, cv.station_a, leg_domain::land, convoy_mode::land, tiles, legs)
+            || !append_rail_leg(w, party, body, cv.station_a, cv.station_b, tiles, legs)
+            || !append_leg(w, party, body, cv.station_b, dt, leg_domain::land, convoy_mode::land, tiles,
                            legs))
             return route;
     }
     else if (cv.port_a != null_entity && cv.port_b != null_entity)
     {
-        if (!append_leg(w, body, st, cv.port_a, leg_domain::land, convoy_mode::land, tiles, legs)
-            || !append_leg(w, body, cv.port_a, cv.port_b, leg_domain::sea, convoy_mode::sea,
+        if (!append_leg(w, party, body, st, cv.port_a, leg_domain::land, convoy_mode::land, tiles, legs)
+            || !append_leg(w, party, body, cv.port_a, cv.port_b, leg_domain::sea, convoy_mode::sea,
                            tiles, legs)
-            || !append_leg(w, body, cv.port_b, dt, leg_domain::land, convoy_mode::land, tiles,
+            || !append_leg(w, party, body, cv.port_b, dt, leg_domain::land, convoy_mode::land, tiles,
                            legs))
             return route; // a leg the dispatch walked no longer exists: no lane
     }
@@ -1909,12 +2058,12 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
         // unconfined cheapest path while it stays on land, else the cheapest
         // LAND-ONLY path (a pair whose cheapest path crosses water but which has a
         // road round).
-        const logistics_path& lp = intra_body_path(w, body, st, dt);
+        const logistics_path& lp = lane_path(w, party, body, st, dt); // BL-1505
         if (!lp.reachable || lp.tiles.empty())
             return route;
         bool laid = false;
         if (lp.crosses_ocean)
-            laid = append_leg(w, body, st, dt, leg_domain::land, convoy_mode::land, tiles, legs);
+            laid = append_leg(w, party, body, st, dt, leg_domain::land, convoy_mode::land, tiles, legs);
         // No overland road: only a convoy built outside the dispatch seam reaches
         // here (the router refuses such a pair a land route). It keeps the direct
         // path, the one lane it can be given.
@@ -1940,6 +2089,20 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
     route.at    = lane_clock(w, tiles, legs);
     route.tiles = std::move(tiles);
     return route;
+}
+
+} // namespace
+
+convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
+{
+    return convoy_route_for(w, cv, lane_party(w, cv.corp));
+}
+
+bool convoy_stranded_by_front(world& w, const convoy_component& cv)
+{
+    const entity_id party = lane_party(w, cv.corp);
+    return party != null_entity && convoy_route_for(w, cv, party).tiles.empty()
+        && !convoy_route_for(w, cv, null_entity).tiles.empty();
 }
 
 int convoy_lane_index(const std::vector<float>& at, float progress)

@@ -228,9 +228,16 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
 /// routes overland, or land -> port -> sea -> port -> land through two active Ports
 /// (SUPPLY.md § Logistical cost) — the ports need not sit on either market centre.
 /// BL-1185's placement asks this same call, so placement and shipping cannot disagree.
+/// BL-1505: @p party, when named, reads the lane as that nation at war may fly it
+/// (`lane_party`). Null is a market's own leg, which no front binds.
 convoy_leg price_market_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id src_market,
-                            entity_id dest_market, float qty);
+                            entity_id dest_market, float qty, entity_id party = null_entity);
+
+/// BL-1505: is the warring front the reason @p owner has no lane between these two markets
+/// of one body? The surfaced reason (SUPPLY.md): a lane a neutral could fly and it cannot.
+bool front_closes_lane(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                       entity_id owner, entity_id src_market, entity_id dest_market);
 
 /// True if `owner` — a corporation or a nation (BL-1402, `assets_of`) — has a
 /// launchpad building whose tile is on `body`.
