@@ -142,7 +142,8 @@ float trade_haul_per_unit(world& w, const recipe_registry& reg, const logistics_
 /// @p memo. Deterministic: sorted walks.
 void rank_trade_routes(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
                        trade_haul_memo& memo, entity_id corp,
-                       const std::vector<entity_id>& sources, std::vector<trade_route_offer>& out);
+                       const std::vector<entity_id>& sources, std::vector<trade_route_offer>& out,
+                       std::vector<std::tuple<entity_id, entity_id, std::size_t>>* no_route_at_war = nullptr);
 
 /// THE TRADE PASS, once per economy tick, after `run_economy_step` (its
 /// production has landed and its draws are made) and before `clear_markets`

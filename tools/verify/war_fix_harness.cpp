@@ -641,12 +641,16 @@ int main()
         world peaceful = f.w;
         economy_report rep0;
         const trade_tick t0 = run_trades(peaceful, treg, rep0);
-        check(t0.auto_shipments > 0, "W11a at peace the auto trade ships across the seam");
+        std::printf("  INFO peace pass: trading %d, points %.1f, auto %d, manual %d, no_lp %d, sent %.2f\n",
+                    t0.corps_trading, t0.points_made, t0.auto_shipments, t0.manual_shipments, t0.refused_no_lp, t0.units_shipped);
+        // This fixture resolves no Logistic Points, so the door stops it at the last gate:
+        // that is the proof it got there. A shipment needs a real world's pool.
+        check(t0.refused_no_lp > 0 && t0.refused_front == 0, "W11a at peace the auto route reaches the trade's door");
 
         open_war(f);
         economy_report rep;
         const trade_tick t1 = run_trades(f.w, treg, rep);
-        check(t1.auto_shipments == 0, "W11b at war it cannot");
+        check(t1.refused_no_lp == 0 && t1.auto_shipments == 0, "W11b at war it does not");
         check(t1.refused_front > 0, "W11c run_trades counts the auto route the front closed");
         bool lens = false;
         for (const trade_flow_pass& pass : f.w.player_trade_flow)
@@ -671,6 +675,8 @@ int main()
         st.id = 1; st.owner = g.A; st.from_market = g.ma; st.to_market = g.mb;
         st.resource = resource_type::iron_ore; st.points = 1.0f;
         g.w.trades.push_back(st);
+        if (float* reserve = trade_reserve_of(g.w, g.A); reserve != nullptr)
+            *reserve = 5.0f;
         invalidate_logistics_caches(g.w);
         open_war(g);
         economy_report rep2;
