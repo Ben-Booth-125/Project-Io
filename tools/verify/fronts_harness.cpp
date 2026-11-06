@@ -1472,6 +1472,21 @@ int main()
               "F12x a clear applies");
     }
     {
+        // F12 through the game's own door: a whole run_military_day, not its parts.
+        fixture f; build(f);
+        reanchor_fronts(f.w);
+        const entity_id d = add_unit(f, f.B, f.at(3, 5));
+        corp_command c; c.corp = f.B; c.as_nation = f.B; c.verb = corp_verb::defend_province;
+        c.subject = d; c.province = f.block(1);
+        (void)apply_corp_command(f.w, reg, c);
+        (void)add_unit(f, f.A, f.at(5, 3), 10);
+        (void)declare_hostile(f.w, f.B, f.A);
+        const entity_id post = f.w.units.at(d).defend_post;
+        (void)run_military_day(f.w, reg, 1);
+        check(f.w.units.at(d).position != post && f.w.units.at(d).defend_province == f.block(1),
+              "F12aa run_military_day wakes the defender and walks it at the stack, on its order");
+    }
+    {
         // THE START ORDER: a major's units in its capital province, and nobody else's.
         fixture f; build(f);
         f.w.nations.at(f.B).is_major = true;
