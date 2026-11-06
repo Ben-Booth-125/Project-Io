@@ -1164,6 +1164,62 @@ int main()
               what);
     }
 
+    // -----------------------------------------------------------------------
+    // F10 - BL-1503 (MILITARY.md § Fronts, Slots): a land unit on hold never takes a
+    // water slot, bridges excepted, and an all-water span leaves it where it stands.
+    // The owned-coast marching rule still stands: a march by hand onto own shore applies.
+    std::printf("\nF10 - hold never walks into water\n");
+    {
+        // Row 2 is A's border with B. Make it A's OWN shore water, save column 7 (land).
+        // Every slot but that one is owned coast, which domain_wall lets a land class on.
+        fixture f; build(f);
+        for (int x = 0; x < W; ++x)
+            if (x != 7)
+                f.w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::coast;
+        reanchor_fronts(f.w);
+        const entity_id u = add_unit(f, f.A, f.at(7, 0));
+        (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+        step(f.w, reg, 12);
+        check(f.w.units.at(u).position == f.at(7, 2),
+              "F10a one land tile on a shore span: the unit takes it, not the water slot in the middle");
+        const entity_id v = add_unit(f, f.A, f.at(3, 0));
+        corp_command m; m.corp = f.A; m.as_nation = f.A; m.verb = corp_verb::march_unit;
+        m.subject = v; m.tile = f.at(3, 2);
+        check(apply_corp_command(f.w, reg, m) == corp_command_result::applied,
+              "F10b the owned-coast ruling stands: a march by hand onto own shore still applies");
+    }
+    {
+        // ALL WATER: no slot at all. The unit stands where it is, and is not reachable.
+        fixture f; build(f);
+        for (int x = 0; x < W; ++x)
+            f.w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::coast;
+        reanchor_fronts(f.w);
+        const entity_id u = add_unit(f, f.A, f.at(4, 0));
+        const front fr = nation_fronts(f.w, f.A).front();
+        check(!front_reachable(f.w, reg, u, fr), "F10c an all-water span is no front a land unit can reach");
+        (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+        step(f.w, reg, 12);
+        check(f.w.units.at(u).position == f.at(4, 0) && f.w.units.at(u).order.dest == null_entity,
+              "F10d assigned anyway, it stays where it stands, with no standing order");
+    }
+    {
+        // A BRIDGE IS A ROAD: every shore tile roaded, the slot in the middle is taken.
+        fixture f; build(f);
+        for (int x = 0; x < W; ++x)
+        {
+            tile_component& t = f.w.tiles.at(f.at(x, 2));
+            t.substrate = terrain_substrate::coast;
+            t.road_edges = road_edges_on_every_side(1);
+        }
+        reanchor_fronts(f.w);
+        const entity_id u = add_unit(f, f.A, f.at(4, 0));
+        (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+        const front fr = nation_fronts(f.w, f.A).front();
+        const entity_id slot = expected_slots(fr, 1)[0];
+        step(f.w, reg, 16);
+        check(f.w.units.at(u).position == slot, "F10e a bridged water slot is taken: a bridge is a road");
+    }
+
     std::printf("\n%d checks, %d failures\n", checks, failures);
     std::printf(failures == 0 ? "ALL PASS (0 failures)\n" : "FAILURES\n");
     return failures == 0 ? 0 : 1;
