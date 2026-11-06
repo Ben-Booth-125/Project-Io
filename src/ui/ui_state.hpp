@@ -1286,13 +1286,20 @@ struct ui_state
             && selected_battle_defender != null_entity;
     }
 
-    /// Clear the battle selection. Called by every other selection path, so the
-    /// Selection element never has two things to draw.
+    /// BL-1506 (SELECTION.md § The convoy element): the selected convoy's id, 0 for none.
+    /// A convoy is not an entity; it is transient, and its id is the stable handle
+    /// (`convoy_component::id`), never reused. An id that has arrived clears itself.
+    std::uint32_t selected_convoy = 0;
+
+    /// Clear the battle selection, and the convoy with it: both are non-entity channels
+    /// the same paths retire. Called by every other selection path, so the Selection
+    /// element never has two things to draw.
     void clear_battle_selection()
     {
         selected_battle_province = 0;
         selected_battle_attacker = null_entity;
         selected_battle_defender = null_entity;
+        selected_convoy          = 0;
     }
 
     // --- The selected front (BL-1427; SELECTION.md § The front element) ----
@@ -1896,6 +1903,36 @@ struct ui_state
     struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f;
                          std::vector<float> at; /* BL-1195: the lane's clock (convoy_route::at) */ };
     std::vector<convoy_beam> convoy_beams;
+
+    /// THE CONVOYS THE CANVAS DRAWS (BL-1506; SELECTION.md § The convoy element). Every
+    /// convoy with a lane on the active body, rebuilt beside `convoy_beams`, because the
+    /// lane read needs the mutable world's path cache and the const draw has neither. The
+    /// draw pass decides which of a rival's the fog shows. View state only.
+    struct convoy_marker
+    {
+        std::uint32_t          id    = 0;
+        entity_id              owner = null_entity;
+        bool                   mine  = false;
+        float                  progress = 0.0f;
+        float                  speed    = 0.0f; ///< 0 while held: a held convoy stands still.
+        std::vector<entity_id> path;
+        std::vector<float>     at;              ///< The lane's clock (convoy_route::at).
+    };
+    std::vector<convoy_marker> convoy_markers;
+    /// One marker as last drawn: the convoy a press on it selects (a repeat press walks to
+    /// the next on that tile), the ground-space hit circle, its screen point, and how many
+    /// share the tile.
+    struct convoy_zone
+    {
+        std::uint32_t id = 0;
+        ImVec2        centre{};
+        float         radius = 0.0f;
+        float         x = 0.0f, y = 0.0f;
+        int           count = 1;
+        bool          mine  = false;
+    };
+    std::vector<convoy_zone> convoy_zones;
+    std::uint32_t hovered_convoy = 0; ///< The convoy the pointer's marker names; 0 none.
 
     // --- Throughput lens: this frame's active-LP anchor pools (BL-598) ---
     // LOGISTICS.md § Logistic Points: LP is a per-tick RATE, never a stock. These

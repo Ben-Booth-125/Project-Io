@@ -2093,6 +2093,63 @@ static void request_neighbourhood_page(const world& w, ui_state& ui, entity_id t
     q.valid  = true;
 }
 
+/// The convoy card (BL-1506; SELECTION.md § The convoy element): cargo, owner, route and
+/// arrival. Another nation's convoy names its owner and how it travels; its cargo and
+/// route stay private (DISCOVERY.md). False when the id has arrived or been cut: the
+/// selection clears itself and the element falls through to the ordinary resolution.
+bool draw_convoy_selection(const world& w, ui_state& ui)
+{
+    const convoy_component* cv = nullptr;
+    for (const convoy_component& c : w.convoys)
+        if (c.id == ui.selected_convoy && !c.arrived) { cv = &c; break; }
+    if (cv == nullptr)
+    {
+        ui.selected_convoy = 0;
+        return false;
+    }
+    const convoy_component& c = *cv;
+    const char* mode = c.mode == convoy_mode::sea ? "Sea"
+                     : c.mode == convoy_mode::air ? "Air"
+                     : c.mode == convoy_mode::space ? "Space" : "Land";
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Convoy");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", mode);
+    ImGui::Separator();
+    const bool show_all = is_player_side(w, c.corp) || (ui.spectating && ui.god_view);
+    {
+        const char* owner_name = owner_display_name(w, c.corp);
+        ImGui::Text("Owner: %s", owner_name != nullptr ? owner_name : "-");
+    }
+    if (!show_all)
+    {
+        ImGui::TextDisabled("Its cargo and route are private.");
+        return true;
+    }
+    const resource_presentation& rp = presentation_of(c.cargo_resource);
+    ImGui::TextUnformatted("Cargo:");
+    ImGui::SameLine();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour), "%s", rp.name);
+    ImGui::SameLine();
+    ImGui::Text("x%.1f", static_cast<double>(c.cargo_qty));
+    ImGui::Text("Route: %s -> %s", market_city_name(w, c.source_market).c_str(),
+                market_city_name(w, c.dest_market).c_str());
+    char overlay[48];
+    if (c.held)
+        std::snprintf(overlay, sizeof overlay, "held");
+    else if (!(c.speed > 0.0f))
+        std::snprintf(overlay, sizeof overlay, "%.0f%%  (stalled)",
+                      static_cast<double>(c.progress) * 100.0);
+    else
+    {
+        const int eta = static_cast<int>(std::ceil(std::max(0.0f, 1.0f - c.progress) / c.speed));
+        std::snprintf(overlay, sizeof overlay, "%.0f%%  arrives in %d qtr%s",
+                      static_cast<double>(c.progress) * 100.0, eta, eta == 1 ? "" : "s");
+    }
+    ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, 320.0f));
+    ImGui::ProgressBar(c.progress, ImVec2{std::min(ImGui::GetContentRegionAvail().x, 320.0f), 0.0f}, overlay);
+    return true;
+}
+
 const active_battle* selected_battle(const world& w, ui_state& ui)
 {
     if (!ui.has_battle_selection())
@@ -4183,6 +4240,10 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         draw_battle_selection(w, ui);
         return;
     }
+    // BL-1506: a CONVOY, the same non-entity shape — its id in its own field. One that
+    // has landed clears itself and falls through.
+    if (ui.selected_convoy != 0 && draw_convoy_selection(w, ui))
+        return;
 
     // BL-671: the two NON-ENTITY LENS REGIONS resolve next, for the same
     // structural reason the battle and the contract do — a deposit is a resource

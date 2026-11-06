@@ -1244,6 +1244,18 @@
     "src/core/app.cpp"
    ],
    "status": "drafted"
+  },
+  "convoy_marker": {
+   "surface": "Convoy marker (Planetary canvas, at a lane's head) and the Convoy card (Selection band, convoy kind)",
+   "answers": "What is moving on this ground, whose is it, what does it carry, where is it bound and when does it land?",
+   "because": "Ben, 2026-11-05 (SELECTION.md § The convoy element): convoys are drawn on the map as they move, and a press selects one. Trade is half the game and until now it moved invisibly: the vision beam lit the ground under the player's own cargo and the Convoys ledger listed it, but nothing on the map was the shipment. The marker sits at the lane's head, on the clock the beam uses, so it stands where the sim says the cargo is. Several on one tile are one marker with a count, the clutter guard, and a repeat press walks them as the wing marker walks its wings. Another nation's marker draws only on ground the player's own vision lights (DISCOVERY.md), and its card names only the owner and how it travels: the cargo and route stay private. A convoy is not an entity, so the selection holds its id in a field of its own, as the battle's triple does, and an arrived id clears itself.",
+   "backlog_item": "BL-1506",
+   "files": [
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/ui_state.hpp"
+   ],
+   "status": "drafted"
   }
  }
 }

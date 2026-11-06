@@ -706,6 +706,10 @@
    "The Planetary canvas: a marching unit's counter, drawn apart from its tile's stack on the hop it is walking (BL-1507; MILITARY.md § Land — on the canvas)."
   ],
   [
+   "canvas.convoy_select",
+   "The Planetary canvas: a convoy marker at a lane's head, a chevron on a dark disc in the owner's colour, with a count when several share the tile (BL-1506; SELECTION.md § The convoy element)."
+  ],
+  [
    "gameplay.hire_wing",
    "The Military ledger's air rows (nav rail slot 7, Recruit tab, Air theatre tab; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too."
   ],

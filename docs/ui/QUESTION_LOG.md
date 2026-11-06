@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**76 surfaces** — 4 settled, 72 awaiting Ben's wording.
+**77 surfaces** — 4 settled, 73 awaiting Ben's wording.
 
 ---
 
@@ -123,6 +123,14 @@ alphabetical order.
 **Because:** CONTRACTS.md's EVENTS.md-derived rule is that an event lands with its message in the SAME change: offer issued, accepted, completed, failed and abandoned are the five moments a contract's money and reputation actually move, and none of them had a surface before this — a completed contract paid out silently. The Public channel is the only correct home rather than a new channel of its own (unlike the battle dispatch stream): CHAT.md already settles Public as nation-voiced, and a contract's counterparty on the client side IS a nation, so the wording is the SAME first-person register post_nation_agency_comms already established, not a new voice to learn. Phrase selection folds the record's own stable id with the event kind (the BL-290 tongue-bank idiom battle_dispatch_line already uses), so replays read identically and no RNG draw is spent narrating a fact the simulation already decided.
 
 *Demanded by BL-577 · `src/core/battle_dispatch_text.cpp`, `src/core/session_history.cpp`, `src/world/nation_step.cpp`, `src/world/nation_step.hpp` · id `contract_events_public_channel`*
+
+### Convoy marker (Planetary canvas, at a lane's head) and the Convoy card (Selection band, convoy kind)
+
+**Answers:** What is moving on this ground, whose is it, what does it carry, where is it bound and when does it land?
+
+**Because:** Ben, 2026-11-05 (SELECTION.md § The convoy element): convoys are drawn on the map as they move, and a press selects one. Trade is half the game and until now it moved invisibly: the vision beam lit the ground under the player's own cargo and the Convoys ledger listed it, but nothing on the map was the shipment. The marker sits at the lane's head, on the clock the beam uses, so it stands where the sim says the cargo is. Several on one tile are one marker with a count, the clutter guard, and a repeat press walks them as the wing marker walks its wings. Another nation's marker draws only on ground the player's own vision lights (DISCOVERY.md), and its card names only the owner and how it travels: the cargo and route stay private. A convoy is not an entity, so the selection holds its id in a field of its own, as the battle's triple does, and an arrived id clears itself.
+
+*Demanded by BL-1506 · `src/ui/body_surface_canvas.cpp`, `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `convoy_marker`*
 
 ### AI decision feed
 

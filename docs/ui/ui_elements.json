@@ -2067,6 +2067,24 @@
    "checks": [
     "unit_glide"
    ]
+  },
+  {
+   "id": "UI-136",
+   "name": "Convoy marker and card",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/SELECTION.md § The convoy element",
+    "docs/ui/DISCOVERY.md",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "summary": "A marker at each convoy's lane head on the active body, in its owner's colour, gliding on the beam's clock; several on a tile are one marker with a count. A press with no lens selects it (selected_convoy, an id, not an entity), and the Selection band shows its cargo, owner, route and arrival; a repeat press walks the tile's convoys. A rival's marker draws only under the player's vision, and its card names only owner and mode.",
+   "interesting_question": "What may the player learn of another nation's convoy by pressing it?",
+   "resolution": "Owner and mode, and only where the player's vision already lights the ground. Cargo and route stay private. Filed for Ben's look at the first capture.",
+   "checks": [
+    "convoy_map"
+   ]
   }
  ]
 }

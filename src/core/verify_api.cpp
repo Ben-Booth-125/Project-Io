@@ -6768,6 +6768,27 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return out;
     });
 
+    // BL-1506: the convoy markers the canvas drew last frame (the convoy a press on each
+    // would select, its screen point, whether it is the player's, how many share its
+    // tile), and the Selection's convoy channel. Nothing the screen does not show.
+    v.set_function("convoy_markers", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        int i = 1;
+        for (const ui_state::convoy_zone& z : m_ui.convoy_zones)
+        {
+            sol::table row = st.create_table();
+            row["id"]    = z.id;
+            row["x"]     = z.x;
+            row["y"]     = z.y;
+            row["mine"]  = z.mine;
+            row["count"] = z.count;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("selected_convoy", [this]() -> unsigned { return m_ui.selected_convoy; });
+
     // BL-1507: the marching counters the canvas drew last frame: the units on each, the
     // hop fraction and the counter's screen point. Nothing the screen does not show.
     v.set_function("unit_glides", [this]() {
@@ -7591,6 +7612,62 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             cv.corp           = m_world.player_entity;
             cv.speed          = 0.1f;
             m_world.convoys.push_back(cv);
+        });
+
+    // BL-1506: STAGE a land convoy with a real id on the player's own ground, between the
+    // two market centres nearest the player's lowest-id unit on the active body, at
+    // `progress`, for the player or (rival = true) the lowest-id other nation. Returns
+    // its id, 0 when two anchored markets are not there; never a position.
+    v.set_function("seed_lane_convoy",
+        [this](const std::string& res_name, float qty, float progress, sol::optional<bool> rival) -> unsigned
+        {
+            const entity_id me = player_actor(m_world);
+            // The anchor is the player's lowest-id unit here: a script frames it through
+            // verify.units(), so the staging takes no position to hand back.
+            const tile_component* anchor = nullptr;
+            entity_id anchor_unit = null_entity;
+            for (const auto& [uid, u] : m_world.units)
+            {
+                if (u.owner != me || u.count <= 0 || (anchor_unit != null_entity && uid > anchor_unit))
+                    continue;
+                const auto tit = m_world.tiles.find(u.position);
+                if (tit != m_world.tiles.end() && tit->second.body == m_ui.active_body)
+                {
+                    anchor = &tit->second;
+                    anchor_unit = uid;
+                }
+            }
+            if (anchor == nullptr)
+                return 0u;
+            std::vector<std::pair<int, entity_id>> by_dist;
+            for (const auto& [mid, mc] : m_world.markets)
+            {
+                if (mc.body != m_ui.active_body)
+                    continue;
+                const auto ct = m_world.tiles.find(mc.centre_tile);
+                if (ct != m_world.tiles.end())
+                    by_dist.emplace_back(std::abs(ct->second.grid_x - anchor->grid_x)
+                                          + std::abs(ct->second.grid_y - anchor->grid_y), mid);
+            }
+            if (by_dist.size() < 2)
+                return 0u;
+            std::sort(by_dist.begin(), by_dist.end());
+            convoy_component cv{};
+            cv.source_market  = by_dist[0].second;
+            cv.dest_market    = by_dist[1].second;
+            cv.cargo_resource = resource_from_name(res_name);
+            cv.cargo_qty      = qty;
+            cv.mode           = convoy_mode::land;
+            cv.progress       = progress;
+            cv.speed          = 0.1f;
+            cv.corp           = me;
+            if (rival.value_or(false))
+                for (const auto& [nid, nc] : m_world.nations)
+                    if (nid != me && (cv.corp == me || nid < cv.corp))
+                        cv.corp = nid;
+            cv.id = m_world.allocate_convoy_id();
+            m_world.convoys.push_back(cv);
+            return cv.id;
         });
 
     // Set a body's survey state deterministically for capture (BL-067). regions_done

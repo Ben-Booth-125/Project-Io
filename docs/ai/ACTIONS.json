@@ -3065,6 +3065,21 @@
    "reason_to_select": "Reach a unit already on the move, to redirect it."
   },
   {
+   "id": "canvas.convoy_select",
+   "family": "canvas",
+   "surface": "The Planetary canvas: a convoy marker at a lane's head, a chevron on a dark disc in the owner's colour, with a count when several share the tile (BL-1506; SELECTION.md § The convoy element).",
+   "press": "Left-click the marker. A repeat press on a marker holding several walks to the next.",
+   "args": [],
+   "preconditions": [
+    "A convoy is in flight with a lane on the active body.",
+    "No lens is active (under a lens a press resolves to the lens's structure).",
+    "Another nation's convoy has a marker only on ground the player's vision lights.",
+    "Zoomed in to at least the unit counters' draw (a hex radius of 6 px)."
+   ],
+   "expected_output": "Selects the convoy. The Selection band shows its card: the player's own (or under the spectator's god view) with cargo and quantity, owner, route and an arrival bar in quarters; another nation's with its owner and mode, and 'Its cargo and route are private.' A press elsewhere retires it, and it clears itself on arrival. No world state changes; a counter under the pointer outranks the marker.",
+   "reason_to_select": "See what a shipment on the map is carrying and when it lands."
+  },
+  {
    "id": "gameplay.hire_wing",
    "family": "gameplay",
    "surface": "The Military ledger's air rows (nav rail slot 7, Recruit tab, Air theatre tab; ledger.military_air_raise). Also a corp_verb (corp_verb::hire_wing, 44) on the command seam, which rival nations' scorers issue too.",

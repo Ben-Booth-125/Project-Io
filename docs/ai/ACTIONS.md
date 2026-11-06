@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*214 entries — 53 gameplay · 37 canvas · 15 lens · 74 ledger · 35 chrome.*
+*215 entries — 53 gameplay · 38 canvas · 15 lens · 74 ledger · 35 chrome.*
 
 ---
 
@@ -1465,6 +1465,20 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** Selects that counter's lowest-id unit, with its card on the Selection band. The counter's units stand apart from the stack on the tile they are leaving. No world state changes.
 
 **Reason to select.** Reach a unit already on the move, to redirect it.
+
+### `canvas.convoy_select` — The Planetary canvas: a convoy marker at a lane's head, a chevron on a dark disc in the owner's colour, with a count when several share the tile (BL-1506; SELECTION.md § The convoy element).
+
+**Press.** Left-click the marker. A repeat press on a marker holding several walks to the next.
+
+**Valid when:**
+- A convoy is in flight with a lane on the active body.
+- No lens is active (under a lens a press resolves to the lens's structure).
+- Another nation's convoy has a marker only on ground the player's vision lights.
+- Zoomed in to at least the unit counters' draw (a hex radius of 6 px).
+
+**Expected output.** Selects the convoy. The Selection band shows its card: the player's own (or under the spectator's god view) with cargo and quantity, owner, route and an arrival bar in quarters; another nation's with its owner and mode, and 'Its cargo and route are private.' A press elsewhere retires it, and it clears itself on arrival. No world state changes; a counter under the pointer outranks the marker.
+
+**Reason to select.** See what a shipment on the map is carrying and when it lands.
 
 ### `canvas.air_designer_slot_pick` — The unit designer opened on an air class (full canvas; the same designer as the land classes', with the slots Airframe, Armament and Avionics): a slot's box, and the item list it opens beside it.
 
