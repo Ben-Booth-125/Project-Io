@@ -1041,6 +1041,8 @@ others** — Ben's 2026-09-24 ruling (NR-917), kept with its original subject: t
 and the trade and the factories behind it wait. A campaign visibly starving its own industry is the
 intended, legible cost of keeping an army in the field.
 
+**A lane lands no points on a hostile port (Ben, 2026-11-05; `../military/MILITARY.md` § Sea, landings).** A nation's lane lands no points on a port held by a nation hostile to it, declared either way, so an army that has landed must take a port, and a port it occupies serves it as its own.
+
 **A unit draws off the road, up to 8 tiles from it (Ben, 2026-10-29).** A unit need not stand on
 the network to be supplied. Its request is **paid at the closest road** of its nation's network —
 the nearest tile within **8 tiles** of the unit that the network reaches, by steps over crossable

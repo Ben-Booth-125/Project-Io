@@ -16,15 +16,19 @@
 #include "world/nation_tech.hpp"
 #include "world/supply_system.hpp"
 #include "world/air_combat.hpp"
+#include "world/battle_system.hpp"
 #include "world/components.hpp"
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
+#include "world/logistic_points.hpp"
+#include "world/fronts.hpp"
 #include "world/logistics.hpp"
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/sea_combat.hpp"
 #include "world/stance.hpp"
 #include "world/unit_designs.hpp"
+#include "world/unit_roster.hpp"
 #include "world/world.hpp"
 #include "world/world_save.hpp"
 
@@ -61,6 +65,7 @@ bool from_bytes(const std::string& b, world& w)
 
 constexpr int GW = 80, GH = 8, STRIP = 4;
 constexpr uint16_t SUB = 0, DES = 1, CAP = 2, TRA = 3;
+constexpr uint16_t LAND_ROW = 0; // BL-1531: a plain land row
 
 struct fixture
 {
@@ -263,6 +268,66 @@ int takes(fixture& f, const recipe_registry& reg, int n, int col = 41, int tick0
 }
 
 } // namespace
+
+/// BL-1531: a land unit standing at (@p c, @p r), direct (fixture).
+entity_id add_soldiers(fixture& f, entity_id owner, int c, int r, int men = 100)
+{
+    const entity_id id = f.w.create_entity();
+    unit_component u;
+    u.owner = owner; u.position = tile(f, c, r); u.count = men; u.establishment = men; u.type = LAND_ROW;
+    f.w.units[id] = u;
+    return id;
+}
+
+/// BL-1531: B's islet in the middle of the sea: land at columns 30-31 of rows 2-4, within a
+/// transport's range of A's port. Its west shore is (30, 3), off which lies (29, 3), strip 7.
+void add_islet(fixture& f, entity_id owner)
+{
+    for (int r = 2; r <= 4; ++r)
+        for (int c = 30; c <= 31; ++c)
+        {
+            tile_component& tc = f.w.tiles.at(tile(f, c, r));
+            tc.substrate = terrain_substrate::sedimentary;
+            tc.cover = terrain_cover::grass;
+            tc.cover_density = 150;
+            f.w.set_tile_nation(tile(f, c, r), owner);
+        }
+}
+
+corp_command_result embark(fixture& f, const recipe_registry& reg, entity_id actor, entity_id unit, entity_id ship)
+{
+    corp_command c;
+    c.tick = 1; c.corp = actor; c.verb = corp_verb::embark_unit; c.subject = unit; c.order = ship;
+    return apply_corp_command(f.w, reg, c);
+}
+
+corp_command_result land(fixture& f, const recipe_registry& reg, entity_id actor, entity_id ship, entity_id at)
+{
+    corp_command c;
+    c.tick = 1; c.corp = actor; c.verb = corp_verb::land_units; c.subject = ship; c.tile = at;
+    return apply_corp_command(f.w, reg, c);
+}
+
+/// BL-1531: a transport of A's at its port's mouth with @p men in one unit aboard. @p unit_out names it.
+entity_id loaded_transport(fixture& f, const recipe_registry& reg, int men, entity_id* unit_out = nullptr)
+{
+    const entity_id ship = add_ship(f, f.a, f.a_port, TRA, 8, 3);
+    const entity_id u = add_soldiers(f, f.a, 7, 3, men);
+    check(embark(f, reg, f.a, u, ship) == corp_command_result::applied, "  (fixture) embark applied");
+    if (unit_out != nullptr)
+        *unit_out = u;
+    return ship;
+}
+
+/// BL-1531: the day's battles and the sea day, in the order the military day runs them.
+void war_days(fixture& f, const recipe_registry& reg, int n, int from)
+{
+    for (int d = 0; d < n; ++d)
+    {
+        (void)run_battles(f.w, reg, from + d);
+        (void)run_sea_day(f.w, reg, from + d);
+    }
+}
 
 int main()
 {
@@ -968,7 +1033,7 @@ int main()
                   && loaded.ships.at(d).kit.fit == f.w.ships.at(d).kit.fit && loaded.ships.at(d).refitting
                   && to_bytes(loaded) == b && loaded.state_hash(1) == f.w.state_hash(1),
               "K9 v81 round trips the designs and a ship's kit");
-        const std::size_t sec = b.size() - 14 - 4; // count, nation, n, one id, then the closed ports' count
+        const std::size_t sec = b.size() - 14 - 4 - 4; // count, nation, n, one id, then the closed ports' count and the surf's
         const auto spoil = [&](std::size_t off, uint32_t v, int width) {
             std::string c = b;
             for (int i = 0; i < width; ++i)
@@ -1091,7 +1156,7 @@ int main()
               "K12 hull and sensors add up on the class");
         const entity_id tr = add_ship(f, f.a, f.a_port, TRA, 41, 3);
         f.w.ships.at(tr).kit.fit = {2, 0, 0};
-        check(ship_stats(reg, f.w.ships.at(tr)).capacity == 2, "K12b a transport's hull sets its capacity");
+        check(ship_stats(reg, f.w.ships.at(tr)).capacity == 4, "K12b a transport's hull adds to its capacity: two and two");
     }
 
     // -----------------------------------------------------------------------
@@ -1579,6 +1644,490 @@ int main()
             f.w.convoys.clear();
         }
         check(taken > 0, "C13 a blockading ship may raid its hostile cargo: " + std::to_string(taken));
+    }
+
+    // =================================================================================
+    // BL-1531 (MILITARY.md § Sea, landings): embark, carry, land, fight for the shore.
+    // =================================================================================
+    std::printf("\nL - troop landings\n");
+    {
+        fixture f; build(f);
+        const entity_id ship = add_ship(f, f.a, f.a_port, TRA, 8, 3);
+        check(ship_stats(reg, f.w.ships.at(ship)).capacity == 2, "L1 a base transport carries two land units");
+        f.w.ships.at(ship).kit.fit[0] = 1;
+        check(ship_stats(reg, f.w.ships.at(ship)).capacity == 3, "L1b the roll-on hull carries one more");
+        f.w.ships.at(ship).kit.fit[0] = 0;
+        const entity_id des = add_ship(f, f.a, f.a_port, DES, 8, 3);
+        const entity_id far = add_soldiers(f, f.a, 2, 1);
+        const entity_id u1 = add_soldiers(f, f.a, 7, 3);
+        const entity_id u2 = add_soldiers(f, f.a, 6, 3); // beside the port
+        const entity_id u3 = add_soldiers(f, f.a, 7, 3);
+        const entity_id foe = add_soldiers(f, f.b, 72, 3);
+        refused(f, [&] { return embark(f, reg, f.a, foe, ship); }, corp_command_result::rejected_not_owner, "L2 not its unit");
+        refused(f, [&] { return embark(f, reg, f.a, u1, des); }, corp_command_result::rejected_invalid, "L2b a destroyer carries nobody");
+        refused(f, [&] { return embark(f, reg, f.a, far, ship); }, corp_command_result::rejected_placement, "L2c a unit away from a port stays");
+        refused(f, [&] { return embark(f, reg, f.a, u1, 999999u); }, corp_command_result::rejected_invalid, "L2d no such ship");
+        f.w.ships.at(ship).tile = tile(f, 9, 3);
+        refused(f, [&] { return embark(f, reg, f.a, u1, ship); }, corp_command_result::rejected_placement, "L2e the ship must lie at the mouth");
+        f.w.ships.at(ship).tile = tile(f, 8, 3);
+        f.w.closed_ports.insert(tile(f, 7, 3));
+        refused(f, [&] { return embark(f, reg, f.a, u1, ship); }, corp_command_result::rejected_placement, "L2f a blockaded port loads nobody");
+        f.w.closed_ports.clear();
+        f.w.units.at(u1).order.dest = tile(f, 2, 2);
+        f.w.units.at(u1).defend_province = strip(f, 1);
+        f.w.units.at(u1).food_permille = 640;
+        check(embark(f, reg, f.a, u1, ship) == corp_command_result::applied, "L3 a unit at the port boards");
+        check(embark(f, reg, f.a, u2, ship) == corp_command_result::applied, "L3b a unit beside it boards");
+        const sea_ship& s = f.w.ships.at(ship);
+        check(f.w.units.count(u1) == 0 && s.aboard.size() == 2 && s.aboard[0].first == u1 && s.aboard[1].first == u2,
+              "L3c aboard, and out of the land's units");
+        check(s.aboard[0].second.order.dest == null_entity && s.aboard[0].second.defend_province == 0xFFFFFFFFu
+              && s.aboard[0].second.position == null_entity, "L3d its order and post end at the gangway");
+        refused(f, [&] { return embark(f, reg, f.a, u3, ship); }, corp_command_result::rejected_state, "L3e a full transport takes nobody");
+        // Aboard, nothing moves: the military day runs, carried supplies live, and the stock it
+        // boarded with stands. The control below shows the same pass draining one on land.
+        const entity_id ashore = add_soldiers(f, f.a, 7, 4);
+        f.w.units.at(ashore).food_permille = 640;
+        for (int d = 0; d < 60; ++d)
+            (void)run_military_day(f.w, reg, 2000 + d);
+        check(f.w.units.at(ashore).food_permille != 640, "L4c (control) the same days move the stock of a unit on land: "
+                  + std::to_string(f.w.units.at(ashore).food_permille));
+        check(f.w.ships.at(ship).aboard[0].second.food_permille == 640, "L4 aboard it keeps the supplies it boarded with");
+        check(f.w.ships.at(ship).aboard[0].second.count == 100, "L4b and no man is lost to hunger");
+    }
+    {
+        // Own ground: sail, three days off the coast, ashore, the ship goes home.
+        fixture f; build(f);
+        entity_id u = null_entity;
+        const entity_id ship = loaded_transport(f, reg, 100, &u);
+        refused(f, [&] { return land(f, reg, f.a, ship, tile(f, 4, 3)); }, corp_command_result::rejected_placement, "L5 an inland tile is no coast");
+        refused(f, [&] { return land(f, reg, f.a, ship, tile(f, 40, 3)); }, corp_command_result::rejected_placement, "L5b the sea is no coast");
+        refused(f, [&] { return land(f, reg, f.b, ship, tile(f, 7, 2)); }, corp_command_result::rejected_not_owner, "L5c not its ship");
+        refused(f, [&] { return land(f, reg, f.a, ship, null_entity); }, corp_command_result::rejected_state, "L5d nothing to recall");
+        check(land(f, reg, f.a, ship, tile(f, 7, 2)) == corp_command_result::applied, "L5e a landing on its own coast is ordered");
+        const entity_id late = add_soldiers(f, f.a, 7, 3);
+        refused(f, [&] { return embark(f, reg, f.a, late, ship); }, corp_command_result::rejected_state, "L5f no boarding once it has orders");
+        check(f.w.ships.at(ship).landing_days == reg.military().sea.landing_days, "L5g the order sets its days");
+        int waited = 0, off_coast = 0;
+        while (f.w.ships.at(ship).aboard.size() != 0 && waited < 40)
+        {
+            (void)run_sea_day(f.w, reg, 20 + waited);
+            ++waited;
+            off_coast += f.w.ships.at(ship).route.empty() ? 1 : 0;
+        }
+        (void)off_coast;
+        check(waited == reg.military().sea.landing_days, "L6e one tile to sail, and the day it arrives counts: ashore on day " + std::to_string(waited));
+        check(f.w.units.count(u) != 0 && f.w.units.at(u).position == tile(f, 7, 2), "L6 it stands on the coast it was ordered to");
+        check(f.w.units.at(u).landing_ship == null_entity, "L6b unopposed, it was never in the surf");
+        check(f.w.ships.at(ship).landing_tile == null_entity, "L6c the transport has done with the order");
+        check(waited >= 3, "L6d landing takes its days: " + std::to_string(waited));
+    }
+    {
+        // A neutral's coast is refused; a friend's opens; hostile ground waits on the water.
+        fixture f; build(f);
+        add_islet(f, f.b);
+        entity_id u = null_entity;
+        const entity_id ship = loaded_transport(f, reg, 100, &u);
+        const entity_id shore = tile(f, 30, 3);
+        refused(f, [&] { return land(f, reg, f.a, ship, shore); }, corp_command_result::rejected_placement, "L7 never on a neutral's ground");
+        refused(f, [&] { return land(f, reg, f.a, ship, tile(f, 72, 3)); }, corp_command_result::rejected_placement, "L7b a far coast is past the class's range");
+        offer_friendship(f.w, f.a, f.b); accept_friendship(f.w, f.a, f.b);
+        check(are_friends(f.w, f.a, f.b) && land(f, reg, f.a, ship, shore) == corp_command_result::applied, "L8 a friend's coast takes a landing");
+        for (int d = 0; d < 40 && !f.w.ships.at(ship).aboard.empty(); ++d)
+            (void)run_sea_day(f.w, reg, 30 + d);
+        check(f.w.units.count(u) != 0 && f.w.units.at(u).position == shore, "L8b with no fleet to win the water first");
+    }
+    {
+        fixture f; build(f);
+        add_islet(f, f.b);
+        declare_hostile(f.w, f.a, f.b);
+        entity_id u = null_entity;
+        const entity_id ship = loaded_transport(f, reg, 100, &u);
+        const entity_id shore = tile(f, 30, 3);
+        check(land(f, reg, f.a, ship, shore) == corp_command_result::applied, "L9 a hostile coast may be ordered before the water is won");
+        for (int d = 0; d < 80; ++d)
+            (void)run_sea_day(f.w, reg, 30 + d);
+        check(f.w.ships.at(ship).aboard.size() == 1 && f.w.units.count(u) == 0
+              && !f.w.ships.at(ship).route.size(), "L9b unheld water: it lies off and does not land");
+        check(f.w.ships.at(ship).landing_days == reg.military().sea.landing_days, "L9c and its days have not started");
+        const std::vector<entity_id> mouths = {tile(f, 29, 3)};
+        const entity_id esc = add_on_station(f, f.a, f.a_port, DES, sea_mission::patrol, {7});
+        (void)esc;
+        check(sea_holds(f.w, reg, f.w.provinces.province_of(f.w.ships.at(ship).tile), f.a), "L10 a fleet wins the water");
+        (void)run_sea_day(f.w, reg, 200);
+        check(f.w.ships.at(ship).landing_days == reg.military().sea.landing_days - 1, "L10b and the landing's days run");
+        // Lose the hold mid-landing and the days start over.
+        const entity_id rival = add_on_station(f, f.b, f.b_port, CAP, sea_mission::patrol, {7});
+        (void)rival;
+        check(!sea_holds(f.w, reg, f.w.provinces.province_of(f.w.ships.at(ship).tile), f.a), "L10c a stronger fleet takes the water back");
+        (void)run_sea_day(f.w, reg, 201);
+        check(f.w.ships.at(ship).landing_days == reg.military().sea.landing_days, "L10d and the landing starts over");
+        f.w.ships.erase(rival);
+        for (auto& [sid, sh] : f.w.ships) { sh.hp_ppm = k_ship_hp_full; sh.morale_permille = 1000; sh.returning = false; }
+        for (int d = 0; d < 10 && f.w.units.count(u) == 0; ++d)
+            (void)run_sea_day(f.w, reg, 210 + d);
+        check(f.w.units.count(u) != 0 && f.w.units.at(u).position == shore, "L11 water held, it comes ashore on an empty coast");
+        check(f.w.tile_occupier.count(shore) == 0, "L11b a bare hostility occupies nothing");
+    }
+    {
+        // At war, an empty hostile coast is occupied on landing.
+        fixture f; build(f);
+        add_islet(f, f.b);
+        declare_hostile(f.w, f.a, f.b);
+        war_record rec; rec.declarer = f.a; rec.defender = f.b;
+        f.w.wars[{ std::min(f.a, f.b), std::max(f.a, f.b) }] = rec;
+        entity_id u = null_entity;
+        const entity_id ship = loaded_transport(f, reg, 100, &u);
+        add_on_station(f, f.a, f.a_port, DES, sea_mission::patrol, {7});
+        check(land(f, reg, f.a, ship, tile(f, 30, 3)) == corp_command_result::applied, "L12 (war) ordered");
+        for (int d = 0; d < 60 && f.w.units.count(u) == 0; ++d)
+            (void)run_sea_day(f.w, reg, 30 + d);
+        check(f.w.tile_controller(tile(f, 30, 3)) == f.a, "L12b at war, what it lands on it occupies");
+    }
+    {
+        // Sunk with the transport.
+        fixture f; build(f);
+        declare_hostile(f.w, f.b, f.a);
+        declare_hostile(f.w, f.a, f.b);
+        entity_id u = null_entity;
+        const entity_id ship = loaded_transport(f, reg, 100, &u);
+        f.w.ships.at(ship).hp_ppm = 1000;
+        add_on_station(f, f.b, f.b_port, CAP, sea_mission::patrol, {2});
+        int lost = 0, sunk = 0;
+        for (int d = 0; d < 40 && f.w.ships.count(ship) != 0; ++d)
+        {
+            const sea_day_tick t = run_sea_day(f.w, reg, 40 + d);
+            lost += t.troops_lost; sunk += t.sunk;
+        }
+        check(f.w.ships.count(ship) == 0 && sunk == 1 && lost == 1 && f.w.units.count(u) == 0,
+              "L13 a unit goes down with a sunk transport: lost " + std::to_string(lost));
+    }
+
+    // The contested landing.
+    const auto contested = [&](fixture& f, int atk, int def, entity_id* attacker, entity_id* defender) {
+        build(f);
+        add_islet(f, f.b);
+        declare_hostile(f.w, f.a, f.b);
+        const entity_id ship = loaded_transport(f, reg, atk, attacker);
+        add_on_station(f, f.a, f.a_port, DES, sea_mission::patrol, {7});
+        *defender = add_soldiers(f, f.b, 30, 3, def);
+        check(land(f, reg, f.a, ship, tile(f, 30, 3)) == corp_command_result::applied, "  (fixture) landing ordered");
+        for (int d = 0; d < 60 && f.w.battles.empty(); ++d)
+            (void)run_sea_day(f.w, reg, 50 + d);
+        return ship;
+    };
+    {
+        fixture f; entity_id att = null_entity, def = null_entity;
+        const entity_id ship = contested(f, 400, 400, &att, &def);
+        check(f.w.battles.size() == 1 && f.w.battles[0].attacker == f.a && f.w.battles[0].tile == tile(f, 30, 3),
+              "L14 a landing met by a defender opens the ordinary campaign battle");
+        check(f.w.units.at(att).landing_ship == ship && f.w.units.at(att).position == f.w.ships.at(ship).tile,
+              "L14b its units fight from the surf");
+        check(is_sea(f.w.tiles.at(f.w.units.at(att).position).substrate), "L14c which is water, not the shore");
+        corp_command mc; mc.tick = 1; mc.corp = f.a; mc.verb = corp_verb::march_unit; mc.subject = att; mc.tile = tile(f, 31, 3);
+        {
+            // With no battle to refuse it first: only the surf's own guard stands.
+            world quiet = f.w;
+            quiet.battles.clear();
+            check(apply_corp_command(quiet, reg, mc) == corp_command_result::rejected_state, "L14d a unit in the surf takes no march");
+        }
+        refused(f, [&] { return land(f, reg, f.a, ship, null_entity); }, corp_command_result::rejected_state, "L14e no recall with men in the surf");
+
+    }
+    {
+        // The penalty: the same fight for the same days, with and without the surf. Well off
+        // parity, since like forces entrench and hardly scratch each other either way.
+        fixture f, g; entity_id att = null_entity, def = null_entity, gatt = null_entity, gdef = null_entity;
+        (void)contested(f, 1600, 400, &att, &def);
+        (void)contested(g, 1600, 400, &gatt, &gdef);
+        g.w.units.at(gatt).landing_ship = null_entity;
+        check(f.w.battles.size() == 1 && g.w.battles.size() == 1, "L15 (fixture) both battles open");
+        const int pd = reg.military().sea.landing_penalty_days;
+        for (int d = 0; d < pd; ++d)
+        {
+            (void)run_battles(f.w, reg, 300 + d);
+            (void)run_battles(g.w, reg, 300 + d);
+        }
+        const auto worn = [](const world& w, entity_id u) {
+            const unit_component& c = w.units.at(u);
+            return c.count * 1000 + c.readiness_permille;
+        };
+        check(worn(f.w, def) > worn(g.w, gdef),
+              "L15b its first days at the authored penalty hit less: defender at " + std::to_string(worn(f.w, def))
+                  + " against " + std::to_string(worn(g.w, gdef)) + " with no surf");
+        check(worn(f.w, att) < worn(g.w, gatt),
+              "L15c and it takes more: attacker at " + std::to_string(worn(f.w, att))
+                  + " against " + std::to_string(worn(g.w, gatt)) + " with no surf");
+        // Past those days the mark changes nothing: the penalty is the opening's only.
+        world past = f.w;
+        past.units.at(att).landing_ship = null_entity;
+        (void)run_battles(f.w, reg, 300 + pd);
+        (void)run_battles(past, reg, 300 + pd);
+        check(worn(f.w, def) == worn(past, def) && worn(f.w, att) == worn(past, att), "L15d past its days the penalty ends");
+    }
+    {
+        // Repulsed: back aboard, home.
+        fixture f; entity_id att = null_entity, def = null_entity;
+        const entity_id ship = contested(f, 300, 900, &att, &def);
+        int d = 0;
+        for (; d < 300 && !f.w.battles.empty(); ++d)
+            war_days(f, reg, 1, 400 + d);
+        war_days(f, reg, 1, 800);
+        std::printf("  READ repulse: attacker in units=%d count=%d aboard=%d battles=%d\n",
+                    f.w.units.count(att) != 0 ? 1 : 0, f.w.units.count(att) != 0 ? f.w.units.at(att).count : -1,
+                    static_cast<int>(f.w.ships.at(ship).aboard.size()), static_cast<int>(f.w.battles.size()));
+        check(f.w.battles.empty() && f.w.ships.count(ship) != 0, "L16 the battle ends: " + std::to_string(d) + " days");
+        const sea_ship& s = f.w.ships.at(ship);
+        const bool aboard = !s.aboard.empty() && s.aboard[0].first == att;
+        check(aboard && f.w.units.count(att) == 0, "L16b repulsed, it falls back aboard");
+        check(s.landing_tile == null_entity, "L16c and the landing is over");
+        check(aboard && s.aboard[0].second.landing_ship == null_entity, "L16d out of the surf");
+    }
+    {
+        // Won: ashore, and it holds what it took.
+        fixture f; entity_id att = null_entity, def = null_entity;
+        const entity_id ship = contested(f, 4000, 50, &att, &def);
+        for (int d = 0; d < 300 && !f.w.battles.empty(); ++d)
+            war_days(f, reg, 1, 400 + d);
+        check(f.w.units.count(att) != 0 && f.w.units.at(att).position == tile(f, 30, 3), "L17 won, it stands on the shore");
+        check(f.w.units.at(att).landing_ship == null_entity, "L17b out of the surf");
+        war_days(f, reg, 1, 800);
+        check(f.w.ships.at(ship).landing_tile == null_entity, "L17c the transport has done with the order");
+    }
+    {
+        // The transport sinks with men in the surf.
+        fixture f; entity_id att = null_entity, def = null_entity;
+        const entity_id ship = contested(f, 400, 400, &att, &def);
+        const entity_id killer = add_on_station(f, f.b, f.b_port, CAP, sea_mission::patrol, {7});
+        (void)killer;
+        f.w.ships.at(ship).hp_ppm = 1000;
+        for (int d = 0; d < 40 && f.w.ships.count(ship) != 0; ++d)
+            (void)run_sea_day(f.w, reg, 500 + d);
+        check(f.w.ships.count(ship) == 0 && (f.w.units.count(att) == 0 || f.w.units.at(att).count == 0),
+              "L18 men in the surf go down with their transport");
+    }
+    {
+        // The wage still falls on the nation while aboard, at rates that are not zero.
+        recipe_registry paying = make_registry();
+        military_capability_params mil = paying.military();
+        mil.upkeep.credits_per_head = 0.5f;
+        paying.set_military(mil);
+        const auto paid = [&](bool afloat) {
+            fixture f; build(f);
+            f.w.nation_budgets[f.a] = nation_budget{};
+            for (float& x : f.w.nation_budgets[f.a].weights) x = 1.0f;
+            entity_id u = add_soldiers(f, f.a, 7, 3, 500);
+            const entity_id ship = add_ship(f, f.a, f.a_port, TRA, 8, 3);
+            if (afloat)
+                check(embark(f, reg, f.a, u, ship) == corp_command_result::applied, "  (fixture) aboard");
+            const float before = f.w.nations.at(f.a).treasury;
+            run_nation_garrison_upkeep(f.w, paying, nullptr);
+            return before - f.w.nations.at(f.a).treasury;
+        };
+        const float ashore = paid(false), afloat = paid(true);
+        check(afloat > 0.0f && ashore == afloat, "L19 aboard its wage is still paid: " + std::to_string(afloat) + " against " + std::to_string(ashore));
+    }
+    {
+        // The save: passengers, the order and the surf.
+        fixture f; entity_id att = null_entity, def = null_entity;
+        const entity_id ship = contested(f, 400, 400, &att, &def);
+        const entity_id second = add_ship(f, f.a, f.a_port, TRA, 8, 3);
+        const entity_id extra = add_soldiers(f, f.a, 7, 3, 77);
+        f.w.units.at(extra).food_permille = 512;
+        f.w.units.at(extra).kit.fit[0] = 0;
+        check(embark(f, reg, f.a, extra, second) == corp_command_result::applied, "L20 (fixture) a second ship loaded");
+        check(land(f, reg, f.a, second, tile(f, 7, 1)) == corp_command_result::applied, "L20b (fixture) and ordered");
+        const std::string b = to_bytes(f.w);
+        world loaded;
+        check(from_bytes(b, loaded), "L20c a world with passengers and a surf loads");
+        check(to_bytes(loaded) == b && loaded.state_hash(1) == f.w.state_hash(1), "L20d the bytes and the digest survive it");
+        check(loaded.ships.at(second).aboard.size() == 1 && loaded.ships.at(second).aboard[0].second.food_permille == 512
+              && loaded.ships.at(second).aboard[0].second.owner == f.a && loaded.ships.at(second).landing_tile == tile(f, 7, 1),
+              "L20e with who is aboard, what they carry and where they are bound");
+        check(loaded.units.at(att).landing_ship == ship, "L20f and who is in the surf");
+        war_days(f, reg, 5, 900);
+        for (int d = 0; d < 5; ++d) { (void)run_battles(loaded, reg, 900 + d); (void)run_sea_day(loaded, reg, 900 + d); }
+        check(loaded.state_hash(1) == f.w.state_hash(1), "L20g and replays the same");
+        // A malformed stream is refused whole: a passenger twice over, or also on land.
+        {
+            fixture g; build(g);
+            entity_id gu = null_entity;
+            const entity_id gs = loaded_transport(g, reg, 100, &gu);
+            world ok;
+            check(from_bytes(to_bytes(g.w), ok), "L20h (control) one ship, one passenger reads");
+            const entity_id other = add_ship(g, g.a, g.a_port, TRA, 8, 3);
+            g.w.ships.at(other).aboard = g.w.ships.at(gs).aboard;
+            world twice;
+            check(!from_bytes(to_bytes(g.w), twice), "L20i a unit aboard two ships is refused");
+            g.w.ships.at(other).aboard.clear();
+            unit_component ghost = g.w.ships.at(gs).aboard[0].second;
+            ghost.position = tile(g, 7, 3);
+            g.w.units[gu] = ghost;
+            world both;
+            check(!from_bytes(to_bytes(g.w), both), "L20j a unit both aboard and on land is refused");
+            g.w.units.erase(gu);
+            const entity_id des = add_ship(g, g.a, g.a_port, DES, 8, 3);
+            g.w.ships.at(des).aboard = g.w.ships.at(gs).aboard;
+            g.w.ships.at(gs).aboard.clear();
+            world on_des;
+            check(!from_bytes(to_bytes(g.w), on_des), "L20k a destroyer's passenger is refused");
+        }
+    }
+    {
+        // The port: an army ashore draws through a port it took, and not without one.
+        const auto drawn = [&](fixture& f, entity_id at) {
+            lp_supply_claim c;
+            c.unit = 1u; c.nation = f.a; c.tile = at; c.need = 1.0f;
+            const lp_tick t = resolve_logistic_points(f.w, {c});
+            return t.supplies.size() == 1 && t.supplies[0].paid_tile != null_entity && t.supplies[0].cover > 0.0f;
+        };
+        const auto field = [&](fixture& f, bool own) {
+            build(f);
+            const entity_id owner = own ? f.a : f.b;
+            add_islet(f, owner);
+            add_building(f, owner, 30, 3, building_type::port);
+            for (int c = 8; c <= 29; ++c) // a lane from A's port to the islet's
+                f.w.tiles.at(tile(f, c, 3)).lane_level = 1;
+        };
+        {
+            fixture f; field(f, true);
+            check(drawn(f, tile(f, 31, 3)), "L21 (control) an army by its own far port draws through it");
+        }
+        {
+            fixture f; field(f, false);
+            declare_hostile(f.w, f.a, f.b);
+            check(!drawn(f, tile(f, 31, 3)), "L21b beside a hostile port it has not taken, it draws nothing");
+            bool batch = false;
+            war_record rec; rec.declarer = f.a; rec.defender = f.b;
+            f.w.wars[{ std::min(f.a, f.b), std::max(f.a, f.b) }] = rec;
+            check(occupy_on_entry(f.w, f.a, LAND_ROW, tile(f, 30, 3), batch), "L21c (fixture) the port is taken");
+            f.w.tile_occupier[tile(f, 30, 3)] = f.a;
+            invalidate_logistics_caches(f.w);
+            check(drawn(f, tile(f, 31, 3)), "L21d through the port it took, overseas supply works");
+            // A blockade of its own does not shut the port it holds.
+            add_on_station(f, f.a, f.a_port, DES, sea_mission::blockade, {7});
+            refresh_closed_ports(f.w, reg);
+            check(f.w.closed_ports.count(tile(f, 30, 3)) == 0, "L21e its own blockade does not close the port it took");
+            f.w.tile_occupier.erase(tile(f, 30, 3));
+            refresh_closed_ports(f.w, reg);
+            check(f.w.closed_ports.count(tile(f, 30, 3)) == 1, "L21f (control) and does close it, not taken");
+        }
+        {
+            // Peacetime moves nothing: a neutral's port lands a lane as it always has.
+            fixture f; field(f, false);
+            check(drawn(f, tile(f, 31, 3)), "L21h a neutral's port still lands its points: no hostile pair, no change");
+        }
+        {
+            // A blockade reads the holder.
+            fixture f; field(f, false);
+            declare_hostile(f.w, f.b, f.a);
+            f.w.tile_occupier[tile(f, 30, 3)] = f.a;
+            add_on_station(f, f.b, f.b_port, DES, sea_mission::blockade, {7});
+            refresh_closed_ports(f.w, reg);
+            check(f.w.closed_ports.count(tile(f, 30, 3)) == 1, "L22 its former owner's fleet closes a port it lost");
+        }
+        {
+            // An own port an enemy holds loads nobody.
+            fixture f; build(f);
+            const entity_id ship = add_ship(f, f.a, f.a_port, TRA, 8, 3);
+            const entity_id u = add_soldiers(f, f.a, 7, 3);
+            f.w.tile_occupier[tile(f, 7, 3)] = f.b;
+            refused(f, [&] { return embark(f, reg, f.a, u, ship); }, corp_command_result::rejected_placement, "L23 an own port an enemy occupies loads nobody");
+        }
+        {
+            // A recall that applies: home with everyone aboard.
+            fixture f; build(f);
+            add_islet(f, f.a);
+            entity_id u = null_entity;
+            const entity_id ship = loaded_transport(f, reg, 100, &u);
+            check(land(f, reg, f.a, ship, tile(f, 30, 3)) == corp_command_result::applied, "L24 (fixture) ordered");
+            days(f, reg, 3, 40);
+            check(land(f, reg, f.a, ship, null_entity) == corp_command_result::applied, "L24b a landing may be recalled");
+            for (int d = 0; d < 60 && !f.w.ships.at(ship).route.empty(); ++d)
+                (void)run_sea_day(f.w, reg, 50 + d);
+            const sea_ship& s = f.w.ships.at(ship);
+            check(s.landing_tile == null_entity && s.tile == tile(f, 8, 3) && s.aboard.size() == 1, "L24c it sails home with them aboard");
+        }
+        {
+            // Two units in one surf: a spent one boards; the ship stays for the other.
+            fixture f; entity_id att = null_entity, def = null_entity;
+            build(f);
+            add_islet(f, f.b);
+            declare_hostile(f.w, f.a, f.b);
+            const entity_id ship = loaded_transport(f, reg, 400, &att);
+            const entity_id second = add_soldiers(f, f.a, 7, 3, 400);
+            check(embark(f, reg, f.a, second, ship) == corp_command_result::applied, "L25 (fixture) two aboard");
+            add_on_station(f, f.a, f.a_port, DES, sea_mission::patrol, {7});
+            def = add_soldiers(f, f.b, 30, 3, 400);
+            check(land(f, reg, f.a, ship, tile(f, 30, 3)) == corp_command_result::applied, "L25b (fixture) ordered");
+            for (int d = 0; d < 60 && f.w.battles.empty(); ++d)
+                (void)run_sea_day(f.w, reg, 50 + d);
+            check(f.w.units.at(att).landing_ship == ship && f.w.units.at(second).landing_ship == ship, "L25c both in the surf");
+            // One leaves the battle spent, as retreat_side leaves it.
+            auto drop = [&](std::vector<entity_id>& v) { v.erase(std::remove(v.begin(), v.end(), att), v.end()); };
+            drop(f.w.battles[0].attacker_units); drop(f.w.battles[0].attacking_units);
+            const entity_id at = f.w.ships.at(ship).tile;
+            (void)run_sea_day(f.w, reg, 120);
+            const sea_ship& s = f.w.ships.at(ship);
+            check(f.w.units.count(att) == 0 && s.aboard.size() == 1 && s.aboard[0].first == att, "L25d the spent unit boards");
+            check(s.landing_tile != null_entity && s.tile == at && s.route.empty(), "L25e the ship stays for the one still fighting");
+            check(f.w.units.at(second).count == 400 && f.w.units.at(second).landing_ship == ship, "L25f who is not abandoned");
+            // And when that one is out, both go home alive.
+            f.w.battles.clear();
+            (void)run_sea_day(f.w, reg, 121);
+            check(f.w.ships.at(ship).aboard.size() == 2 && f.w.ships.at(ship).landing_tile == null_entity, "L25g the last one out, home with both");
+            (void)def;
+        }
+        {
+            // A second transport joins the fight the first opened.
+            fixture f; entity_id att = null_entity, def = null_entity;
+            const entity_id ship = contested(f, 400, 400, &att, &def);
+            const entity_id t2 = add_ship(f, f.a, f.a_port, TRA, 8, 3);
+            const entity_id u2 = add_soldiers(f, f.a, 7, 3, 300);
+            check(embark(f, reg, f.a, u2, t2) == corp_command_result::applied, "L26 (fixture) a second load");
+            check(land(f, reg, f.a, t2, tile(f, 30, 3)) == corp_command_result::applied, "L26b (fixture) the same shore");
+            for (int d = 0; d < 60 && f.w.units.count(u2) == 0; ++d)
+                (void)run_sea_day(f.w, reg, 600 + d);
+            const active_battle& b = f.w.battles.at(0);
+            check(f.w.battles.size() == 1 && std::count(b.attacker_units.begin(), b.attacker_units.end(), u2) == 1
+                  && std::count(b.attacking_units.begin(), b.attacking_units.end(), u2) == 1, "L26c its units join the fight");
+            check(f.w.units.at(u2).landing_ship == t2 && f.w.ships.at(t2).landing_tile != null_entity, "L26d off their own transport, which stays");
+            (void)ship;
+        }
+        {
+            // Withdrawn from the surf: back aboard, not along the shore.
+            fixture f; entity_id att = null_entity, def = null_entity;
+            const entity_id ship = contested(f, 400, 400, &att, &def);
+            check(request_withdraw(f.w, f.a, tile(f, 30, 3)), "L27 (fixture) the withdrawal is asked");
+            for (int d = 0; d < 5 && f.w.units.count(att) != 0; ++d)
+                war_days(f, reg, 1, 700 + d);
+            check(f.w.units.count(att) == 0 && f.w.ships.at(ship).aboard.size() == 1, "L27b withdrawn, it goes back aboard");
+        }
+        {
+            // A transport that breaks off leaves its men in the surf to be lost.
+            fixture f; entity_id att = null_entity, def = null_entity;
+            const entity_id ship = contested(f, 400, 400, &att, &def);
+            f.w.ships.at(ship).returning = true;
+            f.w.ships.at(ship).route = {tile(f, 28, 3)};
+            (void)run_sea_day(f.w, reg, 720); // it sails
+            check(f.w.ships.at(ship).tile != f.w.units.at(att).position, "L28 (fixture) it has left");
+            f.w.battles.clear();
+            const sea_day_tick t = run_sea_day(f.w, reg, 721);
+            check(t.troops_lost == 1 && f.w.units.at(att).count == 0, "L28b left in the surf with the fight over, they are lost");
+        }
+        {
+            // A disbanded transport takes them too (the orphan rule), and the muster base ends.
+            fixture f; build(f);
+            entity_id u = null_entity;
+            const entity_id base = add_building(f, f.a, 5, 5, building_type::military_base);
+            const entity_id x = add_soldiers(f, f.a, 7, 4);
+            f.w.units.at(x).muster_base = base;
+            const entity_id ship = add_ship(f, f.a, f.a_port, TRA, 8, 4);
+            f.w.ships.at(ship).tile = tile(f, 8, 3);
+            check(embark(f, reg, f.a, x, ship) == corp_command_result::applied, "L29 (fixture) aboard");
+            check(f.w.ships.at(ship).aboard[0].second.muster_base == null_entity, "L29b a unit that sails answers to no base");
+            (void)u;
+        }
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

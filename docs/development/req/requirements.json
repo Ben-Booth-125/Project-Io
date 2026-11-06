@@ -7942,6 +7942,75 @@
     }
    ],
    "resolved": "2026-11-06"
+  },
+  {
+   "brief": "troop-landings",
+   "title": "BL-1531 - Transports embark land units and land them on a coast, gated by sea control",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1531 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "A land unit on or beside an own open port boards a transport at its mouth, up to capacity: two at base, more by hull.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness L1-L3e, L23. 373 checks, 0 failures."
+    },
+    {
+     "id": "R2",
+     "text": "Aboard it neither marches nor fights, keeps its carried supplies, draws no goods, is still paid, and goes down with a sunk transport.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L4-L4c with carried supplies live and a land control; L13; L19 at non-zero wage rates."
+    },
+    {
+     "id": "R3",
+     "text": "A transport lands on a coast tile touching the sea, in range, on own, friend's, hostile or no one's ground, never a neutral's. Hostile ground needs its side to hold the province, and the days start over if the water is lost.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L5-L12b, L24 series."
+    },
+    {
+     "id": "R4",
+     "text": "A landing met by a defender opens the ordinary battle from the surf, its first days at a penalty. Won, it comes ashore; repulsed or withdrawn, it goes back aboard; a second load joins; a sunk or departed transport loses those in the surf.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L14-L18, L25-L28b; battle_engagement_harness 97 checks, 0 failures."
+    },
+    {
+     "id": "R5",
+     "text": "Ashore it lives on carried supplies until it takes a port: a lane lands no points on a hostile port, and one it occupies serves it. A blockade reads the holder.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L21-L22. The chain from no draw to a starving unit over months on a real seed is not run: BL-1535 (naval war reading) owes it."
+    },
+    {
+     "id": "R6",
+     "text": "Passengers, a landing order and the surf save, load and replay the same; a malformed stream is refused whole.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "L20-L20k; save_roundtrip OK; save_envelope_roundtrip PASS."
+    },
+    {
+     "id": "R7",
+     "text": "A world with no ship and no hostile pair does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "rebless_shape_probe seeds 0, 46, 28 identical; world_determinism ALL PASS; L21h."
+    },
+    {
+     "id": "R8",
+     "text": "Live click: embark and land from the app.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "No press exists yet. BL-1534 (sea UI) owns the embark and land presses and their live click."
+    }
+   ],
+   "resolved": "2026-11-06"
   }
  ]
 }

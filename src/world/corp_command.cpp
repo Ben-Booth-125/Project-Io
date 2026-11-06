@@ -349,6 +349,8 @@ bool nation_self_shared_verb(corp_verb v)
         case corp_verb::hire_ship:          // BL-1430: a nation's own port
         case corp_verb::assign_sea_mission: // BL-1430: a nation's own ship
         case corp_verb::refit_ship:         // BL-1527: a nation's own ship
+        case corp_verb::embark_unit:        // BL-1531: a nation's own unit and ship
+        case corp_verb::land_units:         // BL-1531: a nation's own ship
         case corp_verb::place_road:
         case corp_verb::set_trade:
         case corp_verb::clear_trade:
@@ -883,6 +885,9 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
     // A unit refitting to a newer type re-equips in place (Ben, 2026-10-27).
     if (unit_refitting(uit->second))
         return corp_command_result::rejected_state;
+    // BL-1531: a unit in the surf comes ashore by winning, or goes back aboard.
+    if (uit->second.landing_ship != null_entity)
+        return corp_command_result::rejected_state;
 
     // EVERY MARCH GOES TO A TILE (Ben, 2026-10-27: "all marches go to a
     // tile"). The destination is `tile`, and the march ends on it.
@@ -1230,6 +1235,26 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
             s.kit = live;
             s.muster_days = reg.military().sea.cls[static_cast<std::size_t>(cls)].muster_days;
             s.refitting = true;
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::embark_unit:
+        {
+            // BL-1531 (MILITARY.md § Sea, landings): `subject` the unit, `order` the transport.
+            const entity_id ship = static_cast<entity_id>(cmd.order);
+            const corp_command_result r = embark_check(w, reg, cmd.corp, cmd.subject, ship);
+            if (r != corp_command_result::applied)
+                return r;
+            embark_unit(w, cmd.subject, ship);
+            return corp_command_result::applied;
+        }
+
+        case corp_verb::land_units:
+        {
+            const corp_command_result r = land_units_check(w, reg, cmd.corp, cmd.subject, cmd.tile);
+            if (r != corp_command_result::applied)
+                return r;
+            set_ship_landing(w, reg, w.ships.at(cmd.subject), cmd.tile);
             return corp_command_result::applied;
         }
 

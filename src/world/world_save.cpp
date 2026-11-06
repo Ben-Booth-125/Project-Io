@@ -2118,6 +2118,34 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             for (const entity_id t : s.route) w_id(out, t);
             if (version >= k_world_save_version_ship_kit) // BL-1527
                 w_u8(out, s.refitting ? 1 : 0);
+            if (version >= k_world_save_version_ship_kit) // BL-1531: the landing, and who is aboard
+            {
+                w_id(out, s.landing_tile);
+                w_i32(out, s.landing_days);
+                w_u32(out, static_cast<uint32_t>(s.aboard.size()));
+                // Embarking cleared the order, front, post, refit and battle carries, and a
+                // unit aboard has no tile, so none of those is written.
+                for (const auto& [uid, u] : s.aboard)
+                {
+                    w_id(out, uid);
+                    w_i32(out, u.count);
+                    w_u16(out, u.type);
+                    w_i32(out, u.supply_factor_permille);
+                    w_id(out, u.muster_base);
+                    w_i32(out, u.establishment);
+                    w_i32(out, u.readiness_permille);
+                    w_i32(out, u.morale_permille);
+                    for (const uint8_t v : u.kit.fit) w_u8(out, v);
+                    w_i32(out, u.food_permille);
+                    w_i32(out, u.ammo_permille);
+                    w_i32(out, u.equipment_permille);
+                    w_i32(out, u.starvation_carry);
+                    w_i32(out, u.food_remainder);
+                    w_i32(out, u.ammo_remainder);
+                    w_i32(out, u.equipment_remainder);
+                    w_i32(out, u.lp_share_permille);
+                }
+            }
         }
     }
 
@@ -2141,6 +2169,18 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
         // BL-1530: the ports a blockade has closed, ascending tile ids.
         w_u32(out, static_cast<uint32_t>(w.closed_ports.size()));
         for (const entity_id t : w.closed_ports) w_id(out, t);
+        // BL-1531: the units in the surf, ascending id, each with its transport.
+        std::vector<entity_id> surf;
+        for (const auto& [uid, u] : w.units)
+            if (u.landing_ship != null_entity)
+                surf.push_back(uid);
+        std::sort(surf.begin(), surf.end());
+        w_u32(out, static_cast<uint32_t>(surf.size()));
+        for (const entity_id uid : surf)
+        {
+            w_id(out, uid);
+            w_id(out, w.units.at(uid).landing_ship);
+        }
     }
 }
 
@@ -2151,6 +2191,21 @@ void write_world_snapshot_pre_ship_kit(const world& w, std::ostream& out)
 }
 
 namespace {
+/// BL-1531: what a ship's record carries for its landing, in the v81 stream.
+std::size_t ship_landing_bytes(const sea_ship& s)
+{
+    return 4 + 4 + 4 + s.aboard.size() * (4 + 4 + 2 + 4 + 4 + 4 + 4 + 4 + k_kit_slot_max + 4 * 8);
+}
+
+/// BL-1531: the surf list, which closes the v81 section.
+std::size_t surf_section_bytes(const world& w)
+{
+    std::size_t n = 4;
+    for (const auto& [uid, u] : w.units)
+        n += u.landing_ship != null_entity ? 8u : 0u;
+    return n;
+}
+
 std::size_t ship_design_section_bytes(const world& w)
 {
     std::size_t n = 4;
@@ -2168,9 +2223,10 @@ std::size_t world_save_ship_hulls_bytes(const world& w)
     write_world_snapshot_pre_ship_kit(w, narrow);
     std::size_t refit_bytes = 0; // v81 closes each ship's record with its refit flag
     for (const auto& [sid, s] : w.ships)
-        refit_bytes += w.nations.count(s.owner) != 0 ? 1u : 0u;
+        refit_bytes += w.nations.count(s.owner) != 0 ? 1u + ship_landing_bytes(s) : 0u;
     return wide.str().size() - narrow.str().size() - ship_design_section_bytes(w) - refit_bytes
-           - (4 + 4 * w.closed_ports.size()); // BL-1530: the closed ports close the v81 section
+           - (4 + 4 * w.closed_ports.size()) // BL-1530: the closed ports close the v81 section
+           - surf_section_bytes(w);          // BL-1531: and the surf after them
 }
 
 void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
@@ -2182,13 +2238,13 @@ void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
 // BL-1527: the whole tail from the ship section on, the ship designs included.
 std::size_t world_save_ships_section_bytes(const world& w)
 {
-    std::size_t n = 4 + ship_design_section_bytes(w) + 4 + 4 * w.closed_ports.size();
+    std::size_t n = 4 + ship_design_section_bytes(w) + 4 + 4 * w.closed_ports.size() + surf_section_bytes(w);
     for (const auto& [sid, s] : w.ships)
     {
         if (w.nations.count(s.owner) == 0)
             continue;
         n += 4 * 3 + 2 + 4 * 5 + 1 + sizeof(s.kit.fit) + 1
-             + 4 + 4 * s.provinces.size() + 4 + 4 * s.route.size() + 4 + 1;
+             + 4 + 4 * s.provinces.size() + 4 + 4 * s.route.size() + 4 + 1 + ship_landing_bytes(s);
     }
     return n;
 }
@@ -4351,6 +4407,7 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             return false;
         };
         const sea_params ship_rules = mil != nullptr ? mil->sea : default_sea_params();
+        std::set<entity_id> aboard_seen; // BL-1531: no unit is aboard two ships
         for (uint32_t k = 0; k < count; ++k)
         {
             entity_id sid = null_entity;
@@ -4420,6 +4477,59 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                     || (refitting != 0 && (sh.muster_days <= 0 || mission != 0)))
                     return false;
                 sh.refitting = refitting != 0;
+                // BL-1531: a transport's landing and its passengers, each no other entity's and
+                // a land row with every number in its domain. Refused whole otherwise.
+                uint32_t carried = 0;
+                if (!r_id(in, sh.landing_tile) || !r_i32(in, sh.landing_days) || !r_u32(in, carried)
+                    || sh.landing_days < 0 || sh.landing_days > 3650 || carried > 1000u)
+                    return false;
+                const bool is_transport = ship_roster_table()[sh.type].cls == ship_class::transport;
+                if (sh.landing_tile != null_entity)
+                {
+                    const auto lt = s.tiles.find(sh.landing_tile);
+                    if (!is_transport || lt == s.tiles.end() || is_water(lt->second.substrate))
+                        return false;
+                }
+                if (carried != 0 && !is_transport)
+                    return false;
+                const auto per_mille = [](int32_t v) { return v >= 0 && v <= 1000; };
+                entity_id prev_aboard = null_entity;
+                for (uint32_t c = 0; c < carried; ++c)
+                {
+                    entity_id uid = null_entity;
+                    unit_component u;
+                    u.owner = sh.owner;
+                    u.position = null_entity;
+                    if (!r_id(in, uid) || !r_i32(in, u.count) || !r_u16(in, u.type)
+                        || !r_i32(in, u.supply_factor_permille) || !r_id(in, u.muster_base)
+                        || !r_i32(in, u.establishment) || !r_i32(in, u.readiness_permille)
+                        || !r_i32(in, u.morale_permille))
+                        return false;
+                    for (uint8_t& v : u.kit.fit)
+                        if (!r_u8(in, v))
+                            return false;
+                    if (!r_i32(in, u.food_permille) || !r_i32(in, u.ammo_permille)
+                        || !r_i32(in, u.equipment_permille) || !r_i32(in, u.starvation_carry)
+                        || !r_i32(in, u.food_remainder) || !r_i32(in, u.ammo_remainder)
+                        || !r_i32(in, u.equipment_remainder) || !r_i32(in, u.lp_share_permille))
+                        return false;
+                    const auto& land_rows = unit_roster_table();
+                    if (uid == null_entity || uid >= next_entity || (c > 0 && uid <= prev_aboard)
+                        || s.units.count(uid) != 0 || s.buildings.count(uid) != 0 || s.ships.count(uid) != 0
+                        || uid == sid || !aboard_seen.insert(uid).second
+                        || u.count <= 0 || u.type >= land_rows.size()
+                        || (land_rows[u.type].domains & domain_bit(traversal_domain::land)) == 0
+                        || !design_valid(land_class_for(land_rows[u.type]), u.kit)
+                        || u.muster_base >= next_entity || u.establishment < 0
+                        || !per_mille(u.supply_factor_permille) || !per_mille(u.readiness_permille)
+                        || !per_mille(u.morale_permille) || !per_mille(u.food_permille)
+                        || !per_mille(u.ammo_permille) || !per_mille(u.equipment_permille)
+                        || !per_mille(u.lp_share_permille) || u.starvation_carry < 0
+                        || u.food_remainder < 0 || u.ammo_remainder < 0 || u.equipment_remainder < 0)
+                        return false;
+                    prev_aboard = uid;
+                    sh.aboard.emplace_back(uid, std::move(u));
+                }
             }
             s.ships.emplace(sid, std::move(sh));
         }
@@ -4488,6 +4598,24 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 return false;
             prev_tile = t;
             s.closed_ports.insert(t);
+        }
+        // BL-1531: the surf. A transport the writer dropped leaves its name here for the sea day
+        // to read as gone.
+        uint32_t surf = 0;
+        if (!r_u32(in, surf) || surf > s.units.size())
+            return false;
+        entity_id prev_surf = null_entity;
+        for (uint32_t k = 0; k < surf; ++k)
+        {
+            entity_id uid = null_entity, ship = null_entity;
+            if (!r_id(in, uid) || !r_id(in, ship) || (k > 0 && uid <= prev_surf)
+                || ship == null_entity || ship >= next_entity)
+                return false;
+            const auto it = s.units.find(uid);
+            if (it == s.units.end())
+                return false;
+            prev_surf = uid;
+            it->second.landing_ship = ship;
         }
     }
 

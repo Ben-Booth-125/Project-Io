@@ -908,6 +908,14 @@
   [
    "gameplay.refit_ship",
    "A corp_verb (corp_verb::refit_ship, 58) on the command seam."
+  ],
+  [
+   "gameplay.embark_unit",
+   "A corp_verb (corp_verb::embark_unit, 59) on the command seam."
+  ],
+  [
+   "gameplay.land_units",
+   "A corp_verb (corp_verb::land_units, 60) on the command seam."
   ]
  ]
 }

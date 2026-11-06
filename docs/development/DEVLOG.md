@@ -10,6 +10,25 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-06 — BL-1531 (troop landings): armies cross the water
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** Two verbs, `embark_unit` and `land_units`. A unit aboard leaves `world::units` for
+`sea_ship::aboard`, so no land pass can see it; its wage is still billed. A transport sails to the water beside a coast,
+runs its landing days (on hostile ground only while its side holds the water), and lands. A hostile stack on the tile opens
+the ordinary battle with the units on the water, marked by `unit_component::landing_ship`, at a penalty for its first
+days. A lane now lands no points on a hostile port, and a port the army occupies serves it.
+
+**Review.** The cold review caught the first Logistic Point filter moving peacetime worlds; a spent unit sending the
+transport home and killing the rest; a second transport bounced off a contested shore; a blockade reading the port's
+owner rather than its holder; stale muster bases; and vacuous wage, march and supply checks. All fixed.
+
+**Left open.** Nine calls in NR-1148. BL-1534 (sea UI) owes the presses and the live click. BL-1535 (naval war reading)
+owes a landed army on a real seed. Shape identical to base.
+
+---
+
 ## 2026-11-06 — BL-1530 (sea control and blockade): water can be held, and a port closed
 
 **Runtime:** one session, Delivery Full on the naval worktree.

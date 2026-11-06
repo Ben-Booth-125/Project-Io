@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*227 entries — 58 gameplay · 39 canvas · 15 lens · 75 ledger · 40 chrome.*
+*229 entries — 60 gameplay · 39 canvas · 15 lens · 75 ledger · 40 chrome.*
 
 ---
 
@@ -1117,6 +1117,45 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The goods of each changed slot are spent, the ship records the live design, and it is out of action for its class's muster days. Its hull share is kept.
 
 **Reason to select.** Bring a ship in port up to the design research has opened since it was raised.
+
+### `gameplay.embark_unit` — A corp_verb (corp_verb::embark_unit, 59) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=59 subject=<unit id> order=<ship id>.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (unit)` | The land unit that boards. |
+| `order` | `entity_id (ship)` | The transport it boards. |
+
+**Valid when:**
+- The unit exists (rejected_invalid), is the actor's (rejected_not_owner), has men and is a land row (rejected_invalid).
+- The ship exists (rejected_invalid), is the actor's (rejected_not_owner) and is a transport (rejected_invalid).
+- The unit is in no battle, not refitting and not in the surf; the ship is raised, not broken off, has no course or landing order, and has room (rejected_state).
+- The unit stands on or beside the actor's own standing, open port that no enemy occupies, and the ship lies at that port's mouth (rejected_placement). A refusal mutates nothing.
+
+**Expected output.** The unit leaves the land and goes aboard, keeping its carried supplies. Its order, front, post and muster base end. It draws no goods and its wage is still paid.
+
+**Reason to select.** Load an army for a crossing no road can make.
+
+### `gameplay.land_units` — A corp_verb (corp_verb::land_units, 60) on the command seam.
+
+**Press.** Over the seam: COMMAND corp=<nation> nation=<nation> verb=60 subject=<ship id> tile=<coast tile>. A null tile recalls a landing.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (ship)` | The transport. |
+| `tile` | `entity_id (tile), or null` | The coast tile to land on; null sails it home. |
+
+**Valid when:**
+- The ship exists (rejected_invalid), is the actor's (rejected_not_owner) and is a transport (rejected_invalid).
+- No unit of it is in the surf (rejected_state). A recall needs a landing under way (rejected_state).
+- It is raised, not broken off, and has units aboard (rejected_state).
+- The tile is land touching the sea, on own, friend's, hostile or no one's ground and never a neutral's, with water beside it the ship can reach, in its class's range of an own port (rejected_placement).
+- Every unit aboard may stand on the tile (rejected_terrain). A refusal mutates nothing.
+
+**Expected output.** The transport sails to the water beside the tile and lands its units over the authored days. On hostile ground those days run only while its side holds that sea province. A hostile stack on the tile opens the ordinary campaign battle, fought from the surf.
+
+**Reason to select.** Put an army ashore where the road does not go, once the water is won.
 
 ---
 

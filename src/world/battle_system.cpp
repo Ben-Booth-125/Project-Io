@@ -244,7 +244,10 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
     for (const entity_id uid : leaving)
     {
         unit_component& u = w.units.at(uid);
-        if (const entity_id to = retreat_tile(w, u, province, foreign, true, mil); to != null_entity)
+        // BL-1531: a unit in the surf falls back on its transport, never along the shore.
+        if (const entity_id to = u.landing_ship != null_entity ? null_entity
+                                 : retreat_tile(w, u, province, foreign, true, mil);
+            to != null_entity)
         {
             u.position       = to;
             u.tile_since_day = day; // BL-1453: it came onto this tile today
@@ -714,6 +717,25 @@ std::vector<entity_id> march_path(world& w, entity_id body, entity_id from, enti
     return path;
 }
 
+bool join_tile_battle(world& w, entity_id tile, entity_id attacker, entity_id defender,
+                      const std::vector<entity_id>& units)
+{
+    for (active_battle& b : w.battles)
+    {
+        if (b.tile != tile || b.attacker != attacker || b.defender != defender
+            || b.state.end != campaign_battle_end::in_progress)
+            continue;
+        for (std::vector<entity_id>* list : {&b.attacker_units, &b.attacking_units})
+        {
+            list->insert(list->end(), units.begin(), units.end());
+            std::sort(list->begin(), list->end());
+            list->erase(std::unique(list->begin(), list->end()), list->end());
+        }
+        return true;
+    }
+    return false;
+}
+
 bool open_tile_battle(world& w, int tick, entity_id tile, entity_id attacker, entity_id defender,
                       const std::vector<entity_id>& attacking_units, const land_recon_params& rp)
 {
@@ -971,7 +993,8 @@ int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vec
     for (const entity_id uid : ids)
     {
         const auto uit = w.units.find(uid);
-        if (uit == w.units.end() || uit->second.count <= 0 || uit->second.position == null_entity)
+        if (uit == w.units.end() || uit->second.count <= 0 || uit->second.position == null_entity
+            || uit->second.landing_ship != null_entity) // BL-1531: it goes home by its transport
             continue;
         unit_component& u = uit->second;
         // THE WALK HOME: equal-rank steps break toward the neighbour nearest (in hex
@@ -1192,6 +1215,13 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
         // BL-1455: each unit's fight scale on the battle ground (the defended tile).
         std::vector<land_combatant> atk = build_combatants(w, b.attacker_units, &reg.military(), b.tile);
         std::vector<land_combatant> def = build_combatants(w, b.defender_units, &reg.military(), b.tile);
+
+        // BL-1531 (MILITARY.md § Sea, landings): the first days of a landing, the attackers
+        // still in the surf fight at the authored penalty, on the terrain scale's own arithmetic.
+        if (const sea_params& sp = reg.military().sea; battle_day(b, params) <= sp.landing_penalty_days)
+            for (land_combatant& c : atk)
+                if (w.units.at(c.unit).landing_ship != null_entity)
+                    c.terrain = c.terrain * sp.landing_penalty_permille / 1000;
 
         // BL-1426 (MILITARY.md § Fortifications): the defender's own bunker on the
         // defended tile raises the defence and hardness of the defending units ON
@@ -1434,6 +1464,7 @@ battle_tick run_battles(world& w, const recipe_registry& reg, int tick)
                             it->second.position       = b.tile;
                             it->second.order          = movement_order{};
                             it->second.tile_since_day = tick; // BL-1453: it advanced today
+                            it->second.landing_ship   = null_entity; // BL-1531: ashore
                             // BL-1502 (MILITARY.md § Occupation): the won tile is occupied.
                             (void)occupy_on_entry(w, it->second.owner, it->second.type, b.tile,
                                                   occupation_batch);

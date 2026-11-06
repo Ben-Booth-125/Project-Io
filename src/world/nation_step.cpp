@@ -275,7 +275,7 @@ float discontent_output_scalar(const world& w, entity_id tile, const tax_params&
 
 void run_nation_garrison_upkeep(world& w, const recipe_registry& reg, const lp_tick* lp)
 {
-    if (w.units.empty() || w.nations.empty())
+    if ((w.units.empty() && w.ships.empty()) || w.nations.empty())
         return;
 
     const unit_upkeep_params& up = reg.military().upkeep;
@@ -300,6 +300,16 @@ void run_nation_garrison_upkeep(world& w, const recipe_registry& reg, const lp_t
             by_nation[u.owner].push_back(id);
         }
     }
+    // BL-1531 (MILITARY.md § Sea, landings): a unit aboard a transport draws nothing, but its
+    // wage is still the nation's, so a fleet of transports is no way off the payroll.
+    std::map<entity_id, float> aboard_bill;
+    for (const auto& [sid, s] : w.ships)
+        for (const auto& [uid, u] : s.aboard)
+            if (w.nations.find(u.owner) != w.nations.end())
+            {
+                aboard_bill[u.owner] += resolve_unit_upkeep(u, up).credits;
+                by_nation[u.owner]; // a nation with its whole army afloat still pays
+            }
     if (by_nation.empty())
         return;
 
@@ -313,6 +323,8 @@ void run_nation_garrison_upkeep(world& w, const recipe_registry& reg, const lp_t
         float bill = 0.0f;
         for (const entity_id uid : unit_ids)
             bill += resolve_unit_upkeep(w.units.at(uid), up).credits;
+        if (const auto ab = aboard_bill.find(nation_id); ab != aboard_bill.end())
+            bill += ab->second;
 
         // The share: run_national_budget's own formula (nation_budget.cpp),
         // recomputed here rather than read off its report — that pass early-

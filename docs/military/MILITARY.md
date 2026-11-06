@@ -733,15 +733,33 @@ hostile cargo as a raider does. A cargo not yet at sea, bound through a closed p
 port. A closed port makes no Logistic Points either. Lose the province and the port reopens that day.
 
 **Landings carry armies over the ocean (Ben, 2026-11-05).** Open ocean bars a land unit except aboard a
-transport (§ Domains and traversal). A land unit **embarks** at an own port up to the transport's capacity.
+transport (§ Domains and traversal). A land unit standing on or beside an own open port
+**embarks** on a transport lying at that port's mouth, up to the transport's capacity: two land units at
+base, and more by its hull. Its order, front and post end at the gangway.
 Aboard, it neither marches nor fights, it keeps the carried supplies it boarded with (§ Carried supplies),
-and **it goes down with a sunk transport**. A transport **lands** its units on a coast tile touching a
-sea province, on own, friend's or hostile ground and never on a neutral's. On hostile ground the landing
-needs its side to hold that province, so a fleet must win the water first. Landing takes authored days,
-and a landing met by a defender opens the ordinary campaign battle, its first days at an authored penalty
-to the attacker. **Ashore the army lives on carried supplies** until its network reaches it, so it must
+it draws no goods and its wage is still paid, and **it goes down with a sunk transport**. A transport **lands** its units on a coast tile touching a
+sea province, in its class's range of an own port, on own, friend's, hostile or no one's ground and never on a neutral's. On hostile ground the landing
+needs its side to hold that province, so a fleet must win the water first: it may be ordered before then,
+and the transport lies off the coast until the water is held. Landing takes authored days, which start
+over whenever the water is lost. A coast held by a stack that is not hostile bars the landing until it moves.
+
+**A landing met by a defender on the tile** opens the ordinary campaign battle, fought from **the surf**,
+the water beside the coast. Its first days are at an authored penalty to the units still in the surf, on
+what they deal and what they absorb, and it opens blind (§ Recon). A second transport's units join the same
+fight. Winning brings the units ashore, unless a beaten defender with nowhere to go still stands there. A unit
+in the surf takes no march and does not fall back along the shore: repulsed or withdrawn, it goes back
+aboard, and once none of its units is left fighting the transport sails home. It is lost if the transport is
+sunk, or has broken off and left it there.
+
+A unit that has sailed answers to no muster base it left behind. A transport with no own port left to call
+home is disbanded by the orphan rule above, and everyone aboard and in the surf goes with it.
+
+**Ashore the army lives on carried supplies** until its network reaches it, so it must
 take a port or lose its strength, and overseas supply works through the port it takes (§ Domains and
-traversal).
+traversal): a lane lands no points on a port of a nation hostile to the army's, so a hostile port that
+still stands feeds no army camped beside it, and a port it occupies does (`../economy/LOGISTICS.md`
+§ A unit draws off the road). A blockade reads a port's holder, its occupier where it has one, so the
+occupier's fleet does not close it and its former owner's may.
 
 **Fleets open from history (Ben, 2026-11-05).** A nation opens with ships at its ports, drawn from the
 standing navy its history left it and sized to its chest

@@ -243,6 +243,10 @@ enum class corp_verb : uint8_t
     assign_sea_mission,   ///< Assign ship `subject` mission `order` (0 none, 1 patrol, 2 escort, 3 raid, 4 blockade) over the sea provinces in `air_provinces` (unused slots `no_province`; any order). It sails there and works the zone; `none` recalls it home. rejected_invalid (no such ship, a mission its class does not work, none with provinces or a mission with none, an unknown or repeated province) / rejected_not_owner / rejected_placement (a province that is land, out of range over water of an own port, or that this ship cannot reach) / rejected_state (no change) — see `sea_mission_check`.
     set_ship_design,      ///< BL-1527: the seat's nation fits ship kit item `unit_type` (a ship kit id, unit_designs.hpp) into slot `recipe` (0 hull, 1 armament, 2 sensors) of ship class `order`; its slot's base item puts it back to base kit. Ships already at sea keep their kit until refitted.
     refit_ship,           ///< BL-1527: ship `subject`, lying at its home port with no mission, refits to the live design of its class: buys the goods of each changed slot and is out of action for its class's muster days.
+    // Appended after refit_ship, same append-only rule. No scorer issues them until the fleet
+    // grant's item (AI_OPPONENT.md § 11).
+    embark_unit,          ///< BL-1531: land unit `subject`, on or beside the actor's own open port, boards transport `order` (a ship id) lying at that port's mouth, up to its capacity.
+    land_units,           ///< BL-1531: transport `subject` sails for the sea beside coast tile `tile` and lands everyone aboard; a null `tile` recalls it home.
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -252,7 +256,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::refit_ship) + 1;
+    static_cast<uint8_t>(corp_verb::land_units) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

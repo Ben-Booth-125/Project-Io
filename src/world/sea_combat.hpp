@@ -135,6 +135,33 @@ corp_command_result ship_design_check(const world& w, entity_id nation, uint32_t
 /// its home port's mouth with no course (rejected_placement). The payment is the seam's.
 corp_command_result refit_ship_check(const world& w, entity_id nation, entity_id ship);
 
+/// BL-1531: every check `embark_unit` makes, READ-ONLY, in its order: the unit exists
+/// (rejected_invalid), is @p nation's (rejected_not_owner), has men and is a land row
+/// (rejected_invalid); the ship exists (rejected_invalid), is @p nation's (rejected_not_owner)
+/// and is a transport (rejected_invalid); the unit is in no battle and not refitting, and the
+/// ship is raised, not broken off, has no course or landing, and has room (rejected_state);
+/// the unit stands on or beside @p nation's own standing, open port, and the ship lies at that
+/// port's mouth (rejected_placement).
+corp_command_result embark_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                 entity_id unit, entity_id ship);
+
+/// Take a checked unit aboard: out of `world::units` and into the ship. Its order, front and
+/// defence post end there.
+void embark_unit(world& w, entity_id unit, entity_id ship);
+
+/// BL-1531: every check `land_units` makes, READ-ONLY, in its order: the ship exists
+/// (rejected_invalid), is @p nation's (rejected_not_owner) and is a transport (rejected_invalid).
+/// A null @p tile recalls a landing: one must be under way with no unit in the surf
+/// (rejected_state). Otherwise the ship is raised, not broken off, has units aboard, and has no
+/// landing in the surf (rejected_state); @p tile is a land tile touching the sea, on own, friend's
+/// or hostile ground, never a neutral's, with its water reachable and in the class's range
+/// (rejected_placement); every unit aboard may stand on it (rejected_terrain).
+corp_command_result land_units_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                     entity_id ship, entity_id tile);
+
+/// Write a checked landing order onto @p s and set its course; a null @p tile sails it home.
+void set_ship_landing(world& w, const recipe_registry& reg, sea_ship& s, entity_id tile);
+
 /// Write a checked mission onto @p s and set its course: to the zone's nearest tile, or
 /// home for `none`. A ship that has broken off keeps its course home and takes the new
 /// mission up when it sails again.
@@ -164,6 +191,9 @@ struct sea_day_tick
     int hits       = 0; ///< Ships that took damage.
     int broke_off  = 0; ///< Ships that turned for home today.
     int sunk       = 0; ///< Ships erased today.
+    int landed     = 0; ///< Landings that came ashore unopposed today.
+    int contested  = 0; ///< Landings that met a defender today.
+    int troops_lost = 0; ///< Land units lost with a transport, or stranded in the surf.
 };
 
 /// Run ONE day (see the file comment). @p day_tick seeds its rolls.
@@ -187,6 +217,7 @@ struct ship_upkeep_tick
     int rehomed   = 0; ///< Home port lost, another of the nation's taken up.
     int refunded  = 0; ///< Recruits returned by a hire whose port was lost before it stood.
     int unmet     = 0; ///< Ships whose upkeep draw went short.
+    int troops_lost = 0; ///< BL-1531: land units lost with a disbanded transport.
 };
 
 /// The sea half of the upkeep pass, run right after the wings' on the same rule

@@ -1146,6 +1146,9 @@ economy = {
             patrol_detection_permille = 1500,
             raid_take_permille_per_day = 100,
             sea_hold_share_permille   = 600,
+            landing_days              = 3,
+            landing_penalty_days      = 5,
+            landing_penalty_permille  = 500,
             morale_per_hp_permille    = 1000,
             dock_morale_per_day       = 10,
             resume_hp_permille        = 700,
@@ -1179,6 +1182,7 @@ economy = {
                 transport = {
                     hp = 80, attack = 0, detection = 10, stealth = 30, range = 30,
                     days_per_tile_permille = 600, muster_days = 135, crew = 20, hire_cost = 700.0,
+                    capacity = 2,
                     hire_goods = { steel = 6.0, machinery = 2.0 },
                     missions = {},
                     targets = {},

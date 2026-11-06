@@ -43,6 +43,7 @@ struct ship_class_stats
     int break_morale_permille  = 200; ///< Below this morale it breaks off home.
     int muster_days = 180; ///< Days to raise it.
     int crew        = 30;  ///< Sea recruits a hire spends from the nation's sea pool.
+    int capacity    = 0;   ///< BL-1531: land units carried, before the hull's kit.
     float hire_cost = 0.0f; ///< Credits, from the treasury's uncommitted part.
     std::array<float, resource_count> hire_goods{}; ///< Bought off the shelf at hire.
     uint8_t missions = 0; ///< Bit (1 << sea_mission) per mission it may work.
@@ -60,6 +61,12 @@ struct sea_params
     int raid_take_permille_per_day = 100;
     /// BL-1530: the share of a sea province's surface attack at or past which a side holds it.
     int sea_hold_share_permille = 600;
+    /// BL-1531: days a transport lying off the coast takes to land its units.
+    int landing_days = 3;
+    /// BL-1531: the first days of a contested landing, in which the units still in the surf
+    /// fight at the scale below.
+    int landing_penalty_days = 5;
+    int landing_penalty_permille = 500;
     /// Morale lost per per-mille of full HP lost, per-mille: 1000 loses them equally.
     int morale_per_hp_permille = 1000;
     /// Morale a ship regains a day lying at its home port.
@@ -119,6 +126,7 @@ inline sea_params default_sea_params()
     ship_class_stats& t = p.cls[static_cast<std::size_t>(ship_class::transport)];
     t.hp = 80; t.attack = 0; t.detection = 10; t.stealth = 30; t.range = 30;
     t.days_per_tile_permille = 600; t.muster_days = 135; t.crew = 20; t.hire_cost = 700.0f;
+    t.capacity = 2;
     g(t.hire_goods, rt::steel, 6.0f); g(t.hire_goods, rt::machinery, 2.0f);
     t.missions = 0;
     t.targets  = 0;

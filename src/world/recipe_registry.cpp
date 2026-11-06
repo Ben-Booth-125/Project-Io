@@ -1021,6 +1021,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
             read_int(at, "patrol_detection_permille", 0, 10000, ap.patrol_detection_permille, "");
             read_int(at, "raid_take_permille_per_day", 0, 1000, ap.raid_take_permille_per_day, "");
             read_int(at, "sea_hold_share_permille", 1, 1000, ap.sea_hold_share_permille, "");
+            read_int(at, "landing_days", 1, 3650, ap.landing_days, "");
+            read_int(at, "landing_penalty_days", 0, 3650, ap.landing_penalty_days, "");
+            read_int(at, "landing_penalty_permille", 0, 1000, ap.landing_penalty_permille, "");
             read_int(at, "morale_per_hp_permille", 0, 10000, ap.morale_per_hp_permille, "");
             read_int(at, "dock_morale_per_day", 0, 1000, ap.dock_morale_per_day, "");
             read_int(at, "resume_hp_permille", 0, 1000, ap.resume_hp_permille, "");
@@ -1066,6 +1069,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
                     read_int(t, "break_morale_permille", 0, 1000, c.break_morale_permille, where);
                     read_int(t, "muster_days", 1, 3650, c.muster_days, where);
                     read_int(t, "crew", 0, 100000, c.crew, where);
+                    read_int(t, "capacity", 0, 1000, c.capacity, where); // BL-1531
                     c.hire_cost = t.get_or("hire_cost", c.hire_cost);
                     if (!std::isfinite(c.hire_cost) || c.hire_cost < 0.0f)
                         bad(where + "hire_cost is not a finite non-negative number");

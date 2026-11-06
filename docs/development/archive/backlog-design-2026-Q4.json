@@ -14446,6 +14446,9 @@
     },
     "BL-1530": {
       "design": "MILITARY.md § Sea; TRADE.md, ports. The share per province, the holding bar, the reveal. A held port-mouth province stops sea legs and trade points; the route pricer reads the port as lost, and the caches invalidate on both edges. Harness: prices move at the blockaded market, reopening is same-day, a convoy at sea finishes its leg."
+    },
+    "BL-1531": {
+      "design": "MILITARY.md § Sea, landings; § Domains and traversal. Embark, carried supplies aboard, loss with a sunk transport, the landing door, the attacker's opening penalty, and life on carried supplies until the network reaches. Read Fronts and Occupation first: a landed unit's front and a taken port's effect on reach are the seams. Live click required. A ship class has no base capacity yet: this item adds it, and is the first reader of ship_live_stats::capacity, which a transport hull already moves."
     }
   }
 }

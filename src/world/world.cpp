@@ -430,6 +430,11 @@ uint64_t world::state_hash(int tick) const
                 fnv1a_u32(h, 0x524B4954u); // "RKIT"
                 for (const uint8_t v : u.refit_kit.fit) fnv1a_u32(h, v);
             }
+            if (u.landing_ship != null_entity) // BL-1531: only in a contested landing
+            {
+                fnv1a_u32(h, 0x53555246u); // "SURF"
+                fnv1a_u32(h, u.landing_ship);
+            }
         }
     }
 
@@ -630,6 +635,34 @@ uint64_t world::state_hash(int tick) const
             for (const uint32_t p : s.provinces) fnv1a_u32(h, p);
             fnv1a_u32(h, static_cast<uint32_t>(s.route.size()));
             for (const entity_id t : s.route) fnv1a_u32(h, t);
+            if (s.landing_tile != null_entity || !s.aboard.empty()) // BL-1531
+            {
+                fnv1a_u32(h, 0x4C414E44u); // "LAND"
+                fnv1a_u32(h, s.landing_tile);
+                fnv1a_i32(h, s.landing_days);
+                fnv1a_u32(h, static_cast<uint32_t>(s.aboard.size()));
+                for (const auto& [uid, u] : s.aboard)
+                {
+                    fnv1a_u32(h, uid);
+                    fnv1a_u32(h, u.owner);
+                    fnv1a_i32(h, u.count);
+                    fnv1a_u32(h, u.type);
+                    fnv1a_i32(h, u.supply_factor_permille);
+                    fnv1a_u32(h, u.muster_base);
+                    fnv1a_i32(h, u.establishment);
+                    fnv1a_i32(h, u.readiness_permille);
+                    fnv1a_i32(h, u.morale_permille);
+                    for (const uint8_t v : u.kit.fit) fnv1a_u32(h, v);
+                    fnv1a_i32(h, u.food_permille);
+                    fnv1a_i32(h, u.ammo_permille);
+                    fnv1a_i32(h, u.equipment_permille);
+                    fnv1a_i32(h, u.starvation_carry);
+                    fnv1a_i32(h, u.food_remainder);
+                    fnv1a_i32(h, u.ammo_remainder);
+                    fnv1a_i32(h, u.equipment_remainder);
+                    fnv1a_i32(h, u.lp_share_permille);
+                }
+            }
         }
     }
     if (!closed_ports.empty()) // BL-1530: only when non-empty, as the ships are

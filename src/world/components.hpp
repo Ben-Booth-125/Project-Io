@@ -2075,6 +2075,11 @@ struct unit_component
     /// upkeep). It — not `supply_factor_permille`, which an unpaid wage or an unmet
     /// goods draw also lowers — is the share that resupplies the three stocks.
     int32_t   lp_share_permille = 1000;
+
+    /// BL-1531 (MILITARY.md § Sea, landings): THE SURF. The transport a unit is landing from,
+    /// while it fights for the shore from the water beside it; null otherwise, which is every
+    /// unit that is not in a contested landing. Saved (the v81 section) and hashed only when set.
+    entity_id landing_ship = null_entity;
 };
 
 /// True when a unit's carried supplies are all full with nothing carried and its road
@@ -2217,6 +2222,14 @@ struct sea_ship
     sea_mission mission = sea_mission::none;
     std::vector<uint32_t>  provinces;  ///< The zone, ascending, <= k_sea_mission_provinces_max.
     std::vector<entity_id> route;      ///< Water tiles still to sail, next first.
+    /// BL-1531: the coast tile a transport is ordered to land on, or null.
+    entity_id landing_tile = null_entity;
+    /// BL-1531: days of the landing still to run, once it lies off that coast.
+    int32_t   landing_days = 0;
+    /// BL-1531: the land units aboard, ascending id. They are OUT of `world::units` while here,
+    /// for the reason a ship is not a unit: no land pass walks them, so none can march, fight,
+    /// feed or starve one. They go down with the ship.
+    std::vector<std::pair<entity_id, unit_component>> aboard;
 };
 
 /// BL-1427 (fronts; MILITARY.md § Fronts): a front's order. Hold is the default and

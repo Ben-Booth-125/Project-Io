@@ -1,5 +1,7 @@
 #include "sea_combat.hpp"
 
+#include "battle_system.hpp"   // BL-1531: a landing opens the ordinary battle
+#include "fronts.hpp"          // BL-1531: a landing occupies what it enters
 #include "air_combat.hpp"      // air_wing_flies, wing_stats, wing_strength_permille, air_tile_distance
 #include "economy_system.hpp"  // draw_goods_at_tile, step_unit_supply_toward, economy_report
 #include "embargo.hpp"         // embargo_refuses
@@ -70,7 +72,7 @@ ship_live_stats ship_stats(const recipe_registry& reg, const sea_ship& s)
     o.detection = std::max(0, b.detection + k.detection);
     o.stealth   = std::max(0, b.stealth + k.stealth);
     o.days_per_tile_permille = std::max(1, b.days_per_tile_permille + k.days_per_tile_permille);
-    o.capacity  = std::max(0, k.capacity);
+    o.capacity  = std::max(0, b.capacity + k.capacity);
     o.targets   = static_cast<uint8_t>(b.targets | k.targets);
     return o;
 }
@@ -180,6 +182,13 @@ void neighbour_cells(int gx, int gy, int gw, int gh, int (&out)[6])
         const int x = ((c.gx % gw) + gw) % gw;
         out[side] = c.gy * gw + x;
     }
+}
+
+/// BL-1531: who holds port @p bid now: its occupier, else its owner.
+entity_id port_holder(const world& w, entity_id bid)
+{
+    const auto taken = w.tile_occupier.find(w.buildings.at(bid).tile);
+    return taken != w.tile_occupier.end() ? taken->second : owner_nation_of(w, bid);
 }
 
 bool is_sea_tile_id(const world& w, entity_id t)
@@ -468,7 +477,7 @@ corp_command_result sea_mission_check(const world& w, const recipe_registry& reg
             bool mouth = false;
             for (const auto& [bid, b] : w.buildings) // a pure any-of
                 if (b.type == building_type::port && b.ticks_remaining <= 0 && !b.decommissioned
-                    && owner_nation_of(w, bid) != nation && is_hostile(w, nation, owner_nation_of(w, bid))
+                    && port_holder(w, bid) != nation && is_hostile(w, nation, port_holder(w, bid))
                     && w.provinces.province_of(port_mouth_tile(w, bid)) == id)
                 {
                     mouth = true;
@@ -488,10 +497,104 @@ namespace {
 
 /// Set @p s's course from where it stands: home when it has broken off or has no mission,
 /// else to the zone unless it already stands in it.
+/// BL-1531: the sea tiles touching @p coast, ascending. Empty when @p coast is water or no tile.
+std::vector<entity_id> landing_mouths(const world& w, entity_id coast)
+{
+    std::vector<entity_id> out;
+    const auto cit = w.tiles.find(coast);
+    if (cit == w.tiles.end() || is_water(cit->second.substrate))
+        return out;
+    const auto bit = w.bodies.find(cit->second.body);
+    if (bit == w.bodies.end())
+        return out;
+    const int gw = bit->second.grid_width, gh = bit->second.grid_height;
+    std::vector<entity_id> local;
+    const std::vector<entity_id>& raster = raster_of(w, cit->second.body, local);
+    int cells[6];
+    neighbour_cells(cit->second.grid_x, cit->second.grid_y, gw, gh, cells);
+    for (const int cell : cells)
+        if (cell >= 0 && static_cast<std::size_t>(cell) < raster.size()
+            && is_sea_tile_id(w, raster[static_cast<std::size_t>(cell)]))
+            out.push_back(raster[static_cast<std::size_t>(cell)]);
+    std::sort(out.begin(), out.end());
+    out.erase(std::unique(out.begin(), out.end()), out.end());
+    return out;
+}
+
+/// BL-1531: what a landing on @p tile needs from @p nation's side.
+enum class landing_ground : uint8_t { refused, open, needs_hold };
+landing_ground landing_ground_of(const world& w, entity_id nation, entity_id tile)
+{
+    const entity_id holder = w.tile_controller(tile);
+    if (holder == null_entity || holder == nation)
+        return landing_ground::open;
+    if (hostile_either(w, nation, holder))
+        return landing_ground::needs_hold;
+    return are_friends(w, nation, holder) ? landing_ground::open : landing_ground::refused;
+}
+
+/// BL-1531: the port a unit on @p tile embarks at: on it, else beside it, lowest id.
+entity_id embark_port(const world& w, entity_id nation, entity_id tile)
+{
+    entity_id best = own_port_at(w, nation, tile);
+    if (best != null_entity)
+        return best;
+    const auto cit = w.tiles.find(tile);
+    if (cit == w.tiles.end())
+        return null_entity;
+    const auto bit = w.bodies.find(cit->second.body);
+    if (bit == w.bodies.end())
+        return null_entity;
+    std::vector<entity_id> local;
+    const std::vector<entity_id>& raster = raster_of(w, cit->second.body, local);
+    int cells[6];
+    neighbour_cells(cit->second.grid_x, cit->second.grid_y, bit->second.grid_width, bit->second.grid_height, cells);
+    for (const int cell : cells)
+    {
+        if (cell < 0 || static_cast<std::size_t>(cell) >= raster.size())
+            continue;
+        const entity_id p = own_port_at(w, nation, raster[static_cast<std::size_t>(cell)]);
+        if (p != null_entity && (best == null_entity || p < best))
+            best = p;
+    }
+    return best;
+}
+
+/// BL-1531: units in the surf off transport @p ship, ascending.
+std::vector<entity_id> surf_of(const world& w, entity_id ship)
+{
+    std::vector<entity_id> out;
+    for (const auto& [uid, u] : w.units) // sorted below
+        if (u.landing_ship == ship && u.count > 0)
+            out.push_back(uid);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+/// BL-1531: everyone aboard @p ship and in the surf off it goes down with it. @return units lost.
+int lose_passengers(world& w, entity_id ship, sea_ship& s)
+{
+    int lost = static_cast<int>(s.aboard.size());
+    s.aboard.clear();
+    for (const entity_id uid : surf_of(w, ship))
+    {
+        // Left listed for the upkeep pass's cleanup, as a battle's dead are.
+        w.units.at(uid).count = 0;
+        ++lost;
+    }
+    return lost;
+}
+
 void plot_course(world& w, sea_ship& s)
 {
     s.route.clear();
-    if (s.returning || s.mission == sea_mission::none)
+    if (s.landing_tile != null_entity && !s.returning)
+    {
+        const std::vector<entity_id> mouths = landing_mouths(w, s.landing_tile);
+        if (!std::binary_search(mouths.begin(), mouths.end(), s.tile))
+            s.route = sea_route(w, s.tile, mouths);
+    }
+    else if (s.returning || s.mission == sea_mission::none)
     {
         const entity_id mouth = port_mouth_tile(w, s.home_port);
         if (mouth != null_entity)
@@ -631,6 +734,105 @@ entity_id prize_market_for(const world& w, const recipe_registry& reg, const sea
 
 } // namespace
 
+corp_command_result embark_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                 entity_id unit, entity_id ship)
+{
+    const auto uit = w.units.find(unit);
+    if (uit == w.units.end())
+        return corp_command_result::rejected_invalid;
+    const unit_component& u = uit->second;
+    if (u.owner != nation)
+        return corp_command_result::rejected_not_owner;
+    const auto& rows = unit_roster_table();
+    if (u.count <= 0 || u.type >= rows.size() || (rows[u.type].domains & domain_bit(traversal_domain::land)) == 0)
+        return corp_command_result::rejected_invalid;
+    const auto sit = w.ships.find(ship);
+    if (sit == w.ships.end())
+        return corp_command_result::rejected_invalid;
+    const sea_ship& s = sit->second;
+    if (s.owner != nation)
+        return corp_command_result::rejected_not_owner;
+    if (ship_class_of(s) != ship_class::transport)
+        return corp_command_result::rejected_invalid;
+    if (unit_in_battle(w, unit) || unit_refitting(u) || u.landing_ship != null_entity
+        || s.muster_days > 0 || s.returning || !s.route.empty() || s.landing_tile != null_entity
+        || static_cast<int>(s.aboard.size()) >= ship_stats(reg, s).capacity)
+        return corp_command_result::rejected_state;
+    const entity_id port = embark_port(w, nation, u.position);
+    if (port == null_entity)
+        return corp_command_result::rejected_placement;
+    const building_component& b = w.buildings.at(port);
+    if (w.closed_ports.count(b.tile) != 0 || port_mouth_tile(w, port) != s.tile
+        || w.tile_occupier.count(b.tile) != 0) // an enemy holds it
+        return corp_command_result::rejected_placement;
+    return corp_command_result::applied;
+}
+
+void embark_unit(world& w, entity_id unit, entity_id ship)
+{
+    unit_component u = w.units.at(unit);
+    u.position = null_entity;
+    u.order = movement_order{};
+    u.front = null_entity;
+    u.defend_province = 0xFFFFFFFFu;
+    u.defend_post = null_entity;
+    u.tile_since_day = -1;
+    u.battle_ready_carry = 0;
+    u.battle_hp_carry = 0;
+    u.landing_ship = null_entity;
+    u.muster_base = null_entity; // a unit that has sailed answers to no base it left behind
+    w.forget_air_unit(unit);
+    w.units.erase(unit);
+    std::vector<std::pair<entity_id, unit_component>>& a = w.ships.at(ship).aboard;
+    const auto at = std::lower_bound(a.begin(), a.end(), unit,
+                                     [](const auto& e, entity_id id) { return e.first < id; });
+    a.insert(at, {unit, std::move(u)});
+}
+
+corp_command_result land_units_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                     entity_id ship, entity_id tile)
+{
+    const auto sit = w.ships.find(ship);
+    if (sit == w.ships.end())
+        return corp_command_result::rejected_invalid;
+    const sea_ship& s = sit->second;
+    if (s.owner != nation)
+        return corp_command_result::rejected_not_owner;
+    if (ship_class_of(s) != ship_class::transport)
+        return corp_command_result::rejected_invalid;
+    if (!surf_of(w, ship).empty())
+        return corp_command_result::rejected_state;
+    if (tile == null_entity)
+        return s.landing_tile != null_entity ? corp_command_result::applied : corp_command_result::rejected_state;
+    if (s.muster_days > 0 || s.returning || s.aboard.empty())
+        return corp_command_result::rejected_state;
+    const std::vector<entity_id> mouths = landing_mouths(w, tile);
+    if (mouths.empty() || landing_ground_of(w, nation, tile) == landing_ground::refused)
+        return corp_command_result::rejected_placement;
+    const int range = reg.military().sea.cls[static_cast<std::size_t>(ship_class_of(s))].range;
+    bool in_range = false;
+    for (const entity_id m : mouths)
+    {
+        bool reachable = false;
+        (void)sea_route(w, s.tile, {m}, &reachable);
+        in_range = in_range || (reachable && sea_province_in_range(w, nation, w.provinces.province_of(m), range));
+    }
+    if (!in_range)
+        return corp_command_result::rejected_placement;
+    const tile_component& ground = w.tiles.at(tile);
+    for (const auto& [uid, u] : s.aboard)
+        if (terrain_class_effects_for_type(reg.military(), u.type, ground).walled)
+            return corp_command_result::rejected_terrain;
+    return corp_command_result::applied;
+}
+
+void set_ship_landing(world& w, const recipe_registry& reg, sea_ship& s, entity_id tile)
+{
+    s.landing_tile = tile;
+    s.landing_days = tile != null_entity ? reg.military().sea.landing_days : 0;
+    plot_course(w, s);
+}
+
 void set_ship_mission(world& w, sea_ship& s, sea_mission m, std::vector<uint32_t> provinces)
 {
     s.mission   = m;
@@ -696,9 +898,9 @@ void refresh_closed_ports(world& w, const recipe_registry& reg)
             const uint32_t province = mouth != null_entity ? w.provinces.province_of(mouth) : 0;
             if (province == 0)
                 continue;
-            const entity_id owner = owner_nation_of(w, bid);
+            const entity_id holder = port_holder(w, bid); // BL-1531: its occupier, else its owner
             for (const sea_ship* s : blockaders)
-                if (s->owner != owner && province_holds(s->provinces, province) && is_hostile(w, s->owner, owner)
+                if (s->owner != holder && province_holds(s->provinces, province) && is_hostile(w, s->owner, holder)
                     && sea_holds(w, reg, province, s->owner))
                 {
                     closed.insert(b.tile);
@@ -904,11 +1106,168 @@ std::vector<interception_record> raid_convoys(world& w, const recipe_registry& r
 // The day
 // ---------------------------------------------------------------------------
 
+namespace {
+
+/// BL-1531: units in the surf whose battle is over go back aboard, and the transport sails home;
+/// with the transport gone, or no longer off that shore, they are lost.
+void settle_surf(world& w, sea_day_tick& out)
+{
+    std::vector<entity_id> ids;
+    for (const auto& [uid, u] : w.units) // sorted below
+        if (u.landing_ship != null_entity && u.count > 0)
+            ids.push_back(uid);
+    if (ids.empty())
+        return;
+    std::sort(ids.begin(), ids.end());
+    const std::set<entity_id> busy = units_in_live_battles(w);
+    std::set<entity_id> repulsed;
+    for (const entity_id uid : ids)
+    {
+        if (busy.count(uid) != 0)
+            continue;
+        unit_component& u = w.units.at(uid);
+        const entity_id sid = u.landing_ship;
+        const auto sit = w.ships.find(sid);
+        if (sit == w.ships.end() || sit->second.tile != u.position)
+        {
+            u.count = 0; // the upkeep pass's cleanup takes it
+            u.landing_ship = null_entity;
+            ++out.troops_lost;
+            continue;
+        }
+        embark_unit(w, uid, sid);
+        repulsed.insert(sid);
+    }
+    for (const entity_id sid : repulsed)
+    {
+        // Not while any of its units still fights: a spent unit is back aboard, and the ship
+        // stays for the rest.
+        if (!surf_of(w, sid).empty())
+            continue;
+        sea_ship& s = w.ships.at(sid);
+        s.landing_tile = null_entity;
+        s.landing_days = 0;
+        plot_course(w, s);
+    }
+}
+
+/// BL-1531 (MILITARY.md § Sea, landings): each transport off its coast runs its landing's days,
+/// which on hostile ground stop and start over whenever its side does not hold the water. Then
+/// its units come ashore, or, with a hostile stack on the tile, fight for it from the surf.
+void run_landings(world& w, const recipe_registry& reg, int day, sea_day_tick& out)
+{
+    const sea_params& sp = reg.military().sea;
+    bool occupation_batch = false;
+    for (auto& [sid_, s] : w.ships)
+    {
+        const entity_id sid = sid_;
+        if (s.landing_tile == null_entity || s.muster_days > 0 || s.returning || !s.route.empty()
+            || !surf_of(w, sid).empty())
+            continue;
+        const auto stand_down = [&]() {
+            s.landing_tile = null_entity;
+            s.landing_days = 0;
+            plot_course(w, s);
+        };
+        const std::vector<entity_id> mouths = landing_mouths(w, s.landing_tile);
+        if (!std::binary_search(mouths.begin(), mouths.end(), s.tile))
+        {
+            plot_course(w, s); // the water changed, or it was re-homed off its course
+            if (s.route.empty())
+                stand_down();
+            continue;
+        }
+        if (s.aboard.empty())
+        {
+            stand_down();
+            continue;
+        }
+        const landing_ground ground = landing_ground_of(w, s.owner, s.landing_tile);
+        if (ground == landing_ground::refused) // peace, or a stance that moved while it sailed
+        {
+            stand_down();
+            continue;
+        }
+        if (ground == landing_ground::needs_hold
+            && !sea_holds(w, reg, w.provinces.province_of(s.tile), s.owner))
+        {
+            s.landing_days = sp.landing_days;
+            continue;
+        }
+        if (s.landing_days > 0 && --s.landing_days > 0)
+            continue;
+
+        // Ashore, or at the door. A foreign stack that is not hostile bars the tile; it waits.
+        entity_id holder = null_entity, holder_unit = null_entity;
+        for (const auto& [uid, u] : w.units) // a minimum: walk order cannot reach it
+            if (u.count > 0 && u.position == s.landing_tile && u.owner != s.owner
+                && (holder_unit == null_entity || uid < holder_unit))
+            {
+                holder_unit = uid;
+                holder = u.owner;
+            }
+        if (holder != null_entity && !hostile_either(w, s.owner, holder))
+            continue;
+
+        const tile_component& shore = w.tiles.at(s.landing_tile);
+        std::vector<std::pair<entity_id, unit_component>> stays;
+        std::vector<entity_id> landed;
+        for (auto& e : s.aboard)
+        {
+            if (terrain_class_effects_for_type(reg.military(), e.second.type, shore).walled)
+            {
+                stays.push_back(std::move(e));
+                continue;
+            }
+            unit_component& u = e.second;
+            u.order = movement_order{};
+            u.tile_since_day = day; // ONLY HASTE ATTACKS BLIND: a landing opens with no recon
+            if (holder == null_entity)
+            {
+                u.position = s.landing_tile;
+                (void)occupy_on_entry(w, u.owner, u.type, s.landing_tile, occupation_batch);
+            }
+            else
+            {
+                u.position = s.tile;
+                u.landing_ship = sid;
+            }
+            landed.push_back(e.first);
+            w.units[e.first] = std::move(u);
+        }
+        s.aboard = std::move(stays);
+        if (holder == null_entity)
+        {
+            if (!landed.empty())
+                ++out.landed;
+            stand_down();
+            continue;
+        }
+        if (landed.empty())
+        {
+            stand_down();
+            continue;
+        }
+        // Into the fight already over this shore, or a new one. Refused (a spent force, or the
+        // defender attacking from here), they stand in the surf with no battle, and settle_surf
+        // takes them back aboard today.
+        if (join_tile_battle(w, s.landing_tile, s.owner, holder, landed)
+            || open_tile_battle(w, day, s.landing_tile, s.owner, holder, landed, reg.military().recon))
+            ++out.contested;
+    }
+    if (occupation_batch)
+        reanchor_fronts(w);
+    settle_surf(w, out);
+}
+
+} // namespace
+
 sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
 {
     sea_day_tick out;
     if (w.ships.empty())
     {
+        settle_surf(w, out); // a save dropped the ship: nothing stranded survives it
         if (!w.closed_ports.empty()) // the last ship went: the ports open
             refresh_closed_ports(w, reg);
         return out;
@@ -1078,6 +1437,7 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
     }
     for (const entity_id sid : sunk)
     {
+        out.troops_lost += lose_passengers(w, sid, w.ships.at(sid)); // BL-1531
         w.ships.erase(sid);
         ++out.sunk;
     }
@@ -1097,6 +1457,7 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
             plot_course(w, s);
         }
     }
+    run_landings(w, reg, day_tick, out); // BL-1531
     // BL-1530: last, so a province lost today opens its port today.
     refresh_closed_ports(w, reg);
     return out;
@@ -1191,6 +1552,7 @@ ship_upkeep_tick run_ship_upkeep(world& w, const recipe_registry& reg, economy_r
     }
     for (const entity_id sid : drop)
     {
+        out.troops_lost += lose_passengers(w, sid, w.ships.at(sid)); // BL-1531
         w.ships.erase(sid);
         ++out.disbanded;
     }
