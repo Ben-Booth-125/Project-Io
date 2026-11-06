@@ -390,7 +390,15 @@ The preview and the province card do not move; two columns change.
      what the column pair said, in a fraction of the height.
    - **The recipe (Ben, 2026-11-05)** — the recipe the building runs, as rows: its **inputs and
      outputs**, each input flagged when it is short. Owner only, under the recipe-disclosure rule
-     above.
+     above. The figures are **per quarter**. The economy report names **one** input, the one that
+     held the run, so that flag is a report and every other per-good figure is a mirror of the
+     recipe at the building's staffing, and the surface says so: the column reads *Est./qtr*, an
+     input short by the shelf carries an amber mark whose hover says *by estimate*, and the
+     reported one a red mark whose hover cites the report. An output's figure is the report's
+     total split by the recipe. An extraction site has no recipe and shows its one output row.
+     **No quarter read is not zero.** Until a building has a report row, as after a load, the
+     heading says *no quarter yet* and an output reads a dash. Power comes off the grid, so its row
+     shows no shelf figure and no estimated flag.
    - **The workforce row** — the building's workforce target as a **read-only bar** with the
      percentage of full employment to its right (0–100 %, the internal target ÷ 2). The game sets it, one 25 % step a quarter toward the
      most profitable level (`../economy/PRODUCTION.md` § Workforce target and the auto-solver);

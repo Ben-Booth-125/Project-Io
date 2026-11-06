@@ -1689,6 +1689,17 @@ struct ui_state
         /// BL-1368: the stack row's per-COLUMN explainers, in drawn order.
         std::vector<ui_grid_col> cols;
     };
+    /// One row of the expanded card's recipe rows, as drawn.
+    struct tile_card_recipe_row
+    {
+        std::string good;    ///< As drawn: the good's display name.
+        std::string id;      ///< The good's id, which the verify staging calls take.
+        bool        input = true;
+        std::string figure;  ///< As drawn: "-12.0", "+8.0", or a dash for no quarter read.
+        std::string shelf;   ///< As drawn; "" on an output or a grid good.
+        std::string mark;    ///< "binding" (reported), "short" (estimated) or "".
+        std::vector<ui_grid_col> cols; ///< The per-column explainers.
+    };
     struct tile_card_readout
     {
         bool        drawn    = false;
@@ -1710,6 +1721,11 @@ struct ui_state
         int         population = 0;         ///< The province card's header figure, thousands.
         float       province_scroll_max = 0.0f; ///< The province card's OWN window scroll range (must be 0).
         std::string status;                 ///< The expanded card's status line, "" when none.
+        bool        recipe_drawn    = false; ///< The recipe rows drew (the player's own, with a recipe or a target).
+        bool        recipe_reported = false; ///< They read a quarter's report.
+        std::string recipe_heading;          ///< The heading as drawn.
+        std::vector<tile_card_recipe_row> recipe_rows;
+        float       card_scroll_max = 0.0f;  ///< The expanded card's scroll range (the card is laid out to fit).
         /// BL-1368: the EXPANDED site row's per-column explainers (the under-
         /// construction card is one grid row), in drawn order. Empty on a card
         /// whose building is finished, which has no grid row at all.

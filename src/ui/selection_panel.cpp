@@ -3004,11 +3004,224 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
 ///     expenses per quarter;
 ///   - the workforce row: a read-only bar and percentage (draw_workforce_bar,
 ///     BL-1322 — the game sets it).
+///   - the recipe rows (draw_building_recipe_rows): the player's own only;
 /// The profit and workforce rows need the player's own COMPLETED building (the
 /// profit row also needs a reading — a fresh campaign has the settle's, BL-1321).
 /// A rival's card is the header, owner and an explicit `private` row; under
 /// spectator god view it opens the method, real rows and profit row (BL-408).
 /// The card holds no lever (BL-1322).
+/// The recipe the building runs, as rows (Ben, 2026-11-05; SELECTION.md § A selected
+/// building): pip | good | per quarter | shelf | short mark. Every per-good figure is
+/// an estimate but the report's one binding input, and the heading and each hover say
+/// which is which. With no quarter read yet (a loaded game, until its first tick) the
+/// heading says so and an output reads a dash: it is not a zero.
+void draw_building_recipe_rows(const world& w, const recipe_registry& reg, const economy_report& report,
+                               ui_state& ui, entity_id bid, const building_component& b)
+{
+    const building_recipe_read rd = read_building_recipe(w, reg, &report, bid, b);
+    ui.tile_card.recipe_drawn    = !rd.rows.empty();
+    ui.tile_card.recipe_reported = rd.reported;
+    if (rd.rows.empty())
+        return;
+
+    const char* const k_dash = "\xe2\x80\x94";
+    const auto figure_text = [&](const building_recipe_row& row) -> std::string {
+        if (!row.has_figure)
+            return k_dash;
+        char buf[32];
+        std::snprintf(buf, sizeof buf, "%s%.1f", row.input ? "-" : "+", static_cast<double>(row.per_qtr));
+        return buf;
+    };
+    const auto shelf_text = [&](const building_recipe_row& row) -> std::string {
+        return (!row.input || row.grid_good) ? std::string()
+                                             : fmt::abbreviate(static_cast<double>(row.shelf));
+    };
+
+    // The columns: each the wider of its heading and its widest figure.
+    const char* const k_fig_head   = "Est./qtr";
+    const char* const k_shelf_head = "Shelf";
+    float fig_w = ImGui::CalcTextSize(k_fig_head).x, shelf_w = ImGui::CalcTextSize(k_shelf_head).x;
+    for (const building_recipe_row& row : rd.rows)
+    {
+        fig_w   = std::max(fig_w, ImGui::CalcTextSize(figure_text(row).c_str()).x);
+        shelf_w = std::max(shelf_w, ImGui::CalcTextSize(shelf_text(row).c_str()).x);
+    }
+    const float line_h = ImGui::GetTextLineHeight();
+    const std::string heading = rd.reported ? "Recipe" : "Recipe, no quarter yet";
+    ui.tile_card.recipe_heading = heading;
+    // The empty report is the one thing here that must read whole, and the good column
+    // cannot hold it, so it takes the card's width on a line of its own.
+    std::vector<grid_explainer> head_cells;
+    const char* const k_no_quarter_hover = "No quarter has been read for this building yet, as after a load. "
+                                           "Reported figures wait for the next tick; a dash is not a zero.";
+    if (!rd.reported)
+    {
+        const ImVec2 hp = ImGui::GetCursorScreenPos();
+        const float  hw = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+        fit_text(text_box::table_cell, "selection.building.recipe.head", heading.c_str(), hw);
+        ImGui::PopStyleColor();
+        head_cells.push_back(construction_cell("heading", hp, hw, std::string(k_no_quarter_hover)));
+    }
+    constexpr ImGuiTableFlags flags = ImGuiTableFlags_NoPadInnerX | ImGuiTableFlags_SizingFixedFit;
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {construction_grid::pad, 0.0f});
+    if (!ImGui::BeginTable("##recipe_rows", 5, flags))
+    {
+        ImGui::PopStyleVar();
+        return;
+    }
+    constexpr float k_recipe_gap = 3.0f; // the table pads no inner edge, so a column holds its own gap
+    ImGui::TableSetupColumn("##pip",   ImGuiTableColumnFlags_WidthFixed, construction_grid::makes + k_recipe_gap);
+    ImGui::TableSetupColumn("##good",  ImGuiTableColumnFlags_WidthStretch, 1.0f);
+    ImGui::TableSetupColumn("##fig",   ImGuiTableColumnFlags_WidthFixed, std::ceil(fig_w) + k_recipe_gap);
+    ImGui::TableSetupColumn("##shelf", ImGuiTableColumnFlags_WidthFixed, std::ceil(shelf_w) + 1.0f);
+    ImGui::TableSetupColumn("##mark",  ImGuiTableColumnFlags_WidthFixed, construction_grid::state);
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(1);
+    if (rd.reported)
+    {
+        const ImVec2 hp = ImGui::GetCursorScreenPos();
+        const float  hw = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        ImGui::TextDisabled("%s", heading.c_str());
+        head_cells.push_back(construction_cell(
+            "heading", hp, hw,
+            std::string("What this building's recipe takes and makes, per quarter. The last "
+                        "quarter's report is read.")));
+    }
+    ImGui::TableSetColumnIndex(2);
+    {
+        const ImVec2 hp = ImGui::GetCursorScreenPos();
+        ImGui::TextDisabled("%s", k_fig_head);
+        head_cells.push_back(construction_cell(
+            "figure_head", hp, fig_w,
+            std::string("An estimate per quarter. The sim reports one input, the one that held the run; "
+                        "the rest are worked out from the recipe.")));
+    }
+    ImGui::TableSetColumnIndex(3);
+    {
+        const ImVec2 hp = ImGui::GetCursorScreenPos();
+        ImGui::TextDisabled("%s", k_shelf_head);
+        head_cells.push_back(construction_cell("shelf_head", hp, shelf_w,
+                                               std::string("What this building's market holds on its shelf now.")));
+    }
+    construction_column_card("Recipe", head_cells);
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    for (const building_recipe_row& row : rd.rows)
+    {
+        const std::string good = resource_name(row.good);
+        std::vector<grid_explainer> cells;
+        ImGui::TableNextRow();
+        ImGui::PushID(static_cast<int>(row.good) * 2 + (row.input ? 1 : 0));
+
+        ImGui::TableSetColumnIndex(0);
+        const ImVec2 pp = ImGui::GetCursorScreenPos();
+        icons::resource(dl, {pp.x + construction_grid::makes * 0.5f, pp.y + line_h * 0.5f},
+                        construction_grid::makes * 0.42f, row.good);
+        ImGui::Dummy({construction_grid::makes, line_h});
+
+        ImGui::TableSetColumnIndex(1);
+        const float name_w = std::max(16.0f, ImGui::GetContentRegionAvail().x);
+        fit_text(text_box::table_cell, "selection.building.recipe.good", good.c_str(), name_w);
+        cells.push_back(construction_cell(
+            "good", pp, construction_grid::makes + construction_grid::pad * 2.0f + name_w,
+            good + (row.input ? ": an input of this recipe." : ": what it makes.")));
+
+        ImGui::TableSetColumnIndex(2);
+        {
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const std::string fig = figure_text(row);
+            ImGui::TextUnformatted(fig.c_str());
+            char buf[240];
+            if (row.input)
+                std::snprintf(buf, sizeof buf,
+                              "About %.1f a quarter, worked out from the recipe at this building's "
+                              "staffing. An estimate, not a report.", static_cast<double>(row.per_qtr));
+            else if (row.has_figure)
+                std::snprintf(buf, sizeof buf, "About %.1f a quarter, from the last quarter's reported output.",
+                              static_cast<double>(row.per_qtr));
+            else
+                std::snprintf(buf, sizeof buf,
+                              "No quarter has been read for this building yet, so there is no figure. "
+                              "It is not a zero.");
+            cells.push_back(construction_cell("figure", p, fig_w, buf));
+        }
+
+        ImGui::TableSetColumnIndex(3);
+        {
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            const std::string sh = shelf_text(row);
+            ImGui::TextDisabled("%s", sh.c_str());
+            if (row.input)
+            {
+                char buf[200];
+                if (row.grid_good)
+                    std::snprintf(buf, sizeof buf,
+                                  "%s comes off the grid, so one market's shelf is not the reading.", good.c_str());
+                else
+                    std::snprintf(buf, sizeof buf, "%.1f %s on this market's shelf now.",
+                                  static_cast<double>(row.shelf), good.c_str());
+                cells.push_back(construction_cell("shelf", p, shelf_w, buf));
+            }
+        }
+
+        ImGui::TableSetColumnIndex(4);
+        std::string mark;
+        {
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+            if (row.input)
+            {
+                const ImU32 red   = IM_COL32(230, 140, 140, 255);
+                const ImU32 amber = ImGui::ColorConvertFloat4ToU32(construction_rate_colour(0.5f));
+                const char* cause = row.cause == input_short_cause::none_on_shelf ? " None on the shelf."
+                                  : row.cause == input_short_cause::over_ceiling  ? " Over the fair-price ceiling."
+                                                                                  : "";
+                char buf[260];
+                ImU32 ink = 0u;
+                if (row.binding)
+                {
+                    mark = "binding";
+                    ink  = red;
+                    std::snprintf(buf, sizeof buf,
+                                  "Short: the last quarter's report names %s as the input that held the "
+                                  "run, at %d%%.%s",
+                                  good.c_str(), static_cast<int>(std::lround(rd.run * 100.0f)), cause);
+                }
+                else if (row.short_mirror)
+                {
+                    mark = "short";
+                    ink  = amber;
+                    std::snprintf(buf, sizeof buf,
+                                  "Short, by estimate: the shelf would not meet about %.1f a quarter. Only the "
+                                  "one binding input is reported.%s",
+                                  static_cast<double>(row.per_qtr), cause);
+                }
+                else
+                    std::snprintf(buf, sizeof buf, "Not short, by the shelf and the recipe's estimate.");
+                if (ink != 0u)
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ink), "!");
+                cells.push_back(construction_cell("mark", p, construction_grid::state, buf, ink));
+            }
+        }
+        construction_column_card(good.c_str(), cells);
+        ImGui::PopID();
+
+        ui_state::tile_card_recipe_row pub;
+        pub.good   = good;
+        pub.id     = resource_names::name_of(row.good);
+        pub.input  = row.input;
+        pub.figure = figure_text(row);
+        pub.shelf  = shelf_text(row);
+        pub.mark   = mark;
+        for (const grid_explainer& e : cells)
+            pub.cols.push_back({e.key, e.text, (e.mn.x + e.mx.x) * 0.5f, (e.mn.y + e.mx.y) * 0.5f});
+        ui.tile_card.recipe_rows.push_back(std::move(pub));
+    }
+    ImGui::EndTable();
+    ImGui::PopStyleVar();
+}
+
 void draw_expanded_building_card(world& w, const recipe_registry& reg,
                                  const economy_report& report, ui_state& ui, entity_id tile_id,
                                  entity_id bid, const std::vector<production_stack>& stacks)
@@ -3255,11 +3468,13 @@ void draw_expanded_building_card(world& w, const recipe_registry& reg,
         draw_building_profit(w, reg, report, bid, &ui.tile_card.net, &ui.tile_card.expenses);
     }
 
-    // ── The workforce row: the player's own building only, READ-ONLY ──
-    // (BL-1322: the game sets it; god view grants sight of a rival's profit row
-    // above, and nothing here was ever a rival's.)
+    // ── The recipe rows, then the workforce row: the player's own building only ──
+    // (BL-1322: the game sets the workforce; god view grants sight of a rival's profit
+    // row above, and nothing here was ever a rival's.)
     if (mine)
     {
+        ImGui::Spacing();
+        draw_building_recipe_rows(w, reg, report, ui, bid, b);
         ImGui::TextDisabled("Workforce");
         ImGui::SameLine();
         ui.tile_card.workforce = draw_workforce_bar(b);
@@ -3798,6 +4013,7 @@ void draw_tile_selection(world& w, const recipe_registry& reg, const economy_rep
         if (expanded != null_entity)
         {
             draw_expanded_building_card(w, reg, report, ui, tile_id, expanded, stacks);
+            ui.tile_card.card_scroll_max = ImGui::GetScrollMaxY();
         }
         else
         {

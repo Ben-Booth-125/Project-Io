@@ -6838,6 +6838,39 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["population_y"]      = c.population_y;
         out["province_scroll_max"] = c.province_scroll_max;
         out["status"]            = c.status;
+        out["recipe_drawn"]      = c.recipe_drawn;
+        out["recipe_reported"]   = c.recipe_reported;
+        out["recipe_heading"]    = c.recipe_heading;
+        out["card_scroll_max"]   = c.card_scroll_max;
+        {
+            sol::table rr = st.create_table();
+            int rrn = 0;
+            for (const ui_state::tile_card_recipe_row& r : c.recipe_rows)
+            {
+                sol::table e = st.create_table();
+                e["good"]   = r.good;
+                e["id"]     = r.id;
+                e["input"]  = r.input;
+                e["figure"] = r.figure;
+                e["shelf"]  = r.shelf;
+                e["mark"]   = r.mark;
+                sol::table cols = st.create_table();
+                int cn = 0;
+                for (const ui_grid_col& gc : r.cols)
+                {
+                    sol::table col = st.create_table();
+                    col["key"]  = gc.key;
+                    col["text"] = gc.text;
+                    col["x"]    = gc.x;
+                    col["y"]    = gc.y;
+                    cols[++cn]  = col;
+                }
+                e["cols"] = cols;
+                rr[++rrn] = e;
+            }
+            out["recipe_rows"]   = rr;
+            out["n_recipe_rows"] = rrn;
+        }
         out["back_x"]            = c.back_x;
         out["back_y"]            = c.back_y;
         out["province_standing"] = c.province_standing;

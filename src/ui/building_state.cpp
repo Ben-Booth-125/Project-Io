@@ -2,11 +2,14 @@
 
 #include "presentation.hpp"
 #include "world/economy_system.hpp"  // economy_report / building_report
+#include "world/input_reach.hpp"     // judged_batches - a plant's need at its staffing
+#include "world/logistics.hpp"       // grid_good_crosses_markets - power is the grid's
 #include "world/placement_rules.hpp" // is_depositless_site — an idle Well/Wharf is labour-short (BL-1198/1199)
 #include "world/recipe_registry.hpp" // price_band — the fair-price ceiling multiple
 #include "world/market_clearing.hpp" // market_for_tile — the tile's market catchment
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdio>
 
 namespace ui {
@@ -182,6 +185,77 @@ building_running_state classify_building_running(const world& w, const recipe_re
         s.input_cause = input_cause_of(w, reg, b, row->limiting_input);
     }
     return s;
+}
+
+building_recipe_read read_building_recipe(const world& w, const recipe_registry& reg,
+                                          const economy_report* report, entity_id id,
+                                          const building_component& b)
+{
+    building_recipe_read out;
+    const building_report* row = report_row(report, id);
+    out.reported = (row != nullptr);
+    if (row != nullptr)
+        out.run = row->run;
+
+    if (b.type == building_type::extraction_site)
+    {
+        building_recipe_row o;
+        o.good       = b.target_resource;
+        o.input      = false;
+        o.has_figure = out.reported;
+        o.per_qtr    = out.reported ? row->output_quantity : 0.0f;
+        out.rows.push_back(o);
+        return out;
+    }
+    const recipe* rc = (b.type == building_type::processing_facility) ? reg.get_recipe(b.recipe) : nullptr;
+    if (rc == nullptr)
+        return out;
+
+    const market_component* m = nullptr;
+    if (const auto mit = w.markets.find(market_for_tile(w, b.tile)); mit != w.markets.end())
+        m = &mit->second;
+    const float res_mult = reg.price_band().reservation_mult;
+    const float batches  = judged_batches(reg, b);
+    // A mothballed plant draws nothing, so nothing it would draw reads as short.
+    const bool  draws    = !b.decommissioned;
+
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (!(rc->inputs[r] > 0.0f))
+            continue;
+        building_recipe_row in;
+        in.good      = static_cast<resource_type>(r);
+        in.per_qtr   = rc->inputs[r] * batches;
+        in.grid_good = grid_good_crosses_markets(r);
+        in.shelf     = m != nullptr ? std::max(0.0f, m->inventory[r]) : 0.0f;
+        in.binding   = draws && row != nullptr && row->has_limiting && row->limiting_input == in.good
+                    && row->run < 0.999f;
+        if (draws && !in.grid_good)
+        {
+            const float admitted = (m != nullptr && shelf_admits(*m, r, res_mult, /*off_buys=*/true)) ? in.shelf : 0.0f;
+            in.short_mirror = admitted < in.per_qtr;
+        }
+        if (in.binding || in.short_mirror)
+            in.cause = input_cause_of(w, &reg, b, in.good);
+        out.rows.push_back(in);
+    }
+    // The report gives one total a tick: the recipe's split says whose share is whose.
+    float out_units = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (rc->outputs[r] > 0.0f)
+            out_units += rc->outputs[r];
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (!(rc->outputs[r] > 0.0f))
+            continue;
+        building_recipe_row o;
+        o.good       = static_cast<resource_type>(r);
+        o.input      = false;
+        o.has_figure = out.reported;
+        o.per_qtr    = (out.reported && out_units > 0.0f) ? row->output_quantity * rc->outputs[r] / out_units : 0.0f;
+        out.rows.push_back(o);
+    }
+    return out;
 }
 
 const char* running_state_word(building_run_kind k)
