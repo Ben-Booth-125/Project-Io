@@ -58,6 +58,10 @@ for _, r in ipairs(rows) do
     if r.world_base and math.abs(r.base_price - r.world_base) > 1e-4 then
         bad_price = bad_price + 1
     end
+    -- The shelf column (BL-1517) is the market's own inventory of the good.
+    if r.world_shelf and math.abs(r.shelf - r.world_shelf) > 1e-4 then
+        bad_price = bad_price + 1
+    end
     -- `price vs base` is price/base_price and nothing else.
     if r.base_price > 0.0 then
         local want = r.price / r.base_price
@@ -72,7 +76,7 @@ for _, r in ipairs(rows) do
 end
 
 verify.expect(bad_price == 0,
-    "every drawn price/base matches market_component (" .. bad_price .. " mismatched)")
+    "every drawn shelf/price/base matches market_component (" .. bad_price .. " mismatched)")
 verify.expect(bad_vs == 0,
     "vs-base column is price/base_price (" .. bad_vs .. " wrong, worst err " ..
     string.format("%.6f", worst_vs) .. ")")
@@ -141,6 +145,81 @@ verify.frames(2)
 verify.expect(fit_without >= fit_with,
     "dropping the body column cannot make the name column narrower (" ..
     fit_with .. " -> " .. fit_without .. " of " .. total_all .. " names fit)")
+
+-- 4b2. EVERY HEADING SORTS (BL-1517; ledgers/market.md § 2), through REAL PRESSES.
+--      A numeric heading goes high to low, then low to high, then back to the roster
+--      at rest: the toggle rule, on a control whose active state is the arrow.
+local function heading(name)
+    for _, h in ipairs(verify.goods_headers()) do
+        if h.name == name then return h end
+    end
+end
+local function press_heading(name)
+    local h = heading(name)
+    verify.expect(h ~= nil, "the '" .. name .. "' heading drew")
+    verify.click(h.x, h.y)
+    verify.frames(3)
+end
+local function in_order(field, desc)
+    local bad, prev = 0, nil
+    for _, r in ipairs(verify.goods_table()) do
+        local v = r[field]
+        if prev ~= nil and ((desc and v > prev) or ((not desc) and v < prev)) then bad = bad + 1 end
+        prev = v
+    end
+    return bad
+end
+local roster_names = {}
+for i, r in ipairs(verify.goods_table()) do roster_names[i] = r.name end
+
+for _, h in ipairs(verify.goods_headers()) do
+    print(string.format("MEASURED heading '%s': needs %.1f px, has %.1f px", h.name, h.need, h.have))
+    if h.name ~= "##g" and h.name ~= "Good" then
+        verify.expect(h.have + 0.5 >= h.need,
+            string.format("the '%s' heading fits beside its sort arrow (%.1f of %.1f px)", h.name, h.have, h.need))
+    end
+end
+
+for _, c in ipairs({ {"Shelf", "shelf"}, {"Price", "price"}, {"v.Base", "vs_base"}, {"8 qtr", "change"} }) do
+    press_heading(c[1])
+    verify.expect(verify.goods_sort().desc, c[1] .. ": the first press sorts high to low")
+    local bad = in_order(c[2], true)
+    verify.expect(bad == 0, c[1] .. " sorts high to low (" .. bad .. " out of order)")
+    if c[1] == "Shelf" then verify.capture("goods_table_sorted_shelf") end
+    press_heading(c[1])
+    bad = in_order(c[2], false)
+    verify.expect(bad == 0, c[1] .. " sorts low to high (" .. bad .. " out of order)")
+    press_heading(c[1])
+    verify.expect(verify.goods_sort().col == 0, c[1] .. ": the third press takes the sort off")
+end
+press_heading("Good")
+verify.expect(not verify.goods_sort().desc, "Good: the first press sorts A to Z")
+local bad_alpha = in_order("name", false)
+verify.expect(bad_alpha == 0, "Good sorts A to Z (" .. bad_alpha .. " out of order)")
+press_heading("Good")
+bad_alpha = in_order("name", true)
+verify.expect(bad_alpha == 0, "Good sorts Z to A (" .. bad_alpha .. " out of order)")
+press_heading("Good")
+local back = 0
+for i, r in ipairs(verify.goods_table()) do
+    if r.name ~= roster_names[i] then back = back + 1 end
+end
+verify.expect(back == 0, "with the sort off the rows are back in roster order (" .. back .. " moved)")
+
+-- A heading stays reachable from the foot of the list: it is frozen, not scrolled.
+do
+    local y0 = heading("Price").y
+    verify.scroll_panel("market", 1.0)
+    verify.frames(2)
+    verify.expect_scrolled("market goods list scrolled to the foot, headings frozen")
+    verify.expect(math.abs(heading("Price").y - y0) < 0.5, "the headings do not scroll with the rows")
+    press_heading("Price")
+    verify.expect(verify.goods_sort().col ~= 0, "a heading presses from the foot of the list")
+    press_heading("Price")
+    press_heading("Price")
+    verify.scroll_panel("market", 0.0)
+    verify.frames(2)
+end
 
 -- 4c. THE MARKET'S TOP SECTION (BL-1317; ledgers/market.md § 2), superseding
 --     BL-688's chip row. "No national presence" is a legitimate state, so this

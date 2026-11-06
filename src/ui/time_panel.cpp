@@ -1,15 +1,18 @@
 /// @file time_panel.cpp
-/// The time panel and the in-app system menu — extracted verbatim from
-/// app::render (BL-361); behaviour unchanged.
+/// The time panel and the escape menu (BL-361, BL-1519).
 
 #include "ui/time_panel.hpp"
 
 #include "core/sim_loop.hpp"
+#include "ui/foldout_column.hpp" // canvas_rect, what the escape menu takes
 #include "ui/format.hpp"
+#include "ui/icons.hpp"
+#include "ui/presentation.hpp"
 #include "ui/shell_metrics.hpp"
 #include "ui/ui_state.hpp"
 
 #include <imgui.h>
+#include <imgui_internal.h> // BringWindowToDisplayFront
 
 #include "profile_panel.hpp" // profile_panel_height — the top band's shared height
 #include <algorithm>
@@ -78,7 +81,6 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
     const float tick_w = ui::right_chrome_width(disp);
     const float col_gap  = ImGui::GetStyle().ItemSpacing.x;
     const float prog_w   = tick_w / 3.0f - col_gap * 0.5f;
-    const float ctrl_w   = tick_w - prog_w - col_gap;
     const float time_line_h    = ImGui::GetTextLineHeightWithSpacing();
     // BL-178: the 10 px bar was easy to miss and carried no label. Tall enough to
     // seat a centred overlay ("58 d to Q2"), which is what actually makes the
@@ -170,6 +172,7 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
         // LAST item, not its top; harmless here since the bar is the only
         // item, but explicit stays correct if that ever changes).
         ImGui::SetCursorPos({row_start.x + prog_w + col_gap, row_start.y});
+        const float ctrl_avail = ImGui::GetWindowContentRegionMax().x - ImGui::GetCursorPosX();
         ImGui::BeginGroup();
 
         // Speed controls: pause + speed-tier buttons, sized to the control
@@ -185,10 +188,15 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
             const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
             const int   n        = 6;
             const float spacing  = ImGui::GetStyle().ItemSpacing.x;
-            // Narrowed off the exact fill-width division (Ben, playtest: the "V"
-            // button was riding the screen edge) — a small margin per button so the
-            // row sits comfortably inside ctrl_w instead of exactly matching it.
-            const float bw       = (ctrl_w - spacing * (n - 1)) / n * 0.92f;
+            // The escape menu's gear closes the row, inside the panel's right end
+            // (TIME_CONTROLS.md § The escape menu): the panel is flush to the screen
+            // edge, so there is no room right of it. The row is measured to the
+            // panel's content edge.
+            const float gear_w   = time_btn_h;
+            const float bw       = (ctrl_avail - gear_w - spacing * n) / n;
+
+            // The escape menu is the pause screen: the clock stays stopped under it.
+            ImGui::BeginDisabled(state.show_system_menu);
 
             for (int i = 0; i < n; ++i)
             {
@@ -244,6 +252,26 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
                 if (i + 1 < n)
                     ImGui::SameLine();
             }
+            ImGui::EndDisabled();
+
+            // The gear (BL-1519): toggles the escape menu, lit while it is open.
+            ImGui::SameLine();
+            const ImVec2 g0 = ImGui::GetCursorScreenPos();
+            if (ImGui::InvisibleButton("##escape_gear", {gear_w, time_btn_h}))
+            {
+                state.show_system_menu = !state.show_system_menu;
+                state.confirm_exit_pending = false;
+            }
+            const bool  gear_hot = ImGui::IsItemHovered();
+            const ImU32 gear_col = state.show_system_menu ? palette::selection
+                                 : gear_hot ? IM_COL32(232, 236, 246, 255)
+                                            : IM_COL32(170, 178, 192, 255);
+            state.escape_drawn[ui_state::esc_gear].x = g0.x + gear_w * 0.5f;
+            state.escape_drawn[ui_state::esc_gear].y = g0.y + time_btn_h * 0.5f;
+            icons::gear(ImGui::GetWindowDrawList(),
+                        {g0.x + gear_w * 0.5f, g0.y + time_btn_h * 0.5f},
+                        time_btn_h * 0.36f, gear_col);
+            ImGui::SetItemTooltip("Menu (Esc)");
         }
 
         // --- BL-178: the active tier's rate, always visible. Guaranteed-fit per
@@ -260,7 +288,7 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
                               speed_rate_label(sim.speed()),
                               speed_quarter_label(sim.speed()));
 
-            if (!sim.paused() && ImGui::CalcTextSize(rate).x > ctrl_w)
+            if (!sim.paused() && ImGui::CalcTextSize(rate).x > ctrl_avail)
                 std::snprintf(rate, sizeof(rate), "%s",
                               speed_rate_label(sim.speed()));
             ImGui::TextDisabled("%s", rate);
@@ -271,112 +299,113 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
     }
 }
 
-void draw_system_menu(ui_state& st, sim_loop& sim, int& prev_speed,
-                      bool& quit_requested, const ImVec2& disp)
+escape_menu_press draw_escape_menu(ui_state& st, bool options_open, const char* last_saved)
 {
-    constexpr float margin = ui::shell_margin;
-    // In-app system menu (BL-070): a corner gear button opening a small popup with
-    // session controls — Pause/Resume (mirroring the Space hotkey via the shared
-    // pause_toggle path) and Exit Game (inline "Really quit?" confirm, since there
-    // is no save). Sits at the top-right, just left of the time column; Esc toggles
-    // the same popup (handle_key_down). See docs/ui/MENU.md.
+    escape_menu_press out;
+    for (int i = 0; i < ui_state::esc_gear; ++i)
+        st.escape_drawn[i] = {};
+    if (!st.show_system_menu)
+        return out;
+
+    // The whole canvas region (LAYOUT.md § Canvas area), the shell standing around
+    // it: the gear in the time panel stays pressable, so the control that opened
+    // this closes it (the toggle rule).
+    const foldout_rect canvas = canvas_rect();
+    ImGui::SetNextWindowPos({canvas.x, canvas.y});
+    ImGui::SetNextWindowSize({canvas.w, canvas.h});
+    ImGui::SetNextWindowBgAlpha(0.94f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus;
+    ImGui::Begin("##escape_menu", nullptr, flags);
+    // Over any takeover when it opens, but a press on it must not bury the Options
+    // window it just opened: hence no bring-to-front on focus.
+    if (ImGui::IsWindowAppearing())
+        ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+
+    const ImVec2 btn{std::min(280.0f, canvas.w - 32.0f), 40.0f};
+    const float  line = ImGui::GetTextLineHeightWithSpacing();
+    const float  gap  = 6.0f;
+    // Title, last-saved line, then four presses or the warning; the hint beneath.
+    const float  body_h = line * 3.0f + (btn.y + gap) * 4.0f
+                        + (st.spectating ? ImGui::GetFrameHeightWithSpacing() : 0.0f);
+    ImGui::SetCursorPosY(std::max(8.0f, (canvas.h - body_h) * 0.5f));
+
+    const auto centred_text = [&](const char* text, ImU32 col) {
+        ImGui::SetCursorPosX((canvas.w - ImGui::CalcTextSize(text).x) * 0.5f);
+        ImGui::PushStyleColor(ImGuiCol_Text, col);
+        ImGui::TextUnformatted(text);
+        ImGui::PopStyleColor();
+    };
+    const auto press = [&](const char* label, ui_state::escape_press which, bool lit = false) {
+        ImGui::SetCursorPosX((canvas.w - btn.x) * 0.5f);
+        if (lit)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        const bool pressed = ImGui::Button(label, btn);
+        if (lit)
+            ImGui::PopStyleColor();
+        const ImVec2 mn = ImGui::GetItemRectMin();
+        st.escape_drawn[which].x = mn.x + btn.x * 0.5f;
+        st.escape_drawn[which].y = mn.y + btn.y * 0.5f;
+        return pressed;
+    };
+
+    centred_text("Paused", ImGui::GetColorU32(ImGuiCol_Text));
+    centred_text(last_saved, palette::text_secondary);
+    ImGui::Dummy({0.0f, 6.0f});
+
+    if (!st.confirm_exit_pending)
     {
-        constexpr float gear = 26.0f;
-        // One margin left of the right chrome column (BL-216).
-        const ImVec2 gear_pos{ ui::right_chrome_left(disp) - margin - gear, margin };
-
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
-        ImGui::SetNextWindowPos(gear_pos);
-        ImGui::SetNextWindowSize({gear, gear});
-        constexpr ImGuiWindowFlags gear_flags =
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
-            ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings;
-        ImGui::Begin("##sysmenu_gear", nullptr, gear_flags);
+        out.save = press("Save", ui_state::esc_save);
+        out.options = press("Options", ui_state::esc_options, options_open);
+        ImGui::SetItemTooltip("Display and UI scale (F10).");
+        if (press("Exit to Menu", ui_state::esc_exit_menu))
         {
-            ImDrawList*  gdl = ImGui::GetWindowDrawList();
-            const ImVec2 g0  = ImGui::GetCursorScreenPos();
-            if (ImGui::InvisibleButton("##sysmenu_btn", {gear, gear}))
-            {
-                st.show_system_menu = !st.show_system_menu;
-                if (!st.show_system_menu)
-                    st.confirm_exit_pending = false;
-            }
-            const bool  hov = ImGui::IsItemHovered() || st.show_system_menu;
-            const ImU32 gc  = hov ? IM_COL32(232, 236, 246, 255) : IM_COL32(170, 178, 192, 255);
-            const float cx  = g0.x + gear * 0.5f;
-            const float cy  = g0.y + gear * 0.5f;
-            const float hw  = gear * 0.28f;
-            for (int i = -1; i <= 1; ++i)
-                gdl->AddLine({cx - hw, cy + static_cast<float>(i) * 6.0f},
-                             {cx + hw, cy + static_cast<float>(i) * 6.0f}, gc, 2.0f);
+            st.confirm_exit_pending = true;
+            st.confirm_exit_to_menu = true;
         }
-        ImGui::End();
-        ImGui::PopStyleVar();
-
-        if (st.show_system_menu)
+        if (press("Exit Game", ui_state::esc_exit_game))
         {
-            ImGui::SetNextWindowPos({gear_pos.x + gear, gear_pos.y + gear + 4.0f},
-                                    ImGuiCond_Always, {1.0f, 0.0f});
-            constexpr ImGuiWindowFlags menu_flags =
-                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
-                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
-                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings;
-            if (ImGui::Begin("##system_menu", nullptr, menu_flags))
-            {
-                constexpr float bw = 150.0f;
-                if (ImGui::Button(sim.paused() ? "Resume" : "Pause", {bw, 0.0f}))
-                {
-                    // Same toggle app::dispatch_action performs for pause_toggle
-                    // (the Space hotkey); inlined here because dispatch_action is
-                    // an app member and this surface no longer lives in app.cpp.
-                    if (sim.paused())
-                        sim.set_speed(prev_speed);
-                    else
-                    {
-                        prev_speed = sim.speed();
-                        sim.set_speed(0);
-                    }
-                }
-
-                // Spectator god view (BL-408): offered ONLY while spectating —
-                // a played session never renders the control, so the BL-068
-                // asymmetry it lifts is unreachable outside spectate by
-                // construction, not by convention. A checkbox is inherently a
-                // toggle (Toggle rule, io-standing-rules.md): its visible
-                // checked state is exactly what re-clicking undoes.
-                if (st.spectating)
-                {
-                    ImGui::Separator();
-                    ImGui::Checkbox("God view", &st.god_view);
-                    if (ImGui::IsItemHovered())
-                        ImGui::SetTooltip("Spectator only: read every corp's internals and see\n"
-                                          "through the survey mask. Presentation-side - the AI's\n"
-                                          "own view of the world is untouched.");
-                }
-
-                ImGui::Separator();
-
-                if (!st.confirm_exit_pending)
-                {
-                    if (ImGui::Button("Exit Game", {bw, 0.0f}))
-                        st.confirm_exit_pending = true;
-                }
-                else
-                {
-                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(IM_COL32(232, 150, 90, 255)),
-                                       "Really quit?");
-                    if (ImGui::Button("Yes, quit", {bw, 0.0f}))
-                        quit_requested = true;
-                    if (ImGui::Button("Cancel", {bw, 0.0f}))
-                        st.confirm_exit_pending = false;
-                }
-            }
-            ImGui::End();
+            st.confirm_exit_pending = true;
+            st.confirm_exit_to_menu = false;
         }
     }
+    else
+    {
+        // MENU.md: both exits warn about unsaved progress before they act. Always,
+        // rather than only when the world moved: a paused player can still place a
+        // build, so "nothing changed" is a claim this surface cannot make.
+        centred_text("Unsaved progress will be lost.", palette::negative);
+        const char* confirm = st.confirm_exit_to_menu ? "Exit to Menu" : "Exit Game";
+        if (press(confirm, ui_state::esc_warn_confirm))
+        {
+            out.exit_to_menu = st.confirm_exit_to_menu;
+            out.exit_game    = !st.confirm_exit_to_menu;
+        }
+        if (press("Cancel", ui_state::esc_warn_cancel))
+            st.confirm_exit_pending = false;
+    }
+
+    // Spectator god view (BL-408): offered ONLY while spectating — a played session
+    // never renders the control, so the BL-068 asymmetry it lifts is unreachable
+    // outside spectate by construction, not by convention. A checkbox is inherently
+    // a toggle (Toggle rule, io-standing-rules.md): its visible checked state is
+    // exactly what re-clicking undoes.
+    if (st.spectating)
+    {
+        ImGui::SetCursorPosX((canvas.w - btn.x) * 0.5f);
+        ImGui::Checkbox("God view", &st.god_view);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Spectator only: read every nation's internals and see\n"
+                              "through the survey mask. Presentation-side - the AI's\n"
+                              "own view of the world is untouched.");
+    }
+
+    centred_text("Esc to resume", palette::neutral);
+    ImGui::End();
+    return out;
 }
 
 } // namespace ui

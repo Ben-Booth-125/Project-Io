@@ -2008,6 +2008,14 @@ struct unit_component
     /// Set by `assign_front`; kept on its span by `reanchor_fronts`.
     entity_id front = null_entity;
 
+    /// BL-1504 (MILITARY.md § Defend province): the province this unit is ordered to
+    /// defend, or 0xFFFFFFFF (`no_province`, corp_command.hpp: 0 is a real id). Set by
+    /// `defend_province`, and by the start order on a major's capital province. It
+    /// excludes a front: the verb clears `front`, and `assign_front` clears this.
+    uint32_t  defend_province = 0xFFFFFFFFu;
+    /// BL-1504: the tile it returns to with no hostile stack in the province.
+    entity_id defend_post = null_entity;
+
     /// BL-1434 (unit designs): the design the unit was raised or last refitted to —
     /// a SNAPSHOT of its class's live design at that moment, not a reference to it,
     /// so a later change to the live design leaves the unit on its old kit until it
@@ -2241,6 +2249,12 @@ struct convoy_component
     /// tick; -1 means "did not move this tick: check the head only" (a loaded save,
     /// a hand-built convoy).
     float       progress_before = -1.0f;
+
+    /// BL-1505: the tile the cargo stood on at the end of the last tick, kept only while its
+    /// owner is at war and null otherwise: a front moves the lane, not the cargo, so this is
+    /// how `advance_convoys` knows where the cargo is when the lane under it re-solves.
+    /// SERIALISED in the v79 trailing section (world_save.cpp).
+    entity_id   lane_head = null_entity;
 };
 
 // ---------------------------------------------------------------------------

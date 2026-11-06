@@ -256,6 +256,60 @@ void draw_stacked_columns(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
     }
 }
 
+void draw_stacked_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                       const stack_segment* top,    std::size_t top_count,
+                       const stack_segment* bottom, std::size_t bottom_count,
+                       const char* top_caption, const char* bottom_caption)
+{
+    const float peak    = std::max(column_total(top, top_count), column_total(bottom, bottom_count));
+    const float ceiling = tight_ceil(peak > 0.0f ? peak : 1.0f);
+    const float gutter_w = std::max(ImGui::CalcTextSize(top_caption).x,
+                                    ImGui::CalcTextSize(bottom_caption).x) + 8.0f;
+    // Room for the longer total at the right end: the axis never runs under it.
+    char total_top[24], total_bot[24];
+    std::snprintf(total_top, sizeof total_top, "%.0f", static_cast<double>(column_total(top, top_count)));
+    std::snprintf(total_bot, sizeof total_bot, "%.0f", static_cast<double>(column_total(bottom, bottom_count)));
+    const float total_w = std::max(ImGui::CalcTextSize(total_top).x, ImGui::CalcTextSize(total_bot).x) + 8.0f;
+    const float x0    = mn.x + gutter_w;
+    const float plot  = mx.x - total_w - x0;
+    const float gap   = 6.0f;
+    const float bh    = ((mx.y - mn.y) - gap) * 0.5f;
+    if (plot <= 0.0f || bh <= 0.0f)
+        return;
+
+    const auto draw_one = [&](float y0, const stack_segment* segs, std::size_t count,
+                              const char* caption, const char* total, int row) {
+        const float th = ImGui::GetTextLineHeight();
+        // fit-exempt: the caption's gutter and the total's room are measured from them above.
+        dl->AddText({mn.x, y0 + (bh - th) * 0.5f}, IM_COL32(190, 190, 198, 255), caption); // fit-exempt: gutter measured from this text
+        dl->AddRectFilled({x0, y0}, {x0 + plot, y0 + bh}, IM_COL32(32, 34, 42, 255));
+        float x = x0;
+        for (std::size_t i = 0; i < count; ++i)
+        {
+            if (segs[i].value <= 0.0f)
+                continue;
+            const float w = std::max(1.0f, plot * (segs[i].value / ceiling));
+            dl->AddRectFilled({x, y0}, {x + w, y0 + bh}, segs[i].colour);
+            char btn_id[32];
+            std::snprintf(btn_id, sizeof btn_id, "##hstack_%d_%d", row, static_cast<int>(i));
+            ImGui::SetCursorScreenPos({x, y0});
+            ImGui::InvisibleButton(btn_id, {w, bh});
+            if (ImGui::IsItemHovered())
+            {
+                if (segs[i].detail != nullptr && segs[i].detail[0] != '\0')
+                    ImGui::SetTooltip("%s: %.1f\n%s", segs[i].label,
+                                      static_cast<double>(segs[i].value), segs[i].detail);
+                else
+                    ImGui::SetTooltip("%s: %.1f", segs[i].label, static_cast<double>(segs[i].value));
+            }
+            x += w;
+        }
+        dl->AddText({x0 + plot + 6.0f, y0 + (bh - th) * 0.5f}, IM_COL32(220, 220, 226, 255), total); // fit-exempt: room measured from this text
+    };
+    draw_one(mn.y, top, top_count, top_caption, total_top, 0);
+    draw_one(mn.y + bh + gap, bottom, bottom_count, bottom_caption, total_bot, 1);
+}
+
 void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                const bar* bars, std::size_t count,
                float ceiling, const char* fmt, float bar_cap,

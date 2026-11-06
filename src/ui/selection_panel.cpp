@@ -1,6 +1,8 @@
 #include "selection_panel.hpp"
 
 #include "core/battle_dispatch_text.hpp" // battle_phase_word — SHARED with BL-468's dispatches
+#include "construction_sites.hpp"
+#include "world/resource_names.hpp"
 #include "world/battle_system.hpp"      // active_battle, quote_withdrawal, read_battle_phase (BL-469)
 
 #include "building_state.hpp" // BL-1239: the one running-state classification (hover card, Production, Status)
@@ -58,6 +60,7 @@
 #include <cfloat>    // FLT_MAX (net-profit PlotLines auto-scale)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
 #include <string>    // ticks_label / construction_status
+#include <set>
 #include <vector>    // top-decile production sample (top_decile_production)
 
 namespace ui {
@@ -782,9 +785,9 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
         const float  name_x       = 6.0f + pipr * 2.0f + 6.0f;
         const float  profit_col_w = row_w - glyph_w - 6.0f;
 
-        // Expected profit — same estimator the construction ledger ranks
-        // candidates with (estimate_prospective_profit), so a switch's payoff
-        // reads the same way a fresh build's does. `&b` prices it at the
+        // Expected profit for a recipe switch. It prices at the posted price, not
+        // the Build door's quote_site, so the two can differ on a scarce good. `&b`
+        // prices it at the
         // building's REAL staffing (not the hypothetical 0.5/100 default) and
         // excludes it from double-counting its own extraction-site stack rank.
         constexpr float profit_scale = 1.1f;
@@ -1425,6 +1428,27 @@ void draw_assign_front_popup(const world& w, ui_state& ui, const char* popup_id,
     if (ImGui::MenuItem("Unassign", nullptr, none))
         queue(null_entity);
     ImGui::EndDisabled();
+
+    // BL-1504 (MILITARY.md § Defend province): an ability beside a front assignment, for
+    // ground a front does not cover. Each unit defends the province it stands in; the
+    // entry is checked when they all already do, and pressing it then clears the order
+    // (the toggle rule). A unit that cannot is refused by the verb.
+    bool all_defending = !units.empty();
+    for (const entity_id u : units)
+    {
+        const auto it = w.units.find(u);
+        all_defending = all_defending && it != w.units.end() && it->second.defend_province != no_province
+                     && it->second.defend_province == w.provinces.province_of(it->second.position);
+    }
+    if (ImGui::MenuItem("Defend this province", nullptr, all_defending))
+    {
+        ui.pending_defend_province.clear();
+        for (const entity_id u : units)
+            if (const auto it = w.units.find(u); it != w.units.end())
+                ui.pending_defend_province.emplace_back(
+                    u, all_defending ? no_province : w.provinces.province_of(it->second.position));
+        ImGui::CloseCurrentPopup();
+    }
     ImGui::EndPopup();
 }
 
@@ -1793,7 +1817,13 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
                            owner_name != nullptr ? owner_name : "\xe2\x80\x94");
         ImGui::SameLine();
-        if (const auto tit = w.tiles.find(head.position); tit != w.tiles.end())
+        // BL-1508: a dragged group may span tiles, and then names how many.
+        std::set<entity_id> group_tiles;
+        for (const entity_id uid : group)
+            group_tiles.insert(w.units.at(uid).position);
+        if (group_tiles.size() > 1)
+            ImGui::TextDisabled("%d units \xc2\xb7 %d tiles", n, static_cast<int>(group_tiles.size()));
+        else if (const auto tit = w.tiles.find(head.position); tit != w.tiles.end())
             ImGui::TextDisabled("%d units \xc2\xb7 tile %d, %d", n,
                                 tit->second.grid_x, tit->second.grid_y);
         else
@@ -1808,7 +1838,7 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
             if (ImGui::Button("Assign to front##unit_group_front", {bw, frame_h}))
                 ImGui::OpenPopup("unit_group_front_menu");
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Assign every unit here to one front");
+                ImGui::SetTooltip("Assign every unit of this group to one front");
             draw_assign_front_popup(w, ui, "unit_group_front_menu", group);
         }
         ImGui::SameLine(bar_w - frame_h);
@@ -2091,6 +2121,63 @@ static void request_neighbourhood_page(const world& w, ui_state& ui, entity_id t
     q.row    = it->second.grid_y;
     q.radius = radius;
     q.valid  = true;
+}
+
+/// The convoy card (BL-1506; SELECTION.md § The convoy element): cargo, owner, route and
+/// arrival. Another nation's convoy names its owner and how it travels; its cargo and
+/// route stay private (DISCOVERY.md). False when the id has arrived or been cut: the
+/// selection clears itself and the element falls through to the ordinary resolution.
+bool draw_convoy_selection(const world& w, ui_state& ui)
+{
+    const convoy_component* cv = nullptr;
+    for (const convoy_component& c : w.convoys)
+        if (c.id == ui.selected_convoy && !c.arrived) { cv = &c; break; }
+    if (cv == nullptr)
+    {
+        ui.selected_convoy = 0;
+        return false;
+    }
+    const convoy_component& c = *cv;
+    const char* mode = c.mode == convoy_mode::sea ? "Sea"
+                     : c.mode == convoy_mode::air ? "Air"
+                     : c.mode == convoy_mode::space ? "Space" : "Land";
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Convoy");
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", mode);
+    ImGui::Separator();
+    const bool show_all = is_player_side(w, c.corp) || (ui.spectating && ui.god_view);
+    {
+        const char* owner_name = owner_display_name(w, c.corp);
+        ImGui::Text("Owner: %s", owner_name != nullptr ? owner_name : "-");
+    }
+    if (!show_all)
+    {
+        ImGui::TextDisabled("Its cargo and route are private.");
+        return true;
+    }
+    const resource_presentation& rp = presentation_of(c.cargo_resource);
+    ImGui::TextUnformatted("Cargo:");
+    ImGui::SameLine();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour), "%s", rp.name);
+    ImGui::SameLine();
+    ImGui::Text("x%.1f", static_cast<double>(c.cargo_qty));
+    ImGui::Text("Route: %s -> %s", market_city_name(w, c.source_market).c_str(),
+                market_city_name(w, c.dest_market).c_str());
+    char overlay[48];
+    if (c.held)
+        std::snprintf(overlay, sizeof overlay, "held");
+    else if (!(c.speed > 0.0f))
+        std::snprintf(overlay, sizeof overlay, "%.0f%%  (stalled)",
+                      static_cast<double>(c.progress) * 100.0);
+    else
+    {
+        const int eta = static_cast<int>(std::ceil(std::max(0.0f, 1.0f - c.progress) / c.speed));
+        std::snprintf(overlay, sizeof overlay, "%.0f%%  arrives in %d qtr%s",
+                      static_cast<double>(c.progress) * 100.0, eta, eta == 1 ? "" : "s");
+    }
+    ImGui::SetNextItemWidth(std::min(ImGui::GetContentRegionAvail().x, 320.0f));
+    ImGui::ProgressBar(c.progress, ImVec2{std::min(ImGui::GetContentRegionAvail().x, 320.0f), 0.0f}, overlay);
+    return true;
 }
 
 const active_battle* selected_battle(const world& w, ui_state& ui)
@@ -4183,6 +4270,10 @@ void draw_selection_content(world& w, const recipe_registry& reg,
         draw_battle_selection(w, ui);
         return;
     }
+    // BL-1506: a CONVOY, the same non-entity shape — its id in its own field. One that
+    // has landed clears itself and falls through.
+    if (ui.selected_convoy != 0 && draw_convoy_selection(w, ui))
+        return;
 
     // BL-671: the two NON-ENTITY LENS REGIONS resolve next, for the same
     // structural reason the battle and the contract do — a deposit is a resource
@@ -4243,7 +4334,10 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     std::vector<entity_id> unit_group;
     if (kind == selection_kind::unit)
     {
-        unit_group = unit_group_of(w, ui.selected_entity);
+        // BL-1508: the dragged group, across tiles, when this unit is one of it.
+        unit_group = std::find(ui.selected_units.begin(), ui.selected_units.end(), ui.selected_entity)
+                         != ui.selected_units.end()
+                         ? ui.selected_units : unit_group_of(w, ui.selected_entity);
         if (ui.selection_unit_group && unit_group.size() > 1)
         {
             draw_unit_group_selection(w, reg, ui, unit_group);
@@ -4301,7 +4395,7 @@ void draw_selection_content(world& w, const recipe_registry& reg,
             if (ImGui::Button(back, {back_w, btn}))
                 ui.selection_unit_group = true;
             if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Back to the %d units on this tile", static_cast<int>(unit_group.size()));
+                ImGui::SetTooltip("Back to the group of %d units", static_cast<int>(unit_group.size()));
         }
 
         ImGui::SameLine(bar_w - btn);
@@ -4560,7 +4654,7 @@ std::string candidate_refusal(const world& w, entity_id tile_id,
 // executes.
 // Candidates sort by expected net descending on a ceiling shared across the list, so
 // the best options are the ones on screen without scrolling.
-void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui,
+void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_state& ui,
                                    float lp_cover)
 {
     const ImGuiStyle& style = ImGui::GetStyle();
@@ -4630,7 +4724,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // Candidate placements for this tile: one extraction option per extractable
     // resource actually deposited here, then the fixed processing / port / launchpad
     // types. Validity + reason come from the shared placement_rules seam; the expected
-    // per-tick net comes from estimate_prospective_profit (world/building_profit.hpp).
+    // per-tick net comes from quote_for_tile (world/site_quote.hpp).
     //
     // Processing expands into ONE ROW PER RECIPE: their margins genuinely diverge, so a
     // single type-level row priced at "steel" would report "processing loses money here"
@@ -4663,6 +4757,8 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
 
         placement_rules::placement_result pr;
         building_profit profit;
+        bool            starved  = false; ///< An input cannot be had here: it would stand idle.
+        resource_type   short_of = resource_type::iron_ore;
         float           capex    = 0.0f; ///< build_cost + materials at the local market.
         bool            produces = false; ///< Extraction/processing earn directly; infrastructure does not.
         int             group    = 0;    ///< Render band: 0 = ranked/priced, 1 = valid unranked, 2 = invalid.
@@ -4815,8 +4911,10 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                       c.type == building_type::processing_facility);
         // Ben, 2026-10-25: the tile's Logistic Point cover is applied, exactly as
         // the site ledger applies it, so the two surfaces quote one figure.
-        c.profit   = estimate_prospective_profit(w, reg, tile_id, c.type, c.target, c.recipe,
-                                                 nullptr, nullptr, lp_cover);
+        const site_quote sq = quote_for_tile(w, reg, tile_id, c.type, c.target, c.recipe, lp_cover);
+        c.profit   = sq.profit;
+        c.starved  = sq.starved;
+        c.short_of = sq.short_of;
         c.group    = !c.pr.ok()                          ? 2
                      : (c.produces && c.profit.has_data) ? 0
                                                          : 1;
@@ -4889,8 +4987,8 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             peak = std::max(peak, std::fabs(c.profit.net()));
     const float ceiling = charts::tight_ceil(peak);
 
-    // What the bars mean, stated once. The assumptions are named rather than modelled
-    // (see estimate_prospective_profit) — an honest static read beats a half-modelled one.
+    // What the bars mean, stated once. The market's response is modelled (site_quote.hpp);
+    // staffing and labour remain named assumptions.
     //
     // "before auto-staffing" is doing real work (NR-001): the estimate mirrors
     // construction.cpp's 50% workforce exactly, so it describes the building at the
@@ -4905,8 +5003,9 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // it goes with it. What replaced it is the cost said in full — goods and credits
     // — which is the honest version of the same sentence: the bar is earnings, the
     // cost lines above it are cost.
-    ImGui::TextWrapped("Est. net / qtr at today's local prices - at least this, before "
-                       "auto-staffing; 50%% staffing, no labour shortage, this tile's Logistic Point cover.");
+    ImGui::TextWrapped("Est. net / qtr once it is selling here: its own output moves the price, and "
+                       "inputs it cannot get mean it stands idle. Before auto-staffing; 50%% staffing, "
+                       "no labour shortage, this tile's Logistic Point cover.");
     ImGui::PopStyleColor();
 
     // ONE LINE A ROW, AND IT IS A GRID (BL-1365; construction.md § "One line a
@@ -5168,9 +5267,15 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             // no longer prints (38 px holds a magnitude or a number, not both),
             // and the staffing assumption the caption above the list carries.
             char nbuf[260];
-            if (c.group == 0)
+            if (c.group == 0 && c.starved)
                 std::snprintf(nbuf, sizeof nbuf,
-                              "Est. net %+d cr / qtr at today's local prices, at 50%% staffing "
+                              "It would likely stand idle: this market cannot get it %s at a price it will "
+                              "pay. Est. net %+d cr / qtr is its upkeep alone. The bar is that figure "
+                              "against the best row in this list.",
+                              resource_names::name_of(c.short_of).c_str(), static_cast<int>(c.profit.net()));
+            else if (c.group == 0)
+                std::snprintf(nbuf, sizeof nbuf,
+                              "Est. net %+d cr / qtr once its output is selling here, at 50%% staffing "
                               "with no labour shortage and %d%% Logistic Point cover. The bar is "
                               "that figure against the best row in this list.",
                               static_cast<int>(c.profit.net()),

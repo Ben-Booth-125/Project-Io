@@ -237,8 +237,9 @@ and from the session menu above.
   `fullscreen`, `vsync`) in the working directory, loaded at interactive startup only (never in the
   `--verify` path, so golden captures stay at the fixed default). Preset/toggle changes save
   immediately; a free drag-resize of the window frame is remembered and flushed on clean exit.
-- **Follow-ons** — this surface is the natural home for later non-display options (UI scale, font
-  size, monitor selection) and sits beside the session menu and Save/Load.
+- **UI Scale** grows the font in steps; the size every element draws at is `LAYOUT.md` § UI scale.
+- **Follow-ons** — this surface is the natural home for later non-display options (monitor
+  selection) and sits beside the session menu and Save/Load.
 
 ## Settled questions
 

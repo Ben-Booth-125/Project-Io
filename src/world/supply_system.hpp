@@ -44,6 +44,13 @@ enum class interception_outcome : std::uint8_t
     /// nothing credited anywhere. `interceptor_corp` names the embargoing nation,
     /// `interceptor_unit` is null, and `tile` is the destination market's centre.
     refused_embargo = 2,
+    /// BL-1505: a front left it no lane on, and it went home to its source market, whole:
+    /// `interceptor_corp` is null and `tile` is the market's centre. The one outcome that
+    /// loses nothing; recorded so a return is not silent.
+    returned_by_front = 3,
+    /// BL-1505: a front left it no lane on and none back, and it is lost. `interceptor_corp`
+    /// is null and `tile` is where it stood.
+    lost_behind_front = 4,
 };
 
 /// One interception, as it happened. Returned by `intercept_convoys` for the
@@ -228,9 +235,16 @@ convoy_leg price_trade_leg(world& w, const recipe_registry& reg,
 /// routes overland, or land -> port -> sea -> port -> land through two active Ports
 /// (SUPPLY.md § Logistical cost) — the ports need not sit on either market centre.
 /// BL-1185's placement asks this same call, so placement and shipping cannot disagree.
+/// BL-1505: @p party, when named, reads the lane as that nation at war may fly it
+/// (`lane_party`). Null is a market's own leg, which no front binds.
 convoy_leg price_market_leg(world& w, const recipe_registry& reg,
                             const logistics_nodes& nodes, entity_id src_market,
-                            entity_id dest_market, float qty);
+                            entity_id dest_market, float qty, entity_id party = null_entity);
+
+/// BL-1505: is the warring front the reason @p owner has no lane between these two markets
+/// of one body? The surfaced reason (SUPPLY.md): a lane a neutral could fly and it cannot.
+bool front_closes_lane(world& w, const recipe_registry& reg, const logistics_nodes& nodes,
+                       entity_id owner, entity_id src_market, entity_id dest_market);
 
 /// True if `owner` — a corporation or a nation (BL-1402, `assets_of`) — has a
 /// launchpad building whose tile is on `body`.

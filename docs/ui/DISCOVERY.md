@@ -278,6 +278,9 @@ brightest edge meeting there. Presentation only — no `world/*` change.
   **glides smoothly** between quarterly steps, and trails a tail one econ tick's travel behind
   (intensity ramping `1 → 0` head → tail). This is the "things are moving" layer; the corridors +
   pockets are the "where I operate" layer.
+- **Another nation's convoy (SELECTION.md § The convoy element):** its marker draws only on a tile
+  this vision lights, and a press names its owner and how it travels. Its cargo and route stay
+  private.
 
 ---
 

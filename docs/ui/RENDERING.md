@@ -756,6 +756,8 @@ suggests … the key element I wanted to bring was the resolution / detail, and 
 scheme"*). The C-F pass first took both from it3 and came out too grey; the palette below is it1's.
 Judged against `docs/ui/design/renders/map/`. What it asks of the bake, procedurally, in this order:
 
+- **A lighter tileset (Ben, 2026-11-05).** The palette across the tileset lifts lighter. The
+  figures below are the base it lifts from; how far it lifts is read against the live map.
 - **Palette and value.** Base hues take **it1's colour** — warm olive and khaki, rich green
   forest, white peaks, blue-green sea — not C-F's grey (the grade's desaturation eases to
   match); from it3 the value structure stays:

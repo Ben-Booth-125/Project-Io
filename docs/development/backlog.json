@@ -262,30 +262,10 @@
    "parked": false,
    "blocked_on": null,
    "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [],
-   "category": "Economy",
-   "priority": "A",
-   "difficulty": 2,
-   "id": "BL-1496",
-   "short_name": "BUILD_PAYBACK_CENSUS",
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "files": [
-    "tools/verify/"
-   ],
-   "title": "Measure what a building pays back, by site, for every major",
-   "design": "Playtest item 20, first because every price below reads it. Baseline, 4 seeds at 30:4, main 76974301: handoff treasury median 27,293 (16,994-36,214); net median 1,262 a quarter; mine 100 cr + 20 steel at base 16.1 = about 422 cr; processor about 602 cr. THE WORK: a harness reading, for each major at the handoff, estimate_prospective_profit across its own valid tiles per finder row: best, median and worst net against capex, so payback years and the best-to-median spread are known. Also per-quarter net, treasury and buildings over 80 quarters. RECONCILE: median treasury fell about 8,000 over five years despite positive net, about 33,000 credits net does not explain against about 5 new buildings; name where it goes. Save as a skill (needs Ben's permission). Reports; does not gate."
-  },
-  {
-   "status": "proposed",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
    "requires": [
-    "BL-1496"
+    "BL-1496",
+    "BL-1536",
+    "BL-1539"
    ],
    "category": "Economy",
    "priority": "A",
@@ -298,7 +278,7 @@
     "tools/verify/"
    ],
    "title": "A mine costs six months of net at the opening; ease over 10-20 years through reinvestment",
-   "design": "Playtest item 20, Ben's most important. Ruling (Ben, 2026-11-05) in the authority doc. Target: a mine costs about 6 months of a major's net at the opening, back to about 1 month after 10-20 years; 6x in 15 years is about 13% a year, or roughly an 8-year payback on a good building. Cost lives mostly in materials, so a planned steel chain is the edge. Good sites pay back in years, poor ones barely: the finder stays open (Ben declined gating it), so this spread is the WHOLE reward for searching and must be read, not assumed. Calibrate from the payback census; multipliers are in-band. RISKS: raises steel demand and can stretch or pause sites (max_stretch); rivals barely build today (median 44 to about 47 in five years), so read whether they stall further; read against BL-1494 (tick-50 stall). Check: market-viability, opening-parity, rebless-shape-probe. One re-bless shared with the other world-movers."
+   "design": "Playtest item 20, Ben's most important. Ruling (Ben, 2026-11-05) in the authority doc. Target: a mine costs about 6 months of a major's net at the opening, back to about 1 month after 10-20 years; 6x in 15 years is about 13% a year, or roughly an 8-year payback on a good building. Cost lives mostly in materials, so a planned steel chain is the edge. Good sites pay back in years, poor ones barely: the finder stays open (Ben declined gating it), so this spread is the WHOLE reward for searching and must be read, not assumed. Calibrate from the payback census; multipliers are in-band. RISKS: raises steel demand and can stretch or pause sites (max_stretch); rivals barely build today (median 44 to about 47 in five years), so read whether they stall further; read against BL-1494 (tick-50 stall). Check: market-viability, opening-parity, rebless-shape-probe. One re-bless shared with the other world-movers. CALIBRATION from the census (BL-1496): six months of net at the measured 1,000-1,150 a quarter is a mine of about 2,000-2,300, about 5-6x today's 327-430. Reinvestment grows income at 1/payback whatever the net: a x5.5 mine pays back in about 5 years on produce (0.9 today), 9 on copper, 21 on iron, 40 on coal; standing processors in about 15-25 years. Background growth of about 4.7% a year carries about 2.5x of the 6x over 20 years, leaving about 2.4x for reinvestment, so x5-6 looks feasible and must be run, not assumed. Timber, fibre and stone mines cost about 105-110 today with no steel in the bill: the materials lever must reach them. Read net after research: see the review queue."
   },
   {
    "status": "proposed",
@@ -979,6 +959,106 @@
    ],
    "title": "Doc-versus-code drift found reading the playtest list",
    "design": "Found 2026-11-05, read not run: ACTIONS chrome.esc lists sticky-card rungs the code lacks; LAYOUT:150 calls Diplomacy reserved; MENU:156-160 places own buildings on the dashboard, code uses Construction; MENU:218 says no in-session save, F5 exists; corporation.md:36-38 a Force segment never filled; market.md:151 read 3 versus rank_trade_routes; SUPPLY:67 says convoys are outside state_hash but rail waypoints are folded (world.cpp:235-241); SUPPLY's table omits station_a and station_b; logistics.hpp:483 stale; AI_OPPONENT:2379 province versus MILITARY:549 tile for push; SELECTION:506 water no-op versus march_check. Reconcile each; skip any the rulings already fixed."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: playtest follow-up)",
+   "requires": [],
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1538",
+   "short_name": "SHELF_RUNWAY_WARNING",
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "src/ui/construction_sites.cpp"
+   ],
+   "title": "Construction tooltip warns when a building's supply has only a few quarters left on the shelf",
+   "design": "Ben, 2026-11-05: \"warnings on tooltip for construction when a building's supply has only a few quarters left on that market's stockpile\". READING, to confirm: a building's supply means its recipe inputs at the tile's market. For each input: shelf (market inventory) over the quarterly use this building would add, plus that market's net drain where it is already falling. Under the threshold, the Build door row's tooltip (selection_panel.cpp near :4818) names the good and the quarters left; the site ledger's row carries the same reading from one shared helper. OPEN: the threshold (4 quarters as the default until Ben reads it live), and whether construction materials count too. It serves the search reward in PRODUCTION § What construction costs at the opening: it shows a site that looks profitable today but will starve. The word on screen is shelf (GLOSSARY). UI only. Check: live click, question log."
+  },
+  {
+   "status": "in_progress",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (BL-1496 census, 2026-11-05)",
+   "requires": [],
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1536",
+   "short_name": "QUOTE_OBTAINABLE",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/world/site_quote.hpp",
+    "src/world/site_quote.cpp",
+    "src/ui/selection_panel.cpp",
+    "src/ui/construction_sites.cpp",
+    "tools/verify/build_payback_census.cpp"
+   ],
+   "title": "The door and the site finder quote what a plant can actually run on",
+   "design": "Found by BL-1496 (build payback census). The door and the finder pass nullptr for input_unit_cost, pricing inputs at the posted price with a full run, so the top rows are goods whose inputs are not there: alloys quoted 4,669 earned 615, electronics 2,332 earned -6. A player trusting the finder is burned, and Ben's ruling rests the whole search reward on these sites (he kept the finder open). The rival scorer already prices through input_reach (BL-1187); the player's quote should use the same obtainable cost plus an expected run from the shelf. That should also open the spread processing lacks (1.1x today), since obtainable cost varies by site: measure it. This is a figure, not a rule, so no sim digest moves if the scorer's call stays byte-identical. Check: census ACTUAL rows, quoted within about 2x of earned on the mirage rows; best-over-median spread for processing reported; live click. Pairs with SHELF_RUNWAY_WARNING. READING 2026-11-06, 16 library seeds, 40 quarters, holdout of 549 processors quoted when ordered and read a year after standing: median |quote - earned| 46.6 old, 24.8 new; right about whether it pays 80% old, 87% new; called idle 58, of which 7 ran above half; extractors steel-free timber 59.5 old, 9.6 new, earned 4.7. Rejected on the same holdout: the scorer's spare-supply test (131 called idle, 95 ran). KNOWN MISS: consumer goods median earned -4.2, quoted 378 (was 4,629), run 0 with inputs apparently available: not explained by the shelf or the bid. The Method lever at selection_panel.cpp:793 still prices at posted."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-05",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: \"a lighter colour palette across the tileset\")",
+   "requires": [
+    "BL-1523"
+   ],
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1537",
+   "short_name": "TILESET_LIGHTER",
+   "authority_doc": "docs/ui/RENDERING.md",
+   "files": [
+    "src/ui/terrain_palette.hpp",
+    "src/ui/ground_bake.cpp",
+    "tools/verify/ground_bake_check.cpp"
+   ],
+   "title": "A lighter colour palette across the tileset",
+   "design": "Ben, 2026-11-05, on the rendering pass: a lighter palette across the tileset. TODAY (RENDERING § Art direction and palette): the bake is held to luminance p10 about 26, p50 about 55, p90 about 106, p99 about 155; median ground about (55, 56, 51), khaki fields about (100, 83, 53), forest about (41-51, 43-54, 27-35), deep sea about (21, 42, 50). OPEN, for Ben at a live look (Rule 0b): how much lighter, whether water and shadow lift too, and whether the map lifts by base colours or by the grade pass. Base entries live in palette::ground_tile_colour; the near-future grade is a separable final pass, so a grade trial is cheap. Do alongside TILE_RES_96 and POINTED_TREES so it is judged once, at the real resolution. GLOBAL_STYLE_SHEET (Joe's) carries the visual-language exploration. Check: new percentile targets in ground_bake_check, goldens, live look."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-06",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-05: \"Yes, count research\", NR-1143)",
+   "requires": [],
+   "category": "Economy",
+   "priority": "A",
+   "difficulty": 3,
+   "id": "BL-1539",
+   "short_name": "RESEARCH_IN_RETURN",
+   "authority_doc": "docs/economy/FINANCE.md",
+   "files": [
+    "src/world/nation_tech.cpp",
+    "src/world/components.hpp",
+    "src/world/economy_tick.cpp",
+    "src/world/serialisation.cpp"
+   ],
+   "title": "Research counts inside the quarterly return, so NET is the money left",
+   "design": "Ben's ruling, in FINANCE § The quarterly return: research counts inside net. Today nation_tech.cpp:1059 takes it from the treasury after the return is written, a mean of 1,644 credits a major-quarter by BL-1496 (build payback census), against net of 1,000-2,500, so NET overstates free cash. Book it as refunds are booked: a running figure the nation step adds to, drained into the next return, with the return's opening taken so net still telescopes. Check garrison pay at nation_step.cpp:349 at the same time: any other direct spend outside the return makes NET lie the same way, and the census's resid column should read zero after this. quarterly_return is asserted sizeof 56 and hashed raw, so it is a save bump and moves the return digest: goes in the ECONOMY wave's shared re-bless. Do before BL-1497 (opening cost curve) sets the mine at six months of net, since that target now reads net after research. Check: census resid near zero; the retain property (returns replay onto the treasury) still holds; save round trip."
   },
   {
    "status": "proposed",

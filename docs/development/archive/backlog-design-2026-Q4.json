@@ -14388,6 +14388,49 @@
         "title",
         "design"
       ]
+    },
+    "BL-1496": {
+      "status": "complete",
+      "glyph": "●",
+      "sprint": 63,
+      "version_goal": null,
+      "written": "2026-11-05",
+      "parked": false,
+      "blocked_on": null,
+      "author": "main session (Ben, 2026-11-05: playtest list and design form)",
+      "requires": [],
+      "category": "Economy",
+      "priority": "A",
+      "difficulty": 2,
+      "id": "BL-1496",
+      "short_name": "BUILD_PAYBACK_CENSUS",
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "files": [
+        "tools/verify/build_payback_census.cpp",
+        "tools/verify/build_payback_census_pool.js"
+      ],
+      "title": "Measure what a building pays back, by site, for every major",
+      "design": "Playtest item 20, first because every price below reads it. Baseline, 4 seeds at 30:4, main 76974301: handoff treasury median 27,293 (16,994-36,214); net median 1,262 a quarter; mine 100 cr + 20 steel at base 16.1 = about 422 cr; processor about 602 cr. THE WORK: a harness reading, for each major at the handoff, estimate_prospective_profit across its own valid tiles per finder row: best, median and worst net against capex, so payback years and the best-to-median spread are known. Also per-quarter net, treasury and buildings over 80 quarters. RECONCILE: median treasury fell about 8,000 over five years despite positive net, about 33,000 credits net does not explain against about 5 new buildings; name where it goes. Save as a skill (needs Ben's permission). Reports; does not gate. READING 2026-11-05, 16 library seeds, 30:4, 80 quarters, main 41326d47: (1) THE MISSING MONEY IS RESEARCH: mean 1,644 credits per major-quarter leaves through the research line (nation_tech.cpp:1059), a direct expenditure outside the quarterly return, so net overstates free cash; on seed 0 it reads 0 through quarter 4, 1,387 at quarter 40, 1,921 at quarter 80. (2) EXTRACTION HAS A REAL SPREAD: best-site payback median 3.1 years (p10 0.8, p90 22.5), median site 5.5, best over median net 2.4x (p90 12.4x), 64% of a row's sites pay. (3) PROCESSING DOES NOT: best over median 1.1x, so the site barely matters. (4) THE DOOR'S QUOTE IS A MIRAGE ON SCARCE GOODS: standing plants, quoted against earned per quarter: alloys 4,669 v 615 at q4, 6,268 v 0 at q20; electronics 2,332 v -6; consumer goods 410 v 22, 932 v 19 at q20; while steel 58 v 44, food rations 73 v 53, refined fuel 45 v 45 are near true. Plant counts for alloys, electronics and consumer goods are small (3-7). (5) THE CURVE: net 1,000 to 2,511 over 20 years with buildings only 45 to 56, about 4.7% a year with little reinvestment; rival treasuries never fall below about 11,600, so money does not bind them. Harness reports; no gate. Skill wrapper owed on Ben's permission.",
+      "_row_keys": [
+        "status",
+        "glyph",
+        "sprint",
+        "version_goal",
+        "written",
+        "parked",
+        "blocked_on",
+        "author",
+        "requires",
+        "category",
+        "priority",
+        "difficulty",
+        "id",
+        "short_name",
+        "authority_doc",
+        "files",
+        "title",
+        "design"
+      ]
     }
   }
 }

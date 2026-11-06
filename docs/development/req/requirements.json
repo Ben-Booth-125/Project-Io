@@ -7634,6 +7634,39 @@
    "batch": "sprint-62",
    "resolved": "2026-11-04",
    "archived": "docs/development/archive/requirements-2026-Q4.json"
+  },
+  {
+   "brief": "quote-obtainable",
+   "title": "BL-1536 - The door and the finder quote what a plant can actually run on",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "in_progress",
+   "promoted_from": "backlog.json BL-1536 - sprint 63 (Ben, 2026-11-05)",
+   "batch": "sprint-63",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Holdout: the quote sits nearer earned than the posted-price quote, and is right about whether a plant pays at least as often.",
+     "kind": "measured",
+     "status": "complete",
+     "evidence": "549 processors, 16 seeds: median error 46.6 to 24.8, pays right 80% to 87%. Earlier reading of 1096 buildings; the final input test was read on processors."
+    },
+    {
+     "id": "R2",
+     "text": "The door and the finder read one figure, and no sim digest moves.",
+     "kind": "static",
+     "status": "complete",
+     "evidence": "Both call quote_for_tile. Cold review found the only world writes are the unsaved leg path memos; the scorer does not call the quote. construction_sites.lua 0 failures on build_rel."
+    },
+    {
+     "id": "R3",
+     "text": "Live click: a starved row names its good, a scarce good stops reading as a fortune.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "Owed to Ben: access for the driven click was declined 2026-11-06."
+    }
+   ]
   }
  ]
 }

@@ -30,6 +30,14 @@ inline constexpr float nav_pane_width = 56.0f;
 /// exactly as opening a ledger from the rail does.
 void close_all_panels(ui_state& state);
 
+/// Is anything selected, on any channel? False when the band rests on the player's
+/// nation (SELECTION.md § Resting state). Esc's Selection rung asks this (BL-1520).
+bool any_selection(const ui_state& state);
+
+/// Back to the resting nation, every channel at once: the clear an empty canvas press
+/// makes, plus the front channel an Esc must also let go.
+void clear_selection_to_resting(ui_state& state);
+
 /// Whether any fold-out ledger/panel currently owns the column. The Selection
 /// element only draws when this is false (the ledger wins the shared slot).
 bool any_panel_open(const ui_state& state);

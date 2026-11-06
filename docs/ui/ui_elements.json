@@ -859,7 +859,7 @@
     "src/ui/header_panel.hpp",
     "src/ui/header_panel.cpp"
    ],
-   "summary": "Always-visible full-width strip between the identity tile and time column: treasury, cargo valuation, net+trend, runway, and at its top right the three recruit readouts (land, air, sea) — the persistent financial and manpower dashboard.",
+   "summary": "Always-visible full-width strip between the identity tile and time column: treasury with its net in brackets, cargo valuation, runway, and at its top right the three recruit readouts (land, air, sea) — the persistent financial and manpower dashboard.",
    "interesting_question": "The header is a 'guaranteed-fit strip' that never wraps and never silently clips a load-bearing number, degrading in a fixed order instead — why treat this one surface as the reference case for a wider text-wrap audit rather than just wrapping like other panels?",
    "resolution": "Explicit precedent-setting intent: HEADER.md states 'This ladder is the reference case for BL-215 (text-wrap render audit)... the audit's job is to make every other worded surface degrade this honestly rather than wrap or clip' — the header's ladder is meant to generalise, not stay a one-off.",
    "checks": [
@@ -902,15 +902,15 @@
   },
   {
    "id": "UI-054",
-   "name": "Net + trend sparkline",
+   "name": "Net in brackets + trend tooltip",
    "kind": "sub-element",
    "parent": "UI-051",
    "source": [
     "docs/ui/HEADER.md § Contents",
     "docs/ui/HEADER.md § Resolved design questions"
    ],
-   "summary": "The last economy tick's signed net change, coloured, plus a sparkline of recent balances (ImGui::PlotLines over a capped history).",
-   "interesting_question": "n/a — a settled design choice (per-tick delta + sparkline over a raw balance figure alone).",
+   "summary": "The last economy tick's signed operating net, coloured, in brackets beside the treasury. The graph of recent treasuries (ImGui::PlotLines over a capped history) is the tooltip shared by the treasury, its net and the cargo figure.",
+   "interesting_question": "n/a — a settled design choice (Ben, 2026-11-05).",
    "resolution": "n/a",
    "checks": [
     "header"
@@ -984,17 +984,20 @@
   },
   {
    "id": "UI-061",
-   "name": "System menu (session-control popup)",
+   "name": "Escape menu (full-canvas pause screen)",
    "kind": "control",
    "parent": null,
    "source": [
-    "docs/ui/MENU.md § Application / system menu — session control (BL-070)"
+    "docs/ui/MENU.md § Application / system menu — session control (BL-070)",
+    "docs/ui/TIME_CONTROLS.md § The escape menu",
+    "src/ui/time_panel.cpp"
    ],
-   "summary": "A top-right corner-gear popup: Pause/Resume and Exit (with an inline 'Really quit?' confirm, since there is no save); Esc toggles it, sharing the pause hotkey's flag.",
-   "interesting_question": "Exit is destructive with no save path in the prototype, so the inline confirm is the only guard against an accidental quit — is a single inline confirm proportionate for a truly unrecoverable action?",
-   "resolution": "Accepted as the prototype minimum, not a final answer: MENU.md frames this as 'Option B... rejected [a centred pause-modal] for the prototype minimum — the centred modal is the right long-term home once a title screen lands,' i.e. the current guard is explicitly interim.",
+   "summary": "Behind the gear at the right end of the time panel, and Esc with nothing open: a full-canvas menu that pauses the game, with Save, Options, Exit to Menu and Exit Game, the last save's date above them. Each exit raises an unsaved-progress warning first. God view sits beneath the presses while spectating.",
+   "interesting_question": "A paused player can still place a build, so can the warning ever honestly be skipped because nothing moved since the last save?",
+   "resolution": "No: both exits warn every time and the date of the last save stands beside the warning, so the player judges what would be lost. The corner popup and the rejection of a centred modal were overturned (Ben, 2026-11-05).",
    "checks": [
-    "shell_pass"
+    "shell_pass",
+    "escape_menu"
    ]
   },
   {
@@ -1280,12 +1283,13 @@
    "source": [
     "docs/ui/ledgers/market.md § Sub-levels"
    ],
-   "summary": "Default view: one row per traded good at the selected market — item glyph, name, price, price vs base, and an 8-quarter price graph flattened into the row. Every row is drawn against a SHARED price/base axis with a 1.0 baseline, which is what makes goods comparable; the line's colour carries direction. Row height is 0.4 x the ten-rows-to-the-view row of the layout before the top section, floored at one frame height (Ben, 2026-10-13).",
+   "summary": "Default view: one row per traded good at the selected market — the good's own item glyph (ICONS.md § 2b), name, shelf stock, price, price vs base, and an 8-quarter price graph flattened into the row. Every row is drawn against a SHARED price/base axis with a 1.0 baseline, which is what makes goods comparable; the line's colour carries direction. Row height is 0.4 x the ten-rows-to-the-view row of the layout before the top section, floored at one frame height (Ben, 2026-10-13).",
    "interesting_question": "The layout it replaces autoscaled every sparkline to its own range, so a good decaying 40% and a flat good drew the same shape — does a shared axis fit at 384 px once the graph is inline, and which column gives way if it does not?",
-   "resolution": "It fits, but not with every column. Measured over the real 45-good roster: with the body-average column the name column is 42 px and 13 of 45 names fit; without it, 98 px and 36 of 45. The design had nominated body_average_price first-to-drop only if the row would not fit, expecting the graph's width to be the pressure — the measurement says otherwise, so the column is off by default behind a one-line dial (ui_state::market_goods_show_body).",
+   "resolution": "It fits, but not with every column. Measured over the real 54-good roster with the Shelf column in the row: with the body-average column the name column is 18 px and 0 of 54 names fit; without it, 72 px and 33 of 54. The design had nominated body_average_price first-to-drop only if the row would not fit, expecting the graph's width to be the pressure — the measurement says otherwise, so the column is off by default behind a one-line dial (ui_state::market_goods_show_body).",
    "checks": [
     "market_ledger",
     "goods_table",
+    "item_glyphs",
     "market_density"
    ]
   },
@@ -1303,6 +1307,7 @@
    "interesting_question": "The reads are not equally cheap to know — one corporation record, a filter on the player's own trades, the same list past a gate, a derivation with no store behind it. What stops them collapsing into one table at 380 px, and what makes a potential trade one press from a real one without the ranking becoming the move?",
    "resolution": "Bounded sections keep every head on screen (caps 5 / 5 / 7 / 6 rows). The potential-trade '+' only FILLS the form — the player still picks the points and presses Add, so the ranking stays one input among several (CONCEPT.md § Player identity). The gate on the second read is enforced rather than assumed and is asserted against the world, including its SHUT state.",
    "checks": [
+    "trade_offers_sourced",
     "market_ledger",
     "trades_tab"
    ]
@@ -2024,7 +2029,7 @@
     "src/ui/diplomacy_ledger.cpp",
     "src/ui/body_surface_canvas.cpp"
    ],
-   "summary": "Rail slot 8, two tabs. Nations (default): one folded row per nation - stance chips you -> them and them -> you, and its Access / Trust / Alarm toward the player as signed bars with a four-tick trend arrow; expanding a row in place adds the player's bars toward it, reach / market share / GDP beside the player's, front strength, trade exposure, Offer / Withdraw / Accept friendship, the Embargo press and Declare war. Declare war turns the row into the declaration: the canvas outlines the target's provinces, a click toggles up to three goals, the justifications show holding or not and the price (Trust and Alarm, summed and per neighbour) follows the goals; Declare files declare_war, Cancel or Escape leaves no trace. Wars: every war, the player's first, with goals and holders, a centred score bar, exhaustion and days open; Answer, the peace composer (white or cession, Impose at 100), Accept / Refuse; then truces.",
+   "summary": "Rail slot 8, two tabs. Nations (default): a dropdown selector of nations, hostile first then by Alarm, with the chosen nation's stance chips, sentiment and detail below it; the view arms the Nations lens, and a press on a nation under that lens chooses it here. Declare war turns the row into the declaration: the canvas outlines the target's provinces, a click toggles up to three goals, the justifications show holding or not and the price (Trust and Alarm, summed and per neighbour) follows the goals; Declare files declare_war, Cancel or Escape leaves no trace. Wars: every war, the player's first, with goals and holders, a centred score bar, exhaustion and days open; Answer, the peace composer (white or cession, Impose at 100), Accept / Refuse; then truces.",
    "interesting_question": "Trend arrows and trade exposure both need a four-tick window, and the world keeps no history of either. Where does the window come from, and what does it show on the first tick a session watches?",
    "resolution": "From a UI-side ring buffer, never saved: once per econ tick the ledger samples each pair's sentiment and notes which convoys landed between nations (a convoy seen in flight and gone at the next sample). Until two samples exist the bars carry no arrow and trade exposure reads 'No ticks watched yet', which is the honest answer rather than a zero.",
    "checks": [
@@ -2050,6 +2055,91 @@
    "checks": [
     "military_ledger",
     "air_ui"
+   ]
+  },
+  {
+   "id": "UI-135",
+   "name": "Marching unit counter",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/military/MILITARY.md § Land — on the canvas",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "summary": "A unit with a next hop draws apart from its tile's stack, gliding from tile centre to tile centre: its bank plus the day's fraction of its movement, over the hop's own price (march_hop_fraction, the price run_unit_march spends). Units on one hop at one pace are one counter. Its hit zone follows the drawn point, and a press selects those units. Presentation only: the march still resolves tile by tile.",
+   "interesting_question": "Can the drawn point ever disagree with the march it shows?",
+   "resolution": "Not on price: the canvas and run_unit_march read one helper. The tile the counter is leaving stays the sim's position until the day's walk steps it, so the drawn point leads the sim's tile by at most one hop.",
+   "checks": [
+    "unit_glide"
+   ]
+  },
+  {
+   "id": "UI-136",
+   "name": "Convoy marker and card",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/SELECTION.md § The convoy element",
+    "docs/ui/DISCOVERY.md",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "summary": "A marker at each convoy's lane head on the active body, in its owner's colour, gliding on the beam's clock; several on a tile are one marker with a count. A press with no lens selects it (selected_convoy, an id, not an entity), and the Selection band shows its cargo, owner, route and arrival; a repeat press walks the tile's convoys. A rival's marker draws only under the player's vision, and its card names only owner and mode.",
+   "interesting_question": "What may the player learn of another nation's convoy by pressing it?",
+   "resolution": "Owner and mode, and only where the player's vision already lights the ground. Cargo and route stay private. Filed for Ben's look at the first capture.",
+   "checks": [
+    "convoy_map"
+   ]
+  },
+  {
+   "id": "UI-137",
+   "name": "Drag-select units",
+   "kind": "control",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/SELECTION.md § The dragged group",
+    "src/ui/body_surface_canvas.cpp",
+    "src/ui/selection_panel.cpp"
+   ],
+   "summary": "A left drag on the Planetary canvas draws a box; every counter of the player's inside joins the group, across tiles, and the band opens the group element. Shift adds to the group held; a shift-press with no drag adds the counter under it. Any plain press retires it. Armed picks (placement, road, March) and the declaration's goal pick outrank it, and a lens collapses selection to one tier, so neither ever drags.",
+   "interesting_question": "The press already selects on its way down. What does a drag do to what the press took?",
+   "resolution": "A plain press still selects at once, so a click is unchanged. A band that gathers own units replaces that selection, and one over nothing of the player's leaves it standing. A shift-press selects nothing itself: the group it adds to must survive to the release.",
+   "checks": [
+    "drag_select"
+   ]
+  },
+  {
+   "id": "UI-138",
+   "name": "Nation overview Standing",
+   "kind": "sub-element",
+   "parent": null,
+   "source": [
+    "docs/ui/ledgers/corporation.md § Slot 1",
+    "docs/ui/MENU.md",
+    "src/ui/corporation_dashboard.cpp",
+    "src/ui/charts.cpp"
+   ],
+   "summary": "Under Balance in the Nation overview: the nation's rank among nations on GDP, market share, reach and total force, each a bar of its own figure against the leader's, with the rank at the right and the leader named on hover. Balance's chart is two horizontal bars, Earnings over stacked Expenses.",
+   "interesting_question": "What may be ranked without opening a rival's books?",
+   "resolution": "GDP, market share and reach are public (the Diplomacy ledger already shows them), and total force counts only the units the map's counters show. A rival's treasury is never read.",
+   "checks": [
+    "corp_dashboard"
+   ]
+  },
+  {
+   "id": "UI-139",
+   "name": "Alert strip",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/LAYOUT.md § Alert strip",
+    "src/ui/alerts.cpp"
+   ],
+   "summary": "Top centre of the canvas area, just below the header: one press per thing that wants attention - research not set, idle buildings, wars, low runway, construction stalled, deposit exhausted, trades exceeding trade points. Each opens the surface that answers it; it wraps rather than clips, and draws nothing with nothing to say.",
+   "interesting_question": "A nation with a dozen idle mines has one alert, not twelve. How many does a player need before the strip stops being read, and should the count be the alert?",
+   "resolution": "Aggregated: one press per KIND, the count in its words, the ledger the press opens carrying the rows. Seven kinds is the ceiling, so the strip's worst case is one wrap at the 1280 floor. Not dismissable, by default: it says only what is true now.",
+   "checks": [
+    "alert_strip"
    ]
   }
  ]

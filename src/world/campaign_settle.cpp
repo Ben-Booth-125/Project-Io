@@ -7,6 +7,7 @@
 #include "world/logistics.hpp"         // the network: reach and traversal cost
 #include "world/market_clearing.hpp"   // clear_markets
 #include "world/nation_generation.hpp" // BL-1452: repost_garrisons_on_cover, at the handoff
+#include "world/fronts.hpp" // BL-1504: open_capital_defence, at the handoff
 #include "world/nation_step.hpp"       // run_nation_step
 #include "world/unit_roster.hpp"       // BL-1452: resolve_unit_upkeep - the settle cap keeps the wage back
 #include "world/nation_tech.hpp"       // clear_research_at_handover (BL-1273)
@@ -134,6 +135,10 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // sees the posted world. A no-op on a world with no generation record (a load).
     if (econ_step == k_campaign_settle_ticks - 1 && !w.gen_garrisons.empty())
         print_garrison_repost(repost_garrisons_on_cover(w, &reg.military()));
+    // BL-1504 (MILITARY.md § Defend province): a major opens defending its capital
+    // province, from the posts just chosen.
+    if (econ_step == k_campaign_settle_ticks - 1)
+        (void)open_capital_defence(w);
     // The settle ends here: from the handoff every nation spends its whole treasury again.
     if (econ_step == k_campaign_settle_ticks - 1)
     {

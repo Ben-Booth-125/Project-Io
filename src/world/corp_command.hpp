@@ -232,6 +232,10 @@ enum class corp_verb : uint8_t
     // Appended after impose_peace, same append-only rule. A nation acting for
     // itself enacts or repeals its own embargo; no scorer issues it (embargo.hpp).
     set_embargo,          ///< `corp` enacts (`order` 1) or repeals (`order` 0) its embargo of nation `counterparty`: no cargo `counterparty` owns lands in a market on `corp`'s ground. Enactment queues embargo_imposed (counterparty -> corp). rejected_invalid (any other `order`, counterparty not a nation, or the actor itself) / rejected_state (enacting one in force, repealing one that is not). A refusal mutates nothing.
+    // --- BL-1504: defend province (MILITARY.md § Defend province, Ben 2026-11-05) ---
+    // Appended after set_embargo, same append-only rule. Any nation on its OWN unit; a
+    // rival's scorer issues it by the grant in AI_OPPONENT.md § 11.
+    defend_province,      ///< Order unit `subject` to defend province `province` (`no_province` clears the order); the unit stores it and its post, and leaves any front. The post is the tile it stands on when inside the province, else the nearest tile of the province the actor owns that a march reaches. rejected_invalid (no such unit or province, a unit no land class, a province with no land the actor owns, no reachable post) / rejected_not_owner (not the actor's unit) / rejected_state (already so).
 };
 
 /// One past the highest verb — the wire parser's range gate (BL-396: run_serve
@@ -241,7 +245,7 @@ enum class corp_verb : uint8_t
 /// appending a verb means moving this with it — and only this, since existing
 /// values never renumber.
 inline constexpr uint8_t corp_verb_count =
-    static_cast<uint8_t>(corp_verb::set_embargo) + 1;
+    static_cast<uint8_t>(corp_verb::defend_province) + 1;
 
 /// `unqueue_research`'s "the last entry" sentinel for `corp_command::order`
 /// (the MCP boundary's -1). UINT32_MAX, never a node index.

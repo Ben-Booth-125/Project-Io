@@ -6,10 +6,12 @@
 #include "session_history.hpp" // step_economy's post-step presentation (BL-361)
 
 #include <imgui.h>
+#include <imgui_internal.h> // BL-1495: the queued pointer events the draw scale rewrites
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <SDL3/SDL.h>
 
+#include "ui/construction_sites.hpp"
 #include "ui/body_surface_canvas.hpp"
 #include "ui/rail_tool.hpp" // BL-1255: rail_player_nation for the Rail group presses
 #include "ui/canvas_command.hpp"
@@ -35,6 +37,7 @@
 #include "ui/generation_preview.hpp" // the wizard's painted right pane
 #include "ui/format.hpp"
 #include "ui/frame_stats.hpp" // frame-budget HUD (BL-249, v0.1.0 quality audit)
+#include "ui/alerts.hpp"
 #include "ui/header_panel.hpp"
 #include "ui/foldout_column.hpp" // shell_column_width — permanent left shell column (BL-122)
 #include "ui/shell_metrics.hpp"  // the shell's rect algebra, one owner (BL-216)
@@ -280,12 +283,44 @@ app::app()
 
 namespace {
 constexpr std::array<float, 3> k_ui_scale_px = {16.0f, 20.0f, 24.0f}; ///< BL-063 steps: 1.0 / 1.25 / 1.5 of the 16px base.
+
+/// THE UI SCALE (BL-1495; LAYOUT.md § UI scale; Ben's number to weigh in on). The one
+/// constant: every element, its text and its hard-coded px together, draws at this
+/// share of its size. A 1280 x 720 window lays out as 1463 x 823 UI pixels, and the 16 px
+/// base font lands as 14 screen pixels. Canvases and chrome scale alike.
+constexpr float k_ui_draw_scale = 0.875f;
 } // namespace
+
+float app::shipped_ui_draw_scale() { return k_ui_draw_scale; }
+
+void app::apply_ui_draw_scale_to_frame()
+{
+    if (m_ui_draw_scale == 1.0f)
+        return;
+    ImGuiIO& io = ImGui::GetIO();
+    io.DisplaySize = {io.DisplaySize.x / m_ui_draw_scale, io.DisplaySize.y / m_ui_draw_scale};
+    // The SDL backend queues the pointer in window pixels, and it has no scale to ask.
+    for (ImGuiInputEvent& e : ImGui::GetCurrentContext()->InputEventsQueue)
+        if (e.Type == ImGuiInputEventType_MousePos && e.MousePos.PosX > -FLT_MAX)
+        {
+            e.MousePos.PosX /= m_ui_draw_scale;
+            e.MousePos.PosY /= m_ui_draw_scale;
+        }
+}
+
+void app::render_imgui_scaled()
+{
+    // The backend defers to a render scale already set, and SDL scales the geometry and
+    // the clip rects with it. Back to 1 straight after: a capture reads whole pixels.
+    SDL_SetRenderScale(m_renderer, m_ui_draw_scale, m_ui_draw_scale);
+    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+    SDL_SetRenderScale(m_renderer, 1.0f, 1.0f);
+}
 
 void app::apply_ui_scale()
 {
     const int step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
-    ui::reload_ui_font(k_ui_scale_px[static_cast<std::size_t>(step)]);
+    ui::reload_ui_font(k_ui_scale_px[static_cast<std::size_t>(step)], m_ui_draw_scale);
     ImGui_ImplSDLRenderer3_DestroyFontsTexture();
 
     // The display floor scales with the font (BL-215): BL-063 grows the atlas
@@ -383,6 +418,7 @@ int app::run(autostart_mode autostart)
     // never touches settings, keeping golden captures at the fixed default size.
     load_settings();
     apply_display_settings();
+    m_ui_draw_scale = k_ui_draw_scale; // BL-1495: interactive only, like the settings above
     apply_ui_scale();
 
     m_lua.load("scripts/init.lua");
@@ -492,6 +528,7 @@ int app::run(autostart_mode autostart)
                     if (m_sim_loop.speed() > 0)
                         m_prev_speed = m_sim_loop.speed();
                     m_sim_loop.set_speed(0);
+                    m_menu_paused_it = false; // the clock is the agent's: an open menu's close leaves it stopped
                 }
                 if (ev.detached)
                 {
@@ -2293,13 +2330,12 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     if (m_screen != app_screen::in_game)
         return;
 
-    // Esc toggles the in-app system menu (BL-070) — cheap keyboard parity with the
-    // corner gear button. Handled before the ImGui keyboard guard so it works even
-    // while the popup (or another panel) holds focus. Precedence, highest first: an
-    // armed exit-confirm backs out; an open system menu closes; an open fold
-    // overlay folds up (BL-214);
-    // otherwise the menu opens. The Selection band never hides (BL-266) — its
-    // former hide rung is gone, so the system menu is the terminal rung.
+    // Esc closes what is open in a queue, Menu then Ledger then Selection, and with
+    // nothing open reaches the escape menu (BL-1520; SELECTION.md § Layout & chrome).
+    // Handled before the ImGui keyboard guard so it works even while a panel holds
+    // focus. One press, one rung: exit warning; escape menu; declaration; drill; fold
+    // overlay (BL-214); an armed tool; the ledger; the selection, back to the resting
+    // nation; then the menu. The band itself never hides (BL-266).
     //
     // The fold rung is a deliberate departure from BL-214's Decision 10, which kept
     // depth off this ladder. That decision reasoned about an in-place stepper, where
@@ -2318,8 +2354,17 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
             m_ui.corp_rollup_drill = -1;                      // back to the roll-up (BL-248)
         else if (ui::any_expanded(m_ui))
             ui::fold(m_ui);                                   // fold the full-screen overlay
+        else if (m_ui.construction.road_arm_tile != null_entity)
+            m_ui.construction.road_arm_tile = null_entity;    // an armed tool disarms before its ledger goes
+        else if (m_ui.pending_march_unit != null_entity)
+            m_ui.pending_march_unit = null_entity;
+        else if (ui::any_panel_open(m_ui))
+            ui::close_all_panels(m_ui);                       // the Ledger rung
+        else if (ui::any_selection(m_ui))
+            ui::clear_selection_to_resting(m_ui);             // the Selection rung: the band rests on the nation
         else
             m_ui.show_system_menu = true;                     // terminal rung (BL-266): the band never hides
+        sync_escape_menu_pause();
         return;
     }
 
@@ -2332,6 +2377,12 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     {
         if (key.scancode == b.scancode && shift == b.shift)
         {
+            // The escape menu is the pause screen: under it the map does not pan and
+            // the clock does not start. Saving and the two windows still answer.
+            if (m_ui.show_system_menu && b.cmd != ui::canvas_command::quick_save
+                && b.cmd != ui::canvas_command::help_toggle
+                && b.cmd != ui::canvas_command::options_toggle)
+                return;
             dispatch_action(b.cmd);
             return;
         }
@@ -2450,6 +2501,8 @@ bool app::save_game_to(const std::string& path)
     }
 
     const bool ok = write_save_game(path, m_world, env);
+    if (ok)
+        m_last_save_day = static_cast<long long>(m_sim_loop.day_tick());
 
     ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), null_entity,
                   ui::chat_state::k_field_channel,
@@ -2553,8 +2606,92 @@ bool app::load_game_from(const std::string& path)
     ui::chat_post(m_chat, static_cast<int>(env.day_tick), null_entity,
                   ui::chat_state::k_field_channel, "Loaded " + path);
     m_war_log_cursor = m_world.history_log.size(); // BL-1480: a loaded log's wars are past
+    m_last_save_day  = static_cast<long long>(env.day_tick);
+    m_menu_message.clear();
 
     return true;
+}
+
+void app::sync_escape_menu_pause()
+{
+    const bool open = m_ui.show_system_menu;
+    if (open == m_menu_was_open)
+        return;
+    m_menu_was_open = open;
+    if (open)
+    {
+        // The Options window is a press on this menu now; left open it would stand
+        // behind the menu with no way to reach it.
+        m_show_options = false;
+        // Already paused (by Space, or by an attached agent's clock gate): nothing
+        // to restore, so a close leaves it paused.
+        m_menu_paused_it = !m_sim_loop.paused();
+        if (m_menu_paused_it)
+            dispatch_action(ui::canvas_command::pause_toggle);
+    }
+    else
+    {
+        m_ui.confirm_exit_pending = false;
+        if (m_menu_paused_it && m_sim_loop.paused())
+            dispatch_action(ui::canvas_command::pause_toggle);
+        m_menu_paused_it = false;
+    }
+}
+
+void app::exit_to_menu()
+{
+    // Off-screen join: on_screen ends the process, and this session goes on.
+    join_workers(/*on_screen=*/false);
+
+    // The agent seam and the play log belong to the campaign being left. Both open
+    // again with the next one (run()'s seam block, open_play_log).
+    if (!m_agent_seam.transcript().empty())
+        m_agent_seam.write_transcript("agent_transcript.log");
+    m_agent_seam.shutdown();
+    m_play_log.close();
+
+    m_ground.forget_world();
+    m_ground_prebake_wizard = false;
+    m_ground_world_live     = false;
+    m_world                 = world{};
+    m_generation_report     = {};
+
+    // The load path's reset list, and the series a load would have replaced.
+    m_last_econ_report = economy_report{};
+    m_last_corp_standings.clear();
+    m_balance_history.clear();
+    m_income_history.clear();
+    m_expenditure_history.clear();
+    m_market_history.clear();
+    m_building_rank_hist.clear();
+    m_chat = ui::chat_state{};
+
+    // Every ledger, selection and takeover: a fresh session opens with ledgers closed
+    // (MENU.md § Policy). What the launch set and the player's F11 stay.
+    const bool spectating = m_ui.spectating;
+    const bool frame_hud  = m_ui.show_frame_hud;
+    m_ui = ui_state{};
+    m_ui.spectating     = spectating;
+    m_ui.show_frame_hud = frame_hud;
+    ui::reset_unit_designer(m_ui);
+    ui::reset_wing_ui(m_ui);
+    ui::reset_diplomacy_ui(m_ui);
+
+    m_sim_loop        = sim_loop();
+    m_prev_speed      = 1;
+    m_last_econ_tick  = 0;
+    m_econ_steps      = 0;
+    m_last_orbit_days = 0.0;
+    m_last_survey_day = 0;
+    m_war_log_cursor  = 0;
+    m_show_options    = false;
+    m_show_help       = false;
+    m_menu_was_open   = false;
+    m_menu_paused_it  = false;
+    m_last_save_day   = -1;
+    m_menu_message.clear();
+
+    m_screen = app_screen::menu;
 }
 
 void app::render()
@@ -2566,8 +2703,18 @@ void app::render()
     ui::frame_stats& s_frame_stats = frame_stats_instance();
     s_frame_stats.begin_frame();
 
+    // BL-1519: the press came from inside last frame's menu; the teardown runs here,
+    // between frames, where nothing on the stack holds the world.
+    if (m_exit_to_menu_requested)
+    {
+        m_exit_to_menu_requested = false;
+        exit_to_menu();
+    }
+    sync_escape_menu_pause();
+
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
+    apply_ui_draw_scale_to_frame(); // BL-1495: the frame in UI pixels from here on
     // BL-521: synthetic pointer input, queued LAST so it outranks whatever the SDL
     // backend fed from the OS cursor above (ImGui applies queued events in order,
     // last write wins). A no-op outside the verify harness — see app.hpp
@@ -2608,7 +2755,7 @@ void app::render()
         ImGui::Render();
         SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
         SDL_RenderClear(m_renderer);
-        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+        render_imgui_scaled();
         s_frame_stats.mark_submit_end(*ImGui::GetDrawData());
         if (m_capture_requested)
         {
@@ -2797,10 +2944,6 @@ void app::render()
     // restores whichever tier was last active, wherever it was set.
     ui::draw_time_panel(m_ui, m_sim_loop, m_prev_speed, disp);
 
-    // In-app system menu (BL-070) — the corner gear + popup, extracted to
-    // ui::draw_system_menu (BL-361). Esc toggles the same popup (handle_key_down).
-    ui::draw_system_menu(m_ui, m_sim_loop, m_prev_speed, m_quit_requested, disp);
-
     // Corporation profile — top-left corner, above the navigation pane.
     ui::draw_profile_panel(m_world);
 
@@ -2818,6 +2961,9 @@ void app::render()
         // the top band that carried the mistake.
         const float header_right = ui::right_chrome_left(disp);
         ui::draw_header_panel(m_world, m_registry, m_balance_history, m_last_econ_report, header_left, header_right);
+        // The alert strip (BL-1515; LAYOUT.md § Alert strip): centred under the header.
+        ui::draw_alert_strip(m_world, m_registry, m_balance_history, m_last_econ_report, m_ui,
+                             header_left, header_right);
     }
 
     // Comms chat log (BL-205) — BL-227 re-homed it from the right chrome column
@@ -2859,6 +3005,7 @@ void app::render()
                               &m_ui.show_strategy_readout);
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
+    ui::set_quote_report(&m_last_econ_report);
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     // Market ledger — Goods and Trades. It takes a NON-CONST world and the recipe
     // registry because the Trades tab's potential-trade read prices real trade
@@ -2907,7 +3054,7 @@ void app::render()
     // live and untouched.
     // The Nation overview (BL-248; re-subjected to the nation by BL-1406) — nav
     // slot 1: how well the player's nation is doing, read off its treasury.
-    ui::draw_corporation_dashboard(m_world, m_registry, m_last_econ_report, m_ui,
+    ui::draw_corporation_dashboard(m_world, m_registry, m_last_econ_report, m_last_corp_standings, m_ui,
                                    m_ui.show_corporation_panel);
 
 
@@ -3629,6 +3776,34 @@ void app::render()
         m_ui.pending_front_order_tile = null_entity; // consume the request
     }
 
+    // Defend this province (BL-1504): the same menu's entry. One `defend_province` per
+    // unit, in the group's ascending id.
+    if (!m_ui.pending_defend_province.empty())
+    {
+        int applied = 0, refused = 0;
+        for (const auto& [unit, province] : m_ui.pending_defend_province)
+        {
+            corp_command cmd;
+            cmd.tick     = static_cast<int>(m_sim_loop.day_tick());
+            cmd.corp     = m_world.player_entity;
+            cmd.verb     = corp_verb::defend_province;
+            cmd.subject  = unit;
+            cmd.province = province;
+            const corp_command_result r = player_command(cmd);
+            (r == corp_command_result::applied || r == corp_command_result::rejected_state
+                 ? applied : refused) += 1;
+        }
+        const bool clearing = m_ui.pending_defend_province.front().second == no_province;
+        if (refused == 0)
+            m_ui.construction.last_message = clearing ? "No longer defending." : "Defending this province.";
+        else if (applied == 0)
+            m_ui.construction.last_message = "Can't defend this province: it holds no ground of yours.";
+        else
+            m_ui.construction.last_message = std::to_string(applied) + " defending, "
+                                           + std::to_string(refused) + " refused.";
+        m_ui.pending_defend_province.clear(); // consume the request
+    }
+
     // Assign to front (BL-1427): the unit card's and the unit group's menu — one
     // `assign_front` per unit, the group's units in ascending id.
     if (!m_ui.pending_front_assign.empty())
@@ -3686,7 +3861,7 @@ void app::render()
                     : (r == corp_command_result::rejected_state)
                         ? "You hold as many trades as a corporation may."
                     : (r == corp_command_result::rejected_placement)
-                        ? "Refused: no route reaches that market from here."
+                        ? "Refused: no route reaches that market from here, or a warring front closes it."
                         : "Refused: it must leave a market where you hold a Marketplace or Port, "
                           "go to a different market, carry a good trade carries, and have points above 0.";
                 break;
@@ -3809,13 +3984,50 @@ void app::render()
         ImGui::End();
     }
 
+    // The escape menu (BL-1519): over everything the canvas region holds, and under
+    // the Options window it opens.
+    {
+        std::string last_saved = "Not saved this session";
+        if (m_last_save_day >= 0)
+        {
+            const ui::fmt::calendar_date d =
+                ui::fmt::date_from_day(static_cast<uint64_t>(m_last_save_day));
+            last_saved = "Last saved " + std::to_string(d.year) + " " + ui::fmt::month_abbrev(d.month)
+                       + " " + ui::fmt::ordinal_day(d.day);
+        }
+        const ui::escape_menu_press press =
+            ui::draw_escape_menu(m_ui, m_show_options, last_saved.c_str());
+        if (press.save)
+            save_game_to(quick_save_path());
+        if (press.options)
+            m_show_options = !m_show_options;
+        if (press.exit_to_menu)
+            m_exit_to_menu_requested = true;
+        if (press.exit_game)
+            m_quit_requested = true;
+    }
+
     // F10 display / options window (BL-076). Self-contained; changes apply live to
     // the SDL window and persist to options.cfg immediately.
     if (m_show_options)
     {
-        ImGui::SetNextWindowPos(
-            ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
-        ImGui::SetNextWindowSize(ImVec2{320.0f, 0.0f}, ImGuiCond_Appearing);
+        // Opened from the escape menu it stands beside the menu's presses rather than
+        // on them, so the press that opened it can close it (the toggle rule).
+        if (m_ui.show_system_menu)
+        {
+            const ui::foldout_rect canvas = ui::canvas_rect();
+            ImGui::SetNextWindowPos(
+                ImVec2{canvas.x + canvas.w * 0.5f - 156.0f, canvas.y + canvas.h * 0.5f},
+                ImGuiCond_Appearing, ImVec2{1.0f, 0.5f});
+            // No size set: the right-edge pivot reads the window's real width. A set
+            // width would seat it from that width on every reopening, over the presses.
+        }
+        else
+        {
+            ImGui::SetNextWindowPos(
+                ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
+            ImGui::SetNextWindowSize(ImVec2{320.0f, 0.0f}, ImGuiCond_Appearing);
+        }
         if (ImGui::Begin("Options", &m_show_options,
                          ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
         {
@@ -3909,7 +4121,7 @@ void app::render()
     ImGui::Render();
     SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
     SDL_RenderClear(m_renderer);
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+    render_imgui_scaled();
     s_frame_stats.mark_submit_end(*ImGui::GetDrawData());
 
     // Capture before present so the screenshot is the exact composited frame.

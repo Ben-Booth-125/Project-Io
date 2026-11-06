@@ -1,5 +1,17 @@
 # REFINED — active worklist
 
+## Sprint 63 — UI, QOL and the opening (opened 2026-11-05)
+
+Scoped by Ben's 24-item playtest. The opening climb leads. Seven lanes run in worktrees; the main
+session merges them one at a time and takes one shared re-bless.
+
+### BL-1536 (quote obtainable)
+
+- [x] `world/site_quote`: price law on output, obtainable inputs, the plant's own bid under the reservation.
+- [x] Door and finder through `quote_for_tile`; hover names the good a starved row lacks.
+- [x] Census holdout: quoted when ordered, read a year after standing.
+- [ ] Live click (Ben).
+
 ## Sprint 62 — equal starts for majors (opened 2026-11-02, CLOSED 2026-11-04)
 
 **Closed.** Delivered BL-1475 (opening parity census), BL-1473 (major opening kit), BL-1474 (major

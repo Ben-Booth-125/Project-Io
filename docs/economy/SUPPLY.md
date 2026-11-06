@@ -203,6 +203,12 @@ price and the lane it flies are one answer. A neutral third nation's convoy is n
 **Default details, for Ben's review (2026-11-05).** With no route left, dispatch is refused with a
 surfaced reason. Cargo in flight with no route left returns to its origin.
 
+**A front moves the lane, not the cargo (default, for Ben's review, 2026-11-06).** A convoy whose lane
+re-solves under it goes on from the tile it stands on: its remaining time is the new lane's from there,
+so a detour costs what it takes, and the haul stays as paid. A convoy already past the front flies on.
+Only cargo with no lane on from where it stands returns, landing on its source market at once. Cargo
+with no lane on and none back, cut off behind a front, is lost.
+
 ## Infrastructure gates
 
 Mode is selected by the source/destination pair: inter-body → **space**; intra-body → a route of **legs**, land by default with a **sea** leg wherever a port-to-port crossing makes the whole route cheaper (§ Logistical cost — the *route* picks the legs, and a sea leg exists only where ports do). The gates per mode:

@@ -84,7 +84,7 @@ Six columns, **every one sortable** by its header, and **every header legible at
 | Column | Figure |
 |---|---|
 | **Place** | The row's identity: the named **population centre whose province holds the tile**, or, where no centre's province covers it, the nearest named centre on the body, read **"near X"**. There is no grid-position column (Ben, 2026-10-26): an x,y is an address only the map can read, and a place name is one the player already knows. A province has no name of its own (`../../GLOSSARY.md` § Province) but it is its centre's ground, so the centre names it; where a province holds two centres, the lower id names it, so the name is one answer. The row's press: it **selects the tile and frames it** on the map; the tile's Build door below places the building. The press is the whole row. Sorted by name, ties by tile id. |
-| **Net** | Est. net / qtr — `estimate_prospective_profit`, the door's own figure with the same assumptions (today's local prices, 50 % staffing, no labour shortage), **with the tile's Logistic Point cover applied** (below). Sign-coloured. The default sort, **descending**. |
+| **Net** | Est. net / qtr — `quote_site`, the door's own figure with the same assumptions (§ What the quote asks; 50 % staffing, no labour shortage), **with the tile's Logistic Point cover applied** (below). Sign-coloured. The default sort, **descending**. |
 | **Cost** | `construction_capex` — the flat cost times the site multiplier, paid once at placement, plus the materials at the local market's posted price, bought in arrears as each tick draws them (Ben, 2026-10-26: costs depend on market prices; PRODUCTION.md § Construction is measured in days). The hover splits the two halves and names the multiplier. |
 | **Market** | The market the tile clears in, by its city's name (`market_city_name`). |
 | **LP** | The tile's Logistic Point cover, 0–100 % (`lp_route_to(...).cover`). **Zero is the no-logistics flag** (`icons::no_logistics`, a struck truck, in amber), drawn in place of the figure — the flag is the zero, and the width a "0%" beside it took was the width the headers needed (Ben, 2026-10-26): no source both reaches the tile and is tied to the capital, so a building there would stand and not run. The hover says which — no source reaches it, or one does and has no chain to the capital. |
@@ -99,12 +99,32 @@ explains itself" rule.
 **Logistic Points are in the profit** (Ben, 2026-10-25: *"This should take into account logistics
 points also"*). A producing building is granted only its cover's share of its run, and the
 economy step folds that share into its labour, so output and the inputs that output takes fall with
-it while maintenance and wages do not. `estimate_prospective_profit` takes the cover as an argument
+it while maintenance and wages do not. The quote takes the cover as an argument
 and applies exactly that; the site ledger and the Build door both pass the tile's real cover, so a
 row and the door quote one figure. The estimate assumes the nation's pool itself is not short —
 that is the one part of the grant that is not a property of the tile. **Labour is not in the
 estimate** (it assumes no labour shortage, as the door always has), so the ledger carries no labour
 column.
+
+### What the quote asks
+
+The player's search is rewarded only if the figure is true, so the quote asks what the building
+would meet, not what the market posts today (`world/site_quote.hpp`; Ben, 2026-11-05: he kept the
+finder open, which rests the whole reward for searching on these figures).
+
+- **Output sells at the price it settles at.** Revenue is valued at `price_target`, the law clearing
+  itself aims at, with this building's output and the plants already under construction added to
+  the market's supply, against demand and the want the ceiling silenced. A good priced high because
+  nobody makes it stops reading as a fortune, and does not read as worthless either.
+- **Inputs are what the tile can get.** An input must be obtainable, from supply in reach or from
+  the market's shelf, and priced at its landed cost where a producer lands it. The plant's own shelf
+  must offer it at a price a plant pays, and the plant's own bid must not take it over that price.
+  This is what a plant would do, not the stricter test a rival builds by: a plant bids goods away
+  from other buyers, so a good with no spare output can still feed it.
+- **A plant that fails that test would likely stand idle** (`../../economy/MARKETS.md` § Settled: every draw BUYS). It quotes its upkeep alone, and the
+  hover names the good it is short of.
+
+The question is the door's and the finder's only. The rival scorer keeps its own glut forecast.
 
 **3. Lens.** Choosing a building arms the **placement lens** (`../LENSES.md` § The placement lens):
 the same tiles the table lists are marked on the map — green, amber with the struck truck where no
@@ -252,7 +272,7 @@ than a best-of-everything field.
 - **Estimated cost** — `compute_building_opex` (`budget_system.hpp`) over the same set, with `body_mean_habitability` feeding the workforce term.
 - **Build cost, arming, placement** — `recipe_registry::economics()` (`build_cost`, `resource_build_cost[]`) and `placement_rules::k_extractable`, read by the tile Selection card rather than here.
 - **Roster** — `player_building_groups` (`construction_panel.cpp`): every `is_player_owned` building, keyed by `building_group_name` (the Build door's own vocabulary — `extraction_building_name` for an extraction site, the active recipe's `group` for a processing facility, `building_type_name` otherwise). The per-building net is `estimate_building_profit(...).net()`, the SAME figure `rank_player_buildings_by_profit` ranks the Balance ledger on, so the two surfaces cannot report different profits for one building. A building the report cannot yet price contributes **zero** to its group's total, never a guess. Groups are walked in name order and members by net descending then entity id, so an unordered `world::buildings` cannot vary what a player or a check sees.
-- **Site ledger** — `construction_sites.cpp` (§ The site ledger): `can_place_in_world`, `construction_capex`, `construction_site_multiplier`, `estimate_prospective_profit` with the tile's `lp_route_to` cover, `market_for_tile` / `market_city_name`, the tile's deposit and reserve, and the row's place from `population_centre_tile` / `population_centre_name` through `provinces.province_of`.
+- **Site ledger** — `construction_sites.cpp` (§ The site ledger): `can_place_in_world`, `construction_capex`, `construction_site_multiplier`, `quote_for_tile` (`world/site_quote.hpp`) with the tile's `lp_route_to` cover, `market_for_tile` / `market_city_name`, the tile's deposit and reserve, and the row's place from `population_centre_tile` / `population_centre_name` through `provinces.province_of`.
 - **Progress circle and site card** — `read_construction_site` (`construction_panel.cpp`): `construction_build_days`, `construction_days_left`, `build_arrears_milli`, `resource_build_cost_for`, and `read_construction`'s per-good `short_of`.
 - **Per-building configuration** — `building_component::workforce_target`, `active_recipe_index` / `recipe`, written through `try_switch_recipe` and the workforce verbs from this ledger's levers. `decommissioned` is written from the building Selection card's action grid.
 

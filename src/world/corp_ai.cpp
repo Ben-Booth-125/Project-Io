@@ -449,6 +449,7 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::set_unit_obsolete: return "unit obsolete"; // BL-1437
         case corp_verb::refit_unit:    return "unit refit"; // 2026-10-27: never issued by a rival
         case corp_verb::assign_front:  return "front assignment"; // BL-1427
+        case corp_verb::defend_province: return "defend province"; // BL-1504
         case corp_verb::set_front_order: return "front order";    // BL-1427
         case corp_verb::set_unit_design: return "unit design";    // BL-1434: never issued by a rival
         case corp_verb::hire_wing:       return "hire wing";      // BL-1449
@@ -1366,6 +1367,36 @@ ranked_site_map rank_extraction_sites(const world& w, const recipe_registry& reg
 constexpr int64_t k_front_push_margin_num = 3;
 constexpr int64_t k_front_push_margin_den = 2;
 
+// BL-1504 (AI_OPPONENT.md § 11, "Defend province moves units", Ben 2026-11-05): the grant
+// and nothing wider. The nation's OWN idle units standing in its capital province, the
+// force § Fronts keeps home, defend it from where they stand. No other province is weighed;
+// the daily step is what reacts, and it plans nothing past the next move.
+void score_nation_defence(world& w, const recipe_registry& reg, entity_id nation, int tick)
+{
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end() || nit->second.capital_tile == null_entity)
+        return;
+    const uint32_t cap = w.provinces.province_of(nit->second.capital_tile);
+    if (cap == 0) // province_of: 0 is absent
+        return;
+    std::vector<entity_id> own;
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == nation && u.count > 0 && u.position != null_entity && u.front == null_entity
+            && u.defend_province == no_province && u.order.dest == null_entity
+            && w.provinces.province_of(u.position) == cap)
+            own.push_back(uid);
+    std::sort(own.begin(), own.end());
+    for (const entity_id uid : own)
+    {
+        if (unit_refitting(w.units.at(uid)) || unit_in_battle(w, uid))
+            continue;
+        corp_command cmd;
+        cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+        cmd.verb = corp_verb::defend_province; cmd.subject = uid; cmd.province = cap;
+        (void)apply_corp_command(w, reg, cmd); // a naval row is refused, and mutates nothing
+    }
+}
+
 void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation, int tick)
 {
     const std::vector<front> fronts = nation_fronts(w, nation); // a copy: the verbs below may re-anchor
@@ -1407,6 +1438,8 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         const unit_component& u = w.units.at(uid);
         if (u.front != null_entity || u.order.dest != null_entity || u.count <= 0
             || u.position == null_entity || unit_refitting(u) || unit_in_battle(w, uid))
+            continue;
+        if (u.defend_province != no_province) // BL-1504: it has its order
             continue;
         if (capital_prov != 0 && w.provinces.province_of(u.position) == capital_prov)
             continue;
@@ -2636,6 +2669,9 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // spectate), and score_nation_embargo refuses the seated player's nation itself.
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_embargo(w, reg, corp, tick, p.spectating);
+
+        if (actor.is_nation && tick >= k_campaign_settle_ticks)
+            score_nation_defence(w, reg, corp, tick); // BL-1504: before the front's assign
 
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_fronts(w, reg, corp, tick);

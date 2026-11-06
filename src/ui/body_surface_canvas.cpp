@@ -20,6 +20,7 @@
 #include "shell_metrics.hpp"     // right chrome column + minimap rect (BL-533 legend home)
 #include "ground_bake.hpp"      // k_tilt_sy: the one camera angle (BL-1246)
 #include "world/battle_system.hpp" // first_battle_in (BL-469 battle rung)
+#include "world/economy_system.hpp" // march_hop_fraction: the glide reads the march's own bank (BL-1507)
 #include "world/hex_neighbors.hpp"   // canonical odd-r neighbour offsets (BL-363)
 #include "world/logistics.hpp"       // intra_body_path (convoy vision beam, BL-152)
 #include "world/logistic_points.hpp" // BL-1352: the Throughput lens reads the REAL sources
@@ -43,6 +44,7 @@
 #include <iterator>
 #include <limits>
 #include <map>
+#include <set>
 #include <string>
 #include <tuple>
 #include <unordered_map>
@@ -1633,9 +1635,9 @@ void draw_supply_routes_key(const world& w, const std::vector<supply_edge>& edge
 /// the CORPORATION dispatcher's rules, worst first (LENSES.md § Trade-flow lens).
 /// The market-viability skill's logistics row classifies MARKET SHELF exports, a
 /// different dispatcher with its own order and its own labels; these are not those.
-constexpr int k_trade_refusal_count = 9;
+constexpr int k_trade_refusal_count = 10;
 constexpr const char* k_trade_refusal_name[k_trade_refusal_count] = {
-    "embargoed", "no lane", "price gate", "no route", "costly",
+    "embargoed", "no lane", "price gate", "no route", "front closed", "costly",
     "no propellant", "no room", "no funds", "room",
 };
 static_assert(static_cast<int>(trade_refusal::room) + 1 == k_trade_refusal_count,
@@ -1970,6 +1972,11 @@ std::vector<entity_id> order_units_of(const world& w, const ui_state& state)
     const auto it = w.units.find(state.selected_entity);
     if (it == w.units.end() || !is_player_side(w, it->second.owner))
         return out;
+    // BL-1508: the dragged group, while the band shows it (the units are pruned each frame).
+    if (state.selection_unit_group && !state.selected_units.empty()
+        && std::find(state.selected_units.begin(), state.selected_units.end(), state.selected_entity)
+               != state.selected_units.end())
+        return state.selected_units;
     if (!state.selection_unit_group)
     {
         out.push_back(state.selected_entity);
@@ -2614,6 +2621,7 @@ void update_body_vision(world& w, ui_state& state, double now_days)
 
     state.permanent_vision.clear();
     state.convoy_beams.clear();
+    state.convoy_markers.clear();
 
     const entity_id body = state.active_body;
     if (body == null_entity) return;
@@ -2727,7 +2735,17 @@ void update_body_vision(world& w, ui_state& state, double now_days)
     const entity_id me_lanes = player_actor(w); // BL-1406: convoys re-owned to the nation
     for (const auto& cv : w.convoys)
     {
-        if (cv.corp != me_lanes && cv.corp != w.player_entity) continue;
+        // BL-1506: a rival's convoy has a lane on the canvas too; the draw asks the fog.
+        // Its markers on another body cost no path read.
+        const bool lane_mine = cv.corp == me_lanes || cv.corp == w.player_entity;
+        if (!lane_mine)
+        {
+            const auto dm = w.markets.find(cv.dest_market);
+            const auto sm = w.markets.find(cv.source_market);
+            if (cv.arrived || dm == w.markets.end() || sm == w.markets.end()
+                || dm->second.body != body || sm->second.body != body)
+                continue;
+        }
         // BL-458: the endpoint resolution, the A* lookup and the lo->hi orientation
         // flip used to live inline here. They are now convoy_route_tiles
         // (world/logistics.hpp), because interdiction has to ask the SAME question
@@ -2754,9 +2772,24 @@ void update_body_vision(world& w, ui_state& state, double now_days)
             entry.route  = convoy_route_tiles(w, cv);
         }
         if (entry.route.body == body && !entry.route.tiles.empty())
-            state.convoy_beams.push_back(
-                { entry.route.tiles, std::clamp(cv.progress, 0.0f, 1.0f),
-                  std::max(cv.speed, 0.0f), entry.route.at });
+        {
+            if (lane_mine)
+                state.convoy_beams.push_back(
+                    { entry.route.tiles, std::clamp(cv.progress, 0.0f, 1.0f),
+                      std::max(cv.speed, 0.0f), entry.route.at });
+            if (!cv.arrived)
+            {
+                ui_state::convoy_marker m;
+                m.id       = cv.id;
+                m.owner    = cv.corp;
+                m.mine     = lane_mine;
+                m.progress = std::clamp(cv.progress, 0.0f, 1.0f);
+                m.speed    = cv.held ? 0.0f : std::max(cv.speed, 0.0f);
+                m.path     = entry.route.tiles;
+                m.at       = entry.route.at;
+                state.convoy_markers.push_back(std::move(m));
+            }
+        }
         live[cv.id] = std::move(entry);
     }
     s_lanes.swap(live); // convoys that arrived or were cut drop out of the cache
@@ -2987,6 +3020,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // A selection made elsewhere (a group row, a ledger) is ONE unit's card.
         state.selection_unit_group = false;
         state.province_sync_entity = state.selected_entity;
+        // BL-1508: a group row opens one unit of the group, and "< Group" comes back to
+        // it; anything outside the group retires it.
+        if (std::find(state.selected_units.begin(), state.selected_units.end(), state.selected_entity)
+            == state.selected_units.end())
+            state.selected_units.clear();
+    }
+    // BL-1508: a fallen unit leaves the group; a group of one is only that unit.
+    if (!state.selected_units.empty())
+    {
+        auto& su = state.selected_units;
+        su.erase(std::remove_if(su.begin(), su.end(), [&](entity_id u) {
+                     const auto uit = w.units.find(u);
+                     return uit == w.units.end() || uit->second.count <= 0;
+                 }), su.end());
+        if (su.size() < 2)
+            su.clear();
+        else if (std::find(su.begin(), su.end(), state.selected_entity) == su.end())
+        {
+            state.selected_entity      = su.front();
+            state.province_sync_entity = su.front();
+        }
     }
 
     // Clip to the grid area so hexes don't overdraw the title bar or the solar canvas.
@@ -3013,10 +3067,71 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // the DEFENDED TILE — BL-1443 — and draws on its `ground_tile`, read per
     // frame below.)
     static std::unordered_map<entity_id, std::vector<unit_marker_summary>> tile_units;
+
+    // THE MARCHING COUNTERS (BL-1507; MILITARY.md § Land — on the canvas: "travelling from
+    // tile centre to tile centre, at the pace the march is actually banking"). A unit with
+    // a next hop draws APART from its tile's stack, gliding along the hop; the sim still
+    // resolves the march tile by tile (`run_unit_march`). Read per frame, never written back.
+    // A unit in a live battle holds (its order waits), so it stands with its stack. Units
+    // on one hop at one pace are one counter, or a marching stack would read as a lone unit.
+    state.unit_glides.clear();
+    std::unordered_set<entity_id> gliding;
+    std::uint64_t glide_sig = 0; // order-independent: what the cached stacks exclude
+    {
+        const float day_frac = static_cast<float>(
+            std::max(0.0, state.sim_now_days) - std::floor(std::max(0.0, state.sim_now_days)));
+        std::vector<entity_id> marching;
+        for (const auto& [uid, uc] : w.units)
+            if (uc.count > 0 && uc.order.dest != null_entity)
+                marching.push_back(uid);
+        if (!marching.empty())
+        {
+            std::sort(marching.begin(), marching.end());
+            const std::set<entity_id> fighting = units_in_live_battles(w);
+            for (const entity_id uid : marching)
+            {
+                const unit_component& uc = w.units.at(uid);
+                if (fighting.count(uid) != 0)
+                    continue;
+                const auto here = w.tiles.find(uc.position);
+                if (here == w.tiles.end() || here->second.body != state.active_body
+                    || w.provinces.province_of(uc.position) == 0)
+                    continue;
+                const float t = march_hop_fraction(w, reg, uc, day_frac);
+                if (t < 0.0f)
+                    continue;
+                const entity_id next = uc.order.path[uc.order.next_index];
+                gliding.insert(uid);
+                glide_sig += (static_cast<std::uint64_t>(uid) + 1u)
+                           * (static_cast<std::uint64_t>(next) + 1u);
+                constexpr float k_same_pace = 0.03f;
+                unit_glide* same = nullptr;
+                for (unit_glide& g : state.unit_glides)
+                    if (g.owner == uc.owner && g.from == uc.position && g.to == next
+                        && std::fabs(g.t - t) <= k_same_pace)
+                    { same = &g; break; }
+                if (same != nullptr)
+                {
+                    same->ids.push_back(uid);
+                    continue;
+                }
+                unit_glide g;
+                g.ids.push_back(uid);
+                g.owner = uc.owner;
+                g.from  = uc.position;
+                g.to    = next;
+                g.t     = t;
+                state.unit_glides.push_back(std::move(g));
+            }
+        }
+    }
+    static std::uint64_t s_glide_sig = 0;
+
     const body_frame_stamp marker_stamp = make_body_frame_stamp(w, state.active_body);
-    if (!(marker_stamp == s_marker_stamp))
+    if (!(marker_stamp == s_marker_stamp) || glide_sig != s_glide_sig)
     {
         s_marker_stamp = marker_stamp;
+        s_glide_sig    = glide_sig;
         built_tiles.clear();
         tile_to_bld.clear();
         tile_to_corp.clear();
@@ -3081,6 +3196,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     continue;
                 if (w.provinces.province_of(uc.position) == 0)
                     continue;
+                if (gliding.count(uid) != 0)
+                    continue; // BL-1507: it draws apart, on its hop
                 std::vector<unit_marker_summary>& groups = tile_units[uc.position];
                 auto grp_it = std::find_if(groups.begin(), groups.end(),
                     [&](const unit_marker_summary& g) { return g.owner == uc.owner; });
@@ -3541,6 +3658,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const float  tilt_pivot = canvas_centre.y;
     const ImVec2 mouse_g    = { mouse.x,
                                 tilt_pivot + (mouse.y - tilt_pivot) / tilt_sy };
+    state.marker_tilt_sy    = tilt_sy;
+    state.marker_tilt_pivot = tilt_pivot;
 
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
     // overlap, and the cylinder draws several wrap copies of each tile, so more
@@ -6402,6 +6521,243 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         state.hovered_structure_kind = sk;
     }
 
+    // --- CONVOYS (BL-1506; SELECTION.md § The convoy element) --- a marker at each lane's
+    // head, gliding with the beam's clock. A press selects it; markers do not outrank a
+    // lens, so under one it takes no press (BL-664). A rival's draws only on ground the
+    // player's own vision lights (DISCOVERY.md), with the Resource lens's lifted fog not
+    // counting. Several on one tile draw as ONE marker with a count, the clutter guard: the
+    // press walks them, as the wing marker walks its wings. Off below the counters' zoom.
+    state.convoy_zones.clear();
+    if (draw_r >= 6.0f && !state.convoy_markers.empty())
+    {
+        const float frac = static_cast<float>(
+            std::fmod(std::max(0.0, state.sim_now_days), 90.0) / 90.0);
+        const float local_period = static_cast<float>(gw) * col_step;
+        struct head_mark { const ui_state::convoy_marker* m; float p; };
+        std::map<entity_id, std::vector<head_mark>> by_tile; // ascending: a stable pick
+        for (const ui_state::convoy_marker& m : state.convoy_markers)
+        {
+            const int n = static_cast<int>(m.path.size());
+            const float p = std::clamp(m.progress + m.speed * frac, 0.0f, 1.0f);
+            const int head = std::clamp(convoy_lane_index(m.at, p), 0, n - 1);
+            const entity_id ht = m.path[static_cast<std::size_t>(head)];
+            const auto tit = w.tiles.find(ht);
+            if (tit == w.tiles.end())
+                continue;
+            const int col = tit->second.grid_x, row = tit->second.grid_y;
+            if (!(survey_tile_visible(body.survey, gw, gh, col, row) || god_view_lift))
+                continue;
+            if (!m.mine && !god_view_lift)
+            {
+                if (!raster_ok || col < 0 || col >= gw || row < 0 || row >= gh
+                    || !(vision_raster[static_cast<std::size_t>(row) * gw + col] > 0.0f))
+                    continue;
+            }
+            by_tile[ht].push_back({ &m, p });
+        }
+        const float cr = std::clamp(draw_r * 0.24f, 6.0f, 12.0f);
+        for (auto& [tile, marks] : by_tile)
+        {
+            std::sort(marks.begin(), marks.end(), [](const head_mark& a, const head_mark& b) {
+                return a.m->id < b.m->id;
+            });
+            std::size_t lead = 0;
+            std::uint32_t next = marks.front().m->id;
+            bool selected = false, hovered = false;
+            for (std::size_t i = 0; i < marks.size(); ++i)
+            {
+                if (marks[i].m->id == state.selected_convoy)
+                {
+                    selected = true;
+                    lead = i;
+                    next = marks[(i + 1) % marks.size()].m->id;
+                }
+                hovered = hovered || marks[i].m->id == state.hovered_convoy;
+            }
+            const ui_state::convoy_marker& m = *marks[lead].m;
+            // The point along the lane: between the two tiles whose clock brackets p.
+            const std::size_t n = m.path.size();
+            const float p = marks[lead].p;
+            const std::size_t hi = std::min<std::size_t>(
+                static_cast<std::size_t>(std::lower_bound(m.at.begin(), m.at.end(), p) - m.at.begin()),
+                n - 1);
+            const std::size_t lo = hi > 0 ? hi - 1 : 0;
+            const auto ta = w.tiles.find(m.path[lo]);
+            const auto tb = w.tiles.find(m.path[hi]);
+            if (ta == w.tiles.end() || tb == w.tiles.end())
+                continue;
+            const float span = m.at[hi] - m.at[lo];
+            const float t = span > 0.0f ? std::clamp((p - m.at[lo]) / span, 0.0f, 1.0f) : 1.0f;
+            const ImVec2 a = hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size);
+            ImVec2       b = hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size);
+            if (b.x - a.x > local_period * 0.5f)       b.x -= local_period;
+            else if (a.x - b.x > local_period * 0.5f)  b.x += local_period;
+            const ImVec2 sc = to_screen({ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t });
+            if (sc.y < grid_area_origin.y - cr * 2.0f
+                || sc.y > grid_area_origin.y + grid_area_size.y + cr * 2.0f)
+                continue;
+            const ImU32 col = corp_identity(m.owner);
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const ImVec2 mp{ sc.x + static_cast<float>(k) * period_px, sc.y };
+                dl->AddCircleFilled(mp, cr, IM_COL32(14, 18, 26, 215));
+                if (selected || hovered)
+                    dl->AddCircle(mp, cr + 1.0f, selected ? palette::selection : palette::hover, 0, 2.0f);
+                else
+                    dl->AddCircle(mp, cr, col, 0, 1.0f);
+                icons::convoy(dl, mp, cr * 0.72f, col);
+                if (marks.size() > 1)
+                {
+                    char num[8];
+                    std::snprintf(num, sizeof num, "%d", static_cast<int>(marks.size()));
+                    dl->AddText({ mp.x + cr * 0.75f, mp.y - cr * 1.35f }, IM_COL32(236, 240, 248, 255), num); // fit-exempt: a marker's count, beside its own glyph
+                }
+                ui_state::convoy_zone z;
+                z.id     = next;
+                z.centre = mp;
+                z.radius = cr * 1.25f;
+                z.x      = mp.x;
+                z.y      = tilt_pivot + (mp.y - tilt_pivot) * tilt_sy;
+                z.count  = static_cast<int>(marks.size());
+                z.mine   = m.mine;
+                state.convoy_zones.push_back(z);
+            }
+        }
+    }
+    {
+        // Hover: the nearest marker under the pointer, with no lens (BL-664). One frame
+        // behind, as every hover read here is.
+        state.hovered_convoy = 0;
+        if (state.overlay == overlay_mode::none)
+        {
+            float best = std::numeric_limits<float>::max();
+            for (const ui_state::convoy_zone& z : state.convoy_zones)
+            {
+                const float dx = mouse_g.x - z.centre.x, dy = mouse_g.y - z.centre.y;
+                const float d2 = dx * dx + dy * dy;
+                if (d2 <= z.radius * z.radius && d2 < best)
+                {
+                    best = d2;
+                    state.hovered_convoy = z.id;
+                }
+            }
+        }
+    }
+
+    // --- MARCHING COUNTERS (BL-1507) --- drawn over the tile pass, each at its point on
+    // the hop, with the counter's own anchor below the centre so a march starts and ends
+    // on the spot a standing counter holds. The hit zone follows the drawn point. A march
+    // past the survey is not drawn. Where its own side still stands on the tile it left,
+    // the counter opens a third of a hop ahead so the two never sit one on the other.
+    if (draw_r >= 6.0f)
+    {
+        const float local_period = static_cast<float>(gw) * col_step;
+        const float ur = std::max(9.0f, draw_r * 0.36f);
+        for (unit_glide& g : state.unit_glides)
+        {
+            const auto ta = w.tiles.find(g.from);
+            const auto tb = w.tiles.find(g.to);
+            if (ta == w.tiles.end() || tb == w.tiles.end())
+                continue;
+            if (!(survey_tile_visible(body.survey, gw, gh, ta->second.grid_x, ta->second.grid_y)
+                  || god_view_lift))
+                continue;
+            bool stack_behind = false;
+            if (const auto st = tile_units.find(g.from); st != tile_units.end())
+                for (const unit_marker_summary& s : st->second)
+                    if (s.owner == g.owner) stack_behind = true;
+            const float t = stack_behind ? 0.35f + 0.65f * g.t : g.t;
+            const ImVec2 a = hex_local_centre(ta->second.grid_x, ta->second.grid_y, hex_size);
+            ImVec2       b = hex_local_centre(tb->second.grid_x, tb->second.grid_y, hex_size);
+            // The hop across the seam goes the short way round the cylinder.
+            if (b.x - a.x > local_period * 0.5f)       b.x -= local_period;
+            else if (a.x - b.x > local_period * 0.5f)  b.x += local_period;
+            const ImVec2 sc = to_screen({ a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t });
+            const float  uy = sc.y + draw_r * 0.50f;
+            if (uy < grid_area_origin.y - ur * 2.0f
+                || uy > grid_area_origin.y + grid_area_size.y + ur * 2.0f)
+                continue;
+            int men = 0;
+            long long est = 0, ready = 0;
+            for (const entity_id uid : g.ids)
+            {
+                const unit_component& uc = w.units.at(uid);
+                men   += uc.count;
+                est   += unit_establishment(uc);
+                ready += static_cast<long long>(uc.count) * uc.readiness_permille;
+            }
+            const float hp = est > 0 ? static_cast<float>(men) / static_cast<float>(est) : 0.0f;
+            const float rd = men > 0 ? static_cast<float>(ready) / static_cast<float>(men) / 1000.0f : 0.0f;
+            const bool hovered = state.overlay == overlay_mode::none
+                              && state.hovered_entity == g.ids.front();
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const ImVec2 mpos{ sc.x + static_cast<float>(k) * period_px, uy };
+                icons::unit_counter(dl, mpos, ur, corp_identity(g.owner),
+                                    static_cast<int>(g.ids.size()), hp, rd,
+                                    /*show_bars=*/g.owner == player_owner, hovered);
+                marker_hit_zone hz;
+                hz.id     = g.ids.front();
+                hz.kind   = marker_hit_zone::kind::unit;
+                hz.centre = mpos;
+                hz.radius = ur * 1.3f;
+                state.marker_hit_zones.push_back(hz);
+                if (k == k_min)
+                {
+                    g.x = mpos.x;
+                    g.y = tilt_pivot + (mpos.y - tilt_pivot) * tilt_sy; // the camera's squash: a screen point
+                }
+            }
+        }
+    }
+
+    // The units one counter stands for (BL-1508): the marching counter's own, or the
+    // owner's standing units on the tile. Ascending.
+    const auto counter_units = [&](entity_id sample) {
+        std::vector<entity_id> out;
+        for (const unit_glide& g : state.unit_glides)
+            if (g.ids.front() == sample)
+                return g.ids;
+        const auto sit = w.units.find(sample);
+        if (sit == w.units.end())
+            return out;
+        for (const auto& [uid, uc] : w.units)
+            if (uc.count > 0 && uc.position == sit->second.position
+                && uc.owner == sit->second.owner && gliding.count(uid) == 0)
+                out.push_back(uid);
+        std::sort(out.begin(), out.end());
+        return out;
+    };
+
+    // THE DRAGGED GROUP, ON THE MAP (BL-1508): every counter holding one of its units
+    // carries the selection's outline, so a group across tiles reads where it stands.
+    if (!state.selected_units.empty())
+    {
+        for (const marker_hit_zone& hz : state.marker_hit_zones)
+        {
+            if (hz.kind != marker_hit_zone::kind::unit || w.units.count(hz.id) == 0)
+                continue;
+            bool lit = false;
+            for (const entity_id uid : counter_units(hz.id))
+                lit = lit || std::binary_search(state.selected_units.begin(),
+                                                state.selected_units.end(), uid);
+            if (!lit)
+                continue;
+            const float ur = hz.radius / 1.3f;
+            dl->AddRect({ hz.centre.x - ur * 1.1f - 2.0f, hz.centre.y - ur * 0.75f - 2.0f },
+                        { hz.centre.x + ur * 1.1f + 2.0f, hz.centre.y + ur * 0.75f + 2.0f },
+                        palette::selection, 2.0f, 0, 2.0f);
+        }
+    }
+
     // --- FRONTS (BL-1427; MILITARY.md § Fronts, SELECTION.md § The front element) ---
     // The PLAYER's fronts: a line along every shared hex edge between a span tile
     // and the neighbour's ground, in the colour of the player's stance toward that
@@ -7634,6 +7990,72 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // justifications and the price before anything is sent - rather than a
     // one-line confirm that declared blind. See the right-click block below.
 
+    // THE DRAG (BL-1508; SELECTION.md § The dragged group). The press that opens it is in
+    // the click path below; here it is drawn and ended, ahead of the input gate, so a band
+    // let go over a panel still ends. Every own counter inside the box joins the group;
+    // Shift adds to the group already held, and a shift-press with no drag adds the own
+    // counter under it. A drag over nothing of the player's leaves what the press selected.
+    if (state.unit_drag.pressed)
+    {
+        const ImVec2 g0{ state.unit_drag.x0,
+                         tilt_pivot + (state.unit_drag.y0 - tilt_pivot) / tilt_sy };
+        const float mdx = mouse.x - state.unit_drag.x0, mdy = mouse.y - state.unit_drag.y0;
+        if (mdx * mdx + mdy * mdy > 36.0f)
+            state.unit_drag.band = true; // six pixels: a shaky press stays a press
+        const ImVec2 bmin{ std::min(g0.x, mouse_g.x), std::min(g0.y, mouse_g.y) };
+        const ImVec2 bmax{ std::max(g0.x, mouse_g.x), std::max(g0.y, mouse_g.y) };
+        if (state.unit_drag.band)
+        {
+            dl->AddRectFilled(bmin, bmax, IM_COL32(120, 190, 255, 36));
+            dl->AddRect(bmin, bmax, palette::selection, 0.0f, 0, 1.5f);
+        }
+        if (!ImGui::IsMouseDown(ImGuiMouseButton_Left))
+        {
+            std::set<entity_id> gathered;
+            bool any = false;
+            for (const marker_hit_zone& hz : state.marker_hit_zones)
+            {
+                if (hz.kind != marker_hit_zone::kind::unit)
+                    continue;
+                const auto uit = w.units.find(hz.id);
+                if (uit == w.units.end() || !is_player_side(w, uit->second.owner))
+                    continue;
+                bool in = false;
+                if (state.unit_drag.band)
+                    in = hz.centre.x >= bmin.x && hz.centre.x <= bmax.x
+                      && hz.centre.y >= bmin.y && hz.centre.y <= bmax.y;
+                else if (state.unit_drag.shift)
+                {
+                    const float dx = mouse_g.x - hz.centre.x, dy = mouse_g.y - hz.centre.y;
+                    in = dx * dx + dy * dy <= hz.radius * hz.radius;
+                }
+                if (!in)
+                    continue;
+                any = true;
+                const std::vector<entity_id> members = counter_units(hz.id);
+                gathered.insert(members.begin(), members.end());
+            }
+            if (any)
+            {
+                if (state.unit_drag.shift)
+                    for (const entity_id uid : order_units_of(w, state))
+                        gathered.insert(uid);
+                state.clear_battle_selection();
+                state.clear_lens_region_selection();
+                state.clear_front_selection();
+                state.selected_province    = 0u;
+                state.selection_cycle_tile = null_entity;
+                state.selected_units.assign(gathered.begin(), gathered.end());
+                state.selected_entity      = state.selected_units.front();
+                state.selection_unit_group = state.selected_units.size() > 1;
+                state.province_sync_entity = state.selected_entity;
+                if (state.selected_units.size() < 2)
+                    state.selected_units.clear();
+            }
+            state.unit_drag = {};
+        }
+    }
+
     if (!input_enabled)
     {
         apply_camera();
@@ -7966,8 +8388,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 state.pending_march_dest_tile = hovered_tile;
             }
         }
+        else if (!state.construction.active && ImGui::GetIO().KeyShift
+                 && state.overlay == overlay_mode::none && !declaring)
+        {
+            // BL-1508: a shift-press holds the selection for the drag or the add to
+            // come, at the release above. It selects nothing itself.
+            state.unit_drag = { true, true, false, mouse.x, mouse.y };
+        }
         else if (!state.construction.active)
         {
+            // BL-1508: any press retires the dragged group, and may open the next drag.
+            // Armed picks took their branches above, and a lens collapses selection to
+            // one tier, so neither ever gathers units.
+            state.selected_units.clear();
+            if (state.overlay == overlay_mode::none && !declaring)
+                state.unit_drag = { true, false, false, mouse.x, mouse.y };
+
             // WHICH RULE APPLIES IS DECIDED FIRST (BL-664, Ben 2026-08-28),
             // because these are two different resolutions rather than one with an
             // exception. SELECTION.md § A lens collapses selection to ONE TIER is
@@ -8019,6 +8455,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             else if (marker_hit != null_entity && w.tiles.count(marker_hit) != 0)
                 marker_hit = null_entity; // a stacked hex's zone carries its tile: same fall-through
 
+            // BL-1506: A CONVOY MARKER. A counter stands in front of it; it stands in
+            // front of the front line and the ground. Non-entity, in its own field.
+            const std::uint32_t convoy_hit =
+                (!lensed && marker_hit == null_entity) ? state.hovered_convoy : 0u;
+            state.selected_convoy = 0; // every press retires the channel; the hit sets it below
+
             // STRUCTURE-GRAIN selection (BL-601), between the markers and the
             // tile/province fallback. With no lens a marker is a specific thing
             // the player aimed at and still outranks a boundary; a boundary in
@@ -8041,14 +8483,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // sits further in, so the band is still reached a little inside each
             // side. The front pass set `hovered_front_key` only on the plain canvas
             // and only where no counter is under the pointer.
-            const bool front_press = !lensed && marker_hit == null_entity
+            const bool front_press = !lensed && marker_hit == null_entity && convoy_hit == 0u
                                   && state.hovered_front_key != null_entity;
             if (!front_press)
                 state.clear_front_selection(); // every other press clears the channel
 
             structure_kind struct_kind = structure_kind::nation;
             entity_id structure_hit =
-                (marker_hit == null_entity && !front_press)
+                (marker_hit == null_entity && !front_press && convoy_hit == 0u)
                     ? resolve_structure_hit(state.structure_hit_zones, mouse_g.x, mouse_g.y,
                                             &struct_kind) // ground space, as hover asks
                     : null_entity;
@@ -8192,7 +8634,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
-            if (front_press)
+            if (convoy_hit != 0u)
+            {
+                // The convoy: every other channel cleared, the cycle anchor dropped.
+                state.selected_entity       = null_entity;
+                state.selected_province     = 0u;
+                state.province_sync_entity  = null_entity;
+                state.selection_cycle_tile  = null_entity;
+                state.selection_unit_group  = false;
+                state.clear_battle_selection();
+                state.clear_lens_region_selection();
+                state.selected_convoy       = convoy_hit;
+            }
+            else if (front_press)
             {
                 // The front is a non-entity selection: (nation, key) in its own
                 // fields, every other channel cleared, the cycle anchor dropped.
@@ -8265,6 +8719,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     close_all_panels(state);
                     state.show_market_ledger = true;
                 }
+                // BL-1511 (LENSES.md § The Nations lens): under that lens a press on a
+                // nation also navigates the Diplomacy ledger to it, opening it if closed.
+                if (struct_kind == structure_kind::nation && state.overlay == overlay_mode::nations)
+                    navigate_diplomacy_to(w, state, structure_hit);
                 // BL-1406: the corporation and company destinations (the stance
                 // table, the Acquisitions ledger) retired with the firms.
             }
@@ -8392,6 +8850,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // A press on a counter opens the GROUP it draws (Ben, 2026-10-27;
                 // SELECTION.md § The unit group element); one unit, its card.
                 state.selection_unit_group = w.units.count(state.selected_entity) != 0;
+                // BL-1507: a marching counter stands for its own units, not the stack
+                // it has left on the tile.
+                for (const unit_glide& g : state.unit_glides)
+                    if (g.ids.front() == state.selected_entity)
+                        state.selection_unit_group = false;
                 // BL-598: the mirror, not a rival selection. A click that lands
                 // on the TILE carries its province (the tile element has the
                 // sections that read it); a marker hit does not, because a
