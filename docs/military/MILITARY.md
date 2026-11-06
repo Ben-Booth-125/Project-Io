@@ -1380,13 +1380,17 @@ its province would guard nothing. A capital province that is also a border provi
 capital rule. Neither post is the province's lowest-id tile, which is its id rather than its place
 (BL-1145, a province's readers take its anchor).
 
-**A garrison is posted only where its network covers (Ben, 2026-10-29).** Each post above is chosen
-among the province's tiles that its nation's Logistic Point cover reaches at the handoff — on the
-network or within the 8-tile off-road draw (§ Carried supplies) — by the
-same rule (the anchor centre; the tile facing the neighbour). A province with no covered tile posts
-its garrison on the covered tile of the nation's own ground nearest the post the rule would have
-chosen, ties to the lowest tile id. A nation's opening army therefore starts fed (§ Carried
-supplies).
+**A garrison is posted only where its network feeds it whole (Ben, 2026-10-29; "whole", 2026-11-05).**
+Each post above is chosen among the province's tiles where its nation's supply claim is met in full
+at the handoff, by the same rule (the anchor centre; the tile facing the neighbour). The test is the
+claim's own: the tile the unit pays at (its own, or the closest road within the 8-tile off-road draw,
+§ Carried supplies) stands at full routed cover. Being reached is not enough, because a claim's share
+is the cover where it pays, and a share of a tenth starves a unit within two quarters. A province
+with no such tile posts its garrison on the nearest such tile of the nation's own ground, ties to the
+lowest tile id. A nation whose ground feeds it whole nowhere posts it on the nearest ground the draw
+reaches. A garrison's opening share is read off the tile it ends on, never assumed. A nation's
+opening army therefore starts fed (§ Carried supplies), for as long as its nation's sources run and
+its pool lasts.
 
 **Every capital is generated with a military base (Ben, 2026-10-27).** Each nation, major or minor,
 opens owning one completed `military_base` on its own ground in its capital province, on the legal

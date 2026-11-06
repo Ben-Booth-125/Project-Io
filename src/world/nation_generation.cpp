@@ -2494,22 +2494,78 @@ void print_major_armies(const major_army_report& r)
     std::fflush(stdout);
 }
 
+namespace {
+
+/// The tiles @p nation's network reaches on @p body, as a claim reads it; memoised.
+const std::unordered_set<entity_id>& reached_by(world& w, unit_draw_memo& memo, entity_id nation,
+                                                entity_id body)
+{
+    auto rit = memo.reached.find({nation, body});
+    if (rit == memo.reached.end())
+        rit = memo.reached.emplace(std::make_pair(nation, body),
+                                   lp_reached_tiles(w, memo.lp, nation, body)).first;
+    return rit->second;
+}
+
+} // namespace
+
 bool unit_tile_drawable(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile)
 {
     const auto memo_hit = memo.drawable.find({nation, tile});
     if (memo_hit != memo.drawable.end())
         return memo_hit->second;
-    const bool found = unit_tile_within_draw(w, nation, tile, [&](entity_id t) {
-        const auto c = memo.cover.find(t);
-        if (c != memo.cover.end())
-            return c->second;
-        const bool v = lp_coverage_at(w, memo.lp, t) > 0.0f;
-        memo.cover.emplace(t, v);
-        return v;
+    // BL-1501: the reach is THIS nation's, as the claim reads it (`lp_reached_tiles`). It read
+    // `lp_coverage_at`, which answers for whoever holds the tile, so a walk over the border
+    // read a neighbour's network as this nation's and missed this nation's own road there.
+    const auto tit = w.tiles.find(tile);
+    const std::unordered_set<entity_id>* reached = nullptr;
+    if (tit != w.tiles.end())
+        reached = &reached_by(w, memo, nation, tit->second.body);
+    const bool found = reached != nullptr && unit_tile_within_draw(w, nation, tile, [&](entity_id t) {
+        return reached->count(t) != 0;
     });
     memo.drawable.emplace(std::make_pair(nation, tile), found);
     return found;
 }
+
+bool unit_tile_fully_fed(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile)
+{
+    const auto hit = memo.fed.find({nation, tile});
+    if (hit != memo.fed.end())
+        return hit->second;
+    bool fed = false;
+    if (const auto tit = w.tiles.find(tile); tit != w.tiles.end())
+    {
+        const entity_id body = tit->second.body;
+        const std::unordered_set<entity_id>& reached = reached_by(w, memo, nation, body);
+        const entity_id paid = unit_supply_draw_tile(
+            w, [&](entity_id t) { return reached.count(t) != 0; }, tile, lp_offroad_draw_steps);
+        // The resolver's tolerance on a share (`k_share_eps`): a summed cover a hair under
+        // one is a whole share there, so it is whole here.
+        fed = paid != null_entity && lp_route_to(w, memo.lp, nation, body, paid).cover >= 1.0f - 1e-5f;
+    }
+    memo.fed.emplace(std::make_pair(nation, tile), fed);
+    return fed;
+}
+
+namespace {
+
+/// The share a unit of @p nation on @p tile is granted while its pool lasts, in the
+/// resolver's per-mille: the cover at the tile it pays at, 0 past its roads.
+int garrison_share_on(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return 0;
+    const entity_id paid = unit_supply_draw_tile(w, memo.lp, nation, tile);
+    if (paid == null_entity)
+        return 0;
+    const float cover = lp_route_to(w, memo.lp, nation, tit->second.body, paid).cover;
+    return cover >= 1.0f - 1e-5f ? 1000
+                                 : std::clamp(static_cast<int>(std::floor((cover + 1e-5f) * 1000.0f)), 0, 1000);
+}
+
+} // namespace
 
 garrison_repost_report repost_garrisons_on_cover(world& w, const military_capability_params* mil)
 {
@@ -2522,16 +2578,24 @@ garrison_repost_report repost_garrisons_on_cover(world& w, const military_capabi
               });
 
     unit_draw_memo memo;
-    // A post must be dry ground of the garrison's own nation that its supply can be
-    // drawn to (`unit_tile_drawable`, the one placement predicate).
-    const auto covered = [&](entity_id nation, entity_id t) {
+    // A post must be dry ground of the garrison's own nation. BL-1501: and it must FEED the
+    // garrison whole (`unit_tile_fully_fed`, the claim's own two steps), or a garrison "fed"
+    // at the far edge of a hub's fade is granted a tenth of its food and starves within two
+    // quarters (measured: 15-31 starving at the first live quarter on seeds 0, 12, 28, 46,
+    // every one short by cover and none by pool). Only where a nation's ground feeds nothing
+    // whole does the draw alone serve, and that post's share is the cover it gets.
+    const auto own_dry = [&](entity_id nation, entity_id t) {
         const auto tit = w.tiles.find(t);
         if (tit == w.tiles.end() || is_water(tit->second.substrate))
             return false;
         const auto own = w.tile_to_nation.find(t);
-        if (own == w.tile_to_nation.end() || own->second != nation)
-            return false;
-        return unit_tile_drawable(w, memo, nation, t);
+        return own != w.tile_to_nation.end() && own->second == nation;
+    };
+    const auto covered = [&](entity_id nation, entity_id t) {
+        return own_dry(nation, t) && unit_tile_fully_fed(w, memo, nation, t);
+    };
+    const auto drawable = [&](entity_id nation, entity_id t) {
+        return own_dry(nation, t) && unit_tile_drawable(w, memo, nation, t);
     };
     // The covered tile of @p tiles (ascending) nearest @p from, ties to the lowest id.
     const auto nearest = [&](entity_id nation, const std::vector<entity_id>& tiles, entity_id from,
@@ -2583,10 +2647,19 @@ garrison_repost_report repost_garrisons_on_cover(world& w, const military_capabi
                     return false;
             return true;
         };
+        const auto postable_drawn = [&](entity_id nation, entity_id t) {
+            if (!drawable(nation, t))
+                return false;
+            if (walled)
+                if (const auto tt = w.tiles.find(t); tt != w.tiles.end() && walled(tt->second))
+                    return false;
+            return true;
+        };
         const entity_id rule_post = u.position;
         if (covered(g.nation, rule_post))
         {
             ++rep.already_covered;
+            u.lp_share_permille = 1000; // fed whole here, whatever the settle's cover was
             continue;
         }
         const province* pr = w.provinces.find(g.province);
@@ -2635,17 +2708,43 @@ garrison_repost_report repost_garrisons_on_cover(world& w, const military_capabi
             to = nearest(g.nation, own, rule_post, postable);
             if (to != null_entity)
                 ++rep.moved_off_province;
+            // NOWHERE FEEDS IT WHOLE: the nearest ground its supply can be drawn to at all,
+            // its own post first. Counted: this garrison opens short, and says so.
+            if (to == null_entity)
+            {
+                to = postable_drawn(g.nation, rule_post) ? rule_post
+                                                         : nearest(g.nation, own, rule_post, postable_drawn);
+                if (to != null_entity)
+                    ++rep.part_fed;
+            }
         }
         if (to == null_entity)
         {
             ++rep.uncovered;
+            u.lp_share_permille = 0; // past its roads, and the share says so
             continue;
         }
         u.position = to;
-        // It now stands where its nation's cover reaches in full: its road share is
-        // whole until the next quarter's draw resolves it (a share granted on the tile
-        // it left would otherwise starve it for a quarter on ground that feeds it).
-        u.lp_share_permille = 1000;
+        // BL-1501: THE SHARE IS READ, NEVER ASSERTED. What the first quarter's claim is granted
+        // on this tile while the pool lasts - whole on a post that feeds it, the cover where
+        // nothing does (a share left from the tile it quit would starve it on ground that
+        // feeds it; a share of 1000 here would hide a shortfall for a quarter).
+        u.lp_share_permille = garrison_share_on(w, memo, g.nation, to);
+        // What the rule cost the border: a garrison guards only through its own tile's
+        // neighbours, so one fed further in has stopped guarding. Counted, never undone.
+        if (g.guarded != null_entity)
+        {
+            bool faces = false;
+            for (int side = 0; side < 6 && !faces; ++side)
+            {
+                const entity_id nb = garrison_neighbour_tile(w, to, side);
+                if (nb == null_entity)
+                    continue;
+                const auto tn = w.tile_to_nation.find(nb);
+                faces = tn != w.tile_to_nation.end() && tn->second == g.guarded;
+            }
+            rep.border_unfaced += faces ? 0 : 1;
+        }
     }
     return rep;
 }
@@ -2653,10 +2752,11 @@ garrison_repost_report repost_garrisons_on_cover(world& w, const military_capabi
 void print_garrison_repost(const garrison_repost_report& g)
 {
     std::printf("[garrisons on cover] %d garrison(s): %d on a front (left), %d in a battle (left), "
-                "%d already covered, %d re-posted in province, %d on the nation's nearest covered "
-                "tile, %d with no covered ground (left)\n",
+                "%d already fed whole, %d re-posted in province, %d on the nation's nearest ground "
+                "that feeds them, %d only part fed, %d with no covered ground (left); %d border "
+                "garrison(s) moved off the neighbour they guard\n",
                 g.garrisons, g.on_front, g.in_battle, g.already_covered, g.moved_in_province,
-                g.moved_off_province, g.uncovered);
+                g.moved_off_province, g.part_fed, g.uncovered, g.border_unfaced);
     std::fflush(stdout);
 }
 
