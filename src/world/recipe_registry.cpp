@@ -265,6 +265,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
         // never shift; it must name no inputs and no outputs — a retired row
         // that still trades is authored nonsense, refused rather than ignored.
         r.retired = entry->get_or("retired", false);
+        r.research_opened = entry->get_or("research_opened", false);
         if (r.retired)
             for (std::size_t k = 0; k < resource_count; ++k)
                 if (r.inputs[k] != 0.0f || r.outputs[k] != 0.0f)

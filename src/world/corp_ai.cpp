@@ -879,6 +879,17 @@ pending_output_map pending_plant_output(const world& w, const recipe_registry& r
     return out;
 }
 
+/// The quarters an authored build spans, by the arithmetic the construction gate uses
+/// (`construction_build_ticks` at a site multiplier of 1). A duration is authored in days
+/// and need not be a whole number of quarters, and a 120-day site gates for two ticks,
+/// so a truncating cast would read its horizon one quarter short.
+static int authored_build_ticks(const building_economics& e)
+{
+    const int q    = k_construction_quarter_days;
+    const int days = std::max(0, static_cast<int>(std::lround(e.build_duration_ticks * static_cast<float>(q))));
+    return (days + q - 1) / q;
+}
+
 float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
                                float added_rate_per_tick, int horizon_ticks,
                                const corp_ai_params& p, const pending_output_map* pending)
@@ -2938,7 +2949,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 // export_corp_blackboard shows a rival (BL-068).
                 const float added_rate = ex.base_rate * rich * wf * (1.0f - tc.hazard_level)
                                        * stack_scalar;
-                const int   horizon    = static_cast<int>(ex.build_duration_ticks) + p.forecast_clearing_ticks;
+                const int   horizon    = authored_build_ticks(ex) + p.forecast_clearing_ticks;
                 float       glut       = forecast_glut_multiplier(w, s.tile, s.target, added_rate, horizon, p, &pending_out());
                 // BL-1227, the chain start (AI_OPPONENT.md § 11): a mine vetoed
                 // ONLY by the zero-bid rule is held back, not dropped — it is
@@ -3091,7 +3102,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             own_tiles.erase(std::unique(own_tiles.begin(), own_tiles.end()), own_tiles.end());
             std::sort(tiles_with_processor.begin(), tiles_with_processor.end());
 
-            const int   n_recipes = reg.recipe_count(building_type::processing_facility);
+            const int   n_recipes = reg.play_recipe_count(building_type::processing_facility);
             const float wf        = 0.5f; // construct_building staffs at 0.5, as above
             const float batches   = pe.base_rate * wf;
 
@@ -3180,7 +3191,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 std::map<std::string, std::pair<uint16_t, float>> group_best;
                 for (int i = 0; i < n_recipes; ++i)
                 {
-                    const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+                    const recipe&  rc  = reg.play_recipe_at(building_type::processing_facility, i);
                     const uint16_t rid = reg.recipe_id(rc.name);
                     const recipe*  abs = reg.get_recipe(rid);
                     if (abs == nullptr)
@@ -3292,7 +3303,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         if (!placement_rules::can_place_in_world(w, tile, building_type::processing_facility, ort))
                             continue;
                         const float out_rate = abs->outputs[static_cast<std::size_t>(ort)] * batches;
-                        const int   out_hz   = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
+                        const int   out_hz   = authored_build_ticks(pe) + p.forecast_clearing_ticks;
                         if (forecast_glut_multiplier(w, tile, ort, out_rate, out_hz, p, &pending_out()) <= 0.0f)
                             continue;
                         if (!construction_materials_obtainable(w, reg, reach(), standing(), tile,
@@ -3326,7 +3337,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // the chosen candidate's score below.
                     {
                         const float added_rate = abs->outputs[static_cast<std::size_t>(rt)] * batches;
-                        const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
+                        const int   horizon    = authored_build_ticks(pe) + p.forecast_clearing_ticks;
                         if (forecast_glut_multiplier(w, tile, rt, added_rate, horizon, p, &pending_out()) <= 0.0f)
                             continue;
                     }
@@ -3386,7 +3397,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     const float capex      = std::max(1.0f, construction_capex(   // BL-1066
                         w, reg, tile, building_type::processing_facility, target, best_recipe));
                     const float added_rate = primary_q * batches;
-                    const int   horizon    = static_cast<int>(pe.build_duration_ticks) + p.forecast_clearing_ticks;
+                    const int   horizon    = authored_build_ticks(pe) + p.forecast_clearing_ticks;
                     const float glut       = forecast_glut_multiplier(w, tile, target, added_rate, horizon, p, &pending_out());
                     if (glut <= 0.0f)
                         continue; // forecast hard glut — veto, as the extraction half does
@@ -3914,7 +3925,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 float cur_margin = 0.0f;
                 (void)recipe_margin_obtainable(w, reg, reach(), b.tile, b.recipe, sw_pool,
                                                sw_batches, bid, cur_margin);
-                const int   n          = reg.recipe_count(building_type::processing_facility);
+                const int   n          = reg.play_recipe_count(building_type::processing_facility);
                 uint16_t best_id = b.recipe;
                 float    best_m  = cur_margin;
                 for (int i = 0; i < n; ++i)
@@ -3929,10 +3940,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     // neither this era's roster nor the whole registry: it could
                     // propose an out-of-band recipe and could never see one whose
                     // absolute id sits past the browse count.
-                    const recipe&  rc  = reg.recipe_at(building_type::processing_facility, i);
+                    const recipe&  rc  = reg.play_recipe_at(building_type::processing_facility, i);
                     const uint16_t rid = reg.recipe_id(rc.name);
                     if (reg.get_recipe(rid) == nullptr)
                         continue; // the name did not round-trip; never propose it
+                    if (!recipe_unlocked(w, reg, corp, rid))
+                        continue; // the retool door refuses it; never let it take the argmax
                     //
                     // (2) SCALE-BLINDNESS, the same defect as the build candidate
                     // (AI_OPPONENT.md § Selection must be scale-free) — but here it

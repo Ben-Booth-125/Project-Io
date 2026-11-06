@@ -778,6 +778,25 @@ bool structure_unlocked(const world& w, entity_id corp, building_type type)
     return !named;
 }
 
+std::vector<std::string> research_opened_recipes()
+{
+    std::vector<std::string> out;
+    for (const resolved_unlock& u : tables().recipe_unlocks)
+        out.emplace_back(u.recipe);
+    return out;
+}
+
+bool recipe_offered(const world& w, const recipe_registry& reg, entity_id viewer,
+                    std::uint16_t recipe_id)
+{
+    if (viewer == null_entity)
+    {
+        const recipe* rc = reg.get_recipe(recipe_id);
+        return rc == nullptr || !rc->research_opened;
+    }
+    return recipe_unlocked(w, reg, viewer, recipe_id);
+}
+
 bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
                      std::uint16_t recipe_id)
 {
@@ -1059,7 +1078,12 @@ void advance_research(world& w, const research_params& p, std::vector<research_a
         research_accrual row = compute_accrual(
             w, nid, rb, sit != w.nation_tech.end() ? &sit->second : nullptr, nc.treasury, p, price);
         if (row.line_spend > 0.0f)
+        {
+            // BL-1539: booked on the next quarterly return, inside its net.
+            const float before = nc.treasury;
             nc.treasury -= row.line_spend;
+            nc.research_unbooked += static_cast<double>(before) - static_cast<double>(nc.treasury);
+        }
 
         // An entry is created only when there is something to hold, so a world
         // where nothing researches keeps an empty map (and its state_hash).

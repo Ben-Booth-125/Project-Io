@@ -8,6 +8,7 @@
 #include <bitset>
 #include <cstdint>
 #include <string_view>
+#include <string>
 #include <vector>
 
 struct world;
@@ -335,12 +336,22 @@ bool nation_mechanic(const world& w, entity_id nation, std::string_view key);
 /// open to every nation. `null_entity` = open.
 bool structure_unlocked(const world& w, entity_id corp, building_type type);
 
+/// The recipes a read `unlock_recipe` effect names, in tree order. They are the ones
+/// recipes.lua must author `research_opened`, which nation_tech_harness checks.
+std::vector<std::string> research_opened_recipes();
+
 /// The recipe counterpart of `structure_unlocked`, same contract: the build
 /// door, the retool door, the corp scorer and the selection panel all ask it.
 /// A recipe named by a read `unlock_recipe` effect is closed until the corp's
-/// home nation holds the node. None is named today: the propellant routes are
-/// open to every nation (Ben, 2026-10-10 — Propellant Synthesis is a yield
-/// bonus), and fertiliser, plastics and microchips are unread.
+/// home nation holds the node. Only Wind Power names one today: the propellant
+/// routes are open to every nation (Ben, 2026-10-10 — Propellant Synthesis is a
+/// yield bonus), and fertiliser, plastics and microchips are unread.
+/// What a door may LIST for @p viewer. `recipe_unlocked` reads a null actor as open, for
+/// a caller with no nation to ask after. A viewer with none (a spectator: nobody is
+/// seated) holds no node, so what research opens is not offered to it.
+bool recipe_offered(const world& w, const recipe_registry& reg, entity_id viewer,
+                    std::uint16_t recipe_id);
+
 bool recipe_unlocked(const world& w, const recipe_registry& reg, entity_id corp,
                      std::uint16_t recipe_id);
 

@@ -103,6 +103,8 @@
 #include <exception>
 #include <fstream>
 #include <initializer_list>
+#include "world/site_quote.hpp"
+
 #include <limits>
 #include <map>
 #include <memory>
@@ -1147,7 +1149,42 @@ void rows_t2(const recipe_registry& reg)
         bool all_types = true;
         for (std::uint8_t ty = 0; ty < building_type_count; ++ty)
             all_types = all_types && structure_unlocked(f.w, f.corp2, static_cast<building_type>(ty));
-        check(open && all_types, "T2l no recipe or structure unlock is read: propellant and every building type open to every nation");
+        check(open && all_types, "T2l no node names propellant or a structure: propellant and every building type open to every nation");
+    }
+
+    // (e2) Wind Power (Ben, 2026-11-05): the one recipe a node opens. Closed to both
+    // nations, open to the holder alone once held, and the recipe takes no input.
+    {
+        fixture f = make_fixture();
+        const std::uint16_t wind = reg.recipe_id("wind_turbine");
+        const recipe* rc = reg.get_recipe(wind);
+        bool no_input = rc != nullptr && rc->outputs[static_cast<std::size_t>(resource_type::power)] > 0.0f;
+        if (rc != nullptr)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                no_input = no_input && rc->inputs[r] == 0.0f;
+        check(no_input, "T2w the wind turbine makes power from no input");
+        const bool closed = !recipe_unlocked(f.w, reg, f.corp, wind) && !recipe_unlocked(f.w, reg, f.corp2, wind);
+        f.w.nation_tech[f.nation].held.set(static_cast<std::size_t>(node("DG-PR-EN-W")));
+        check(closed && recipe_unlocked(f.w, reg, f.corp, wind) && !recipe_unlocked(f.w, reg, f.corp2, wind),
+              "T2x Wind Power opens the wind turbine to the nation that holds it, and to no other");
+        // The two lists differ by exactly what the tree opens: what the tree names is
+        // what recipes.lua authors, so the two cannot drift apart.
+        const int generation_n = reg.recipe_count(building_type::processing_facility);
+        const int play_n       = reg.play_recipe_count(building_type::processing_facility);
+        bool on_generation_list = false;
+        for (int i = 0; i < generation_n; ++i)
+            on_generation_list = on_generation_list
+                || reg.recipe_at(building_type::processing_facility, i).research_opened;
+        std::vector<std::string> flagged;
+        for (int i = 0; i < play_n; ++i)
+        {
+            const recipe& rc = reg.play_recipe_at(building_type::processing_facility, i);
+            if (rc.research_opened)
+                flagged.push_back(rc.name);
+        }
+        check(!on_generation_list && play_n == generation_n + static_cast<int>(flagged.size())
+                  && flagged == research_opened_recipes(),
+              "T2y the play list is generation's plus exactly the recipes the tree opens");
     }
 
     // (f) Rocketry gates launch: the space_dispatch mechanic.
@@ -1181,6 +1218,27 @@ bool rows_t2_live(std::uint32_t seed, bool overland_rows)
     world& w = start->w;
     const recipe_registry& reg = start->reg;
     run_app_validation_settle(w, start->reg);
+    if (overland_rows)
+    {
+        // What the door quotes for wind: no input, so never starved and nothing to buy.
+        // Power prices on a grid wider than the market, so it keeps its post.
+        entity_id quoted_tile = null_entity;
+        for (const auto& [mid, m] : w.markets)
+            if (m.centre_tile != null_entity && (quoted_tile == null_entity || m.centre_tile < quoted_tile))
+                quoted_tile = m.centre_tile;
+        bool quoted = quoted_tile != null_entity;
+        if (quoted)
+        {
+            site_quote_context cx = make_site_quote_context(w, reg, nullptr);
+            const site_quote q = quote_site(w, reg, cx, quoted_tile, building_type::processing_facility,
+                                            resource_type::iron_ore, reg.recipe_id("wind_turbine"), 1.0f);
+            std::printf("  wind quote: starved %d share %.3f revenue %.3f inputs %.3f\n", q.starved ? 1 : 0,
+                        q.price_share, q.profit.revenue, q.profit.input_cost);
+            quoted = !q.starved && q.profit.input_cost == 0.0f && q.price_share == 1.0f && q.profit.revenue > 0.0f;
+        }
+        check(quoted, "T2z the door quotes the wind turbine as running, buying nothing, selling at the post");
+    }
+
     const logistics_nodes nodes = collect_logistics_nodes(w);
     const std::size_t ri = static_cast<std::size_t>(resource_type::steel);
     const float qty = 10.0f;

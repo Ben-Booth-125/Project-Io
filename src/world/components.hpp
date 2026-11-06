@@ -2358,6 +2358,19 @@ struct quarterly_return
     /// SERIALISED in the v52 trailing tax section (only firms that ever paid).
     float taxes       = 0.0f;
 
+    /// BL-1539 (Ben, 2026-11-05: research counts inside net; FINANCE.md § The quarterly
+    /// return): the credits the nation's research line spent since its last return. A
+    /// debit, paid in the nation step AFTER the return is written and booked on the
+    /// next one, as a refund is, so `net` = the flows - research + refunds. Other debits
+    /// land outside it (FINANCE.md § What a return does not carry), so a nation can lose
+    /// treasury at a positive `net`. `upkeep` above is booked the same way
+    /// (garrison pay, also a nation-step debit). SERIALISED in the v80 section.
+    float research    = 0.0f;
+
+    /// No meaning: holds the record padding-free at 64, since its bytes are hashed raw
+    /// and implicit padding is unspecified. Always zero, and never saved.
+    float reserved_   = 0.0f;
+
     /// Closing `nation_component::treasury` (BL-1407; the field keeps its name).
     float balance = 0.0f;
 
@@ -2374,12 +2387,12 @@ struct quarterly_return
     /// a rounded `net` both misstates the quarter and fails to replay onto the
     /// balance the loop wrote. The difference of two floats is exact in double
     /// whenever their exponents are within 29 of each other, so this IS the
-    /// movement. Declared LAST so the record has no padding (sizeof 56, asserted
+    /// movement. Declared LAST so the record has no padding (sizeof 64, asserted
     /// below — the record's bytes are hashed raw by a harness). SERIALISED as the
     /// record's f32 slot plus the v54 trailing exact-net section.
     double net = 0.0;
 };
-static_assert(sizeof(quarterly_return) == 56,
+static_assert(sizeof(quarterly_return) == 64,
               "quarterly_return must stay padding-free: its bytes are compared raw");
 
 /// Rolling retention of `nation_component::returns`: ten years at four
@@ -2633,6 +2646,16 @@ struct nation_component
     /// the v56 nation-books section.
     float refund_unbooked = 0.0f;
     float refund_opening  = 0.0f;
+
+    /// BL-1539: the running debits the nation step took from `treasury` after the last
+    /// return was written and no return has booked yet: the research line's spend and
+    /// the garrison's pay. The next return books them as `research` and `upkeep`, inside
+    /// `net`. Each is the EXACT difference of the treasury across its debit, in double,
+    /// so a run's nets still telescope onto the treasury. The Balance card and the
+    /// header read them between ticks: they are this quarter's. SERIALISED in the v80
+    /// section.
+    double research_unbooked = 0.0;
+    double upkeep_unbooked   = 0.0;
 
     /// BL-1309 — how this nation's Logistic Points were shared among its state,
     /// its champion and other firms. RETIRED (BL-1405; LOGISTICS.md § Logistic

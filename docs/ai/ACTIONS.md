@@ -221,7 +221,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** The idled asset now reads profitable again — prices recovered or inputs cheapened — so resuming captures margin with zero capex. The AI's own dial_resume fires on exactly this signal.
 
-### `gameplay.set_recipe` — The Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per era-allowed recipe in the building's own group, each with its expected profit and a Switch glyph.
+### `gameplay.set_recipe` — The Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per era-allowed recipe in the building's own group that the actor's nation has opened, each with its expected profit and a Switch glyph. A recipe research opens (Wind Turbine, by Wind Power) is not listed until the nation holds its node, nor to a spectator; the active recipe is always listed.
 
 **Press.** Open the Construction ledger (nav rail slot 3, or the building card's 'Open in ledger' button), expand the building's type group, press the building, then press Switch on the desired method row. Selecting the building on the MAP drives the same levers - the two selectors compose.
 
@@ -235,6 +235,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The acting corporation exists (rejected_no_corp otherwise).
 - The corporation owns the building (rejected_not_owner otherwise).
 - The recipe is valid for the building's type, and in the ACTIVE recipe's own group - a cross-group retool is refused outright, so it is never offered (rejected_invalid otherwise).
+- The actor's nation holds the node that opens the recipe, if one does (RESEARCH.md; a locked recipe is never offered, and try_switch_recipe refuses it as tech_locked).
 - Construction is complete - the ledger draws 'Under construction.' instead of the levers while ticks_remaining > 0.
 - The building is a processing facility (nothing else has a method to choose; the section draws nothing for other types).
 - The recipe runs on the building's body's air (Ben, 2026-10-09; PRODUCTION.md § Chemical Plant): propellant_electrolysis only on an airless body, propellant_atmospheric only on a body with an atmosphere (rejected_wrong_air otherwise; try_switch_recipe returns wrong_air). The Method grid never offers a wrong-air row.

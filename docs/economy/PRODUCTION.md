@@ -777,7 +777,11 @@ power supply is induced by price the way every other good's is.
 
 **A wind turbine is a power building that burns no fuel.** It stands on land and feeds the grid as a
 plant does, and it pays its way by its site, not its fuel bill. Water still takes no building
-(`TILES.md`); offshore turbines and drilling arrive with the naval system.
+(`TILES.md`); offshore turbines and drilling arrive with the naval system. It is a Power Generation
+recipe with no input and a smaller output than either fuel route, so it earns between them at base
+prices. A nation opens it by researching Wind Power, in the Energy branch (`tech/DIGITISATION_TREE.md`).
+Generation founds none: no nation holds a node before play, and a recipe research opens is out of what
+the campaign build walks.
 
 ### Why this closes the fuel chain at BOTH ends
 

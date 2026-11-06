@@ -502,7 +502,7 @@ void t6_save(const app_start_world& out)
     for (auto& [nid, nc] : base.nations)
     {
         nc.trade_reserve = 0.0f; nc.trade_points = 0.0f;
-        nc.refund_unbooked = 0.0f; nc.refund_opening = 0.0f;
+        nc.refund_unbooked = 0.0f; nc.refund_opening = 0.0f; nc.research_unbooked = 0.0; nc.upkeep_unbooked = 0.0; // BL-1539 (v80)
         nc.returns.clear();
         // ...and the majors: a pre-v55 stream derives them from its corporation
         // records, of which the verification writer writes none.

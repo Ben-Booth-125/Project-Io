@@ -47,7 +47,7 @@
   ],
   [
    "gameplay.set_recipe",
-   "The Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per era-allowed recipe in the building's own group, each with its expected profit and a Switch glyph."
+   "The Method grid in the Construction ledger's Buildings view (`draw_production_method_section`): one row per era-allowed recipe in the building's own group that the actor's nation has opened, each with its expected profit and a Switch glyph. A recipe research opens (Wind Turbine, by Wind Power) is not listed until the nation holds its node, nor to a spectator; the active recipe is always listed."
   ],
   [
    "gameplay.set_workforce",

@@ -11,6 +11,7 @@
 #include <chrono>
 #include <thread>
 #include "app.hpp"
+#include "world/nation_tech.hpp"
 #include "world/economy_system.hpp" // BL-1453: advance_quarter_to for day_step
 #include "core/session_history.hpp" // BL-1453: day_step posts battle dispatches
 
@@ -5089,7 +5090,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
                 if (bit->second.type != building_type::processing_facility) continue;
                 out["found"]   = true;
                 out["tile"]    = static_cast<unsigned>(bit->second.tile);
-                out["recipes"] = m_registry.recipe_count(building_type::processing_facility);
+                out["recipes"] = m_registry.play_recipe_count(building_type::processing_facility);
                 out["index"]   = bit->second.active_recipe_index;
                 out["workforce"] = bit->second.workforce_target;
                 return out;
@@ -5109,10 +5110,28 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         for (auto& [bid, b] : m_world.buildings)
         {
             if (b.tile != tile) continue;
-            const int n = m_registry.recipe_count(b.type);
+            const int n = m_registry.play_recipe_count(b.type);
             if (n <= 0) return std::string("");
-            const int i = std::clamp(index, 0, n - 1);
-            const recipe& r = m_registry.recipe_at(b.type, i);
+            int i = std::clamp(index, 0, n - 1);
+            // An index past the list means "the last one": the last one this nation may
+            // run, so the clamp never lands on a recipe research has not opened. One it
+            // asked for by position and may not run is refused below.
+            const entity_id owner = building_owner_of(m_world, bid).id;
+            const building_type type = b.type;
+            const auto open_at = [&](int at) {
+                return recipe_offered(m_world, m_registry, owner,
+                                      m_registry.recipe_id(m_registry.play_recipe_at(type, at).name));
+            };
+            if (index >= n)
+                while (i > 0 && !open_at(i))
+                    --i;
+            const recipe& r = m_registry.play_recipe_at(b.type, i);
+            if (!open_at(i))
+            {
+                SDL_Log("verify.set_building_recipe: tile=%u index=%d recipe=%s REFUSED (tech_locked)",
+                        tile_u, i, r.name.c_str());
+                return std::string("");
+            }
             // The body's air (Ben, 2026-10-09): a route the tile's body cannot run
             // is refused here as at every other door — nothing written, "" back.
             if (!recipe_runs_at_tile(m_world, r, tile))
@@ -6270,7 +6289,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         if (bit != m_world.buildings.end())
         {
             for (const int i : ui::method_grid_candidates(m_world, m_registry, bit->second))
-                names[++n] = m_registry.recipe_at(bit->second.type, i).name;
+                names[++n] = m_registry.play_recipe_at(bit->second.type, i).name;
             const recipe* cur = m_registry.get_recipe(bit->second.recipe);
             out["active"] = cur ? cur->name : std::string();
         }
@@ -7131,7 +7150,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["refunds"]  = static_cast<double>(r.refunds); // BL-1215
         out["nation"]   = r.nation;                       // BL-1406
 
-        const ui::balance_columns c = ui::build_balance_columns(r.budget, r.refunds, r.tax_income);
+        const ui::balance_columns c = ui::build_balance_columns(r.budget, r.refunds, r.tax_income, r.research);
         const auto emit = [&st](const ui::charts::stack_segment* segs, std::size_t n) {
             sol::table t = st.create_table();
             for (std::size_t i = 0; i < n; ++i)
@@ -7518,9 +7537,9 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         for (const auto& [bid, b] : m_world.buildings)
         {
             if (b.tile != tile) continue;
-            const int n = m_registry.recipe_count(b.type);
+            const int n = m_registry.play_recipe_count(b.type);
             if (n <= 0) return 0;
-            const recipe& r = m_registry.recipe_at(b.type, std::clamp(b.active_recipe_index, 0, n - 1));
+            const recipe& r = m_registry.play_recipe_at(b.type, std::clamp(b.active_recipe_index, 0, n - 1));
             // BL-1265: onto the SHELF the building buys from (its tile's market).
             const entity_id mid = market_for_tile(m_world, tile);
             if (mid == null_entity) return -1;

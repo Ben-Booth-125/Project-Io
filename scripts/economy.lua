@@ -53,7 +53,9 @@ economy = {
     --   build_duration_days — DAYS the building spends under construction at full
     --                 supply before it produces anything (0 = instant). Construction
     --                 is measured in days (Ben, 2026-10-24; PRODUCTION.md): a building
-    --                 finishes between quarters; 180 days = two quarters.
+    --                 finishes between quarters; 180 days = two quarters. Every type
+    --                 scales together, anchored on a 120-day extraction site (Ben,
+    --                 2026-11-05): time is not the opening's brake.
     -- MATERIAL COSTS: re-enabled 2026-07-06 (BL-095-lite). BL-044 originally gated
     -- these against the corp's own pool on the body (construction.cpp), which
     -- deadlocked a fresh start — a corp's steel surplus auto-sells each tick
@@ -99,7 +101,7 @@ economy = {
             maintenance = 2.0,
             base_wage   = 4.0,
             build_cost  = 100.0,
-            build_duration_days = 180,
+            build_duration_days = 120,
             resource_costs = { steel = 20.0 },
 
             -- BL-436: how a deposit's richness becomes an extraction RATE.
@@ -185,7 +187,7 @@ economy = {
             maintenance = 2.0,
             base_wage   = 12.0,
             build_cost  = 200.0,
-            build_duration_days = 270,
+            build_duration_days = 180,
             resource_costs = { steel = 25.0 },
 
             -- BL-590 (2026-08-24): keyed by RECIPE — every industrial recipe is
@@ -231,7 +233,7 @@ economy = {
             maintenance = 8.0,
             base_wage   = 6.0,
             build_cost  = 150.0,
-            build_duration_days = 180,
+            build_duration_days = 120,
             resource_costs = { steel = 20.0 },
         },
         -- BL-433: the one building type that is unambiguously not ancient. Tagged
@@ -245,7 +247,7 @@ economy = {
             maintenance = 20.0,
             base_wage   = 15.0,
             build_cost  = 500.0,
-            build_duration_days = 540,
+            build_duration_days = 360,
             resource_costs = { steel = 50.0, refined_fuel = 20.0 },
         },
         -- BL-1255 (LOGISTICS.md § 4c; PRODUCTION.md § Infrastructure buildings): the
@@ -259,7 +261,7 @@ economy = {
             maintenance = 6.0,
             base_wage   = 0.0,
             build_cost  = 120.0,
-            build_duration_days = 180,
+            build_duration_days = 120,
             resource_costs = { steel = 15.0 },
             requires_centre = true, -- a city tile; touching track is checked at the door
         },
@@ -272,7 +274,7 @@ economy = {
             maintenance = 12.0,
             base_wage   = 8.0,
             build_cost  = 250.0,
-            build_duration_days = 270,
+            build_duration_days = 180,
             resource_costs = { steel = 30.0 },
         },
         -- BL-325 S1: Military Base — the unit muster building. Produces nothing
@@ -289,7 +291,7 @@ economy = {
             maintenance = 0.0,
             base_wage   = 0.0,
             build_cost  = 300.0,
-            build_duration_days = 360,
+            build_duration_days = 240,
             resource_costs = { steel = 35.0 },
         },
         -- BL-1449 (MILITARY.md § Air, Ben 2026-10-28): Airbase — the one door an
@@ -302,7 +304,7 @@ economy = {
             maintenance = 0.0, -- BL-1463: bases carry no upkeep (above)
             base_wage   = 0.0,
             build_cost  = 450.0,
-            build_duration_days = 360,
+            build_duration_days = 240,
             resource_costs = { steel = 50.0 },
         },
         -- BL-1426 (MILITARY.md § Fortifications): Bunker - concrete on a tile. The
@@ -316,7 +318,7 @@ economy = {
             maintenance = 5.0,
             base_wage   = 0.0,
             build_cost  = 120.0,
-            build_duration_days = 90,
+            build_duration_days = 60,
             resource_costs = { stone = 20.0, steel = 8.0 },
         },
         -- BL-332: Research Institute — the dedicated tech-progress building.
@@ -330,7 +332,7 @@ economy = {
             maintenance = 15.0,
             base_wage   = 10.0,
             build_cost  = 300.0,
-            build_duration_days = 360,
+            build_duration_days = 240,
             resource_costs = { steel = 35.0 },
         },
         -- BL-615: Schooling — the education building any settlement can host.
@@ -347,7 +349,7 @@ economy = {
             maintenance = 8.0,
             base_wage   = 6.0,
             build_cost  = 150.0,
-            build_duration_days = 270,
+            build_duration_days = 180,
             resource_costs = { timber = 12.0, stone = 8.0 },
             requires_centre = true,
         },
@@ -362,7 +364,7 @@ economy = {
             maintenance = 18.0,
             base_wage   = 12.0,
             build_cost  = 400.0,
-            build_duration_days = 450,
+            build_duration_days = 300,
             resource_costs = { stone = 30.0, timber = 12.0 },
             requires_centre  = true,
             min_centre_scale = 4,
@@ -379,7 +381,7 @@ economy = {
             maintenance = 10.0,
             base_wage   = 8.0,
             build_cost  = 200.0,
-            build_duration_days = 270,
+            build_duration_days = 180,
             resource_costs = { timber = 14.0, stone = 10.0 },
         },
     },

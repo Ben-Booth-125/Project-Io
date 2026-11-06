@@ -362,11 +362,11 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
     // Processing: one per RECIPE in the era-masked browse order the door walks, with
     // the door's unlock filter.
     if (reg.building_available(building_type::processing_facility))
-        for (int ri = 0; ri < reg.recipe_count(building_type::processing_facility); ++ri)
+        for (int ri = 0; ri < reg.play_recipe_count(building_type::processing_facility); ++ri)
         {
-            const recipe& browsed = reg.recipe_at(building_type::processing_facility, ri);
+            const recipe& browsed = reg.play_recipe_at(building_type::processing_facility, ri);
             const std::uint16_t id = reg.recipe_id(browsed.name);
-            if (!recipe_unlocked(w, reg, actor, id))
+            if (!recipe_offered(w, reg, actor, id))
                 continue;
             out.push_back({building_type::processing_facility, resource_type::iron_ore, id,
                            browsed.display_name, "Processing"});

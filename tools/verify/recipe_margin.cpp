@@ -281,7 +281,7 @@ int main()
                     basket_value(pbasket, price));
         print_header();
 
-        const int n = reg.recipe_count(building_type::processing_facility);
+        const int n = reg.play_recipe_count(building_type::processing_facility);
 
         // The anchor route per primary output: lowest marginal cost per unit of
         // that output among the band's routes; ties go to the earlier recipe.
@@ -291,7 +291,7 @@ int main()
         anchor_mc.fill(0.0);
         for (int i = 0; i < n; ++i)
         {
-            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+            const recipe& rc = reg.play_recipe_at(building_type::processing_facility, i);
             const resource_type po = primary_output_resource(rc);
             const std::size_t   pi = static_cast<std::size_t>(po);
             if (rc.outputs[pi] <= 0.0f || price[pi] <= 0.0f)
@@ -316,7 +316,7 @@ int main()
 
         for (int i = 0; i < n; ++i)
         {
-            const recipe& rc = reg.recipe_at(building_type::processing_facility, i);
+            const recipe& rc = reg.play_recipe_at(building_type::processing_facility, i);
             ++t.recipes;
             // A recipe whose primary output is an EXTRACTABLE raw (hydroponics ->
             // agricultural_produce) is never the anchor: the extraction site is

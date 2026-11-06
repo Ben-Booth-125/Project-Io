@@ -134,6 +134,11 @@ struct recipe
     /// seeder, no default — and a building an old save holds on one is idle at
     /// the production pass: it draws nothing and makes nothing.
     bool retired = false;
+
+    /// A nation opens this recipe by research (authored `research_opened = true`; a
+    /// node's `unlock_recipe` effect names it). It is on the play list only:
+    /// `recipe_registry::play_recipe_at`.
+    bool research_opened = false;
 };
 
 /// THE ONE PREDICATE every door asks of a recipe's air (Ben, 2026-10-09;
@@ -1454,6 +1459,27 @@ public:
         return m_recipes[m_allowed[static_cast<std::size_t>(clamped)]];
     }
 
+    /// THE PLAY LIST: `recipe_at`'s list plus the recipes research opens. No nation
+    /// holds a node before play, so generation, the chain depth and every other walk
+    /// over "what the economy runs" read the list above, and a recipe the tree gates
+    /// moves none of them. Only a door a nation can reach in play reads this one, and
+    /// each still asks `recipe_unlocked`.
+    int play_recipe_count(building_type bt) const
+    {
+        if (bt != building_type::processing_facility)
+            return 0;
+        return static_cast<int>(m_play_allowed.size());
+    }
+    const recipe& play_recipe_at(building_type bt, int i) const
+    {
+        static const recipe empty{};
+        const int n = play_recipe_count(bt);
+        if (n == 0)
+            return empty;
+        const int clamped = (i < 0) ? 0 : (i >= n ? n - 1 : i);
+        return m_recipes[m_play_allowed[static_cast<std::size_t>(clamped)]];
+    }
+
     // --- direct construction for tests (headless harness builds these by hand) ---
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
     /// BL-739: the idle-maintenance floor (economy.thresholds.idle_maintenance_floor).
@@ -1553,9 +1579,14 @@ private:
     void rebuild_allowed()
     {
         m_allowed.clear();
+        m_play_allowed.clear();
         for (std::size_t i = 0; i < m_recipes.size(); ++i)
             if (!m_recipes[i].retired && era_permits(m_era, m_recipes[i].era))
-                m_allowed.push_back(i); // a retired slot is never browsable (BL-1438)
+            {
+                m_play_allowed.push_back(i); // a retired slot is never browsable (BL-1438)
+                if (!m_recipes[i].research_opened)
+                    m_allowed.push_back(i);
+            }
         rebuild_depth();
     }
 
@@ -1682,6 +1713,8 @@ private:
     /// BL-433 browse mask: positions in m_recipes permitted by m_era, in authored
     /// order. Rebuilt by set_era / add_recipe / load_from_lua.
     std::vector<std::size_t> m_allowed;
+    /// `m_allowed` plus the research-opened recipes, in the same authored order.
+    std::vector<std::size_t> m_play_allowed;
 
     /// The campaign's band. `any` = unset = permit everything, which is what keeps
     /// every pre-BL-433 harness and the default world byte-identical.
