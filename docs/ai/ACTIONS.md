@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*216 entries — 53 gameplay · 36 canvas · 15 lens · 74 ledger · 38 chrome.*
+*217 entries — 53 gameplay · 36 canvas · 15 lens · 74 ledger · 39 chrome.*
 
 ---
 
@@ -3262,4 +3262,15 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** A tooltip: '<Theatre> recruits: held / cap', what the pool is for and where it comes from (the military bases, airbases or ports of your nation, from their provinces' people), the quarter's output as sources x rate (50 a military base, 20 an airbase), the cap (fifteen quarters of the output), that a full pool takes none, and 'Full now' or 'nothing fills it' where either holds. Sea reads 0 / 0 until ports make sea recruits. Nothing in the world changes.
 
 **Reason to select.** Before raising: is there the manpower, how fast does it come back, and has a full pool stopped your bases making any? A hire the pool cannot fill is refused before money moves (MILITARY.md § Recruits).
+
+### `chrome.header_money_hover` — Header strip: TREASURY and its figure, the net in brackets beside it, CARGO and its figure
+
+**Press.** Hover a money figure.
+
+**Valid when:**
+- App is in game. A graph needs two quarters of history; before that the tooltip is words alone.
+
+**Expected output.** A tooltip says what the figure is and shows the graph of recent treasury values, one point a quarter. When the strip has no room for the runway, the treasury's and the net's tooltips carry its arithmetic. Nothing changes.
+
+**Reason to select.** To see which way the treasury has been going, not just where it stands.
 

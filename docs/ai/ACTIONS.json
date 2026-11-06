@@ -3404,6 +3404,18 @@
    "reason_to_select": "Before raising: is there the manpower, how fast does it come back, and has a full pool stopped your bases making any? A hire the pool cannot fill is refused before money moves (MILITARY.md § Recruits)."
   },
   {
+   "id": "chrome.header_money_hover",
+   "family": "chrome",
+   "surface": "Header strip: TREASURY and its figure, the net in brackets beside it, CARGO and its figure",
+   "press": "Hover a money figure.",
+   "args": [],
+   "preconditions": [
+    "App is in game. A graph needs two quarters of history; before that the tooltip is words alone."
+   ],
+   "expected_output": "A tooltip says what the figure is and shows the graph of recent treasury values, one point a quarter. When the strip has no room for the runway, the treasury's and the net's tooltips carry its arithmetic. Nothing changes.",
+   "reason_to_select": "To see which way the treasury has been going, not just where it stands."
+  },
+  {
    "id": "ledger.military_air_raise",
    "family": "ledger",
    "surface": "Military ledger, Recruit tab, with the Air theatre tab chosen: the airbase picker ('Raise at' - one row per completed airbase of your nation, with the wings based there) and one row per air class (Interceptor Wing, Strike Wing, Strategic Bomber Wing, Attack Helicopter Wing, Strike Drone Wing, Airborne Early Warning Wing), each with its class, the missions it flies, its live design's numbers (air, soft, hard, strategic, recon, range), its price and a 'Raise' press. With no airbase the theatre reads 'No airbase' and offers 'Find a site for an airbase'.",

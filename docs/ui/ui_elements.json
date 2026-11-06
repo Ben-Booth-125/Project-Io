@@ -859,7 +859,7 @@
     "src/ui/header_panel.hpp",
     "src/ui/header_panel.cpp"
    ],
-   "summary": "Always-visible full-width strip between the identity tile and time column: treasury, cargo valuation, net+trend, runway, and at its top right the three recruit readouts (land, air, sea) — the persistent financial and manpower dashboard.",
+   "summary": "Always-visible full-width strip between the identity tile and time column: treasury with its net in brackets, cargo valuation, runway, and at its top right the three recruit readouts (land, air, sea) — the persistent financial and manpower dashboard.",
    "interesting_question": "The header is a 'guaranteed-fit strip' that never wraps and never silently clips a load-bearing number, degrading in a fixed order instead — why treat this one surface as the reference case for a wider text-wrap audit rather than just wrapping like other panels?",
    "resolution": "Explicit precedent-setting intent: HEADER.md states 'This ladder is the reference case for BL-215 (text-wrap render audit)... the audit's job is to make every other worded surface degrade this honestly rather than wrap or clip' — the header's ladder is meant to generalise, not stay a one-off.",
    "checks": [
@@ -902,15 +902,15 @@
   },
   {
    "id": "UI-054",
-   "name": "Net + trend sparkline",
+   "name": "Net in brackets + trend tooltip",
    "kind": "sub-element",
    "parent": "UI-051",
    "source": [
     "docs/ui/HEADER.md § Contents",
     "docs/ui/HEADER.md § Resolved design questions"
    ],
-   "summary": "The last economy tick's signed net change, coloured, plus a sparkline of recent balances (ImGui::PlotLines over a capped history).",
-   "interesting_question": "n/a — a settled design choice (per-tick delta + sparkline over a raw balance figure alone).",
+   "summary": "The last economy tick's signed operating net, coloured, in brackets beside the treasury. The graph of recent treasuries (ImGui::PlotLines over a capped history) is the tooltip shared by the treasury, its net and the cargo figure.",
+   "interesting_question": "n/a — a settled design choice (Ben, 2026-11-05).",
    "resolution": "n/a",
    "checks": [
     "header"

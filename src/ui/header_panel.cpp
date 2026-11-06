@@ -283,7 +283,7 @@ void draw_header_panel(const world& w,
     ImGui::Begin("##header_panel", nullptr, flags);
 
     // Vertically centre the single content row within the tall strip. Every element
-    // on the row (text + sparkline) is drawn at one frame height, so centring the
+    // on the row is drawn at one frame height, so centring the
     // start Y centres the whole row.
     ImGui::SetCursorPosY((header_panel_height - ImGui::GetFrameHeight()) * 0.5f);
 
@@ -308,12 +308,11 @@ void draw_header_panel(const world& w,
         burn = series_step;
 
     // Guaranteed-fit strip (LAYOUT.md container vocabulary): the strip never wraps
-    // to a second line. The three treasury/cargo/net figures are bounded-length
+    // to a second line. The three treasury/net/cargo figures are bounded-length
     // (fmt::credits/rate abbreviate to a handful of characters) and always drawn in
-    // full; the sparkline is the genuine last resort to drop when the available
-    // width is too narrow, so a load-bearing number is never silently clipped.
+    // full, so a load-bearing number is never silently clipped. The strip carries no
+    // decorative element: the graph is the money figures' tooltip (BL-1512).
     const ImVec2 item_spacing = ImGui::GetStyle().ItemSpacing;
-    const float  spark_width  = 96.0f;
 
     // BL-177 — the runway read: how long the treasury lasts at the current burn.
     // Shown only while it MEANS something — burning cash. A growing treasury shows
@@ -356,15 +355,16 @@ void draw_header_panel(const world& w,
         runway_tip = tip;
     }
 
+    // HEADER.md § Contents: TREASURY 1.2M (+34/qtr)   |   CARGO 40K
     float used_width = ImGui::CalcTextSize("TREASURY").x + item_spacing.x +
                        ImGui::CalcTextSize(fmt::credits(treasury).c_str()).x + item_spacing.x +
+                       ImGui::CalcTextSize("(").x +
+                       ImGui::CalcTextSize(fmt::rate(net, "qtr").c_str()).x +
+                       ImGui::CalcTextSize(")").x +
                        ImGui::CalcTextSize("   |   CARGO").x + item_spacing.x +
-                       ImGui::CalcTextSize(fmt::credits(valuation).c_str()).x + item_spacing.x +
-                       ImGui::CalcTextSize("   |   NET").x + item_spacing.x +
-                       ImGui::CalcTextSize(fmt::rate(net, "qtr").c_str()).x;
+                       ImGui::CalcTextSize(fmt::credits(valuation).c_str()).x;
 
     const float available  = ImGui::GetContentRegionAvail().x;
-    bool        show_spark = balance_history.size() >= 2;
 
     // BL-1472 — the recruit pools (HEADER.md § Contents, Recruits), read first: their
     // glyph-and-bar floor is RESERVED before the runway is fitted, because the bars
@@ -380,12 +380,11 @@ void draw_header_panel(const world& w,
     const float recruit_floor = k_recruit_lead + recruit_strip_width(pools, 2);
     const float money_room    = available - recruit_floor; // what the left run may take
 
-    // BL-177 runway fit, resolved BEFORE the decorative drop because the runway
-    // is load-bearing and the sparkline is not. Container 4 (LAYOUT.md) forbids
-    // silently truncating a header figure, so this degrades in three honest steps:
+    // BL-177 runway fit. Container 4 (LAYOUT.md) forbids silently truncating a header
+    // figure, so this degrades in three honest steps:
     //   full   "   |   RUNWAY  12q"   - label and value
     //   value  "   |   12q"           - label dropped, value kept (tooltip explains)
-    //   none                          - folded into the NET tooltip instead
+    //   none                          - folded into the treasury's tooltip instead
     const float runway_sep_w   = ImGui::CalcTextSize("   |   ").x;
     const float runway_label_w = ImGui::CalcTextSize("RUNWAY").x + item_spacing.x;
     const float runway_val_w   = ImGui::CalcTextSize(runway_meaningful ? runway_text.c_str() : "12q").x;
@@ -411,13 +410,13 @@ void draw_header_panel(const world& w,
         }
         else
         {
-            show_runway = false; // no room at all — NET's tooltip carries it
+            show_runway = false; // no room at all — the treasury's tooltip carries it
         }
     }
     recruits_record().runway = !runway_meaningful ? -1 : !show_runway ? 0 : show_runway_label ? 2 : 1;
 
     // BL-1472 — the recruit readouts, step 2 of the ladder (HEADER.md § Fit and
-    // degradation): resolved after the runway and before the sparkline. "held / cap",
+    // degradation): resolved after the runway. "held / cap",
     // then the held figure alone, then glyph and bar only (the numbers move into each
     // readout's tooltip). The last step is the floor reserved above.
     int recruit_fit = 2;
@@ -429,13 +428,34 @@ void draw_header_panel(const world& w,
         }
     used_width += k_recruit_lead + recruit_strip_width(pools, recruit_fit);
 
-    if (show_spark && used_width + item_spacing.x + spark_width > available)
-        show_spark = false; // the sparkline is the last decorative element to drop
+    // The one shared tooltip (HEADER.md § Contents, Ben, 2026-11-05): hovering the
+    // treasury, its net or the cargo figure shows what that figure is and the graph
+    // of recent treasuries. Where the strip could not draw the runway it says it here,
+    // so the fact is never simply lost.
+    const bool  runway_folded = runway_meaningful && !show_runway;
+    const auto money_tooltip = [&](const char* what, bool carries_runway) {
+        if (!ImGui::IsItemHovered())
+            return;
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(what);
+        if (balance_history.size() >= 2)
+            ImGui::PlotLines("##balance_spark", balance_history.data(),
+                             static_cast<int>(balance_history.size()), 0, nullptr,
+                             FLT_MAX, FLT_MAX, {ImGui::GetFontSize() * 16.0f, ImGui::GetFontSize() * 3.0f});
+        if (carries_runway)
+            ImGui::TextUnformatted(runway_tip.c_str());
+        ImGui::EndTooltip();
+        recruits_record().money_tip_frame = ImGui::GetFrameCount();
+    };
+    constexpr const char* k_treasury_tip = "Your nation's treasury. A nation never runs into debt.";
+    constexpr const char* k_net_tip =
+        "Last quarter's operating net: income, less expenditure, maintenance, wages and\n"
+        "research, plus tax income. Construction and refunds are not operating flows.";
+    constexpr const char* k_cargo_tip = "Your trades' goods in transit, at the price where they land.";
 
     // --- Treasury ---
     ImGui::TextDisabled("TREASURY");
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Your nation's treasury. A nation never runs into debt.");
+    money_tooltip(k_treasury_tip, runway_folded);
     ImGui::SameLine();
     {
         // The figures draw through fit_text (BL-215): the drop ladder above runs
@@ -447,20 +467,12 @@ void draw_header_panel(const world& w,
                  ImGui::GetContentRegionAvail().x);
         ImGui::PopStyleColor();
     }
+    money_tooltip(k_treasury_tip, runway_folded);
 
-    // --- Cargo in transit, valued where it lands ---
+    // --- Last-tick net, in brackets beside the treasury ---
     ImGui::SameLine();
-    ImGui::TextDisabled("   |   CARGO");
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Your trades' goods in transit, at the price where they land.");
-    ImGui::SameLine();
-    fit_text(text_box::header_strip, "header.cargo", fmt::credits(valuation).c_str(),
-             ImGui::GetContentRegionAvail().x);
-
-    // --- Last-tick net + a sparkline of recent treasuries ---
-    ImGui::SameLine();
-    ImGui::TextDisabled("   |   NET");
-    ImGui::SameLine();
+    ImGui::TextDisabled("(");
+    ImGui::SameLine(0.0f, 0.0f);
     {
         const ImU32 col = value_colour(fmt::sign_of(net));
         ImGui::PushStyleColor(ImGuiCol_Text, col);
@@ -468,10 +480,18 @@ void draw_header_panel(const world& w,
                  ImGui::GetContentRegionAvail().x);
         ImGui::PopStyleColor();
     }
-    // NET carries the runway when there was no room to draw it (see the fit
-    // resolution above), so the fact is never simply lost.
-    if (runway_meaningful && !show_runway && ImGui::IsItemHovered())
-        ImGui::SetTooltip("%s", runway_tip.c_str());
+    money_tooltip(k_net_tip, runway_folded);
+    ImGui::SameLine(0.0f, 0.0f);
+    ImGui::TextDisabled(")");
+
+    // --- Cargo in transit, valued where it lands ---
+    ImGui::SameLine(0.0f, 0.0f);
+    ImGui::TextDisabled("   |   CARGO");
+    money_tooltip(k_cargo_tip, false);
+    ImGui::SameLine();
+    fit_text(text_box::header_strip, "header.cargo", fmt::credits(valuation).c_str(),
+             ImGui::GetContentRegionAvail().x);
+    money_tooltip(k_cargo_tip, false);
 
     // --- BL-177: runway — how long the treasury lasts at the current burn ---
     if (show_runway)
@@ -484,17 +504,6 @@ void draw_header_panel(const world& w,
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s", runway_text.c_str());
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("%s", runway_tip.c_str());
-    }
-
-    if (show_spark)
-    {
-        ImGui::SameLine();
-        ImGui::PlotLines("##balance_spark",
-                         balance_history.data(),
-                         static_cast<int>(balance_history.size()),
-                         0, nullptr,
-                         FLT_MAX, FLT_MAX,
-                         {spark_width, ImGui::GetFrameHeight()});
     }
 
     // --- BL-1472: the recruit readouts, flush to the strip's right edge ---

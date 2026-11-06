@@ -762,6 +762,10 @@
    "The header strip's top right (HEADER.md § Contents, Recruits): three recruit readouts, land, air and sea in that order - each the theatre's glyph (soldier, aircraft, anchor), the nation's recruits held against the pool's cap ('120 / 750') and a thin bar of held over cap beneath. A narrow window shows the held figure alone, then the glyph and bar only (HEADER.md § Fit and degradation); the bars never drop."
   ],
   [
+   "chrome.header_money_hover",
+   "Header strip: TREASURY and its figure, the net in brackets beside it, CARGO and its figure"
+  ],
+  [
    "ledger.military_air_raise",
    "Military ledger, Recruit tab, with the Air theatre tab chosen: the airbase picker ('Raise at' - one row per completed airbase of your nation, with the wings based there) and one row per air class (Interceptor Wing, Strike Wing, Strategic Bomber Wing, Attack Helicopter Wing, Strike Drone Wing, Airborne Early Warning Wing), each with its class, the missions it flies, its live design's numbers (air, soft, hard, strategic, recon, range), its price and a 'Raise' press. With no airbase the theatre reads 'No airbase' and offers 'Find a site for an airbase'."
   ],

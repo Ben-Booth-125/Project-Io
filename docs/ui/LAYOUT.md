@@ -133,8 +133,8 @@ This is a static identity readout in the prototype — no interaction beyond, ev
 A strip across the top of the canvas area, between the identity tile and the time column. Its left edge is the shell column's right edge (`x = W`). It stands the **full identity-tile height** (`profile_panel_height`, ~92 px) and top-aligns at `y = 0`, so the header and the identity tile read as **one level top band**; its content row is vertically centred within that strip. It is the player's persistent financial dashboard, wired to the live economy:
 
 - **Treasury** — the player nation's treasury (a nation never runs into debt, so it has no negative state).
+- **Net, in brackets beside the treasury** — the last economy tick's operating net as a coloured per-quarter figure, `TREASURY 1.2M (+34/qtr)`. Hovering a money figure shows the graph of recent treasury values (Ben, 2026-11-05).
 - **Cargo valuation** — an estimated value of the goods the player owns: its trades' cargo in transit, at each destination market's current price (`HEADER.md`). A single money figure, not a per-resource inventory.
-- **Net + trend** — the last economy tick's net change as a coloured per-quarter figure, alongside a small sparkline of recent treasury values.
 
 The header answers "can I afford this, and which way is it trending?" without opening a ledger. Detailed, per-body breakdowns stay in their respective ledgers.
 
