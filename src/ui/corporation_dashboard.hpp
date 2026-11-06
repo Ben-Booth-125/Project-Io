@@ -4,9 +4,11 @@
 #include "ui_state.hpp"
 #include "world/economy_system.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/standing.hpp"
 #include "world/world.hpp"
 
 #include <cstddef>
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // The Corporation ledger (BL-248, cut to one card by BL-691) — nav slot 1
@@ -19,13 +21,13 @@
 // Convoys ledgers. What was left that only this surface can answer is how well
 // the corporation is doing, and the honest answer to that today is money.
 //
-// So: ONE card, **Balance**, condensed to a two-column chart — earnings against
-// stacked expenses. It is a sub-header inside the Corporation ledger, not a
+// So: ONE card, **Balance**, condensed to two horizontal bars — earnings over
+// stacked expenses (BL-1509) — and under it the nation's **Standing** among nations. It is a sub-header inside the Corporation ledger, not a
 // competing surface name (Ben, 2026-08-29). The overlap with the Budget ledger
 // is explicitly accepted rather than tolerated, with Budget to be revisited.
 //
-// The chart itself is `ui::charts::draw_stacked_columns`, shared with the
-// building card's Revenue/Expenses graph at the building grain. The corp's
+// The chart itself is `ui::charts::draw_stacked_bars`, the horizontal drawing of the
+// arithmetic `draw_stacked_columns` gives the building card's Revenue/Expenses graph. The corp's
 // expense set is wider — inputs bought, maintenance, wages, interest, levies and
 // force upkeep — and interest is charged only while the corp is in debt, so this
 // stack has a VARIABLE segment count where the building's is fixed at three.
@@ -139,6 +141,7 @@ bool nation_operating_net(const world& w, entity_id nation, float& net);
 /// @param open   The nav slot's flag; the ledger draws nothing while false.
 void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
                                 const economy_report& report,
+                                const std::vector<corp_standing>& standings,
                                 ui_state& s, bool& open);
 
 } // namespace ui

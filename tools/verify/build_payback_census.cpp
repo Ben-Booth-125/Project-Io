@@ -40,6 +40,7 @@
 #include "world/orbital_system.hpp"
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/site_quote.hpp"
 #include "world/resource_names.hpp"
 #include "world/survey_system.hpp"
 #include "world/world.hpp"
@@ -52,6 +53,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <map>
 #include <string>
 #include <utility>
@@ -139,7 +141,8 @@ void site_census(world& w, const recipe_registry& reg, int seed, int tt, int mt,
     {
         const placement_gate gate = reg.placement_gate_for(o.type, o.recipe);
         const recipe* rc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
-        struct site { double net; double capex; };
+        struct site { double net; double capex; double quote; int starved; };
+        site_quote_context cx = make_site_quote_context(w, reg, nullptr);
         std::vector<site> sites;
         int uncovered = 0;
         for (const entity_id tid : n.tiles)
@@ -150,20 +153,25 @@ void site_census(world& w, const recipe_registry& reg, int seed, int tt, int mt,
             if (!(cv > 0.0f)) ++uncovered;
             const building_profit bp = estimate_prospective_profit(w, reg, tid, o.type, o.target, o.recipe, nullptr, nullptr, cv);
             if (!bp.has_data) continue;
-            sites.push_back({static_cast<double>(bp.net()), static_cast<double>(construction_capex(w, reg, tid, o.type, o.target, o.recipe))});
+            const site_quote sq = quote_site(w, reg, cx, tid, o.type, o.target, o.recipe, cv);
+            sites.push_back({static_cast<double>(bp.net()), static_cast<double>(construction_capex(w, reg, tid, o.type, o.target, o.recipe)),
+                             static_cast<double>(sq.profit.net()), sq.starved ? 1 : 0});
         }
         if (sites.empty()) continue;
         std::sort(sites.begin(), sites.end(), [](const site& a, const site& b) { return a.net > b.net; });
         const site& best = sites.front();
         const site& med  = sites[sites.size() / 2];
         const site& worst = sites.back();
-        int positive = 0;
-        for (const site& s : sites) if (s.net > 0.0) ++positive;
+        int positive = 0, starved = 0;
+        std::vector<double> quotes;
+        for (const site& s : sites) { if (s.net > 0.0) ++positive; starved += s.starved; quotes.push_back(s.quote); }
+        std::sort(quotes.begin(), quotes.end(), std::greater<double>());
         std::printf("SITE seed=%d pair=%d:%d nation=%llu kind=%s name=%s sites=%zu positive=%d uncovered=%d"
-                    " best=%.2f med=%.2f worst=%.2f capex_best=%.1f capex_med=%.1f payback_best=%.2f payback_med=%.2f\n",
+                    " best=%.2f med=%.2f worst=%.2f capex_best=%.1f capex_med=%.1f payback_best=%.2f payback_med=%.2f qbest=%.2f qmed=%.2f starved=%d\n",
                     seed, tt, mt, static_cast<unsigned long long>(nid), o.kind, o.name.c_str(), sites.size(), positive,
                     uncovered, best.net, med.net, worst.net, best.capex, med.capex,
-                    payback_years(best.capex, best.net), payback_years(med.capex, med.net));
+                    payback_years(best.capex, best.net), payback_years(med.capex, med.net),
+                    quotes.front(), quotes[quotes.size() / 2], starved);
     }
 }
 } // namespace
@@ -238,6 +246,11 @@ int main(int argc, char** argv)
         std::map<entity_id, double> last;
         for (const entity_id nid : majors) last[nid] = w.nations.at(nid).treasury;
         constexpr int k_econ_tick_days = 90;
+        // The holdout: a building the moment it is ordered is a real answer to "what
+        // would a site earn", with its output not yet in any market. Quote it then, read
+        // what it earns a year after it stands.
+        struct watched { int ordered; std::string name; double old_quote; double new_quote; int starved; double share; int age; double earned; double run; };
+        std::map<entity_id, watched> watch;
         for (int k = 1; k <= quarters; ++k)
         {
             const int day = k * k_econ_tick_days;
@@ -268,6 +281,37 @@ int main(int argc, char** argv)
                     prev = now;
                 }
                 std::printf("\n");
+            }
+            {
+                site_quote_context hcx = make_site_quote_context(w, seed_reg, &tick.report);
+                for (const auto& [a, bc] : w.buildings)
+                {
+                    if (bc.type != building_type::processing_facility && bc.type != building_type::extraction_site) continue;
+                    auto wit = watch.find(a);
+                    if (bc.ticks_remaining > 0)
+                    {
+                        if (wit != watch.end()) continue;
+                        const recipe* rc = seed_reg.get_recipe(bc.recipe);
+                        const building_profit old_q = estimate_prospective_profit(w, seed_reg, bc.tile, bc.type, bc.target_resource, bc.recipe);
+                        const site_quote nq = quote_site(w, seed_reg, hcx, bc.tile, bc.type, bc.target_resource, bc.recipe, 1.0f, a);
+                        watch[a] = watched{k, rc != nullptr ? rc->name : std::string(resource_names::name_of(bc.target_resource)),
+                                           old_q.net(), nq.profit.net(), nq.starved ? 1 : 0, nq.price_share, 0, 0.0, 0.0};
+                        continue;
+                    }
+                    if (wit == watch.end()) continue;
+                    watched& h = wit->second;
+                    if (h.age >= 8) continue;
+                    ++h.age;
+                    if (h.age > 4)
+                    {
+                        h.earned += estimate_building_profit(w, seed_reg, tick.report, a).net();
+                        for (const building_report& br : tick.report.buildings)
+                            if (br.building == a) { h.run += br.run; break; }
+                    }
+                    if (h.age == 8)
+                        std::printf("HOLDOUT seed=%d q=%d name=%s old=%.2f new=%.2f starved=%d share=%.3f earned=%.2f run=%.2f kind=%d\n",
+                                    seed, h.ordered, h.name.c_str(), h.old_quote, h.new_quote, h.starved, h.share, h.earned / 4.0, h.run / 4.0, bc.type == building_type::processing_facility ? 1 : 0);
+                }
             }
             // What a standing plant truly earned, beside what the door would quote.
             if (k == 4 || k == 20)

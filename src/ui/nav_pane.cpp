@@ -346,7 +346,8 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // BL-1406: the corporation stance table retired with the corporation
         // (ledgers/corporation.md § Slot 8, retired). The slot is live again under
         // the nation-grain Diplomacy ledger (Ben, 2026-10-30; ledgers/diplomacy.md):
-        // Nations and Wars. No lens on open (§ 3).
+        // Nations and Wars. The Nations view arms the Nations lens (§ 3), on the edge the
+        // ledger's own draw watches (BL-1511).
         case 8:
             if (ImGui::Selectable(id, state.show_diplomacy_ledger, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_diplomacy_ledger;

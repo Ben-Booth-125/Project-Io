@@ -3,7 +3,12 @@
 #include "charts.hpp"
 #include "detail_level.hpp"   // the fold idiom (BL-214)
 #include "foldout_column.hpp" // shell fold-out column host
+#include "diplomacy_ledger.hpp" // refresh_nation_gdp: the one public GDP read
+#include "format.hpp"
+#include "player_side.hpp"
 #include "presentation.hpp"
+#include "world/survey_system.hpp" // survey_tile_visible: a rival's force past the survey is unseen
+#include "world/standing.hpp"
 
 #include <imgui.h>
 
@@ -18,16 +23,11 @@ namespace {
 /// three went, and where their questions are answered instead.
 constexpr const char* k_balance_title = "Balance";
 
-/// The Balance card's body: the two-column chart, the quarter's net, and the
-/// force line. ONE builder with TWO hosts — the resting ledger column and the
+/// The Balance card's body: the two bars, the quarter's net, and the force line. ONE builder with TWO hosts — the resting ledger column and the
 /// full-canvas takeover — which is the shared-body pattern BL-265 established
 /// and the reason the two hosts cannot drift apart.
 ///
-/// @param chart_h Height budgeted by the host from its OWN remaining space. The
-///        column is ~380 px at 1280 and 384 px at 1920 — the difference between
-///        the two resolutions is all vertical — so a literal here would fit one
-///        screen and waste or overflow the other.
-void balance_body(const corp_rollups& r, float chart_h)
+void balance_body(const corp_rollups& r)
 {
     if (!r.budget_measured)
     {
@@ -40,15 +40,11 @@ void balance_body(const corp_rollups& r, float chart_h)
 
     const ImVec2 p  = ImGui::GetCursorScreenPos();
     const float  cw = ImGui::GetContentRegionAvail().x;
-    // bar_cap 0 auto-fits the columns to the host. The building card's 44 px cap
-    // comes from the mockup its chart was drawn from; here the chart IS the
-    // surface, so two hairlines in a 380 px column would be the wrong reading of
-    // the same shape.
-    charts::draw_stacked_columns(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + chart_h},
-                                 c.earnings, c.earning_count,
-                                 c.expenses, c.expense_count,
-                                 /*bar_cap=*/0.0f, "Earnings", "Expenses",
-                                 /*tight_axis=*/true);
+    // Two bars at text height and a half: Standing takes the column's room beneath.
+    const float chart_h = ImGui::GetTextLineHeight() * 3.0f + 8.0f;
+    charts::draw_stacked_bars(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + chart_h},
+                              c.earnings, c.earning_count, c.expenses, c.expense_count,
+                              "Earnings", "Expenses");
     // The drawer leaves the cursor wherever its last hover target sat, so the
     // row is reserved explicitly rather than inferred.
     ImGui::SetCursorScreenPos(p);
@@ -85,16 +81,114 @@ void balance_body(const corp_rollups& r, float chart_h)
     }
 }
 
-/// Height to give the chart inside the host's remaining space: everything left,
-/// less the lines that follow it. The void under this card is the whole reason
-/// the surface was cut to one, so the chart takes the space rather than leaving
-/// it — but it never takes the space the net and force lines need.
-float chart_budget(const corp_rollups& r)
+/// The unit entities @p nation fields that the player can see. Its own, all of them; a
+/// rival's, those on surveyed ground, which is exactly what the map's counters show of it
+/// (DISCOVERY.md; a counter's count is public, a unit's internals are not, BL-068).
+int visible_force(const world& w, const ui_state& s, entity_id nation, bool mine)
 {
-    const float line = ImGui::GetTextLineHeightWithSpacing();
-    const int   tail = 1 + ((r.budget_measured && r.budget.force_units > 0) ? 1 : 0)
-                         + (r.refunds > 0.0f ? 1 : 0); // BL-1215's refunds line
-    return std::max(140.0f, ImGui::GetContentRegionAvail().y - line * (tail + 1));
+    int n = 0;
+    for (const auto& [uid, u] : w.units)
+    {
+        if (u.owner != nation || u.count <= 0)
+            continue;
+        if (!mine && !(s.spectating && s.god_view))
+        {
+            const auto tit = w.tiles.find(u.position);
+            if (tit == w.tiles.end())
+                continue;
+            const auto bit = w.bodies.find(tit->second.body);
+            if (bit == w.bodies.end()
+                || !survey_tile_visible(bit->second.survey, bit->second.grid_width, bit->second.grid_height,
+                                        tit->second.grid_x, tit->second.grid_y))
+                continue;
+        }
+        ++n;
+    }
+    return n;
+}
+
+/// STANDING (BL-1509; ledgers/corporation.md § Slot 1): the nation's rank among nations on
+/// GDP, market share, reach and total force, each a bar against the leader's figure. All
+/// four are public; a rival's treasury is not, and is not here (FINANCE.md § Disclosure).
+void standing_body(const world& w, const recipe_registry& reg, const economy_report& report,
+                   const std::vector<corp_standing>& standings, ui_state& s, entity_id me)
+{
+    refresh_nation_gdp(w, reg, report, s);
+    auto& rows = s.diplomacy.standing;
+    rows.clear();
+
+    std::vector<entity_id> nations;
+    for (const auto& [id, n] : w.nations)
+        nations.push_back(id);
+    std::sort(nations.begin(), nations.end());
+
+    const auto standing_of = [&](entity_id n) -> const corp_standing* {
+        for (const corp_standing& c : standings)
+            if (c.corp == n) return &c;
+        return nullptr;
+    };
+    const auto gdp = [&](entity_id n) {
+        const auto it = s.diplomacy.gdp_year.find(n);
+        return it == s.diplomacy.gdp_year.end() ? 0.0 : it->second;
+    };
+    const auto share = [&](entity_id n) {
+        const corp_standing* c = standing_of(n);
+        return c != nullptr ? static_cast<double>(c->market_share) * 100.0 : 0.0;
+    };
+    const auto reach = [&](entity_id n) {
+        const corp_standing* c = standing_of(n);
+        return c != nullptr ? static_cast<double>(c->reach_bodies) : 0.0;
+    };
+    const auto force = [&](entity_id n) {
+        return static_cast<double>(visible_force(w, s, n, n == me));
+    };
+
+    const auto row = [&](const char* label, const char* fmt_v, const char* tip, auto&& value_of) {
+        double mine = 0.0, leader = 0.0;
+        entity_id leader_id = null_entity;
+        int rank = 1, of = 0;
+        std::vector<double> vals;
+        for (const entity_id n : nations)
+        {
+            const double v = value_of(n);
+            ++of;
+            if (n == me) mine = v;
+            if (leader_id == null_entity || v > leader) { leader = v; leader_id = n; }
+            vals.push_back(v);
+        }
+        for (const double v : vals)
+            if (v > mine) ++rank;
+        rows.push_back({label, mine, leader, rank, of});
+
+        ImGui::TextUnformatted(label);
+        char pos[32];
+        std::snprintf(pos, sizeof pos, "#%d of %d", rank, of);
+        const float pw = ImGui::CalcTextSize(pos).x;
+        ImGui::SameLine(std::max(ImGui::GetCursorPosX(), ImGui::GetContentRegionMax().x - pw));
+        ImGui::TextDisabled("%s", pos);
+
+        const ImVec2 p  = ImGui::GetCursorScreenPos();
+        const float  cw = ImGui::GetContentRegionAvail().x;
+        const float  h  = ImGui::GetTextLineHeight();
+        charts::draw_value_bar(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + h},
+                               static_cast<float>(mine), static_cast<float>(leader > 0.0 ? leader : 1.0),
+                               rank == 1 ? palette::positive : palette::selection, fmt_v);
+        ImGui::Dummy({cw, h});
+        if (ImGui::IsItemHovered())
+        {
+            const char* leader_name = owner_display_name(w, leader_id);
+            ImGui::SetTooltip("%s\nThe bar is yours against the leader, %s: %.1f.", tip,
+                              leader_name != nullptr ? leader_name : "-", leader);
+        }
+    };
+
+    ImGui::Spacing();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Standing");
+    ImGui::Separator();
+    row("GDP", "%.0f", "What your buildings' goods sell for in a year.", gdp);
+    row("Market share", "%.1f%%", "Your share of what the markets cleared last quarter.", share);
+    row("Reach", "%.0f", "Bodies with at least one of the nation's buildings.", reach);
+    row("Total force", "%.0f", "Units in the field. A rival's are the ones on ground you have surveyed.", force);
 }
 
 } // namespace
@@ -178,6 +272,15 @@ bool fill_nation_rollups(const world& w, entity_id nation, corp_rollups& r)
         r.tax_income         = led.taxes;
         r.budget_measured    = true;
     }
+    // The force line (BL-1509): the units themselves, since the nation's row holds no
+    // force flow of its own. A unit below full supply is the "weakening" the line names.
+    for (const auto& [uid, u] : w.units)
+        if (u.owner == nation && u.count > 0)
+        {
+            ++r.budget.force_units;
+            if (u.supply_factor_permille < 1000)
+                ++r.budget.force_unsupplied;
+        }
     return true;
 }
 
@@ -213,6 +316,7 @@ corp_rollups derive_corp_rollups(const world& w, const recipe_registry& reg,
 
 void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
                                 const economy_report& report,
+                                const std::vector<corp_standing>& standings,
                                 ui_state& s, bool& open)
 {
     if (!open)
@@ -253,7 +357,8 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
         // has nothing to disclose and only `›` is drawn — in the same rightmost
         // column as every other row in the app.
         disclosure_controls(s, detail_surface::corp_rollup, 0, /*in_place=*/false);
-        balance_body(r, chart_budget(r));
+        balance_body(r);
+        standing_body(w, reg, report, standings, s, corp);
         ImGui::PopID();
     }
     ui::foldout_end();
@@ -272,7 +377,8 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
         // verdict would print the same figure twice on one screen — and the net
         // line under the chart is already the third.
         ImGui::SeparatorText(k_balance_title);
-        balance_body(r, chart_budget(r));
+        balance_body(r);
+        standing_body(w, reg, report, standings, s, corp);
         fold_overlay_end(s);
     }
 }

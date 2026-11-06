@@ -169,6 +169,21 @@ struct structure_hit_zone
 /// now a unit's command grain (BL-511's march_unit retarget; corp_command.hpp),
 /// exactly as the existing building "+N" stack badge already groups several
 /// buildings sharing one tile.
+/// One counter marching between two tiles, as this frame drew it (BL-1507;
+/// MILITARY.md § Land — on the canvas). Rebuilt every frame by the Planetary canvas;
+/// the `ids` are the units walking together on the same hop at the same pace, ascending,
+/// so `ids.front()` is the counter's hit-zone id. View state only.
+struct unit_glide
+{
+    std::vector<entity_id> ids;
+    entity_id owner = null_entity;
+    entity_id from  = null_entity; ///< The tile the march still stands on (the sim's position).
+    entity_id to    = null_entity; ///< The next hop.
+    float     t     = 0.0f;        ///< March fraction of the hop, 0..1: the bank over the hop's price.
+    float     x     = -1.0f;       ///< Where the counter drew (screen, first wrap copy); -1 off screen.
+    float     y     = -1.0f;
+};
+
 struct unit_marker_summary
 {
     entity_id owner       = null_entity; ///< The corp/nation entity owning this group.
@@ -430,8 +445,16 @@ struct diplomacy_ledger_state
 {
     /// 0 = Nations (default), 1 = Wars.
     int       view = 0;
-    /// The nation whose row is expanded in place, or null. A toggle per row.
+    /// The nation the Nations view has chosen in its selector (BL-1511; diplomacy.md § 1).
+    /// Null only until the view first draws, which then takes the selector's first nation.
     entity_id expanded = null_entity;
+    /// Whether the Nations view was open last frame: the edge that arms and disarms the
+    /// Nations lens (diplomacy.md § 3), on every route that opens or closes it.
+    bool      nations_view_was_open = false;
+    /// The selector as drawn, for verify: its centre, and each item of its open list.
+    float     combo_x = -1.0f, combo_y = -1.0f;
+    struct combo_item { entity_id nation = null_entity; float x = 0.0f, y = 0.0f; };
+    std::vector<combo_item> combo_items;
     /// One-shot scroll requests: bring a just-expanded row's head, or a just-opened
     /// declaration's head, to the top of the column so its content is not below
     /// the fold. Consumed when drawn.
@@ -500,6 +523,14 @@ struct diplomacy_ledger_state
     std::uint64_t                   owners_catchment  = ~std::uint64_t{0};
     std::map<uint32_t, entity_id>   province_owners;  ///< province -> political owner.
     std::map<entity_id, int>        provinces_owned;  ///< nation -> provinces it owns.
+    /// BL-1509: the Nation overview's Standing rows as drawn, for verify.
+    struct standing_row
+    {
+        const char* label = "";
+        double      value = 0.0, leader = 0.0;
+        int         rank = 0, of = 0;
+    };
+    std::vector<standing_row> standing;
     /// GDP per nation per year, recomputed once per econ tick.
     int                             gdp_tick = -1;
     std::map<entity_id, double>     gdp_year;
@@ -509,7 +540,7 @@ struct diplomacy_ledger_state
     struct drawn_row
     {
         entity_id nation = null_entity;
-        float x = -1.0f, y = -1.0f;   ///< The row's expander.
+        float x = -1.0f, y = -1.0f;   ///< Retired with the row's expander (BL-1511): always absent.
         bool  expanded = false;
         bool  hostile_out = false, hostile_in = false, friends = false, at_war = false, truce = false;
         float access = 0.0f, trust = 0.0f, alarm = 0.0f; ///< Their sentiment toward the player.
@@ -830,7 +861,9 @@ struct site_row
     /// its province has none (`place_near`).
     std::string   place;
     bool          place_near = false;
-    bool          priced   = false; ///< `estimate_prospective_profit(...).has_data`.
+    bool          priced   = false; ///< The quote's `has_data` (`quote_for_tile`).
+    bool          starved  = false; ///< An input cannot be had here, so it would stand idle.
+    resource_type short_of = resource_type::iron_ore; ///< The first such input, when starved.
     float         profit   = 0.0f;  ///< Est. net / qtr, Logistic Point cover applied.
     float         profit_full_cover = 0.0f; ///< The same estimate at cover 1.
     float         capex    = 0.0f;  ///< `construction_capex` - what the press charges.
@@ -1213,6 +1246,23 @@ struct ui_state
     /// the band draws that unit's card whatever this says.
     bool selection_unit_group = false;
 
+    /// THE DRAGGED GROUP (BL-1508; SELECTION.md § The dragged group): the player's own
+    /// units a left drag gathered, ascending, across tiles; at least two, or empty for
+    /// none. `selected_entity` stays one of them, so every reader of the selection still
+    /// has its entity, and the band, a right-click and Assign to front read this list.
+    /// Pruned each frame of the fallen, and retired by any other selection.
+    std::vector<entity_id> selected_units;
+    /// The left press that may become that drag: where it went down (screen), whether
+    /// Shift held at the press, and whether it has moved far enough to be a band.
+    struct unit_drag_gesture
+    {
+        bool  pressed = false;
+        bool  shift   = false;
+        bool  band    = false;
+        float x0 = 0.0f, y0 = 0.0f;
+    };
+    unit_drag_gesture unit_drag;
+
     /// The province the CURRENT SELECTION stands in, or 0 when the selection is
     /// not a tile. A DERIVED MIRROR, not a selection channel (BL-598).
     ///
@@ -1271,13 +1321,20 @@ struct ui_state
             && selected_battle_defender != null_entity;
     }
 
-    /// Clear the battle selection. Called by every other selection path, so the
-    /// Selection element never has two things to draw.
+    /// BL-1506 (SELECTION.md § The convoy element): the selected convoy's id, 0 for none.
+    /// A convoy is not an entity; it is transient, and its id is the stable handle
+    /// (`convoy_component::id`), never reused. An id that has arrived clears itself.
+    std::uint32_t selected_convoy = 0;
+
+    /// Clear the battle selection, and the convoy with it: both are non-entity channels
+    /// the same paths retire. Called by every other selection path, so the Selection
+    /// element never has two things to draw.
     void clear_battle_selection()
     {
         selected_battle_province = 0;
         selected_battle_attacker = null_entity;
         selected_battle_defender = null_entity;
+        selected_convoy          = 0;
     }
 
     // --- The selected front (BL-1427; SELECTION.md § The front element) ----
@@ -1556,20 +1613,30 @@ struct ui_state
     /// DEFAULTS OFF ON A MEASUREMENT, not a preference. The design nominated this
     /// as the FIRST COLUMN TO DROP if the row will not fit, and required the fit
     /// be measured rather than assumed — expecting the pressure at 384 px to be
-    /// on the graph's width rather than the column count. Measured at 1920x1080
-    /// over the real 45-good roster (`scripts/verify/goods_table.lua`, which
-    /// prints both):
+    /// on the graph's width rather than the column count. Measured with the Shelf
+    /// column in the row over the real 54-good roster at 16 px type
+    /// (`scripts/verify/goods_table.lua`, which prints both):
     ///
-    ///     with the column:     name column 42 px, 13 of 45 names fit
-    ///     without the column:  name column 98 px, 36 of 45 names fit
+    ///     with the column:     name column 18 px, 0 of 54 names fit
+    ///     without the column:  name column 72 px, 33 of 54 names fit
     ///
     /// So the expectation was wrong and the design's own rule applies: dropping
-    /// one text column more than doubles the name width, because the graph is
-    /// only ~3.4em to begin with. At 42 px "Iron Ore" and "Iron-something" BOTH
-    /// elide to "Iron ...", which defeats the one thing a price board is for.
+    /// one text column quadruples the name width, because the graph is only ~2.6em
+    /// to begin with. At 18 px no name survives, which defeats the one thing a price
+    /// board is for.
     /// Kept as a dial so the call is one line to revert, and the script reports
     /// both numbers on every run.
     bool market_goods_show_body = false;
+
+    /// The Goods table's sort (ledgers/market.md § 2): which heading, or 0 for the
+    /// roster order at rest, and which way. Written from the table's own sort specs;
+    /// a press on the active heading walks it down, up, and back to rest.
+    int  market_goods_sort_col  = 0;
+    bool market_goods_sort_desc = false;
+
+    /// Verify only (`verify.item_glyph_sheet`): draw the item-glyph contact sheet
+    /// over the window while the Market ledger is open (BL-1518). No control sets it.
+    bool verify_item_glyph_sheet = false;
 
     // --- BL-1239 (tile production section): the Market ledger's AIM ---------
     // A drill-through door (DRILL_THROUGH.md) from the tile element's
@@ -1776,6 +1843,9 @@ struct ui_state
     /// the top of body_surface_canvas each frame and rebuilt during the draw pass
     /// so click/hover handling can hit-test in priority order. See marker_hit_zone.
     std::vector<marker_hit_zone> marker_hit_zones;
+    std::vector<unit_glide> unit_glides; ///< BL-1507: this frame's marching counters.
+    float marker_tilt_sy    = 1.0f; ///< BL-1508: the camera's squash, so a zone's ground point has a screen point.
+    float marker_tilt_pivot = 0.0f;
 
     /// Per-frame list of on-canvas STRUCTURE boundaries (national borders today).
     /// Cleared and rebuilt with `marker_hit_zones`, and hit-tested after it: a
@@ -1883,6 +1953,36 @@ struct ui_state
     struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f;
                          std::vector<float> at; /* BL-1195: the lane's clock (convoy_route::at) */ };
     std::vector<convoy_beam> convoy_beams;
+
+    /// THE CONVOYS THE CANVAS DRAWS (BL-1506; SELECTION.md § The convoy element). Every
+    /// convoy with a lane on the active body, rebuilt beside `convoy_beams`, because the
+    /// lane read needs the mutable world's path cache and the const draw has neither. The
+    /// draw pass decides which of a rival's the fog shows. View state only.
+    struct convoy_marker
+    {
+        std::uint32_t          id    = 0;
+        entity_id              owner = null_entity;
+        bool                   mine  = false;
+        float                  progress = 0.0f;
+        float                  speed    = 0.0f; ///< 0 while held: a held convoy stands still.
+        std::vector<entity_id> path;
+        std::vector<float>     at;              ///< The lane's clock (convoy_route::at).
+    };
+    std::vector<convoy_marker> convoy_markers;
+    /// One marker as last drawn: the convoy a press on it selects (a repeat press walks to
+    /// the next on that tile), the ground-space hit circle, its screen point, and how many
+    /// share the tile.
+    struct convoy_zone
+    {
+        std::uint32_t id = 0;
+        ImVec2        centre{};
+        float         radius = 0.0f;
+        float         x = 0.0f, y = 0.0f;
+        int           count = 1;
+        bool          mine  = false;
+    };
+    std::vector<convoy_zone> convoy_zones;
+    std::uint32_t hovered_convoy = 0; ///< The convoy the pointer's marker names; 0 none.
 
     // --- Throughput lens: this frame's active-LP anchor pools (BL-598) ---
     // LOGISTICS.md § Logistic Points: LP is a per-tick RATE, never a stock. These

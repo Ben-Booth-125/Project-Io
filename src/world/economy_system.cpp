@@ -4703,6 +4703,51 @@ void charge_supply_draws(world& w, const recipe_registry& reg, const lp_tick& lp
     }
 }
 
+float march_hop_cost(const world& w, const recipe_registry& reg, const unit_component& u,
+                     const tile_component& to, entity_id to_id, const tile_component& from)
+{
+    const int march_side = road_side_between(w, u.position, to_id);
+    float step_cost = edge_traversal_cost(from, to, march_side);
+    // BL-1455 (MILITARY.md § Terrain and the classes): the class's MOVE row on the
+    // destination tile multiplies the hop's days - a dismount folded in as foot
+    // infantry's days over the class's own. Exactly 1.0 on ground no row names.
+    {
+        const float move = terrain_class_effects_for_type(reg.military(), u.type, to).move;
+        if (move != 1.0f)
+            step_cost *= move;
+    }
+    // BL-1449 (MILITARY.md § Air): air superiority SLOWS the side that lacks
+    // it — a step into a province where the marcher's share is short costs up
+    // to (1000 + march_slow) per-mille. Exactly 1000 (the unchanged path) when
+    // no superiority is flown anywhere.
+    if (!w.air_superiority.empty())
+    {
+        const int slow = air_march_cost_permille(w, reg, u.owner, to_id);
+        if (slow != 1000)
+            step_cost *= static_cast<float>(slow) / 1000.0f;
+    }
+    return step_cost;
+}
+
+float march_hop_fraction(const world& w, const recipe_registry& reg, const unit_component& u,
+                         float day_fraction)
+{
+    if (u.order.dest == null_entity || u.order.next_index >= u.order.path.size())
+        return -1.0f;
+    const auto from = w.tiles.find(u.position);
+    const entity_id next_id = u.order.path[u.order.next_index];
+    const auto to = w.tiles.find(next_id);
+    if (from == w.tiles.end() || to == w.tiles.end() || to->second.body != from->second.body)
+        return -1.0f;
+    const float rate = march_rate_per_day(reg.military(), u.type);
+    if (rate <= 0.0f)
+        return -1.0f;
+    const float cost = march_hop_cost(w, reg, u, to->second, next_id, from->second);
+    if (cost <= 0.0f)
+        return 0.0f; // a free hop: tomorrow's walk takes it whole
+    return std::clamp((u.order.progress + rate * day_fraction) / cost, 0.0f, 1.0f);
+}
+
 unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tick)
 {
     unit_march_tick out;
@@ -4872,27 +4917,8 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
             // of the two nodes, the crossing's road tier, its river discount, and a
             // bridged water node at its deck — so a unit marching over a bridge pays the
             // road, as a convoy does, and neither invents a second model.
-            const int march_side = road_side_between(w, u.position, next_id);
-            float step_cost =
-                edge_traversal_cost(cur_it->second, next_it->second, march_side);
-            // BL-1455 (MILITARY.md § Terrain and the classes): the class's MOVE row on the
-            // destination tile multiplies the hop's days - a dismount folded in as foot
-            // infantry's days over the class's own. Exactly 1.0 on ground no row names.
-            {
-                const float move = terrain_class_effects_for_type(mil, u.type, next_it->second).move;
-                if (move != 1.0f)
-                    step_cost *= move;
-            }
-            // BL-1449 (MILITARY.md § Air): air superiority SLOWS the side that lacks
-            // it — a step into a province where the marcher's share is short costs up
-            // to (1000 + march_slow) per-mille. Exactly 1000 (the unchanged path) when
-            // no superiority is flown anywhere.
-            if (!w.air_superiority.empty())
-            {
-                const int slow = air_march_cost_permille(w, reg, u.owner, next_id);
-                if (slow != 1000)
-                    step_cost *= static_cast<float>(slow) / 1000.0f;
-            }
+            const float step_cost =
+                march_hop_cost(w, reg, u, next_it->second, next_id, cur_it->second);
             if (step_cost <= 0.0f || points + 1e-6f >= step_cost)
             {
                 points -= step_cost;

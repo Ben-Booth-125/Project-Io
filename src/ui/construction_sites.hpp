@@ -21,6 +21,7 @@
 // `update_body_throughput` does) and publishes into `ui_state::site_finder`.
 
 #include "ui_state.hpp"
+#include "world/site_quote.hpp"
 
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
@@ -41,6 +42,16 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
 /// the economy tick, the building count, the logistics generation). @p blocked receives
 /// whether a source reached it without a chain to the capital. 0 on nobody's ground.
 float site_lp_cover(world& w, entity_id tile, bool* blocked = nullptr);
+
+/// The app's last economy report, which the quote reads for what producers really made.
+/// The pointer must outlive the UI: it is the app's own record.
+void set_quote_report(const economy_report* report);
+
+/// THE quote a building would earn on @p tile (world/site_quote.hpp), for the Build door
+/// and the site finder alike, so a row and the door quote one figure. Cached until the
+/// frame stamp moves, because the door asks for every candidate on every frame.
+site_quote quote_for_tile(world& w, const recipe_registry& reg, entity_id tile, building_type type,
+                          resource_type target, std::uint16_t recipe, float lp_cover);
 
 /// Rebuild the finder's evaluation when its key moves (the chosen building, the
 /// active body, the frame stamp, the treasury, the reach budget), and mark it live

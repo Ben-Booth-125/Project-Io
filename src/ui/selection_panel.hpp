@@ -87,7 +87,7 @@ std::string unit_roster_display_name(std::uint16_t type);
 /// ordering of that list is a recommendation"; CONCEPT.md).
 ///
 /// @p lp_cover is the selected tile's Logistic Point cover (`site_lp_cover`), handed to
-/// `estimate_prospective_profit` so the door and the site ledger quote one figure.
+/// `quote_for_tile` so the door and the site ledger quote one figure.
 ///
 /// Lists every building type placeable on the tile (via placement_rules) with its
 /// full construction cost as one credit total (build cost plus materials priced at
@@ -102,7 +102,7 @@ std::string unit_roster_display_name(std::uint16_t type);
 /// @param reg  Loaded registry — per-type build costs.
 /// @param ui   UI state; read for the selected tile, written by the Build action
 ///             (enqueue).
-void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui,
+void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_state& ui,
                                    float lp_cover = 1.0f);
 
 /// The **Method** lever — the tiled recipe grid whose Switch buttons call

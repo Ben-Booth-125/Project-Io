@@ -48,6 +48,19 @@ local function click(x, y)
     verify.mouse(-1, -1)
     verify.frames(3)
 end
+-- BL-1511: the selector, by real presses: open the dropdown, press the nation's item.
+local function choose(nation)
+    local dl = led()
+    click(dl.combo_x, dl.combo_y)
+    verify.frames(2)
+    for _, it in ipairs(led().combo_items) do
+        if it.nation == nation then
+            click(it.x, it.y)
+            return
+        end
+    end
+    error("the selector does not list nation " .. tostring(nation))
+end
 
 -- 1. Press rail slot 8.
 local sx, sy = verify.nav_slot(8)
@@ -56,13 +69,17 @@ click(sx, sy)
 assert(open_panel() == "diplomacy", "slot 8 opened '" .. tostring(open_panel()) .. "', not diplomacy")
 ok("slot 8 opens the Diplomacy ledger")
 local d = led()
+-- BL-1511 (diplomacy.md § 3): opening the Nations view arms the Nations lens.
+assert(verify.overlay_name() == "nations", "the Nations view did not arm the Nations lens: " .. tostring(verify.overlay_name()))
+ok("slot 8 arms the Nations lens")
+assert(d.combo_x >= 0, "the Nations view drew no selector")
 assert(d.view == 0, "the ledger did not open on Nations")
 assert(#d.rows > 0, "Nations drew no rows")
 print("diplomacy_ledger: " .. #d.rows .. " nation rows; first " .. d.rows[1].nation
       .. " access " .. string.format("%.2f", d.rows[1].access)
       .. " trust " .. string.format("%.2f", d.rows[1].trust)
       .. " alarm " .. string.format("%.2f", d.rows[1].alarm))
-verify.capture("diplomacy_nations_folded")
+verify.capture("diplomacy_nations_selector")
 
 -- BL-1470: hovering a sentiment bar names its largest cause. Aim at the first row
 -- whose Access toward the player is not zero and hover its Access bar.
@@ -98,11 +115,10 @@ end
 local target = theirs and theirs.owner or d.rows[1].nation
 print("diplomacy_ledger: target nation " .. target .. (theirs and (" (stack at " .. theirs.col .. "," .. theirs.row .. ")") or ""))
 
--- 2. Expand the target's row in place.
-local r = row_of(target)
-click(r.x, r.y)
-assert(led().expanded == target, "the expander did not expand the row")
-ok("the row expands in place")
+-- 2. Choose the target in the selector.
+choose(target)
+assert(led().expanded == target, "the selector did not choose the nation")
+ok("the selector chooses the nation")
 local emb = press_of("embargo", target)
 assert(emb ~= nil and emb.enabled, "the Embargo press is not drawn live")
 local friend = press_of("offer_friendship", target) or press_of("withdraw", target)
@@ -112,15 +128,36 @@ local decl = press_of("declare_open", target)
 assert(decl ~= nil, "no Declare war press drawn")
 print("diplomacy_ledger: friendship press '" .. friend.kind .. "', declare enabled=" .. tostring(decl.enabled)
       .. (decl.enabled and "" or (" (" .. decl.reason .. ")")))
-verify.capture("diplomacy_nations_expanded")
+verify.capture("diplomacy_nations_chosen")
 
--- Re-pressing the expander folds it (a toggle), then open it again. The row may
--- have scrolled to the column top when it opened, so read its point afresh.
-r = row_of(target)
-click(r.x, r.y)
-assert(led().expanded == 0, "re-pressing the expander did not fold the row")
-click(row_of(target).x, row_of(target).y)
-ok("the expander is a toggle")
+-- A press on a nation under the Nations lens navigates here (LENSES.md § The Nations
+-- lens), and from a closed ledger opens it. Aim at the rival stack's own ground.
+if theirs then
+    verify.center_tile(theirs.col, theirs.row, 6.0)
+    verify.frames(3)
+    local other = nil
+    for _, row in ipairs(led().rows) do
+        if row.nation ~= theirs.owner then other = row.nation; break end
+    end
+    if other then choose(other) end
+    local gp = verify.tile_screen(theirs.col, theirs.row)
+    click(gp.x, gp.y)
+    assert(led().expanded == theirs.owner, "a press under the lens did not choose the nation")
+    ok("a press under the Nations lens chooses the nation")
+    local rx, ry = verify.nav_slot(8)
+    click(rx, ry)
+    assert(open_panel() ~= "diplomacy", "re-pressing slot 8 did not close the ledger")
+    assert(verify.overlay_name() ~= "nations", "closing the ledger did not disarm the Nations lens")
+    ok("closing the ledger disarms the lens")
+    verify.set_overlay("nations")
+    verify.frames(2)
+    gp = verify.tile_screen(theirs.col, theirs.row)
+    click(gp.x, gp.y)
+    assert(open_panel() == "diplomacy", "a press under the lens did not open the closed ledger")
+    ok("a press under the Nations lens opens the closed ledger")
+    verify.capture("diplomacy_lens_press_opened")
+    if led().expanded ~= target then choose(target) end
+end
 
 -- Embargo / Lift is a toggle: Embargo enacts and the press reads Lift; Lift
 -- repeals and it reads Embargo again. Both through set_embargo.
@@ -191,7 +228,7 @@ if mine ~= nil and theirs ~= nil then
 end
 local d0 = led()
 if d0.view ~= 0 then click(d0.tab_nations_x, d0.tab_nations_y) end
-if led().expanded ~= target then click(row_of(target).x, row_of(target).y) end
+if led().expanded ~= target then choose(target) end
 
 -- Reopen and choose a goal on the canvas: the rival stack's province.
 click(press_of("declare_open", target).x, press_of("declare_open", target).y)
