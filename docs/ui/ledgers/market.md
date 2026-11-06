@@ -55,7 +55,14 @@ Goods and Trades tabs**, and splits left and right:
   Values, not quantities, because a ton of ore and a ton of electronics do not add.
 
 **Goods carries shelf stock and sorts (Ben, 2026-11-05).** Each row shows the good's stock on this
-market's shelf, and the table sorts by every heading.
+market's shelf, and the table sorts by every heading: **Good** by name, **Shelf**, **Price** and
+**v.Base** by their figures, and **8 qtr** by the good's change across the graph's window, last sample
+over first. A press sorts a number high to low first, because the top of the list is the question;
+the next press flips it and the third takes the sort off, back to the roster order the table rests in
+(the toggle rule, on a control whose active state is the arrow). Ties keep roster order, so equal rows
+never swap. The headings stay frozen while the rows scroll, so a sort is one press from anywhere in
+the list. Every column is sized from the live font: the wider of its heading and its widest figure,
+the sort arrow reserved only on the sorted column, and the name takes what is left.
 
 **Default on open:** **Goods**.
 **Cross-cutting selectors (NOT views, toggle-exempt):** the **Body** combo and the **Market**
@@ -68,17 +75,18 @@ stay legible. The graph shrinks with the row; the shared `price / base_price` ax
 
 **`body_average_price` does not survive, and the expectation was wrong.** The column was
 nominated first-to-drop *if* the row would not fit, on the reasoning that the pressure at 384 px
-would be on the graph's width rather than the column count. Measured at 1920x1080 over the real
-45-good roster (`scripts/verify/goods_table.lua` prints both layouts on every run):
+would be on the graph's width rather than the column count. Measured with the Shelf column in the row,
+over the real 54-good roster at 16 px type (`scripts/verify/goods_table.lua` prints both layouts on
+every run):
 
 | Layout | Name column | Names that fit |
 |---|---|---|
-| **with** body average | 42 px | **13 of 45** |
-| **without** body average | 98 px | **36 of 45** |
+| **with** body average | 18 px | **0 of 54** |
+| **without** body average | 72 px | **33 of 54** |
 
-So the column count was the pressure after all — the graph is only ~3.4 em, and dropping one
-text column more than doubles the name width. At 42 px `Iron Ore` and `Iron-Nickel Ore` both
-elide to `Iron ...`, which defeats the one thing a price board is for. It is kept as a one-line
+So the column count was the pressure after all — the graph is only ~2.6 em, and dropping one
+text column quadruples the name width. At 18 px no name survives, and elided names like `Agricultur...`
+that remain at 72 px are carried by the row's own glyph, which is what makes that width livable. It is kept as a one-line
 dial (`ui_state::market_goods_show_body`) rather than deleted, so the call is cheap to revisit.
 
 ## 2b. Trades — five sections, and why they are five

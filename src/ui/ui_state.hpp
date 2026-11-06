@@ -1553,20 +1553,26 @@ struct ui_state
     /// DEFAULTS OFF ON A MEASUREMENT, not a preference. The design nominated this
     /// as the FIRST COLUMN TO DROP if the row will not fit, and required the fit
     /// be measured rather than assumed — expecting the pressure at 384 px to be
-    /// on the graph's width rather than the column count. Measured at 1920x1080
-    /// over the real 45-good roster (`scripts/verify/goods_table.lua`, which
-    /// prints both):
+    /// on the graph's width rather than the column count. Measured with the Shelf
+    /// column in the row over the real 54-good roster at 16 px type
+    /// (`scripts/verify/goods_table.lua`, which prints both):
     ///
-    ///     with the column:     name column 42 px, 13 of 45 names fit
-    ///     without the column:  name column 98 px, 36 of 45 names fit
+    ///     with the column:     name column 18 px, 0 of 54 names fit
+    ///     without the column:  name column 72 px, 33 of 54 names fit
     ///
     /// So the expectation was wrong and the design's own rule applies: dropping
-    /// one text column more than doubles the name width, because the graph is
-    /// only ~3.4em to begin with. At 42 px "Iron Ore" and "Iron-something" BOTH
-    /// elide to "Iron ...", which defeats the one thing a price board is for.
+    /// one text column quadruples the name width, because the graph is only ~2.6em
+    /// to begin with. At 18 px no name survives, which defeats the one thing a price
+    /// board is for.
     /// Kept as a dial so the call is one line to revert, and the script reports
     /// both numbers on every run.
     bool market_goods_show_body = false;
+
+    /// The Goods table's sort (ledgers/market.md § 2): which heading, or 0 for the
+    /// roster order at rest, and which way. Written from the table's own sort specs;
+    /// a press on the active heading walks it down, up, and back to rest.
+    int  market_goods_sort_col  = 0;
+    bool market_goods_sort_desc = false;
 
     /// Verify only (`verify.item_glyph_sheet`): draw the item-glyph contact sheet
     /// over the window while the Market ledger is open (BL-1518). No control sets it.

@@ -18,6 +18,7 @@
 #include <cmath>
 #include <cstdio>  // std::snprintf
 #include <cstdint>
+#include <cstring> // std::strcmp — the Good column's order
 #include <string>
 #include <vector>
 
@@ -1540,6 +1541,47 @@ void draw_item_glyph_sheet()
     }
 }
 
+/// The Goods table's sort keys (`ui_state::market_goods_sort_col`), carried as each
+/// column's user id. Zero is the roster order, the table's rest.
+enum goods_sort_key : int
+{
+    goods_sort_roster = 0,
+    goods_sort_name,
+    goods_sort_shelf,
+    goods_sort_price,
+    goods_sort_body,
+    goods_sort_vs_base,
+    goods_sort_change,
+};
+
+/// What the 8 qtr column sorts by: the good's move across the window the graph
+/// draws, last sample over first. No window is no move.
+float goods_window_change(const std::vector<float>& ser)
+{
+    const std::size_t n = std::min(k_graph_quarters, ser.size());
+    if (n < 2)
+        return 0.0f;
+    const float first = ser[ser.size() - n];
+    return (first > 0.0f) ? ser.back() / first - 1.0f : 0.0f;
+}
+
+/// A shelf figure: abbreviated like every large count on this column, but a shelf
+/// holding less than ten shows its decimal, so a nearly bare shelf does not print
+/// the same "0" as an empty one.
+std::string shelf_figure(float units)
+{
+    if (units > 0.0f && units < 10.0f)
+    {
+        char buf[16];
+        std::snprintf(buf, sizeof buf, "%.1f", static_cast<double>(units));
+        return buf;
+    }
+    return fmt::abbreviate(static_cast<double>(units));
+}
+
+/// The Goods table's headings as drawn, for the check's presses and fit.
+std::vector<goods_header_record> g_goods_headers;
+
 /// The Goods table's drawn rows, refreshed every frame the table draws. See
 /// `goods_row_record` in the header for why the check reads what was DRAWN.
 std::vector<goods_row_record> g_goods_rows;
@@ -1557,6 +1599,7 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
     const auto hist_it = history.find(mid);
 
     g_goods_rows.clear();
+    g_goods_headers.clear();
     g_goods_market = mid;
 
     // BL-1239: an aimed good this market does not trade has no row below, so
@@ -1633,145 +1676,263 @@ void draw_goods_tab(const world& w, ui_state& s, entity_id body,
     const float lo = 1.0f - half;
     const float hi = 1.0f + half;
 
-    // Named child so `verify.scroll_panel("market", …)` can reach the REAL
-    // scroller (NR-719): the request names this key, not the window.
-    if (ImGui::BeginChild("##goods_scroll", {0.0f, 0.0f}, false))
+    // SCROLLS INSIDE ITS OWN TABLE, HEADINGS FROZEN: sorting is one of the things this
+    // table is for, and a heading that scrolled off with the rows could not be pressed
+    // from anywhere but the top. `verify.scroll_panel("market", …)` reaches this
+    // scroller by name (NR-719), claimed just inside BeginTable.
+    constexpr ImGuiTableFlags flags =
+        ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY
+        | ImGuiTableFlags_Sortable | ImGuiTableFlags_SortTristate
+        | ImGuiTableFlags_NoSavedSettings;
+
+    // `body_average_price` is the column the design nominated as first to drop IF
+    // the row will not fit — measured, not assumed (see `market_goods_show_body`).
+    // Both layouts are built so the pictures can decide.
+    const bool show_body = s.market_goods_show_body;
+    const int  n_cols    = show_body ? 7 : 6;
+
+    // TIGHT CELLS, FROM THE FONT: at six columns the default padding is 48 px of a
+    // ~300 px table, which is the name column's whole width again.
+    const float em = ImGui::GetFontSize();
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, {std::floor(em * 0.15f), ImGui::GetStyle().CellPadding.y});
+    const bool goods_table_open = ImGui::BeginTable("##goods", n_cols, flags);
+    ImGui::PopStyleVar();
+    if (goods_table_open)
     {
         ui::foldout_scroll_child("##goods_scroll");
 
-        constexpr ImGuiTableFlags flags =
-            ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
-
-        // `body_average_price` is the column the design nominated as first to
-        // drop IF the row will not fit — measured, not assumed (see
-        // `market_goods_show_body`). Both layouts are built so the pictures can
-        // decide, which is what the brief asked for.
-        const bool  show_body = s.market_goods_show_body;
-        const int   n_cols    = show_body ? 6 : 5;
-
-        if (ImGui::BeginTable("##goods", n_cols, flags))
+        // The rows this market trades, and each row's sort figures, ahead of the
+        // columns: the fixed columns are sized off these figures.
+        struct goods_row
         {
-            const float em = ImGui::GetFontSize();
-            // FIXED SIBLINGS SIZED IN em, AND THE NAME TAKES WHAT IS LEFT. Budget
-            // against the font, never against a pixel count: the column host is
-            // ~380 px at 1280 and 384 px at 1920 (`shell_column_width`), and the
-            // difference between those resolutions is all VERTICAL. NR-709 is the
-            // failure this avoids — a WidthStretch name column behind fixed
-            // siblings that ate it entirely, on four surfaces so far.
-            // Sized to the WIDEST STRING EACH COLUMN CAN HOLD, measured at the
-            // live font, rather than to an em multiple guessed at authoring time.
-            // The first cut used multiples and they were tuned against a 13 px
-            // font while the shell renders at ~18 px, so the fixed siblings ate
-            // the name column and "Iron Ore" and "Iron-something" both drew as
-            // "Iron ..." — two goods, one string, on a board whose whole job is
-            // telling goods apart. Measuring is the only version of this that
-            // cannot go stale when the font changes.
-            const float pad     = ImGui::GetStyle().CellPadding.x * 2.0f;
-            const float w_price = ImGui::CalcTextSize("00.00").x + pad;
-            const float w_vbase = ImGui::CalcTextSize("0.00x").x + pad;
-            const float w_graph = em * 3.4f;
+            std::size_t r        = 0;
+            float       shelf    = 0.0f;
+            float       body_avg = 0.0f;
+            float       vs_base  = 0.0f;
+            float       change   = 0.0f;
+            std::string shelf_text;
+        };
+        std::vector<goods_row> rows;
+        rows.reserve(resource_count);
+        float fig_shelf = 0.0f, fig_price = 0.0f, fig_body = 0.0f, fig_vbase = 0.0f;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (mc.base_price[r] <= 0.0f)
+                continue; // good not traded at this market
+            goods_row row;
+            row.r        = r;
+            row.shelf    = mc.inventory[r];
+            row.body_avg = body_average_price(w, body, r);
+            row.vs_base  = mc.price[r] / mc.base_price[r];
+            if (hist_it != history.end())
+                row.change = goods_window_change(hist_it->second[r].price);
+            row.shelf_text = shelf_figure(row.shelf);
 
-            ImGui::TableSetupColumn("##g",    ImGuiTableColumnFlags_WidthFixed, em);
-            ImGui::TableSetupColumn("Good",   ImGuiTableColumnFlags_WidthStretch, 1.0f);
-            ImGui::TableSetupColumn("Price",  ImGuiTableColumnFlags_WidthFixed, w_price);
-            if (show_body)
-                ImGui::TableSetupColumn("Body", ImGuiTableColumnFlags_WidthFixed, w_price);
-            ImGui::TableSetupColumn("v.Base", ImGuiTableColumnFlags_WidthFixed, w_vbase);
-            ImGui::TableSetupColumn("8 qtr",  ImGuiTableColumnFlags_WidthFixed, w_graph);
-            ImGui::TableHeadersRow();
-
-            bool any = false;
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                if (mc.base_price[r] <= 0.0f)
-                    continue; // good not traded at this market
-                any = true;
-                ImGui::PushID(static_cast<int>(r));
-                ImGui::TableNextRow(ImGuiTableRowFlags_None, row_h);
-
-                const resource_presentation& rp =
-                    presentation_of(static_cast<resource_type>(r));
-
-                ImGui::TableSetColumnIndex(0);
-                // BL-1239: the good a Production-section door aimed at — the
-                // row is washed and, once, scrolled into view, which is what
-                // "aimed at that good" means in a view listing every good.
-                if (mid == s.market_ledger_aimed_market &&
-                    s.market_ledger_aim_resource == static_cast<int>(r))
-                {
-                    ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, IM_COL32(70, 110, 160, 110));
-                    if (s.market_ledger_aim_scroll)
-                    {
-                        ImGui::SetScrollHereY(0.5f);
-                        s.market_ledger_aim_scroll = false;
-                    }
-                }
-                draw_item_glyph(static_cast<resource_type>(r), em);
-
-                ImGui::TableSetColumnIndex(1);
-                const float name_avail  = ImGui::GetContentRegionAvail().x;
-                const float name_needed = ImGui::CalcTextSize(rp.name).x;
-                // The name wears what the glyph wears, so the pair still match on the row.
-                ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::readable_on_chrome(rp.colour)));
-                ui::fit_text(ui::text_box::table_cell, "market.goods.name", rp.name, name_avail);
-                ImGui::PopStyleColor();
-
-                int col = 2;
-                ImGui::TableSetColumnIndex(col++);
-                ImGui::Text("%.2f", static_cast<double>(mc.price[r]));
-
-                const float body_avg = body_average_price(w, body, r);
-                if (show_body)
-                {
-                    ImGui::TableSetColumnIndex(col++);
-                    ImGui::TextDisabled("%.2f", static_cast<double>(body_avg));
-                }
-
-                ImGui::TableSetColumnIndex(col++);
-                const float vs_base = mc.price[r] / mc.base_price[r];
-                // The number carries direction too, in the same tints the graph
-                // uses, so colour means one thing across the whole row.
-                const ImU32 vb_col =
-                    (vs_base > 1.005f) ? IM_COL32(90, 200, 140, 255) :
-                    (vs_base < 0.995f) ? IM_COL32(225, 120, 110, 255) :
-                                         IM_COL32(150, 158, 178, 255);
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(vb_col),
-                                   "%.2fx", static_cast<double>(vs_base));
-
-                ImGui::TableSetColumnIndex(col);
-                const float gw = ImGui::GetContentRegionAvail().x;
-                const float gh = std::max(8.0f, row_h - 4.0f);
-                int samples = 0;
-                if (hist_it != history.end())
-                {
-                    const std::vector<float>& ser = hist_it->second[r].price;
-                    samples = static_cast<int>(std::min(k_graph_quarters, ser.size()));
-                    draw_row_graph(ser, mc.base_price[r], {gw, gh}, lo, hi);
-                }
-                else
-                    ImGui::TextDisabled("-");
-
-                goods_row_record rec;
-                rec.resource   = static_cast<resource_type>(r);
-                rec.name       = rp.name;
-                rec.price      = mc.price[r];
-                rec.base_price = mc.base_price[r];
-                rec.body_avg   = body_avg;
-                rec.vs_base    = vs_base;
-                rec.samples     = samples;
-                rec.name_avail  = name_avail;
-                rec.name_needed = name_needed;
-                g_goods_rows.push_back(rec);
-
-                ImGui::PopID();
-            }
-            ImGui::EndTable();
-
-            if (!any)
-                ImGui::TextDisabled("No tradeable goods at this market.");
+            char buf[32];
+            std::snprintf(buf, sizeof buf, "%.2f", static_cast<double>(mc.price[r]));
+            fig_price = std::max(fig_price, ImGui::CalcTextSize(buf).x);
+            std::snprintf(buf, sizeof buf, "%.2f", static_cast<double>(row.body_avg));
+            fig_body = std::max(fig_body, ImGui::CalcTextSize(buf).x);
+            std::snprintf(buf, sizeof buf, "%.2fx", static_cast<double>(row.vs_base));
+            fig_vbase = std::max(fig_vbase, ImGui::CalcTextSize(buf).x);
+            fig_shelf = std::max(fig_shelf, ImGui::CalcTextSize(row.shelf_text.c_str()).x);
+            rows.push_back(std::move(row));
         }
+
+        // EVERY COLUMN COMES FROM THE LIVE FONT, AND THE NAME TAKES WHAT IS LEFT. The
+        // column host is ~380 px at 1280 and 384 px at 1920 (`shell_column_width`), so
+        // what the UI scale moves is the font. Each fixed column is the wider of its
+        // heading and its widest figure as they measure now, the sort arrow reserved
+        // only on the sorted column, the one place it draws (the site ledger's idiom:
+        // ImGui's own header reserves it on every column, which at this width costs a
+        // name's worth of pixels for arrows nobody sees).
+        // NR-709 is the failure this avoids: a stretch name column behind fixed
+        // siblings that ate it entirely.
+        const float arrow_w = std::floor(em * 0.65f + ImGui::GetStyle().FramePadding.x);
+        const auto  head_w  = [&](const char* label, int uid) {
+            return ImGui::CalcTextSize(label).x + (uid == s.market_goods_sort_col ? arrow_w : 0.0f);
+        };
+        const auto  fixed   = [&](const char* label, int uid, float fig) {
+            return std::ceil(std::max(head_w(label, uid), fig)) + 1.0f;
+        };
+
+        constexpr ImGuiTableColumnFlags num =
+            ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_PreferSortDescending;
+        ImGui::TableSetupColumn("##g", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoSort, em);
+        ImGui::TableSetupColumn("Good", ImGuiTableColumnFlags_WidthStretch, 1.0f, goods_sort_name);
+        ImGui::TableSetupColumn("Shelf", num, fixed("Shelf", goods_sort_shelf, fig_shelf), goods_sort_shelf);
+        ImGui::TableSetupColumn("Price", num, fixed("Price", goods_sort_price, fig_price), goods_sort_price);
+        if (show_body)
+            ImGui::TableSetupColumn("Body", num, fixed("Body", goods_sort_body, fig_body), goods_sort_body);
+        ImGui::TableSetupColumn("v.Base", num, fixed("v.Base", goods_sort_vs_base, fig_vbase), goods_sort_vs_base);
+        ImGui::TableSetupColumn("8 qtr", num, fixed("8 qtr", goods_sort_change, em * 2.6f), goods_sort_change);
+        ImGui::TableSetupScrollFreeze(0, 1);
+
+        // The headings by hand: ImGui's header item keeps the press, the hover and the
+        // sorted column's arrow, the label is drawn whole beside it, and each one's press
+        // point and fit are published for the check.
+        ImGui::TableNextRow(ImGuiTableRowFlags_Headers);
+        for (int ci = 0; ci < n_cols; ++ci)
+        {
+            if (!ImGui::TableSetColumnIndex(ci))
+                continue;
+            const char*  name = ImGui::TableGetColumnName(ci);
+            const float  have = ImGui::GetContentRegionAvail().x;
+            const ImVec2 at   = ImGui::GetCursorScreenPos();
+            char id[24];
+            std::snprintf(id, sizeof id, "##goods_hdr%d", ci);
+            ImGui::TableHeader(id);
+            if (ci > 0) // the glyph column has no heading
+                ImGui::GetWindowDrawList()->AddText(at, ImGui::GetColorU32(ImGuiCol_Text), name);
+            const ImVec2 rmin = ImGui::GetItemRectMin();
+            const ImVec2 rmax = ImGui::GetItemRectMax();
+            goods_header_record h;
+            h.name = name;
+            h.x    = (rmin.x + rmax.x) * 0.5f;
+            h.y    = (rmin.y + rmax.y) * 0.5f;
+            h.need = head_w(name, (ImGui::TableGetColumnFlags(ci) & ImGuiTableColumnFlags_IsSorted) ? s.market_goods_sort_col : -1);
+            h.have = have;
+            g_goods_headers.push_back(std::move(h));
+        }
+
+        if (ImGuiTableSortSpecs* specs = ImGui::TableGetSortSpecs(); specs && specs->SpecsDirty)
+        {
+            s.market_goods_sort_col  = (specs->SpecsCount > 0)
+                ? static_cast<int>(specs->Specs[0].ColumnUserID) : static_cast<int>(goods_sort_roster);
+            s.market_goods_sort_desc = specs->SpecsCount > 0
+                && specs->Specs[0].SortDirection == ImGuiSortDirection_Descending;
+            specs->SpecsDirty = false;
+        }
+
+        // Sorted every frame against the live figures, every tie broken by the roster
+        // order, so a row moves when its figure does and two equal rows never swap.
+        const int  sort_col = s.market_goods_sort_col;
+        const bool desc     = s.market_goods_sort_desc;
+        if (sort_col != goods_sort_roster)
+        {
+            const auto key = [&](const goods_row& row) -> float {
+                switch (sort_col)
+                {
+                    case goods_sort_shelf:   return row.shelf;
+                    case goods_sort_price:   return mc.price[row.r];
+                    case goods_sort_body:    return row.body_avg;
+                    case goods_sort_vs_base: return row.vs_base;
+                    case goods_sort_change:  return row.change;
+                    default:                 return 0.0f;
+                }
+            };
+            std::sort(rows.begin(), rows.end(), [&](const goods_row& x, const goods_row& y) {
+                if (sort_col == goods_sort_name)
+                {
+                    const int c = std::strcmp(presentation_of(static_cast<resource_type>(x.r)).name,
+                                              presentation_of(static_cast<resource_type>(y.r)).name);
+                    if (c != 0)
+                        return desc ? c > 0 : c < 0;
+                }
+                else if (const float kx = key(x), ky = key(y); kx != ky)
+                    return desc ? kx > ky : kx < ky;
+                return x.r < y.r;
+            });
+        }
+
+        for (const goods_row& row : rows)
+        {
+            const std::size_t r = row.r;
+            ImGui::PushID(static_cast<int>(r));
+            ImGui::TableNextRow(ImGuiTableRowFlags_None, row_h);
+
+            const resource_presentation& rp =
+                presentation_of(static_cast<resource_type>(r));
+
+            ImGui::TableSetColumnIndex(0);
+            // BL-1239: the good a Production-section door aimed at — the
+            // row is washed and, once, scrolled into view, which is what
+            // "aimed at that good" means in a view listing every good.
+            if (mid == s.market_ledger_aimed_market &&
+                s.market_ledger_aim_resource == static_cast<int>(r))
+            {
+                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1, IM_COL32(70, 110, 160, 110));
+                if (s.market_ledger_aim_scroll)
+                {
+                    ImGui::SetScrollHereY(0.5f);
+                    s.market_ledger_aim_scroll = false;
+                }
+            }
+            draw_item_glyph(static_cast<resource_type>(r), em);
+
+            ImGui::TableSetColumnIndex(1);
+            const float name_avail  = ImGui::GetContentRegionAvail().x;
+            const float name_needed = ImGui::CalcTextSize(rp.name).x;
+            // The name wears what the glyph wears, so the pair still match on the row.
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::readable_on_chrome(rp.colour)));
+            ui::fit_text(ui::text_box::table_cell, "market.goods.name", rp.name, name_avail);
+            ImGui::PopStyleColor();
+
+            int col = 2;
+            // THE SHELF (ledgers/market.md § 2): what this market holds of the good. An
+            // empty shelf is dimmed, so the eye finds what is actually there to buy.
+            ImGui::TableSetColumnIndex(col++);
+            if (row.shelf > 0.0f)
+                ImGui::TextUnformatted(row.shelf_text.c_str());
+            else
+                ImGui::TextDisabled("%s", row.shelf_text.c_str());
+
+            ImGui::TableSetColumnIndex(col++);
+            ImGui::Text("%.2f", static_cast<double>(mc.price[r]));
+
+            if (show_body)
+            {
+                ImGui::TableSetColumnIndex(col++);
+                ImGui::TextDisabled("%.2f", static_cast<double>(row.body_avg));
+            }
+
+            ImGui::TableSetColumnIndex(col++);
+            // The number carries direction too, in the same tints the graph
+            // uses, so colour means one thing across the whole row.
+            const ImU32 vb_col =
+                (row.vs_base > 1.005f) ? IM_COL32(90, 200, 140, 255) :
+                (row.vs_base < 0.995f) ? IM_COL32(225, 120, 110, 255) :
+                                         IM_COL32(150, 158, 178, 255);
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(vb_col),
+                               "%.2fx", static_cast<double>(row.vs_base));
+
+            ImGui::TableSetColumnIndex(col);
+            const float gw = ImGui::GetContentRegionAvail().x;
+            const float gh = std::max(em * 0.45f, row_h - em * 0.22f);
+            int samples = 0;
+            if (hist_it != history.end())
+            {
+                const std::vector<float>& ser = hist_it->second[r].price;
+                samples = static_cast<int>(std::min(k_graph_quarters, ser.size()));
+                draw_row_graph(ser, mc.base_price[r], {gw, gh}, lo, hi);
+            }
+            else
+                ImGui::TextDisabled("-");
+
+            goods_row_record rec;
+            rec.resource    = static_cast<resource_type>(r);
+            rec.name        = rp.name;
+            rec.shelf       = row.shelf;
+            rec.price       = mc.price[r];
+            rec.base_price  = mc.base_price[r];
+            rec.body_avg    = row.body_avg;
+            rec.vs_base     = row.vs_base;
+            rec.change      = row.change;
+            rec.samples     = samples;
+            rec.name_avail  = name_avail;
+            rec.name_needed = name_needed;
+            g_goods_rows.push_back(rec);
+
+            ImGui::PopID();
+        }
+        if (rows.empty())
+        {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextDisabled("No tradeable goods at this market.");
+        }
+        ImGui::EndTable();
     }
-    ImGui::EndChild();
 }
 
 } // namespace
@@ -1781,6 +1942,7 @@ entity_id                              goods_market() { return g_goods_market; }
 const std::vector<nation_row_record>&  nation_rows()  { return g_nation_rows; }
 const market_top_record&               market_top()   { return g_market_top; }
 const std::vector<item_glyph_census_record>& item_glyph_census() { return g_item_census; }
+const std::vector<goods_header_record>& goods_headers() { return g_goods_headers; }
 
 const std::vector<trade_row_record>&       my_trades()          { return g_my_trades; }
 const std::vector<trade_row_record>&       market_trades()      { return g_market_trades; }

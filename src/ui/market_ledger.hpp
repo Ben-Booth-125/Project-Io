@@ -59,14 +59,30 @@ struct goods_row_record
 {
     resource_type resource{};
     const char*   name        = "";
+    float         shelf       = 0.0f;  ///< `market_component::inventory[r]` as drawn.
     float         price       = 0.0f;  ///< `market_component::price[r]` as drawn.
     float         base_price  = 0.0f;  ///< `market_component::base_price[r]`.
     float         body_avg    = 0.0f;  ///< Mean price across the body's markets.
     float         vs_base     = 0.0f;  ///< `price / base_price`, the drawn column.
+    float         change      = 0.0f;  ///< Last sample over first across the graph's window, less 1: the 8 qtr sort key.
     int           samples     = 0;     ///< Points the row's graph plotted (<= 8).
     float         name_avail  = 0.0f;  ///< Px the name column actually offered.
     float         name_needed = 0.0f;  ///< Px the full name needed at this font.
 };
+
+/// One heading of the Goods table as drawn (BL-1517): where a press lands, and the
+/// width its label and sort arrow needed against what the column gave it.
+struct goods_header_record
+{
+    std::string name;
+    float       x    = 0.0f;
+    float       y    = 0.0f;
+    float       need = 0.0f;
+    float       have = 0.0f;
+};
+
+/// The Goods table's headings, in column order, as last drawn.
+const std::vector<goods_header_record>& goods_headers();
 
 /// One good's item glyph on the verify contact sheet (BL-1518; ICONS.md § 2b):
 /// `shape` fingerprints its geometry alone, so a check can say every good has its

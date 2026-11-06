@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*213 entries — 53 gameplay · 36 canvas · 15 lens · 74 ledger · 35 chrome.*
+*214 entries — 53 gameplay · 36 canvas · 15 lens · 75 ledger · 35 chrome.*
 
 ---
 
@@ -2065,11 +2065,26 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Expected output.** Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Market Ledger (toggle rule on tab strips); clicking the other tab is an ordinary view change.
 
-Goods shows one row per traded good at the selected market -- item glyph, name, price, price vs base, and an 8-QUARTER price graph flattened into the row, every row drawn against a SHARED price/base axis with a 1.0 baseline so goods can be compared.
+Goods shows one row per traded good at the selected market -- the good's own item glyph, name, shelf stock, price, price vs base, and an 8-QUARTER price graph flattened into the row, every row drawn against a SHARED price/base axis with a 1.0 baseline so goods can be compared.
 
 TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long ones bounded and scrolling inside themselves so every head stays on screen: (0) TRADE POINTS -- 'Made X pts · manual Y · auto Z' for the acting corp (points its Planetary Marketplaces and Ports made last pass; the reserve as used; the rest, auto), the reserve field with its 'Set reserve' press (gameplay.set_trade_reserve), and warnings when the reserve exceeds what is made or the manual trades ask for more than it covers; (1) MY TRADES -- the acting corp's manual trades that leave or land on the selected MARKET, in placement order (the order the reserve is spent in), columns Good / Route (from > to, by city) / Pts, units a tick on hover, each with an 'x' press (gameplay.clear_trade); a count of the corp's trades elsewhere; then the 'Add a trade' fold (gameplay.set_trade) and the seam's answer to the last trade press; (2) ALL TRADES HERE -- every corporation's manual trades touching this market, GATED on the player owning a building on the market's body (the section says so in words when the gate is shut, which is a different answer from an empty list); (3) POTENTIAL TRADES -- the trade pass's own route ranking (rank_trade_routes) from this market: posted buy price here, the destination's price, the haul trade_haul_per_unit charges, only goods trade carries and shelves the fair-price ceiling admits, margins above dispatch_margin(), ordered by margin per trade point (best first), the terms in the row's hover, and a '+' press that fills the Add-a-trade form with the route; (4) RECENT EXCHANGES -- the exchange record filtered to this market, newest first, columns qtr / good / counterparty / REVENUE. The revenue column is quantity * unit_price and is NOT a profit: no cost basis exists anywhere in the model. A counterparty that is the market itself renders as 'Market' -- it is not unknown.
 
 **Reason to select.** Goods answers 'what is each good worth here, and which way is it moving?'; Trades answers 'what am I moving in and out of this market, how much of my trade capacity do I steer, and what could I be moving?'. Convoys is no longer here: 'what is on its way to me' is a logistics question and has its own rail slot (ledger.nav_convoys).
+
+### `ledger.market_goods_sort` — Market Ledger, Goods view, the table headings (Good, Shelf, Price, v.Base, 8 qtr)
+
+**Press.** Click a heading; click it again to reverse the direction; click it a third time to take the sort off
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `column` | `enum` | Good (name), Shelf (the market's stock of the good), Price, v.Base (price over base price), 8 qtr (the good's change across the graph's eight-quarter window, last sample over first) |
+
+**Valid when:**
+- Market Ledger is open on the Goods view
+
+**Expected output.** Re-orders the rows by that heading. Shelf, Price, v.Base and 8 qtr open high to low, Good opens A to Z; the second press flips it and the third returns to the roster order the table rests in (toggle rule). Every tie keeps roster order. The headings stay frozen while the rows scroll, and the sort survives leaving the tab. Nothing in the simulation changes.
+
+**Reason to select.** Find the goods this market actually holds (Shelf), the dearest, the furthest above base, or the fastest moving, rather than reading all of them in roster order.
 
 ### `ledger.nav_budget` — Nav rail, slot 2 (Budget icon)
 

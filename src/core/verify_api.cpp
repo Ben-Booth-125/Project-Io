@@ -3913,6 +3913,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             sol::table row = m_lua.state().create_table();
             row["name"]        = r.name;
             // As DRAWN by the surface.
+            row["shelf"]       = r.shelf;
+            row["change"]      = r.change;
             row["price"]       = r.price;
             row["base_price"]  = r.base_price;
             row["body_avg"]    = r.body_avg;
@@ -3926,6 +3928,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // As the WORLD holds it, read independently right now.
             if (mit != m_world.markets.end() && ri < resource_count)
             {
+                row["world_shelf"] = mit->second.inventory[ri];
                 row["world_price"] = mit->second.price[ri];
                 row["world_base"]  = mit->second.base_price[ri];
             }
@@ -3940,6 +3943,30 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // both layouts and report the name column's fit under each.
     v.set_function("goods_body_column", [this](bool on) {
         m_ui.market_goods_show_body = on;
+    });
+
+    // The Goods table's headings (BL-1517), for real presses and the fit, and the
+    // sort they have set.
+    v.set_function("goods_headers", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::goods_header_record& h : ui::goods_headers())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["name"] = h.name;
+            row["x"]    = h.x;
+            row["y"]    = h.y;
+            row["need"] = h.need;
+            row["have"] = h.have;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("goods_sort", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["col"]  = m_ui.market_goods_sort_col;
+        out["desc"] = m_ui.market_goods_sort_desc;
+        return out;
     });
 
     // The item-glyph contact sheet (BL-1518; ICONS.md § 2b): the capture Ben reads
