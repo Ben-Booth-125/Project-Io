@@ -783,16 +783,13 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
         h.end = imposed ? war_end::imposed_white : war_end::white_peace;
 
     // AT ANY PEACE (BL-1460 fix round): every goal of THIS war that one party holds
-    // against the other and that was not ceded goes back to its owner, and the
-    // occupier's units on that province's ground the owner holds withdraw by the
-    // retreat rule — so at peace no province stays held against its owner by a former
-    // party to the war. Only where owner and holder are this war's two parties: a third
-    // nation's occupation, from its own war, is untouched. A ceded goal is its holder's
-    // now (owner == holder) and so is skipped by the same test.
+    // against the other and that was not ceded goes back to its owner — so at peace no
+    // province stays held against its owner by a former party to the war. Only where owner
+    // and holder are this war's two parties: a third nation's occupation, from its own war,
+    // is untouched. A ceded goal is its holder's now (owner == holder), skipped by the test.
     {
         const auto party = [&](entity_id n) { return n == war.declarer || n == war.defender; };
-        std::vector<uint32_t> returned;
-        std::map<uint32_t, std::pair<entity_id, entity_id>> occupied; // goal -> (owner, occupier)
+        const auto& rows = unit_roster_table();
         for (const std::vector<uint32_t>* goals : { &war.declarer_goals, &war.defender_goals })
             for (const uint32_t g : *goals)
             {
@@ -801,27 +798,31 @@ void conclude_peace(world& w, const sentiment_params& p, std::pair<entity_id, en
                 if (owner != holder && party(owner) && party(holder))
                 {
                     set_holder(w, g, owner);
-                    returned.push_back(g);
-                    occupied[g] = { owner, holder };
                 }
             }
-        if (!returned.empty())
+        // BL-1502: occupation reaches past the goals, so the walk does too. Every land unit of
+        // either party left on the other's ground leaves it, whichever province it is in, by
+        // the same walk, until it stands outside the other's provinces.
+        for (const entity_id side : { war.declarer, war.defender })
         {
-            std::sort(returned.begin(), returned.end());
-            returned.erase(std::unique(returned.begin(), returned.end()), returned.end());
+            const entity_id other = side == war.declarer ? war.defender : war.declarer;
             std::vector<entity_id> leaving;
             for (const auto& [uid, u] : w.units) // collected; withdraw_units walks ascending
             {
-                if (u.count <= 0 || u.position == null_entity)
-                    continue;
-                const auto oit = occupied.find(w.provinces.province_of(u.position));
-                if (oit == occupied.end() || u.owner != oit->second.second)
-                    continue;
+                if (u.owner != side || u.count <= 0 || u.position == null_entity || u.type >= rows.size()
+                    || (rows[u.type].domains & domain_bit(traversal_domain::land)) == 0)
+                    continue; // a fleet at sea stands on no one's ground
                 const auto tn = w.tile_to_nation.find(u.position);
-                if (tn != w.tile_to_nation.end() && tn->second == oit->second.first)
+                if (tn != w.tile_to_nation.end() && tn->second == other)
                     leaving.push_back(uid);
             }
-            (void)withdraw_units(w, leaving, returned, peace_day_stamp(w));
+            if (leaving.empty())
+                continue;
+            std::vector<uint32_t> theirs; // the provinces table is ascending
+            for (const province& pr : w.provinces.provinces)
+                if (province_owner(w, pr.id) == other)
+                    theirs.push_back(pr.id);
+            (void)withdraw_units(w, leaving, theirs, peace_day_stamp(w));
         }
     }
 
