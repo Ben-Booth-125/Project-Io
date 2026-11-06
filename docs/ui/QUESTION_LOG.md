@@ -240,9 +240,9 @@ alphabetical order.
 
 **Answers:** What is each good worth here, and which way is it moving?
 
-**Because:** Markets are the public intelligence channel under the BL-068 visibility rule -- a rival's production and stockpiles are private, so price and the order book are the only honest read the player has on a competitor. The stacked-sparkline layout this replaces failed at that in three ways and only one was density: every sparkline was autoscaled to its OWN range, so a good decaying 40% and a good flat to a rounding error drew the same shape and goods could not be compared -- the one thing a price board is for; 'now 0.63' gave no direction; and the scroll hook aimed at the window while the list sat in a child scroller, so no capture, golden or human, had ever seen past the fourth good of 45. One row per good with the 8-quarter graph flattened into it fixes the density; drawing every row against a SHARED price/base axis with a 1.0 baseline fixes the comparison, which was the real defect.
+**Because:** Markets are the public intelligence channel under the BL-068 visibility rule -- a rival's production and stockpiles are private, so price and the order book are the only honest read the player has on a competitor. The stacked-sparkline layout this replaces failed at that in three ways and only one was density: every sparkline was autoscaled to its OWN range, so a good decaying 40% and a good flat to a rounding error drew the same shape and goods could not be compared -- the one thing a price board is for; 'now 0.63' gave no direction; and the scroll hook aimed at the window while the list sat in a child scroller, so no capture, golden or human, had ever seen past the fourth good of 45. One row per good with the 8-quarter graph flattened into it fixes the density; drawing every row against a SHARED price/base axis with a 1.0 baseline fixes the comparison, which was the real defect. The price alone did not say whether a good could be bought here at all, so the shelf stock earns a column (Ben, 2026-11-05), and a board of about fifty goods earns a sort on every heading: finding what is on the shelf, or what is moving, should not be a read down the roster. Each good wears its own glyph so the eye finds a row without reading its name.
 
-*Demanded by BL-122, BL-159, BL-686 · `src/ui/market_ledger.cpp` · id `market_ledger`*
+*Demanded by BL-122, BL-159, BL-686, BL-1518, BL-1517 · `src/ui/market_ledger.cpp` · id `market_ledger`*
 
 ### Convoys ledger (nav rail slot 6)
 
@@ -272,7 +272,7 @@ THE POTENTIAL TRADE IS ONE PRESS FROM A REAL ONE, BUT NOT THE PRESS ITSELF. Its 
 
 THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (both markets must trade the good; the corporation's trades are capped at 64) and a refusal mutates nothing; the player is told why under the form. THE HISTORY COLUMN IS STILL REVENUE, NEVER PROFIT (no cost basis exists anywhere in the model), and an absent counterparty is still the market.
 
-*Demanded by BL-687, BL-1269 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/ui/selection_panel.cpp`, `src/core/app.cpp` · id `market_ledger_trades`*
+*Demanded by BL-1516, BL-687, BL-1269 · `src/ui/market_ledger.cpp`, `src/ui/market_ledger.hpp`, `src/ui/selection_panel.cpp`, `src/core/app.cpp` · id `market_ledger_trades`*
 
 ### Military ledger (nav rail slot 7): Recruit and Design tabs
 

@@ -6,6 +6,7 @@
 #include "world/world.hpp"
 
 #include <string>
+#include <cstdint>
 #include <vector>
 
 namespace ui {
@@ -58,14 +59,44 @@ struct goods_row_record
 {
     resource_type resource{};
     const char*   name        = "";
+    float         shelf       = 0.0f;  ///< `market_component::inventory[r]` as drawn.
     float         price       = 0.0f;  ///< `market_component::price[r]` as drawn.
     float         base_price  = 0.0f;  ///< `market_component::base_price[r]`.
     float         body_avg    = 0.0f;  ///< Mean price across the body's markets.
     float         vs_base     = 0.0f;  ///< `price / base_price`, the drawn column.
+    float         change      = 0.0f;  ///< Last sample over first across the graph's window, less 1: the 8 qtr sort key.
     int           samples     = 0;     ///< Points the row's graph plotted (<= 8).
     float         name_avail  = 0.0f;  ///< Px the name column actually offered.
     float         name_needed = 0.0f;  ///< Px the full name needed at this font.
 };
+
+/// One heading of the Goods table as drawn (BL-1517): where a press lands, and the
+/// width its label and sort arrow needed against what the column gave it.
+struct goods_header_record
+{
+    std::string name;
+    float       x    = 0.0f;
+    float       y    = 0.0f;
+    float       need = 0.0f;
+    float       have = 0.0f;
+};
+
+/// The Goods table's headings, in column order, as last drawn.
+const std::vector<goods_header_record>& goods_headers();
+
+/// One good's item glyph on the verify contact sheet (BL-1518; ICONS.md § 2b):
+/// `shape` fingerprints its geometry alone, so a check can say every good has its
+/// own glyph without reading a colour or a screen position.
+struct item_glyph_census_record
+{
+    resource_type resource{};
+    const char*   name     = "";
+    int           vertices = 0;
+    std::uint64_t shape    = 0;
+};
+
+/// The contact sheet's census, as last drawn. Empty unless the verify seam asked.
+const std::vector<item_glyph_census_record>& item_glyph_census();
 
 /// One row of the market top section's nation list (BL-1317; superseding BL-688's chips).
 struct nation_row_record
@@ -246,6 +277,10 @@ bool market_trades_open();
 /// Ranking is permitted HERE and only here (`CONCEPT.md` § Player identity: rank
 /// where the top row is one input among several, not where it IS the move).
 const std::vector<potential_trade_record>& potential_trades();
+
+/// The acting nation's trade points at the Trades tab's market, the gate on
+/// `potential_trades` (BL-1516; ledgers/market.md § 2b). Zero: no offers.
+float potential_trade_points();
 
 /// The history half — exchanges at the selected market, NEWEST FIRST.
 const std::vector<exchange_row_record>& exchange_rows();

@@ -342,6 +342,10 @@
    "Market Ledger, view tab strip at the top"
   ],
   [
+   "ledger.market_goods_sort",
+   "Market Ledger, Goods view, the table headings (Good, Shelf, Price, v.Base, 8 qtr)"
+  ],
+  [
    "ledger.nav_budget",
    "Nav rail, slot 2 (Budget icon)"
   ],

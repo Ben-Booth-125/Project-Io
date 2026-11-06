@@ -29,6 +29,16 @@ struct resource_presentation
 /// @return  Reference to the static metadata for @p r.
 const resource_presentation& presentation_of(resource_type r);
 
+namespace palette {
+
+/// An identity colour raised, hue kept, until it reads on dark chrome at a row's
+/// size (BL-1518; ICONS.md § 2b). Coal, Peat and Charcoal are near-black on purpose
+/// and stay so on a canvas; on a ledger row they all but disappear. Colours already
+/// bright enough come back unchanged.
+ImU32 readable_on_chrome(ImU32 colour);
+
+} // namespace palette
+
 /// Full display name for @p r. Convenience over presentation_of(r).name.
 ///
 /// @param r Resource type to name.

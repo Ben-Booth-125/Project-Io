@@ -61,6 +61,7 @@
 #include "world/state_industry.hpp" // BL-1255: state_uncommitted_treasury (rail_state)
 #include "ui/rail_tool.hpp"          // BL-1255: rail_player_nation
 #include "world/market_clearing.hpp" // BL-1241: stage_one mirrors place_building's market emergence
+#include "world/trade.hpp"           // BL-1516: market_trade_points, corp_trade_markets - the gate check
 #include "world/placement_rules.hpp"
 #include "world/road_generation.hpp" // BL-1347: lay_site_roads, after this path's own stamper
 #include "world/river_generation.hpp" // BL-1375: hex_side_for_offset - the link-bit audit's own mapping
@@ -3913,6 +3914,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             sol::table row = m_lua.state().create_table();
             row["name"]        = r.name;
             // As DRAWN by the surface.
+            row["shelf"]       = r.shelf;
+            row["change"]      = r.change;
             row["price"]       = r.price;
             row["base_price"]  = r.base_price;
             row["body_avg"]    = r.body_avg;
@@ -3926,6 +3929,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             // As the WORLD holds it, read independently right now.
             if (mit != m_world.markets.end() && ri < resource_count)
             {
+                row["world_shelf"] = mit->second.inventory[ri];
                 row["world_price"] = mit->second.price[ri];
                 row["world_base"]  = mit->second.base_price[ri];
             }
@@ -3940,6 +3944,51 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // both layouts and report the name column's fit under each.
     v.set_function("goods_body_column", [this](bool on) {
         m_ui.market_goods_show_body = on;
+    });
+
+    // The Goods table's headings (BL-1517), for real presses and the fit, and the
+    // sort they have set.
+    v.set_function("goods_headers", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::goods_header_record& h : ui::goods_headers())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["name"] = h.name;
+            row["x"]    = h.x;
+            row["y"]    = h.y;
+            row["need"] = h.need;
+            row["have"] = h.have;
+            out[i++] = row;
+        }
+        return out;
+    });
+    v.set_function("goods_sort", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["col"]  = m_ui.market_goods_sort_col;
+        out["desc"] = m_ui.market_goods_sort_desc;
+        return out;
+    });
+
+    // The item-glyph contact sheet (BL-1518; ICONS.md § 2b): the capture Ben reads
+    // the set from, and its census, one fingerprint per good of the shape alone.
+    // Names and vertex counts, nothing of the world.
+    v.set_function("item_glyph_sheet", [this](bool on) {
+        m_ui.verify_item_glyph_sheet = on;
+    });
+    v.set_function("item_glyph_census", [this]() {
+        sol::table out = m_lua.state().create_table();
+        int i = 1;
+        for (const ui::item_glyph_census_record& r : ui::item_glyph_census())
+        {
+            sol::table row = m_lua.state().create_table();
+            row["name"]     = r.name;
+            row["key"]      = resource_names::name_of(r.resource);
+            row["vertices"] = r.vertices;
+            row["shape"]    = std::to_string(r.shape); // a string: Lua numbers lose the low bits
+            out[i++] = row;
+        }
+        return out;
     });
 
     // The market top section's nation list as drawn (BL-1317, superseding
@@ -4226,6 +4275,23 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             row["margin_per_point"] = r.margin_per_point; // the ranking key
             out[i++] = row;
         }
+        return out;
+    });
+
+    // The gate on read 3 (BL-1516): the points the surface gated on, beside an
+    // independent read of the same question and of what the trade verb will accept
+    // as a source. Figures the Trades tab already prints; no position.
+    v.set_function("potential_gate", [this]() {
+        sol::table out = m_lua.state().create_table();
+        const entity_id actor = player_actor(m_world);
+        const entity_id mid   = ui::trades_market();
+        const std::map<entity_id, float> pts = market_trade_points(m_world, m_registry, nullptr, actor);
+        const auto it = pts.find(mid);
+        const std::vector<entity_id> src = corp_trade_markets(m_world, actor);
+        out["market"]       = mid;
+        out["points"]       = ui::potential_trade_points();
+        out["world_points"] = (it != pts.end()) ? it->second : 0.0f;
+        out["verb_source"]  = std::binary_search(src.begin(), src.end(), mid);
         return out;
     });
 

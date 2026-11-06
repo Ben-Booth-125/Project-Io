@@ -1280,12 +1280,13 @@
    "source": [
     "docs/ui/ledgers/market.md § Sub-levels"
    ],
-   "summary": "Default view: one row per traded good at the selected market — item glyph, name, price, price vs base, and an 8-quarter price graph flattened into the row. Every row is drawn against a SHARED price/base axis with a 1.0 baseline, which is what makes goods comparable; the line's colour carries direction. Row height is 0.4 x the ten-rows-to-the-view row of the layout before the top section, floored at one frame height (Ben, 2026-10-13).",
+   "summary": "Default view: one row per traded good at the selected market — the good's own item glyph (ICONS.md § 2b), name, shelf stock, price, price vs base, and an 8-quarter price graph flattened into the row. Every row is drawn against a SHARED price/base axis with a 1.0 baseline, which is what makes goods comparable; the line's colour carries direction. Row height is 0.4 x the ten-rows-to-the-view row of the layout before the top section, floored at one frame height (Ben, 2026-10-13).",
    "interesting_question": "The layout it replaces autoscaled every sparkline to its own range, so a good decaying 40% and a flat good drew the same shape — does a shared axis fit at 384 px once the graph is inline, and which column gives way if it does not?",
-   "resolution": "It fits, but not with every column. Measured over the real 45-good roster: with the body-average column the name column is 42 px and 13 of 45 names fit; without it, 98 px and 36 of 45. The design had nominated body_average_price first-to-drop only if the row would not fit, expecting the graph's width to be the pressure — the measurement says otherwise, so the column is off by default behind a one-line dial (ui_state::market_goods_show_body).",
+   "resolution": "It fits, but not with every column. Measured over the real 54-good roster with the Shelf column in the row: with the body-average column the name column is 18 px and 0 of 54 names fit; without it, 72 px and 33 of 54. The design had nominated body_average_price first-to-drop only if the row would not fit, expecting the graph's width to be the pressure — the measurement says otherwise, so the column is off by default behind a one-line dial (ui_state::market_goods_show_body).",
    "checks": [
     "market_ledger",
     "goods_table",
+    "item_glyphs",
     "market_density"
    ]
   },
@@ -1303,6 +1304,7 @@
    "interesting_question": "The reads are not equally cheap to know — one corporation record, a filter on the player's own trades, the same list past a gate, a derivation with no store behind it. What stops them collapsing into one table at 380 px, and what makes a potential trade one press from a real one without the ranking becoming the move?",
    "resolution": "Bounded sections keep every head on screen (caps 5 / 5 / 7 / 6 rows). The potential-trade '+' only FILLS the form — the player still picks the points and presses Add, so the ranking stays one input among several (CONCEPT.md § Player identity). The gate on the second read is enforced rather than assumed and is asserted against the world, including its SHUT state.",
    "checks": [
+    "trade_offers_sourced",
     "market_ledger",
     "trades_tab"
    ]
