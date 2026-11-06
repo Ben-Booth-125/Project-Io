@@ -1372,6 +1372,23 @@ void opportunity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddLine({ centre.x, centre.y - a }, { centre.x, centre.y + a }, colour, 1.5f);
 }
 
+void gear(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A ring with eight short teeth: the session control, stroke only, so it does
+    // not read as any filled building or resource glyph.
+    constexpr int   teeth = 8;
+    constexpr float tau   = 6.2831853f;
+    dl->AddCircle(centre, r * 0.62f, colour, 0, 1.5f);
+    for (int i = 0; i < teeth; ++i)
+    {
+        const float a  = tau * static_cast<float>(i) / static_cast<float>(teeth);
+        const float cx = std::cos(a);
+        const float sy = std::sin(a);
+        dl->AddLine({ centre.x + cx * r * 0.62f, centre.y + sy * r * 0.62f },
+                    { centre.x + cx * r, centre.y + sy * r }, colour, 2.0f);
+    }
+}
+
 void production(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // A filled upward-pointing triangle over a short baseline — an "output /

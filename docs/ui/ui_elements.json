@@ -859,7 +859,7 @@
     "src/ui/header_panel.hpp",
     "src/ui/header_panel.cpp"
    ],
-   "summary": "Always-visible full-width strip between the identity tile and time column: treasury, cargo valuation, net+trend, runway, and at its top right the three recruit readouts (land, air, sea) — the persistent financial and manpower dashboard.",
+   "summary": "Always-visible full-width strip between the identity tile and time column: treasury with its net in brackets, cargo valuation, runway, and at its top right the three recruit readouts (land, air, sea) — the persistent financial and manpower dashboard.",
    "interesting_question": "The header is a 'guaranteed-fit strip' that never wraps and never silently clips a load-bearing number, degrading in a fixed order instead — why treat this one surface as the reference case for a wider text-wrap audit rather than just wrapping like other panels?",
    "resolution": "Explicit precedent-setting intent: HEADER.md states 'This ladder is the reference case for BL-215 (text-wrap render audit)... the audit's job is to make every other worded surface degrade this honestly rather than wrap or clip' — the header's ladder is meant to generalise, not stay a one-off.",
    "checks": [
@@ -902,15 +902,15 @@
   },
   {
    "id": "UI-054",
-   "name": "Net + trend sparkline",
+   "name": "Net in brackets + trend tooltip",
    "kind": "sub-element",
    "parent": "UI-051",
    "source": [
     "docs/ui/HEADER.md § Contents",
     "docs/ui/HEADER.md § Resolved design questions"
    ],
-   "summary": "The last economy tick's signed net change, coloured, plus a sparkline of recent balances (ImGui::PlotLines over a capped history).",
-   "interesting_question": "n/a — a settled design choice (per-tick delta + sparkline over a raw balance figure alone).",
+   "summary": "The last economy tick's signed operating net, coloured, in brackets beside the treasury. The graph of recent treasuries (ImGui::PlotLines over a capped history) is the tooltip shared by the treasury, its net and the cargo figure.",
+   "interesting_question": "n/a — a settled design choice (Ben, 2026-11-05).",
    "resolution": "n/a",
    "checks": [
     "header"
@@ -984,17 +984,20 @@
   },
   {
    "id": "UI-061",
-   "name": "System menu (session-control popup)",
+   "name": "Escape menu (full-canvas pause screen)",
    "kind": "control",
    "parent": null,
    "source": [
-    "docs/ui/MENU.md § Application / system menu — session control (BL-070)"
+    "docs/ui/MENU.md § Application / system menu — session control (BL-070)",
+    "docs/ui/TIME_CONTROLS.md § The escape menu",
+    "src/ui/time_panel.cpp"
    ],
-   "summary": "A top-right corner-gear popup: Pause/Resume and Exit (with an inline 'Really quit?' confirm, since there is no save); Esc toggles it, sharing the pause hotkey's flag.",
-   "interesting_question": "Exit is destructive with no save path in the prototype, so the inline confirm is the only guard against an accidental quit — is a single inline confirm proportionate for a truly unrecoverable action?",
-   "resolution": "Accepted as the prototype minimum, not a final answer: MENU.md frames this as 'Option B... rejected [a centred pause-modal] for the prototype minimum — the centred modal is the right long-term home once a title screen lands,' i.e. the current guard is explicitly interim.",
+   "summary": "Behind the gear at the right end of the time panel, and Esc with nothing open: a full-canvas menu that pauses the game, with Save, Options, Exit to Menu and Exit Game, the last save's date above them. Each exit raises an unsaved-progress warning first. God view sits beneath the presses while spectating.",
+   "interesting_question": "A paused player can still place a build, so can the warning ever honestly be skipped because nothing moved since the last save?",
+   "resolution": "No: both exits warn every time and the date of the last save stands beside the warning, so the player judges what would be lost. The corner popup and the rejection of a centred modal were overturned (Ben, 2026-11-05).",
    "checks": [
-    "shell_pass"
+    "shell_pass",
+    "escape_menu"
    ]
   },
   {
@@ -2121,6 +2124,22 @@
    "resolution": "GDP, market share and reach are public (the Diplomacy ledger already shows them), and total force counts only the units the map's counters show. A rival's treasury is never read.",
    "checks": [
     "corp_dashboard"
+   ]
+  },
+  {
+   "id": "UI-139",
+   "name": "Alert strip",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/LAYOUT.md § Alert strip",
+    "src/ui/alerts.cpp"
+   ],
+   "summary": "Top centre of the canvas area, just below the header: one press per thing that wants attention - research not set, idle buildings, wars, low runway, construction stalled, deposit exhausted, trades exceeding trade points. Each opens the surface that answers it; it wraps rather than clips, and draws nothing with nothing to say.",
+   "interesting_question": "A nation with a dozen idle mines has one alert, not twelve. How many does a player need before the strip stops being read, and should the count be the alert?",
+   "resolution": "Aggregated: one press per KIND, the count in its words, the ledger the press opens carrying the rows. Seven kinds is the ceiling, so the strip's worst case is one wrap at the 1280 floor. Not dismissable, by default: it says only what is true now.",
+   "checks": [
+    "alert_strip"
    ]
   }
  ]

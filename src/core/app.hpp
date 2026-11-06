@@ -556,8 +556,21 @@ private:
     void save_settings() const;
     /// Apply m_settings to the live SDL window + renderer (size, fullscreen, vsync).
     void apply_display_settings();
-    /// Re-load the UI font atlas at the size for m_settings.ui_scale_step (BL-063).
+    /// Re-load the UI font atlas at the size for m_settings.ui_scale_step (BL-063) and
+    /// the density for m_ui_draw_scale (BL-1495).
     void apply_ui_scale();
+    /// The UI's draw scale (BL-1495; LAYOUT.md § UI scale): every UI pixel lands on this
+    /// many screen pixels. Set to the shipped constant on the interactive path only;
+    /// --verify stays at 1, the tightest layout, unless a script asks (verify.ui_draw_scale).
+    float m_ui_draw_scale = 1.0f;
+    /// Turn this frame's OS window size and pointer events into UI pixels. Between the
+    /// SDL backend's NewFrame and ImGui's, before the harness's injected pointer, which
+    /// is in UI pixels already.
+    void apply_ui_draw_scale_to_frame();
+    /// Draw ImGui's frame through the draw scale.
+    void render_imgui_scaled();
+    /// The constant the interactive path draws at.
+    static float shipped_ui_draw_scale();
 
     /// How many rounds the New World wizard walks (BL-167, extended to five by
     /// BL-816 and to SIX by BL-860). Declared here rather than beside the wizard
@@ -668,6 +681,20 @@ private:
     /// Pending `--load` target, consumed by run() before the frame loop.
     std::string m_pending_load;
     bool       m_quit_requested = false;  ///< Set by the menu's Quit button; breaks the run() loop.
+    // --- The escape menu (BL-1519; MENU.md § Application / system menu) ---
+    bool       m_exit_to_menu_requested = false; ///< Pressed inside a frame; acted on at the next frame's head.
+    bool       m_menu_was_open   = false; ///< The escape menu's open state last seen, for its open and close edges.
+    bool       m_menu_paused_it  = false; ///< The menu's open edge is what stopped the clock, so its close restarts it.
+    long long  m_last_save_day   = -1;    ///< day_tick of this session's last save or load; -1 before either.
+    std::string m_menu_message;           ///< The main menu's Load refusal, said where the press was.
+
+    /// Leave the campaign for the main menu: the teardown behind Exit to Menu. Joins
+    /// the workers, closes the play log and the agent seam, drops the world and every
+    /// presentation record of it, so a new game or a load starts clean.
+    void exit_to_menu();
+    /// Pause on the escape menu's open edge, restore on its close edge. Taken on the
+    /// edge so every route that opens or closes it behaves alike (gear, Esc, a check).
+    void sync_escape_menu_pause();
 
     SDL_Window*   m_window   = nullptr;
     SDL_Renderer* m_renderer = nullptr;

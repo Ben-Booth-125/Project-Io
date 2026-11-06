@@ -403,6 +403,8 @@ std::vector<trade_row_record> collect_trades(const world& w, const recipe_regist
     return out;
 }
 
+} // namespace
+
 /// The player's trade-points read (TRADE.md § Auto and reserved trade).
 trade_points_record collect_trade_points(const world& w)
 {
@@ -425,6 +427,8 @@ trade_points_record collect_trade_points(const world& w)
         }
     return p;
 }
+
+namespace {
 
 /// READ 3 — the potential-trade derivation: the routes FROM this market the
 /// trade pass itself would rank, best margin per trade point first.

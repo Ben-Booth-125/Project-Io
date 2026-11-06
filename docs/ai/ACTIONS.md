@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*217 entries — 53 gameplay · 39 canvas · 15 lens · 75 ledger · 35 chrome.*
+*222 entries — 53 gameplay · 39 canvas · 15 lens · 75 ledger · 40 chrome.*
 
 ---
 
@@ -2856,9 +2856,24 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 - App is in game. On the main menu and the wizard, Esc does nothing (the key handler returns before Esc handling on those screens).
 - Works even while an ImGui panel holds keyboard focus — Esc is handled before the ImGui keyboard guard.
 
-**Expected output.** Exactly one rung of this precedence ladder fires, highest first: (1) an armed exit-confirm backs out (Really quit? disarms); (2) an open system menu closes; (3) if the sticky selection card is open and has a drill stack, one drill level unwinds; (4) if the corporation roll-up is drilled into a constituent, it returns to the roll-up; (5) if a fold overlay is expanded full-screen, it folds up; (6) an open sticky card hides (hidden for this selection, not destroyed); (7) otherwise the system menu opens. One press never does two of these — e.g. Esc reaches the menu only once the card is fully closed.
+**Expected output.** Exactly one rung fires, highest first (SELECTION.md § Layout & chrome): (1) an exit warning backs out; (2) an open escape menu closes, restoring the remembered speed; (3) an open declaration backs out; (4) a drilled roll-up returns to the roll-up; (5) a full-canvas overlay folds up; (6) an armed tool disarms (a road's two presses, a march awaiting its tile); (7) the open ledger closes; (8) the Selection clears to the resting nation; (9) with nothing open, the escape menu opens and pauses. One press never does two of these.
 
-**Reason to select.** The universal step-out key: back out of a confirmation, close the menu, unwind a drill, fold an overlay, dismiss the card — or, with nothing open, reach the session menu.
+**Reason to select.** The universal step-out key: close the Menu, then the Ledger, then the Selection, one press at a time - or, with nothing open, reach the escape menu.
+
+### `chrome.alert_press` — Alert strip, top centre of the canvas area just below the header. Each alert is one press; the strip draws nothing with nothing to say.
+
+**Press.** Click an alert.
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `alert` | `one of the alerts on the strip` | Research not set; N idle buildings; At war / N wars; Runway Nq; N sites stalled; N deposits exhausted; Trades exceed trade points. |
+
+**Valid when:**
+- App is in game; the alert is on the strip. Recomputed from the live world: an alert leaves when its cause does, and cannot be dismissed.
+
+**Expected output.** Opens the surface that answers the alert, closing any other ledger: Research not set opens Research; idle buildings and exhausted deposits open the Construction ledger on Buildings; a stalled site opens it on Construction; a war opens the Diplomacy ledger on Wars; low runway (under 8 quarters) opens the Budget; trades exceeding trade points opens the Market ledger on Trades, arming its lens. Nothing is acted on: the press only opens a surface. Hovering says why it is up.
+
+**Reason to select.** To go straight from what wants attention to where it is answered. Offers of peace or friendship are not alerts (Ben, 2026-11-05).
 
 ### `chrome.f10_options` — Keyboard; opens the centred Options window
 
@@ -2918,16 +2933,16 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Answers "which technologies can my nation reach, what does each give, and when will my plan arrive?" - the route to the queue_research press.
 
-### `chrome.gear_toggle` — In-game chrome, top-right gear button just left of the time column
+### `chrome.gear_toggle` — In-game chrome, the gear at the right end of the time panel's speed row, right of the speed buttons
 
-**Press.** Click the gear (three-bar) button.
+**Press.** Click the gear.
 
 **Valid when:**
 - App is in game (app_screen::in_game).
 
-**Expected output.** Toggles the small system-menu popup open or closed beneath the gear. Closing it via the gear also disarms any pending exit confirmation.
+**Expected output.** Toggles the full-canvas escape menu, lit while it is open. Opening it pauses the game; closing it restores the remembered speed, and a clock that was already stopped stays stopped. Closing it also takes back an exit warning. While the menu is open the speed buttons are disabled, and the only hotkeys that answer are F5, F1 and F10.
 
-**Reason to select.** Mouse route to the session controls (Pause/Resume, Exit Game); Esc is the keyboard parity for the same popup.
+**Reason to select.** Mouse route to the session controls (Save, Options, Exit to Menu, Exit Game); Esc is the keyboard parity.
 
 ### `chrome.menu_new_game` — Main menu, primary button column
 
@@ -2940,7 +2955,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** To start setting up a new world round by round: the nation targets and resources on the setup round, then the planetology and history leans. The seed is hidden: the wizard draws it unseen, and the Life round's Reroll gives another world (Ben, 2026-10-15).
 
-### `chrome.menu_quick_start` — Main menu, primary button column, between New Game and Quit
+### `chrome.menu_quick_start` — Main menu, primary button column, between New Game and Load
 
 **Press.** Click Quick Start.
 
@@ -2950,6 +2965,18 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Opens the New World wizard on its setup round alone (STARTUP.md section Rounds, Ben 2026-10-13): the nation targets and the abundance, which the main menu no longer carries. The seed is drawn hidden (no entry, Roll or Copy; Ben, 2026-10-15). The setup round's Begin then builds the world straight through with no other wizard round drawn: the loading bar (app_screen::building) while the cold build runs (make_hard_coded_world, then finish_campaign_world, the same calls the wizard's Begin makes), then the nation selection screen (app_screen::choosing_seat), where the player picks a major nation. The same settings give the same world the wizard would have built. Back on that round returns to the menu.
 
 **Reason to select.** To start play on chosen settings without walking the wizard's rounds; the seat is still chosen.
+
+### `chrome.menu_load` — Main menu, primary button column, between Quick Start and Quit
+
+**Press.** Click Load.
+
+**Valid when:**
+- App is on the main menu screen.
+- A save exists: the press is disabled, with the tooltip Nothing saved yet, until one does.
+
+**Expected output.** Opens the campaign in the in-game save (quicksave.iosave, the file Save and F5 write) and enters play. A save that cannot be read leaves the menu up with the reason beneath its presses.
+
+**Reason to select.** To go back to a saved campaign from the entry screen, after Exit to Menu or a fresh launch.
 
 ### `chrome.menu_quit` — Main menu, primary button column
 
@@ -3014,7 +3041,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - Options window open.
 
-**Expected output.** UI scale applies live and persists to options.cfg immediately.
+**Expected output.** UI scale applies live and persists to options.cfg immediately. These steps grow the font on top of the UI draw scale (LAYOUT.md § UI scale), which is one constant and has no control.
 
 **Reason to select.** To make the interface legible on dense or high-DPI displays.
 
@@ -3033,56 +3060,78 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** To trade tearing against frame latency, or to uncap frames when measuring with the F11 HUD.
 
-### `chrome.sysmenu_exit` — System menu popup, below the separator
+### `chrome.escape_exit_menu` — Escape menu, third press
+
+**Press.** Click Exit to Menu.
+
+**Valid when:**
+- App is in game; the escape menu is open; no exit warning is up.
+
+**Expected output.** Raises the warning 'Unsaved progress will be lost.' with Exit to Menu (chrome.escape_exit_confirm) and Cancel (chrome.escape_exit_cancel) in place of the presses. Nothing leaves yet.
+
+**Reason to select.** First step of returning to the main menu, with a guard against a stray click.
+
+### `chrome.escape_exit_game` — Escape menu, fourth press
 
 **Press.** Click Exit Game.
 
 **Valid when:**
-- App is in game; the system menu popup is open; no exit confirmation is currently armed.
+- App is in game; the escape menu is open; no exit warning is up.
 
-**Expected output.** Arms an inline confirmation: the button is replaced by a 'Really quit?' prompt with Yes, quit and Cancel. Nothing exits yet. The confirm exists because there is no save in the prototype — quitting discards the session.
+**Expected output.** Raises the warning 'Unsaved progress will be lost.' with Exit Game (chrome.escape_exit_confirm) and Cancel (chrome.escape_exit_cancel) in place of the presses. Nothing exits yet.
 
-**Reason to select.** First step of leaving a session deliberately, with a guard against a stray click.
+**Reason to select.** First step of closing the game, with a guard against a stray click.
 
-### `chrome.sysmenu_exit_cancel` — System menu popup, armed exit confirmation
+### `chrome.escape_exit_cancel` — Escape menu, exit warning
 
-**Press.** Click Cancel (or press Esc, which backs the armed confirm out as its highest-precedence rung).
+**Press.** Click Cancel (or press Esc, the highest rung of chrome.esc).
 
 **Valid when:**
-- App is in game; the exit confirmation is armed.
+- App is in game; the exit warning is up.
 
-**Expected output.** The confirmation disarms and the popup returns to showing Exit Game. Play continues unaffected.
+**Expected output.** The warning goes and the four presses return. The menu stays open and the game stays paused.
 
 **Reason to select.** To back out of an exit started by mistake.
 
-### `chrome.sysmenu_exit_confirm` — System menu popup, armed exit confirmation
+### `chrome.escape_exit_confirm` — Escape menu, exit warning
 
-**Press.** Click Yes, quit.
-
-**Valid when:**
-- App is in game; the system menu is open and the exit confirmation is armed.
-
-**Expected output.** The application quits. The session is not saved (there is no save in the prototype); display settings already live in options.cfg.
-
-**Reason to select.** To end the session for good.
-
-### `chrome.sysmenu_pause` — System menu popup, top button
-
-**Press.** Click Pause (or Resume — the label reflects the current sim state).
+**Press.** Click Exit to Menu or Exit Game, whichever the warning names.
 
 **Valid when:**
-- App is in game; the system menu popup is open.
+- App is in game; the exit warning is up.
 
-**Expected output.** Toggles simulation pause via the same pause_toggle path as the Space hotkey. Resuming restores the previous speed tier. The button label flips accordingly.
+**Expected output.** Exit to Menu ends the campaign and opens the main menu: workers joined, the play log and the agent seam closed, the world and every ledger, selection and comms line dropped. Exit Game quits the application. Neither saves; display settings already live in options.cfg.
 
-**Reason to select.** To halt or resume the simulation clock from the mouse-driven session menu.
+**Reason to select.** To leave the campaign for good.
 
-### `chrome.sysmenu_god_view` — System menu popup, spectate-only checkbox
+### `chrome.escape_save` — Escape menu, first press
+
+**Press.** Click Save.
+
+**Valid when:**
+- App is in game; the escape menu is open; no exit warning is up.
+
+**Expected output.** Writes the in-game save F5 writes (quicksave.iosave, beside the executable), posts 'Saved to ...' to the Field channel and updates the menu's 'Last saved' line. The menu stays open.
+
+**Reason to select.** To keep the campaign before leaving it.
+
+### `chrome.escape_options` — Escape menu, second press
+
+**Press.** Click Options.
+
+**Valid when:**
+- App is in game; the escape menu is open; no exit warning is up.
+
+**Expected output.** Toggles the Options window (chrome.f10_options) over the menu, the press lit while it is open.
+
+**Reason to select.** To change display settings or the UI scale from the pause screen.
+
+### `chrome.sysmenu_god_view` — Escape menu, spectate-only checkbox beneath the presses
 
 **Press.** Toggle the God view checkbox. Rendered only while spectating (corp_ai_params::spectating); unreachable in a played session by construction.
 
 **Valid when:**
-- App is in game; the system menu popup is open; the session is spectating (BL-409).
+- App is in game; the escape menu is open; the session is spectating (BL-409).
 
 **Expected output.** While on, competitor-visibility redactions lift for the WATCHER only: rival building internals (production, the market it sells into, profitability read-only page), corp cash/reserve facts and trade points / reserve / manual-trade count, and the survey tell (unsurveyed tiles render through a lock-colour wash so the corp's own blindness stays visible). Off restores the BL-068 redactions with no residue. Never changes what any AI reads; the rival action grid stays disabled - sight, never hands.
 
@@ -3283,4 +3332,15 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** A tooltip: '<Theatre> recruits: held / cap', what the pool is for and where it comes from (the military bases, airbases or ports of your nation, from their provinces' people), the quarter's output as sources x rate (50 a military base, 20 an airbase), the cap (fifteen quarters of the output), that a full pool takes none, and 'Full now' or 'nothing fills it' where either holds. Sea reads 0 / 0 until ports make sea recruits. Nothing in the world changes.
 
 **Reason to select.** Before raising: is there the manpower, how fast does it come back, and has a full pool stopped your bases making any? A hire the pool cannot fill is refused before money moves (MILITARY.md § Recruits).
+
+### `chrome.header_money_hover` — Header strip: TREASURY and its figure, the net in brackets beside it, CARGO and its figure
+
+**Press.** Hover a money figure.
+
+**Valid when:**
+- App is in game. A graph needs two quarters of history; before that the tooltip is words alone.
+
+**Expected output.** A tooltip says what the figure is and shows the graph of recent treasury values, one point a quarter. When the strip has no room for the runway, the treasury's and the net's tooltips carry its arithmetic. Nothing changes.
+
+**Reason to select.** To see which way the treasury has been going, not just where it stands.
 

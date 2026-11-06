@@ -133,8 +133,8 @@ This is a static identity readout in the prototype — no interaction beyond, ev
 A strip across the top of the canvas area, between the identity tile and the time column. Its left edge is the shell column's right edge (`x = W`). It stands the **full identity-tile height** (`profile_panel_height`, ~92 px) and top-aligns at `y = 0`, so the header and the identity tile read as **one level top band**; its content row is vertically centred within that strip. It is the player's persistent financial dashboard, wired to the live economy:
 
 - **Treasury** — the player nation's treasury (a nation never runs into debt, so it has no negative state).
+- **Net, in brackets beside the treasury** — the last economy tick's operating net as a coloured per-quarter figure, `TREASURY 1.2M (+34/qtr)`. Hovering a money figure shows the graph of recent treasury values (Ben, 2026-11-05).
 - **Cargo valuation** — an estimated value of the goods the player owns: its trades' cargo in transit, at each destination market's current price (`HEADER.md`). A single money figure, not a per-resource inventory.
-- **Net + trend** — the last economy tick's net change as a coloured per-quarter figure, alongside a small sparkline of recent treasury values.
 
 The header answers "can I afford this, and which way is it trending?" without opening a ledger. Detailed, per-body breakdowns stay in their respective ledgers.
 
@@ -164,6 +164,25 @@ attention, and **each alert clicks through** to the surface that answers it. It 
 - **Construction stalled**
 - **Deposit exhausted**
 - **Trades exceed trade points**
+
+It says only what is true now: an alert leaves when its cause does and cannot be dismissed, and the
+strip draws nothing with nothing to say. One press stands for each kind, its count in its words, so
+a dozen idle mines are one alert. It wraps rather than clips. Low runway is the header's own red bar,
+under 8 quarters (`HEADER.md` § Contents).
+
+---
+
+## UI scale (Ben, 2026-11-05)
+
+The whole UI draws smaller than the pixels it is laid out in, so **each element is smaller** and
+text stops clipping: text, hard-coded chrome, the canvases and hit-testing all move together, by one
+constant (`k_ui_draw_scale`, `src/core/app.cpp`). A window lays out at its size divided by that
+constant, so the 1280 x 720 floor gains room as well as shrinking. Glyphs are rasterised at the size
+they land on screen, so the text stays sharp. The Options window's UI Scale steps grow the font on
+top of this; they do not move it.
+
+A layout checked at a draw scale of 1 is therefore the tightest case: the headless harness runs
+there unless a script asks otherwise, and whatever fits at 1 fits below it.
 
 ---
 
@@ -413,7 +432,7 @@ A few cross-cutting notes:
 
 Beyond the persistent chrome, the UI uses **transient popup elements** — context menus, confirmation dialogs, hover cards, and action prompts that appear in response to a click or hover and dismiss on action or click-away. Examples: right-clicking a unit for an order menu, a "confirm purchase" dialog.
 
-The **hover card** is the glance-then-stick card on the Planetary surface, framed by `draw_hover_card` (`src/ui/hover_card.cpp`) with lens-keyed content from `hover_content.cpp` — [`TOOLTIP.md`](TOOLTIP.md) is its spec. The system menu and its inline exit-confirm, and the confirm popups on Dismantle and Withdraw (SELECTION.md), are the popup dialogs. Context menus float above every region without belonging to any one of them, which the layout accounts for.
+The **hover card** is the glance-then-stick card on the Planetary surface, framed by `draw_hover_card` (`src/ui/hover_card.cpp`) with lens-keyed content from `hover_content.cpp` — [`TOOLTIP.md`](TOOLTIP.md) is its spec. The confirm popups on Dismantle and Withdraw (SELECTION.md), are the popup dialogs. Context menus float above every region without belonging to any one of them, which the layout accounts for.
 
 ---
 

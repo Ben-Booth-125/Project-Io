@@ -27,6 +27,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <atomic>
 #include <future>
 #include <optional>
@@ -1762,8 +1763,32 @@ void app::draw_main_menu()
             ImGui::SetTooltip("Set the nations and resources, then build the world\n"
                               "straight through, past the rounds, and choose your corporation.");
         ImGui::Dummy({0.0f, 6.0f});
+        {
+            // Load (BL-1519; STARTUP.md § Main menu): the save the escape menu and F5
+            // write. Disabled with nothing to load, and the tooltip says why.
+            std::error_code ec;
+            const bool have_save = std::filesystem::exists(quick_save_path(), ec);
+            ImGui::BeginDisabled(!have_save);
+            const ImVec2 load_at = ImGui::GetCursorScreenPos();
+            if (ImGui::Button("Load", btn) && !load_game_from(quick_save_path()))
+                m_menu_message = "That save could not be read: it is missing, corrupt, or from another version.";
+            ImGui::EndDisabled();
+            m_ui.escape_drawn[ui_state::esc_main_load].x = load_at.x + btn.x * 0.5f;
+            m_ui.escape_drawn[ui_state::esc_main_load].y = load_at.y + btn.y * 0.5f;
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip(have_save ? "Open your saved campaign." : "Nothing saved yet.");
+        }
+        ImGui::Dummy({0.0f, 6.0f});
         if (ImGui::Button("Quit", btn))
             m_quit_requested = true;
+        if (!m_menu_message.empty())
+        {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + btn.x);
+            ImGui::PushStyleColor(ImGuiCol_Text, ui::palette::negative);
+            ImGui::TextUnformatted(m_menu_message.c_str());
+            ImGui::PopStyleColor();
+            ImGui::PopTextWrapPos();
+        }
     }
     ImGui::End();
 }

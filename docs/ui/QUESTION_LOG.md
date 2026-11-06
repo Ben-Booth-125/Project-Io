@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**77 surfaces** — 4 settled, 73 awaiting Ben's wording.
+**79 surfaces** — 4 settled, 75 awaiting Ben's wording.
 
 ---
 
@@ -27,6 +27,14 @@ alphabetical order.
 **Because:** military.md § Grouped by theatre: Design lists the air classes beside the land ones and each opens the same full-canvas designer with its own slots (airframe, armament, avionics; MILITARY.md § Air, on the one-live-design rule). It IS the same designer: one machine over a theatre adapter, so the land designer's rules hold unchanged - the class centred, one box per slot with a leader line, a box's press listing the slot's kit base first with locked kit readable and its research node named, and a pick that DRAFTS (military.md § The designer, NR-1096): the box marked changed, Save sending set_air_design per changed slot, Revert, a close with an unsaved draft asking Save / Discard / Keep editing, a refused slot staying drafted with the seam's message beside it. One draft at a time across both theatres, so opening a land class over an air draft is a close like any other. Only what differs is the theatre's: the summary carries the numbers a wing fights with (HP, air attack, soft and hard attack, strategic, recon, range), goods are per wing, it counts wings flying an older design, and picks are greyed by air_design_check. There is no air art yet, so the image is the aircraft glyph on the placeholder panel. Its summary is the stat grid at the bottom right too (BL-1454): HP at full under Condition, air attack, soft and hard attack and strategic under Combat, recon and range under Field, each with its signed delta against the live design.
 
 *Demanded by BL-1450, BL-1454 · `src/ui/unit_designer.cpp`, `src/ui/unit_designer.hpp`, `src/ui/detail_level.hpp`, `src/ui/ui_state.hpp`, `src/ui/stat_grid.cpp`, `src/ui/stat_grid.hpp`, `src/ui/icons.cpp`, `src/ui/icons.hpp` · id `air_designer`*
+
+### Alert strip: top centre of the canvas area, just below the header; one press per thing that wants attention
+
+**Answers:** What wants my attention right now?
+
+**Because:** The conditions that need acting on were each true somewhere, in a ledger a player had to think to open: an empty research queue, a stalled site, a spent deposit. A player in a 16x campaign finds out from the damage. The strip earns the top centre because it is the one surface that names a problem before the player asks, and it stays honest about its size: it draws nothing with nothing to say, so it costs no canvas in a healthy nation. Each alert is a press to the surface that answers it, because knowing a thing is wrong and being one click from why are the same need; and it never acts, because the player decides (CONCEPT.md § Player identity). The list is seven, each a cause with an answer on the rail: research not set, idle buildings, wars, low runway, construction stalled, deposit exhausted, trades exceeding trade points. Offers were left off (Ben, 2026-11-05). It is not dismissable, because it says only what is true now and leaves when the cause does; a dismissed alert would be a true thing the screen had stopped saying.
+
+*Demanded by BL-1515 · `src/ui/alerts.cpp`, `src/ui/header_panel.cpp`, `src/ui/market_ledger.cpp`, `src/core/app.cpp` · id `alert_strip`*
 
 ### Balance Ledger
 
@@ -156,6 +164,14 @@ alphabetical order.
 
 *Demanded by BL-031, BL-145 · `src/ui/entity_summary.cpp` · id `entity_summary`*
 
+### Escape menu: the full-canvas pause screen behind the gear and Esc, with Save, Options, Exit to Menu and Exit Game; and Load on the main menu
+
+**Answers:** How do I stop, keep what I have, and leave?
+
+**Because:** A player must be able to reach save, settings and the way out without knowing a hotkey (BL-070), and leaving a campaign has to be a thing the game can do short of closing the window: until this surface a campaign had no way back to the main menu, and the save it could write had no door on the screen a player would look for it on. It takes the whole canvas rather than a corner popup because it is the pause screen (Ben, 2026-11-05): the world under it has stopped, so the map earns nothing while it is up. It says when the campaign was last saved, because that is the one fact the choice in front of the player turns on. Both exits warn every time, not only when the world moved, because a paused player can still place a build and 'nothing changed' is a claim the surface cannot make. The main menu gains Load because Exit to Menu must not strand a save (STARTUP.md § Main menu).
+
+*Demanded by BL-1519 · `src/ui/time_panel.cpp`, `src/ui/startup_screens.cpp`, `src/core/app.cpp`, `src/ui/icons.cpp` · id `escape_menu`*
+
 ### Field channel (comms dock)
 
 **Answers:** What happened in my fights while I was looking somewhere else?
@@ -204,7 +220,7 @@ alphabetical order.
 
 *Demanded by BL-408 · `src/ui/selection_panel.cpp`, `src/ui/hover_content.cpp`, `src/ui/body_surface_canvas.cpp` · id `god_view_readouts`*
 
-### System menu — God view checkbox (spectate only)
+### Escape menu — God view checkbox (spectate only)
 
 **Answers:** Am I watching honestly or omnisciently?
 
@@ -216,7 +232,7 @@ alphabetical order.
 
 **Answers:** Is my nation solvent, which way is its treasury moving - and how many men can I raise?
 
-**Because:** The facts that condition every other decision, needed at a glance without opening anything. Re-subjected to the NATION (BL-1406; Ben, 2026-10-23: the player IS its nation): the first figure is the player nation's TREASURY, not a corporation's balance, and its NET is the nation's own row of the state ledger (the treasury as the tick's funding gate opened it, against the treasury as the budget settled it). A nation never runs into debt, so the figure has no negative state and the '[in debt]' flag retired with the balance it flagged. Runway (BL-177) stays here rather than in a ledger because it is a warning, not an analysis: treasury over the quarterly loss, shown only while burning, and its tooltip says what happens at the end - a losing building idles, the nation does not borrow. The middle figure reads CARGO (BL-1269): the goods the player owns are its trades' cargo in transit, valued at the price where they land. BL-1472 (Ben, 2026-11-02; HEADER.md § Contents, Recruits): the top right carries the nation's three recruit pools - land, air, sea - each the theatre's glyph, held / cap and a thin bar of held over cap, its tooltip naming the pool, its quarter's output and that a full pool takes none. They earn the header rather than the head of the Recruit theatres because every Raise and every refit draws on them, with the Military ledger open or shut, and the player should see a pool filling or full without opening anything. They degrade as fit ladder step 2 (held alone, then glyph and bar with the numbers in the tooltip) and the bars never drop.
+**Because:** The facts that condition every other decision, needed at a glance without opening anything. Re-subjected to the NATION (BL-1406; Ben, 2026-10-23: the player IS its nation): the first figure is the player nation's TREASURY, not a corporation's balance, and its NET is the nation's own row of the state ledger (the treasury as the tick's funding gate opened it, against the treasury as the budget settled it). A nation never runs into debt, so the figure has no negative state and the '[in debt]' flag retired with the balance it flagged. Runway (BL-177) stays here rather than in a ledger because it is a warning, not an analysis: treasury over the quarterly loss, shown only while burning, and its tooltip says what happens at the end - a losing building idles, the nation does not borrow. The middle figure reads CARGO (BL-1269): the goods the player owns are its trades' cargo in transit, valued at the price where they land. BL-1472 (Ben, 2026-11-02; HEADER.md § Contents, Recruits): the top right carries the nation's three recruit pools - land, air, sea - each the theatre's glyph, held / cap and a thin bar of held over cap, its tooltip naming the pool, its quarter's output and that a full pool takes none. They earn the header rather than the head of the Recruit theatres because every Raise and every refit draws on them, with the Military ledger open or shut, and the player should see a pool filling or full without opening anything. They degrade as fit ladder step 2 (held alone, then glyph and bar with the numbers in the tooltip) and the bars never drop. BL-1512 (Ben, 2026-11-05; HEADER.md § Contents): the net stands in brackets beside the treasury, TREASURY 1.2M (+34/qtr), because the two are read together as 'what I have and which way it is going', and the graph left the strip for the money figures' shared tooltip, because a sparkline earned its width only for the player who was already hovering to read it.
 
 *Demanded by BL-073, BL-171, BL-177, BL-1269, BL-1406, BL-1472 · `src/ui/header_panel.cpp`, `src/ui/icons.cpp` · id `header_panel`*
 

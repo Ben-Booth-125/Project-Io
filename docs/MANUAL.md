@@ -246,7 +246,7 @@ Tax and wage tiers are set in the Budget Ledger with `-` / `+`, or by clicking a
 | `F10` | Options — resolution, UI scale, fullscreen, VSync |
 | `F11` | Frame-budget HUD |
 | `F12` | Screen capture |
-| `Esc` | System menu; backs out of an armed confirmation first |
+| `Esc` | Closes the menu, then the ledger, then the selection; with nothing open, the escape menu |
 
 ---
 

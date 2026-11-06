@@ -1819,14 +1819,21 @@ struct ui_state
     /// static so a verify script can park the ledger on a given round.
     int  history_round = 0;
 
-    // --- application / system menu (BL-070) ---
-    // The corner gear popup for session control (Pause/Resume, Exit Game). Opened
-    // by the gear button and toggled by Esc; confirm_exit_pending arms the inline
-    // "Really quit?" confirm before the destructive quit (there is no save). Drawn
-    // and acted on in app::render, which owns the quit flag and the sim pause. See
-    // docs/ui/MENU.md § Application / system menu.
-    bool show_system_menu     = false; ///< Whether the corner system-menu popup is open.
-    bool confirm_exit_pending = false; ///< Within the popup, whether Exit is armed to the "Really quit?" confirm.
+    // --- application / escape menu (BL-070, BL-1519) ---
+    // The full-canvas session menu: Save, Options, Exit to Menu, Exit Game. Opened by
+    // the gear in the time panel and by Esc; confirm_exit_pending arms the unsaved
+    // progress warning before either exit acts. Drawn in app::render, which owns the
+    // quit flag, the sim pause and the session teardown. See docs/ui/MENU.md
+    // § Application / system menu.
+    bool show_system_menu     = false; ///< Whether the escape menu is open.
+    bool confirm_exit_pending = false; ///< The unsaved-progress warning is up.
+    bool confirm_exit_to_menu = false; ///< ...for Exit to Menu (true) or Exit Game (false).
+
+    /// The menu's presses as drawn this frame, so a check presses the real control
+    /// through verify.click. Verify-only reader; x < 0 means not drawn this frame.
+    enum escape_press { esc_save, esc_options, esc_exit_menu, esc_exit_game,
+                        esc_warn_confirm, esc_warn_cancel, esc_gear, esc_main_load, esc_press_count };
+    struct { float x = -1.0f, y = -1.0f; } escape_drawn[esc_press_count];
 
     // --- frame-budget HUD (BL-249) ---
     // The v0.1.0 quality audit's frame-time instrument, toggled by F11 (app.cpp

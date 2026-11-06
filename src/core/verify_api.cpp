@@ -31,6 +31,7 @@
 #include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
 #include "ui/selection_panel.hpp"
 #include "ui/stat_grid.hpp"      // BL-1454: verify.stat_grids, the grids on screen
+#include "ui/alerts.hpp"        // BL-1515: verify.alerts
 #include "ui/header_panel.hpp"   // BL-1472: verify.header_recruits, the header's readouts
 #include "ui/corporation_dashboard.hpp"
 // BL-1406: ui/corporation_panel.hpp retired with the corporation stance table.
@@ -3294,6 +3295,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["fit"]   = r.fit;
         out["runway"] = r.runway; out["room"] = r.room; out["money_used"] = r.money_used;
         out["runway_full"] = r.runway_full; out["runway_value"] = r.runway_value;
+        out["money_tip"] = r.money_tip_frame >= 0 && r.money_tip_frame == r.frame; // BL-1512
         static const char* const k_theatres[3] = {"land", "air", "sea"};
         for (int t = 0; t < 3; ++t)
         {
@@ -3609,8 +3611,77 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // Process-global, never saved; the script turns it back off. Verify-only.
     v.set_function("waive_kit_research", [](bool on) { set_kit_research_waived_for_harness(on); });
 
+    // BL-1519: the escape menu as drawn. Each press's centre, for verify.click; the
+    // clock's speed under it; whether the menu and its exit warning are up. x = -1 on
+    // a press not drawn this frame. All of it is on screen.
+    v.set_function("escape_menu", [this]() {
+        sol::state& st = m_lua.state();
+        sol::table out = st.create_table();
+        out["open"]    = m_ui.show_system_menu;
+        out["warning"] = m_ui.confirm_exit_pending;
+        out["speed"]   = m_sim_loop.speed();
+        out["options_open"] = m_show_options;
+        static const char* const k_names[ui_state::esc_press_count] = {
+            "save", "options", "exit_menu", "exit_game", "warn_confirm", "warn_cancel", "gear", "main_load"};
+        for (int i = 0; i < ui_state::esc_press_count; ++i)
+        {
+            sol::table p = st.create_table();
+            p["x"] = m_ui.escape_drawn[i].x;
+            p["y"] = m_ui.escape_drawn[i].y;
+            out[k_names[i]] = p;
+        }
+        return out;
+    });
+    // BL-1495: draw this run at a UI scale. No argument: the shipped constant, so a
+    // check never restates the number. Verify otherwise runs at 1, the tightest layout.
+    v.set_function("ui_draw_scale", [this](sol::optional<float> s) {
+        m_ui_draw_scale = s.value_or(shipped_ui_draw_scale());
+        apply_ui_scale();
+    });
+
+    // BL-1515: the alert strip as drawn: each alert's words and press. All on screen.
+    v.set_function("alerts", [this](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        int i = 0;
+        for (const ui::alert_drawn& a : ui::alerts_drawn())
+        {
+            sol::table row = lua.create_table();
+            row["kind"] = static_cast<int>(a.kind);
+            row["text"] = a.text;
+            row["x"] = a.x;
+            row["y"] = a.y;
+            out[++i] = row;
+        }
+        return out;
+    });
+    // BL-1515: which ledger stands open, so a check can read where a click-through led.
+    v.set_function("open_ledgers", [this](sol::this_state ts) {
+        sol::state_view lua(ts);
+        sol::table out = lua.create_table();
+        out["research"]     = m_ui.show_tech_tree;
+        out["construction"] = m_ui.show_construction_panel;
+        out["view"]         = m_ui.construction.panel_view;
+        out["diplomacy"]    = m_ui.show_diplomacy_ledger;
+        out["budget"]       = m_ui.show_balance_ledger;
+        out["market"]       = m_ui.show_market_ledger;
+        return out;
+    });
+
+    // BL-1520: what the Esc queue has still to close.
+    v.set_function("escape_queue", [this]() {
+        sol::table out = m_lua.state().create_table();
+        out["ledger"]    = ui::any_panel_open(m_ui);
+        out["selection"] = ui::any_selection(m_ui);
+        return out;
+    });
+    v.set_function("set_speed", [this](int speed) {
+        m_prev_speed = speed > 0 ? speed : m_prev_speed;
+        m_sim_loop.set_speed(speed);
+    });
+
     // Press Escape through the app's own key handler (its precedence ladder: exit
-    // confirm, system menu, roll-up drill, the takeover's fold, the menu), so a
+    // warning, escape menu, roll-up drill, the takeover's fold, the menu), so a
     // check drives the real Escape rung rather than calling fold() itself.
     v.set_function("press_escape", [this]() {
         SDL_KeyboardEvent k{};
