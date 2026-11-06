@@ -240,6 +240,7 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
         return 0;
 
     const std::set<entity_id> foreign = foreign_held_tiles(w, owner);
+    bool occupation_batch = false; // BL-1502: a retreat enters ground like any other move
     for (const entity_id uid : leaving)
     {
         unit_component& u = w.units.at(uid);
@@ -247,6 +248,7 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
         {
             u.position       = to;
             u.tile_since_day = day; // BL-1453: it came onto this tile today
+            (void)occupy_on_entry(w, u.owner, u.type, to, occupation_batch);
         }
         u.order           = movement_order{};
         u.morale_permille = std::clamp(u.morale_permille - p.morale_loss, 0, 1000);
@@ -265,6 +267,8 @@ int retreat_side(world& w, std::vector<entity_id>& units, entity_id owner, uint3
         strip(other.defender_units);
     }
     strip(units); // a no-op when @p units is one of w.battles' own lists; kept for a caller's copy
+    if (occupation_batch)
+        reanchor_fronts(w);
     return static_cast<int>(leaving.size());
 }
 
@@ -888,6 +892,7 @@ shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params*
     }
 
     std::set<entity_id> doomed;
+    bool occupation_batch = false;
     for (const auto& [tile, here] : on_tile)
     {
         const entity_id keeper = w.units.at(here.front()).owner; // the lowest-id unit's nation
@@ -911,6 +916,7 @@ shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params*
                 u.position       = to;
                 u.order          = movement_order{};
                 u.tile_since_day = w.current_day_tick; // BL-1453: it came onto this tile now
+                (void)occupy_on_entry(w, u.owner, u.type, to, occupation_batch); // BL-1502
                 ++out.stepped;
             }
             else
@@ -920,6 +926,8 @@ shared_tile_fix resolve_shared_tiles(world& w, const military_capability_params*
             }
         }
     }
+    if (occupation_batch)
+        reanchor_fronts(w);
 
     if (!doomed.empty())
     {
@@ -959,6 +967,7 @@ int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vec
     };
 
     std::set<entity_id> moved;
+    bool occupation_batch = false; // BL-1502: an owner walking home frees what it walks on
     for (const entity_id uid : ids)
     {
         const auto uit = w.units.find(uid);
@@ -1003,6 +1012,7 @@ int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vec
             visited.insert(u.position);
             u.position = to;
             stepped    = true;
+            (void)occupy_on_entry(w, u.owner, u.type, to, occupation_batch);
         }
         if (stuck != nullptr && in_leave(u.position))
             ++*stuck;
@@ -1014,6 +1024,8 @@ int withdraw_units(world& w, const std::vector<entity_id>& units, const std::vec
         u.battle_hp_carry    = 0;
         moved.insert(uid);
     }
+    if (occupation_batch)
+        reanchor_fronts(w);
     if (moved.empty())
         return 0;
     const auto strip = [&](std::vector<entity_id>& v) {
