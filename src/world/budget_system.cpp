@@ -214,6 +214,10 @@ void apply_budget(world& w,
     // before an unbooked refund, which the row books as `refunds`), and its `net`
     // is the treasury's difference across the pass in DOUBLE (BL-1337), so a run's
     // returns telescope onto the treasury exactly.
+    //
+    // BL-1539 (Ben, 2026-11-05: research counts inside net): the debits the nation
+    // step took since the last return (research, garrison pay) are booked here too,
+    // as exact doubles, so `net` is the money left and still telescopes.
     std::map<entity_id, quarterly_return> filed_returns;
     {
         std::vector<entity_id> nation_ids;
@@ -230,6 +234,11 @@ void apply_budget(world& w,
             const float opening_balance = exact ? nc.refund_opening : nc.treasury - refunds;
             nc.refund_unbooked          = 0.0f;
             nc.refund_opening           = 0.0f;
+
+            const double research_out   = nc.research_unbooked;
+            const double upkeep_out     = nc.upkeep_unbooked;
+            nc.research_unbooked        = 0.0;
+            nc.upkeep_unbooked          = 0.0;
 
             corp_budget bud;
             float book_value = 0.0f;
@@ -317,10 +326,12 @@ void apply_budget(world& w,
             qr.expenditure = bud.expenditure;
             qr.maintenance = bud.maintenance;
             qr.wages       = bud.wages;
-            qr.upkeep      = bud.upkeep;
+            qr.upkeep      = bud.upkeep + static_cast<float>(upkeep_out);
             qr.taxes       = bud.taxes;
+            qr.research    = static_cast<float>(research_out);
             qr.refunds     = refunds;
-            qr.net         = static_cast<double>(nc.treasury) - static_cast<double>(opening_balance);
+            qr.net         = static_cast<double>(nc.treasury) - static_cast<double>(opening_balance)
+                           - research_out - upkeep_out;
             qr.balance     = nc.treasury;
             qr.holdings    = static_cast<uint32_t>(nc.state_assets.size());
             qr.book_value  = book_value;

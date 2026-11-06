@@ -712,7 +712,22 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// a u32 count, every defending unit ascending id as (unit, u32 province, post tile). Each
 /// names a unit of the stream, a province of the stream and a tile of it. Refused whole
 /// otherwise. v78 is a STRICT PREFIX of v79 and is read too, as no unit defending.
-inline constexpr uint32_t world_save_version = 79;
+///
+/// **80 (BL-1539, FINANCE.md § The quarterly return) — THE RESEARCH BOOKS.** Appended last:
+/// after a u32 count, every nation with an unbooked debit or a return that booked research,
+/// ascending id, as (id, f64 research_unbooked, f64 upkeep_unbooked, u32 n = its return
+/// count, n x f32 research in filed order). All finite and never negative. v79 is a STRICT
+/// PREFIX of v80 and is read too (`k_world_save_version_pre_research_books`), as a world
+/// whose returns booked none. Below v80 a building site's `days_remaining` is on the old
+/// build days, so the reader rescales it (`rescale_site_days_to_research_books`).
+inline constexpr uint32_t world_save_version = 80;
+
+/// BL-1539: the first version carrying the research-books section (see above).
+inline constexpr uint32_t k_world_save_version_research_books = 80;
+
+/// BL-1539: the version before it, a strict prefix of it.
+inline constexpr uint32_t k_world_save_version_pre_research_books =
+    k_world_save_version_research_books - 1;
 
 /// BL-1504: the first version carrying the defend-order section.
 inline constexpr uint32_t k_world_save_version_defend = 79;
@@ -928,6 +943,10 @@ std::size_t world_save_occupation_section_bytes(const world& w);
 /// BL-1504: the bytes v79's defend-order section takes for @p w: the count and 12 a unit.
 std::size_t world_save_defend_section_bytes(const world& w);
 
+/// BL-1539: the byte length of the v80 research-books section `w` writes - 4, plus 24 +
+/// 4 per return for each nation it lists. The LAST section of a v80 stream.
+std::size_t world_save_research_books_section_bytes(const world& w);
+
 /// BL-1422, widened by BL-1436: the bytes ALL SIX kit goods' extra elements add to
 /// every per-resource array of the stream `w` writes - the widening from 49 to today's
 /// width: (the v74 stream less the v73 stream, the five goods) plus
@@ -1053,6 +1072,9 @@ void write_world_snapshot_pre_occupation(const world& w, std::ostream& out);
 
 /// VERIFICATION ONLY (BL-1504): the v78 stream shape, no defend-order section.
 void write_world_snapshot_pre_defend(const world& w, std::ostream& out);
+
+/// VERIFICATION ONLY (BL-1539): the v79 stream shape - no research-books section.
+void write_world_snapshot_pre_research_books(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

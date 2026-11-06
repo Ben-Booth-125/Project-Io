@@ -302,7 +302,7 @@
    "design": "Ben, 2026-11-05: \"every major power starts with the same amount\". Ruling (Ben, 2026-11-05) in the authority doc. Today the 12,000 authored figure is set before the 12-tick settle, which spreads majors to 16,994-36,214 at the handoff. Set one figure at the handoff, after the settle: the kit's running bill for the runway plus a build fund of 2-3 buildings at the new prices. No minting rule conflict: read NATION_GENERATION § Pass 7 and money_conservation first, since a set after the settle must be stated as the kit's grant, not a silent clamp. Check: opening-parity treasury spread 1.00, money_conservation."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -325,7 +325,7 @@
    "design": "Playtest item 8. Ruling (Ben, 2026-11-05) in the authority doc. Ben chose scale-all-keep-differences; the x2/3 anchor on extraction is a call taken on his behalf (see the review queue): bunker 60, extraction/port/station 120, processing/hub/schooling/marketplace 180, base/airbase/institute 240, university 300, launchpad 360. TRAP: corp_ai.cpp:2905,3259,3293,3353 cast build_duration_ticks to int, so fractional quarters truncate (120 days reads as 1); fix to the float or the ceiling the gate uses (construction.cpp:272). Materials per quarter rise, so more sites may stretch. Check: market-viability, opening-parity. Shares the re-bless."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -349,7 +349,7 @@
    "design": "Playtest item 10. Ruling (Ben, 2026-11-05) in the authority doc. All count, capital's source included. Confirmed by reading: stations (state_industry.cpp:1687-1717) and place_source (logistic_points.cpp:1709-1725, placeable :1764) bypass non_extraction_stack_cap; charters, kit and road-gen ports honour it. Count first: add a per-tile over-cap counter to province_capacity_probe (today it flags > per province only). RISK: a refused hub or port can darken a capital (comment near logistic_points.cpp:2215), and volcanic or icy caps are 2. Report what is refused. Check: the counter reads zero, rebless-shape-probe. Shares the re-bless."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -372,7 +372,7 @@
    "design": "Playtest item 6. MILITARY already promises a unit starts fed. Suspected: repost_garrisons_on_cover tests any cover above zero (nation_generation.cpp:2505), asserts lp_share_permille = 1000 (:2648) so the shortfall appears a quarter later, and leaves rep.uncovered units in place (:2641). Also read: no write to force_unsupplied was found in src/world, so confirm whether the flag is live at all. Measure first with a harness: actual share and starving units over the first live quarters. Then tighten the predicate to fully fed. Front slots do not bend to supply (MILITARY rule stands). Shares the re-bless."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -399,7 +399,7 @@
    "design": "Playtest item 5. Ruling (Ben, 2026-11-05) in the authority doc. Three causes confirmed by reading: run_unit_march changes only position (economy_system.cpp:4901); a pushing unit on enemy ground stops for good (fronts.cpp:865); set_tile_nation outside generation is only cession (war.cpp:1112), and fronts read tile_to_nation. THE WORK: a saved per-tile occupation map, written at the march step and battle advance, cleared at peace; fronts derive from owner-or-occupier (owner_of); push continues past the first tile. Defaults on review: empty tile occupied on entry; output denied to the owner, not gained. Rivals' pushes now take ground under the existing push: no new verb, but flagged. Save version bump; state_hash takes the field; sim outcomes move once a war runs. Check: war_census, save_roundtrip, world_determinism, live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -421,7 +421,7 @@
    "design": "Playtest item 5, second half. Ruling (Ben, 2026-11-05) in the authority doc. fronts_of takes all owned tiles, owned shore water is in tile_to_nation (fronts.cpp:259), and hold skips only walled slots (:828), while domain_wall allows owned coast for land classes; push_candidates does filter water (:459). Read, not reproduced: reproduce first. Skip water for land units in hold and front_reachable, bridges excepted. An all-water span leaves the unit where it stands. The owned-coast marching ruling stands. Check: a fixture in fronts' harness, live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -450,7 +450,7 @@
    "design": "Playtest item 7. Ruling (Ben, 2026-11-05) in the authority doc. AI grant given, AI_OPPONENT § 11 (Ben, 2026-11-05), player and rivals. Saved unit field, a verb appended to corp_verb, a daily step beside advance_fronts: march to a hostile stack in the province, otherwise return to post, no pursuit out of it. Wake test (economy_system.cpp:4957,4987). Units can start on it at the capital province. Save bump, state_hash, deterministic order. Note: low supply does not stop a march (movement costs no Logistic Points), so naval invasion is its real case. Check: harness, ACTIONS entry, question log, live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -475,7 +475,7 @@
    "design": "Playtest item 22, second half. Ruling (Ben, 2026-11-05) in the authority doc. Lanes ignore borders today; intercept_convoys cuts only on a hostile unit on the lane (supply_system.cpp:92-135). Lane solve treats a warring front as closed, for both parties only. Defaults on review: no route means dispatch refused with a surfaced reason; in-flight cargo with no route returns to origin. TRAP: lane legs are re-solved on read, so route price and lane must agree (LOGISTICS); a standing route ships what it can. Rival scorers meet refusals. Reads the front as OCCUPATION_MOVES_FRONT defines it. Check: war_census, market-viability, determinism."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -499,7 +499,7 @@
    "design": "Playtest item 22, first half. Ruling (Ben, 2026-11-05) in the authority doc. Convoys have no entity or stored position; derive it with convoy_route_tiles and convoy_lane_index. Selection by a selected_convoy id field, like the battle triple. A marker at the lane head with a hit zone, and a convoy card. Rival convoys obey the commercial fog (DISCOVERY). Watch clutter. UI only. Check: capture, live click, question log, ACTIONS."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -521,7 +521,7 @@
    "design": "Playtest item 12. Ruling (Ben, 2026-11-05) in the authority doc. Counters group by position and draw at the hex (body_surface_canvas.cpp:3084,6165). Offset = order.progress / next hop's edge_traversal_cost, with class-move and air-slow factors, plus a fraction of the day from sim_now_days; expose the cost through one shared helper. A moving unit draws apart from its tile's stack; hit zones follow the drawn point. UI only. Check: live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -546,7 +546,7 @@
    "design": "Playtest item 14. Ruling (Ben, 2026-11-05) in the authority doc. Own units only, shift adds. selected_units beside selected_entity; the band, right-click and Assign to front read it; one command per unit already exists. Armed-pick modes take priority; confirm nothing else uses left-drag (pan is middle). UI only. Check: live click, question log, ACTIONS."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -592,7 +592,7 @@
    "design": "Playtest item 3. Replace the text Selectable (construction_sites.cpp:488) with icons::building plus the name, identity from primary_output_resource as at selection_panel.cpp:5018. Check: live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -616,7 +616,7 @@
    "design": "Playtest item 4. Ruling (Ben, 2026-11-05) in the authority doc. Combo replaces the Nations list and shows draw_expanded (:984, :1426). Opening arms overlay_mode::nations, closing disarms (nav_pane.cpp:98). A press under the lens aims the ledger, opening it if closed. Wars stays. The side-by-side scan goes, and the question log's reason changes with it. The lens is Planetary-row only: name what happens on other rows. Declaration flow must survive. Check: live click, question log, ACTIONS."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -685,7 +685,7 @@
    "design": "Playtest item 15. Ruling (Ben, 2026-11-05) in the authority doc. Own buildings only (SELECTION's recipe-disclosure rule). Rows per input and output from recipe inputs and outputs, the report row (economy_system.hpp:62-75), m->inventory and shelf_admits via input_cause_of, modelled on read_construction's short_of (construction_panel.cpp:100-119). Only the single binding input is sim-reported, so per-good need is a mirror: label accordingly. The report is empty after load until a tick. Per quarter. Check: live click, question log."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -709,7 +709,7 @@
    "design": "Playtest item 17. Ruling (Ben, 2026-11-05) in the authority doc. Research not set (research_queue_idle), idle buildings (report idle, aggregated), wars (at_war), low runway (under 8 quarters, header_panel.cpp:340), construction stalled (read_construction), deposit exhausted (report exhausted), trades exceed points (collect_trade_points). Peace or friendship offers were left off. Recomputed per tick; each clicks through. Not dismissable, by default. Check: live click, question log, ACTIONS."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -731,7 +731,7 @@
    "design": "Playtest item 18. Ruling (Ben, 2026-11-05) in the authority doc. derive_potential_trades (market_ledger.cpp:442) has no ownership or points check, so + offers what trade_is_valid refuses (trade.cpp:159). Gate in the ledger on market_trade_points (trade.hpp:62) above zero, with its own empty-state line; trade_points_of is a nation sum and cannot gate. Do NOT change rank_trade_routes: run_trades and corp_ai.cpp:4230,4538 share it. Check: live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -756,7 +756,7 @@
    "design": "Playtest item 21. Ruling (Ben, 2026-11-05) in the authority doc. Add mc.inventory[r] (market_ledger.cpp:1611-1653); sort via the finder's pattern (construction_sites.cpp:542,624), key in ui_state. The word is shelf. market.md measured name-column fit, so it depends on BL-1495 (UI scale down). The 8 qtr column sorts by its change. Check: goods_table, live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -780,7 +780,7 @@
    "design": "Playtest item 21. Ruling (Ben, 2026-11-05) in the authority doc. Overturns ICONS § 2b's four silhouettes. About 45 goods; 19 have identity shapes on building glyphs only (icons.cpp:495-517), which seed the set; icons::resource (:593) stops being a diamond and Goods' dashed placeholder (:1489) goes. Check: a contact-sheet capture for Ben, icon_silhouettes golden."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -805,7 +805,7 @@
    "design": "Playtest item 23. Ruling (Ben, 2026-11-05) in the authority doc. Gear inside the time column's right end (flush to the edge, shell_metrics.cpp:15). Modal with Save (save_game_to), Options (the F10 window), Exit to Menu, Exit Game. New exit_to_menu(): join_workers, the load path's reset list (app.cpp:2460-2552), clear m_ground_world_live, close the play log and agent seam, drop the world. Pause remembers speed; check the agent clock gate (app.cpp:450+). God view moves here. Warn on unsaved progress. Main menu gains Load (startup_screens.cpp:1758-1766). Check: live click including exit, new game, load, and repeat."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -829,7 +829,7 @@
    "design": "Playtest item 24. Ruling (Ben, 2026-11-05) in the authority doc. app.cpp:2308-2323 today: confirm, menu, declaration, drill, fold, open menu. Add ledger (close_all_panels), then selection clear (unit, battle, front, convoy), then open the escape menu. Selection rests on the player's nation, so no hide rung appears. Armed tools disarm before the ledger, by default. Also corrects ACTIONS chrome.esc. Check: live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -879,7 +879,7 @@
    "design": "Playtest item 1. Ben, 2026-11-05: lands with the naval system. PARKED until then. Amends TILES' no-buildings-on-water; adds sea petroleum (worldgen moves); DG-PR-EX-A already promises oil platforms on shelf sea. Port points ride lanes and land only on port tiles, so \"supplied by ports nearby\" needs a new rule (a rig tile counts as landed, or a radius). Offshore wind has no grid (power rides roads). Not settled: shelf only or open ocean."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -902,7 +902,7 @@
    "design": "Playtest item 9. Ruling (Ben, 2026-11-05) in the authority doc. Overturns 128 over 96 (2026-10-10). k_master_ppr and the ladder (ground_bake.hpp:483-486) become 96/48/24/12/6; the bottom level equals the 6 px far page, so check it is not redundant. Top rung falls from about 110 px to about 96. Choose_level expectations and P22 (ground_bake_check.cpp:449-472). Computed, not measured: about 5 GB to 2.8 GB, home re-bake about 71 s to 40 s. Trees, crags and installations lose detail. No sim digest. Check: measured memory and bake time, goldens, live look."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -1031,7 +1031,7 @@
    "design": "Ben, 2026-11-05, on the rendering pass: a lighter palette across the tileset. TODAY (RENDERING § Art direction and palette): the bake is held to luminance p10 about 26, p50 about 55, p90 about 106, p99 about 155; median ground about (55, 56, 51), khaki fields about (100, 83, 53), forest about (41-51, 43-54, 27-35), deep sea about (21, 42, 50). OPEN, for Ben at a live look (Rule 0b): how much lighter, whether water and shadow lift too, and whether the map lifts by base colours or by the grade pass. Base entries live in palette::ground_tile_colour; the near-future grade is a separable final pass, so a grade trial is cheap. Do alongside TILE_RES_96 and POINTED_TREES so it is judged once, at the real resolution. GLOBAL_STYLE_SHEET (Joe's) carries the visual-language exploration. Check: new percentile targets in ground_bake_check, goldens, live look."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,

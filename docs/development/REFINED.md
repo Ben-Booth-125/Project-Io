@@ -12,6 +12,23 @@ session merges them one at a time and takes one shared re-bless.
 - [x] Census holdout: quoted when ordered, read a year after standing.
 - [ ] Live click (Ben).
 
+### Merged lanes (cold reviewed, on main; re-bless shared at the wave's end)
+
+- [x] Market lane: TRADE_OFFERS_SOURCED, GOODS_TABLE_STOCK_SORT, RESOURCE_GLYPHS.
+- [ ] One glyph per good; sort cycles on goods-table headings; tabs; offers open and shut; trades from own markets within points.
+- [x] Canvas lane: CONVOYS_ON_MAP, UNIT_SMOOTH_MARCH, DRAG_SELECT_UNITS, NATION_STANDING_BARS, DIPLOMACY_NATION_SELECTOR.
+- [ ] Unit glide; convoy marker press and walk; drag band, shift and right-click; diplomacy dropdown and slot 8 lens; standing bars.
+- [x] Shell lane: HEADER_NET_BRACKETS, ALERT_STRIP, ESCAPE_MENU, ESCAPE_QUEUE.
+- [ ] Gear and Esc pause, Options, Save, Exit and Load twice, Exit to New Game Quick Start, Exit Game; each Esc rung; header hover; each alert kind; hit-testing through the UI scale.
+- [x] War lane: OCCUPATION_MOVES_FRONT, HOLD_NOT_INTO_WATER, DEFEND_PROVINCE, CONVOY_REROUTES_FRONTS.
+- [ ] Defend this province menu; a front moves under a push; Trade flow reads front closed; set_trade refusal text; a hand march on a defender.
+- [x] Art lane: TILE_RES_96, POINTED_TREES.
+- [ ] Live look at 96 px through the zoom ladder; the zoom-out floor; firs at the closest rungs.
+- [x] Generation lane: NODES_COUNT_TO_CAP, UNITS_START_SUPPLIED.
+- [x] No click: world-side. Digests await the shared re-bless.
+- [x] Money lane: RESEARCH_IN_RETURN, BUILD_DAYS_SCALED, WIND_TURBINE.
+- [ ] Balance card Research segment; header NET; method grid with wind locked and open.
+
 ## Sprint 62 — equal starts for majors (opened 2026-11-02, CLOSED 2026-11-04)
 
 **Closed.** Delivered BL-1475 (opening parity census), BL-1473 (major opening kit), BL-1474 (major

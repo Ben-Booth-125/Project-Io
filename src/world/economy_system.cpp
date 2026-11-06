@@ -3344,7 +3344,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                     };
                     if (output_ratio(b.recipe) <= floored_frac)
                     {
-                        const int n      = reg.recipe_count(building_type::processing_facility);
+                        const int n      = reg.play_recipe_count(building_type::processing_facility);
                         int   best_i     = -1;
                         float best_ratio = output_ratio(b.recipe);
                         // BL-1206 (seat day-1 profit): the rescue proposes only a
@@ -3372,9 +3372,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         // opening shelf no longer admits it (so no pool is read).
                         for (int i = 0; i < n; ++i)
                         {
-                            const recipe& cand = reg.recipe_at(building_type::processing_facility, i);
+                            const recipe& cand = reg.play_recipe_at(building_type::processing_facility, i);
                             const float ratio  = output_ratio(reg.recipe_id(cand.name));
                             if (ratio > best_ratio
+                                && recipe_unlocked(w, reg, corp, reg.recipe_id(cand.name)) // this writes b.recipe past the retool door
                                 && recipe_runs_at_tile(w, cand, b.tile) // the body's air (Ben, 2026-10-09)
                                 // BL-1399: a nation's building takes any recipe; the
                                 // strategic-sector limit retired (Ben, 2026-10-23).
@@ -3390,13 +3391,13 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
                         if (best_i >= 0 && nation_owner)
                         {
                             building_component after = b;
-                            after.recipe = reg.recipe_id(reg.recipe_at(building_type::processing_facility, best_i).name);
+                            after.recipe = reg.recipe_id(reg.play_recipe_at(building_type::processing_facility, best_i).name);
                             if (!state_commit_change(w, reg, owner, b, after))
                                 best_i = -1;
                         }
                         if (best_i >= 0)
                         {
-                            const recipe& chosen  = reg.recipe_at(building_type::processing_facility, best_i);
+                            const recipe& chosen  = reg.play_recipe_at(building_type::processing_facility, best_i);
                             b.recipe              = reg.recipe_id(chosen.name);
                             b.active_recipe_index = best_i;
                             b.loss_streak         = 0; // give the new recipe a chance before idling

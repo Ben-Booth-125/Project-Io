@@ -908,6 +908,27 @@ recipes = {
         outputs      = { airframes = 1.0 },
         qualified_workforce = 0.25,
     },
+
+    -- WIND (Ben, 2026-11-05; PRODUCTION.md § Wind): a power building that burns no
+    -- fuel. Appended here and not beside the plants, because a recipe's id is its
+    -- index and that id is stored in every processing building.
+    --
+    -- Its output is sized so it earns between the two fuel routes, not above them: at
+    -- power's base price of 2.60, 2.0 power is 5.20 a batch with nothing to buy,
+    -- against the oil plant's 5.60 and the coal plant's 4.80 after fuel. Lower output
+    -- is the price of no fuel bill, and it clears the fixed cost at the floor
+    -- (recipe_margin M2 needs 1.78 or more). Re-derive it if a base price moves.
+    --
+    -- `research_opened` keeps it off the list generation walks, so the seeder never
+    -- sees it and no nation opens with one. Opened by Wind Power (DG-PR-EN-W).
+    {
+        name         = "wind_turbine",
+        display_name = "Wind Turbine",
+        era          = "industrial",
+        group        = "Power Generation",
+        outputs      = { power = 2.0 },
+        research_opened = true,
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

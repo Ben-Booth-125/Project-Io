@@ -58,6 +58,11 @@
 //       stack. A stream one version older is refused whole with the destination
 //       untouched.
 //
+//   R8  BL-1539: research counts inside net. A nation-step debit (research, then
+//       garrison pay) lands on the treasury AFTER the return is written, and the
+//       next return books it inside its net: the flows rebuild the net, and the
+//       nets replay onto the treasury across the debit, exactly.
+//
 //   R6  THE ITEM-SPANNING GATE. End to end over the settle — phase 6's
 //       validation run, 12 economy ticks (`app::validation_ticks`) on a
 //       really generated world: every corporation has a filed history, each
@@ -84,6 +89,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
 #include "world/nation_step.hpp" // BL-1335: run_nation_step (R7)
+#include "world/nation_tech.hpp" // BL-1539: advance_research (R8)
 #include "world/state_industry.hpp" // BL-1407: fold_to_ground
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
@@ -479,7 +485,7 @@ void run_tax_rows(const recipe_registry& reg)
             sum   += static_cast<double>(q.net);
             taxes += static_cast<double>(q.taxes);
             const double flows_net = static_cast<double>(q.income) - q.expenditure - q.maintenance
-                                   - q.wages - q.interest - q.levies - q.upkeep + q.taxes + q.refunds;
+                                   - q.wages - q.interest - q.levies - q.upkeep - q.research + q.taxes + q.refunds;
             rebuild = rebuild && std::fabs(flows_net - q.net) <= 1e-3 * std::max(1.0, std::fabs(static_cast<double>(q.net)));
         }
         exact = exact && cc.returns.size() == 20
@@ -843,6 +849,77 @@ void run_settle_rows(const recipe_registry& reg)
 
 } // namespace
 
+// ---------------------------------------------------------------------------
+// R8 — BL-1539: research counts inside net
+// ---------------------------------------------------------------------------
+// The real debit (advance_research, after the return is written) on the isolated
+// fixture, where it and apply_budget are the only balance movers. So every filed net
+// must replay the LAST return's closing treasury onto this one's, across the debit.
+void run_research_rows(const recipe_registry& reg)
+{
+    std::printf("\nR8 — BL-1539: research is debited after the return and booked inside the next one\n");
+    fixture f = build_fixture(reg);
+    const entity_id n = f.corp_a;
+    f.w.nations.at(n).treasury = 50000.0f;
+    nation_budget nb;
+    nb.weights[static_cast<std::size_t>(budget_priority::academic_research)] = 0.1f;
+    nb.weights[static_cast<std::size_t>(budget_priority::schooling)]         = 0.9f;
+    nb.reserve_fraction = 0.0f;
+    f.w.nation_budgets[n] = nb;
+
+    // Keep the queue owing: every node the planner takes.
+    const auto top_up_queue = [&]() {
+        for (int node = 0; node < io::dg::node_count; ++node)
+            (void)enqueue_node(f.w, n, node);
+    };
+
+    research_params p{};
+    bool replay = true, rebuild = true, booked_is_last = true, drained = true;
+    double sum = 0.0, booked = 0.0, last_spend = 0.0;
+    const double first_close_of_run = f.w.nations.at(n).treasury;
+    double prev_close = first_close_of_run;
+    int rows = 0;
+    for (int t = 0; t < 12; ++t)
+    {
+        f.w.current_econ_tick = k_campaign_settle_ticks + t;
+        economy_report report = run_economy_step(f.w, reg);
+        run_trades(f.w, reg, report);
+        auto flows = clear_markets(f.w, reg, report);
+        flows[n].income += 100.0f;
+        apply_budget(f.w, reg, flows, report.workforce_contention);
+
+        const nation_component& nc = f.w.nations.at(n);
+        const quarterly_return& q  = nc.returns.back();
+        ++rows;
+        replay = replay && static_cast<float>(prev_close + q.net) == nc.treasury;
+        const double flows_net = static_cast<double>(q.income) - q.expenditure - q.maintenance - q.wages
+                               - q.interest - q.levies - q.upkeep - q.research + q.taxes + q.refunds;
+        rebuild = rebuild && std::fabs(flows_net - q.net) <= 1e-2 * std::max(1.0, std::fabs(q.net));
+        booked_is_last = booked_is_last
+            && std::fabs(static_cast<double>(q.research) - last_spend) <= 1e-2;
+        drained = drained && nc.research_unbooked == 0.0;
+        sum    += q.net;
+        booked += q.research;
+        prev_close = nc.treasury;
+
+        top_up_queue();
+        std::vector<research_accrual> accruals;
+        advance_research(f.w, p, &accruals);
+        last_spend = 0.0;
+        for (const research_accrual& a : accruals)
+            if (a.nation == n)
+                last_spend = a.line_spend;
+    }
+    char buf[200];
+    std::snprintf(buf, sizeof buf, "research was really paid and booked (%.2f credits over %d rows)", booked, rows);
+    check(booked > 0.0, "R8", buf);
+    check(booked_is_last, "R8", "each return books what the line spent since the last one");
+    check(drained, "R8", "a filed return leaves nothing unbooked");
+    check(rebuild, "R8", "every filed return's flows, research a debit, rebuild its net");
+    check(replay, "R8", "each net replays the last closing treasury onto this one, across the debit, bit for bit");
+    check(sum == prev_close - first_close_of_run, "R8", "sum of the filed nets == the treasury's change, EXACTLY");
+}
+
 int main()
 {
     recipe_registry reg;
@@ -869,6 +946,7 @@ int main()
     run_save_rows(reg);
     run_settle_rows(reg);
     run_tax_rows(reg);
+    run_research_rows(reg);
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES ABOVE",
                 g_failures, g_failures == 1 ? "" : "s");
