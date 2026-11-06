@@ -21,28 +21,115 @@
 #include <utility>
 #include <vector>
 
+namespace {
+
+entity_id lane_head_under(world& w, const convoy_component& c, entity_id party)
+{
+    const convoy_route r = convoy_route_under(w, c, party);
+    const int i = convoy_lane_index(r.at, c.progress);
+    return i < 0 ? null_entity : r.tiles[static_cast<std::size_t>(i)];
+}
+
+/// BL-1505 (SUPPLY.md § A lane does not cross a warring front): a front moves the lane, not
+/// the cargo. A convoy whose lane no longer has it where it stood goes on from THERE: its lane
+/// starts at that tile, its progress at 0, and its speed is the new lane's, so a detour costs
+/// the time it takes and a convoy already past the front flies on. The haul stays as paid. A
+/// peace runs the same test once, then the convoy needs nothing more kept. With no lane from
+/// there, it is left standing on that tile for `credit_arrived_convoys` to read as stranded.
+/// Vector order: fixed.
+void rebase_convoys_on_moved_lanes(world& w)
+{
+    for (convoy_component& c : w.convoys)
+    {
+        if (c.arrived)
+            continue;
+        const entity_id party = lane_party(w, c.corp);
+        if (party == null_entity && c.lane_head == null_entity)
+            continue; // at peace and nothing kept: the peace-time lane, untouched
+        // A convoy that has only now come under a war stood on the lane a neutral reads.
+        const entity_id stood = c.lane_head != null_entity ? c.lane_head : lane_head_under(w, c, null_entity);
+        if (stood == null_entity || lane_head_under(w, c, party) == stood)
+            continue;
+        convoy_component moved = c;
+        moved.origin_tile = stood;
+        moved.progress    = 0.0f;
+        convoy_route lane = convoy_route_under(w, moved, party);
+        if (lane.tiles.empty() && moved.station_a != null_entity)
+        {
+            moved.station_a = moved.station_b = null_entity; // off the rails, by road
+            lane = convoy_route_under(w, moved, party);
+        }
+        if (lane.tiles.empty() && moved.port_a != null_entity)
+        {
+            // Afloat, its sea leg starts where it is; ashore, it goes by road.
+            const auto here = w.tiles.find(stood);
+            if (here != w.tiles.end() && is_water(here->second.substrate))
+                moved.port_a = stood;
+            else
+                moved.port_a = moved.port_b = null_entity;
+            lane = convoy_route_under(w, moved, party);
+        }
+        if (lane.tiles.empty() && convoy_route_under(w, moved, null_entity).tiles.empty())
+            continue; // not the front's doing: a road or a port lost, as before
+        if (lane.days > 0.0f)
+            moved.speed = 1.0f / static_cast<float>(travel_ticks_for_days(lane.days));
+        c = moved;
+    }
+}
+
+/// Where each convoy of a nation at war stands now, for tomorrow's test.
+void note_lane_heads(world& w)
+{
+    for (convoy_component& c : w.convoys)
+    {
+        if (c.arrived)
+            continue;
+        const entity_id party = lane_party(w, c.corp);
+        if (party == null_entity)
+        {
+            c.lane_head = null_entity;
+            continue;
+        }
+        if (const entity_id head = lane_head_under(w, c, party); head != null_entity)
+            c.lane_head = head;
+    }
+}
+
+/// BL-1505 (SUPPLY.md): cargo with no lane from where it stands. With a lane back to its
+/// source market it returns, and lands there now, the haul already paid. With none, it stands
+/// behind a front with no way on or back, and is lost. Vector order: fixed.
+void resolve_stranded_convoys(world& w)
+{
+    if (w.wars.empty())
+        return;
+    std::vector<std::uint32_t> gone;
+    for (const convoy_component& c : w.convoys)
+    {
+        if (c.arrived || w.markets.count(c.source_market) == 0 || !convoy_stranded_by_front(w, c))
+            continue;
+        convoy_component back = c;
+        back.dest_market = c.source_market;
+        back.port_a = back.port_b = back.station_a = back.station_b = null_entity;
+        back.progress = 0.0f;
+        const bool home = c.origin_tile == w.markets.at(c.source_market).centre_tile
+                       || !convoy_route_under(w, back, lane_party(w, c.corp)).tiles.empty();
+        if (home)
+            w.land_goods(c.corp, c.source_market, static_cast<std::size_t>(c.cargo_resource), c.cargo_qty);
+        gone.push_back(c.id);
+    }
+    if (!gone.empty())
+        w.convoys.erase(std::remove_if(w.convoys.begin(), w.convoys.end(),
+                                       [&](const convoy_component& c) {
+                                           return std::find(gone.begin(), gone.end(), c.id) != gone.end();
+                                       }),
+                        w.convoys.end());
+}
+
+} // namespace
+
 void advance_convoys(world& w)
 {
-    // BL-1505 (SUPPLY.md § A lane does not cross a warring front): cargo in flight with no
-    // route left returns to its origin: it lands on its source market now, and its owner
-    // has paid the haul. A convoy whose lane another way is left alone: a detour is simply
-    // the lane it reads next. Vector order: fixed.
-    if (!w.wars.empty())
-    {
-        std::vector<std::uint32_t> home;
-        for (const convoy_component& c : w.convoys)
-            if (!c.arrived && w.markets.count(c.source_market) != 0 && convoy_stranded_by_front(w, c))
-            {
-                w.land_goods(c.corp, c.source_market, static_cast<std::size_t>(c.cargo_resource), c.cargo_qty);
-                home.push_back(c.id);
-            }
-        if (!home.empty())
-            w.convoys.erase(std::remove_if(w.convoys.begin(), w.convoys.end(),
-                                           [&](const convoy_component& c) {
-                                               return std::find(home.begin(), home.end(), c.id) != home.end();
-                                           }),
-                            w.convoys.end());
-    }
+    rebase_convoys_on_moved_lanes(w);
     for (auto& convoy : w.convoys)
     {
         // BL-1195: where this tick's travel starts — interdiction sweeps from here
@@ -60,6 +147,7 @@ void advance_convoys(world& w)
             convoy.arrived  = true;
         }
     }
+    note_lane_heads(w);
 }
 
 std::vector<interception_record> intercept_convoys(world& w, int tick)
@@ -232,6 +320,8 @@ void credit_arrived_convoys(world& w, int tick, std::vector<interception_record>
     std::vector<interception_record> cuts = intercept_convoys(w, tick);
     if (out_cuts != nullptr)
         out_cuts->insert(out_cuts->end(), cuts.begin(), cuts.end());
+
+    resolve_stranded_convoys(w);
 
     // Credit in insertion order, then erase in one sweep.
     for (const auto& convoy : w.convoys)

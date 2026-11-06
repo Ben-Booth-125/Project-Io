@@ -2068,6 +2068,18 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_u32(out, w.units.at(uid).defend_province);
             w_id(out, w.units.at(uid).defend_post);
         }
+        // BL-1505, the same version: where each convoy of a nation at war stands, in the
+        // convoys' own order, as (convoy id, tile).
+        uint32_t heads = 0;
+        for (const convoy_component& c : w.convoys)
+            heads += c.lane_head != null_entity ? 1u : 0u;
+        w_u32(out, heads);
+        for (const convoy_component& c : w.convoys)
+            if (c.lane_head != null_entity)
+            {
+                w_u32(out, c.id);
+                w_id(out, c.lane_head);
+            }
     }
 }
 
@@ -2083,7 +2095,11 @@ std::size_t world_save_defend_section_bytes(const world& w)
     for (const auto& [uid, u] : w.units)
         if (u.defend_province != no_province)
             ++n;
-    return 4 + 12 * n;
+    std::size_t heads = 0; // BL-1505: the lane heads share the section (v79)
+    for (const convoy_component& c : w.convoys)
+        if (c.lane_head != null_entity)
+            ++heads;
+    return 4 + 12 * n + 4 + 8 * heads;
 }
 
 void write_world_snapshot_pre_occupation(const world& w, std::ostream& out)
@@ -4166,6 +4182,24 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
             prev = uid;
             uit->second.defend_province = prov;
             uit->second.defend_post     = post;
+        }
+        // BL-1505: the lane heads. Each names a convoy of the stream, in the stream's order,
+        // and a tile on the body the stream holds. Refused whole otherwise.
+        uint32_t heads = 0;
+        if (!r_u32(in, heads) || heads > s.convoys.size())
+            return false;
+        std::size_t cursor = 0;
+        for (uint32_t k = 0; k < heads; ++k)
+        {
+            uint32_t id = 0;
+            entity_id head = null_entity;
+            if (!r_u32(in, id) || !r_id(in, head) || head == null_entity || s.tiles.count(head) == 0)
+                return false;
+            while (cursor < s.convoys.size() && s.convoys[cursor].id != id)
+                ++cursor;
+            if (cursor == s.convoys.size())
+                return false;
+            s.convoys[cursor++].lane_head = head;
         }
     }
 

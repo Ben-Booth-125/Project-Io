@@ -235,14 +235,15 @@ int main()
     std::printf("\nC5 - in flight (no route left)\n");
     {
         g.w.convoys.clear();
-        g.w.convoys.push_back(convoy_of(g, g.A, 30));
-        g.w.convoys.push_back(convoy_of(g, g.C, 31));
+        g.w.convoys.push_back(convoy_of(g, g.A, 30, 0.2f)); // on the near side of the front
+        g.w.convoys.push_back(convoy_of(g, g.C, 31, 0.2f));
         convoy_component arrived = convoy_of(g, g.A, 32, 1.0f);
         arrived.arrived = true;
         g.w.convoys.push_back(arrived);
         check(convoy_stranded_by_front(g.w, g.w.convoys[0]) && !convoy_stranded_by_front(g.w, g.w.convoys[1]),
               "C5b the party's cargo is stranded by the front; the neutral's is not");
         advance_convoys(g.w);
+        credit_arrived_convoys(g.w, 1);
         bool thirty = false, thirty_one = false;
         for (const convoy_component& c : g.w.convoys)
         {

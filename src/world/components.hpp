@@ -2249,6 +2249,12 @@ struct convoy_component
     /// tick; -1 means "did not move this tick: check the head only" (a loaded save,
     /// a hand-built convoy).
     float       progress_before = -1.0f;
+
+    /// BL-1505: the tile the cargo stood on at the end of the last tick, kept only while its
+    /// owner is at war and null otherwise: a front moves the lane, not the cargo, so this is
+    /// how `advance_convoys` knows where the cargo is when the lane under it re-solves.
+    /// SERIALISED in the v79 trailing section (world_save.cpp).
+    entity_id   lane_head = null_entity;
 };
 
 // ---------------------------------------------------------------------------

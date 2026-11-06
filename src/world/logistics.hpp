@@ -541,6 +541,8 @@ struct convoy_route
     /// spent on reaching `tiles[i]` (0 at the origin, 1 at the destination), each
     /// leg at its own speed. Same size as `tiles`. Read through convoy_lane_index.
     std::vector<float>     at;
+    /// BL-1505: the whole lane's time, the days `at` divides up. 0 on a body with no scale.
+    float                  days = 0.0f;
 };
 
 /// Derive @p cv's lane, oriented source->destination. Non-const `w` because
@@ -553,6 +555,10 @@ convoy_route convoy_route_tiles(world& w, const convoy_component& cv);
 /// war, the convoy is on one body, its lane does not solve for its owner, and the same lane
 /// solves for a neutral. A road or a port lost in transit is not this (SUPPLY.md).
 bool convoy_stranded_by_front(world& w, const convoy_component& cv);
+
+/// BL-1505: @p cv's lane as @p party may fly it (null: as a neutral). `convoy_route_tiles` is
+/// this with the convoy's own party.
+convoy_route convoy_route_under(world& w, const convoy_component& cv, entity_id party);
 
 /// BL-1195: the index along a lane of the tile the cargo is on at @p progress (the
 /// fraction of its travel time elapsed), read off the lane's clock

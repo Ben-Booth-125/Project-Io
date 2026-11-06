@@ -243,6 +243,15 @@ uint64_t world::state_hash(int tick) const
             fnv1a_u32(h, o);
     }
 
+    // BL-1505: where the cargo of a nation at war stands. Sparse: no war, no marker.
+    for (const convoy_component& cv : convoys)
+        if (cv.lane_head != null_entity)
+        {
+            fnv1a_u32(h, 0x4C484544u); // "LHED"
+            fnv1a_u32(h, cv.id);
+            fnv1a_u32(h, cv.lane_head);
+        }
+
     // BL-1309: the Logistic Point share rules a nation has SET — sparse and
     // sorted, so a world where every nation shares mechanically hashes as before.
     {

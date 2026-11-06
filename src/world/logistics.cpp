@@ -2087,11 +2087,19 @@ convoy_route convoy_route_for(world& w, const convoy_component& cv, entity_id pa
 
     route.body  = body;
     route.at    = lane_clock(w, tiles, legs);
+    for (const lane_leg& l : legs)
+        if (std::isfinite(l.days) && l.days > 0.0f)
+            route.days += l.days;
     route.tiles = std::move(tiles);
     return route;
 }
 
 } // namespace
+
+convoy_route convoy_route_under(world& w, const convoy_component& cv, entity_id party)
+{
+    return convoy_route_for(w, cv, party);
+}
 
 convoy_route convoy_route_tiles(world& w, const convoy_component& cv)
 {
