@@ -10,6 +10,7 @@
 #include <imgui_impl_sdlrenderer3.h>
 #include <SDL3/SDL.h>
 
+#include "ui/construction_sites.hpp"
 #include "ui/body_surface_canvas.hpp"
 #include "ui/rail_tool.hpp" // BL-1255: rail_player_nation for the Rail group presses
 #include "ui/canvas_command.hpp"
@@ -2859,6 +2860,7 @@ void app::render()
                               &m_ui.show_strategy_readout);
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
+    ui::set_quote_report(&m_last_econ_report);
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     // Market ledger — Goods and Trades. It takes a NON-CONST world and the recipe
     // registry because the Trades tab's potential-trade read prices real trade

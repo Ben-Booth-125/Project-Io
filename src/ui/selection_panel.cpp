@@ -1,6 +1,8 @@
 #include "selection_panel.hpp"
 
 #include "core/battle_dispatch_text.hpp" // battle_phase_word — SHARED with BL-468's dispatches
+#include "construction_sites.hpp"
+#include "world/resource_names.hpp"
 #include "world/battle_system.hpp"      // active_battle, quote_withdrawal, read_battle_phase (BL-469)
 
 #include "building_state.hpp" // BL-1239: the one running-state classification (hover card, Production, Status)
@@ -782,9 +784,9 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
         const float  name_x       = 6.0f + pipr * 2.0f + 6.0f;
         const float  profit_col_w = row_w - glyph_w - 6.0f;
 
-        // Expected profit — same estimator the construction ledger ranks
-        // candidates with (estimate_prospective_profit), so a switch's payoff
-        // reads the same way a fresh build's does. `&b` prices it at the
+        // Expected profit for a recipe switch. It prices at the posted price, not
+        // the Build door's quote_site, so the two can differ on a scarce good. `&b`
+        // prices it at the
         // building's REAL staffing (not the hypothetical 0.5/100 default) and
         // excludes it from double-counting its own extraction-site stack rank.
         constexpr float profit_scale = 1.1f;
@@ -4560,7 +4562,7 @@ std::string candidate_refusal(const world& w, entity_id tile_id,
 // executes.
 // Candidates sort by expected net descending on a ceiling shared across the list, so
 // the best options are the ones on screen without scrolling.
-void draw_construction_ledger_body(const world& w, const recipe_registry& reg, ui_state& ui,
+void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_state& ui,
                                    float lp_cover)
 {
     const ImGuiStyle& style = ImGui::GetStyle();
@@ -4630,7 +4632,7 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // Candidate placements for this tile: one extraction option per extractable
     // resource actually deposited here, then the fixed processing / port / launchpad
     // types. Validity + reason come from the shared placement_rules seam; the expected
-    // per-tick net comes from estimate_prospective_profit (world/building_profit.hpp).
+    // per-tick net comes from quote_for_tile (world/site_quote.hpp).
     //
     // Processing expands into ONE ROW PER RECIPE: their margins genuinely diverge, so a
     // single type-level row priced at "steel" would report "processing loses money here"
@@ -4663,6 +4665,8 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
 
         placement_rules::placement_result pr;
         building_profit profit;
+        bool            starved  = false; ///< An input cannot be had here: it would stand idle.
+        resource_type   short_of = resource_type::iron_ore;
         float           capex    = 0.0f; ///< build_cost + materials at the local market.
         bool            produces = false; ///< Extraction/processing earn directly; infrastructure does not.
         int             group    = 0;    ///< Render band: 0 = ranked/priced, 1 = valid unranked, 2 = invalid.
@@ -4815,8 +4819,10 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
                       c.type == building_type::processing_facility);
         // Ben, 2026-10-25: the tile's Logistic Point cover is applied, exactly as
         // the site ledger applies it, so the two surfaces quote one figure.
-        c.profit   = estimate_prospective_profit(w, reg, tile_id, c.type, c.target, c.recipe,
-                                                 nullptr, nullptr, lp_cover);
+        const site_quote sq = quote_for_tile(w, reg, tile_id, c.type, c.target, c.recipe, lp_cover);
+        c.profit   = sq.profit;
+        c.starved  = sq.starved;
+        c.short_of = sq.short_of;
         c.group    = !c.pr.ok()                          ? 2
                      : (c.produces && c.profit.has_data) ? 0
                                                          : 1;
@@ -4889,8 +4895,8 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             peak = std::max(peak, std::fabs(c.profit.net()));
     const float ceiling = charts::tight_ceil(peak);
 
-    // What the bars mean, stated once. The assumptions are named rather than modelled
-    // (see estimate_prospective_profit) — an honest static read beats a half-modelled one.
+    // What the bars mean, stated once. The market's response is modelled (site_quote.hpp);
+    // staffing and labour remain named assumptions.
     //
     // "before auto-staffing" is doing real work (NR-001): the estimate mirrors
     // construction.cpp's 50% workforce exactly, so it describes the building at the
@@ -4905,8 +4911,9 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
     // it goes with it. What replaced it is the cost said in full — goods and credits
     // — which is the honest version of the same sentence: the bar is earnings, the
     // cost lines above it are cost.
-    ImGui::TextWrapped("Est. net / qtr at today's local prices - at least this, before "
-                       "auto-staffing; 50%% staffing, no labour shortage, this tile's Logistic Point cover.");
+    ImGui::TextWrapped("Est. net / qtr once it is selling here: its own output moves the price, and "
+                       "inputs it cannot get mean it stands idle. Before auto-staffing; 50%% staffing, "
+                       "no labour shortage, this tile's Logistic Point cover.");
     ImGui::PopStyleColor();
 
     // ONE LINE A ROW, AND IT IS A GRID (BL-1365; construction.md § "One line a
@@ -5168,9 +5175,15 @@ void draw_construction_ledger_body(const world& w, const recipe_registry& reg, u
             // no longer prints (38 px holds a magnitude or a number, not both),
             // and the staffing assumption the caption above the list carries.
             char nbuf[260];
-            if (c.group == 0)
+            if (c.group == 0 && c.starved)
                 std::snprintf(nbuf, sizeof nbuf,
-                              "Est. net %+d cr / qtr at today's local prices, at 50%% staffing "
+                              "It would likely stand idle: this market cannot get it %s at a price it will "
+                              "pay. Est. net %+d cr / qtr is its upkeep alone. The bar is that figure "
+                              "against the best row in this list.",
+                              resource_names::name_of(c.short_of).c_str(), static_cast<int>(c.profit.net()));
+            else if (c.group == 0)
+                std::snprintf(nbuf, sizeof nbuf,
+                              "Est. net %+d cr / qtr once its output is selling here, at 50%% staffing "
                               "with no labour shortage and %d%% Logistic Point cover. The bar is "
                               "that figure against the best row in this list.",
                               static_cast<int>(c.profit.net()),

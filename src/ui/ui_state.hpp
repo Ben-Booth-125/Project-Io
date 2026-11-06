@@ -830,7 +830,9 @@ struct site_row
     /// its province has none (`place_near`).
     std::string   place;
     bool          place_near = false;
-    bool          priced   = false; ///< `estimate_prospective_profit(...).has_data`.
+    bool          priced   = false; ///< The quote's `has_data` (`quote_for_tile`).
+    bool          starved  = false; ///< An input cannot be had here, so it would stand idle.
+    resource_type short_of = resource_type::iron_ore; ///< The first such input, when starved.
     float         profit   = 0.0f;  ///< Est. net / qtr, Logistic Point cover applied.
     float         profit_full_cover = 0.0f; ///< The same estimate at cover 1.
     float         capex    = 0.0f;  ///< `construction_capex` - what the press charges.
