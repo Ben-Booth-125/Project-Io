@@ -1916,7 +1916,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `ledger.construction_site_pick` — Construction ledger, Construction view, the 'Find a site' building picker (a combo above the tile build bar)
 
-**Press.** Open the combo and press a building: one per extractable good (by its building's name - 'Iron Mine', 'Farm', ...), one per processing recipe (its display name), then Port, Planetary Marketplace, Launchpad, Inland Logistics Hub, Military Base, Research Institute - whichever the era and tech allow. Pressing the CHOSEN building again, or 'None', clears it.
+**Press.** Open the combo and press a building (each row draws its building glyph beside its name): one per extractable good (by its building's name - 'Iron Mine', 'Farm', ...), one per processing recipe (its display name), then Port, Planetary Marketplace, Launchpad, Inland Logistics Hub, Military Base, Research Institute - whichever the era and tech allow. Pressing the CHOSEN building again, or 'None', clears it.
 
 | Arg | Type | Meaning |
 |---|---|---|

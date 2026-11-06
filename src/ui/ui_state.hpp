@@ -927,6 +927,11 @@ struct site_finder_state
 
     /// Where the ledger's controls landed this frame (absent: x < 0).
     float         picker_x = -1.0f, picker_y = -1.0f;
+    /// The picker's options as the OPEN combo drew them this frame (empty while it
+    /// is shut): the glyph's half-extent, the name's width against its room, and
+    /// where the row's press is.
+    struct picker_row { std::string name, category; float glyph_r = 0.0f, need = 0.0f, have = 0.0f, x = -1.0f, y = -1.0f; };
+    std::vector<picker_row> picker_rows;
     struct drawn_row { entity_id tile = null_entity; float x = -1.0f, y = -1.0f; };
     std::vector<drawn_row> drawn;   ///< Visible rows, in drawn order.
     int           map_marks = 0;    ///< No-logistics marks the canvas drew this frame.

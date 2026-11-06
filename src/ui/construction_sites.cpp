@@ -508,6 +508,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
 {
     site_finder_state& sf = ui.site_finder;
     sf.drawn.clear();
+    sf.picker_rows.clear();
     sf.picker_x = sf.picker_y = -1.0f;
 
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Find a site");
@@ -539,7 +540,25 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             const bool is_choice = sf.armed && sf.choice.type == o.type
                 && sf.choice.target == o.target && sf.choice.recipe == o.recipe;
             ImGui::PushID(static_cast<int>(i));
-            if (ImGui::Selectable(o.name.c_str(), is_choice))
+            // EACH OPTION DRAWS ITS BUILDING GLYPH (Ben, 2026-11-05; construction.md
+            // § The site ledger), on the door's identity rule: an extraction option's
+            // target, a recipe's primary output.
+            const float  lh = ImGui::GetTextLineHeight();
+            const float  gr = lh * 0.5f;
+            const ImVec2 op = ImGui::GetCursorScreenPos();
+            const float  text_x = lh + ImGui::GetStyle().ItemInnerSpacing.x;
+            const float  have   = std::max(16.0f, ImGui::GetContentRegionAvail().x - text_x);
+            const bool   pressed = ImGui::Selectable("##site_option", is_choice);
+            const recipe* orc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
+            ImDrawList*  odl = ImGui::GetWindowDrawList();
+            icons::building(odl, {op.x + gr, op.y + gr}, gr, o.type,
+                            orc != nullptr ? primary_output_resource(*orc) : o.target,
+                            IM_COL32(150, 235, 160, 255));
+            odl->AddText({op.x + text_x, op.y}, ImGui::GetColorU32(ImGuiCol_Text),
+                         fitted(o.name.c_str(), have).c_str()); // fit-exempt: fitted to the row
+            sf.picker_rows.push_back({o.name, o.category, gr, ImGui::CalcTextSize(o.name.c_str()).x, have,
+                                      op.x + text_x, op.y + gr});
+            if (pressed)
             {
                 if (is_choice)
                     sf.armed = false; // the toggle: the active choice, pressed again, clears

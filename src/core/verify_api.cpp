@@ -5459,6 +5459,24 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         out["ties_covered"]     = sf.ties_covered;
         out["picker_x"]     = sf.picker_x;
         out["picker_y"]     = sf.picker_y;
+        {
+            sol::table pr = st.create_table();
+            int pn = 0;
+            for (const site_finder_state::picker_row& o : sf.picker_rows)
+            {
+                sol::table e = st.create_table();
+                e["name"]     = o.name;
+                e["category"] = o.category;
+                e["glyph_r"]  = o.glyph_r;
+                e["need"]     = o.need;
+                e["have"]     = o.have;
+                e["x"]        = o.x;
+                e["y"]        = o.y;
+                pr[++pn] = e;
+            }
+            out["picker_rows"]   = pr;
+            out["n_picker_rows"] = pn;
+        }
         int valid = 0, flagged = 0;
         for (const std::uint8_t c : sf.cls)
         {
