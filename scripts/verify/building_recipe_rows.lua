@@ -15,8 +15,8 @@
 --   R6  pointing at a row opens one card, and it holds that row's text alone.
 --   R7  where the sim runs no batch, an input reads a dash and no shortage.
 --   R8  an extraction site's rows are its basket, each share labelled an estimate.
---   R9  buildings the sim ran: a plant's inputs read as estimated draws, and a worked site's
---       shares sum to the reported total.
+--   R9  a report that ran, staged: a plant's inputs read as estimated draws, its binding input
+--       cites the report, and a worked site's shares sum to the reported total.
 --
 -- Run with: ProjectIo --verify scripts/verify/building_recipe_rows.lua
 
@@ -118,7 +118,7 @@ verify.expect(marks >= 1, "R3: the plant's bare shelf gave a short mark to read"
 verify.frames(2)
 
 -- R2: a quarter read. Scarce labour goes to the oldest buildings first, so this new plant
--- can go on getting none: that is R7, read here. R9 reads an older plant that does run.
+-- can go on getting none: that is R7, read here. R9 stages the report of one that runs.
 local no_draw_seen = false
 local function draws_none(c)
     for _, r in ipairs(c.recipe_rows) do
@@ -229,6 +229,61 @@ if basket ~= nil then
     verify.capture("building_recipe_rows_basket")
 end
 
+-- R9: a report that ran. The verify world's staged buildings get no labour, so the report row
+-- is staged (verify.stage_building_report writes the view record, nothing the sim reads).
+verify.goto_surface("home")
+verify.select_building(plant.x, plant.y)
+verify.frames(2)
+verify.expect(verify.stage_building_report(plant.x, plant.y, 8.0, 0.5, 1.0), "R9: the plant has a report row")
+verify.frames(3)
+c = card()
+verify.expect(not draws_none(c), "R9: with labour, the plant reads a draw")
+for _, r in ipairs(c.recipe_rows) do
+    print(string.format("building_recipe_rows: R9 %s %-16s fig=%s shelf=%s mark=%s", r.input and "in " or "out", r.good, r.figure, r.shelf, r.mark))
+    if r.input then
+        verify.expect(r.figure:sub(1, 1) == "-", "R9: an input reads a draw: " .. r.figure)
+        verify.expect(col(r, "figure").text:find("An estimate", 1, true) ~= nil, "R9: labelled an estimate")
+    else
+        verify.expect(r.figure == "+8.0", "R9: the output is the report's: " .. r.figure)
+        verify.expect(col(r, "figure").text:find("reported", 1, true) ~= nil, "R9: and cites the report")
+        verify.expect(col(r, "figure").text:find("estimate", 1, true) == nil, "R9: and is no estimate")
+    end
+end
+hover_is_its_own(c, "R9 plant")
+verify.capture("building_recipe_rows_running")
+-- The reported binding input: a red mark citing the report, not the estimate.
+verify.expect(verify.stage_building_report(plant.x, plant.y, 4.0, 0.5, 0.5, "copper_ore"), "R9: the binding row staged")
+verify.frames(3)
+local bound = 0
+for _, r in ipairs(card().recipe_rows) do
+    if r.mark == "binding" then
+        bound = bound + 1
+        verify.expect(col(r, "mark").text:find("report", 1, true) ~= nil, "R9: a binding mark cites the report")
+    end
+end
+verify.expect(bound == 1, "R9: one input reads binding (" .. bound .. ")")
+verify.capture("building_recipe_rows_binding")
+-- A worked basket: the shares sum to the reported total.
+if basket ~= nil then
+    verify.goto_surface("home")
+    verify.select_building(basket.x, basket.y)
+    verify.frames(2)
+    verify.expect(verify.stage_building_report(basket.x, basket.y, 90.0, 0.5, 1.0), "R9: the site has a report row")
+    verify.frames(3)
+    c = card()
+    local sum = 0.0
+    for _, r in ipairs(c.recipe_rows) do
+        print(string.format("building_recipe_rows: R9 basket %-16s %s", r.good, r.figure))
+        verify.expect((tonumber(r.figure) or 0.0) > 0.0, "R9: a worked deposit's share is a figure: " .. r.figure)
+        verify.expect(col(r, "figure").text:find("reported total is 90.0", 1, true) ~= nil, "R9: the hover states the total")
+        sum = sum + (tonumber(r.figure) or 0.0)
+    end
+    verify.expect(math.abs(sum - 90.0) <= 0.1 * #c.recipe_rows, string.format("R9: the shares sum to the total (%.1f)", sum))
+    print(string.format("building_recipe_rows: R9 basket of %d, card over by %.1f px", #c.recipe_rows, c.card_scroll_max))
+    hover_is_its_own(c, "R9 basket")
+    verify.capture("building_recipe_rows_basket_worked")
+end
+
 -- R4: a save and a load empty the report.
 local path = "building_recipe_rows.save"
 local saved = verify.save(path)
@@ -259,79 +314,5 @@ if rival ~= nil then
     verify.expect(rc.is_expanded and not rc.player, "R5: the card is a rival's")
     verify.expect(not rc.recipe_drawn and rc.n_recipe_rows == 0, "R5: a rival's card draws no recipe rows")
 end
-
--- R9: buildings the sim really ran. The verify world's own builder gives its nation no labour
--- pool until it is folded to ground (verify.fold_world), so fold, step, and read. A worked
--- site's shares sum to its reported total, and a running plant's inputs are figures labelled
--- estimates, each hover its own.
-local folded = verify.fold_world()
-verify.expect(folded.folded, "R9: the verify world folds to ground")
-verify.econ_step(2)
-verify.frames(3)
-local ran_plant, ran_site, ran_basket = false, false, false
-local to_read = verify.buildings()
-local seen_player, seen_card, seen_reported = 0, 0, 0
-print("building_recipe_rows: R9 reads " .. #to_read .. " buildings")
-for _, b in ipairs(to_read) do
-    if b.player and b.complete and not (ran_plant and ran_basket) then
-        seen_player = seen_player + 1
-        verify.goto_surface("home")
-        verify.select_building(b.x, b.y)
-        verify.frames(2)
-        local bc = card()
-        if bc.is_expanded and bc.player then seen_card = seen_card + 1 end
-        if bc.is_expanded and bc.player and bc.recipe_reported then
-            seen_reported = seen_reported + 1
-            if seen_reported <= 6 then
-                for _, r in ipairs(bc.recipe_rows) do
-                    print(string.format("building_recipe_rows: read (%d,%d) %s %s %s", b.x, b.y, r.input and "in" or "out", r.good, r.figure))
-                end
-            end
-            local n_in, n_out, sum, total, drew = 0, 0, 0.0, nil, false
-            for _, r in ipairs(bc.recipe_rows) do
-                if r.input then
-                    n_in = n_in + 1
-                    if r.figure:find("%d") then drew = true end
-                else
-                    n_out = n_out + 1
-                    sum = sum + (tonumber(r.figure) or 0.0)
-                    total = tonumber(col(r, "figure").text:match("reported total is ([%d%.]+)")) or total
-                end
-            end
-            if n_in > 0 and drew and not ran_plant then
-                ran_plant = true
-                print(string.format("building_recipe_rows: a running plant at (%d,%d)", b.x, b.y))
-                for _, r in ipairs(bc.recipe_rows) do
-                    print(string.format("building_recipe_rows:   %s %-16s fig=%s shelf=%s mark=%s", r.input and "in " or "out", r.good, r.figure, r.shelf, r.mark))
-                    if r.input then
-                        verify.expect(r.figure:sub(1, 1) == "-", "R9: a running plant's input reads a draw: " .. r.figure)
-                        verify.expect(col(r, "figure").text:find("An estimate", 1, true) ~= nil, "R9: labelled an estimate")
-                    else
-                        verify.expect(r.figure:sub(1, 1) == "+", "R9: its output reads a figure: " .. r.figure)
-                    end
-                end
-                hover_is_its_own(bc, "R9 plant")
-                verify.capture("building_recipe_rows_running")
-            elseif n_in == 0 and n_out >= 1 and sum > 0.0 then
-                ran_site = true
-                if n_out >= 2 and not ran_basket then
-                    ran_basket = true
-                    print(string.format("building_recipe_rows: a worked basket at (%d,%d), total %s", b.x, b.y, tostring(total)))
-                    for _, r in ipairs(bc.recipe_rows) do
-                        print(string.format("building_recipe_rows:   out %-16s fig=%s", r.good, r.figure))
-                        verify.expect(col(r, "figure").text:find("an estimate", 1, true) ~= nil, "R9: a basket share is labelled an estimate")
-                    end
-                    verify.expect(total ~= nil and math.abs(sum - total) <= 0.1 * n_out,
-                                  string.format("R9: the shares sum to the reported total (%.1f of %s)", sum, tostring(total)))
-                    hover_is_its_own(bc, "R9 basket")
-                    verify.capture("building_recipe_rows_basket_worked")
-                end
-            end
-        end
-    end
-end
-print(string.format("building_recipe_rows: R9 found: plant=%s site=%s basket=%s; own %d, carded %d, reported %d", tostring(ran_plant), tostring(ran_site), tostring(ran_basket), seen_player, seen_card, seen_reported))
-verify.expect(ran_plant, "R9: a running plant was read")
-verify.expect(ran_basket, "R9: a worked basket was read")
 
 print("building_recipe_rows: done")

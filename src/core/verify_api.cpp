@@ -7489,6 +7489,43 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // bought off its own market's shelf) where the world's shelves are bare.
     // Refuses an unknown market, an unknown good, or a non-finite / non-positive
     // quantity, mutating nothing.
+    // Sprint 63 (building_recipe_rows.lua): a STAGING fixture that WRITES one building's row of
+    // the LAST economy report, a view record the card reads, nothing the sim reads back. The
+    // verify world's staged buildings get no labour, so no check could otherwise read a report
+    // that ran. Takes the output, the labour applied and the run, with an optional limiting
+    // good; returns whether the building had a row. Verify-only, behind --verify.
+    v.set_function("stage_building_report", [this](int col, int row, double output, double labour, double run,
+                                                   sol::optional<std::string> limiting) -> bool {
+        for (const auto& [bid, bc] : m_world.buildings)
+        {
+            const auto tit = m_world.tiles.find(bc.tile);
+            if (tit == m_world.tiles.end() || tit->second.body != m_ui.active_body
+                || tit->second.grid_x != col || tit->second.grid_y != row)
+                continue;
+            const auto rit = m_last_econ_report.building_row.find(bid);
+            if (rit == m_last_econ_report.building_row.end() || rit->second >= m_last_econ_report.buildings.size())
+                return false;
+            building_report& rp = m_last_econ_report.buildings[rit->second];
+            rp.output_quantity     = static_cast<float>(output);
+            rp.effective_workforce = static_cast<float>(labour);
+            rp.run                 = static_cast<float>(run);
+            rp.active              = output > 0.0;
+            rp.idle                = !(output > 0.0);
+            rp.exhausted           = false;
+            rp.has_limiting        = false;
+            if (limiting)
+            {
+                bool ok = false;
+                const resource_type r = resource_names::resource_from_name(*limiting, ok);
+                if (!ok)
+                    return false;
+                rp.has_limiting   = true;
+                rp.limiting_input = r;
+            }
+            return true;
+        }
+        return false;
+    });
     v.set_function("stock_market", [this](unsigned market, const std::string& res, double qty) {
         bool ok = false;
         const resource_type r = resource_names::resource_from_name(res, ok);
