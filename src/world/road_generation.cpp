@@ -3473,6 +3473,7 @@ colonial_port_report place_colonial_ports(world& w)
             const tile_component& tc = w.tiles.at(t);
             if (source_tiles.count(t) != 0
                 || placement_rules::non_extraction_buildings_on_tile(w, t)
+                           + placement_rules::capital_source_slot_held(w, t) // BL-1500
                        >= placement_rules::non_extraction_stack_cap(tc.substrate, tc.cover))
                 return false;
             const auto tn = w.tile_to_nation.find(t);

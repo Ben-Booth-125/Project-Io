@@ -422,7 +422,10 @@ as they bind a charter. The want bound is read at the markets on the major's own
 the body. A minor's plant next door does not make a major's own steel unwanted; the major's
 households and its own processors are what want it. Extraction is laid first, ranked by
 richness × cover over the major's whole ground. Processors anchor at the capital, then the market
-centres in chain-distance order, as a processing charter does.
+centres in chain-distance order, as a processing charter does. **The capital's source holds its slot
+(Ben, 2026-11-05; `../economy/PRODUCTION.md` § Building stacks):** the cap binds that source too, and
+it may stand nowhere but the capital, so the kit lays around one held slot there and takes the next
+tile for what no longer fits.
 
 **A kit is curated so its industries are fed (Ben, 2026-11-03).** Extraction counts are fixed and
 authored, never sized at placement. They are chosen per industry so each processing slot has the

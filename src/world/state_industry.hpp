@@ -430,6 +430,7 @@ struct rail_handover_report
     int unowned         = 0; ///< tiles no owner could reach (no owner on the body at all)
     int stations        = 0; ///< stations stood up
     int station_nations = 0; ///< of them, a nation's (BL-1404: the ground's, a minor's too)
+    int stations_refused_cap = 0; ///< BL-1500: cities a line serves with no room on their tile: no station
     std::vector<std::pair<entity_id, int>> per_owner_tiles; ///< ascending owner id
 };
 

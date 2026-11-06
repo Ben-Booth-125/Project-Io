@@ -541,7 +541,8 @@ every fuel read takes the survey, so every reader agrees about who has coal.
 stockpile becomes its charter budget (property 1).
 
 **Who lays rail (Ben, 2026-10-13):** realms that lean into works spend treasury laying track on their
-busiest corridors from the city, with a station at each city a line serves; the track and stations
+busiest corridors from the city, with a station at each city a line serves that has room on its
+tile (the stack cap binds a station, `../economy/PRODUCTION.md`); the track and stations
 pass at the fold to the nation whose ground they stand on, like every building (Ben, 2026-10-23).
 **Lines cross borders (Ben, 2026-10-14):** a realm's line may run into a neighbour's ground along the
 busiest road corridors, and a major's line may reach a minor's market city, so rail joins the cities

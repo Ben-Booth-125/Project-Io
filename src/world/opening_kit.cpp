@@ -824,6 +824,22 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
     kit_layer L{ w, reg, kit, gen_occupancy{}, gen_lp_cover{}, make_input_reach(w, reg) };
     for (const auto& [bid, b] : w.buildings) // additive counts: order-free
         L.occ.add(b);
+    // BL-1500 (PRODUCTION.md, Ben 2026-11-05: generation obeys the cap with no exemptions):
+    // THE CAPITAL'S SOURCE HOLDS ITS SLOT. The seeding that follows must stand a source on
+    // the capital and the cap now binds it, while the kit's processors anchor at the capital
+    // first and would fill the tile (seeds 0, 12, 28, 46: every major's capital, full when
+    // the seeding reached it). So the kit lays around one held slot, and goes next door for
+    // what it cannot fit: the occupancy counts the source before it stands. Local to the
+    // kit's own count; nothing is added to the world.
+    for (const major_kit& mk : kits)
+    {
+        if (placement_rules::capital_source_slot_held(w, mk.g.capital) == 0)
+            continue;
+        building_component held;
+        held.tile = mk.g.capital;
+        held.type = building_type::inland_logistics_hub;
+        L.occ.add(held);
+    }
     const std::vector<const recipe*> planned = planned_recipes(reg, kit);
 
     for (std::size_t k = 0; k < kits.size(); ++k)

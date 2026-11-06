@@ -443,6 +443,12 @@ int stack_capacity(const tile_component& tc, building_type type, resource_type t
 /// @return        Non-extraction building ceiling for that pair.
 int non_extraction_stack_cap(terrain_substrate sub, terrain_cover cov);
 
+/// BL-1500 (PRODUCTION.md, Ben 2026-11-05): THE CAPITAL'S SOURCE HOLDS ITS SLOT. 1 while
+/// @p tile_id is the capital of the nation holding it and no inland logistics hub stands
+/// there yet, else 0. The source counts toward the cap and may stand nowhere else, so what
+/// generation lays before the seeding (a kit, a station, a harbour) leaves it this much room.
+int capital_source_slot_held(const world& w, entity_id tile_id);
+
 /// Total non-extraction buildings (every type except extraction_site) standing on
 /// @p tile_id — the aggregate `non_extraction_stack_cap` is the ceiling for.
 ///

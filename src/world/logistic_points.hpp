@@ -598,6 +598,12 @@ struct lp_seed_report
     int   stacked_tiles          = 0;
     int   stack_refused_cap      = 0;
     int   stack_refused_funds    = 0;
+    /// BL-1500 (PRODUCTION.md, Ben 2026-11-05: generation obeys the cap with no exemptions).
+    /// A source's tile choice is steered off a full tile (`placeable`), so most of the rule's
+    /// effect is a hub standing next door. These count what could NOT be steered: a source
+    /// asked for by name on a tile with no room, and a capital left without its source.
+    int   sources_refused_cap    = 0;
+    int   capital_source_refused = 0;
 };
 
 /// Place logistics sources at the fold so every producing building on a nation's ground is

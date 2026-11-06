@@ -875,6 +875,8 @@ Three things follow, and each is a check rather than a preference:
   overturning the 2026-10-22 dark exception):** the one source standing on a nation's capital carries
   no upkeep bill and the funding gate never idles it, so a capital is never dark however poor its
   nation. Every other source, a second hub stacked on the capital included, is billed as before.
+  It counts toward the capital tile's stack cap like any building (`PRODUCTION.md`, Ben,
+  2026-11-05), so what generation lays before it leaves it room.
 - **The capital is the peak of its own nation's field.** No other tile of that nation may hold more
   points than its capital at generation. A later build may overtake it — that is the player's doing
   and is allowed — but the world does not start that way.
