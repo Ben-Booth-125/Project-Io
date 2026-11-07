@@ -102,6 +102,9 @@ grid on a Military ledger row's card — needs its glyphs named, so it uses
 
 - **Glance.** While its item is hovered it is an ordinary tooltip, shown at once and tracking the
   pointer.
+- **The wheel (Ben, 2026-11-07).** A small progress wheel at the tooltip's top right fills clockwise
+  as the hover runs toward the freeze, and stays full once frozen, so the player sees the freeze coming
+  and knows when the card will hold still.
 - **Freeze.** After `kFreezableTooltipFreezeSec` (2 s) of hover it freezes where it stands, as a
   plain window held in front, which takes the pointer. Its items are hoverable, so each carries its
   own tooltip: a nested one.

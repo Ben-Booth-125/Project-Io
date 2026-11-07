@@ -2,6 +2,8 @@
 
 #include <imgui_internal.h>
 
+#include <algorithm>
+
 namespace ui {
 
 void draw_hover_card(ImVec2 anchor,
@@ -73,6 +75,27 @@ struct freeze_state
 
 freeze_state g_freeze;
 
+/// The freeze's progress wheel at the tooltip's top-right corner: a faint ring the dwell
+/// fills clockwise from twelve o'clock, @p frac of the way; full once frozen. Drawn over the
+/// current window, so call it inside the tooltip, after its content.
+void draw_freeze_wheel(float frac)
+{
+    ImDrawList*  dl  = ImGui::GetWindowDrawList();
+    const ImVec2 wp  = ImGui::GetWindowPos();
+    const ImVec2 ws  = ImGui::GetWindowSize();
+    const float  r   = ImGui::GetFontSize() * 0.32f;
+    const float  pad = ImGui::GetStyle().WindowPadding.x * 0.5f;
+    const ImVec2 c   = {wp.x + ws.x - pad - r, wp.y + pad + r};
+    const float  th  = std::max(1.5f, r * 0.3f);
+    dl->AddCircle(c, r, ImGui::GetColorU32(ImGuiCol_TextDisabled, 0.45f), 24, th);
+    frac = std::clamp(frac, 0.0f, 1.0f);
+    if (frac <= 0.0f)
+        return;
+    constexpr float kTop = -1.5707963f; // twelve o'clock
+    dl->PathArcTo(c, r, kTop, kTop + frac * 6.2831853f, 24);
+    dl->PathStroke(ImGui::GetColorU32(ImGuiCol_Text), ImDrawFlags_None, th);
+}
+
 } // namespace
 
 bool freezable_tooltip(const char* id, float dt, const std::function<void()>& content)
@@ -101,6 +124,7 @@ bool freezable_tooltip(const char* id, float dt, const std::function<void()>& co
         {
             ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
             content();
+            draw_freeze_wheel(1.0f);
         }
         wmin = ImGui::GetWindowPos();
         const ImVec2 wsz = ImGui::GetWindowSize();
@@ -131,6 +155,7 @@ bool freezable_tooltip(const char* id, float dt, const std::function<void()>& co
     g_freeze.dwell += dt;
     ImGui::BeginTooltip();
     content();
+    draw_freeze_wheel(g_freeze.dwell / kFreezableTooltipFreezeSec);
     const ImVec2 at = ImGui::GetWindowPos();
     ImGui::EndTooltip();
     if (g_freeze.dwell >= kFreezableTooltipFreezeSec - kHoverThresholdEpsilon)

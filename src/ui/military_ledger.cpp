@@ -121,10 +121,6 @@ void raise_tooltip(const std::string& why, float price, float room, const hire_g
             row(resource_name(l.res), goods_amount(l.need), goods_amount(l.have), l.have < l.need);
         ImGui::EndTable();
     }
-    if (g.lines.empty())
-        ImGui::TextDisabled("Takes no goods.");
-    else
-        ImGui::TextDisabled("Goods are bought off your shelves at hire.");
     ImGui::EndTooltip();
 }
 
