@@ -405,6 +405,28 @@
    "why_it_matters": "A player with a research queue may have little left for construction under the new prices, and a share of treasury shrinks as the opening treasury falls. This sets how research and construction compete at the opening.",
    "resolved": "2026-11-05",
    "resolution": "Ben: \"Yes, count research.\" Research counts inside net; written into FINANCE § The quarterly return; the work is BL-1539 (research in return)."
+  },
+  {
+   "id": "NR-1144",
+   "title": "Sprint 63 defaults taken without a form question: overturn any you dislike",
+   "raised": "2026-11-07",
+   "kind": "decision",
+   "status": "open",
+   "source": "Sprint 63 lanes",
+   "what": "MARKET: pip rather than glyph on the Build door; name column 72 px. CANVAS: rival convoy card; Total force reads a unit count; no hover on a convoy marker. SHELL: UI scale 0.875; exit warnings; a single quicksave behind Load. WAR: stranded cargo rule; retreats occupy; muster allowed on occupied ground; no territory tint for occupation. ART: default framing off the ladder (zoom 4/3); top rung 2x at 4K; scrub round, forest fringe pointed. CONSTRUCTION: 0-cover rows never warn; a rising shelf gets no credit; a 7-good basket may scroll. GENERATION: seed 25 loses one station.",
+   "why_it_matters": "Each was small enough to take as a default, and each is visible in play.",
+   "recommended": "Leave them unless the playtest says otherwise."
+  },
+  {
+   "id": "NR-1145",
+   "title": "Novelty: research is priced as a share of the chest, so a smaller chest cuts research",
+   "raised": "2026-11-07",
+   "kind": "novel-work",
+   "status": "open",
+   "source": "Opening lane stage 1",
+   "what": "Research takes up to 14.3% of the chest per quarter, and points follow the square root of credits. A much smaller flat chest therefore also slows research, a coupling no doc states as an opening lever. The opening lane reads research per quarter on each chest rung.",
+   "why_it_matters": "The opening chest ruling may move the tech pace as well as construction.",
+   "recommended": "Read the chest ladder first, then decide whether the share stands."
   }
  ]
 }

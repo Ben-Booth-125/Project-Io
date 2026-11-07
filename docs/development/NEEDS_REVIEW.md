@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*23 entries — 22 open, 1 resolved.*
+*25 entries — 24 open, 1 resolved.*
 
 ---
 
@@ -269,6 +269,20 @@ Read from selection_panel.cpp:4764: the door lists Port, Marketplace, Launchpad,
 Ben ruled the master at 96 px and the top rung lowered to about 96 px. Written beyond that: the lower zoom rungs halve from about 96; and a 4K-height window now magnifies the top rung about 2x (computed), where the 2026-10-10 ruling accepted about 1.7x. TECH_FOUNDATIONS.md keeps a benchmark measured at 128 px, labelled as such.
 
 **Why it matters.** Halving lowers every zoom level, not only the closest, and 4K play looks softer than the accepted figure.
+
+### NR-1144 — Sprint 63 defaults taken without a form question: overturn any you dislike
+*decision · raised 2026-11-07 · from Sprint 63 lanes*
+
+MARKET: pip rather than glyph on the Build door; name column 72 px. CANVAS: rival convoy card; Total force reads a unit count; no hover on a convoy marker. SHELL: UI scale 0.875; exit warnings; a single quicksave behind Load. WAR: stranded cargo rule; retreats occupy; muster allowed on occupied ground; no territory tint for occupation. ART: default framing off the ladder (zoom 4/3); top rung 2x at 4K; scrub round, forest fringe pointed. CONSTRUCTION: 0-cover rows never warn; a rising shelf gets no credit; a 7-good basket may scroll. GENERATION: seed 25 loses one station.
+
+**Why it matters.** Each was small enough to take as a default, and each is visible in play.
+
+### NR-1145 — Novelty: research is priced as a share of the chest, so a smaller chest cuts research
+*novel-work · raised 2026-11-07 · from Opening lane stage 1*
+
+Research takes up to 14.3% of the chest per quarter, and points follow the square root of credits. A much smaller flat chest therefore also slows research, a coupling no doc states as an opening lever. The opening lane reads research per quarter on each chest rung.
+
+**Why it matters.** The opening chest ruling may move the tech pace as well as construction.
 
 ---
 

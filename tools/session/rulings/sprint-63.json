@@ -192,5 +192,28 @@
   "anchor": "A marching unit moves smoothly \\(Ben, 2026-11-05\\)",
   "stale": [],
   "owner": "sprint 63 (smooth movement item, filed by the main session)"
+ },
+ {
+  "ruling": "Occupation details as built: owner loses the output, still pays wages; only war occupies",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "The details \\(Ben, 2026-11-07\\)",
+  "stale": [
+   "Default details, for Ben's review \\(2026-11-05\\)\\.\\*\\* An empty tile"
+  ],
+  "owner": "sprint 63 (occupation layer)"
+ },
+ {
+  "ruling": "Garrison posts bend to supply; the network does not extend to reach them",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "Posts bend to supply \\(Ben, 2026-11-07\\)",
+  "stale": [],
+  "owner": "sprint 63 (units start supplied)"
+ },
+ {
+  "ruling": "Zoom rungs halve from 96 px and the wider view stands, past the 0.7x cap",
+  "doc": "docs/ui/RENDERING.md",
+  "anchor": "the wider view stands \\(Ben, 2026-11-07\\)",
+  "stale": [],
+  "owner": "sprint 63 (tile resolution)"
  }
 ]
