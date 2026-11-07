@@ -1051,13 +1051,13 @@ leg as a dashed line from that road tile to the unit (`../ui/LENSES.md` § Logis
 
 **A shipment draws points again (Ben, 2026-10-16).** The cap retired in BL-1309's cut is
 reinstated: a shipment draws **by cargo quantity**.
-**It pays for its whole route (Ben, 2026-10-23, NR-1060):** a shipment needs the Logistic Points its route costs **from its market's
-centre all the way to the market it trades with** — an international trade included — not only at
-the anchor it leaves. So distance now counts as well as cargo. It is what makes rail's twenty tiles matter, because an inter-market haul
-now has to be paid for in the capacity that carries it, and what makes a market's logistics a real
-constraint on its trading rather than a number beside it. A trade is a standing route with nobody to
-tell, so it is never refused whole: its shipment sends what the anchor admits, exactly as
-`SUPPLY.md` § A shipment already rules.
+**A shipment pays where it leaves (Ben, 2026-11-07).** A shipment draws its Logistic Points at the
+market it leaves — its anchor, the source market's centre — and nowhere along the way; distance does
+not enter the draw. This replaces the 2026-10-23 reading (NR-1060) that a shipment paid the points
+of its route all the way to the market it trades with. What a market's logistics constrains is what
+can leave it: a market whose centre no source reaches ships nothing, however near its buyer. A
+trade is a standing route with nobody to tell, so it is never refused whole: its shipment sends
+what the anchor admits, exactly as `SUPPLY.md` § A shipment already rules.
 
 **Under routing, the anchor is a request like any other (decided 2026-10-22, NR-1062).** The
 anchor is the source market's **centre tile**. A shipment leaving it draws on the pool of the
@@ -1103,8 +1103,8 @@ cannot generate, since the half that serves trade is not owned by anybody.
 
 **Trade points are not Logistic Points (Ben, 2026-10-10).** Trade points are how much an *owner*
 can move, made by its Planetary Marketplaces and Ports (`TRADE.md`); passive LP is how much can move
-*through a place*. A shipment spends its owner's trade points and still pays Logistic Points for its
-whole route from its source market's centre, on a leg within a body (`SUPPLY.md` § A shipment).
+*through a place*. A shipment spends its owner's trade points and still pays Logistic Points at
+its source market's centre, on a leg within a body (`SUPPLY.md` § A shipment).
 Neither replaces the other.
 
 ### Active use costs credits — and that is not a reversal of "a cap, not a price"
@@ -1167,9 +1167,9 @@ Each rejected an earlier cut. Two are structural.
    supplies' quantity (Ben, 2026-10-28, replacing "a march draw is its march points")**, so one rate
    serves both and a unit of goods burdens an anchor equally whether it is freight or an army's
    ration — the exchange rate kept as settled (Ben, 2026-10-23, NR-1049).
-   **For a shipment, distance now counts too (Ben, 2026-10-23, NR-1060):** it pays for its whole
-   route (§ A shipment draws points again), which overturns the old rule that only cargo, never
-   distance, decides the draw.
+   **For a shipment, distance does not count (Ben, 2026-11-07):** it pays where it leaves
+   (§ A shipment draws points again), so the draw is decided by what the cargo is, never by how far
+   it goes.
 4. **The base allowance must not be the whole mechanic.** No corp is seeded a hub, so "your own
    nodes decide how much you may move" is fictional; city generation is what makes the rate real.
 5. **A rival must be able to build the generator.** `corp_ai.cpp`'s scorer carries `place_road`
