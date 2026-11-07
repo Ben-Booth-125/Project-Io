@@ -677,7 +677,9 @@ economy = {
             -- endemic goods
             tobacco = 8, spices = 8, coffee = 8, furs = 8,
             -- processed goods
-            charcoal = 6, iron_blooms = 1.6, trade_goods_misc = 5, steel = 2.5,
+            -- steel: six a point (Ben, 2026-11-07, BL-1546; TRADE.md § The capacity table),
+            -- set above the table's value line on purpose.
+            charcoal = 6, iron_blooms = 1.6, trade_goods_misc = 5, steel = 6,
             refined_fuel = 2.6, food_rations = 3, propellant = 0.6, silicon = 4,
             refined_copper = 3, ree_alloy = 1.6, clean_water = 5,
             medical_supplies = 2.9, ceramics = 6, dressed_stone = 6.5, planks = 5,
