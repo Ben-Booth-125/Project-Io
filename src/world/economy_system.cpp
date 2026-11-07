@@ -1686,7 +1686,7 @@ float construction_credit_cost(const recipe_registry& reg, const building_compon
     const float duration = reg.economics(b.type).build_duration_ticks;
     if (duration <= 0.0f || b.days_remaining <= 0)
         return 0.0f;
-    return reg.economics(b.type).build_cost * static_cast<float>(b.days_remaining)
+    return reg.live_build_credits(b.type) * static_cast<float>(b.days_remaining)
          / (duration * static_cast<float>(k_construction_quarter_days));
 }
 

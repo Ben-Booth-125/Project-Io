@@ -193,7 +193,7 @@ void site_census(world& w, const recipe_registry& reg, int seed, int tt, int mt,
                     if (row[g] > 0.0f)
                         mats += row[g] * (mi->second.price[g] > 0.0f ? mi->second.price[g] : mi->second.base_price[g]);
             }
-            const double authored = reg.economics(o.type).build_cost + mats;
+            const double authored = reg.live_build_credits(o.type) + mats;
             sites.push_back({static_cast<double>(bp.net()), capex, static_cast<double>(sq.profit.net()), sq.starved ? 1 : 0,
                              authored > 0.0 ? mats * capex / authored : 0.0});
         }
@@ -221,11 +221,13 @@ int main(int argc, char** argv)
     std::vector<int> seeds{ 0 };
     int tt = 30, mt = 4, quarters = 80;
     bool sites = true;
+    float chest_override = -1.0f; // --chest N: the kit's handoff figure, for a ladder
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) seeds = parse_ints(argv[++i]);
         else if (!std::strcmp(argv[i], "--quarters") && i + 1 < argc) quarters = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--no-sites")) sites = false;
+        else if (!std::strcmp(argv[i], "--chest") && i + 1 < argc) chest_override = static_cast<float>(std::atof(argv[++i]));
         else if (!std::strcmp(argv[i], "--pairs") && i + 1 < argc)
         {
             const std::vector<int> nums = [&] {
@@ -249,6 +251,9 @@ int main(int argc, char** argv)
     recipe_registry  reg;
     lua.load("scripts/world_gen.lua");
     cfg.load_from_lua(lua);
+    if (chest_override >= 0.0f)
+        for (auto& kv : cfg.opening_kit.configs)
+            kv.second.handoff_treasury = chest_override;
     lua.load("scripts/works.lua");
     works.load_from_lua(lua);
     lua.load("scripts/recipes.lua");
@@ -283,7 +288,24 @@ int main(int argc, char** argv)
             for (const entity_id nid : majors)
                 site_census(w, seed_reg, seed, tt, mt, nid, w.nations.at(nid));
 
-        for (const entity_id nid : majors) steel_row(w, seed, nid, w.nations.at(nid), 0);
+        for (const entity_id nid : majors)
+        {
+            steel_row(w, seed, nid, w.nations.at(nid), 0);
+            int built = 0, constructing = 0, idled = 0;
+            for (const entity_id a : w.nations.at(nid).state_assets)
+            {
+                const auto b = w.buildings.find(a);
+                if (b == w.buildings.end()) continue;
+                if (b->second.decommissioned) ++idled;
+                else if (b->second.ticks_remaining > 0) ++constructing;
+                else ++built;
+            }
+            std::printf("HANDOFF seed=%d nation=%llu treasury=%.1f built=%d constructing=%d idled=%d refmine=%.1f\n", seed,
+                        static_cast<unsigned long long>(nid), static_cast<double>(w.nations.at(nid).treasury), built, constructing, idled,
+                        w.nations.at(nid).tiles.empty() ? 0.0
+                            : static_cast<double>(construction_capex(w, seed_reg, w.nations.at(nid).tiles.front(), building_type::extraction_site,
+                                                                     resource_type::iron_ore, no_recipe)));
+        }
         std::map<entity_id, double> last;
         for (const entity_id nid : majors) last[nid] = w.nations.at(nid).treasury;
         constexpr int k_econ_tick_days = 90;
@@ -307,19 +329,20 @@ int main(int argc, char** argv)
             const settle_tick_result tick = run_settle_tick(w, seed_reg, k_campaign_settle_ticks + (k - 1), day,
                                                             /*spectating=*/true, &hooks);
             // What the report can name of the money that left outside the return.
-            std::map<entity_id, double> research_spend, research_share, research_owed, budget_paid;
+            std::map<entity_id, double> research_spend, research_share, research_owed, research_rp, budget_paid;
             for (const research_accrual& a : tick.report.research)
             {
                 research_spend[a.nation] += a.line_spend;
                 research_share[a.nation] += a.line_share;
                 research_owed[a.nation] += static_cast<double>(a.owed_milli) / 1000.0;
+                research_rp[a.nation] += static_cast<double>(a.rp_milli) / 1000.0;
             }
             for (const nation_budget_result& b : tick.report.national_budget.nations) budget_paid[b.nation] += b.paid;
             for (const entity_id nid : majors)
             {
                 double prev = before.at(nid);
-                std::printf("LAPS seed=%d nation=%llu q=%d research=%.1f research_share=%.1f owed_rp=%.1f budget=%.1f", seed,
-                            static_cast<unsigned long long>(nid), k, research_spend[nid], research_share[nid], research_owed[nid], budget_paid[nid]);
+                std::printf("LAPS seed=%d nation=%llu q=%d research=%.1f research_share=%.1f owed_rp=%.1f rp=%.1f budget=%.1f", seed,
+                            static_cast<unsigned long long>(nid), k, research_spend[nid], research_share[nid], research_owed[nid], research_rp[nid], budget_paid[nid]);
                 for (int l = 0; l < k_campaign_settle_lap_count; ++l)
                 {
                     const double now = laps.treasury[nid][static_cast<std::size_t>(l)];
@@ -384,7 +407,7 @@ int main(int argc, char** argv)
                     }
                 }
 
-            if (k == 4 || k == 8 || k == 20)
+            if (k == 4 || k == 8 || k == 20 || k == 40 || k == 80)
                 for (const entity_id nid : majors)
                     if (const auto it = w.nations.find(nid); it != w.nations.end())
                         steel_row(w, seed, nid, it->second, k);
@@ -401,13 +424,19 @@ int main(int argc, char** argv)
                 if (it == w.nations.end() || it->second.returns.empty()) continue;
                 const nation_component& n = it->second;
                 const quarterly_return& r = n.returns.back();
-                int built = 0, constructing = 0, idled = 0;
+                int built = 0, constructing = 0, idled = 0, stretched = 0, paused = 0;
                 for (const entity_id a : n.state_assets)
                 {
                     const auto b = w.buildings.find(a);
                     if (b == w.buildings.end()) continue;
                     if (b->second.decommissioned) ++idled;
-                    else if (b->second.ticks_remaining > 0) ++constructing;
+                    else if (b->second.ticks_remaining > 0)
+                    {
+                        ++constructing;
+                        // The rate this quarter: 0 is paused, under full is stretched.
+                        if (b->second.build_rate_permille <= 0) ++paused;
+                        else if (b->second.build_rate_permille < 1000) ++stretched;
+                    }
                     else ++built;
                 }
                 const double delta = static_cast<double>(n.treasury) - last[nid];
@@ -418,10 +447,14 @@ int main(int argc, char** argv)
                 const auto f = force.find(nid);
                 std::printf("QTR seed=%d nation=%llu q=%d treasury=%.1f delta=%.1f net=%.1f resid=%.1f income=%.1f"
                             " expenditure=%.1f maintenance=%.1f wages=%.1f upkeep=%.1f taxes=%.1f refunds=%.1f research=%.1f"
-                            " built=%d constructing=%d idled=%d units=%d men=%ld\n",
+                            " built=%d constructing=%d idled=%d stretched=%d paused=%d refmine=%.1f units=%d men=%ld\n",
                             seed, static_cast<unsigned long long>(nid), k, static_cast<double>(n.treasury), delta, r.net,
                             resid, r.income, r.expenditure, r.maintenance, r.wages, r.upkeep, r.taxes, r.refunds, r.research,
-                            built, constructing, idled, f == force.end() ? 0 : f->second.first,
+                            built, constructing, idled, stretched, paused,
+                            n.tiles.empty() ? 0.0
+                                            : static_cast<double>(construction_capex(w, seed_reg, n.tiles.front(), building_type::extraction_site,
+                                                                                    resource_type::iron_ore, no_recipe)),
+                            f == force.end() ? 0 : f->second.first,
                             f == force.end() ? 0L : f->second.second);
             }
         }

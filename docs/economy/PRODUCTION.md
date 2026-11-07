@@ -916,13 +916,29 @@ of an input registers that want as demand, so the stall is visible to the price 
 ### What construction costs at the opening (Ben, 2026-11-05)
 
 **Construction is the opening's scarce decision.** At the opening a mine costs about **six months of
-a major's net**. Construction comes back to about one month of net only after **10-20 years of
-play**. No timer and no era gate carries that curve: it is reinvestment, income growing as the
-buildings a nation chose pay back.
+a major's net**, and that net reads **before research** (Ben, 2026-11-07): research is a choice a
+nation makes against construction, so the price is set against what its economy earns, not against
+how hard it is researching. A nation researching hard reads a longer wait, and that wait is true.
+Construction comes back to about one month of that net only after **10-20 years of play**. No timer
+and no era gate carries that curve: it is reinvestment, income growing as the buildings a nation
+chose pay back.
+
+**Two authored scales set the live price.** A live build pays `build_cost` times
+`credit_cost_mult`, plus materials at the row times `material_cost_mult`
+(`economy.construction`, `scripts/economy.lua`). The authored `build_cost` itself stays the book
+value (FINANCE.md § The quarterly return) and the size of a building for what reads it as a size.
+
+**The curve never prices what a nation's ground opens with (Ben, 2026-11-07).** A founding and every
+site the settle places are on the authored bills, so the kit, the minors' walks and the opening
+position are what they would be with no curve. A site still building at the handoff draws the live
+bill for the days it has left.
 
 **The extra cost lives mostly in materials.** Materials are bought off the shelf at the tile market's
 price, so a nation that planned a steel chain has a real edge over one that did not, and a nation
-building hard moves the price it pays.
+building hard moves the price it pays. **The camps carry steel too (Ben, 2026-11-07):** a timber, stone,
+sand, clay, peat, hides or fibre site is built of goods too cheap for any scale to matter, so a live
+build of one adds its own steel (`curve_materials`), about half a mine's, since a camp is lighter than
+a shaft.
 
 **Searching is rewarded by the sites themselves.** A good site pays back in years and a poor one
 barely. The site finder stays open from the start (`../ui/ledgers/construction.md` § The site ledger;

@@ -293,7 +293,7 @@ profitability, updated each quarter with company balance sheets."*
 | `taxes` | the tier's share of the quarter's wages, returned to the treasury (`NATIONS.md` § Taxes and Discontent) |
 | `research` | Credits the nation's research line spent since its last return, booked on the next one. A debit: research is paid in the nation step, after the return is written (Ben, 2026-11-05: research counts inside net) |
 | `refunds` | Credits refunded to the nation since its last return, booked on the next one — a cancelled construction. A credit: `net` = the flows **+ refunds**, and the return's opening is taken from before the refund so it still telescopes |
-| `net` | The difference of two consecutive treasuries across the money loop, research included — see below. Construction, hiring, retooling and the other movers listed below debit the treasury outside it, so a nation at +100 net can still lose treasury. The header's NET and every price quoted in months of net read after research |
+| `net` | The difference of two consecutive treasuries across the money loop, research included — see below. Construction, hiring, retooling and the other movers listed below debit the treasury outside it, so a nation at +100 net can still lose treasury. The header's NET reads after research. The opening's construction price is the one figure set against net before research (`PRODUCTION.md` § What construction costs at the opening) |
 | `treasury` | the closing `nation_component::treasury` |
 | `holdings` | the nation's building count |
 | `book_value` | Sum of `build_cost` over the holdings, from the recipe registry — historical cost, deliberately **not** what the build press charges |

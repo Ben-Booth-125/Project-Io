@@ -173,6 +173,20 @@ economy = {
                 hides  = { timber = 10.0 },
                 fibre  = { timber = 8.0  },
             },
+            -- THE CAMPS' OWN BILL (Ben, 2026-11-07; PRODUCTION.md § What construction costs at
+            -- the opening): added to a live build's scaled basket above. Their timber and stone
+            -- are too cheap for any scale to matter, so steel is what carries the curve to
+            -- them. About half a mine's: a camp is lighter than a shaft. Not on the settle's or
+            -- a founding's bill.
+            curve_materials = {
+                stone  = { steel = 42.0 },
+                timber = { steel = 42.0 },
+                sand   = { steel = 42.0 },
+                clay   = { steel = 42.0 },
+                peat   = { steel = 42.0 },
+                hides  = { steel = 42.0 },
+                fibre  = { steel = 42.0 },
+            },
         },
         processing_facility = {
             -- BL-744 (Ben, 2026-09-02): base_rate 8 -> 16 (ruled), halving the
@@ -1988,6 +2002,14 @@ economy = {
     -- so a starved build takes up to max_stretch × its base duration, then stalls.
     construction = {
         max_stretch = 10.0, -- longest a starved build stretches to (×base duration); below 1/max_stretch it pauses.
+
+        -- THE OPENING COST CURVE (Ben, 2026-11-05 and 2026-11-07; PRODUCTION.md § What
+        -- construction costs at the opening): a mine costs about six months of a major's
+        -- net before research. What a LIVE build pays against the authored bills below;
+        -- the extra lives mostly in materials, so a planned steel chain is the edge.
+        -- Foundings stay on the authored bills: the curve never prices what ground opens with.
+        credit_cost_mult   = 2.0,
+        material_cost_mult = 4.75,
 
         -- BL-323 S2 — LOGISTICAL MAX BUILDING RANGE.
         -- The furthest a new building may sit from its nearest supply anchor (a

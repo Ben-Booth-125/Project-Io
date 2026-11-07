@@ -18,11 +18,23 @@
 
 #include <algorithm> // std::sort (BL-1321 readings)
 #include <atomic>
+#include <optional>
 
-settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int econ_step,
+settle_tick_result run_settle_tick(world& w, const recipe_registry& live_reg, int econ_step,
                                    int day_tick, bool spectating,
                                    const settle_tick_hooks* hooks)
 {
+    // THE SETTLE IS GENERATION'S (Ben, 2026-11-07: raising prices must not change what a major
+    // opens with; PRODUCTION.md § What construction costs at the opening). Its ticks build at the
+    // authored bills, so the opening position is what it would be with no cost curve at all.
+    std::optional<recipe_registry> settle_reg;
+    if (econ_step < k_campaign_settle_ticks && live_reg.has_cost_curve())
+    {
+        settle_reg.emplace(live_reg);
+        settle_reg->use_authored_costs();
+    }
+    const recipe_registry& reg = settle_reg ? *settle_reg : live_reg;
+
     using clk = std::chrono::steady_clock;
     const auto stamp = [&](int i) {
         if (hooks != nullptr && hooks->lap_clock != nullptr)

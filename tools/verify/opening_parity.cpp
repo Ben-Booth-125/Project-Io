@@ -312,6 +312,27 @@ int main(int argc, char** argv)
                     if (b != w.buildings.end() && b->second.decommissioned && !kit_ids.count(a)) ++out[3];
                 }
             };
+            // The kit census: what each major opens with, slot by slot, by building count at
+            // the handoff. A price must not move it (Ben, 2026-11-07: same buildings, same count).
+            for (const entity_id nid : majors)
+            {
+                if (const opening_kit_major* km = fin.kit.of(nid))
+                    for (const opening_kit_slot_record& r : km->slots)
+                    {
+                        const auto b = w.buildings.find(r.building);
+                        std::printf("KIT seed=%d pair=%d:%d nation=%llu slot=%s as=%s tile=%llu\n", seed, tt, mt,
+                                    static_cast<unsigned long long>(nid), r.slot.c_str(),
+                                    r.placed_as.empty() ? r.slot.c_str() : r.placed_as.c_str(),
+                                    b == w.buildings.end() ? 0ULL : static_cast<unsigned long long>(b->second.tile));
+                    }
+                std::map<int, int> by_type;
+                for (const entity_id a : w.nations.at(nid).state_assets)
+                    if (const auto b = w.buildings.find(a); b != w.buildings.end() && b->second.ticks_remaining <= 0)
+                        ++by_type[static_cast<int>(b->second.type)];
+                std::printf("KITCOUNT seed=%d pair=%d:%d nation=%llu", seed, tt, mt, static_cast<unsigned long long>(nid));
+                for (const auto& [ty, c] : by_type) std::printf(" t%d=%d", ty, c);
+                std::printf("\n");
+            }
             std::map<entity_id, std::array<int, 4>> idled_at_handoff;
             for (const entity_id nid : majors)
             {

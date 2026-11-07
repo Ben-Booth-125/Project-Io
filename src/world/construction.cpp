@@ -51,8 +51,12 @@ float construction_site_multiplier(const world& w, const recipe_registry& reg,
     return landform_factor * reach_factor * stack_factor;
 }
 
-float construction_capex(const world& w, const recipe_registry& reg, entity_id tile,
-                         building_type type, resource_type target, std::uint16_t recipe)
+namespace
+{
+/// The capex at @p credits flat, the material row divided by @p material_div.
+float capex_at(const world& w, const recipe_registry& reg, entity_id tile, building_type type,
+               resource_type target, float credits,
+               const std::array<float, resource_count>& material_cost_row)
 {
     // Materials priced at the tile market's CURRENT price (base price where none has
     // resolved). The draw itself happens tick by tick at the price prevailing then
@@ -62,7 +66,6 @@ float construction_capex(const world& w, const recipe_registry& reg, entity_id t
         if (const auto mit = w.markets.find(mid); mit != w.markets.end())
             mkt = &mit->second;
     // BL-590: the material cost specific to THIS named building (target/recipe).
-    const auto& material_cost_row = reg.resource_build_cost_for(type, target, recipe);
     float material_cost = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
@@ -71,7 +74,7 @@ float construction_capex(const world& w, const recipe_registry& reg, entity_id t
         const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
         material_cost += material_cost_row[r] * p;
     }
-    const float authored = reg.economics(type).build_cost + material_cost;
+    const float authored = credits + material_cost;
     // The draw is the authored cost over the AUTHORED duration per full-rate tick,
     // for as many ticks as the site actually takes — so the ratio is the ROUNDED
     // tick count over the authored duration, not the raw multiplier (a 4-tick build
@@ -86,6 +89,21 @@ float construction_capex(const world& w, const recipe_registry& reg, entity_id t
     // No construction-capacity term: the system is retired (Ben, 2026-10-27,
     // BL-1438) — a site costs its credits and its materials, nothing else.
     return authored * ticks / duration;
+}
+} // namespace
+
+float construction_capex(const world& w, const recipe_registry& reg, entity_id tile,
+                         building_type type, resource_type target, std::uint16_t recipe)
+{
+    return capex_at(w, reg, tile, type, target, reg.live_build_credits(type),
+                    reg.resource_build_cost_for(type, target, recipe));
+}
+
+float construction_founding_capex(const world& w, const recipe_registry& reg, entity_id tile,
+                                  building_type type, resource_type target, std::uint16_t recipe)
+{
+    return capex_at(w, reg, tile, type, target, reg.economics(type).build_cost,
+                    reg.authored_build_cost_for(type, target, recipe));
 }
 
 int construction_build_days(const world& w, const recipe_registry& reg,
