@@ -146,6 +146,23 @@ void steel_row(const world& w, int seed, entity_id nid, const nation_component& 
     const double k = mkts.empty() ? 1.0 : static_cast<double>(mkts.size());
     std::printf("STEEL seed=%d nation=%llu q=%d markets=%zu inventory=%.1f supply=%.1f demand=%.1f price=%.2f base=%.2f\n",
                 seed, static_cast<unsigned long long>(nid), q, mkts.size(), inv, sup, dem, price / k, base / k);
+    // Every good the same way, so a materials bill can be read against what the shelves hold.
+    for (std::size_t gi = 0; gi < resource_count; ++gi)
+    {
+        double ginv = 0.0, gsup = 0.0, gdem = 0.0, gprice = 0.0;
+        for (const entity_id mid : mkts)
+        {
+            const auto m = w.markets.find(mid);
+            if (m == w.markets.end()) continue;
+            ginv += m->second.inventory[gi];
+            gsup += m->second.supply[gi];
+            gdem += m->second.demand[gi];
+            gprice += m->second.price[gi];
+        }
+        std::printf("GOOD seed=%d nation=%llu q=%d good=%s inventory=%.1f supply=%.1f demand=%.1f price=%.2f\n", seed,
+                    static_cast<unsigned long long>(nid), q, resource_names::name_of(static_cast<resource_type>(gi)).c_str(),
+                    ginv, gsup, gdem, gprice / k);
+    }
 }
 
 /// Years for a net per quarter to repay a capex; -1 when it never does.
@@ -222,11 +239,13 @@ int main(int argc, char** argv)
     int tt = 30, mt = 4, quarters = 80;
     bool sites = true;
     float chest_override = -1.0f; // --chest N: the kit's handoff figure, for a ladder
+    std::string kit_override;     // --kit NAME: another configuration of the kit table
     for (int i = 1; i < argc; ++i)
     {
         if (!std::strcmp(argv[i], "--seeds") && i + 1 < argc) seeds = parse_ints(argv[++i]);
         else if (!std::strcmp(argv[i], "--quarters") && i + 1 < argc) quarters = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--no-sites")) sites = false;
+        else if (!std::strcmp(argv[i], "--kit") && i + 1 < argc) kit_override = argv[++i];
         else if (!std::strcmp(argv[i], "--chest") && i + 1 < argc) chest_override = static_cast<float>(std::atof(argv[++i]));
         else if (!std::strcmp(argv[i], "--pairs") && i + 1 < argc)
         {
@@ -251,6 +270,7 @@ int main(int argc, char** argv)
     recipe_registry  reg;
     lua.load("scripts/world_gen.lua");
     cfg.load_from_lua(lua);
+    if (!kit_override.empty()) cfg.opening_kit.active = kit_override;
     if (chest_override >= 0.0f)
         for (auto& kv : cfg.opening_kit.configs)
             kv.second.handoff_treasury = chest_override;

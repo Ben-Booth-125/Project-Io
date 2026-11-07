@@ -1143,7 +1143,19 @@ public:
 
     /// Puts THIS registry on the authored bills, credits and materials: the settle's prices
     /// (`run_settle_tick`). The opening position is generation's, so the curve never reaches it.
-    void use_authored_costs();
+    /// In the header: the settle runs in the Lua-free world build.
+    void use_authored_costs()
+    {
+        if (!m_has_cost_curve)
+            return;
+        for (std::size_t t = 0; t < m_building_econ.size(); ++t)
+            m_building_econ[t].resource_build_cost = m_authored_type_cost[t];
+        m_extraction_material_overrides = m_authored_extraction_overrides;
+        m_processing_material_overrides = m_authored_processing_overrides;
+        m_construction.credit_cost_mult   = 1.0f;
+        m_construction.material_cost_mult = 1.0f;
+        m_has_cost_curve = false;
+    }
 
     /// BL-615: the stratum placement gate for a SPECIFIC named building — the
     /// type's authored gate, with a processing recipe's own

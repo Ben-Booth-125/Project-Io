@@ -1611,15 +1611,3 @@ void recipe_registry::load_from_lua(lua_state& lua)
         }
     }
 }
-void recipe_registry::use_authored_costs()
-{
-    if (!m_has_cost_curve)
-        return;
-    for (std::size_t t = 0; t < m_building_econ.size(); ++t)
-        m_building_econ[t].resource_build_cost = m_authored_type_cost[t];
-    m_extraction_material_overrides = m_authored_extraction_overrides;
-    m_processing_material_overrides = m_authored_processing_overrides;
-    m_construction.credit_cost_mult   = 1.0f;
-    m_construction.material_cost_mult = 1.0f;
-    m_has_cost_curve = false;
-}
