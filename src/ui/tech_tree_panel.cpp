@@ -44,7 +44,8 @@ constexpr float kDeg = kPi / 180.0f;
 // § Kit): Travel III / V is depth 0, each node one past its deepest requirement in the
 // arm, a cluster's minors (arm +-5) sharing a depth; the arm's steps divide 164 -> 264
 // evenly, so an arm of travel, travel, minors, major reads as before (164, 197, 231, 264)
-// and a longer arm packs its clusters closer.
+// and a longer arm packs its clusters closer. A node needing BOTH arms (Wind Power) sits
+// on the branch's axis at 174, past them and inside its ring.
 //
 // Pair majors sit +-6 degrees off their slot; a quest diamond beside its major;
 // a joint on the boundary between the two arms it joins, at 214.
@@ -240,7 +241,18 @@ std::array<node_place, dg::node_count> compute_layout()
         }
         else if (slot[1] == 'a' || slot[1] == 'b')
             d = slot[1] == 'a' ? -6.0f : 6.0f;
-        L[static_cast<std::size_t>(i)] = {arm + d, 164.0f + 100.0f * static_cast<float>(dep) / static_cast<float>(top)};
+        bool needs_minus = false, needs_plus = false;
+        for (int g = 0; g < n.group_count; ++g)
+        {
+            const int m = n.groups[static_cast<std::size_t>(g)][0];
+            if (m < 0 || depth[static_cast<std::size_t>(m)] < 0)
+                continue;
+            (side[static_cast<std::size_t>(m)] > 0 ? needs_plus : needs_minus) = true;
+        }
+        if (needs_minus && needs_plus)
+            L[static_cast<std::size_t>(i)] = {branch_angle(b), 174.0f};
+        else
+            L[static_cast<std::size_t>(i)] = {arm + d, 164.0f + 100.0f * static_cast<float>(dep) / static_cast<float>(top)};
         placed[static_cast<std::size_t>(i)] = true;
     }
 

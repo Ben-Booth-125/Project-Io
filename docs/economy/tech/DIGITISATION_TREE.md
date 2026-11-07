@@ -50,6 +50,10 @@ kit-bearing branches lengthen its arms with kit clusters (§ Kit):
 The branch's **quest** hangs off one of its three majors and costs at that major's ring. A pair
 cluster has one minor and two majors, of which a nation may hold one.
 
+**Wind Power is a major (Ben, 2026-11-07), off Energy's spine.** It opens a recipe, so it costs what
+a ring-2 major costs. It has no minors of its own: it needs Fuel Economy III and Fuel Economy V, the
+first node of each arm, so the two paths into it are the branch's own. No minor or mastery needs it.
+
 ## Travel themes
 
 A branch's six travel nodes all carry its theme; its mastery carries the theme at triple strength.
@@ -173,7 +177,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 
 <!-- BEGIN GENERATED NODES (tools/session/tech_tree_store.js) -->
 
-**194 nodes** — 70 travel (7 joints, 9 masteries), 74 minor, 41 major, 9 quest; 12 placeholder nodes. Whole age: 1427 cost units.
+**194 nodes** — 70 travel (7 joints, 9 masteries), 73 minor, 42 major, 9 quest; 12 placeholder nodes. Whole age: 1435 cost units.
 
 ### Production — what the nation can extract and make
 
@@ -248,7 +252,7 @@ shape; `nation_tech_harness` holds the store to what the code reads.
 | `DG-PR-EN-C` | Propellant Synthesis | major | 4 | propellant recipes +20% yield | Cryogenic Storage + Rocket-Fuel Chemistry |
 | `DG-PR-EN-M` | Energy Security | mastery | 4 | -3% fuel draw at every building | Civil Nuclear Power + Propellant Synthesis |
 | `DG-PR-EN-Q` | Propellant at Scale | quest | 4 | propellant output +15%. **Deed:** a propellant plant fully staffed for 8 quarters. **Keys next age:** In-Situ Propellant | Propellant Synthesis |
-| `DG-PR-EN-W` | Wind Power | minor | 2 | unlocks the Wind Turbine: land power with no fuel | Fuel Economy III |
+| `DG-PR-EN-W` | Wind Power | major | 2 | unlocks the Wind Turbine: land power with no fuel | Fuel Economy III + Fuel Economy V |
 
 ### Network — how far and fast the nation moves goods and word
 

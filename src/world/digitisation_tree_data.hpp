@@ -264,7 +264,7 @@ inline constexpr std::array<node, node_count> nodes = {{
     /* 190 */ {"DG-NE-SO-F1", "FPV Drones", tier::minor, 4, 8, 1, {{{189, -1}, {-1, -1}}}, -1, false, false, false, false, false, "NE-SO", "", "", "opens FPV attack drones (motorised and mechanised weapon)", 291, 293, ""},
     /* 191 */ {"DG-NE-SO-F2", "Counter-Drone Defence", tier::minor, 4, 8, 1, {{{189, -1}, {-1, -1}}}, -1, false, false, false, false, false, "NE-SO", "", "", "opens layered defence with counter-drone (air defence launcher)", 293, 294, ""},
     /* 192 */ {"DG-NE-SO-F", "Loitering Munitions", tier::major, 4, 24, 2, {{{190, -1}, {191, -1}}}, -1, false, false, false, false, false, "NE-SO", "", "", "opens loitering drones (artillery munitions, drone armament)", 294, 296, ""},
-    /* 193 */ {"DG-PR-EN-W", "Wind Power", tier::minor, 2, 4, 1, {{{39, -1}, {-1, -1}}}, -1, false, false, false, false, false, "PR-EN", "", "", "unlocks the Wind Turbine: land power with no fuel", 296, 297, ""},
+    /* 193 */ {"DG-PR-EN-W", "Wind Power", tier::major, 2, 12, 2, {{{39, -1}, {41, -1}}}, -1, false, false, false, false, false, "PR-EN", "", "", "unlocks the Wind Turbine: land power with no fuel", 296, 297, ""},
 }};
 
 inline constexpr std::array<effect, effect_count> effects = {{
