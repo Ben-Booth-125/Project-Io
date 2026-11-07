@@ -601,6 +601,7 @@ struct unit_draw_memo
     /// BL-1501: (nation, tile) -> `unit_tile_fully_fed`, and the reached set it walks over:
     /// `lp_reached_tiles` for (nation, body). Lookups only, so a set's layout decides nothing.
     std::map<std::pair<entity_id, entity_id>, bool>   fed;
+    std::map<std::pair<entity_id, entity_id>, int>    cover; ///< (nation, tile) -> `unit_tile_cover_permille`
     std::map<std::pair<entity_id, entity_id>, std::unordered_set<entity_id>> reached;
 };
 
@@ -616,6 +617,12 @@ bool unit_tile_drawable(world& w, unit_draw_memo& memo, entity_id nation, entity
 /// the claim is granted while the pool lasts. True at full cover. There is no second estimate
 /// of reach here: a tile this reads as fed is one the claim is paid in full at.
 bool unit_tile_fully_fed(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile);
+
+/// RIVAL_MARCH_SUPPLY: the cover, per-mille, a unit of @p nation on @p tile would be paid at: the
+/// same two steps as `unit_tile_fully_fed` (the tile it pays at, that tile's routed cover), and
+/// 0 past its roads. The share the claim is granted while the pool lasts, with the resolver's
+/// truncation and its tolerance. Memoised in @p memo.
+int unit_tile_cover_permille(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile);
 
 /// What `repost_garrisons_on_cover` did, for the finish log and the harnesses.
 struct garrison_repost_report

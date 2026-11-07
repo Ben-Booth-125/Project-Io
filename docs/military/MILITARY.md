@@ -574,6 +574,17 @@ no front stays unassigned. A rival pushes where it is hostile to
 the neighbour and its assigned strength exceeds 3:2 over the push target's defence. Otherwise it
 holds. It never declares the hostility a push needs.
 
+**A rival weighs a march's supply (Ben, 2026-11-07; `../ai/AI_OPPONENT.md` § 11).** The price of a
+march is what § Carried supplies would do to the men at the share the unit's claim is granted where
+it would stand, over the 180 days starvation takes. Slots stay where they are; the rival chooses
+where to send units. A front's price is what one more unit does to its whole slot set, counted in
+the fewest-per-span-tile preference as that share of one more unit. A front toward a nation at odds
+with it, hostile either way, is a reason to go hungry. Any other front is taken only if it costs no
+more than standing where the unit stands. A push prices the weakest ground it would spread onto
+against where its units stand. Ground that costs more is taken only if it holds a goal of the war
+with that neighbour, and then the 3:2 reads the strength after those men and the flat hunger step.
+On ground its network feeds, the price is nothing and both choices are the ones above.
+
 ### Defend province (Ben, 2026-11-05)
 
 **A unit may be ordered to defend a province.** It is an ability beside a front assignment, for ground

@@ -74,6 +74,23 @@ bool stocks_equal(const unit_component& a, const unit_component& b)
 
 } // namespace
 
+int carried_hunger_loss_permille(const carried_supply_params& p, int food_permille, int share_permille, int days)
+{
+    // In `stock_day`'s units (k_supply_unit to the per-mille): today's spend, less what the
+    // share delivers of spend + restock. A stock it does not shrink never empties.
+    const int64_t spend_milli = int64_t{ std::max(0, p.food_per_day) } * 1000;
+    const int64_t need_u      = spend_milli + int64_t{ std::max(0, p.food_per_day) } * std::max(0, p.restock_permille);
+    const int64_t drain       = spend_milli * 1000 - clamp_pm(share_permille) * need_u;
+    if (drain <= 0 || days <= 0)
+        return 0;
+    const int64_t stock = int64_t{ clamp_pm(food_permille) } * k_supply_unit;
+    // A unit starves at zero WHOLE per-mille (`unit_starving` reads no remainder), and that day
+    // starves: the first day that ends under one per-mille, the same order as the day.
+    const int64_t empty_on = stock >= k_supply_unit ? (stock - k_supply_unit) / drain + 1 : 1;
+    const int64_t starving = std::max<int64_t>(0, days - empty_on + 1);
+    return static_cast<int>(std::min<int64_t>(1000, starving * 1000 / k_starvation_days));
+}
+
 int carried_combat_permille(const unit_component& u)
 {
     const int64_t ammo  = std::max(k_ammo_floor_permille, clamp_pm(u.ammo_permille));

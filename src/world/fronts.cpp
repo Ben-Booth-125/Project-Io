@@ -748,6 +748,48 @@ entity_id front_push_target(const world& w, const front& f, int64_t* defence)
     return best;
 }
 
+std::vector<entity_id> front_push_weakest(const world& w, const front& f)
+{
+    raster_source rs{ w, {} };
+    const std::map<entity_id, int64_t> held = push_strengths(w, f.nation, push_candidates(w, rs, f));
+    int64_t low = std::numeric_limits<int64_t>::max();
+    for (const auto& [t, s] : held)
+    {
+        (void)t;
+        low = std::min(low, s);
+    }
+    std::vector<entity_id> out;
+    for (const auto& [t, s] : held) // ascending
+        if (s == low)
+            out.push_back(t);
+    return out;
+}
+
+entity_id front_hold_slot(world& w, const recipe_registry& reg, const unit_component& unit, const front& f,
+                          std::size_t i, std::size_t n)
+{
+    const std::size_t len = f.span.size();
+    if (len == 0 || n == 0 || i >= n)
+        return null_entity;
+    const std::function<bool(const tile_component&)> wall =
+        march_wall(w, unit.owner, unit.type, class_wall(reg.military(), unit.type));
+    const auto open = [&](entity_id t) {
+        const auto tit = w.tiles.find(t);
+        return tit != w.tiles.end() && !(wall && wall(tit->second)) && !water_slot_for(unit.type, tit->second);
+    };
+    const std::size_t s = ((2 * i + 1) * len) / (2 * n); // the slot, as advance_fronts spaces them
+    for (std::size_t d = 0; d < len; ++d) // nearest first, ties to the lower index, as hold walks
+    {
+        if (d > s && s + d >= len)
+            break;
+        if (d <= s && open(f.span[s - d]))
+            return f.span[s - d];
+        if (d > 0 && s + d < len && open(f.span[s + d]))
+            return f.span[s + d];
+    }
+    return null_entity;
+}
+
 bool front_reachable(world& w, const recipe_registry& reg, entity_id unit, const front& f)
 {
     const auto uit = w.units.find(unit);

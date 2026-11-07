@@ -68,6 +68,13 @@ inline constexpr int k_hunger_penalty_permille = 150; ///< Flat -15% attack and 
 inline constexpr int k_ammo_floor_permille     = 200; ///< Out of shells, it still fights with small arms.
 inline constexpr int k_starvation_days         = 180; ///< Days a starving unit takes to lose its establishment.
 
+/// RIVAL_MARCH_SUPPLY (AI_OPPONENT.md § 11, "A rival's march may weigh supply", Ben 2026-11-07):
+/// what standing at @p share_permille for @p days does to a unit holding @p food_permille of
+/// food, per-mille of its establishment lost to starvation. The day's own arithmetic read
+/// forward (`run_carried_supplies_day`), no second estimate: 0 at or past the break-even share,
+/// else the stock empties at the shortfall and every day from then on takes 1/180. Pure.
+int carried_hunger_loss_permille(const carried_supply_params& p, int food_permille, int share_permille, int days);
+
 /// True when the unit's food is below full: the flat hunger step applies.
 inline bool unit_hungry(const unit_component& u) { return u.food_permille < 1000; }
 

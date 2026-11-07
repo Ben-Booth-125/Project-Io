@@ -701,6 +701,33 @@ int main()
               "S14 on dunes the equipment drain is x1.5 the plains drain (15 against 10 over ten days)");
     }
 
+    // RIVAL_MARCH_SUPPLY: the rival scorer's price of a march is this forward read, so it must
+    // be the day's own arithmetic: the same men, at every share, over the days it reads.
+    std::printf("\nS15 - the hunger read is what the days do (carried_hunger_loss_permille)\n");
+    {
+        bool agree = true;
+        for (const int share : { 0, 100, 300, 500, 600, 660, 666, 667, 800, 1000 })
+            for (const int start_food : { 1000, 400 })
+            {
+                camp c;
+                build_camp(c, 0);
+                unit_component& u = c.w.units.at(c.u);
+                u.count = 1800;
+                u.establishment = 1800;
+                u.food_permille = start_food;
+                u.lp_share_permille = share;
+                const std::set<entity_id> none;
+                for (int day = 0; day < k_starvation_days; ++day)
+                    (void)run_carried_supplies_day(c.w, sp, none);
+                const int lost = (1800 - c.w.units.at(c.u).count) * 1000 / 1800;
+                const int read = carried_hunger_loss_permille(sp, start_food, share, k_starvation_days);
+                std::printf("      share %4d, food %4d: the days took %4d permille, the read says %4d\n", share,
+                            start_food, lost, read);
+                agree = agree && lost == read;
+            }
+        check(agree, "S15 at every share the forward read is the men the days take over 180 days");
+    }
+
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }

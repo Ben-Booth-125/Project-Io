@@ -138,6 +138,16 @@ bool front_may_push(const world& w, const front& f);
 /// this is the front-wide reading a rival's scorer weighs.
 entity_id front_push_target(const world& w, const front& f, int64_t* defence = nullptr);
 
+/// RIVAL_MARCH_SUPPLY: every tile tied for weakest under `front_push_target`'s rule, ascending:
+/// the ground a push across `f` would actually spread over. Empty when there is none.
+std::vector<entity_id> front_push_weakest(const world& w, const front& f);
+
+/// RIVAL_MARCH_SUPPLY: the tile `advance_fronts`' hold gives @p unit as the @p i th of @p n on
+/// `f`, by its walls but not asking `march_check`: slot i, else the nearest tile to it its class
+/// may stand on. null_entity when the span has none. What a scorer reads supply at.
+entity_id front_hold_slot(world& w, const recipe_registry& reg, const unit_component& unit, const front& f,
+                          std::size_t i, std::size_t n);
+
 /// BL-1441 (front edge cases): may @p unit reach front @p f? The test a front's
 /// own hold step would meet for a lone unit: of the span tiles nearest the span's
 /// middle (ties to the lower index), the first the unit's class may enter; reachable

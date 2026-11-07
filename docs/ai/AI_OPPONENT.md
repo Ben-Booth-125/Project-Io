@@ -2456,3 +2456,16 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   ordering another nation's units, the player's included; choosing a province, war or target for the
   player's nation; a defence planned beyond the next move. Pure, seeded, deterministic, replayable,
   legal verbs only, never a planner.
+  **A rival's march may weigh supply — granted (Ben, 2026-11-07; `../military/MILITARY.md` § Fronts, "A
+  rival's fronts").** Raised on the measurement: rival marches starved 9-16% of their opening armies
+  in 8 quarters. His answer: *"Grant it, scorer weighs supply."* A new reading, on the standing terms.
+  A rival nation's scorer, weighing a march of its OWN units, may read its OWN network's supply at the
+  destination and along the route: the share its claim would be granted there, and what that share
+  does to the unit's stocks and men. A march onto ground its network cannot feed scores lower, by that
+  amount and no other; the brake is the hunger itself, so no handicap and no fixed cap on marches. A
+  rival still marches to war: a front toward a nation at odds with it stays a reason to go hungry, and
+  a war goal stays a prize worth it. **Not admitted:** any march, front or unit of the player's
+  nation; a new verb; bending a front's slots to supply (§ Nation garrisons' ruling stands, and a
+  rival meets it as a commander, by where it sends units); reading another nation's supply; a march
+  planned beyond the next order. Pure, seeded, deterministic, replayable, legal verbs only, never a
+  planner.

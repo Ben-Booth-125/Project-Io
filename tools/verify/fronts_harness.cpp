@@ -39,6 +39,7 @@
 #include "world/economy_system.hpp"
 #include "world/fronts.hpp"
 #include "world/hex_neighbors.hpp"
+#include "world/nation_generation.hpp" // RIVAL_MARCH_SUPPLY: unit_tile_cover_permille
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/stance.hpp"
@@ -1518,6 +1519,198 @@ int main()
                   && f.w.units.at(pu).defend_province == no_province && f.w.units.at(ru).front == null_entity
                   && f.w.state_hash(2) == twin.state_hash(2),
               "F12z the rival's capital unit defends; the player's is untouched; twins agree");
+    }
+
+    // -----------------------------------------------------------------------
+    // F13 - RIVAL_MARCH_SUPPLY (AI_OPPONENT.md § 11, "A rival's march may weigh supply",
+    // Ben 2026-11-07): the scored term, on a cylinder wide enough to be past the 8-tile draw,
+    // with one real hub. A (rows 0-2) is the rival; the seat holds nothing. Province ids are
+    // each block's lowest tile. With @p two_neighbours the south is B to column 29 and C from 30,
+    // two fronts; else it is all B, one closed front.
+    std::printf("\nF13 - a rival's march weighs supply\n");
+    {
+        constexpr int WW = 60, HH = 6;
+        struct wide
+        {
+            world w;
+            entity_id body = null_entity, A = null_entity, B = null_entity, C = null_entity, seat = null_entity;
+            std::vector<entity_id> cell;
+            entity_id at(int x, int y) const { return cell[static_cast<std::size_t>(y * WW + x)]; }
+        };
+        const auto build_wide = [](wide& f, bool two_neighbours) {
+            world& w = f.w;
+            f.body = w.create_entity();
+            body_component bc{};
+            bc.name = "Wide"; bc.type = body_type::planet; bc.grid_width = WW; bc.grid_height = HH;
+            w.bodies[f.body] = bc;
+            for (int y = 0; y < HH; ++y)
+                for (int x = 0; x < WW; ++x)
+                {
+                    const entity_id t = w.create_entity();
+                    tile_component tc{};
+                    tc.body = f.body; tc.grid_x = x; tc.grid_y = y;
+                    tc.substrate = terrain_substrate::rocky; tc.landform = terrain_landform::plains;
+                    w.tiles[t] = tc;
+                    f.cell.push_back(t);
+                }
+            const auto add_nation = [&](const char* name) {
+                const entity_id n = w.create_entity();
+                nation_component nc{};
+                nc.name = name; nc.treasury = 1.0e6f;
+                w.nations[n] = nc;
+                return n;
+            };
+            f.A = add_nation("Aster"); f.B = add_nation("Brael"); f.C = add_nation("Corvan");
+            f.seat = add_nation("Seat");
+            w.player_entity = f.seat;
+            for (int y = 0; y < HH; ++y)
+                for (int x = 0; x < WW; ++x)
+                    w.set_tile_nation(f.at(x, y), y < 3 ? f.A : (two_neighbours && x >= 30 ? f.C : f.B));
+            // Provinces: A's ground one; the south, a block of ten columns each.
+            province pa; pa.id = f.at(0, 0); pa.body = f.body;
+            for (int y = 0; y < 3; ++y)
+                for (int x = 0; x < WW; ++x)
+                    pa.tiles.push_back(f.at(x, y));
+            std::sort(pa.tiles.begin(), pa.tiles.end());
+            w.provinces.provinces.push_back(pa);
+            for (int k = 0; k < WW / 10; ++k)
+            {
+                province p; p.id = f.at(10 * k, 3); p.body = f.body;
+                for (int y = 3; y < HH; ++y)
+                    for (int x = 10 * k; x < 10 * k + 10; ++x)
+                        p.tiles.push_back(f.at(x, y));
+                std::sort(p.tiles.begin(), p.tiles.end());
+                w.provinces.provinces.push_back(p);
+            }
+            for (const province& p : w.provinces.provinces)
+                for (const entity_id t : p.tiles)
+                    w.provinces.tile_province[t] = p.id;
+            reanchor_fronts(w);
+        };
+        const auto add_hub = [](wide& f, entity_id tile) {
+            const entity_id b = f.w.create_entity();
+            building_component bc{};
+            bc.type = building_type::inland_logistics_hub;
+            bc.tile = tile;
+            f.w.buildings[b] = bc;
+        };
+        const auto add_wide_unit = [](wide& f, entity_id owner, entity_id tile, int men) {
+            const entity_id u = f.w.create_entity();
+            unit_component uc{};
+            uc.position = tile; uc.owner = owner; uc.count = men;
+            uc.type = static_cast<uint16_t>(row_named("Rifle Infantry"));
+            f.w.units[u] = uc;
+            return u;
+        };
+        const auto score_once = [&](world& w) {
+            corp_ai_params p; p.cadence_k = 1;
+            economy_report r;
+            run_corp_strategic_step(w, reg, r, k_campaign_settle_ticks, p);
+        };
+        const auto cover_at = [](world& w, entity_id nation, entity_id t) {
+            unit_draw_memo memo;
+            return unit_tile_cover_permille(w, memo, nation, t);
+        };
+        // The column of the closed front's lone slot, and the column across the world from it.
+        const auto far_column = [&reg](wide& f) {
+            const std::vector<front> fs = current_fronts(f.w, f.A);
+            unit_component probe{};
+            probe.owner = f.A;
+            probe.type = static_cast<uint16_t>(row_named("Rifle Infantry"));
+            const entity_id slot = fs.empty() ? null_entity : front_hold_slot(f.w, reg, probe, fs.front(), 0, 1);
+            return slot == null_entity ? 0 : (f.w.tiles.at(slot).grid_x + WW / 2) % WW;
+        };
+
+        // (a) Two peaceful fronts, tied on load: today's first choice is B's, whose slot the
+        // network cannot feed; the hub stands under C's span.
+        {
+            wide f; build_wide(f, true);
+            add_hub(f, f.at(45, 1));
+            const entity_id u = add_wide_unit(f, f.A, f.at(45, 0), 40);
+            world twin = f.w;
+            score_once(f.w);
+            score_once(twin);
+            const std::vector<front> fs = current_fronts(f.w, f.A);
+            const front* on = front_named(fs, f.w.units.at(u).front);
+            std::printf("  [info] cover: post %d, the front it took %d\n", cover_at(f.w, f.A, f.at(45, 0)),
+                        on != nullptr ? cover_at(f.w, f.A, f.w.units.at(u).position) : -1);
+            check(on != nullptr && on->neighbour == f.C,
+                  "F13a two peaceful fronts tied on load: the unit takes the one its network feeds");
+            check(f.w.state_hash(2) == twin.state_hash(2), "F13b the term is deterministic (twins hash alike)");
+        }
+        // (b, c) One front, its slot past the draw. At peace the unit stays on its fed post; with
+        // a nation at odds it marches all the same, either way round.
+        {
+            wide peace; build_wide(peace, false);
+            const int col = far_column(peace);
+            add_hub(peace, peace.at(col, 1));
+            const entity_id u = add_wide_unit(peace, peace.A, peace.at(col, 0), 40);
+            wide mine, theirs;
+            build_wide(mine, false);
+            build_wide(theirs, false);
+            for (wide* v : { &mine, &theirs })
+            {
+                add_hub(*v, v->at(col, 1));
+                (void)add_wide_unit(*v, v->A, v->at(col, 0), 40);
+            }
+            (void)declare_hostile(mine.w, mine.A, mine.B);
+            (void)declare_hostile(theirs.w, theirs.B, theirs.A);
+            score_once(peace.w);
+            score_once(mine.w);
+            score_once(theirs.w);
+            std::printf("  [info] post column %d: cover at the post %d\n", col, cover_at(peace.w, peace.A, peace.at(col, 0)));
+            check(cover_at(peace.w, peace.A, peace.at(col, 0)) == 1000 && peace.w.units.at(u).front == null_entity,
+                  "F13c a peaceful front past the draw: the unit stands on its fed post, unassigned");
+            bool marched_mine = false, marched_theirs = false;
+            for (const auto& [id, un] : mine.w.units)
+                marched_mine = marched_mine || (un.owner == mine.A && un.front != null_entity);
+            for (const auto& [id, un] : theirs.w.units)
+                marched_theirs = marched_theirs || (un.owner == theirs.A && un.front != null_entity);
+            check(marched_mine && marched_theirs,
+                  "F13d the same front toward a nation at odds, hostile either way: it marches, hunger and all");
+        }
+        // (e, f, g) A push onto unfed ground: refused for plain ground, taken for a war goal,
+        // and a goal under a real defence is weighed with the hungry strength.
+        const auto push_case = [&](bool goal, int defenders) {
+            wide f; build_wide(f, false);
+            const int col = far_column(f);
+            add_hub(f, f.at(col, 1));
+            for (int k = 0; k < 3; ++k)
+                (void)add_wide_unit(f, f.A, f.at(col, 0), 40);
+            if (defenders > 0)
+                for (int x = 0; x < WW; ++x)
+                    (void)add_wide_unit(f, f.B, f.at(x, 3), defenders);
+            (void)declare_hostile(f.w, f.A, f.B);
+            war_record war;
+            war.declarer = f.A; war.defender = f.B;
+            if (goal)
+                for (int k = 0; k < 3; ++k)
+                    war.declarer_goals.push_back(f.at(10 * k, 3));
+            f.w.wars[{ f.A, f.B }] = war;
+            score_once(f.w);
+            const std::vector<front> fs = current_fronts(f.w, f.A);
+            return !fs.empty() && front_order_of(f.w, f.A, fs.front().key) == front_order::push;
+        };
+        const bool plain = push_case(false, 0), prize = push_case(true, 0);
+        const bool held_goal = push_case(true, 60), thin_goal = push_case(true, 2);
+        std::printf("  [info] push: plain ground %d, a goal undefended %d, a goal held by 60 %d, by 2 %d\n", plain, prize,
+                    held_goal, thin_goal);
+        check(!plain, "F13e empty unfed ground that is no goal: a fed force holds");
+        check(prize, "F13f the same ground is a war goal: it pushes, the prize worth the hunger");
+        check(!held_goal, "F13g a goal whose defence 3:2 would pass on raw strength: the hungry strength does not");
+        check(thin_goal, "F13h a goal thinly held: the hungry strength still clears it");
+        // (i) A nation whose network feeds nothing: nothing costs more than standing, so a push
+        // is scored as it always was (F8h is the same row on the narrow cylinder).
+        {
+            wide f; build_wide(f, false);
+            for (int k = 0; k < 3; ++k)
+                (void)add_wide_unit(f, f.A, f.at(k * 7, 0), 40);
+            (void)declare_hostile(f.w, f.A, f.B);
+            score_once(f.w);
+            const std::vector<front> fs = current_fronts(f.w, f.A);
+            check(!fs.empty() && front_order_of(f.w, f.A, fs.front().key) == front_order::push,
+                  "F13i a force no better fed where it stands pays nothing to go on");
+        }
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);
