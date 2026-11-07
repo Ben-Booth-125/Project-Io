@@ -36,9 +36,10 @@ nation fields units.
 **The chart is two horizontal bars sharing a left edge (Ben, 2026-11-05).** Earnings on top — what the nation's
 buildings sold, plus the tariff and the tax that return to the treasury (`NATIONS.md` § 2); every
 outflow of the nation's quarterly return stacked on the bar below — **Inputs, Maintenance, Wages,
-Force** — each segment its own shade, naming itself and its figure on hover. Force keeps its own
-segment rather than folding into Wages for the reason it was given its own bar in the first
-place: a force cost buried inside Wages is a term nobody can tune against. The former
+Upkeep** — each segment its own shade, naming itself and its figure on hover. **Upkeep** is the
+garrison's pay and the space assets' upkeep (Ben, 2026-11-07). It keeps its own segment rather than
+folding into Wages for the reason it was given its own bar in the first place: a force cost buried
+inside Wages is a term nobody can tune against. The former
 **Interest**, **Levies** and **Subsidies** segments have no subject (Ben, 2026-10-23): a nation
 never runs into debt, the extraction levy retired, and no nation pays another's industry.
 

@@ -2364,7 +2364,7 @@ struct quarterly_return
     /// next one, as a refund is, so `net` = the flows - research + refunds. Other debits
     /// land outside it (FINANCE.md § What a return does not carry), so a nation can lose
     /// treasury at a positive `net`. `upkeep` above is booked the same way
-    /// (garrison pay, also a nation-step debit). SERIALISED in the v80 section.
+    /// (garrison pay and space upkeep, also nation-step debits). SERIALISED in the v80 section.
     float research    = 0.0f;
 
     /// No meaning: holds the record padding-free at 64, since its bytes are hashed raw
@@ -2649,7 +2649,8 @@ struct nation_component
 
     /// BL-1539: the running debits the nation step took from `treasury` after the last
     /// return was written and no return has booked yet: the research line's spend and
-    /// the garrison's pay. The next return books them as `research` and `upkeep`, inside
+    /// the standing upkeep: the garrison's pay and each space asset's quarterly upkeep
+    /// (Ben, 2026-11-07). The next return books them as `research` and `upkeep`, inside
     /// `net`. Each is the EXACT difference of the treasury across its debit, in double,
     /// so a run's nets still telescope onto the treasury. The Balance card and the
     /// header read them between ticks: they are this quarter's. SERIALISED in the v80
