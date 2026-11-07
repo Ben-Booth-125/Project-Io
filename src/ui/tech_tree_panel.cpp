@@ -45,7 +45,8 @@ constexpr float kDeg = kPi / 180.0f;
 // arm, a cluster's minors (arm +-5) sharing a depth; the arm's steps divide 164 -> 264
 // evenly, so an arm of travel, travel, minors, major reads as before (164, 197, 231, 264)
 // and a longer arm packs its clusters closer. A node needing BOTH arms (Wind Power) sits
-// on the branch's axis at 174, past them and inside its ring.
+// on the branch's axis at 174, between ring edges 118 and 179: past the arms' first nodes
+// (164) and short of the ring 3 guide.
 //
 // Pair majors sit +-6 degrees off their slot; a quest diamond beside its major;
 // a joint on the boundary between the two arms it joins, at 214.

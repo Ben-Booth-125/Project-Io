@@ -47,7 +47,7 @@ kit-bearing branches lengthen its arms with kit clusters (§ Kit):
 | 3 | Travel IV and Travel VI → each arm's cluster minors |
 | 4 | Each arm's major (needs both its minors) → the branch's **mastery** (needs both majors) |
 
-The branch's **quest** hangs off one of its three majors and costs at that major's ring. A pair
+The branch's **quest** hangs off one of its cluster majors and costs at that major's ring. A pair
 cluster has one minor and two majors, of which a nation may hold one.
 
 **Wind Power is a major (Ben, 2026-11-07), off Energy's spine.** It opens a recipe, so it costs what

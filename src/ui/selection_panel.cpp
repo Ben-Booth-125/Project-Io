@@ -2986,10 +2986,11 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
         case building_type::bunker: // BL-1426
             return "Its owner's defenders here gain defence and hardness";
         case building_type::research_institute:
-        case building_type::university:
             return "Makes research points for its nation";
         case building_type::schooling:
-            return "Schooling for the centre it stands in";
+            return "Raises its nation's qualification";
+        case building_type::university:
+            return "Makes research points and raises its nation's qualification";
         default:
             return building_type_name(b.type);
     }
@@ -4764,9 +4765,9 @@ std::string candidate_effect_line(const recipe_registry& reg, building_type type
         case building_type::research_institute:
             return "Makes research points for its nation";
         case building_type::schooling:
-            return "Raises its nation's qualification. Must stand in a population centre";
+            return "Raises its nation's qualification";
         case building_type::university:
-            return "Makes research points and raises its nation's qualification. Must stand in a City or larger";
+            return "Makes research points and raises its nation's qualification";
         default:
             return building_type_name(type);
     }

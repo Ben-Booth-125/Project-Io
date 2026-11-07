@@ -38,8 +38,8 @@ buildings sold, plus the tariff and the tax that return to the treasury (`NATION
 outflow of the nation's quarterly return stacked on the bar below — **Inputs, Maintenance, Wages,
 Upkeep** — each segment its own shade, naming itself and its figure on hover. **Upkeep** is the
 garrison's pay and the space assets' upkeep (Ben, 2026-11-07). It keeps its own segment rather than
-folding into Wages for the reason it was given its own bar in the first place: a force cost buried
-inside Wages is a term nobody can tune against. The former
+folding into Wages because a standing cost buried inside Wages is a term nobody can tune against: the
+player cuts it by disbanding a unit or letting an asset go, not by the labour dial. The former
 **Interest**, **Levies** and **Subsidies** segments have no subject (Ben, 2026-10-23): a nation
 never runs into debt, the extraction levy retired, and no nation pays another's industry.
 

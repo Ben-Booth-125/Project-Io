@@ -7422,7 +7422,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // (they call construct_building directly and reselect the result), so neither can
     // exercise it.
     //
-    // @param type   "extraction" / "processing" / "port" / "launchpad" / "hub".
+    // @param type   "extraction" / "processing" / "port" / "launchpad" / "hub" / "marketplace"
+    //               / "schooling" / "university".
     // @param target Extraction target resource name (ignored for other types).
     // @param recipe Processing recipe name, or "" for construct_building's default.
     v.set_function("ledger_build", [this](const std::string& type, const std::string& target,

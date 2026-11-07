@@ -5,7 +5,12 @@
 --
 -- What this check reads: the finder's options, its rows, and the rows the door drew. A finder
 -- row is a tile the gate passed, so a University row that is not a Schooling row would mean
--- the two gates disagree; and the door on a tile with no centre must refuse both.
+-- the two gates disagree. Three presses, each on its OWN centre, because a tile with a site
+-- under way refuses another for a reason that is not the one under test:
+--   SCHOOL  Schooling goes up on a centre.
+--   TOWN    a University is refused on a centre below City.
+--   CITY    a University goes up on a City; STAGED when the player holds none.
+-- Fewer than three centres, or no centre below City, is staged rather than skipped.
 --
 -- Run with: ProjectIo --verify scripts/verify/schooling_door.lua
 
@@ -38,35 +43,70 @@ local function rows_of(name)
     return out, s
 end
 
+local key = function(r) return r.x .. "," .. r.y end
+
 local school_rows, school = rows_of("Schooling")
 print(string.format("schooling_door: Schooling %d sites of %d own tiles", #school_rows, school.own_tiles))
-verify.expect(#school_rows > 0, "the player has a centre to school")
+verify.expect(#school_rows >= 3, "the player has three centres, one for each press")
 verify.expect(#school_rows < school.own_tiles, "Schooling is gated: not every own tile is a centre")
 verify.capture("schooling_door_finder")
 
-local key = function(r) return r.x .. "," .. r.y end
 local at_centre = {}
 for _, r in ipairs(school_rows) do at_centre[key(r)] = true end
 
 local uni_rows = rows_of("University")
 print(string.format("schooling_door: University %d sites", #uni_rows))
 verify.expect(#uni_rows <= #school_rows, "a University's ground is no wider than Schooling's")
+local at_city = {}
 for _, r in ipairs(uni_rows) do
+    at_city[key(r)] = true
     verify.expect(at_centre[key(r)], "a University site is also a Schooling site: " .. key(r))
 end
 
--- A centre too small for a University is a Schooling site that holds no University site.
-local at_city = {}
-for _, r in ipairs(uni_rows) do at_city[key(r)] = true end
--- (A tile with a site under way refuses another, so each press below takes its own tile.)
-local town = nil
-for i = 2, #school_rows do
-    if not at_city[key(school_rows[i])] then town = school_rows[i]; break end
+-- WHAT THE GROUND HOLDS (Rule 0b, the numbers, unasserted).
+local hist = { 0, 0, 0, 0, 0 }
+for _, c in ipairs(verify.population_centres()) do
+    if hist[c.scale] then hist[c.scale] = hist[c.scale] + 1 end
 end
+print(string.format("schooling_door: centres by scale 1..5: %d %d %d %d %d; the player's City+: %d of %d",
+                    hist[1], hist[2], hist[3], hist[4], hist[5], #uni_rows, #school_rows))
+
+-- Choose the three tiles. The town comes first from row 1; if every centre the player holds is
+-- a City, one is STAGED down, so the refusal is always exercised.
+local town = nil
+for _, r in ipairs(school_rows) do
+    if not at_city[key(r)] then town = r; break end
+end
+if town == nil and #school_rows > 0 then
+    town = school_rows[1]
+    verify.expect(verify.stage_centre(town.x, town.y, 3), "a City staged down to a town")
+    at_city[key(town)] = nil
+end
+verify.expect(town ~= nil, "a centre below City to refuse")
+
+local function other_centre(not_a, not_b)
+    for _, r in ipairs(school_rows) do
+        if (not not_a or key(r) ~= key(not_a)) and (not not_b or key(r) ~= key(not_b)) then return r end
+    end
+    return nil
+end
+
+local city = nil
+for _, r in ipairs(uni_rows) do
+    if key(r) ~= key(town) then city = r; break end
+end
+if city == nil then
+    city = other_centre(town, nil)
+    verify.expect(city ~= nil, "a second centre to stage as a City")
+    verify.expect(verify.stage_centre(city.x, city.y, 4), "a centre staged to City")
+    print(string.format("schooling_door: the player holds no City: (%d,%d) STAGED to scale 4", city.x, city.y))
+end
+local centre = other_centre(town, city)
+verify.expect(centre ~= nil, "a third centre for the Schooling press")
+
 verify.site_clear()
 verify.frames(2)
 
--- Find a door's row, by name, in the Infrastructure fold.
 local function door_row(name)
     local d = verify.build_door()
     for _, r in ipairs(d.rows) do
@@ -75,54 +115,12 @@ local function door_row(name)
     return nil, d
 end
 
--- The door names both rows on any own tile, and its hover names the reason on a refusal.
-local function look_at(x, y)
-    verify.select_tile(x, y)
+local function look_at(r)
+    verify.select_tile(r.x, r.y)
     verify.frames(4)
     verify.scroll_panel("build_list", 1.0)
     verify.frames(3)
 end
-
-local centre = school_rows[1]
-look_at(centre.x, centre.y)
-verify.capture("schooling_door_row")
-local sr, door = door_row("Schooling")
-verify.expect(door.n_rows > 0, "the door drew its rows")
-verify.expect(sr ~= nil, "the door lists Schooling on a centre")
-if sr then
-    verify.expect(sr.fold == "Infrastructure", "the door files Schooling under Infrastructure, not " .. sr.fold)
-    print("schooling_door: Schooling hover: " .. sr.hover)
-    verify.expect(sr.hover:find("qualification", 1, true) ~= nil, "Schooling's row says what it buys")
-end
-local ur = door_row("University")
-verify.expect(ur ~= nil, "the door lists University on a centre")
-if ur then
-    print("schooling_door: University hover: " .. ur.hover)
-    verify.expect(ur.fold == "Infrastructure", "the door files University under Infrastructure, not " .. ur.fold)
-end
-
-if town then
-    look_at(town.x, town.y)
-    local u = door_row("University")
-    verify.expect(u ~= nil, "the door lists University on a small centre, refused")
-    if u then
-        print(string.format("schooling_door: University at a small centre (%d,%d): %s", town.x, town.y, u.hover))
-        verify.expect(u.hover:find("too small", 1, true) ~= nil,
-                      "a small centre's University row says the settlement is too small")
-    end
-    verify.capture("schooling_door_town")
-else
-    print("schooling_door: every centre the player holds is a City: no small centre to refuse")
-end
-
--- WHAT THE GROUND HOLDS (Rule 0b, the numbers, unasserted): how many centres stand at each
--- rung, across the body, and how many of the player's are City or above.
-local hist = { 0, 0, 0, 0, 0 }
-for _, c in ipairs(verify.population_centres()) do
-    if hist[c.scale] then hist[c.scale] = hist[c.scale] + 1 end
-end
-print(string.format("schooling_door: centres by scale 1..5: %d %d %d %d %d; the player's City+: %d of %d",
-                    hist[1], hist[2], hist[3], hist[4], hist[5], #uni_rows, #school_rows))
 
 local function count_type(name)
     local n = 0
@@ -132,52 +130,61 @@ local function count_type(name)
     return n
 end
 
--- THE BUILD PRESS'S SEAM, on a centre: Schooling goes up.
-local before = count_type("Schooling")
-look_at(centre.x, centre.y)
+-- SCHOOL.
+look_at(centre)
+verify.capture("schooling_door_row")
+local sr, door = door_row("Schooling")
+verify.expect(door.n_rows > 0, "the door drew its rows")
+verify.expect(sr ~= nil, "the door lists Schooling on a centre")
+if sr then
+    verify.expect(sr.fold == "Infrastructure", "the door files Schooling under Infrastructure, not " .. sr.fold)
+    print("schooling_door: Schooling hover: " .. sr.hover)
+    verify.expect(sr.hover:find("nation's qualification", 1, true) ~= nil, "Schooling's row says what it buys")
+end
+local schools_before = count_type("Schooling")
 verify.ledger_build("schooling", "", "")
 verify.frames(3)
-verify.expect(count_type("Schooling") == before + 1, "the press stands a Schooling on a centre")
+verify.expect(count_type("Schooling") == schools_before + 1, "the press stands a Schooling on a centre")
 
--- A town refuses a University (the press's own gate, not only the row's words).
-local uni_before = count_type("University")
-if town then
-    look_at(town.x, town.y)
-    verify.ledger_build("university", "", "")
-    verify.frames(3)
-    verify.expect(count_type("University") == uni_before, "a town refuses a University: you can't build a university in a town")
+-- TOWN: the row names the gate and the press is refused by it.
+look_at(town)
+local u = door_row("University")
+verify.expect(u ~= nil, "the door lists University on a small centre, refused")
+if u then
+    print(string.format("schooling_door: University at a small centre (%d,%d): %s", town.x, town.y, u.hover))
+    verify.expect(u.fold == "Infrastructure", "the door files University under Infrastructure, not " .. u.fold)
+    verify.expect(u.hover:find("too small", 1, true) ~= nil,
+                  "a small centre's University row says the settlement is too small")
 end
+verify.capture("schooling_door_town")
+local unis_before = count_type("University")
+verify.ledger_build("university", "", "")
+verify.frames(3)
+verify.expect(count_type("University") == unis_before, "a town refuses a University: you can't build a university in a town")
 
--- A City takes one. STAGED when the player holds none: the gate is what is under test.
-local city = uni_rows[1]
-if city == nil then
-    local stage = nil
-    for i = 2, #school_rows do
-        local r = school_rows[i]
-        if not town or key(r) ~= key(town) then stage = r; break end
-    end
-    verify.expect(stage ~= nil, "a second small centre to stage")
-    verify.expect(verify.stage_centre(stage.x, stage.y, 4), "a centre staged to City")
-    verify.set_balance(4000000.0) -- the finder re-reads the ground when its key moves
-    verify.frames(2)
-    city = stage
-end
+-- CITY: the finder and the door agree, and the press stands it. A moved balance is what makes
+-- the finder re-read the ground it cached.
+verify.set_balance(4000000.0)
 verify.expect(verify.site_pick("University"), "the finder arms University")
 verify.frames(3)
-local staged_sites = verify.site_finder()
+local sites = verify.site_finder()
 local found = false
-for i = 1, staged_sites.n_rows do
-    local r = staged_sites.rows[i]
+for i = 1, sites.n_rows do
+    local r = sites.rows[i]
     if r.x == city.x and r.y == city.y then found = true end
 end
-print(string.format("schooling_door: University sites with a City: %d", staged_sites.n_rows))
+print(string.format("schooling_door: University sites with the City: %d", sites.n_rows))
 verify.expect(found, "the finder lists a University site at the City")
 verify.site_clear()
 verify.frames(2)
-look_at(city.x, city.y)
+look_at(city)
 local cu = door_row("University")
-verify.expect(cu ~= nil and cu.hover:find("too small", 1, true) == nil, "the door does not refuse a University at a City")
+verify.expect(cu ~= nil, "the door lists University at a City")
+if cu then
+    verify.expect(cu.hover:find("too small", 1, true) == nil, "the door does not refuse a University at a City")
+    verify.expect(cu.hover:find("research points", 1, true) ~= nil, "University's row says what it buys")
+end
 verify.capture("schooling_door_city")
 verify.ledger_build("university", "", "")
 verify.frames(3)
-verify.expect(count_type("University") == uni_before + 1, "the press stands a University at a City")
+verify.expect(count_type("University") == unis_before + 1, "the press stands a University at a City")
