@@ -239,7 +239,9 @@ balance_columns build_balance_columns(const corp_budget& b, float refunds, float
         {b.wages,       IM_COL32(160, 115, 200, 255), "Wages",       nullptr},
         {b.interest,    IM_COL32(200, 110, 160, 255), "Interest",    nullptr},
         {b.levies,      IM_COL32(210, 175, 90, 255),  "Levies",      nullptr},
-        {b.upkeep,      IM_COL32(200, 130, 110, 255), "Force",       nullptr},
+        // The garrison's pay and the space assets' upkeep, one booked figure (Ben, 2026-11-07).
+        {b.upkeep,      IM_COL32(200, 130, 110, 255), "Upkeep",
+         "Your garrison's pay and your space assets' upkeep this quarter"},
         // BL-1335: the home nation's tax on the quarter's operating profit.
         {b.taxes,       IM_COL32(185, 150, 120, 255), "Taxes",
          "Your home nation's tax tier: its share of this quarter's operating profit"},

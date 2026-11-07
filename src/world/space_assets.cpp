@@ -205,7 +205,12 @@ void run_space_asset_step(world& w, const space_asset_params& p, int econ_tick,
                           && nit->second.treasury >= a.upkeep;
         if (can_pay)
         {
+            // BL-1539's leak, the same shape as garrison pay: a standing cost paid after
+            // the return is written, booked on the next return as its `upkeep`, inside its
+            // net (Ben, 2026-11-07). The exact difference, so the nets still telescope.
+            const float before = nit->second.treasury;
             nit->second.treasury -= a.upkeep;
+            nit->second.upkeep_unbooked += static_cast<double>(before) - static_cast<double>(nit->second.treasury);
             r.upkeep_paid += a.upkeep;
             a.unpaid_quarters = 0;
             a.state = space_asset_state::active;

@@ -61,7 +61,7 @@ and so is the safety net.
 | `UI-051` Header Panel | panel | `header`, `shell_pass`, `nation_seat_ui` | 9 | 1 | 1 |
 | `UI-052` Header Panel > Treasury figure | sub-element | `header`, `debt_interest`, `nation_seat_ui` | 9 | 0 | 0 |
 | `UI-074` Construction Ledger | ledger | `construction_ledger`, `construction_panel`, `build_door_wide_roster`, `construction_ledger_tabs` | 31 | 1 | 7 |
-| `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build`, `air_gate`, `construction_progress`, `construction_folds`, `shelf_runway_warning` | 168 | 0 | 10 |
+| `UI-075` Construction Ledger > Build view | view | `tile_build_ledger`, `roads`, `build_door_wide_roster`, `fresh_start_build`, `air_gate`, `construction_progress`, `construction_folds`, `shelf_runway_warning`, `schooling_door` | 196 | 0 | 10 |
 | `UI-076` Construction Ledger > Manage view | view | `building_management`, `building_management_shell`, `recipe_workforce`, `building_profit`, `processing_management_ux`, `v009_batch`, `air_gate` | 36 | 0 | 0 |
 | `UI-080` Market Ledger | ledger | `market_ledger`, `lens_structure_pivot`, `goods_table`, `lens_ledger_pairs`, `market_names` | 44 | 1 | 8 |
 | `UI-081` Market Ledger > Goods table | view | `market_ledger`, `goods_table`, `item_glyphs`, `market_density` | 36 | 1 | 1 |
@@ -75,7 +75,7 @@ and so is the safety net.
 | `UI-122` Lens system (overlay_mode family) > Nations lens | sub-element | `nations_lens` | 4 | 0 | 1 |
 | `UI-100` Nation overview | ledger | `corp_dashboard`, `nation_seat_ui` | 26 | 1 | 0 |
 | `UI-105` Generation Ledger | ledger | `save_load`, `generation_ledger` | 6 | 1 | 5 |
-| `UI-108` Research panel | ledger | `tech_tree_panel` | 15 | 0 | 2 |
+| `UI-108` Research panel | ledger | `tech_tree_panel`, `wind_power_links` | 21 | 0 | 2 |
 | `UI-111` Spectator god view | element | `spectator_god_view` | 1 | 0 | 0 |
 | `UI-112` Market Ledger > Market top section | sub-element | `goods_table` | 33 | 1 | 1 |
 | `UI-113` Convoys Ledger | ledger | `convoys_ledger`, `ledger_pass` | 7 | 2 | 4 |

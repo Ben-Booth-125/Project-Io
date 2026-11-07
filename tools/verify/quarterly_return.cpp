@@ -63,6 +63,11 @@
 //       next return books it inside its net: the flows rebuild the net, and the
 //       nets replay onto the treasury across the debit, exactly.
 //
+//   R9  Space upkeep counts inside net too (Ben, 2026-11-07). A staged asset in place
+//       (no launch reaches one on this fixture): its quarterly debit lands in the next
+//       return's `upkeep`, the flows rebuild the net, the nets replay exactly. An asset
+//       its owner cannot pay books nothing.
+//
 //   R6  THE ITEM-SPANNING GATE. End to end over the settle — phase 6's
 //       validation run, 12 economy ticks (`app::validation_ticks`) on a
 //       really generated world: every corporation has a filed history, each
@@ -90,6 +95,7 @@
 #include "world/market_clearing.hpp"
 #include "world/nation_step.hpp" // BL-1335: run_nation_step (R7)
 #include "world/nation_tech.hpp" // BL-1539: advance_research (R8)
+#include "world/space_assets.hpp" // R9: the quarterly space-asset step
 #include "world/state_industry.hpp" // BL-1407: fold_to_ground
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
@@ -920,6 +926,98 @@ void run_research_rows(const recipe_registry& reg)
     check(sum == prev_close - first_close_of_run, "R8", "sum of the filed nets == the treasury's change, EXACTLY");
 }
 
+// ---------------------------------------------------------------------------
+// R9 — space upkeep counts inside net (Ben, 2026-11-07)
+// ---------------------------------------------------------------------------
+// STAGED: an asset already in place, because a launch needs a launch site this fixture
+// does not hold. The debit is the real one (run_space_asset_step, after the return).
+void run_space_rows(const recipe_registry& reg)
+{
+    std::printf("\nR9 — space upkeep is debited after the return and booked inside the next one\n");
+    constexpr float k_upkeep = 500.25f;
+    fixture f = build_fixture(reg);
+    const entity_id n = f.corp_a;
+    f.w.nations.at(n).treasury = 50000.0f;
+    {
+        space_asset a;
+        a.id    = f.w.create_entity();
+        a.owner = n;
+        a.state = space_asset_state::active;
+        a.launch_tick = -1;
+        a.upkeep = k_upkeep;
+        f.w.space_assets.emplace(a.id, a);
+    }
+    const space_asset_params p{};
+
+    const auto file_return = [&](int t) {
+        f.w.current_econ_tick = k_campaign_settle_ticks + t;
+        economy_report report = run_economy_step(f.w, reg);
+        run_trades(f.w, reg, report);
+        auto flows = clear_markets(f.w, reg, report);
+        apply_budget(f.w, reg, flows, report.workforce_contention);
+    };
+
+    bool replay = true, rebuild = true, booked_each = true, drained = true, debit_exact = true;
+    double sum = 0.0, booked = 0.0, spent = 0.0, owed = 0.0;
+    const double first_close = f.w.nations.at(n).treasury;
+    double prev_close = first_close;
+    int rows = 0;
+    for (int t = 0; t < 8; ++t)
+    {
+        file_return(t);
+        const nation_component& nc = f.w.nations.at(n);
+        const quarterly_return& q  = nc.returns.back();
+        ++rows;
+        replay = replay && static_cast<float>(prev_close + q.net) == nc.treasury;
+        const double flows_net = static_cast<double>(q.income) - q.expenditure - q.maintenance - q.wages
+                               - q.interest - q.levies - q.upkeep - q.research + q.taxes + q.refunds;
+        rebuild = rebuild && std::fabs(flows_net - q.net) <= 1e-2 * std::max(1.0, std::fabs(q.net));
+        booked_each = booked_each && std::fabs(static_cast<double>(q.upkeep) - owed) <= 1e-2;
+        drained = drained && nc.upkeep_unbooked == 0.0;
+        sum    += q.net;
+        booked += q.upkeep;
+        prev_close = nc.treasury;
+
+        space_asset_step_report step;
+        const float before = nc.treasury;
+        run_space_asset_step(f.w, p, f.w.current_econ_tick, &step);
+        owed = f.w.nations.at(n).upkeep_unbooked;
+        debit_exact = debit_exact
+            && owed == static_cast<double>(before) - static_cast<double>(f.w.nations.at(n).treasury)
+            && step.paid == 1 && std::fabs(owed - k_upkeep) <= 1e-2;
+        spent += owed;
+    }
+    // The last step's debit has no return yet: file it, so every debit is booked.
+    {
+        file_return(8);
+        const nation_component& nc = f.w.nations.at(n);
+        const quarterly_return& q  = nc.returns.back();
+        replay = replay && static_cast<float>(prev_close + q.net) == nc.treasury;
+        booked_each = booked_each && std::fabs(static_cast<double>(q.upkeep) - owed) <= 1e-2;
+        drained = drained && nc.upkeep_unbooked == 0.0;
+        sum    += q.net;
+        booked += q.upkeep;
+        prev_close = nc.treasury;
+    }
+    char buf[200];
+    std::snprintf(buf, sizeof buf, "the asset was really paid and booked (%.2f credits over %d rows)", booked, rows + 1);
+    check(spent > 0.0 && std::fabs(booked - spent) <= 1e-1, "R9", buf);
+    check(debit_exact, "R9", "each debit leaves its exact treasury difference unbooked");
+    check(booked_each, "R9", "each return books what the asset cost since the last one");
+    check(drained, "R9", "a filed return leaves nothing unbooked");
+    check(rebuild, "R9", "every filed return's flows, space upkeep a debit, rebuild its net");
+    check(replay, "R9", "each net replays the last closing treasury onto this one, across the debit, bit for bit");
+    check(sum == prev_close - first_close, "R9", "sum of the filed nets == the treasury's change, EXACTLY");
+
+    // An unpaid quarter moves no money, so it books none.
+    f.w.nations.at(n).treasury = k_upkeep * 0.5f;
+    f.w.nations.at(n).upkeep_unbooked = 0.0;
+    space_asset_step_report broke;
+    run_space_asset_step(f.w, p, f.w.current_econ_tick + 1, &broke);
+    check(broke.unpaid == 1 && f.w.nations.at(n).upkeep_unbooked == 0.0, "R9",
+          "an asset its owner cannot pay books nothing");
+}
+
 int main()
 {
     recipe_registry reg;
@@ -947,6 +1045,7 @@ int main()
     run_settle_rows(reg);
     run_tax_rows(reg);
     run_research_rows(reg);
+    run_space_rows(reg);
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES ABOVE",
                 g_failures, g_failures == 1 ? "" : "s");

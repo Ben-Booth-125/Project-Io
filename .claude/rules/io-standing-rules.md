@@ -67,6 +67,16 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   (exists, past, forecast), its share and a drawn count - what the lens draws - never a position.
   Reason: the Logistics lens's off-road dash (BL-1456) can only be checked on a unit known to stand
   off the road, and generation's garrisons now open within the draw. Verify-only, behind `--verify`.
+  **Ninth (Ben, 2026-11-07):** one grant for sprint 63's verify set: reads report what the surface draws
+  and nothing else. `verify.site_finder` may add `picker_rows` and each row's `starved`, `runway_warn`,
+  `runway_text` and `drawn.net_text`; `verify.site_options` its `group`; `verify.tile_card` the recipe card
+  (`recipe_drawn`, `recipe_reported`, `recipe_heading`, `card_scroll_max`, `recipe_hover_cards`,
+  `recipe_hover_who`, `recipe_hover_text`, `recipe_rows`); `verify.road_state` its `fold`, `h`, `fold_x`,
+  `fold_y`; `verify.build_door` its `fold`; and the canvas and shell reads of unit glides, unit counters,
+  convoy markers and alerts. The STAGING calls `verify.set_input_shelf` and `verify.stage_building_report`
+  may write what they name for a fixture. A recipe row touches the no-tile-data rule, and it stands here
+  because the card draws it for a tile the player already pressed. Reason: a check cannot aim at a convoy,
+  a glide, an alert, a recipe row or a shelf reading it cannot find. Verify-only, behind `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of
