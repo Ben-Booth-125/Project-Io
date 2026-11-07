@@ -966,6 +966,16 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
     if (out_building)
         *out_building = null_entity;
 
+    // BL-1540: the census's gate, with nothing pressing: did anything order a player's unit? Else null.
+    if (rival_march_tally* const census = rival_march_tally_sink(); census != nullptr)
+    {
+        const entity_id seat = player_nation(w);
+        const auto subject = w.units.find(cmd.subject);
+        if (seat != null_entity && ((subject != w.units.end() && subject->second.owner == seat)
+                                    || (cmd.verb == corp_verb::set_front_order && cmd.corp == seat)))
+            ++census->player_verbs;
+    }
+
     // BL-1407 (Ben, 2026-10-23: no corporation; the player IS its nation): EVERY
     // ACTOR IS A NATION, acting for itself (`corp == as_nation`, or `as_nation`
     // unnamed). A nation never acts for another (the champion's seat retired with

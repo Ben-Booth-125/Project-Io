@@ -25,9 +25,11 @@
 //   reentered      tile-occupier pairs that reappeared at a quarter's end after a quarter's end
 //                  without, within one open war: a winner walking off its prize and back, or
 //                  ground lost and retaken. Read at quarter ends, so a flip inside one is unseen.
-//   player_fronts  the player's own units on a front now: nothing here presses one, so must be 0
-//   player_orders  across the run, every quarter's change in a player unit's position or march
-//                  order, and every halt among them: nothing here presses one, so must be 0
+//   player_verbs   `apply_corp_command` asked to order a player's unit or front, across the run:
+//                  nothing here presses one, so the scorer did it. THE GATE: must be 0
+//   player_fronts, player_moves   information, not a gate: the player's units on a front now,
+//                  and every quarter's change in one's position or march order (a retreat, a
+//                  step-off and a walk home at peace all move a unit nobody ordered)
 //   fronts_moved   (nation, quarter) pairs whose fronts differ from the quarter before
 //   t_*            `rival_march_tally`: how often each path of the score fired. fed_push,
 //                  prize_push, priced_push, no_target_push, refused_supply, refused_supply_goal,
@@ -35,9 +37,13 @@
 //                  odds_hungry, odds_hungry_no_war, liberation (per unit); assign_refused (per
 //                  unit and front refused)
 //
-// The exit code gates only player_fronts and player_orders: the player's nation is never acted on.
+// The exit code gates only player_verbs: the player's nation is never acted on. player_units is
+// how many units the seat holds at the handoff: with none, the gate has nothing to see. --red-case
+// proves it can fire: it seats the census on the lowest-id rival nation holding units, steps the
+// world as spectate does, lifting the scorer's player guard (§ 10i), and FAILS if player_verbs
+// stays 0 across the seeds.
 //
-//   build_gen/verify/rival_march_census.exe [--seeds a,b,c] [--ticks T]   (default T 8)
+//   build_gen/verify/rival_march_census.exe [--seeds a,b,c] [--ticks T] [--red-case]   (default T 8)
 //
 // Build: bash tools/verify/build_lua_harness.sh rival_march_census. Run from the repo root.
 
@@ -70,6 +76,7 @@ int main(int argc, char** argv)
 {
     std::vector<std::uint32_t> seeds;
     int ticks = 8;
+    bool red_case = false;
     for (int i = 1; i < argc; ++i)
     {
         if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc)
@@ -83,11 +90,14 @@ int main(int argc, char** argv)
         }
         else if (std::strcmp(argv[i], "--ticks") == 0 && i + 1 < argc)
             ticks = std::atoi(argv[++i]);
+        else if (std::strcmp(argv[i], "--red-case") == 0)
+            red_case = true;
     }
     if (seeds.empty())
         seeds = { 0u, 28u, 46u, 12u };
 
     int failed = 0;
+    long long red_verbs = 0;
     lua_state lua;
     for (const std::uint32_t seed : seeds)
     {
@@ -102,7 +112,20 @@ int main(int argc, char** argv)
             (void)run_settle_tick(w, reg, step, /*day_tick=*/0, /*spectating=*/true);
         clear_research_at_handover(w);
         seat_player_corporation(w, seed, start->land.search.winner_score);
+        if (red_case)
+        {
+            entity_id armed = null_entity;
+            for (const auto& [uid, u] : w.units)
+                if (u.count > 0 && u.owner != w.player_entity && w.nations.count(u.owner) != 0
+                    && (armed == null_entity || u.owner < armed))
+                    armed = u.owner;
+            if (armed != null_entity)
+                w.player_entity = armed;
+        }
         const entity_id player = player_nation(w);
+        int player_units = 0;
+        for (const auto& [uid, u] : w.units)
+            player_units += u.count > 0 && u.owner == player ? 1 : 0;
 
         std::map<entity_id, int> opening; // unit -> men at the handoff, ascending
         long long opening_men = 0;
@@ -120,7 +143,7 @@ int main(int argc, char** argv)
         long long men_battle = 0;
         std::size_t occupied_max = 0;
         int foreign_max = 0, push_max = 0, player_fronts = 0;
-        long long player_orders = 0, reentered = 0;
+        long long player_moves = 0, reentered = 0;
         std::map<entity_id, std::pair<entity_id, entity_id>> player_last; // unit -> position, march dest
         for (const auto& [uid, u] : w.units)
             if (u.owner == player)
@@ -159,13 +182,13 @@ int main(int argc, char** argv)
             std::printf("ROW seed=%u tick=%d opening=%zu opening_men=%lld starved_t8=%d ever_starved=%zu hungry_t8=%d dead=%d "
                         "men_lost=%lld why_hold=%d why_hold_odds=%d why_push=%d why_none=%d why_past=%d why_cover=%d why_pool=%d "
                         "declared=%zu closed=%zu cessions=%zu battles=%zu men_battle=%lld occupied_new=%zu "
-                        "occupied_max=%zu reentered=%lld foreign_max=%d push_max=%d assigned_t8=%d player_fronts=%d player_orders=%lld fronts_moved=%lld "
+                        "occupied_max=%zu reentered=%lld foreign_max=%d push_max=%d assigned_t8=%d player_units=%d player_verbs=%lld player_fronts=%d player_moves=%lld fronts_moved=%lld "
                         "t_fed_push=%lld t_prize_push=%lld t_priced_push=%lld t_no_target_push=%lld t_refused_supply=%lld t_refused_supply_goal=%lld "
                         "t_refused_battle=%lld t_fall_back=%lld t_fall_back_home=%lld t_reweigh=%lld t_assign_refused=%lld t_odds_hungry=%lld t_odds_hungry_no_war=%lld t_liberation=%lld\n",
                         seed, k, opening.size(), opening_men, starved_now, ever.size(), hungry_now, dead, men_lost, why_hold,
                         why_hold_odds, why_push, why_none, why_past, why_cover, why_pool, w.wars.size() + w.war_history.size(),
                         w.war_history.size(), w.province_cessions.size(), battles.size(), men_battle, occupations.size(),
-                        occupied_max, reentered, foreign_max, push_max, assigned, player_fronts, player_orders, fronts_moved,
+                        occupied_max, reentered, foreign_max, push_max, assigned, player_units, tally.player_verbs, player_fronts, player_moves, fronts_moved,
                         tally.fed_push, tally.prize_push, tally.priced_push, tally.no_target_push, tally.refused_supply,
                         tally.refused_supply_goal, tally.refused_battle, tally.fall_back, tally.fall_back_home, tally.reweigh,
                         tally.assign_refused, tally.odds_hungry, tally.odds_hungry_no_war, tally.liberation);
@@ -179,7 +202,7 @@ int main(int argc, char** argv)
             advance_surveys(w, 90);
             w.current_day_tick = day;
             const settle_tick_result res =
-                run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), day, /*spectating=*/false);
+                run_settle_tick(w, reg, k_campaign_settle_ticks + (k - 1), day, /*spectating=*/red_case);
 
             for (const battle_dispatch& d : res.report.battle_dispatches)
             {
@@ -254,7 +277,7 @@ int main(int argc, char** argv)
                     player_fronts += u.front != null_entity ? 1 : 0;
                     const auto last = player_last.find(uid);
                     if (last != player_last.end() && (last->second.first != u.position || last->second.second != u.order.dest))
-                        ++player_orders;
+                        ++player_moves;
                     player_last[uid] = { u.position, u.order.dest };
                     continue;
                 }
@@ -279,10 +302,19 @@ int main(int argc, char** argv)
                 print_row(k);
         }
         rival_march_tally_sink() = nullptr;
-        if (player_fronts != 0 || player_orders != 0)
+        red_verbs += tally.player_verbs;
+        if (!red_case && tally.player_verbs != 0)
         {
-            std::printf("  FAIL  seed %u: the player's units moved with nothing pressed: %d on a front, %lld orders or moves\n",
-                        seed, player_fronts, player_orders);
+            std::printf("  FAIL  seed %u: %lld verbs ordered the player's units with nothing pressed\n", seed, tally.player_verbs);
+            ++failed;
+        }
+    }
+    if (red_case)
+    {
+        std::printf("red case: %lld verbs on the player's units with the guard lifted\n", red_verbs);
+        if (red_verbs == 0)
+        {
+            std::printf("  FAIL  the gate cannot see the scorer acting on the player\n");
             ++failed;
         }
     }

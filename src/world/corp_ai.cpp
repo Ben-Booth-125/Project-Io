@@ -1387,22 +1387,24 @@ ranked_site_map rank_extraction_sites(const world& w, const recipe_registry& reg
 //   ASSIGN. The hunger is what the assignment does to the front's whole slot set, since one
 //   more unit respaces the others. It counts as that share of one more unit in the
 //   fewest-per-span-tile preference. A front with no reason refuses a unit whose OWN slot is
-//   priced; a unit that cannot stand fed (below) takes a slot no costlier than where it stands.
-//   RE-WEIGH. A unit on a front with no reason, its slot priced, that can stand fed comes off it
-//   (`assign_front` with a null tile), and is idle like any other.
+//   priced or that raises the sum; a unit that cannot stand fed (below) takes one no costlier
+//   than where it stands.
+//   RE-WEIGH. A unit on a front with no reason comes off it (`assign_front` with a null tile) and
+//   is idle like any other, under the joiner's test at its own slot.
 //   FALL BACK. An idle unit on priced ground that no front takes marches to its nation's nearest
 //   fed ground, if any. The next order only. This is a rule on the price, not a score. It holds
-//   for a nation with no front at all, and it is never an attack: a tile with a hostile stack on
-//   it is not fed ground. A unit CAN STAND FED where its own tile is, or that order exists.
+//   for a nation with no front at all, and it never shares a tile: another nation's stack on it
+//   and it is not fed ground. A unit CAN STAND FED where its own tile is, or that order exists.
 //   ORDER. A push is scored unit by unit, at the tile `advance_fronts` would march THAT unit
 //   onto: strength x (worth - price). Ground is worth half a unit's men. A goal the neighbour
 //   still holds, stack or no stack, is worth all of them on it and on the way to it, within
-//   `k_goal_way_steps`: a cover-0 price then scores nothing against it, so a war marches. The
+//   `k_goal_way_steps` straight hex steps (water and walls are not read): a cover-0 price then
+//   scores nothing against it, so a war marches. The
 //   price has no credit for where the unit stands unless it cannot stand fed. A unit the push
 //   would leave on the neighbour's ground, with no war to take it, is priced where it stands, for
 //   no ground. The front pushes when the sum is not negative and the 3:2 passes. The 3:2 reads
-//   each unit's strength less what it would lose by the time it fights: its stock, on the share
-//   it holds, over the straight march's days.
+//   each unit's strength less what it would lose by the time it fights: its stock, on the cover
+//   at the target, over the straight march's days.
 // ---------------------------------------------------------------------------
 
 /// How much stronger a front's assigned force must be than the weakest adjacent
@@ -1519,10 +1521,11 @@ int64_t ground_worth_permille(const world& w, const std::vector<entity_id>& goal
 }
 
 /// BL-1540: the nearest tile of @p nation's own ground a march would accept, on the unit's body,
-/// that feeds it (price 0) and holds no hostile stack. Hex steps, the capital province last, ties to the lower id; no plan
-/// past this order. Null when the nearest few fed tiles all refuse, or there are none.
+/// that feeds it (price 0) and holds no other nation's stack. Hex steps, the capital province
+/// last, ties to the lower id; no plan past this order. Null when the nearest few fed tiles of
+/// each tier all refuse, or there are none.
 entity_id nearest_fed_ground(world& w, const recipe_registry& reg, unit_draw_memo& memo, entity_id nation, entity_id uid,
-                             const std::set<entity_id>& hostile_stacks)
+                             const std::set<entity_id>& foreign_stacks)
 {
     const auto nit = w.nations.find(nation);
     const unit_component& u = w.units.at(uid);
@@ -1539,7 +1542,7 @@ entity_id nearest_fed_ground(world& w, const recipe_registry& reg, unit_draw_mem
         const auto tit = w.tiles.find(t);
         if (t != u.position && tit != w.tiles.end() && tit->second.body == here->second.body
             && !is_water(tit->second.substrate) && !(wall && wall(tit->second)) && w.tile_controller(t) == nation
-            && hostile_stacks.count(t) == 0)
+            && foreign_stacks.count(t) == 0)
         {
             // The capital province last: a unit arriving there is posted home for good
             // (`score_nation_defence`), which is better than death but no way to fall back.
@@ -1548,16 +1551,16 @@ entity_id nearest_fed_ground(world& w, const recipe_registry& reg, unit_draw_mem
         }
     }
     std::sort(order.begin(), order.end());
-    int asked = 0;
+    constexpr int k_asks_per_tier = 8; // the capital's own: refusals elsewhere must not spend them
+    int asked[2] = { 0, 0 };
     for (const auto& [d, t] : order)
     {
-        (void)d;
-        if (march_price_permille(w, reg, memo, nation, t, u.food_permille) != 0)
+        int& spent = asked[d >= k_home_last ? 1 : 0];
+        if (spent == k_asks_per_tier || march_price_permille(w, reg, memo, nation, t, u.food_permille) != 0)
             continue;
         if (march_check(w, nation, uid, t, null_entity, nullptr, &reg.military()) == corp_command_result::applied)
             return t;
-        if (++asked == 8)
-            break;
+        ++spent;
     }
     return null_entity;
 }
@@ -1601,15 +1604,15 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
     rival_march_tally* const tally = rival_march_tally_sink(); // the census's, else null: nothing reads it
 
     // BL-1540: where each unit could fall back to, asked once and only of a unit a price touches.
-    std::set<entity_id> hostile_stacks;
+    std::set<entity_id> foreign_stacks;
     for (const auto& [uid, u] : w.units)
-        if (u.count > 0 && u.owner != nation && (is_hostile(w, nation, u.owner) || is_hostile(w, u.owner, nation)))
-            hostile_stacks.insert(u.position);
+        if (u.count > 0 && u.owner != nation)
+            foreign_stacks.insert(u.position);
     std::map<entity_id, entity_id> fed_ground_memo;
     const auto fed_ground_of = [&](entity_id uid) {
         const auto [it, fresh] = fed_ground_memo.try_emplace(uid, null_entity);
         if (fresh)
-            it->second = nearest_fed_ground(w, reg, supply_memo, nation, uid, hostile_stacks);
+            it->second = nearest_fed_ground(w, reg, supply_memo, nation, uid, foreign_stacks);
         return it->second;
     };
     const auto can_stand_fed = [&](entity_id uid) {
@@ -1658,9 +1661,14 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
             const unit_component& u = w.units.at(uid);
             if (u.count <= 0 || unit_refitting(u) || unit_in_battle(w, uid))
                 continue;
+            // The joiner's test: no slot of its own prices where it stands; one that cannot stand
+            // fed pays only what the slot adds over that.
             const entity_id slot = front_hold_slot(w, reg, u, fronts[i], m, members.size());
-            if (slot == null_entity || march_price_permille(w, reg, supply_memo, nation, slot, u.food_permille) == 0
-                || !can_stand_fed(uid))
+            const int64_t own = march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : u.position,
+                                                     u.food_permille);
+            if (own == 0
+                || (!can_stand_fed(uid)
+                    && own <= march_price_permille(w, reg, supply_memo, nation, u.position, u.food_permille)))
                 continue;
             const int64_t s = unit_strength(w, u);
             corp_command off;
@@ -1828,14 +1836,16 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
                         continue;
                     }
                     any_target = true;
-                    // What those men have lost by the time they fight: the stock, on the share
-                    // it holds, over the straight march. `unit_strength` already reads any
-                    // hunger it has now; the flat step counts only if the march brings it on.
+                    // What those men have lost by the time they fight: the stock, on the cover at
+                    // the target (the price's own read; the pool is not read), over the straight
+                    // march. `unit_strength` already reads any hunger it has now; the flat step
+                    // counts only if the march brings it on.
+                    const int cover = unit_tile_cover_permille(w, supply_memo, nation, t);
                     const int days = static_cast<int>(std::ceil(
                         static_cast<float>(tile_hex_steps(w, u.position, t)) * march_days_per_tile(reg.military(), u.type)));
-                    const int loss = carried_hunger_loss_permille(sp, u.food_permille, u.lp_share_permille, days);
+                    const int loss = carried_hunger_loss_permille(sp, u.food_permille, cover, days);
                     int64_t arrives = s * (1000 - loss) / 1000;
-                    if (!unit_hungry(u) && carried_food_after_days(sp, u.food_permille, u.lp_share_permille, days) < 1000)
+                    if (!unit_hungry(u) && carried_food_after_days(sp, u.food_permille, cover, days) < 1000)
                         arrives = arrives * (1000 - k_hunger_penalty_permille) / 1000;
                     force += arrives;
                     const int64_t extra = extra_at(assigned[i][m], t);

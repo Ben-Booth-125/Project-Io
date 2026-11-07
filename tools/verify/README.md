@@ -1161,7 +1161,8 @@ rivals' opening armies starved, by cause and by what they stood on; the wars, ba
 tiles, re-entered tiles and fronts moved; and `rival_march_tally`, how often each path of the score fired (fed push, prize push, priced push,
 refused on supply, refused at the battle, fall back and how many went home, re-weigh, assign refused, a hungry march to a front at
 odds, a priced push onto its own occupied ground). A measurement: the exit code gates only that the player's
-nation is never acted on: no front, march, halt or move on its units. Keep it: it is the one read of the starvation and the wars side by side, and the
+nation is never acted on, counted at the verb door; raw moves on its units are information, since a retreat moves a
+unit nobody ordered. `--red-case` lifts the scorer's guard, as spectate does, and fails if that gate stays 0. Keep it: it is the one read of the starvation and the wars side by side, and the
 scorer's rows (`fronts_harness` F13, `carried_supplies_harness` S15) prove the arithmetic, not the campaign.
 
     bash tools/verify/par_seeds.sh rival_march_census --tier full --build -- --ticks 20

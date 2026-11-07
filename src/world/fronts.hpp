@@ -169,6 +169,7 @@ struct rival_march_tally
     long long odds_hungry = 0;    ///< A unit the verb accepted onto a front at odds, its hunger above zero.
     long long odds_hungry_no_war = 0; ///< Of them, on a bare hostility: no war between the pair.
     long long liberation = 0;     ///< A priced push target on its own occupied ground, weighed as plain ground.
+    long long player_verbs = 0;   ///< `apply_corp_command` asked to order a seated player's unit or front.
 };
 rival_march_tally*& rival_march_tally_sink();
 
