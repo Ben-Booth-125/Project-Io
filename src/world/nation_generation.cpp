@@ -2571,6 +2571,28 @@ bool unit_tile_fully_fed(world& w, unit_draw_memo& memo, entity_id nation, entit
     return fed;
 }
 
+int unit_tile_cover_permille(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile)
+{
+    const auto hit = memo.cover.find({nation, tile});
+    if (hit != memo.cover.end())
+        return hit->second;
+    int cover = 0;
+    if (const auto tit = w.tiles.find(tile); tit != w.tiles.end())
+    {
+        const entity_id body = tit->second.body;
+        const std::unordered_set<entity_id>& reached = reached_by(w, memo, nation, body);
+        const entity_id paid = unit_supply_draw_tile(
+            w, [&](entity_id t) { return reached.count(t) != 0; }, tile, lp_offroad_draw_steps);
+        if (paid != null_entity)
+        {
+            const float c = std::clamp(lp_route_to(w, memo.lp, nation, body, paid).cover, 0.0f, 1.0f);
+            cover = c >= 1.0f - 1e-5f ? 1000 : std::min(1000, static_cast<int>(std::floor((c + 1e-5f) * 1000.0f)));
+        }
+    }
+    memo.cover.emplace(std::make_pair(nation, tile), cover);
+    return cover;
+}
+
 garrison_repost_report repost_garrisons_on_cover(world& w, const military_capability_params* mil)
 {
     garrison_repost_report rep;

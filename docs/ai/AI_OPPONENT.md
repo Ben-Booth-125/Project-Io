@@ -2456,3 +2456,40 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   ordering another nation's units, the player's included; choosing a province, war or target for the
   player's nation; a defence planned beyond the next move. Pure, seeded, deterministic, replayable,
   legal verbs only, never a planner.
+  **A rival's march may weigh supply — granted (Ben, 2026-11-07; BL-1540, rival march supply;
+  `../military/MILITARY.md` § Fronts, "A rival's fronts").** Raised on the measurement: rival marches
+  starved 9-16% of their opening armies in 8 quarters. His answer: *"Grant it, scorer weighs supply."* A
+  new reading, on the standing terms. A rival nation's scorer, weighing a march of its OWN units, may
+  read its OWN network's **cover** at the destination (never the route, and not the pool), what that
+  cover does to the unit's stock and men, and the days of the straight march. The price is how fast the
+  ground would kill it, so every cover below break-even costs something; the brake is the hunger itself,
+  with no handicap and no fixed cap on marches. A push is scored unit by unit at the tile that unit
+  would march onto: strength x (what the ground is worth - its price). Plain ground is worth half a
+  unit's men. A war goal, and the ground within 8 steps of it, is worth all of them, so a cover-0 price
+  scores nothing against it and the war marches. The 8 steps are straight hex distance, ignoring water and
+  walls, a cheap radial read and not a route. Past them the ground is plain. On that
+  read it may also take its own unit off its own front (`assign_front` with a null tile) and march an idle
+  unit from priced ground to its own nearest fed ground, the next order only; both are verbs it already
+  holds. Asked about that fall back the same day, his answer: *"Yes, allow fall back."* **Fall back is a
+  rule on the price, not a score:** a unit on priced ground that no front takes goes, nothing weighed
+  against it. It holds for a nation with no front at all, and it never shares a tile: a tile with another
+  nation's stack on it is not fed ground. It takes the capital province last, with its own asks, because a unit arriving there is
+  posted home (the "Defend province moves units" grant) and is not taken for a later front. A rival still marches to war: a front at odds with it, hostile either
+  way, stays a reason to go hungry. **So does a prize it holds:** a front keeps its reason while either
+  side occupies ground of the other on that body, and hunger on a held prize is the prize's cost, until
+  peace. A goal a third party holds, or that a merge removed, is not taken. **Two vetoes remain, and they
+  are named here.** A front with no reason (at peace, or this nation holding every goal of its war with
+  that neighbour and nothing occupied either way) refuses a unit on its own slot or on the sum: its slot is
+  priced, or it respaces the others onto priced ground, and there is nothing to set against the hunger. The
+  same test takes a unit already on that front off it, at its slot or, with no slot, where it stands. The
+  3:2 stays a test, read on the men who arrive, at the cover of the tile they would take; the pool is not
+  read here either. A unit that
+  cannot stand fed, its own tile priced and no fed ground a march would take within reach, gets no veto
+  from this grant and no free pass: it pays only what an order adds over where it stands. A unit a push
+  would leave on the neighbour's ground, with no war to take it, is priced where it stands. **Under
+  spectate** the seat's nation is scored like any rival, by § 10i's general lift, and this grant then acts
+  on it as on any rival; never
+  on a seated player's nation. **Not admitted:** any march, front or unit of a seated player's nation; a
+  new verb; bending a front's slots to supply (§ Nation garrisons' ruling stands, and a rival meets it
+  as a commander, by where it sends units); reading another nation's cover; a march planned beyond the
+  next order. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
