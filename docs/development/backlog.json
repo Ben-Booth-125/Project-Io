@@ -1072,10 +1072,13 @@
    "short_name": "RIVAL_MARCH_SUPPLY",
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "files": [
-    "src/world/corp_ai.cpp"
+    "src/world/corp_ai.cpp",
+    "src/world/fronts.cpp",
+    "src/world/carried_supplies.cpp",
+    "tools/verify/rival_march_census.cpp"
    ],
    "title": "Rival marches weigh supply",
-   "design": "Ben, 2026-11-07: a rival march's score reads supply at the destination and along the route. Rival marches starved 9-16% of opening armies in 8 quarters. New dated grant in AI_OPPONENT section 11."
+   "design": "Ben, 2026-11-07: a rival march's score reads its own network's cover at the destination, never the route or the pool; fall back allowed (\"Yes, allow fall back\"), narrowed so a front keeps its reason while either side holds ground of the other until peace. Grant in AI_OPPONENT section 11. Measured, 16 seeds: starved 22.4% -> 6.0% of opening units at 20 quarters. Merged after three cold reviews; open calls in NR-1150."
   },
   {
    "status": "in_progress",

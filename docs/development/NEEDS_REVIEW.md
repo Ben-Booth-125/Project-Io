@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*29 entries — 28 open, 1 resolved.*
+*30 entries — 29 open, 1 resolved.*
 
 ---
 
@@ -311,6 +311,13 @@ You allowed fall back on 2026-11-07. Taken inside the grant: plain ground is wor
 Foundings and every settle tick use the authored bills; play uses the raised curve, through a registry swap. That holds every kit identical, and it means 31 sites on 23 majors still building at handoff draw the live bill for their remaining days.
 
 **Why it matters.** Two price tables for one building are a new seam, and first-quarter bills are not perfectly equal between majors.
+
+### NR-1150 — Rival march supply: three calls after merge
+*question · raised 2026-11-07 · from BL-1540 (rival march supply)*
+
+CLOCK: rivals score fronts once a year, while a unit with no supply dies near day 210. Scoring fronts every quarter (and nothing else) takes men lost from 6.7% to 4.4% at 20 quarters, but the march-off-and-return loop count goes from 9 to 31. Not shipped. HOME LEAK: 5 of 21 fall backs at 20 quarters land in the capital province and are then posted home for good; telling them from the deliberate home garrison needs a new saved field. RANGE: ground within 8 straight hex steps of a goal is worth the goal; past it a hungry march holds, 7 refusals in 20 quarters across 16 seeds, all with a goal left.
+
+**Why it matters.** Each sets how often rivals lose men to hunger against how steadily they hold a war.
 
 ---
 

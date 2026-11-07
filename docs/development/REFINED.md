@@ -20,7 +20,7 @@ session merges them one at a time and takes one shared re-bless.
 ### Rulings of 2026-11-07, in lanes
 
 - [ ] Opening lane stage 2: flat chest ladder, then the cost curve. Kits unchanged.
-- [ ] Rival marches weigh supply (new AI grant).
+- [x] Rival marches weigh supply (new AI grant). Merged after three cold reviews.
 - [x] Wind Power a major; space upkeep in net; Schooling and University in the Build door. Merged after cold review.
 - [ ] Live click: wind's links at zoom; press the Schooling and University rows; Balance card "Upkeep" at a nonzero figure.
 
