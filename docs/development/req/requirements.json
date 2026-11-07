@@ -8026,8 +8026,8 @@
      "id": "R1",
      "text": "Recruit's Sea tab holds the port picker, the four ship rows each with a Raise press whose dimmed form says why, and the player's ships. A press raises through hire_ship.",
      "kind": "visual",
-     "status": "complete",
-     "evidence": "scripts/verify/sea_ui.lua section 1-2: a real Raise row 0 -> Ship mustering, Your ships lists it. Capture sea_recruit."
+     "status": "failed",
+     "evidence": "scripts/verify/sea_ui.lua section 1-2: a real Raise row 0 -> Ship mustering, Your ships lists it. Capture sea_recruit. LIVE 2026-11-07, Quick Start, Khebokhon Deiszei: every Raise press is refused \"Can't afford or supply it.\" with Cr 19.5k in hand, on day 2 and again a year on - the nation holds no steel or machinery, which every ship's hire goods need. The row does not dim for the goods leg, so four enabled presses all refuse. The script passed because its world held the goods."
     },
     {
      "id": "R2",
@@ -8090,7 +8090,7 @@
      "text": "Live click in the built app: Sea tab, Raise, card, right-click, board, land, a contested landing, the off-road dash on a landed unit by a hostile port, and shift-clicking a Naval node in the research panel. Also the per-frame cost of the preview line.",
      "kind": "visual",
      "status": "pending",
-     "evidence": "NOT DONE. Computer-use access was declined on 2026-11-07. Scripted clicks passed; a scripted capture does not prove a press is reachable. Owed with BL-1531 (troop landings) R8."
+     "evidence": "PARTLY DONE 2026-11-07 in the built app. PASSED: the Sea tab opens with two ports and four rows; the ring's rim labels print clear; a Naval node's hover reads. NOT REACHABLE: card, zone right-click, board, land, contested landing and the landed unit's dash, since no ship could be raised (R1). INCONCLUSIVE: shift-click queued no node at all, Naval or otherwise, which points at the input tool's shift rather than the panel; Ben to try by hand. Preview per-frame cost not measured."
     }
    ],
    "resolved": "2026-11-07"
