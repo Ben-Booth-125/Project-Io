@@ -48,6 +48,12 @@ struct opening_kit_major
     int       refused_no_site = 0, refused_not_wanted = 0, refused_no_feed = 0, refused_not_sized = 0;
     std::vector<opening_kit_slot_record> slots; ///< in slot order (flex slots after the fixed extraction)
 
+    // A MARKETPLACE ON THE MILL'S MARKET (Ben, 2026-11-07, BL-1545), per steel slot.
+    int mill_marketplace_placed  = 0; ///< a Marketplace laid on the slot's market
+    int mill_marketplace_held    = 0; ///< the market already held one of the kit's
+    int mill_marketplace_no_slot = 0; ///< the steel slot stood no building
+    int mill_marketplace_no_site = 0; ///< no free own tile in that market admitted one
+
     // THE LOGISTICS CAP (`cap_major_logistics`), after the Logistic Point seeding.
     int nodes_source  = 0; ///< nodes on the capital tile, kept as the capital's source
     int nodes_kept    = 0; ///< hubs, stations and ports kept in slot
