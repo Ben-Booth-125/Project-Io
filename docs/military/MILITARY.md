@@ -580,20 +580,26 @@ A march's price is how fast the ground would kill the unit: the cover where it w
 break-even costs nothing, and every cover below it costs something. The pool is not read, and the route is
 not read. Slots stay where they are; the rival chooses where to send units.
 
-A front has a **reason** when it is at odds with the nation, hostile either way, unless every goal of the
-nation's war with that neighbour is taken. A front's price is what one more unit does to its whole slot
-set, counted in the fewest-per-span-tile preference as that share of one more unit. A front with no reason
-is not taken at a price while the nation has fed ground. A unit on such a front whose slot is priced comes
-off it, by the assign verb's unassign. An idle unit on priced ground that no front takes marches to its
-nation's nearest fed ground that a march accepts.
+A front has a **reason** when it is at odds with the nation, hostile either way, unless the nation holds every
+goal of its war with that neighbour and neither side occupies ground of the other on that body. A held prize
+keeps its reason until peace: hunger on it is the prize's cost. A goal a third party holds, or that a merge
+removed, is not taken. A front's price is what one more unit does to its whole slot set, counted in the
+fewest-per-span-tile preference as that share of one more unit. A front with no reason refuses a unit whose own
+slot is priced. A unit on such a front whose slot is priced comes off it, by the assign verb's unassign. An idle
+unit on priced ground that no front takes marches to its nation's nearest fed ground that a march accepts and no
+hostile stack stands on, the capital province last, since a unit arriving there is posted home; fall back is a
+rule on the price, not a score. A unit that cannot stand fed, its own tile
+priced and no such ground in reach, pays only what an order adds over where it stands.
 
 A push is scored unit by unit, at the tile that unit would march onto: its strength x (worth - price). Ground
-is worth half of the men who take it. A goal the neighbour still holds, under a stack or not, is worth all of
-them on it or next to it, falling toward half with distance. The price takes no credit for where the unit
-stands while the nation has fed ground: a starving force is weighed as a fed one is. The front pushes when
-the sum is not negative and the 3:2 passes. The 3:2 reads each unit's strength less what it will have lost by
-the time it fights: its stock, on the share it holds, over the straight march's days. So a full stock attacking
-across a border loses nothing. Liberating a nation's own occupied ground is weighed as plain ground.
+is worth half of the men who take it. A goal the neighbour still holds, under a stack or not, and the ground
+within 8 steps on the way to it, is worth all of them, so a cover-0 price scores nothing against it and the war
+marches. The price takes no credit for where the unit stands if it can stand fed: a starving force is weighed as a
+fed one is. A unit a push would leave on the neighbour's ground, with no war to take it, is priced where it stands,
+for no ground. The front pushes when the sum is not negative and the 3:2 passes. The 3:2 reads each unit's
+strength less what it will have lost by the time it fights: its stock, on the share it holds, over the straight
+march's days, and the hungry step if the march brings it on. So a full stock attacking across a border loses no
+man, but fights at the hungry step on ground that does not feed it. Liberating a nation's own occupied ground is weighed as plain ground.
 
 ### Defend province (Ben, 2026-11-05)
 

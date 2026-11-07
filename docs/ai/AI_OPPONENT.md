@@ -2464,16 +2464,27 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   cover does to the unit's stock and men, and the days of the straight march. The price is how fast the
   ground would kill it, so every cover below break-even costs something; the brake is the hunger itself,
   with no handicap and no fixed cap on marches. A push is scored unit by unit at the tile that unit
-  would march onto: strength x (what the ground is worth - its price), with a war goal worth more than
-  plain ground. On that read it may also take its own unit off its own front (`assign_front` with a
-  null tile) and march an idle unit from priced ground to its own nearest fed ground, the next order
-  only; both are verbs it already holds. A rival still marches to war: a front at odds with it, hostile
-  either way, stays a reason to go hungry, and a goal stays worth the hunger. **Two vetoes remain, and
-  they are named here.** A front with no reason (at peace, or every goal of its war with that neighbour
-  taken) is not taken at any price while its nation has fed ground, because there is nothing to set
-  against the hunger. The 3:2 stays a test, read on the men who arrive. A nation with no fed ground has
-  nothing to fall back to, so hunger prices no choice for it. **Under spectate** the seat's nation is
-  scored like any rival, by § 10i's general lift, and this grant then acts on it as on any rival; never
+  would march onto: strength x (what the ground is worth - its price). Plain ground is worth half a
+  unit's men. A war goal, and the ground within 8 steps on the way to it, is worth all of them, so a
+  cover-0 price scores nothing against it and the war marches. Past 8 steps the ground is plain. On that
+  read it may also take its own unit off its own front (`assign_front` with a null tile) and march an idle
+  unit from priced ground to its own nearest fed ground, the next order only; both are verbs it already
+  holds. Asked about that fall back the same day, his answer: *"Yes, allow fall back."* **Fall back is a
+  rule on the price, not a score:** a unit on priced ground that no front takes goes, nothing weighed
+  against it. It holds for a nation with no front at all, and it is never an attack: a tile with a hostile
+  stack on it is not fed ground. It takes the capital province last, because a unit arriving there is
+  posted home (the "Defend province moves units" grant) and is not taken for a later front. A rival still marches to war: a front at odds with it, hostile either
+  way, stays a reason to go hungry. **So does a prize it holds:** a front keeps its reason while either
+  side occupies ground of the other on that body, and hunger on a held prize is the prize's cost, until
+  peace. A goal a third party holds, or that a merge removed, is not taken. **Two vetoes remain, and they
+  are named here.** A front with no reason (at peace, or this nation holding every goal of its war with
+  that neighbour and nothing occupied either way) refuses a unit whose own slot is priced, because there
+  is nothing to set against the hunger. The 3:2 stays a test, read on the men who arrive. A unit that
+  cannot stand fed, its own tile priced and no fed ground a march would take within reach, gets no veto
+  from this grant and no free pass: it pays only what an order adds over where it stands. A unit a push
+  would leave on the neighbour's ground, with no war to take it, is priced where it stands. **Under
+  spectate** the seat's nation is scored like any rival, by § 10i's general lift, and this grant then acts
+  on it as on any rival; never
   on a seated player's nation. **Not admitted:** any march, front or unit of a seated player's nation; a
   new verb; bending a front's slots to supply (§ Nation garrisons' ruling stands, and a rival meets it
   as a commander, by where it sends units); reading another nation's cover; a march planned beyond the

@@ -155,14 +155,18 @@ int tile_hex_steps(const world& w, entity_id a, entity_id b);
 /// per front evaluation where it names a push.
 struct rival_march_tally
 {
-    long long fed_push = 0;       ///< A front set to push with no unit priced.
-    long long prize_push = 0;     ///< A front set to push with a unit priced: the prize was worth it.
+    long long fed_push = 0;       ///< A front set to push, some unit with a target, none priced.
+    long long prize_push = 0;     ///< Set to push with a unit priced on a goal or the way to it.
+    long long priced_push = 0;    ///< Set to push with a unit priced, all on plain ground.
+    long long no_target_push = 0; ///< Set to push with no unit a target: nobody will march.
     long long refused_supply = 0; ///< 3:2 passes, and the hunger outweighs the ground: holds.
+    long long refused_supply_goal = 0; ///< Of them, with a goal of its war left to take.
     long long refused_battle = 0; ///< The ground is worth it, and 3:2 fails only on the men the march loses.
     long long fall_back = 0;      ///< A unit marched off priced ground to its own fed ground.
+    long long fall_back_home = 0; ///< Of them, into its capital province, where the defence scorer posts it.
     long long reweigh = 0;        ///< A unit taken off a front with no reason left, its slot priced.
-    long long assign_refused = 0; ///< A unit left a front's slot it had no reason to go hungry on.
-    long long odds_hungry = 0;    ///< A unit sent to a priced slot on a front at odds.
+    long long assign_refused = 0; ///< One unit refused by one front, per evaluation: a slot it had no reason to go hungry on.
+    long long odds_hungry = 0;    ///< A unit the verb accepted onto a front at odds, its hunger above zero.
     long long odds_hungry_no_war = 0; ///< Of them, on a bare hostility: no war between the pair.
     long long liberation = 0;     ///< A priced push target on its own occupied ground, weighed as plain ground.
 };

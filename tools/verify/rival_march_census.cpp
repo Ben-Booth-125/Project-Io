@@ -22,13 +22,20 @@
 //   foreign_max    the most rival units standing on another nation's ground at a quarter's end
 //   push_max       the most PUSH orders rivals stood under at a quarter's end
 //   assigned_t8    opening rival units on a front at the last quarter's end
-//   player_fronts  the player's own units on a front: nothing here presses one, so must be 0
+//   reentered      tile-occupier pairs that reappeared at a quarter's end after a quarter's end
+//                  without, within one open war: a winner walking off its prize and back, or
+//                  ground lost and retaken. Read at quarter ends, so a flip inside one is unseen.
+//   player_fronts  the player's own units on a front now: nothing here presses one, so must be 0
+//   player_orders  across the run, every quarter's change in a player unit's position or march
+//                  order, and every halt among them: nothing here presses one, so must be 0
 //   fronts_moved   (nation, quarter) pairs whose fronts differ from the quarter before
 //   t_*            `rival_march_tally`: how often each path of the score fired. fed_push,
-//                  prize_push, refused_supply, refused_battle (per front evaluation); fall_back,
-//                  reweigh, assign_refused, odds_hungry, odds_hungry_no_war, liberation (per unit)
+//                  prize_push, priced_push, no_target_push, refused_supply, refused_supply_goal,
+//                  refused_battle (per front evaluation); fall_back, fall_back_home, reweigh,
+//                  odds_hungry, odds_hungry_no_war, liberation (per unit); assign_refused (per
+//                  unit and front refused)
 //
-// The exit code gates only that last: the player's nation is never acted on.
+// The exit code gates only player_fronts and player_orders: the player's nation is never acted on.
 //
 //   build_gen/verify/rival_march_census.exe [--seeds a,b,c] [--ticks T]   (default T 8)
 //
@@ -113,6 +120,12 @@ int main(int argc, char** argv)
         long long men_battle = 0;
         std::size_t occupied_max = 0;
         int foreign_max = 0, push_max = 0, player_fronts = 0;
+        long long player_orders = 0, reentered = 0;
+        std::map<entity_id, std::pair<entity_id, entity_id>> player_last; // unit -> position, march dest
+        for (const auto& [uid, u] : w.units)
+            if (u.owner == player)
+                player_last[uid] = { u.position, u.order.dest };
+        std::set<std::pair<entity_id, entity_id>> held_last, held_in_war;
         long long fronts_moved = 0;
         std::map<entity_id, std::vector<std::pair<entity_id, std::vector<entity_id>>>> last_fronts;
         const auto front_shape = [](const std::map<entity_id, std::vector<front>>& all) {
@@ -146,14 +159,15 @@ int main(int argc, char** argv)
             std::printf("ROW seed=%u tick=%d opening=%zu opening_men=%lld starved_t8=%d ever_starved=%zu hungry_t8=%d dead=%d "
                         "men_lost=%lld why_hold=%d why_hold_odds=%d why_push=%d why_none=%d why_past=%d why_cover=%d why_pool=%d "
                         "declared=%zu closed=%zu cessions=%zu battles=%zu men_battle=%lld occupied_new=%zu "
-                        "occupied_max=%zu foreign_max=%d push_max=%d assigned_t8=%d player_fronts=%d fronts_moved=%lld "
-                        "t_fed_push=%lld t_prize_push=%lld t_refused_supply=%lld t_refused_battle=%lld t_fall_back=%lld "
-                        "t_reweigh=%lld t_assign_refused=%lld t_odds_hungry=%lld t_odds_hungry_no_war=%lld t_liberation=%lld\n",
+                        "occupied_max=%zu reentered=%lld foreign_max=%d push_max=%d assigned_t8=%d player_fronts=%d player_orders=%lld fronts_moved=%lld "
+                        "t_fed_push=%lld t_prize_push=%lld t_priced_push=%lld t_no_target_push=%lld t_refused_supply=%lld t_refused_supply_goal=%lld "
+                        "t_refused_battle=%lld t_fall_back=%lld t_fall_back_home=%lld t_reweigh=%lld t_assign_refused=%lld t_odds_hungry=%lld t_odds_hungry_no_war=%lld t_liberation=%lld\n",
                         seed, k, opening.size(), opening_men, starved_now, ever.size(), hungry_now, dead, men_lost, why_hold,
                         why_hold_odds, why_push, why_none, why_past, why_cover, why_pool, w.wars.size() + w.war_history.size(),
                         w.war_history.size(), w.province_cessions.size(), battles.size(), men_battle, occupations.size(),
-                        occupied_max, foreign_max, push_max, assigned, player_fronts, fronts_moved, tally.fed_push,
-                        tally.prize_push, tally.refused_supply, tally.refused_battle, tally.fall_back, tally.reweigh,
+                        occupied_max, reentered, foreign_max, push_max, assigned, player_fronts, player_orders, fronts_moved,
+                        tally.fed_push, tally.prize_push, tally.priced_push, tally.no_target_push, tally.refused_supply,
+                        tally.refused_supply_goal, tally.refused_battle, tally.fall_back, tally.fall_back_home, tally.reweigh,
                         tally.assign_refused, tally.odds_hungry, tally.odds_hungry_no_war, tally.liberation);
             std::fflush(stdout);
         };
@@ -175,6 +189,24 @@ int main(int argc, char** argv)
             for (const auto& [tile, occ] : w.tile_occupier)
                 occupations.insert({ tile, occ });
             occupied_max = std::max(occupied_max, w.tile_occupier.size());
+            {
+                std::set<std::pair<entity_id, entity_id>> held_now;
+                for (const auto& [tile, occ] : w.tile_occupier)
+                {
+                    held_now.insert({ tile, occ });
+                    reentered += held_last.count({ tile, occ }) == 0 && held_in_war.count({ tile, occ }) != 0 ? 1 : 0;
+                }
+                for (auto it = held_in_war.begin(); it != held_in_war.end();)
+                {
+                    const auto own = w.tile_to_nation.find(it->first);
+                    if (own == w.tile_to_nation.end() || !at_war(w, it->second, own->second))
+                        it = held_in_war.erase(it);
+                    else
+                        ++it;
+                }
+                held_in_war.insert(held_now.begin(), held_now.end());
+                held_last = std::move(held_now);
+            }
 
             std::map<entity_id, const lp_supply_row*> rows;
             for (const lp_supply_row& r : res.report.logistic_points.supplies)
@@ -215,12 +247,15 @@ int main(int argc, char** argv)
             player_fronts = 0;
             for (const auto& [uid, u] : w.units)
             {
-                (void)uid;
                 if (u.count <= 0)
                     continue;
                 if (u.owner == player)
                 {
                     player_fronts += u.front != null_entity ? 1 : 0;
+                    const auto last = player_last.find(uid);
+                    if (last != player_last.end() && (last->second.first != u.position || last->second.second != u.order.dest))
+                        ++player_orders;
+                    player_last[uid] = { u.position, u.order.dest };
                     continue;
                 }
                 const auto own = w.tile_to_nation.find(u.position);
@@ -244,9 +279,10 @@ int main(int argc, char** argv)
                 print_row(k);
         }
         rival_march_tally_sink() = nullptr;
-        if (player_fronts != 0)
+        if (player_fronts != 0 || player_orders != 0)
         {
-            std::printf("  FAIL  seed %u: %d of the player's units on a front nothing pressed\n", seed, player_fronts);
+            std::printf("  FAIL  seed %u: the player's units moved with nothing pressed: %d on a front, %lld orders or moves\n",
+                        seed, player_fronts, player_orders);
             ++failed;
         }
     }

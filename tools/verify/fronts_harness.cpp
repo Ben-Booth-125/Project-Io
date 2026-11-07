@@ -1706,31 +1706,38 @@ int main()
         // unless their slot falls beside it, so the plain row's goal is the hub's own block.
         check(!push_case(false), "F13e unfed plain ground: a fed force holds");
         check(push_case(true), "F13f the same ground is a war goal: it pushes, the prize worth the hunger");
-        // (g, h) The battle's own read. A full stock lasts 30 days with no man lost, so a border
-        // attack on share-0 ground lands at full strength: the 3:2 stands as written. The same
-        // force on an empty stock and share 0 has lost men by the time it fights.
-        const auto battle_case = [&](bool empty_stock, bool& raw_passes) {
+        // (g, g2, h) The battle's own read, with the share truly at zero. A full stock stands next
+        // to its target: no man is lost by the fight, but the march brings on the hungry step, so
+        // the 3:2 reads 85%. An empty stock marching far has lost men by the time it fights. No hub:
+        // the goals price nothing out, and these rows read the 3:2 alone.
+        const auto battle_case = [&](bool empty_stock, int margin_permille, bool& raw_passes) {
             wide f; build_wide(f, false);
-            const int col = far_column(f);
-            add_hub(f, f.at(col, 1));
+            const std::vector<front> fs = current_fronts(f.w, f.A);
+            unit_component probe{};
+            probe.owner = f.A;
+            probe.type = static_cast<uint16_t>(row_named("Rifle Infantry"));
             std::vector<entity_id> us;
-            for (int k = 0; k < 3; ++k)
-                us.push_back(add_wide_unit(f, f.A, f.at(col, 0), 40));
-            if (empty_stock)
-                for (const entity_id u : us)
-                {
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                const entity_id slot = front_hold_slot(f.w, reg, probe, fs.front(), k, 3);
+                const int x = f.w.tiles.at(slot).grid_x;
+                us.push_back(add_wide_unit(f, f.A, f.at(empty_stock ? (x + WW / 2) % WW : x, 2), 40));
+            }
+            for (const entity_id u : us)
+            {
+                f.w.units.at(u).lp_share_permille = 0;
+                if (empty_stock)
                     f.w.units.at(u).food_permille = 0;
-                    f.w.units.at(u).lp_share_permille = 0;
-                }
+            }
             int64_t raw = 0;
             for (const entity_id u : us)
                 raw += unit_strength(f.w, f.w.units.at(u));
-            // Defenders on every tile just under what the raw 3:2 clears.
+            // Defenders on every tile just under the 3:2 of that share of the raw force.
             unit_component one{};
             one.count = 1;
             one.type = static_cast<uint16_t>(row_named("Rifle Infantry"));
             const int64_t per_man = std::max<int64_t>(1, unit_strength(f.w, one));
-            const int men = static_cast<int>((raw * 2 - 1) / 3 / per_man);
+            const int men = static_cast<int>((raw * margin_permille / 1000 * 2 - 1) / 3 / per_man);
             for (int x = 0; x < WW; ++x)
                 (void)add_wide_unit(f, f.B, f.at(x, 3), men);
             raw_passes = raw * 2 > static_cast<int64_t>(men) * per_man * 3;
@@ -1738,20 +1745,30 @@ int main()
             score_once(f.w);
             return pushing(f);
         };
-        bool raw_full = false, raw_empty = false;
-        const bool full_pushes = battle_case(false, raw_full), empty_pushes = battle_case(true, raw_empty);
-        check(raw_full && full_pushes, "F13g a full stock on share-0 ground: no man lost by the fight, so the raw 3:2 stands");
+        bool raw_full = false, raw_near = false, raw_empty = false;
+        const bool full_pushes = battle_case(false, 850, raw_full);
+        const bool near_pushes = battle_case(false, 1000, raw_near);
+        const bool empty_pushes = battle_case(true, 1000, raw_empty);
+        check(raw_full && full_pushes, "F13g a full stock on share 0, next to its target: 85% of the raw force clears the 3:2, and it pushes");
+        check(raw_near && !near_pushes, "F13g2 the same, its defence sized to the raw force: the hungry step the march brings fails the 3:2");
         check(raw_empty && !empty_pushes, "F13h an empty stock on share 0: the men it loses on the march fail the 3:2 it passed raw");
-        // (i) Replaces "a force no better fed where it stands pays nothing to go on", which
-        // pinned hunger compounding free: it let a starving force push anywhere at raw strength
-        // where a fed one was refused. A starving force past its goals, no prize ahead, its
-        // nation's fed ground behind it, is refused like a fed one and falls back.
-        {
-            wide f; build_wide(f, false);
+        // (i) A force on its front past its goals, starving: the goal is its own ground now and
+        // nothing is occupied either way, so no prize and nothing held is ahead of it. It is
+        // refused like a fed one, comes off and falls back.
+        const auto past_goals = [&](wide& f, bool ceded) {
+            build_wide(f, false);
             const entity_id goal_prov = f.at(0, 3);
             for (int y = 3; y < HH; ++y)
                 for (int x = 0; x < 10; ++x)
-                    f.w.tile_occupier[f.at(x, y)] = f.A;
+                {
+                    if (ceded)
+                    {
+                        f.w.set_tile_nation(f.at(x, y), f.A);
+                        f.w.nations.at(f.A).tiles.push_back(f.at(x, y));
+                    }
+                    else
+                        f.w.tile_occupier[f.at(x, y)] = f.A;
+                }
             ++f.w.territory_generation;
             stage_war(f, { goal_prov });
             reanchor_fronts(f.w);
@@ -1772,22 +1789,133 @@ int main()
                 if (fr.neighbour == f.B && on == nullptr)
                     on = &fr;
             (void)cmd_assign(f.w, reg, f.A, u, on != nullptr ? on->key : null_entity);
+            return u;
+        };
+        {
+            wide f;
+            const entity_id u = past_goals(f, true);
             score_once(f.w);
             const unit_component& after = f.w.units.at(u);
             const int dest_cover = after.order.dest != null_entity ? cover_at(f.w, f.A, after.order.dest) : -1;
             std::printf("  [info] past its goals: front %u, marching to cover %d\n", static_cast<unsigned>(after.front), dest_cover);
             check(after.front == null_entity && dest_cover >= 667,
-                  "F13i a starving force past its goals, no prize ahead: refused, off the front, marching to fed ground");
+                  "F13i a starving force past its goals, the prize ceded and nothing held: refused, off the front, marching to fed ground");
         }
-        // (j) The other half of the old row, which still holds for a reason: a nation with no fed
-        // ground at all has nothing to fall back to, so hunger prices no choice (F8h's case too).
+        // (q) Winning does not walk the army off its prize: the same goal taken by OCCUPYING it,
+        // the war open. Hunger on a held prize is the prize's cost, until peace.
         {
-            wide f; build_wide(f, false);
-            for (int k = 0; k < 3; ++k)
-                (void)add_wide_unit(f, f.A, f.at(k * 7, 0), 40);
-            (void)declare_hostile(f.w, f.A, f.B);
+            wide f;
+            const entity_id u = past_goals(f, false);
+            const entity_id was = f.w.units.at(u).front;
             score_once(f.w);
-            check(pushing(f), "F13j a nation with no fed ground anywhere: nothing to weigh against, the push is scored as written");
+            check(was != null_entity && f.w.units.at(u).front == was,
+                  "F13q every goal taken by occupation, the war open: it stays on its front, hungry");
+        }
+        // (r, r2) The other direction: A, defending, holds its one goal outright, and B still
+        // occupies other land of A's. A does not leave the line. With nothing occupied, it does.
+        {
+            const auto defender = [&](bool occupied) {
+                wide f; build_wide(f, false);
+                const int col = far_column(f);
+                const int slot = (col + WW / 2) % WW;
+                add_hub(f, f.at(col, 1));
+                if (occupied)
+                {
+                    f.w.tile_occupier[f.at((slot + 15) % WW, 2)] = f.B;
+                    ++f.w.territory_generation;
+                    reanchor_fronts(f.w);
+                }
+                province gp; gp.id = f.at(col, 0); gp.body = f.body; gp.tiles = { f.at(col, 0) };
+                f.w.provinces.provinces.push_back(gp);
+                std::sort(f.w.provinces.provinces.begin(), f.w.provinces.provinces.end(),
+                          [](const province& l, const province& r) { return l.id < r.id; });
+                (void)declare_hostile(f.w, f.B, f.A);
+                war_record war;
+                war.declarer = f.B; war.defender = f.A;
+                war.defender_goals = { gp.id };
+                war.answered = true; // or the war scorer writes its own
+                f.w.wars[{ f.B, f.A }] = war;
+                const std::vector<front> fs = current_fronts(f.w, f.A);
+                const front* on = nullptr;
+                for (const front& fr : fs)
+                    if (fr.neighbour == f.B && on == nullptr)
+                        on = &fr;
+                const entity_id u = add_wide_unit(f, f.A, f.at(slot, 2), 40);
+                (void)cmd_assign(f.w, reg, f.A, u, on != nullptr ? on->key : null_entity);
+                const entity_id was = f.w.units.at(u).front;
+                score_once(f.w);
+                return was != null_entity && f.w.units.at(u).front == was;
+            };
+            check(defender(true), "F13r a defender holding its goal while the attacker still occupies its land: it stays on the line");
+            check(!defender(false), "F13r2 the same defender with nothing occupied: its slot priced, it comes off");
+        }
+        // (s, t) A goal a third party holds, or that a merge removed, is not taken by this nation.
+        {
+            const auto not_taken = [&](bool third_party) {
+                wide f; build_wide(f, true);
+                add_hub(f, f.at(45, 1)); // under C's span; B's slot is past the draw
+                std::vector<uint32_t> goals = { third_party ? f.at(40, 3) : 0x7FFFFF00u };
+                (void)declare_hostile(f.w, f.A, f.B);
+                war_record war;
+                war.declarer = f.A; war.defender = f.B;
+                war.declarer_goals = goals;
+                f.w.wars[{ f.A, f.B }] = war;
+                const std::vector<front> fs = current_fronts(f.w, f.A);
+                const front* on = nullptr;
+                for (const front& fr : fs)
+                    if (fr.neighbour == f.B && on == nullptr)
+                        on = &fr;
+                unit_component probe{};
+                probe.owner = f.A;
+                probe.type = static_cast<uint16_t>(row_named("Rifle Infantry"));
+                const entity_id slot = on != nullptr ? front_hold_slot(f.w, reg, probe, *on, 0, 1) : null_entity;
+                if (slot == null_entity)
+                    return false;
+                const entity_id u = add_wide_unit(f, f.A, slot, 40);
+                (void)cmd_assign(f.w, reg, f.A, u, on->key);
+                const entity_id was = f.w.units.at(u).front;
+                score_once(f.w);
+                return was != null_entity && f.w.units.at(u).front == was;
+            };
+            check(not_taken(true), "F13s a goal a third party holds is not taken: the war keeps its reason");
+            check(not_taken(false), "F13t a goal a merge removed is not taken: the war keeps its reason");
+        }
+        // (j, j2, j3) A unit that cannot stand fed. The nation's fed ground all holds hostile
+        // stacks, so no march goes there; the unit stands on a road's fading end (a price), and the
+        // push's tile is past every road (a dearer one). It pays only what the march adds, and that
+        // is under plain ground's worth; with the fed ground free it has no such credit.
+        {
+            const auto fading = [&](bool fed_free, bool hostile, int* here_cover, int* there_cover) {
+                wide f; build_wide(f, false);
+                const int col = far_column(f);
+                const int slot = (col + WW / 2) % WW;
+                add_hub(f, f.at(col, 0));
+                for (int k = 0; k <= 11; ++k)
+                    f.w.tiles.at(f.at((col + k) % WW, 0)).road_edges = road_edges_on_every_side(1);
+                const entity_id u = add_wide_unit(f, f.A, f.at((col + 13) % WW, 0), 40);
+                const entity_id foe = hostile ? f.B : f.C;
+                if (!fed_free)
+                    for (int y = 0; y < 3; ++y)
+                        for (int x = 0; x < WW; ++x)
+                            if (cover_at(f.w, f.A, f.at(x, y)) >= 667)
+                                (void)add_wide_unit(f, foe, f.at(x, y), 1);
+                (void)declare_hostile(f.w, f.A, foe);
+                if (here_cover != nullptr)
+                    *here_cover = cover_at(f.w, f.A, f.w.units.at(u).position);
+                if (there_cover != nullptr)
+                    *there_cover = cover_at(f.w, f.A, f.at(slot, 3));
+                score_once(f.w);
+                return std::make_pair(pushing(f), f.w.units.at(u).front != null_entity);
+            };
+            int here = -1, there = -1;
+            const auto stuck = fading(false, true, &here, &there);
+            const auto freed = fading(true, true, nullptr, nullptr);
+            const auto calm = fading(false, false, nullptr, nullptr);
+            std::printf("  [info] cover where it stands %d, at the push's tile %d\n", here, there);
+            check(here > 0 && here < 667 && there < here && stuck.first,
+                  "F13j no fed ground a march would take, here != there: it pays only what the march adds, and pushes");
+            check(!freed.first, "F13j2 the same ground with fed ground free: no credit for where it stands, and it holds");
+            check(!calm.second, "F13j3 at peace, the same stuck unit: a slot costlier than standing is refused");
         }
         // (k) Each unit prices its own tile: two of three stand to take fed ground, and the one
         // share-0 tile does not veto them. It is weighed, and outweighed.
@@ -1856,6 +1984,140 @@ int main()
             (void)cmd_assign(g.w, reg, g.A, v, gs.front().key);
             score_once(g.w);
             check(g.w.units.at(v).front == gs.front().key, "F13o peace with a unit on a fed slot: it stays on its front");
+        }
+        // (u) Mixed slots at peace, four units with only the last slot fed. Three come off and the
+        // sum alone would call them back: with the fed one respaced onto a priced lone slot, a
+        // joiner's own priced slot adds nothing to the sum. Read per slot, they stay off.
+        {
+            wide f; build_wide(f, false);
+            const std::vector<front> fs = current_fronts(f.w, f.A);
+            unit_component probe{};
+            probe.owner = f.A;
+            probe.type = static_cast<uint16_t>(row_named("Rifle Infantry"));
+            std::vector<entity_id> us;
+            std::vector<int> cols;
+            for (std::size_t k = 0; k < 4; ++k)
+                cols.push_back(f.w.tiles.at(front_hold_slot(f.w, reg, probe, fs.front(), k, 4)).grid_x);
+            add_hub(f, f.at(cols[3], 1));
+            for (std::size_t k = 0; k < 4; ++k)
+            {
+                us.push_back(add_wide_unit(f, f.A, f.at(cols[k], 2), 40));
+                (void)cmd_assign(f.w, reg, f.A, us.back(), fs.front().key);
+            }
+            world twin = f.w;
+            score_once(f.w);
+            score_once(twin);
+            int off = 0;
+            bool off_to_fed = true;
+            for (std::size_t k = 0; k < 3; ++k)
+            {
+                const unit_component& un = f.w.units.at(us[k]);
+                off += un.front == null_entity ? 1 : 0;
+                off_to_fed = off_to_fed && un.order.dest != null_entity && cover_at(f.w, f.A, un.order.dest) >= 667;
+            }
+            std::printf("  [info] slots at columns %d, %d, %d, %d: %d of three off the front\n", cols[0], cols[1], cols[2], cols[3], off);
+            check(off == 3 && off_to_fed && f.w.units.at(us[3]).front == fs.front().key && f.w.state_hash(2) == twin.state_hash(2),
+                  "F13u peace, mixed slots, several units: the priced three stay off and march to fed ground, the fed one stays; twins agree");
+        }
+        // (v, w) A goal stays worth the hunger on the way to it: at 2-3 steps and at the stated
+        // range, a cover-0 tile scores nothing against the goal and the war marches. One past
+        // the range it is plain ground, and the hunger holds it.
+        {
+            const auto steps_case = [&](int want, int& got) {
+                wide f; build_wide(f, false);
+                const int col = far_column(f);
+                const int slot = (col + WW / 2) % WW;
+                add_hub(f, f.at(col, 1));
+                (void)add_wide_unit(f, f.A, f.at(col, 0), 40);
+                entity_id goal = null_entity;
+                for (int x = 0; x < WW && goal == null_entity; ++x)
+                    if (tile_hex_steps(f.w, f.at(slot, 3), f.at(x, 5)) == want)
+                        goal = f.at(x, 5);
+                got = goal != null_entity ? tile_hex_steps(f.w, f.at(slot, 3), goal) : -1;
+                province gp; gp.id = goal; gp.body = f.body; gp.tiles = { goal };
+                f.w.provinces.provinces.push_back(gp);
+                std::sort(f.w.provinces.provinces.begin(), f.w.provinces.provinces.end(),
+                          [](const province& l, const province& r) { return l.id < r.id; });
+                stage_war(f, { goal });
+                score_once(f.w);
+                return pushing(f);
+            };
+            int a = 0, b = 0, c = 0, d = 0;
+            const bool at2 = steps_case(2, a), at3 = steps_case(3, b), at8 = steps_case(8, c), at9 = steps_case(9, d);
+            check(a == 2 && at2, "F13v a goal 2 steps past a cover-0 tile: the war marches");
+            check(b == 3 && at3, "F13w a goal 3 steps past it: the war marches");
+            check(c == 8 && at8, "F13x a goal at the stated range, 8 steps: the war marches");
+            check(d == 9 && !at9, "F13y one past the range: plain ground, the hunger holds it");
+        }
+        // (z, aa) A nation with no front at all falls back too; and a fall back is never an
+        // attack: with a hostile stack on the tile it would have gone to, it goes elsewhere.
+        {
+            const auto no_fronts = [&](entity_id stack_on, entity_id& dest, bool& none) {
+                wide f; build_wide(f, false);
+                for (int y = 3; y < HH; ++y)
+                    for (int x = 0; x < WW; ++x)
+                    {
+                        f.w.set_tile_nation(f.at(x, y), f.A);
+                        f.w.nations.at(f.A).tiles.push_back(f.at(x, y));
+                    }
+                ++f.w.territory_generation;
+                reanchor_fronts(f.w);
+                add_hub(f, f.at(0, 1));
+                const entity_id u = add_wide_unit(f, f.A, f.at(30, 1), 40);
+                if (stack_on != null_entity)
+                {
+                    (void)add_wide_unit(f, f.B, stack_on, 1);
+                    (void)declare_hostile(f.w, f.B, f.A);
+                }
+                none = current_fronts(f.w, f.A).empty();
+                score_once(f.w);
+                dest = f.w.units.at(u).order.dest;
+                return dest != null_entity ? cover_at(f.w, f.A, dest) : -1;
+            };
+            entity_id first = null_entity, second = null_entity;
+            bool none = false, none2 = false;
+            const int cover1 = no_fronts(null_entity, first, none);
+            const int cover2 = no_fronts(first, second, none2);
+            check(none && cover1 >= 667, "F13aa a nation with no front at all: an idle unit on priced ground marches to fed ground");
+            check(cover2 >= 667 && second != first, "F13z a fall back is never an attack: a hostile stack's tile is not fed ground");
+        }
+        // (cc) A fall back takes fed ground outside the capital province first: arriving there
+        // posts a unit home for good (`score_nation_defence`).
+        {
+            wide f; build_wide(f, false);
+            for (int y = 3; y < HH; ++y)
+                for (int x = 0; x < WW; ++x)
+                {
+                    f.w.set_tile_nation(f.at(x, y), f.A);
+                    f.w.nations.at(f.A).tiles.push_back(f.at(x, y));
+                }
+            ++f.w.territory_generation;
+            reanchor_fronts(f.w);
+            f.w.nations.at(f.A).capital_tile = f.at(0, 0);
+            add_hub(f, f.at(0, 0));
+            const entity_id u = add_wide_unit(f, f.A, f.at(30, 1), 40);
+            f.w.units.at(u).position = f.at(30, 3);
+            score_once(f.w);
+            const entity_id dest = f.w.units.at(u).order.dest;
+            check(dest != null_entity && cover_at(f.w, f.A, dest) >= 667
+                      && f.w.provinces.province_of(dest) != f.w.provinces.province_of(f.at(0, 0)),
+                  "F13cc a fall back takes fed ground outside the capital province first");
+        }
+        // (bb) A unit on the neighbour's ground under a bare hostility takes no ground, and pays
+        // for where it stands. Alone, it is not worth a push.
+        {
+            wide f; build_wide(f, false);
+            const int col = far_column(f);
+            const int slot = (col + WW / 2) % WW;
+            add_hub(f, f.at(col, 1));
+            const std::vector<front> fs = current_fronts(f.w, f.A);
+            const entity_id u = add_wide_unit(f, f.A, f.at(slot, 4), 40);
+            (void)declare_hostile(f.w, f.A, f.B);
+            (void)cmd_assign(f.w, reg, f.A, u, fs.front().key);
+            f.w.units.at(u).order = {};
+            f.w.units.at(u).position = f.at(slot, 4);
+            score_once(f.w);
+            check(!pushing(f), "F13bb on the neighbour's ground under a bare hostility: priced where it stands, and it holds");
         }
     }
 
