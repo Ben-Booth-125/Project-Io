@@ -57,6 +57,7 @@
 #include <cstring>
 #include <functional>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -122,6 +123,31 @@ struct lap_reader
     }
 };
 
+/// Steel on a major's own markets: the materials lever spends this shelf. Inventory,
+/// last clear's supply and demand are summed over the distinct markets on its ground;
+/// price is the mean over them.
+void steel_row(const world& w, int seed, entity_id nid, const nation_component& n, int q)
+{
+    std::set<entity_id> mkts;
+    for (const entity_id tid : n.tiles)
+        if (const entity_id mid = market_for_tile(w, tid); mid != null_entity) mkts.insert(mid);
+    const std::size_t g = static_cast<std::size_t>(resource_type::steel);
+    double inv = 0.0, sup = 0.0, dem = 0.0, price = 0.0, base = 0.0;
+    for (const entity_id mid : mkts)
+    {
+        const auto m = w.markets.find(mid);
+        if (m == w.markets.end()) continue;
+        inv += m->second.inventory[g];
+        sup += m->second.supply[g];
+        dem += m->second.demand[g];
+        price += m->second.price[g];
+        base += m->second.base_price[g];
+    }
+    const double k = mkts.empty() ? 1.0 : static_cast<double>(mkts.size());
+    std::printf("STEEL seed=%d nation=%llu q=%d markets=%zu inventory=%.1f supply=%.1f demand=%.1f price=%.2f base=%.2f\n",
+                seed, static_cast<unsigned long long>(nid), q, mkts.size(), inv, sup, dem, price / k, base / k);
+}
+
 /// Years for a net per quarter to repay a capex; -1 when it never does.
 double payback_years(double capex, double net_per_quarter)
 {
@@ -143,7 +169,7 @@ void site_census(world& w, const recipe_registry& reg, int seed, int tt, int mt,
     {
         const placement_gate gate = reg.placement_gate_for(o.type, o.recipe);
         const recipe* rc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
-        struct site { double net; double capex; double quote; int starved; };
+        struct site { double net; double capex; double quote; int starved; double materials; };
         site_quote_context cx = make_site_quote_context(w, reg, nullptr);
         std::vector<site> sites;
         int uncovered = 0;
@@ -156,8 +182,20 @@ void site_census(world& w, const recipe_registry& reg, int seed, int tt, int mt,
             const building_profit bp = estimate_prospective_profit(w, reg, tid, o.type, o.target, o.recipe, nullptr, nullptr, cv);
             if (!bp.has_data) continue;
             const site_quote sq = quote_site(w, reg, cx, tid, o.type, o.target, o.recipe, cv);
-            sites.push_back({static_cast<double>(bp.net()), static_cast<double>(construction_capex(w, reg, tid, o.type, o.target, o.recipe)),
-                             static_cast<double>(sq.profit.net()), sq.starved ? 1 : 0});
+            const double capex = construction_capex(w, reg, tid, o.type, o.target, o.recipe);
+            // The materials' part of the capex at this tile's market, so the bill can be
+            // read as credits and materials. The site multiplier scales both alike.
+            double mats = 0.0;
+            if (const auto mi = w.markets.find(market_for_tile(w, tid)); mi != w.markets.end())
+            {
+                const auto& row = reg.resource_build_cost_for(o.type, o.target, o.recipe);
+                for (std::size_t g = 0; g < resource_count; ++g)
+                    if (row[g] > 0.0f)
+                        mats += row[g] * (mi->second.price[g] > 0.0f ? mi->second.price[g] : mi->second.base_price[g]);
+            }
+            const double authored = reg.economics(o.type).build_cost + mats;
+            sites.push_back({static_cast<double>(bp.net()), capex, static_cast<double>(sq.profit.net()), sq.starved ? 1 : 0,
+                             authored > 0.0 ? mats * capex / authored : 0.0});
         }
         if (sites.empty()) continue;
         std::sort(sites.begin(), sites.end(), [](const site& a, const site& b) { return a.net > b.net; });
@@ -169,9 +207,9 @@ void site_census(world& w, const recipe_registry& reg, int seed, int tt, int mt,
         for (const site& s : sites) { if (s.net > 0.0) ++positive; starved += s.starved; quotes.push_back(s.quote); }
         std::sort(quotes.begin(), quotes.end(), std::greater<double>());
         std::printf("SITE seed=%d pair=%d:%d nation=%llu kind=%s name=%s sites=%zu positive=%d uncovered=%d"
-                    " best=%.2f med=%.2f worst=%.2f capex_best=%.1f capex_med=%.1f payback_best=%.2f payback_med=%.2f qbest=%.2f qmed=%.2f starved=%d\n",
+                    " best=%.2f med=%.2f worst=%.2f capex_best=%.1f capex_med=%.1f mats_best=%.1f mats_med=%.1f payback_best=%.2f payback_med=%.2f qbest=%.2f qmed=%.2f starved=%d\n",
                     seed, tt, mt, static_cast<unsigned long long>(nid), o.kind, o.name.c_str(), sites.size(), positive,
-                    uncovered, best.net, med.net, worst.net, best.capex, med.capex,
+                    uncovered, best.net, med.net, worst.net, best.capex, med.capex, best.materials, med.materials,
                     payback_years(best.capex, best.net), payback_years(med.capex, med.net),
                     quotes.front(), quotes[quotes.size() / 2], starved);
     }
@@ -245,6 +283,7 @@ int main(int argc, char** argv)
             for (const entity_id nid : majors)
                 site_census(w, seed_reg, seed, tt, mt, nid, w.nations.at(nid));
 
+        for (const entity_id nid : majors) steel_row(w, seed, nid, w.nations.at(nid), 0);
         std::map<entity_id, double> last;
         for (const entity_id nid : majors) last[nid] = w.nations.at(nid).treasury;
         constexpr int k_econ_tick_days = 90;
@@ -268,14 +307,19 @@ int main(int argc, char** argv)
             const settle_tick_result tick = run_settle_tick(w, seed_reg, k_campaign_settle_ticks + (k - 1), day,
                                                             /*spectating=*/true, &hooks);
             // What the report can name of the money that left outside the return.
-            std::map<entity_id, double> research_spend, budget_paid;
-            for (const research_accrual& a : tick.report.research) research_spend[a.nation] += a.line_spend;
+            std::map<entity_id, double> research_spend, research_share, research_owed, budget_paid;
+            for (const research_accrual& a : tick.report.research)
+            {
+                research_spend[a.nation] += a.line_spend;
+                research_share[a.nation] += a.line_share;
+                research_owed[a.nation] += static_cast<double>(a.owed_milli) / 1000.0;
+            }
             for (const nation_budget_result& b : tick.report.national_budget.nations) budget_paid[b.nation] += b.paid;
             for (const entity_id nid : majors)
             {
                 double prev = before.at(nid);
-                std::printf("LAPS seed=%d nation=%llu q=%d research=%.1f budget=%.1f", seed,
-                            static_cast<unsigned long long>(nid), k, research_spend[nid], budget_paid[nid]);
+                std::printf("LAPS seed=%d nation=%llu q=%d research=%.1f research_share=%.1f owed_rp=%.1f budget=%.1f", seed,
+                            static_cast<unsigned long long>(nid), k, research_spend[nid], research_share[nid], research_owed[nid], budget_paid[nid]);
                 for (int l = 0; l < k_campaign_settle_lap_count; ++l)
                 {
                     const double now = laps.treasury[nid][static_cast<std::size_t>(l)];
@@ -340,6 +384,10 @@ int main(int argc, char** argv)
                     }
                 }
 
+            if (k == 4 || k == 8 || k == 20)
+                for (const entity_id nid : majors)
+                    if (const auto it = w.nations.find(nid); it != w.nations.end())
+                        steel_row(w, seed, nid, it->second, k);
             std::map<entity_id, std::pair<int, long>> force;
             for (const auto& [uid, u] : w.units)
             {
@@ -369,10 +417,10 @@ int main(int argc, char** argv)
                 last[nid] = n.treasury;
                 const auto f = force.find(nid);
                 std::printf("QTR seed=%d nation=%llu q=%d treasury=%.1f delta=%.1f net=%.1f resid=%.1f income=%.1f"
-                            " expenditure=%.1f maintenance=%.1f wages=%.1f upkeep=%.1f taxes=%.1f refunds=%.1f"
+                            " expenditure=%.1f maintenance=%.1f wages=%.1f upkeep=%.1f taxes=%.1f refunds=%.1f research=%.1f"
                             " built=%d constructing=%d idled=%d units=%d men=%ld\n",
                             seed, static_cast<unsigned long long>(nid), k, static_cast<double>(n.treasury), delta, r.net,
-                            resid, r.income, r.expenditure, r.maintenance, r.wages, r.upkeep, r.taxes, r.refunds,
+                            resid, r.income, r.expenditure, r.maintenance, r.wages, r.upkeep, r.taxes, r.refunds, r.research,
                             built, constructing, idled, f == force.end() ? 0 : f->second.first,
                             f == force.end() ? 0L : f->second.second);
             }
