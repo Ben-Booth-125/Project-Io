@@ -138,6 +138,7 @@ inline constexpr ImU32 order_declare = IM_COL32(240, 150,  60, 240); ///< An att
 // --- an air wing's provinces (BL-1450; MILITARY.md § Air) ---
 inline constexpr ImU32 air_assigned = IM_COL32(140, 150, 255, 235); ///< A province the selected wing flies over; its right-click assign preview.
 inline constexpr ImU32 air_refused  = IM_COL32(232,  84,  72, 240); ///< A right-click the seam would refuse (order_attack's red).
+inline constexpr ImU32 sea_assigned = IM_COL32( 88, 206, 214, 235); ///< BL-1534: a sea province the selected ship works; its right-click order preview.
 
 // --- the declaration's goal picking (docs/ui/ledgers/diplomacy.md § The declaration) ---
 // A possible goal reads as the declare-and-attack's orange; a chosen one as the

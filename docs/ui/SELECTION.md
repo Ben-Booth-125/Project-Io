@@ -465,6 +465,11 @@ rival's unit shows design stats only once seen, internals never.
 A unit standing with others of its owner on its tile carries a **`< Group (N)`** press in the
 card's header, left of 'go to', which returns the band to that group (§ The unit group element).
 
+### The ship element
+
+A ship owns its whole card, as a wing does. `ledgers/military.md` § Ships on the map owns what it holds and
+how a ship is ordered from the canvas.
+
 ### The unit group element
 
 A canvas counter draws **every unit of one owner on one tile** (ICONS.md § Unit; MILITARY.md

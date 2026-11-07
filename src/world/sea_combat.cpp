@@ -655,6 +655,19 @@ std::map<uint32_t, std::vector<presence>> sea_presence(const world& w)
     return present;
 }
 
+/// The day's roll: does @p viewer, at detection @p d, find @p ship of stealth @p st in @p province_id?
+/// A pure hash, so the map's read and the daily pass agree.
+bool detection_roll(uint64_t seed, int day_tick, uint32_t province_id, entity_id viewer, entity_id ship,
+                    int64_t d, int64_t st)
+{
+    const int64_t chance = d * 1000 / (d + st);
+    uint64_t h = mix(seed, static_cast<uint64_t>(static_cast<int64_t>(day_tick)));
+    h = mix(h, province_id);
+    h = mix(h, viewer);
+    h = mix(h, ship);
+    return static_cast<int64_t>(h % 1000) < chance;
+}
+
 /// Each side's detection in @p province_id: its ships', a patrol's raised, plus its recon wings'.
 std::map<entity_id, int64_t> side_detection(const world& w, const recipe_registry& reg, uint32_t province_id,
                                             const std::vector<presence>& ships,
@@ -1265,6 +1278,8 @@ void run_landings(world& w, const recipe_registry& reg, int day, sea_day_tick& o
 sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
 {
     sea_day_tick out;
+    w.ships_found_by_player.clear(); // BL-1534: the map reads today's, written below
+    const entity_id map_viewer = player_nation(w);
     if (w.ships.empty())
     {
         settle_surf(w, out); // a save dropped the ship: nothing stranded survives it
@@ -1327,16 +1342,17 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
             for (const presence& pc : ships)
             {
                 const sea_ship& t = w.ships.at(pc.ship);
-                if (!hostile_either(w, viewer, t.owner))
+                const bool hostile = hostile_either(w, viewer, t.owner);
+                const bool for_map = viewer == map_viewer && t.owner != viewer; // BL-1534
+                if (!hostile && !for_map)
                     continue;
                 const int64_t st = std::max(0, stats(t).stealth);
-                const int64_t chance = d * 1000 / (d + st);
-                uint64_t h = mix(seed, static_cast<uint64_t>(static_cast<int64_t>(day_tick)));
-                h = mix(h, province_id);
-                h = mix(h, viewer);
-                h = mix(h, pc.ship);
-                if ((holds && ship_class_of(t) != ship_class::submarine)
-                    || static_cast<int64_t>(h % 1000) < chance)
+                // The roll is a pure hash, so rolling a neutral's ship for the map moves nothing.
+                const bool rolled = detection_roll(seed, day_tick, province_id, viewer, pc.ship, d, st);
+                const bool seen   = rolled || (hostile && holds && ship_class_of(t) != ship_class::submarine);
+                if (seen && for_map)
+                    w.ships_found_by_player.insert(pc.ship);
+                if (seen && hostile)
                 {
                     found[viewer].push_back(&pc);
                     ++out.detections;

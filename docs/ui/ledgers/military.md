@@ -68,6 +68,41 @@ avionics; hull, armament, sensors).
 wing there on its current mission; a province out of range is refused with its distance and the
 wing's range. The wing card on the Selection band sets the mission and lists the provinces assigned.
 
+### Ships on the map
+
+**A ship is ordered from the canvas, as a wing is, and stands on it, as a wing does not.** It draws where
+it is, a diamond on its water tile with its class's silhouette in its owner's colour and a count where
+several share the tile. A press selects a ship and a repeat press walks the ships there. Mustering at
+its port's mouth, it is already drawn. **Only what the player's side has found is drawn:** its own ships,
+and another nation's on a day its detection finds it (`../../military/MILITARY.md` § Sea, the daily pass)
+or on water it holds, so a submarine no one has found is not on the map, and a side with no ship and no
+recon wing near sees none there.
+
+**The ship card on the Selection band gives its orders.** Three columns, the wing card's shape: the stat
+grid and a line saying what it is doing; the missions its class works; its zone. A mission with no zone is
+held on the card until a right-click names one, and the lit mission's press recalls the ship. A rival's
+ship shows its class and owner, with every cell a dash.
+
+- **A warship's right-click is a zone.** With a warship selected, right-clicking water adds that sea
+  province on its current mission; the hover line says so first, or why not. Land does nothing, so the line
+  stays silent over it. The card's list carries each province's x, and "held" where its side holds it.
+- **A transport's right-click is a landing.** It has no mission. Right-clicking land orders its landing on
+  that tile, the line saying so first, or why not, and that on hostile ground it waits off the coast until
+  its side holds the water. Water does nothing. The ordered coast is ringed. **Recall** calls it off, until
+  its units are in the surf.
+- **The transport's card lists who is aboard, and who may board.** Each land unit the seam would take
+  now has a **Board** press beside it, so standing a unit at the port and selecting the transport is the
+  whole of it. Why no unit is listed is the tooltip of "Ready to board". Units in the surf are listed under
+  aboard, marked.
+- **Refit is on the card of any ship.** Enabled lying at the home port with no mission, on an older design.
+  The goods it buys are its tooltip, and why it is off when it is.
+
+**A closed port is marked on the map** with a no-entry sign on the port's hex, for anyone's port: a
+blockade is public, as the port's trade stopping is.
+
+**A port on a lake raises no ship.** A ship needs sea at the port's mouth, so the Sea tab's rows say
+"This port opens on no sea." under that port.
+
 ### The empty states
 
 - **No military base** → Recruit says **"No military base"** and offers the Construction ledger's

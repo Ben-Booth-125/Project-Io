@@ -8011,6 +8011,89 @@
     }
    ],
    "resolved": "2026-11-06"
+  },
+  {
+   "brief": "sea-ui",
+   "title": "BL-1534 - The sea UI: ships on the map, their card, the Sea tabs, the marks and the Lost rows",
+   "difficulty": 5,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1534 - sprint 64 (Ben, 2026-11-06)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Recruit's Sea tab holds the port picker, the four ship rows each with a Raise press whose dimmed form says why, and the player's ships. A press raises through hire_ship.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "scripts/verify/sea_ui.lua section 1-2: a real Raise row 0 -> Ship mustering, Your ships lists it. Capture sea_recruit."
+    },
+    {
+     "id": "R2",
+     "text": "A ship draws on water with class and owner, only where the last sea day found it unless it is the player's own; its marker selects it and a stack cycles.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "sea_theatre_harness F1-F4c; sea_ui.lua section 3b, 4b: hidden until found, on the stack when found, gone when not."
+    },
+    {
+     "id": "R3",
+     "text": "The card lists only the missions a class works; a held mission plus a right-click on water assigns; the x takes a province off; the lit mission stands down.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 3-4, 0 failures. Capture sea_zone_assigned."
+    },
+    {
+     "id": "R4",
+     "text": "A transport has no mission; a unit at the port boards through its press; a right-click on a coast orders the landing; Recall calls it off.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 5. Capture sea_landing_ordered."
+    },
+    {
+     "id": "R5",
+     "text": "A rival's card offers no mission and states no orders, on screen and in the verify read.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 4b. Capture sea_card_rival."
+    },
+    {
+     "id": "R6",
+     "text": "Ship classes join the unit designer through set_ship_design; a transport has no armament box; refit at the home port through refit_ship.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 6. Capture sea_designer_transport. The refit press drew; its verb is sea_theatre_harness's."
+    },
+    {
+     "id": "R7",
+     "text": "A closed port and a taken cargo are marked on the map, and the Convoys ledger states each lost cargo's cause for a few ticks, both from economy_report::interceptions. A cargo that came home whole is not lost.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "sea_ui.lua section 7. Capture sea_marks_and_lost. The whole-cargo skip is by reading, not exercised."
+    },
+    {
+     "id": "R8",
+     "text": "The rim labels of the ten-branch ring print clear of each other.",
+     "kind": "visual",
+     "status": "complete",
+     "evidence": "tech_tree_panel capture tech_tree_inspect, looked at: Order, Naval and Signal and Orbit clusters clear."
+    },
+    {
+     "id": "R9",
+     "text": "The map record is a read: no hash, no save, no move. A world with no ship does not move.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "F4, F4b; rebless_shape_probe seeds 0, 46, 28 identical; world_determinism ALL PASS; save_roundtrip OK."
+    },
+    {
+     "id": "R10",
+     "text": "Live click in the built app: Sea tab, Raise, card, right-click, board, land, a contested landing, the off-road dash on a landed unit by a hostile port, and shift-clicking a Naval node in the research panel. Also the per-frame cost of the preview line.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": "NOT DONE. Computer-use access was declined on 2026-11-07. Scripted clicks passed; a scripted capture does not prove a press is reachable. Owed with BL-1531 (troop landings) R8."
+    }
+   ],
+   "resolved": "2026-11-07"
   }
  ]
 }

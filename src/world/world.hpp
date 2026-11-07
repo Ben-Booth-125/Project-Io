@@ -420,6 +420,12 @@ struct world
     /// loaded world would price routes through a closed port until the next day.
     std::set<entity_id> closed_ports;
 
+    /// BL-1534: the other nations' ships the player's side found on the last sea day, as the
+    /// pass rolled them: what the map draws. A READ FOR THE UI ONLY: nothing in the simulation
+    /// reads it, so it is neither hashed nor saved, and a loaded world draws none until its
+    /// next day.
+    std::set<entity_id> ships_found_by_player;
+
     /// BL-1449: each nation's AIR SUPERIORITY power over each province as the last
     /// air day flew it, keyed (province, nation), milli-HP of air attack a day. The
     /// share it gives (`air_share_permille`) scales a side's bombing, slows its

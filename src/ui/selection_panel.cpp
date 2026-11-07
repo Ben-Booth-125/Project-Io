@@ -56,6 +56,7 @@
 #include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
 #include <cstddef>   // std::ptrdiff_t (nth_element iterator offset)
 #include "wing_card.hpp" // BL-1450: the wing card
+#include "ship_card.hpp" // BL-1534: the ship card
 #include <cstdio>    // std::snprintf (tile coord caption + chart labels)
 #include <cfloat>    // FLT_MAX (net-profit PlotLines auto-scale)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
@@ -4316,6 +4317,9 @@ void draw_selection_content(world& w, const recipe_registry& reg,
     // canvas already shows the name (Ben, 2026-10-13). Every other kind keeps it.
     // BL-1450: an air WING owns its whole card (wing_card.hpp), header included.
     if (kind == selection_kind::wing && draw_wing_selection(w, reg, ui))
+        return;
+    // BL-1534: so does a SHIP (ship_card.hpp).
+    if (kind == selection_kind::ship && draw_ship_selection(w, reg, ui))
         return;
 
     if (kind == selection_kind::tile)

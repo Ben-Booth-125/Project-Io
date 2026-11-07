@@ -2141,6 +2141,55 @@
    "checks": [
     "alert_strip"
    ]
+  },
+  {
+   "id": "UI-140",
+   "name": "Ship card",
+   "kind": "sub-element",
+   "parent": "UI-043",
+   "source": [
+    "docs/ui/ledgers/military.md § Ships on the map",
+    "src/ui/ship_card.cpp"
+   ],
+   "summary": "A ship's card on the Selection band: its stat grid and status; the missions its class works; its zone. A transport shows its landing, who is aboard, and a Board press beside each land unit the seam would take. Refit on any ship.",
+   "interesting_question": "",
+   "resolution": "",
+   "checks": [
+    "sea_ui"
+   ]
+  },
+  {
+   "id": "UI-141",
+   "name": "Ship marker",
+   "kind": "sub-element",
+   "parent": "UI-013",
+   "source": [
+    "docs/ui/ledgers/military.md § Ships on the map",
+    "docs/ui/ICONS.md",
+    "src/ui/body_surface_canvas.cpp"
+   ],
+   "summary": "A diamond on a water tile with the class's silhouette in its owner's colour, for each ship the player can see, plus the right-click order line, the no-entry mark on a closed port and the cross on a tile where a cargo was taken.",
+   "interesting_question": "",
+   "resolution": "",
+   "checks": [
+    "sea_ui"
+   ]
+  },
+  {
+   "id": "UI-142",
+   "name": "Convoys: Lost",
+   "kind": "sub-element",
+   "parent": "UI-113",
+   "source": [
+    "docs/ui/ledgers/convoys.md",
+    "src/ui/convoys_ledger.cpp"
+   ],
+   "summary": "Above the convoy rows, each of the player's cargo cut or raided lately, in the Field channel's words, kept a few ticks.",
+   "interesting_question": "",
+   "resolution": "",
+   "checks": [
+    "sea_ui"
+   ]
   }
  ]
 }

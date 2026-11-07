@@ -37,6 +37,9 @@ enum class selection_kind
     /// `create_entity`, so it travels in `selected_entity` and `selection_kind_of`
     /// resolves it; its card is its own element (wing_card.hpp).
     wing,
+    /// BL-1534: a SHIP (`world::ships`, sea_combat.hpp), on the wing's rules; its card is
+    /// its own element (ship_card.hpp).
+    ship,
     // Future kinds (logistics vessel, …) slot in here once their component
     // stores exist; see SELECTION.md (§ Polymorphism).
 };

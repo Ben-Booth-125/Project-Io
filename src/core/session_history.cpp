@@ -76,6 +76,25 @@ void post_interceptions(const world& w, const economy_report& report, ui::chat_s
     }
 }
 
+void note_convoy_losses(const world& w, const economy_report& report, ::ui_state& ui_s)
+{
+    constexpr int k_ticks_kept = 3; // LOGISTICS.md § 7: "marked for a few ticks"
+    const int now = w.current_econ_tick;
+    auto& kept = ui_s.convoy_losses;
+    kept.erase(std::remove_if(kept.begin(), kept.end(),
+                              [&](const ::convoy_loss& l) { return now - l.tick >= k_ticks_kept; }),
+               kept.end());
+    const entity_id me = player_nation(w);
+    for (const interception_record& r : report.interceptions)
+    {
+        if (r.outcome == interception_outcome::returned_by_front)
+            continue; // it came home whole: the Field line says so, and nothing was lost
+        std::string line = interception_line(w, r, me);
+        if (!line.empty())
+            kept.push_back({std::move(line), r.tile, now, r.victim_corp == me});
+    }
+}
+
 void post_war_dispatches(const world& w, std::size_t& cursor, ui::chat_state& chat, int day_tick)
 {
     if (cursor > w.history_log.size())

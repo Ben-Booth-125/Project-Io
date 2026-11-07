@@ -109,6 +109,31 @@ void draw_convoys_ledger(const world& w, ui_state& s, bool& open)
                   return a->id < b->id;
               });
 
+    // BL-1534 (LOGISTICS.md § 7): a cargo that left the list with its cause stated, newest
+    // first, for the few ticks `note_convoy_losses` keeps it.
+    s.convoy_loss_rows = 0;
+    {
+        bool headed = false;
+        const float loss_w = ImGui::GetContentRegionAvail().x;
+        for (auto it = s.convoy_losses.rbegin(); it != s.convoy_losses.rend(); ++it)
+        {
+            if (!it->lost)
+                continue;
+            if (!headed)
+            {
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::air_refused), "Lost");
+                headed = true;
+            }
+            ui::wrap_text(ui::text_box::foldout_column, "convoys.lost", it->line.c_str(), loss_w);
+            ++s.convoy_loss_rows;
+        }
+        if (headed)
+        {
+            ImGui::Separator();
+            ImGui::Spacing();
+        }
+    }
+
     if (rows.empty())
     {
         ImGui::TextDisabled("Nothing in flight.");

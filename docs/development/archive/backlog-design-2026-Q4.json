@@ -14449,6 +14449,9 @@
     },
     "BL-1531": {
       "design": "MILITARY.md § Sea, landings; § Domains and traversal. Embark, carried supplies aboard, loss with a sunk transport, the landing door, the attacker's opening penalty, and life on carried supplies until the network reaches. Read Fronts and Occupation first: a landed unit's front and a taken port's effect on reach are the seams. Live click required. A ship class has no base capacity yet: this item adds it, and is the first reader of ship_live_stats::capacity, which a transport hull already moves."
+    },
+    "BL-1534": {
+      "design": "ledgers/military.md; MILITARY.md § Sea. Replace the stub tab, draw ships on water with class and owner, and add mission assignment by right-click, embark and land presses, a closed-port mark on the map, and raid causes in the Convoys ledger. Every control updates ACTIONS.json and every surface the question log. Every press needs a live click. The ship classes join the existing unit designer (set_ship_design), and a refit press sits on a ship at its home port (refit_ship): both verbs are on the seam with no player surface until this item. The live click owed by the Naval research branch goes with this pass: open the research panel, shift-click a Naval node, see it queue. Some rim labels overlap on the ten-branch ring (Order with Mass Surveillance, Anti-Ship Missiles with Long-Range Precision Strike): look at them there, at zoom. LOGISTICS.md § 7 also owes two surfaces no interception has yet: the Convoys ledger row leaving with a stated cause, and the tile marked for a few ticks. Both read economy_report::interceptions, on land and at sea. BL-1531 (troop landings) owes its live click here: board at a port, land on a coast, see a contested landing. The off-road dash must be looked at on a landed unit beside a hostile port."
     }
   }
 }

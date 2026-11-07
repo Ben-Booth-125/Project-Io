@@ -1704,7 +1704,7 @@
    "preconditions": [
     "In-game"
    ],
-   "expected_output": "Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; under the Recruit / Design tabs a row of THEATRE TABS, Land / Air / Sea, each with its count (ledger.military_theatre_tab; Land by default), one theatre shown at a time. The recruit pools are NOT in the ledger: they are the header's recruit readouts (chrome.header_recruit_hover); a Raise needs its men (50) or a wing its crew from the theatre's pool, and a Raise the pool cannot fill says so in its tooltip. Land: the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed, the goods or port it lacks on its Raise press's tooltip; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base' (why is the tooltip of both). Explanation is never ledger text: every refusal reason and intro sentence is the hover tooltip of the control it explains (Ben, 2026-10-30). Air: the airbase picker, the six air rows and your wings. Sea: a stub - 'Ships are not raised yet.' and your nation's ports under a picker. DESIGN (the same theatre tabs; Sea reads 'Ships are not designed yet.'): Land - one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its live design's numbers; pressing a class opens the unit designer on the full canvas (ledger.military_open_designer). Below, every unit type with its obsolete toggle (gameplay.set_unit_obsolete). Closing the ledger by any path (this icon, the active tab's re-press, another ledger opening) also closes an open unit designer, through its close catch: an unsaved draft asks Save or Discard first.",
+   "expected_output": "Toggles the Military ledger open in the fold-out column; re-click closes; opening closes any other ledger. No lens is armed. Two tabs, Recruit (default) and Design; re-clicking the ACTIVE tab closes the ledger (toggle rule), the other tab is a view change. RECRUIT: a base picker listing your nation's completed military bases, each named by the place its province holds with the count of your units standing on its tile (the first is chosen by default; choosing one is a target selection, not a toggle); your treasury room; under the Recruit / Design tabs a row of THEATRE TABS, Land / Air / Sea, each with its count (ledger.military_theatre_tab; Land by default), one theatre shown at a time. The recruit pools are NOT in the ledger: they are the header's recruit readouts (chrome.header_recruit_hover); a Raise needs its men (50) or a wing its crew from the theatre's pool, and a Raise the pool cannot fill says so in its tooltip. Land: the roster - every unit type the campaign band admits, newest band first, each with its price in credits, its land class and numbers (soft, hard, hardness, defence) and a Raise press; a type your nation cannot field is listed dimmed, the goods or port it lacks on its Raise press's tooltip; and the muster queue ('Nothing mustering.' when empty) - one row per muster order of yours with the unit type, its base and a progress bar of days left. With no completed base Recruit says 'No military base' and offers 'Find a site for a base' (why is the tooltip of both). Explanation is never ledger text: every refusal reason and intro sentence is the hover tooltip of the control it explains (Ben, 2026-10-30). Air: the airbase picker, the six air rows and your wings. Sea: your nation's ports under a picker, the four ship rows and your ships. DESIGN (the same theatre tabs; Sea lists the four ship classes, each opening the designer): Land - one row per land class (infantry, motorised, mechanised, armour, light armour, artillery, air defence) with its live design's numbers; pressing a class opens the unit designer on the full canvas (ledger.military_open_designer). Below, every unit type with its obsolete toggle (gameplay.set_unit_obsolete). Closing the ledger by any path (this icon, the active tab's re-press, another ledger opening) also closes an open unit designer, through its close catch: an unsaved draft asks Save or Discard first.",
    "reason_to_select": "Answers 'what force can I raise, where, at what cost - and what is it raised with?'. It is the broad door to every hire: every base and every unit type on one surface, where the tile card's Hire list shows one base's rows only."
   },
   {
@@ -3486,7 +3486,7 @@
    "preconditions": [
     "The Military ledger is open (nav rail slot 7)."
    ],
-   "expected_output": "The view lists that theatre alone. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Recruit's Sea is a stub - 'Ships are not raised yet.' and one row per completed port of your nation under a picker (the first chosen; choosing one is a target selection with no other effect), or 'No port'. Design's Land holds the land classes and the obsolete toggles; Design's Air the six air classes; Design's Sea reads 'Ships are not designed yet.'. No world change.",
+   "expected_output": "The view lists that theatre alone. Recruit's Land holds the military-base picker, the land roster and the muster queue; Recruit's Air holds the airbase picker, the six air rows and the player's wings; Recruit's Sea holds one row per completed port of your nation under a picker (the first chosen; choosing one is a target selection with no other effect), or 'No port', the four ship rows and your ships. Design's Land holds the land classes and the obsolete toggles; Design's Air the six air classes; Design's Sea reads 'Ships are not designed yet.'. No world change.",
    "reason_to_select": "Work one theatre at a time: the ledger column is narrow, and land and air together are long."
   },
   {
@@ -4017,7 +4017,7 @@
   {
    "id": "gameplay.hire_ship",
    "family": "gameplay",
-   "surface": "A corp_verb (corp_verb::hire_ship, 55) on the command seam.",
+   "surface": "The Military ledger's Sea tab (ledger.military_sea_raise). Also a corp_verb (corp_verb::hire_ship, 55) on the command seam.",
    "press": "Over the seam: COMMAND corp=<nation> nation=<nation> verb=55 tile=<the port's tile> unit_type=<sea roster row: 0 Attack Submarine, 1 Fleet Destroyer, 2 Capital Ship, 3 Fleet Transport>.",
    "args": [
     {
@@ -4044,7 +4044,7 @@
   {
    "id": "gameplay.assign_sea_mission",
    "family": "gameplay",
-   "surface": "A corp_verb (corp_verb::assign_sea_mission, 56) on the command seam.",
+   "surface": "The ship card on the Selection band (ledger.selection_ship_mission, ledger.selection_ship_remove_province) and a right-click on water of the Planetary canvas with a warship selected (canvas.ship_order). Also a corp_verb (corp_verb::assign_sea_mission, 56) on the command seam.",
    "press": "Over the seam: COMMAND corp=<nation> nation=<nation> verb=56 subject=<ship> order=<0 none, 1 patrol, 2 escort, 3 raid, 4 blockade> provinces=<id>,<id>,...",
    "args": [
     {
@@ -4077,7 +4077,7 @@
   {
    "id": "gameplay.set_ship_design",
    "family": "gameplay",
-   "surface": "A corp_verb (corp_verb::set_ship_design, 57) on the command seam.",
+   "surface": "The ship designer (ledger.military_open_ship_designer), its Save. Also a corp_verb (corp_verb::set_ship_design, 57) on the command seam.",
    "press": "Over the seam: COMMAND corp=<nation> nation=<nation> verb=57 order=<ship class> recipe=<slot> unit_type=<ship kit id>.",
    "args": [
     {
@@ -4108,7 +4108,7 @@
   {
    "id": "gameplay.refit_ship",
    "family": "gameplay",
-   "surface": "A corp_verb (corp_verb::refit_ship, 58) on the command seam.",
+   "surface": "The ship card's Refit press (ledger.selection_ship_refit). Also a corp_verb (corp_verb::refit_ship, 58) on the command seam.",
    "press": "Over the seam: COMMAND corp=<nation> nation=<nation> verb=58 subject=<ship id>.",
    "args": [
     {
@@ -4129,7 +4129,7 @@
   {
    "id": "gameplay.embark_unit",
    "family": "gameplay",
-   "surface": "A corp_verb (corp_verb::embark_unit, 59) on the command seam.",
+   "surface": "A transport's card, Board beside a unit (ledger.selection_ship_board). Also a corp_verb (corp_verb::embark_unit, 59) on the command seam.",
    "press": "Over the seam: COMMAND corp=<nation> nation=<nation> verb=59 subject=<unit id> order=<ship id>.",
    "args": [
     {
@@ -4155,7 +4155,7 @@
   {
    "id": "gameplay.land_units",
    "family": "gameplay",
-   "surface": "A corp_verb (corp_verb::land_units, 60) on the command seam.",
+   "surface": "A right-click on land of the Planetary canvas with a transport selected (canvas.ship_order), and the card's Recall (ledger.selection_ship_recall). Also a corp_verb (corp_verb::land_units, 60) on the command seam.",
    "press": "Over the seam: COMMAND corp=<nation> nation=<nation> verb=60 subject=<ship id> tile=<coast tile>. A null tile recalls a landing.",
    "args": [
     {
@@ -4178,6 +4178,181 @@
    ],
    "expected_output": "The transport sails to the water beside the tile and lands its units over the authored days. On hostile ground those days run only while its side holds that sea province. A hostile stack on the tile opens the ordinary campaign battle, fought from the surf.",
    "reason_to_select": "Put an army ashore where the road does not go, once the water is won."
+  },
+  {
+   "id": "ledger.military_sea_raise",
+   "family": "ledger",
+   "surface": "Military ledger, Recruit, Sea tab: one row per ship type with its price and a Raise press, under the port picker.",
+   "press": "Choose a port in the picker, then click Raise on a row.",
+   "args": [
+    {
+     "name": "row",
+     "type": "sea roster row",
+     "meaning": "The ship raised."
+    },
+    {
+     "name": "port",
+     "type": "the picker's port",
+     "meaning": "Where it is raised."
+    }
+   ],
+   "preconditions": [
+    "Reads hire_ship_check: the row is fieldable, the port is yours and complete with water at its mouth, the sea pool holds its crew. The credit leg is checked here and the goods leg answers on the press. Why a Raise is off is its tooltip."
+   ],
+   "expected_output": "Issues gameplay.hire_ship at the frame's end; the ledger shows \"Ship mustering.\" or the refusal is the row's tooltip.",
+   "reason_to_select": "Raise a ship at a port."
+  },
+  {
+   "id": "ledger.military_select_ship",
+   "family": "ledger",
+   "surface": "Military ledger, Recruit, Sea tab: \"Your ships\", one row per ship with what it is doing.",
+   "press": "Click a row.",
+   "args": [
+    {
+     "name": "ship",
+     "type": "row",
+     "meaning": "The ship selected."
+    }
+   ],
+   "preconditions": [
+    "Your own ships only."
+   ],
+   "expected_output": "Selects the ship: its card on the Selection band, its zone outlined on the canvas, its marker ringed. No world change.",
+   "reason_to_select": "Pick up a ship from the list."
+  },
+  {
+   "id": "ledger.military_open_ship_designer",
+   "family": "ledger",
+   "surface": "Military ledger, Design, Sea tab: one row per ship class with its numbers.",
+   "press": "Click a class row; click it again to close (the toggle rule).",
+   "args": [
+    {
+     "name": "class",
+     "type": "ship class",
+     "meaning": "The class opened."
+    }
+   ],
+   "preconditions": [
+    "None. Locked kit is listed with the Naval node that opens it. A transport has no armament box."
+   ],
+   "expected_output": "Opens the full-canvas designer on the class: hull, armament, sensors. A pick drafts; Save sends gameplay.set_ship_design per changed slot.",
+   "reason_to_select": "Choose what a class of ship is raised with."
+  },
+  {
+   "id": "canvas.ship_select",
+   "family": "canvas",
+   "surface": "Planetary canvas: the ship marker - a diamond with the class's silhouette in its owner's colour, on each water tile holding a ship you can see, with the number there when more than one.",
+   "press": "Left-click the marker. A repeat click walks to the next ship on the tile, in id order, and wraps.",
+   "args": [
+    {
+     "name": "tile",
+     "type": "tile on the canvas",
+     "meaning": "The marker pressed."
+    }
+   ],
+   "preconditions": [
+    "The hex surveyed and drawn at a radius of 6 px or more. Your own ships always; another nation's only on a day your side finds it, or on water it holds."
+   ],
+   "expected_output": "Selects the ship: its card on the Selection band. A rival's shows its class and owner only. No world change.",
+   "reason_to_select": "Pick up a ship from the map, or see what a found ship is."
+  },
+  {
+   "id": "canvas.ship_order",
+   "family": "canvas",
+   "surface": "Planetary canvas with one of your ships selected: the hovered hex is outlined in the sea colour with a line at the cursor saying what a right-click would do, or in red with why it is refused.",
+   "press": "Right-click. A warship: water, adding its sea province on its current mission. A transport: land, ordering its landing on that tile.",
+   "args": [
+    {
+     "name": "tile",
+     "type": "the right-clicked tile",
+     "meaning": "Its sea province joins the zone, or it is where the landing goes."
+    }
+   ],
+   "preconditions": [
+    "Your own ship is selected; no construction or road tool is armed, no march pick is armed, no lens is on.",
+    "The line reads sea_mission_check and land_units_check, so it cannot disagree with the press. A warship over land and a transport over water say nothing and the press does nothing.",
+    "A warship refuses with no mission held, a province already assigned, eight assigned, out of range, or a blockade away from a hostile port's mouth. A transport refuses with nothing aboard, ground it may not land on, or a unit aboard that cannot stand there."
+   ],
+   "expected_output": "Issues gameplay.assign_sea_mission with the whole list, or gameplay.land_units, at the frame's end through the seam.",
+   "reason_to_select": "Send a ship to work water, or put an army ashore."
+  },
+  {
+   "id": "ledger.selection_ship_mission",
+   "family": "ledger",
+   "surface": "Selection band, a warship's card, its Mission column: None and only the missions its class works.",
+   "press": "Click a mission. The lit one recalls the ship (the toggle rule).",
+   "args": [
+    {
+     "name": "mission",
+     "type": "sea_mission",
+     "meaning": "The mission set."
+    }
+   ],
+   "preconditions": [
+    "Your own ship. A mission the seam would refuse over the zone it has is disabled with the reason as its tooltip."
+   ],
+   "expected_output": "Issues gameplay.assign_sea_mission at the frame's end, or with no zone yet holds the choice on the card and sends nothing.",
+   "reason_to_select": "Choose what a ship does before naming where."
+  },
+  {
+   "id": "ledger.selection_ship_remove_province",
+   "family": "ledger",
+   "surface": "Selection band, a warship's card, its Zone column: each sea province with an x.",
+   "press": "Click x beside a province.",
+   "args": [
+    {
+     "name": "province",
+     "type": "row",
+     "meaning": "The province removed."
+    }
+   ],
+   "preconditions": [
+    "Your own ship."
+   ],
+   "expected_output": "Issues gameplay.assign_sea_mission with the rest of the list; removing the last recalls the ship, the mission staying held on the card.",
+   "reason_to_select": "Pull a ship off a stretch of water."
+  },
+  {
+   "id": "ledger.selection_ship_refit",
+   "family": "ledger",
+   "surface": "Selection band, any of your ships' cards: Refit.",
+   "press": "Click Refit.",
+   "args": [],
+   "preconditions": [
+    "Reads refit_ship_check: on an older design, raised, no mission, lying at its home port. Why it is off is its tooltip; when on, the tooltip names the goods."
+   ],
+   "expected_output": "Issues gameplay.refit_ship: it buys each changed slot's goods and is out of action for its muster days.",
+   "reason_to_select": "Bring a ship up to the live design."
+  },
+  {
+   "id": "ledger.selection_ship_board",
+   "family": "ledger",
+   "surface": "Selection band, a transport's card, \"Ready to board\": each land unit embark_check would take, with a Board press.",
+   "press": "Click Board beside a unit.",
+   "args": [
+    {
+     "name": "unit",
+     "type": "row",
+     "meaning": "The land unit that boards."
+    }
+   ],
+   "preconditions": [
+    "Listed only while the seam would take it: on or beside your open port, the transport at that port's mouth with room, the unit out of battle."
+   ],
+   "expected_output": "Issues gameplay.embark_unit; the unit moves to the Aboard list and leaves the map.",
+   "reason_to_select": "Load an army for a crossing."
+  },
+  {
+   "id": "ledger.selection_ship_recall",
+   "family": "ledger",
+   "surface": "Selection band, a transport's card with a landing ordered: Recall.",
+   "press": "Click Recall.",
+   "args": [],
+   "preconditions": [
+    "Disabled while its units are in the surf: the fight decides it."
+   ],
+   "expected_output": "Issues gameplay.land_units with a null tile: the landing is off and it sails home, its units still aboard.",
+   "reason_to_select": "Call off a landing the water has turned against."
   }
  ]
 }

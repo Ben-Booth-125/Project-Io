@@ -7,7 +7,7 @@
 --    each row's price and Raise press, and the muster queue's empty state.
 -- 3a. BL-1472: Recruit draws theatre tabs Land / Air / Sea under its own tabs, Land
 --     active; a theatre tab is a selector (re-pressing the active one does nothing);
---     the Sea tab is a stub - ships are not raised yet - with the nation's ports.
+--     the Sea tab lists the nation's ports (sea_ui.lua checks its ship rows).
 -- 3b. BL-1472: the recruit pools are the HEADER's, at its top right: land, air, sea,
 --     each held / cap with a bar, checked against the world (verify.recruit_pools);
 --     the land readout's tooltip and the header captured. Recruit has no pool strip.
@@ -127,7 +127,7 @@ do
             fail("re-pressing Land changed the view (open " .. tostring(l2.open) .. ", theatre " ..
                  tostring(l2.recruit_theatre) .. ")") end
     end
-    -- The Sea stub: ships are not raised yet, the nation's ports under a picker.
+    -- The Sea tab: the nation's ports under a picker; its rows are sea_ui.lua's.
     if ts then
         verify.click(ts.x, ts.y); verify.mouse(-1, -1); verify.frames(3)
         local l3 = verify.military_ledger()
@@ -137,7 +137,7 @@ do
         end
         print(string.format("military_ledger: Sea tab: %d port row(s) drawn, %d completed player port(s), chosen %d",
                             #l3.ports, nports, l3.sea_base))
-        if l3.recruit_theatre == "sea" and #l3.raises == 0 then ok("the Sea tab shows the stub, no Raise rows") else
+        if l3.recruit_theatre == "sea" and #l3.raises == 0 then ok("the Sea tab draws no land Raise rows") else
             fail("the Sea tab did not switch the theatre") end
         if #l3.ports == nports then ok("the Sea picker lists every port (" .. nports .. ")") else
             fail("the Sea picker drew " .. #l3.ports .. " rows for " .. nports .. " ports") end

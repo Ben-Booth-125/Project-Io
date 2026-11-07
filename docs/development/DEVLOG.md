@@ -10,6 +10,26 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-07 — BL-1534 (sea UI): ships on the map, and a card to order them
+
+**Runtime:** one session, Delivery Full on the naval worktree.
+
+**What was built.** Recruit's and Design's Sea tabs replace the stub. Ships draw on the water as a class diamond with a
+stack count; a new card (`src/ui/ship_card.*`) holds missions, zone, passengers, Board, Recall and Refit. A right-click
+on water assigns and on a coast lands, both previewed on the hover line from the seam's own checks. The closed-port and
+interception marks draw on the map, and the Convoys ledger gains a Lost section. The designer takes ship classes. Rim
+labels on the research ring now clear each other.
+
+**Review.** The cold review caught the map re-rolling detection on post-pass state with a different day stamp, so the
+player would have seen a different sea from the one the pass fought on: the pass now records what it found. Also a cargo
+that came home whole listed as lost, a verify read leaking a rival's orders, a script that walked tiles without a grant,
+silent skips in the check, and stale stub wording in the question log and the action dictionary.
+
+**Left open.** The live click: access was declined on 2026-11-07, so R10 is pending, with BL-1531 (troop landings) R8.
+Nine calls in NR-1149, including lake ports that can raise nothing. Shape identical to base.
+
+---
+
 ## 2026-11-06 — BL-1531 (troop landings): armies cross the water
 
 **Runtime:** one session, Delivery Full on the naval worktree.

@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <imgui_internal.h> // ImRect: the rim labels' clearing
 #include <vector>
 
 namespace ui {
@@ -564,8 +565,10 @@ void draw_node(ImDrawList* dl, ImVec2 c, float r, const dg::node& n, node_state 
 
 /// Text anchored outward from the ring's centre along @p ang (degrees): to the
 /// right of the point on the right half, left on the left, centred top/bottom.
+/// A label already on the ring. Each one placed steps a line further from the centre until it
+/// clears those before it, so ten branches' rim names never print over each other.
 void outward_text(ImDrawList* dl, ImFont* font, float size, ImVec2 at, float ang, ImU32 col,
-                  const char* text, float centre_band = 0.35f)
+                  const char* text, float centre_band, std::vector<ImRect>& placed)
 {
     const ImVec2 ts = font->CalcTextSizeA(size, FLT_MAX, 0.0f, text);
     const float cx = std::cos(ang * kDeg), cy = std::sin(ang * kDeg);
@@ -576,6 +579,17 @@ void outward_text(ImDrawList* dl, ImFont* font, float size, ImVec2 at, float ang
     if (cy > 0.35f)       p.y += 0.0f;
     else if (cy < -0.35f) p.y -= ts.y;
     else                  p.y -= ts.y * 0.5f;
+    const float step = cy < 0.0f ? -ts.y : ts.y;
+    const auto clashes = [&](const ImVec2 q) {
+        const ImRect box(q, {q.x + ts.x, q.y + ts.y});
+        for (const ImRect& o : placed)
+            if (o.Overlaps(box))
+                return true;
+        return false;
+    };
+    for (int tries = 0; tries < 8 && clashes(p); ++tries)
+        p.y += step;
+    placed.emplace_back(p, ImVec2{p.x + ts.x, p.y + ts.y});
     dl->AddText(font, size, p, col, text); // fit-exempt: free-standing ring label, no container to fit
 }
 
@@ -1118,7 +1132,14 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
             dl->AddCircle(c, r + 4.0f, palette::hover, 0, 2.0f);
     }
 
-    // --- labels: rim majors, branch names on the rim, tree names inside
+    // --- labels: branch names on the rim, then rim majors around them, tree names inside
+    std::vector<ImRect> placed_labels;
+    for (int b = 0; b < dg::branch_count; ++b)
+    {
+        const float a = branch_angle(b);
+        outward_text(dl, font, ImGui::GetFontSize(), at(a, kLabelRadius), a, palette::research_accent,
+                     dg::branches[static_cast<std::size_t>(b)].name, 0.35f, placed_labels);
+    }
     for (int i = 0; i < dg::node_count; ++i)
     {
         const dg::node& n = node_at(i);
@@ -1132,13 +1153,7 @@ void draw_tech_tree_panel(const world& w, const research_params& p, ui_state& s)
         // each other.
         outward_text(dl, font, small, lp, pl.ang,
                      n.is_placeholder ? palette::research_muted : palette::text_secondary, n.name,
-                     0.04f);
-    }
-    for (int b = 0; b < dg::branch_count; ++b)
-    {
-        const float a = branch_angle(b);
-        outward_text(dl, font, ImGui::GetFontSize(), at(a, kLabelRadius), a, palette::research_accent,
-                     dg::branches[static_cast<std::size_t>(b)].name);
+                     0.04f, placed_labels);
     }
     // Tree names inside their own sectors (Ben, 2026-10-10): each on its
     // tree's axis in the hub, inside the ring of its root travel nodes,

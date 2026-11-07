@@ -2130,6 +2130,69 @@ int main()
         }
     }
 
+    // BL-1534 (sea UI): what the map draws is what the day's pass found, recorded by the pass.
+    printf("\nF: the map's record of ships found\n");
+    {
+        // A hostile ship: found on some days and not others, and never one's own.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        const entity_id mine  = add_ship(f, f.a, f.a_port, DES, 30, 3);
+        const entity_id theirs = add_ship(f, f.b, f.b_port, SUB, 31, 3);
+        int on = 0, off = 0, own = 0;
+        const int days = 12;
+        for (int d = 0; d < days && f.w.ships.count(theirs) != 0 && f.w.ships.count(mine) != 0; ++d)
+        {
+            f.w.ships.at(theirs).hp_ppm = k_ship_hp_full;
+            f.w.ships.at(mine).hp_ppm   = k_ship_hp_full;
+            run_sea_day(f.w, reg, d);
+            (f.w.ships_found_by_player.count(theirs) != 0 ? on : off) += 1;
+            own += f.w.ships_found_by_player.count(mine) != 0 ? 1 : 0;
+        }
+        check(on > 0, "F1 a hostile submarine is found on some days (" + std::to_string(on) + ")");
+        check(off > 0, "F1b and not on others (" + std::to_string(off) + ")");
+        check(own == 0, "F1c the player's own ship is never in the record");
+    }
+    {
+        // No detection, no record: a side with no working eye sees nothing.
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        const entity_id mine = add_ship(f, f.a, f.a_port, SUB, 30, 3);
+        add_ship(f, f.b, f.b_port, DES, 31, 3);
+        f.w.ships.at(mine).morale_permille = 0;
+        run_sea_day(f.w, reg, 3);
+        check(f.w.ships_found_by_player.empty(), "F2 no detection finds nothing");
+    }
+    {
+        // A neutral's ship is found by the roll alone, and that is not a detection: nothing fires.
+        fixture f; build(f);
+        const entity_id mine = add_ship(f, f.a, f.a_port, DES, 30, 3);
+        const entity_id them = add_ship(f, f.b, f.b_port, CAP, 31, 3);
+        int finds = 0, detections = 0;
+        for (int d = 0; d < 60; ++d)
+        {
+            detections += run_sea_day(f.w, reg, d).detections;
+            finds += f.w.ships_found_by_player.count(them) != 0 ? 1 : 0;
+        }
+        check(finds > 0, "F3 a neutral's ship can be found for the map (" + std::to_string(finds) + " of 60)");
+        check(detections == 0 && f.w.ships.at(them).hp_ppm == k_ship_hp_full
+                  && f.w.ships.at(mine).hp_ppm == k_ship_hp_full,
+              "F3b and the day's pass does not treat it as found: no detection, no hit");
+    }
+    {
+        // A read for the UI: the snapshot does not carry it, and the last day's goes with the ships.
+        fixture f; build(f);
+        const entity_id them = add_ship(f, f.b, f.b_port, CAP, 31, 3);
+        const std::string before = to_bytes(f.w);
+        f.w.ships_found_by_player.insert(them);
+        check(to_bytes(f.w) == before, "F4 the record is not in the save");
+        world loaded;
+        check(from_bytes(to_bytes(f.w), loaded) && loaded.ships_found_by_player.empty(),
+              "F4b a loaded world holds none");
+        f.w.ships.clear();
+        run_sea_day(f.w, reg, 1);
+        check(f.w.ships_found_by_player.empty(), "F4c a day with no ships clears it");
+    }
+
     std::printf("\n%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

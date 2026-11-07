@@ -6,6 +6,7 @@
 #include "stat_grid.hpp" // BL-1454: the design's stat grid, bottom right
 #include "unit_art.hpp"
 #include "wing_card.hpp" // air_class_label
+#include "ship_card.hpp" // ship_class_label
 
 #include "world/air_combat.hpp"             // wing_class — an air class's stale wings
 #include "world/corp_command.hpp"           // unit_design_check / air_design_check
@@ -333,13 +334,127 @@ private:
     air_class              c_;
 };
 
+/// The ship classes (`ship_kit_catalogue`; MILITARY.md § Sea). No ship art yet: the image is the
+/// class's silhouette on the placeholder panel, anchored at the hull, the guns and the mast.
+class sea_theatre final : public theatre
+{
+public:
+    sea_theatre(const world& w, const recipe_registry& reg, entity_id nation, ship_class c)
+        : w_(w), reg_(reg), nation_(nation), c_(c) {}
+    int slots() const override { return k_ship_kit_slot_count; }
+    const char* slot_name(int sl) const override { return ship_kit_slot_name(sl); }
+    const std::vector<uint16_t>& items(int sl) const override { return ship_kit_items_for(c_, sl); }
+    uint16_t live(int sl) const override { return ship_design_fitted(w_, nation_, c_, sl); }
+    uint16_t item_at(int sl, uint8_t v) const override { return ship_kit_item_at(c_, sl, v); }
+    uint8_t variant_of(uint16_t it) const override { return ship_kit_variant_of(it); }
+    unit_design live_design() const override { return ship_design_of(w_, nation_, c_); }
+    std::size_t catalogue_size() const override { return ship_kit_catalogue().size(); }
+    const char* item_name(uint16_t it) const override { return ship_kit_catalogue()[it].name; }
+    bool item_is_base(uint16_t it) const override { return ship_kit_catalogue()[it].goods_count == 0; }
+    std::string item_goods(uint16_t it) const override { return item_goods_text(ship_kit_catalogue()[it]); }
+    const char* research_node(uint16_t it) const override { return ship_kit_catalogue()[it].research_node; }
+    bool researched(uint16_t it) const override { return ship_kit_item_researched(w_, nation_, it); }
+    corp_command_result check(int sl, uint16_t it) const override
+    {
+        return ship_design_check(w_, nation_, static_cast<uint32_t>(c_), static_cast<uint16_t>(sl), it);
+    }
+    std::string item_delta(uint16_t it) const override
+    {
+        const ship_combat_stats& k = ship_kit_catalogue()[it].delta;
+        ship_live_stats t;
+        t.hp = k.hp; t.attack = k.attack; t.detection = k.detection; t.stealth = k.stealth;
+        t.days_per_tile_permille = k.days_per_tile_permille; t.capacity = k.capacity;
+        return stat_delta_text(to_stats({}), to_stats(t));
+    }
+    std::vector<stat> stats(const unit_design& d) const override { return to_stats(totals(d)); }
+    stat_bands bands(const recipe_registry&, const unit_design& shown, const unit_design& live) const override
+    {
+        return ship_design_stat_bands(totals(shown), totals(live),
+                                      reg_.military().sea.cls[static_cast<std::size_t>(c_)].range);
+    }
+    std::string design_goods(const unit_design& d) const override { return goods_text(ship_kit_goods(c_, d)); }
+    const char* class_label() const override { return ship_class_label(c_); }
+    const char* per() const override { return "ship"; }
+    int stale() const override
+    {
+        const unit_design live_d = live_design();
+        int n = 0;
+        for (const auto& [sid, sh] : w_.ships)
+            if (sh.owner == nation_ && ship_class_of(sh) == c_ && sh.kit != live_d)
+                ++n;
+        return n;
+    }
+    std::string stale_text(int n) const override
+    {
+        char buf[120];
+        std::snprintf(buf, sizeof buf, "%d ship%s on an older design: refit at the home port.", n, n == 1 ? "" : "s");
+        return buf;
+    }
+    std::string model_text() const override
+    {
+        return "A pick is a draft. Save makes it the live design: new ships are raised with it, and old ones refit to it.";
+    }
+    void draw_image(ImDrawList* dl, ImVec2 i0, ImVec2 i1) const override
+    {
+        dl->AddRect(i0, i1, k_box_border, 4.0f, 0, 1.5f);
+        icons::ship(dl, {(i0.x + i1.x) * 0.5f, (i0.y + i1.y) * 0.5f},
+                    std::min(i1.x - i0.x, i1.y - i0.y) * 0.62f, c_,
+                    palette::building_kind_colour(building_type::port));
+    }
+    float image_w() const override { return 640.0f; }
+    float image_h() const override { return 400.0f; }
+    float anchor_x(int sl) const override { static constexpr float x[3] = {0.28f, 0.74f, 0.47f}; return x[sl]; }
+    float anchor_y(int sl) const override { static constexpr float y[3] = {0.68f, 0.44f, 0.20f}; return y[sl]; }
+
+private:
+    ship_live_stats totals(const unit_design& d) const
+    {
+        sea_ship probe;
+        probe.type = static_cast<uint16_t>(c_); // the sea rows are one per class, in class order
+        probe.kit  = d;
+        return ship_stats(reg_, probe);
+    }
+    static std::vector<stat> to_stats(const ship_live_stats& s)
+    {
+        return {{"HP", "HP", s.hp, false},
+                {"Attack", "attack", s.attack, false},
+                {"Detection", "detection", s.detection, false},
+                {"Stealth", "stealth", s.stealth, false},
+                {"Speed", "per-mille days a tile", s.days_per_tile_permille, false},
+                {"Capacity", "capacity", s.capacity, false}};
+    }
+    const world&           w_;
+    const recipe_registry& reg_;
+    entity_id              nation_;
+    ship_class             c_;
+};
+
 bool is_air(detail_surface s) { return s == detail_surface::air_designer; }
+bool is_sea(detail_surface s) { return s == detail_surface::ship_designer; }
+
+/// The draft's slot count in (@p surface, @p cls).
+int slots_of(detail_surface surface, int cls)
+{
+    if (is_air(surface)) return k_air_kit_slot_count;
+    if (is_sea(surface)) return k_ship_kit_slot_count;
+    return kit_slot_count(static_cast<land_class>(cls));
+}
+
+/// The live item of (@p surface, @p cls, @p sl).
+uint16_t fitted_of(const world& w, entity_id nation, detail_surface surface, int cls, int sl)
+{
+    if (is_air(surface)) return air_design_fitted(w, nation, static_cast<air_class>(cls), sl);
+    if (is_sea(surface)) return ship_design_fitted(w, nation, static_cast<ship_class>(cls), sl);
+    return design_fitted(w, nation, static_cast<land_class>(cls), sl);
+}
 
 /// Is (@p surface, @p key) a designer the theatre can open?
 bool valid_key(detail_surface surface, int key)
 {
     if (is_air(surface))
         return key >= 0 && key < air_class_count;
+    if (is_sea(surface))
+        return key >= 0 && key < ship_class_count;
     return key >= 0 && key < land_class_count && kit_slot_count(static_cast<land_class>(key)) > 0;
 }
 
@@ -355,6 +470,12 @@ std::unique_ptr<theatre> make_theatre(const world& w, const recipe_registry* reg
         if (reg == nullptr)
             return nullptr;
         return std::make_unique<air_theatre>(w, *reg, nation, static_cast<air_class>(key));
+    }
+    if (is_sea(surface))
+    {
+        if (reg == nullptr)
+            return nullptr;
+        return std::make_unique<sea_theatre>(w, *reg, nation, static_cast<ship_class>(key));
     }
     return std::make_unique<land_theatre>(w, nation, static_cast<land_class>(key));
 }
@@ -379,15 +500,13 @@ int changed_in(const world& w, const unit_designer_state& d, entity_id nation)
     if (d.draft_cls < 0 || !valid_key(d.draft_surface, d.draft_cls))
         return 0;
     int n = 0;
-    const bool air   = is_air(d.draft_surface);
-    const int  slots = air ? k_air_kit_slot_count : kit_slot_count(static_cast<land_class>(d.draft_cls));
+    const int  slots = slots_of(d.draft_surface, d.draft_cls);
     for (int sl = 0; sl < slots && sl < static_cast<int>(k_kit_slot_max); ++sl)
     {
         const uint16_t it = d.draft[static_cast<std::size_t>(sl)];
         if (it == k_no_kit_item)
             continue;
-        const uint16_t live = air ? air_design_fitted(w, nation, static_cast<air_class>(d.draft_cls), sl)
-                                  : design_fitted(w, nation, static_cast<land_class>(d.draft_cls), sl);
+        const uint16_t live = fitted_of(w, nation, d.draft_surface, d.draft_cls, sl);
         if (it != live)
             ++n;
     }
@@ -439,15 +558,13 @@ void save_draft(const world& w, unit_designer_state& d, entity_id nation)
 {
     if (d.draft_cls >= 0 && valid_key(d.draft_surface, d.draft_cls))
     {
-        const bool air   = is_air(d.draft_surface);
-        const int  slots = air ? k_air_kit_slot_count : kit_slot_count(static_cast<land_class>(d.draft_cls));
+        const int  slots = slots_of(d.draft_surface, d.draft_cls);
         for (int sl = 0; sl < slots && sl < static_cast<int>(k_kit_slot_max); ++sl)
         {
             const uint16_t it = d.draft[static_cast<std::size_t>(sl)];
-            const uint16_t live = air ? air_design_fitted(w, nation, static_cast<air_class>(d.draft_cls), sl)
-                                      : design_fitted(w, nation, static_cast<land_class>(d.draft_cls), sl);
+            const uint16_t live = fitted_of(w, nation, d.draft_surface, d.draft_cls, sl);
             if (it != k_no_kit_item && it != live)
-                d.pending.push_back({d.draft_cls, sl, it, air});
+                d.pending.push_back({d.draft_cls, sl, it, is_air(d.draft_surface), is_sea(d.draft_surface)});
         }
     }
     clear_draft(d);
@@ -484,6 +601,19 @@ bool air_designer_open_on(const ui_state& s, air_class c)
     return is_expanded(s, detail_surface::air_designer, static_cast<int>(c));
 }
 
+bool ship_designer_open_on(const ui_state& s, ship_class c)
+{
+    return is_expanded(s, detail_surface::ship_designer, static_cast<int>(c));
+}
+
+void toggle_ship_designer(ui_state& s, ship_class c)
+{
+    if (ship_designer_open_on(s, c))
+        fold(s);
+    else
+        expand(s, detail_surface::ship_designer, static_cast<int>(c));
+}
+
 void toggle_air_designer(ui_state& s, air_class c)
 {
     if (air_designer_open_on(s, c))
@@ -496,10 +626,12 @@ static_assert(std::tuple_size<decltype(unit_designer_state::draft)>::value == k_
               "the designer's draft holds one item per kit slot");
 static_assert(k_air_kit_slot_count <= static_cast<int>(k_kit_slot_max),
               "an air design's slots fit the draft");
+static_assert(k_ship_kit_slot_count <= static_cast<int>(k_kit_slot_max),
+              "a ship design's slots fit the draft");
 
 unit_design unit_designer_draft_design(const world& w, const ui_state& s, entity_id nation, land_class c)
 {
-    if (s.designer.draft_cls != static_cast<int>(c) || is_air(s.designer.draft_surface))
+    if (s.designer.draft_cls != static_cast<int>(c) || s.designer.draft_surface != detail_surface::unit_designer)
         return design_of(w, nation, c);
     return drafted(land_theatre(w, nation, c), s.designer);
 }
@@ -545,6 +677,7 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     d.stale_units = 0;
     d.drawn_cls   = -1;
     d.drawn_air   = false;
+    d.drawn_sea   = false;
 
     const entity_id nation = player_nation(w);
 
@@ -558,9 +691,11 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
         {
             clear_draft(d);
             d.draft_cls     = d.refused.front().cls;
-            d.draft_surface = d.refused.front().air ? detail_surface::air_designer : detail_surface::unit_designer;
+            d.draft_surface = d.refused.front().air ? detail_surface::air_designer
+                            : d.refused.front().sea ? detail_surface::ship_designer
+                                                    : detail_surface::unit_designer;
             for (const auto& r : d.refused)
-                if (r.cls == d.draft_cls && r.air == is_air(d.draft_surface)
+                if (r.cls == d.draft_cls && r.air == is_air(d.draft_surface) && r.sea == is_sea(d.draft_surface)
                     && r.slot >= 0 && r.slot < static_cast<int>(k_kit_slot_max))
                     d.draft[static_cast<std::size_t>(r.slot)] = r.item;
             d.refused.clear();
@@ -609,7 +744,8 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     }
 
     const detail_surface surface = s.expanded.surface;
-    if (surface != detail_surface::unit_designer && surface != detail_surface::air_designer)
+    if (surface != detail_surface::unit_designer && surface != detail_surface::air_designer
+        && surface != detail_surface::ship_designer)
     {
         d.slot_open    = -1;
         d.open_cls     = -1;
@@ -658,6 +794,7 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     }
     d.drawn_cls = key;
     d.drawn_air = is_air(surface);
+    d.drawn_sea = is_sea(surface);
 
     const unit_design design = drafted(t, d); // what is shown
     ImDrawList*       dl     = ImGui::GetWindowDrawList();
@@ -697,6 +834,8 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
     std::vector<slot_pos> pos;
     for (int sl = 0; sl < slots; ++sl)
     {
+        if (t.items(sl).empty())
+            continue; // a transport has no armament: no box
         const ImVec2 a = {i0.x + t.anchor_x(sl) * iw, i0.y + t.anchor_y(sl) * ih};
         pos.push_back({sl, a, t.anchor_x(sl) >= 0.5f, 0.0f});
     }
@@ -940,7 +1079,8 @@ void draw_unit_designer(const world& w, const recipe_registry& reg, ui_state& s)
         // previewed fitted, each with its signed delta against the LIVE design.
         const ImVec2 strip = ImGui::GetCursorScreenPos();
         ImGui::SetCursorScreenPos({o.x + avail.x - grid_w, strip.y});
-        draw_stat_grid(is_air(surface) ? "air_designer" : "unit_designer", t.bands(reg, next, live_d), grid_w);
+        draw_stat_grid(is_air(surface) ? "air_designer" : is_sea(surface) ? "ship_designer" : "unit_designer",
+                       t.bands(reg, next, live_d), grid_w);
         ImGui::SetCursorScreenPos(strip);
         const float text_w = std::max(120.0f, avail.x - grid_w - 16.0f);
         ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + text_w);

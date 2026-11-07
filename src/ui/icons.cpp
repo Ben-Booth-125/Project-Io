@@ -1983,6 +1983,88 @@ void anchor(ImDrawList* dl, ImVec2 c, float r, ImU32 colour)
     }
 }
 
+void ship(ImDrawList* dl, ImVec2 c, float r, ship_class cls, ImU32 colour)
+{
+    const auto at = [&](float x, float y) { return ImVec2{c.x + x * r, c.y + y * r}; };
+    const auto hull = [&](float top, float bottom, float stern, float keel) {
+        const ImVec2 q[4] = {at(-stern, top), at(1.0f, top), at(keel, bottom), at(-stern + 0.12f, bottom)};
+        dl->AddConvexPolyFilled(q, 4, colour);
+    };
+    const auto box = [&](float x0, float y0, float x1, float y1) {
+        dl->AddRectFilled(at(x0, y0), at(x1, y1), colour);
+    };
+    const float t = std::max(1.0f, r * 0.10f);
+    switch (cls)
+    {
+        case ship_class::submarine:
+            dl->AddRectFilled(at(-1.0f, 0.02f), at(1.0f, 0.40f), colour, r * 0.18f);
+            box(-0.22f, -0.30f, 0.12f, 0.06f);
+            dl->AddLine(at(-0.05f, -0.30f), at(-0.05f, -0.56f), colour, t);
+            break;
+        case ship_class::destroyer:
+            hull(0.06f, 0.42f, 0.95f, 0.68f);
+            box(-0.26f, -0.20f, 0.22f, 0.08f);
+            dl->AddLine(at(-0.02f, -0.20f), at(-0.02f, -0.62f), colour, t);
+            break;
+        case ship_class::capital:
+            hull(0.00f, 0.50f, 1.00f, 0.76f);
+            box(-0.48f, -0.28f, 0.34f, 0.02f);
+            box(-0.20f, -0.60f, 0.10f, -0.26f);
+            dl->AddLine(at(0.34f, -0.14f), at(0.78f, -0.14f), colour, t);
+            dl->AddLine(at(-0.48f, -0.14f), at(-0.84f, -0.14f), colour, t);
+            break;
+        case ship_class::transport:
+        default:
+            hull(0.14f, 0.50f, 1.00f, 0.80f);
+            box(-0.54f, -0.36f, 0.42f, 0.16f);
+            box(-0.88f, -0.24f, -0.62f, 0.16f);
+            break;
+    }
+}
+
+void ship_marker(ImDrawList* dl, ImVec2 centre, float r, ship_class cls, ImU32 fill, int count, bool hovered)
+{
+    const ImVec2 q[4] = {{centre.x, centre.y - r}, {centre.x + r, centre.y}, {centre.x, centre.y + r}, {centre.x - r, centre.y}};
+    dl->AddConvexPolyFilled(q, 4, IM_COL32(18, 20, 26, 235));
+    dl->AddPolyline(q, 4, fill, ImDrawFlags_Closed, std::max(1.0f, r * 0.10f));
+    ship(dl, centre, r * 0.62f, cls, fill);
+    if (count > 1 && r >= 6.0f)
+    {
+        char buf[8];
+        std::snprintf(buf, sizeof buf, "%d", count);
+        ImFont*      font = ImGui::GetFont();
+        const float  size = std::max(8.0f, std::min(ImGui::GetFontSize(), r * 0.95f));
+        const ImVec2 ts   = font->CalcTextSizeA(size, FLT_MAX, 0.0f, buf);
+        const ImVec2 at{ centre.x + r * 0.40f, centre.y + r * 0.40f };
+        dl->AddRectFilled({ at.x - 1.0f, at.y }, { at.x + ts.x + 1.0f, at.y + ts.y }, IM_COL32(18, 20, 26, 235));
+        dl->AddText(font, size, at, IM_COL32(235, 235, 240, 255), buf); // fit-exempt: on-canvas badge, sized to its own text
+    }
+    if (hovered)
+    {
+        const float o = r + std::max(1.5f, r * 0.18f);
+        const ImVec2 h[4] = {{centre.x, centre.y - o}, {centre.x + o, centre.y}, {centre.x, centre.y + o}, {centre.x - o, centre.y}};
+        dl->AddPolyline(h, 4, palette::hover, ImDrawFlags_Closed, 2.0f);
+    }
+}
+
+void closed_port_mark(ImDrawList* dl, ImVec2 c, float r)
+{
+    const ImU32 red = IM_COL32(232, 84, 72, 245);
+    const float t   = std::max(1.5f, r * 0.24f);
+    dl->AddCircleFilled(c, r, IM_COL32(18, 20, 26, 235));
+    dl->AddCircle(c, r, red, 0, t);
+    dl->AddLine({c.x - r * 0.68f, c.y - r * 0.68f}, {c.x + r * 0.68f, c.y + r * 0.68f}, red, t);
+}
+
+void interception_mark(ImDrawList* dl, ImVec2 c, float r, ImU32 colour)
+{
+    const float t = std::max(1.5f, r * 0.20f);
+    dl->AddCircleFilled(c, r, IM_COL32(18, 20, 26, 200));
+    dl->AddCircle(c, r, colour, 0, t);
+    dl->AddLine({c.x - r * 0.5f, c.y - r * 0.5f}, {c.x + r * 0.5f, c.y + r * 0.5f}, colour, t);
+    dl->AddLine({c.x - r * 0.5f, c.y + r * 0.5f}, {c.x + r * 0.5f, c.y - r * 0.5f}, colour, t);
+}
+
 void wing_marker(ImDrawList* dl, ImVec2 centre, float r, ImU32 fill, int count, bool hovered)
 {
     // A round dark plate — the land counter is square, so a wing never reads as a
@@ -2451,6 +2533,14 @@ void stat(ImDrawList* dl, ImVec2 c, float r, stat_glyph which, ImU32 col)
         case stat_glyph::supply:
             supply(dl, c, r * 0.85f, col);
             break;
+        case stat_glyph::capacity:
+        {
+            const float t = std::max(1.0f, r * 0.14f);
+            dl->AddLine({c.x - r, c.y + r * 0.62f}, {c.x + r, c.y + r * 0.62f}, col, t);
+            dl->AddRect({c.x - r * 0.82f, c.y - r * 0.30f}, {c.x - r * 0.08f, c.y + r * 0.46f}, col, 0.0f, 0, t);
+            dl->AddRect({c.x + r * 0.08f, c.y - r * 0.30f}, {c.x + r * 0.82f, c.y + r * 0.46f}, col, 0.0f, 0, t);
+            break;
+        }
     }
 }
 

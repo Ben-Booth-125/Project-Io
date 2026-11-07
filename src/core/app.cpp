@@ -28,6 +28,8 @@
 #include "ui/unit_art.hpp"        // the unit designer's class art, loaded once
 #include "ui/unit_designer.hpp"   // the full-canvas unit designer
 #include "ui/wing_card.hpp"       // BL-1450: reset_wing_ui beside reset_unit_designer
+#include "ui/ship_card.hpp"       // BL-1534: reset_ship_ui, ship_order_answer
+#include "world/sea_combat.hpp"   // BL-1534: ship_crew, for the hire's refusal
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
@@ -1912,7 +1914,7 @@ void app::finish_new_game()
 
     open_play_log(std::string());
     ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
-    ui::reset_wing_ui(m_ui);       // BL-1450: so do a wing card's held missions and queued order
+    ui::reset_ship_ui(m_ui); ui::reset_wing_ui(m_ui);       // BL-1450: so do a wing card's held missions and queued order
     ui::reset_diplomacy_ui(m_ui);  // BL-1462: and the Diplomacy ledger's declaration, history and caches
     m_screen = app_screen::in_game;
 }
@@ -2106,6 +2108,7 @@ void app::step_economy()
         // pre-game posts lines the player never saw.
         session_history::post_battle_dispatches(m_world, m_last_econ_report, m_chat, day);
         session_history::post_interceptions(m_world, m_last_econ_report, m_chat, day); // BL-1529
+        session_history::note_convoy_losses(m_world, m_last_econ_report, m_ui);       // BL-1534
         // BL-1480 (NR-1120): a declaration or peace the player is party to - the rival's
         // pass above, or the player's own press since the last step.
         session_history::post_war_dispatches(m_world, m_war_log_cursor, m_chat, day);
@@ -2598,7 +2601,7 @@ bool app::load_game_from(const std::string& path)
     m_ui.clear_battle_selection();
     m_ui.clear_front_selection();
     ui::reset_unit_designer(m_ui); // a draft belongs to the world it was drafted in
-    ui::reset_wing_ui(m_ui);       // BL-1450: so do a wing card's held missions and queued order
+    ui::reset_ship_ui(m_ui); ui::reset_wing_ui(m_ui);       // BL-1450: so do a wing card's held missions and queued order
     ui::reset_diplomacy_ui(m_ui);  // BL-1462: and the Diplomacy ledger's declaration, history and caches
 
     m_screen = app_screen::in_game;
@@ -2675,7 +2678,7 @@ void app::exit_to_menu()
     m_ui.spectating     = spectating;
     m_ui.show_frame_hud = frame_hud;
     ui::reset_unit_designer(m_ui);
-    ui::reset_wing_ui(m_ui);
+    ui::reset_ship_ui(m_ui); ui::reset_wing_ui(m_ui);
     ui::reset_diplomacy_ui(m_ui);
 
     m_sim_loop        = sim_loop();
@@ -3628,7 +3631,9 @@ void app::render()
             corp_command cmd;
             cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
             cmd.corp      = m_world.player_entity;
-            cmd.verb      = p.air ? corp_verb::set_air_design : corp_verb::set_unit_design; // BL-1450
+            cmd.verb      = p.air ? corp_verb::set_air_design // BL-1450
+                          : p.sea ? corp_verb::set_ship_design // BL-1534
+                                  : corp_verb::set_unit_design;
             cmd.order     = static_cast<uint32_t>(p.cls);
             cmd.recipe    = static_cast<uint16_t>(p.slot);
             cmd.unit_type = p.item;
@@ -3645,8 +3650,10 @@ void app::render()
             }
         }
         const bool air_save = m_ui.designer.pending.front().air;
+        const bool sea_save = m_ui.designer.pending.front().sea;
         if (applied == sent)
             m_ui.designer.last_message = air_save ? "Saved: new wings are raised with this design."
+                                       : sea_save ? "Saved: new ships are raised with this design."
                                                   : "Saved: new units are raised with this design.";
         else
             m_ui.designer.last_message = "Saved " + std::to_string(applied) + " of " + std::to_string(sent)
@@ -3657,6 +3664,49 @@ void app::render()
 
     // BL-1450 (air UI): the three air presses, each through the same seam any caller
     // uses. A refusal mutates nothing and is worded where the press was made.
+
+    // BL-1534: the Military ledger's sea Raise: `hire_ship` at the chosen port's tile.
+    if (m_ui.military.pending_ship_tile != null_entity)
+    {
+        corp_command cmd;
+        cmd.tick      = static_cast<int>(m_sim_loop.day_tick());
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::hire_ship;
+        cmd.tile      = m_ui.military.pending_ship_tile;
+        cmd.unit_type = m_ui.military.pending_ship_row;
+        const corp_command_result sr = player_command(cmd);
+        m_ui.military.sea_raise_refused = sr != corp_command_result::applied;
+        switch (sr)
+        {
+            case corp_command_result::applied:
+                m_ui.military.sea_message = "Ship mustering."; break;
+            case corp_command_result::rejected_funds:
+                m_ui.military.sea_message = "Can't afford or supply it."; break;
+            case corp_command_result::rejected_placement:
+                m_ui.military.sea_message = "No port of yours there."; break;
+            case corp_command_result::rejected_no_recruits:
+                m_ui.military.sea_message =
+                    recruit_shortfall_text(ship_crew(m_registry, cmd.unit_type),
+                                           recruit_pool(m_world, player_actor(m_world), recruit_theatre::sea)) + ".";
+                break;
+            default:
+                m_ui.military.sea_message = "Raising the ship failed."; break;
+        }
+        m_ui.military.pending_ship_tile = null_entity; // consume the request
+    }
+    // BL-1534: the ship card's presses and the canvas right-click, in the order pressed.
+    if (!m_ui.ship.pending.empty())
+    {
+        for (corp_command cmd : m_ui.ship.pending)
+        {
+            cmd.tick = static_cast<int>(m_sim_loop.day_tick());
+            const uint32_t said = cmd.order;
+            if (cmd.verb == corp_verb::land_units)
+                cmd.order = 0; // the card's mark for its own wording; the seam reads the tile
+            m_ui.ship.last_message = ui::ship_order_answer(cmd.verb, said, player_command(cmd));
+        }
+        m_ui.ship.pending.clear();
+    }
 
     // The Military ledger's air Raise: `hire_wing` at the chosen airbase's tile.
     if (m_ui.military.pending_wing_tile != null_entity)

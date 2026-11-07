@@ -895,27 +895,67 @@
   ],
   [
    "gameplay.hire_ship",
-   "A corp_verb (corp_verb::hire_ship, 55) on the command seam."
+   "The Military ledger's Sea tab (ledger.military_sea_raise). Also a corp_verb (corp_verb::hire_ship, 55) on the command seam."
   ],
   [
    "gameplay.assign_sea_mission",
-   "A corp_verb (corp_verb::assign_sea_mission, 56) on the command seam."
+   "The ship card on the Selection band (ledger.selection_ship_mission, ledger.selection_ship_remove_province) and a right-click on water of the Planetary canvas with a warship selected (canvas.ship_order). Also a corp_verb (corp_verb::assign_sea_mission, 56) on the command seam."
   ],
   [
    "gameplay.set_ship_design",
-   "A corp_verb (corp_verb::set_ship_design, 57) on the command seam."
+   "The ship designer (ledger.military_open_ship_designer), its Save. Also a corp_verb (corp_verb::set_ship_design, 57) on the command seam."
   ],
   [
    "gameplay.refit_ship",
-   "A corp_verb (corp_verb::refit_ship, 58) on the command seam."
+   "The ship card's Refit press (ledger.selection_ship_refit). Also a corp_verb (corp_verb::refit_ship, 58) on the command seam."
   ],
   [
    "gameplay.embark_unit",
-   "A corp_verb (corp_verb::embark_unit, 59) on the command seam."
+   "A transport's card, Board beside a unit (ledger.selection_ship_board). Also a corp_verb (corp_verb::embark_unit, 59) on the command seam."
   ],
   [
    "gameplay.land_units",
-   "A corp_verb (corp_verb::land_units, 60) on the command seam."
+   "A right-click on land of the Planetary canvas with a transport selected (canvas.ship_order), and the card's Recall (ledger.selection_ship_recall). Also a corp_verb (corp_verb::land_units, 60) on the command seam."
+  ],
+  [
+   "ledger.military_sea_raise",
+   "Military ledger, Recruit, Sea tab: one row per ship type with its price and a Raise press, under the port picker."
+  ],
+  [
+   "ledger.military_select_ship",
+   "Military ledger, Recruit, Sea tab: \"Your ships\", one row per ship with what it is doing."
+  ],
+  [
+   "ledger.military_open_ship_designer",
+   "Military ledger, Design, Sea tab: one row per ship class with its numbers."
+  ],
+  [
+   "canvas.ship_select",
+   "Planetary canvas: the ship marker - a diamond with the class's silhouette in its owner's colour, on each water tile holding a ship you can see, with the number there when more than one."
+  ],
+  [
+   "canvas.ship_order",
+   "Planetary canvas with one of your ships selected: the hovered hex is outlined in the sea colour with a line at the cursor saying what a right-click would do, or in red with why it is refused."
+  ],
+  [
+   "ledger.selection_ship_mission",
+   "Selection band, a warship's card, its Mission column: None and only the missions its class works."
+  ],
+  [
+   "ledger.selection_ship_remove_province",
+   "Selection band, a warship's card, its Zone column: each sea province with an x."
+  ],
+  [
+   "ledger.selection_ship_refit",
+   "Selection band, any of your ships' cards: Refit."
+  ],
+  [
+   "ledger.selection_ship_board",
+   "Selection band, a transport's card, \"Ready to board\": each land unit embark_check would take, with a Board press."
+  ],
+  [
+   "ledger.selection_ship_recall",
+   "Selection band, a transport's card with a landing ordered: Recall."
   ]
  ]
 }

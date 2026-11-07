@@ -79,6 +79,7 @@ enum class detail_surface : std::uint8_t
     building_section,  ///< Building management in the Buildings tab (key = building_view_section, BL-229).
     unit_designer,     ///< The unit designer (key = land_class; docs/ui/ledgers/military.md § The designer).
     air_designer,      ///< BL-1450: the same designer rung opened on an AIR class (key = air_class).
+    ship_designer,     ///< BL-1534: the same designer rung opened on a SHIP class (key = ship_class).
     // BL-1406: `acquisitions_profit` retired with the Acquisitions ledger.
 };
 

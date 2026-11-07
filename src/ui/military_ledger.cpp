@@ -8,6 +8,8 @@
 #include "presentation.hpp"
 #include "unit_designer.hpp"      // the Design tab's class rows open it
 #include "wing_card.hpp"          // BL-1450: air class / mission names
+#include "ship_card.hpp" // BL-1534: the Sea tab's labels and rows
+#include "world/sea_combat.hpp"
 
 #include "world/air_combat.hpp"   // BL-1450: the air roster, hire_wing_check
 #include "world/recruits.hpp"     // BL-1463: the recruit pools a Raise spends
@@ -183,7 +185,8 @@ struct base_row
 };
 
 void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s);
-void draw_sea_stub(const world& w, ui_state& s, bool design);
+void draw_recruit_sea(const world& w, const recipe_registry& reg, ui_state& s);
+void draw_design_sea(const world& w, const recipe_registry& reg, ui_state& s);
 
 void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
 {
@@ -214,7 +217,8 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
         if (m.show_obsolete || !roster_row_obsolete(w, actor, idx))
             ++land_rows;
     {
-        const int counts[3] = {land_rows, static_cast<int>(air_roster_table().size()), 0};
+        const int counts[3] = {land_rows, static_cast<int>(air_roster_table().size()),
+                               static_cast<int>(ship_roster_table().size())};
         theatre_tabs(m, 0, counts);
     }
     if (m.theatre[0] == 1)
@@ -224,7 +228,7 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
     }
     if (m.theatre[0] == 2)
     {
-        draw_sea_stub(w, s, false);
+        draw_recruit_sea(w, reg, s);
         return;
     }
 
@@ -626,41 +630,232 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
         ImGui::TextDisabled("No wings yet.");
 }
 
-/// The SEA theatre's stub (military.md § Grouped by theatre, Ben 2026-11-02): ships
-/// are not raised yet, and the nation's ports stand under a base picker - the sea
-/// pool itself is the header's (HEADER.md § Contents, Recruits). @p design names
-/// the tab it sits under, for its one line.
-void draw_sea_stub(const world& w, ui_state& s, bool design)
+/// A ship design's numbers on one line: the class's plus its live kit's.
+void ship_stats_line(char* out, std::size_t n, const recipe_registry& reg, ship_class c, const unit_design& d)
+{
+    sea_ship probe;
+    probe.type = static_cast<std::uint16_t>(c); // the sea rows are one per class, in class order
+    probe.kit  = d;
+    const ship_live_stats st = ship_stats(reg, probe);
+    if (c == ship_class::transport)
+        std::snprintf(out, n, "hp %d  stealth %d  carries %d", st.hp, st.stealth, st.capacity);
+    else
+        std::snprintf(out, n, "hp %d  attack %d  detection %d  stealth %d", st.hp, st.attack, st.detection, st.stealth);
+}
+
+/// What class @p c does, in words: "Patrol, Escort, Raid, Blockade"; a transport carries.
+std::string sea_missions_of(const recipe_registry& reg, ship_class c)
+{
+    std::string out;
+    for (int mi = 1; mi < sea_mission_count; ++mi)
+        if (ship_class_works(reg, c, static_cast<sea_mission>(mi)))
+        {
+            if (!out.empty()) out += ", ";
+            out += sea_mission_label(static_cast<sea_mission>(mi));
+        }
+    return out.empty() ? std::string("Carries land units") : out;
+}
+
+/// The SEA theatre of Recruit (military.md § Grouped by theatre): the nation's ports under a
+/// picker, the four ship rows raising at the chosen one, and its ships, each a press that
+/// selects it. As the Air theatre, with the sea pool in the header.
+void draw_recruit_sea(const world& w, const recipe_registry& reg, ui_state& s)
 {
     military_ledger_state& m = s.military;
-    ImGui::TextDisabled(design ? "Ships are not designed yet." : "Ships are not raised yet.");
-    if (design)
-        return;
-    const std::vector<entity_id> ports = player_ports(w, player_actor(w));
+    const entity_id actor = player_actor(w);
+    const std::vector<ship_roster_row>& table = ship_roster_table();
+
+    if (m.raise_pressed && m.raise_row < 0 && m.air_raise_row < 0 && !m.sea_raise_refused
+        && !m.sea_message.empty())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", m.sea_message.c_str());
+
+    // ── Ports ──
+    const std::vector<entity_id> ports = player_ports(w, actor);
     if (ports.empty())
     {
         m.sea_base = null_entity;
         ImGui::TextUnformatted("No port");
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("A port makes sea recruits, and ships will be raised at one.");
-        return;
+            ImGui::SetTooltip("Every ship is raised at a port, and a port makes sea recruits.");
     }
-    if (std::find(ports.begin(), ports.end(), m.sea_base) == ports.end())
-        m.sea_base = ports.front();
-    ImGui::TextDisabled("Ports");
-    for (const entity_id pid : ports)
+    else
     {
-        ImGui::PushID(static_cast<int>(pid) + 0x70000);
-        const auto bit = w.buildings.find(pid);
-        const std::string where = bit != w.buildings.end() ? place_of(w, bit->second.tile) : "Unknown ground";
-        // A target selector, exempt from the toggle rule, as the base pickers are.
-        if (ImGui::Selectable(where.c_str(), m.sea_base == pid))
-            m.sea_base = pid;
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("This port makes sea recruits every quarter. Ships are not raised yet.");
-        m.ports.push_back({pid, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
-                           (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f, 0});
+        if (std::find(ports.begin(), ports.end(), m.sea_base) == ports.end())
+            m.sea_base = ports.front();
+        ImGui::TextDisabled("Ports");
+        for (const entity_id pid : ports)
+        {
+            ImGui::PushID(static_cast<int>(pid) + 0x70000);
+            const auto bit = w.buildings.find(pid);
+            int homed = 0;
+            for (const auto& [sid, sh] : w.ships)
+                if (sh.home_port == pid)
+                    ++homed;
+            char label[200];
+            std::snprintf(label, sizeof label, "%s  -  %d ship%s",
+                          bit != w.buildings.end() ? place_of(w, bit->second.tile).c_str() : "Unknown ground",
+                          homed, homed == 1 ? "" : "s");
+            // A target selector, exempt from the toggle rule, as the base pickers are.
+            if (ImGui::Selectable(label, m.sea_base == pid))
+                m.sea_base = pid;
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Raise ships here. This port makes sea recruits every quarter.");
+            m.ports.push_back({pid, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                               (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f, homed});
+            ImGui::PopID();
+        }
+        ImGui::Separator();
+    }
+    entity_id port_tile = null_entity;
+    if (const auto bit = w.buildings.find(m.sea_base); bit != w.buildings.end())
+        port_tile = bit->second.tile;
+
+    // ── The sea roster ──
+    const float room  = purse_room_of(w, actor);
+    const auto  avail = available_ship_rows(w, actor);
+    const campaign_roster_gate_input gate_in = campaign_gate_input(w, actor);
+    const entity_id nation = player_nation(w);
+    const float btn_w = ImGui::CalcTextSize("Raise").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    for (std::size_t i = 0; i < table.size(); ++i)
+    {
+        const ship_roster_row&  row = table[i];
+        const std::uint16_t     idx = static_cast<std::uint16_t>(i);
+        const ship_class_stats& cs  = reg.military().sea.cls[static_cast<std::size_t>(row.cls)];
+        const bool  fieldable = std::find(avail.begin(), avail.end(), idx) != avail.end();
+        const float price     = cs.hire_cost;
+        ImGui::PushID(static_cast<int>(idx) + 0x80000);
+
+        // The seam's own checks (`hire_ship_check`), then the credit leg; the goods leg is
+        // the seam's answer on the press.
+        std::string reason;
+        if (!fieldable)
+        {
+            reason = missing_air_gate(row.gate, gate_in);
+            if (reason.empty())
+                reason = "Not fieldable now.";
+        }
+        else if (port_tile == null_entity)
+            reason = "No port to raise it at.";
+        else if (const corp_command_result hc = hire_ship_check(w, reg, actor, port_tile, idx);
+                 hc == corp_command_result::rejected_no_recruits)
+            reason = recruit_shortfall_text(ship_crew(reg, idx), recruit_pool(w, actor, recruit_theatre::sea)) + ".";
+        else if (hc == corp_command_result::rejected_placement)
+            reason = "This port opens on no sea."; // a lake's shore: a mouth is sea water
+        else if (hc != corp_command_result::applied)
+            reason = "Cannot be raised at this port.";
+        else if (price > room)
+            reason = "The treasury cannot cover it.";
+        const bool enabled = reason.empty();
+
+        const float line_x  = ImGui::GetCursorPosX();
+        const float avail_w = ImGui::GetContentRegionAvail().x;
+        if (fieldable) ImGui::TextUnformatted(row.name);
+        else           ImGui::TextDisabled("%s", row.name);
+        const std::string price_s = fmt::credits(price);
+        const float price_w = ImGui::CalcTextSize(price_s.c_str()).x;
+        const float gap_x   = ImGui::GetStyle().ItemSpacing.x;
+        const bool price_inline = ImGui::CalcTextSize(row.name).x + 2.0f * gap_x + price_w + btn_w <= avail_w;
+        if (price_inline)
+        {
+            ImGui::SameLine(line_x + avail_w - btn_w - price_w - gap_x);
+            if (price <= room) ImGui::TextUnformatted(price_s.c_str());
+            else               ImGui::TextDisabled("%s", price_s.c_str());
+        }
+        ImGui::SameLine(line_x + avail_w - btn_w);
+        ImGui::BeginDisabled(!enabled);
+        if (ImGui::Button("Raise", {btn_w, 0.0f}) && enabled)
+        {
+            m.pending_ship_tile = port_tile;
+            m.pending_ship_row  = idx;
+            m.sea_message.clear();
+            s.construction.last_message.clear();
+            m.air_message.clear();
+            m.raise_pressed     = true;
+            m.sea_raise_row     = static_cast<int>(idx);
+            m.sea_raise_refused = false;
+            m.raise_row         = -1;
+            m.air_raise_row     = -1;
+        }
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            if (!enabled)
+                ImGui::SetTooltip("%s", reason.c_str());
+            else if (m.raise_pressed && m.sea_raise_refused && m.sea_raise_row == static_cast<int>(idx)
+                     && !m.sea_message.empty())
+                ImGui::SetTooltip("%s", m.sea_message.c_str());
+        }
+        m.sea_raises.push_back({idx, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                                (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f,
+                                fieldable, enabled, price, reason});
+
+        char stats[120];
+        ship_stats_line(stats, sizeof stats, reg, row.cls, ship_design_of(w, nation, row.cls));
+        ImGui::PushTextWrapPos(0.0f);
+        if (!price_inline)
+            ImGui::TextDisabled("%s  %s - %s   %s", price_s.c_str(), ship_class_label(row.cls),
+                                sea_missions_of(reg, row.cls).c_str(), stats);
+        else
+            ImGui::TextDisabled("%s - %s   %s", ship_class_label(row.cls), sea_missions_of(reg, row.cls).c_str(), stats);
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
         ImGui::PopID();
+    }
+
+    // ── Your ships ── each a press that selects it (its card gives its orders).
+    ImGui::Separator();
+    ImGui::TextDisabled("Your ships");
+    int shown = 0;
+    for (const auto& [sid, sh] : w.ships)
+    {
+        if (!(sh.owner == actor || sh.owner == w.player_entity))
+            continue;
+        ++shown;
+        ImGui::PushID(static_cast<int>(sid) + 0x90000);
+        char label[240];
+        std::snprintf(label, sizeof label, "%s  -  %s", ship_display_name(w, sid), ship_status_text(w, reg, sid).c_str());
+        if (ImGui::Selectable(label, s.selected_entity == sid))
+        {
+            s.clear_battle_selection();
+            s.clear_front_selection();
+            s.clear_lens_region_selection();
+            s.selected_entity      = sid;
+            s.selection_unit_group = false;
+            s.selected_province    = 0;
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Select this ship");
+        m.ship_rows.push_back({sid, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                               (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
+        ImGui::PopID();
+    }
+    if (shown == 0)
+        ImGui::TextDisabled("No ships yet.");
+}
+
+/// The SEA theatre of Design: the four ship classes, each opening the designer on its own
+/// slots (hull, armament, sensors; a transport has no armament).
+void draw_design_sea(const world& w, const recipe_registry& reg, ui_state& s)
+{
+    military_ledger_state& m = s.military;
+    const entity_id nation = player_nation(w);
+    for (int c = 0; c < ship_class_count; ++c)
+    {
+        const ship_class sc = static_cast<ship_class>(c);
+        char stats[120];
+        ship_stats_line(stats, sizeof stats, reg, sc, ship_design_of(w, nation, sc));
+        ImGui::PushID(c + 0xA0000);
+        if (ImGui::Selectable(ship_class_label(sc), ship_designer_open_on(s, sc)))
+            toggle_ship_designer(s, sc);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Open the designer for %s. Kit choices open as Naval research lands.", ship_class_label(sc));
+        m.sea_class_rows.push_back({c, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                                    (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
+        ImGui::PopID();
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextDisabled("%s - %s", sea_missions_of(reg, sc).c_str(), stats);
+        ImGui::PopTextWrapPos();
+        ImGui::Spacing();
     }
 }
 
@@ -671,12 +866,12 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
     const entity_id nation = player_nation(w);
     military_ledger_state& m = s.military;
     {
-        const int counts[3] = {land_class_count - 1, air_class_count, 0}; // every land class but `none`
+        const int counts[3] = {land_class_count - 1, air_class_count, ship_class_count}; // every land class but `none`
         theatre_tabs(m, 1, counts);
     }
     if (m.theatre[1] == 2)
     {
-        draw_sea_stub(w, s, true);
+        draw_design_sea(w, reg, s);
         return;
     }
     if (m.theatre[1] == 0)
@@ -780,7 +975,8 @@ void close_designer_on_ledger_close(ui_state& s, bool open)
     military_ledger_state& m = s.military;
     if (m.was_open && !open
         && (s.expanded.surface == detail_surface::unit_designer
-            || s.expanded.surface == detail_surface::air_designer))
+            || s.expanded.surface == detail_surface::air_designer
+            || s.expanded.surface == detail_surface::ship_designer))
         fold(s);
     m.was_open = open;
 }
@@ -801,6 +997,9 @@ void draw_military_ledger(const world& w, const recipe_registry& reg, ui_state& 
     m.air_raises.clear();
     m.wing_rows.clear();
     m.air_class_rows.clear();
+    m.sea_raises.clear();
+    m.ship_rows.clear();
+    m.sea_class_rows.clear();
     m.queue_rows = 0;
 
     if (!open)
