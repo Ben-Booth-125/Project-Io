@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*25 entries — 24 open, 1 resolved.*
+*27 entries — 26 open, 1 resolved.*
 
 ---
 
@@ -283,6 +283,20 @@ MARKET: pip rather than glyph on the Build door; name column 72 px. CANVAS: riva
 Research takes up to 14.3% of the chest per quarter, and points follow the square root of credits. A much smaller flat chest therefore also slows research, a coupling no doc states as an opening lever. The opening lane reads research per quarter on each chest rung.
 
 **Why it matters.** The opening chest ruling may move the tech pace as well as construction.
+
+### NR-1146 — Wind Power, Upkeep, University: the calls the small lane took
+*decision · raised 2026-11-07 · from Sprint 63 small lane (WIND_TURBINE, RESEARCH_IN_RETURN, SCHOOLING_DOOR)*
+
+WIND: a major at ring 2, cost 12, needing Fuel Economy III and V, the first node of each arm. Grammar says two minors, so this is a new shape; the alternative is a real cluster with two new minors you author. Rivals first differ at quarter 132 on seed 46, none within 40 quarters on seeds 0 and 46. UPKEEP: the Balance segment "Force" became "Upkeep", because one figure holds garrison and space; a separate line needs a new saved field. LAUNCH COST stays outside the return, as construction does. UNIVERSITY: 100 RP a quarter against an institute's 50, at 400 cr against 300, on a constant still marked unmeasured, and it also raises qualification, so it is better on both counts. No tree node gates Schooling or University, so both open on day one subject only to the stratum gate. On the verify world the player holds no City, so University mostly refuses. OLD SAVES: a queued Wind Power with Fuel Economy V not held waits forever and reads "not in 120 y"; a shift-click off and on recovers it, and a rival in that state stops picking. The state needs an old save.
+
+**Why it matters.** University is now reachable on an unmeasured number, and wind is a new shape in the tree's grammar.
+
+### NR-1147 — Novelty: a major with no cluster of its own enters the tree grammar
+*novel-work · raised 2026-11-07 · from Sprint 63 small lane*
+
+docs/economy/RESEARCH.md gains a sentence for a major that needs one node of each arm rather than two minors. The wording is the lane's, not yours.
+
+**Why it matters.** A grammar exception is how a tree loses its grammar.
 
 ---
 
