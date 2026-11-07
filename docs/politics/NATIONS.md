@@ -459,8 +459,8 @@ Three rules keep the budget honest, each a requirement row in `nation_budget_har
    flagged `rationed`. Unearmarked claims keep rule 3's partial fill.
 
 A paid claim is read on its `budget_line_result`, and an earmark also lives on `report.earmarks`.
-The quarterly return books the academic-research line and garrison pay (Ben, 2026-11-05: research
-counts inside net); the other lines debit the treasury outside it (`../economy/FINANCE.md` § What a
+The quarterly return books the academic-research line, garrison pay and space upkeep (Ben, 2026-11-05:
+research counts inside net; Ben, 2026-11-07: space upkeep too); the other lines debit the treasury outside it (`../economy/FINANCE.md` § What a
 return does not carry).
 
 **Determinism.** Once per economy tick, over nations in ascending id, over lines in the fixed enum

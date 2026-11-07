@@ -164,7 +164,8 @@
     "BL-1371",
     "BL-1379",
     "BL-1513",
-    "BL-1538"
+    "BL-1538",
+    "BL-1541 (Schooling door)"
    ],
    "files": [
     "src/ui/construction_panel.cpp",
@@ -1045,7 +1046,8 @@
     "Ben's request 2026-10-25: building-first placement lens and site ledger (no backlog id yet)",
     "Ben's live-click rulings 2026-10-26 (Construction ledger and site finder; no backlog id yet)",
     "BL-1510",
-    "BL-1538"
+    "BL-1538",
+    "BL-1541 (Schooling door)"
    ],
    "files": [
     "src/ui/construction_sites.cpp",

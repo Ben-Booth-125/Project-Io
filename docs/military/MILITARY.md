@@ -1339,7 +1339,7 @@ so a push moves the front and can keep going. Occupation clears at peace: a cede
 new owner (`../politics/RELATIONS.md` § 7) and every other tile returns to its owner. Battles work
 as they did, and the province holder stays the narrower military fact above.
 
-**Default details, for Ben's review (2026-11-05).** An empty tile is occupied on entry. An occupied
+**The details (Ben, 2026-11-07).** An empty tile is occupied on entry. An occupied
 tile's output is denied to its owner and not gained by the occupier; the owner still pays its wages.
 Occupation needs a war: a bare hostility, unanswered by a declaration, occupies nothing. The occupier
 is always at war with the tile's owner. An owner re-entering its own ground frees it. A third party at
@@ -1395,6 +1395,9 @@ garrison is read as border force only through its own tile's neighbours, so one 
 its province would guard nothing. A capital province that is also a border province takes the
 capital rule. Neither post is the province's lowest-id tile, which is its id rather than its place
 (BL-1145, a province's readers take its anchor).
+
+**Posts bend to supply (Ben, 2026-11-07).** Where a border post cannot be fed whole, the post moves and
+the network does not: no hub is added to reach it, so a border can open thinner than it would be guarded.
 
 **A garrison is posted only where its network feeds it whole (Ben, 2026-10-29; "whole", 2026-11-05).**
 Each post above is chosen among the province's tiles where its nation's supply claim is met in full

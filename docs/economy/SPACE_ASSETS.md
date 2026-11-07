@@ -35,7 +35,8 @@ The Era 1 classes:
 
 **A launch** spends a rocket, propellant and the payload's goods at a launch site, and places the
 asset after a travel time. Orbits and bodies carry a cost to reach; the further body costs more.
-**Upkeep** is paid each quarter; an asset unpaid decays and is lost.
+**Upkeep** is paid each quarter; an asset unpaid decays and is lost. It counts inside the nation's net
+(`FINANCE.md` § The quarterly return; Ben, 2026-11-07).
 
 ## Open
 

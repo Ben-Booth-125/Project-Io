@@ -97,6 +97,8 @@ carry the same buff, so a nation that walks a branch feels it stack.
 members, and every group must be satisfied. So:
 
 - **A major needs both of its minors.** The weight of an important node is the two paths into it.
+  A major off the spine with no cluster of its own takes those two paths from the branch's two arms,
+  both of their first nodes, and needs both. Wind Power is the one such major.
 - **A joint needs both of its neighbouring branches.** Joints sit where two branches — of one tree
   or of two — meet, and buy a combined buff.
 - **A mastery needs both of its branch's rim majors**, and caps the branch with its travel buff at
