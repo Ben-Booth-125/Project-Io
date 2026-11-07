@@ -2385,7 +2385,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 ### `ledger.military_raise` — Military ledger (nav rail slot 7), Recruit tab, a roster row's 'Raise' press
 
-**Press.** Choose a base in the picker, then click 'Raise' on a roster row
+**Press.** Choose a base in the picker, then click 'Raise' on a roster row. Hovering 'Raise' shows what the hire takes: credits and each good, needed against held, a short one red. Hovering the row's NAME shows its card: the type, its class, and the stat grid of what it raises; held 2 s the card freezes and its cells name their stats on hover.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -2395,7 +2395,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Valid when:**
 - A completed military base of yours is chosen in the picker (Raise is disabled otherwise; its tooltip reads 'No military base to raise it at.')
 - Your nation can field the row (dimmed otherwise; the Raise tooltip names the goods or port it lacks)
-- The row's credit price is within your treasury room (Raise disabled otherwise; its tooltip reads 'The treasury cannot cover it.'). A disabled Raise shows its reason only on hover, never as ledger text.
+- The row's credit price is within your treasury room (Raise disabled otherwise; its tooltip reads 'The treasury cannot cover it.'), and the hire's goods are on your shelves as the verb plans them (disabled otherwise; its tooltip names each short good, held of needed: 'Short of steel (0 of 6) and machinery (0 of 2).'), and the goods' price bound fits the room with the credits ('The treasury cannot cover it and its goods.'). Every theatre's Raise checks the same legs. A disabled Raise shows its reason only on hover, never as ledger text.
 
 **Expected output.** Issues gameplay.hire_unit with {tile, unit_type} - the same pending request the tile card's Hire press makes, executed at the frame's end through the corp-command seam with its full live re-validation. Not a second hire path. A landed press shows its result above the roster: 'Unit mustering.'. A refusal - 'Can't afford or supply it.' (either payment leg) or 'Hiring failed.' - is not ledger text: it is the pressed row's Raise tooltip (Ben, 2026-10-30).
 

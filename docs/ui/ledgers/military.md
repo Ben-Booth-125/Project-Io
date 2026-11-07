@@ -29,7 +29,7 @@ Two views behind a `nav_button` strip, inside `foldout_begin("Military")`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Recruit** *(default)* | "What can I raise, where, and what will it cost?" | A **base picker** — the nation's completed military bases, each with its province and the units standing there. Below it, the **roster**: one row per unit type the nation may field (`available_rows`), each carrying its land class, its numbers (soft, hard, hardness, defence), its hire price in credits and the kit it buys off the shelf, and a **Raise** press that hires at the chosen base. A type the nation cannot field yet is listed dimmed, its Raise disabled, and **why** (the missing good, or the technology it waits on) is the Raise press's tooltip, so the roster shows the ladder, not only the rungs in reach. |
+| **Recruit** *(default)* | "What can I raise, where, and what will it cost?" | A **base picker** — the nation's completed military bases, each with its province and the units standing there. Below it, the **roster**: one row per unit type the nation may field (`available_rows`), each one line: its name, its hire price in credits, and a **Raise** press that hires at the chosen base. The row's numbers are its **card**, the name's hover (§ A row's card). What the hire takes is the Raise press's hover (§ What a Raise takes). A type the nation cannot field yet is listed dimmed, its Raise disabled, and **why** (the missing good, or the technology it waits on) is the Raise press's tooltip, so the roster shows the ladder, not only the rungs in reach. |
 | **Design** | "What is each kind of unit raised with?" | **Designs, one per land class to start** (Ben, 2026-10-27): each class's **kit slots** with the researched choice in each — infantry's rifles or anti-tank launchers, artillery's guns with drones or anti-armour alongside — what the kit costs per unit, and what the design gives (its soft, hard and hardness). A slot offers only researched kit; a class with nothing researched for a slot fields its base kit. Saving a design makes it the one Recruit raises; units in the field refit to it as kit arrives (BL-1423). Kit opens by military research. |
 
 **Why Recruit is the default.** It is the act the ledger exists for; Design is set once and
@@ -45,12 +45,35 @@ explains, never wrapped text in the column.
   the shelf.", "No military base to raise it at.", "The treasury cannot cover it.") shows on hover
   over the disabled press. When the seam refuses a live press ("Can't afford or supply it."), the
   answer is that row's Raise tooltip too.
+- **A row whose goods are short is dimmed (Ben, 2026-11-07).** The Raise press checks the hire's
+  goods as its verb plans them, after its credits, so a row the press would refuse never looks live.
+  Its tooltip names each short good with what is held and what is needed ("Short of steel (0 of 6)
+  and machinery (0 of 2)."). Where the goods' price would take the treasury past its room, it says
+  "The treasury cannot cover it and its goods."
 - **A result stays a line.** The seam's answer to a press that landed ("Unit mustering.",
   "Wing mustering.") is shown above the theatres, where it was.
 - **The empty states' explanation** is the tooltip of their heading and of the site-finder press.
 - **The Design tab's intro** is the Design tab's tooltip and each class row's ("Open the designer
   for … Kit choices open as military research lands."); the obsolete toggles' explanation is the
   tooltip of the "Unit types" heading and of each toggle.
+
+### What a Raise takes (Ben, 2026-11-07)
+
+**Hovering a Raise press shows what the hire takes against what the nation holds.** It answers
+"can I raise this, and what is short?" A small table: credits, then each good the hire buys off the
+shelves (its row's goods and its live design's kit), each with the amount needed and the amount
+held, a short one in the loss colour. Above it, when there is one, the reason the press is off or
+why its last press was refused. Every theatre's rows carry it, because every hire buys goods.
+
+### A row's card (Ben, 2026-11-07)
+
+**A row's numbers are the card on its name's hover, not a second line of text.** Hovering the name
+of a Recruit row, or a Design tab class row, shows the type, what it is (its land class, or the
+missions an air or sea class flies), and the stat grid (§ The stat grid) of what the row raises:
+its type with its class's live design kit. A Design row adds that its press opens the designer.
+The card is a **freezable tooltip** (`../TOOLTIP.md` § The freezable tooltip): two seconds on, it
+freezes and takes the pointer, so each cell's glyph can be hovered for its name. The grid is the
+unit card's, because a player choosing what to raise compares by the numbers it will fight with.
 
 ### Grouped by theatre (Ben, 2026-10-28; tabs, Ben, 2026-11-02)
 

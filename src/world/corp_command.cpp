@@ -715,6 +715,94 @@ corp_command_result apply_state_command(world& w, const recipe_registry& reg,
 } // namespace
 
 // ---------------------------------------------------------------------------
+// The goods leg of a hire, read for the Raise rows (military.md § Raising)
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// The lines of @p need against @p nation's shelves, with the verb's quantity gate
+/// @p ok and the price bound the purse leg adds.
+hire_goods_reading reading_of(const world& w, entity_id nation, const std::array<float, resource_count>& need,
+                              bool ok)
+{
+    hire_goods_reading out;
+    out.goods_ok = ok;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (!(need[r] > 0.0f))
+            continue;
+        const resource_type res = static_cast<resource_type>(r);
+        out.lines.push_back({res, need[r], corp_stockpile_total(w, nation, res)});
+    }
+    out.price_bound = hire_goods_price_bound(w, nation, need);
+    return out;
+}
+
+} // namespace
+
+hire_goods_reading read_land_hire_goods(const world& w, entity_id nation, uint16_t row_index)
+{
+    const auto& table = unit_roster_table();
+    if (row_index >= table.size())
+        return {};
+    const roster_row& row  = table[row_index];
+    const land_class  lc   = land_class_for(row);
+    const std::array<float, resource_count> kit = kit_goods(lc, design_of(w, nation, lc));
+    std::array<float, resource_count> need{};
+    std::array<resource_type, hire_axis_count> axis_res{};
+    if (plan_hire_goods(w, nation, &row, kit, need, axis_res))
+        return reading_of(w, nation, need, hire_goods_affordable(w, nation, &row, kit));
+    // An axis no candidate covers: the plan stopped at it. Name each gated axis at the
+    // candidate the plan would take, its first where none covers it, so the row says
+    // what the shelves lack rather than nothing.
+    need = kit;
+    for (std::size_t i = 0; i < hire_axis_count; ++i)
+    {
+        const hire_axis axis = static_cast<hire_axis>(i);
+        if (gate_axis_q(row.gate, axis) <= 0)
+            continue;
+        const auto& cands = hire_axis_resources(axis);
+        resource_type pick = cands.candidates[0];
+        for (const resource_type r : cands)
+            if (corp_stockpile_total(w, nation, r) >= need[static_cast<std::size_t>(r)] + hire_axis_cost)
+            {
+                pick = r;
+                break;
+            }
+        need[static_cast<std::size_t>(pick)] += hire_axis_cost;
+    }
+    return reading_of(w, nation, need, false);
+}
+
+hire_goods_reading read_air_hire_goods(const world& w, const recipe_registry& reg, entity_id nation,
+                                       uint16_t row_index)
+{
+    const auto& table = air_roster_table();
+    if (row_index >= table.size())
+        return {};
+    const air_class cls = table[row_index].cls;
+    std::array<float, resource_count> goods = air_kit_goods(cls, air_design_of(w, nation, cls));
+    const air_class_stats& cs = reg.military().air.cls[static_cast<std::size_t>(cls)];
+    for (std::size_t g = 0; g < resource_count; ++g)
+        goods[g] += cs.hire_goods[g];
+    return reading_of(w, nation, goods, hire_goods_affordable(w, nation, nullptr, goods));
+}
+
+hire_goods_reading read_ship_hire_goods(const world& w, const recipe_registry& reg, entity_id nation,
+                                        uint16_t row_index)
+{
+    const auto& table = ship_roster_table();
+    if (row_index >= table.size())
+        return {};
+    const ship_class cls = table[row_index].cls;
+    std::array<float, resource_count> goods = ship_kit_goods(cls, ship_design_of(w, nation, cls));
+    const ship_class_stats& cs = reg.military().sea.cls[static_cast<std::size_t>(cls)];
+    for (std::size_t g = 0; g < resource_count; ++g)
+        goods[g] += cs.hire_goods[g];
+    return reading_of(w, nation, goods, hire_goods_affordable(w, nation, nullptr, goods));
+}
+
+// ---------------------------------------------------------------------------
 // Refit to a newer type (Ben, 2026-10-27; MILITARY.md § The muster interface)
 // ---------------------------------------------------------------------------
 

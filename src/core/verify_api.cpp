@@ -31,6 +31,7 @@
 #include "ui/construction_sites.hpp" // the site finder (Ben, 2026-10-25): construction_sites.lua
 #include "ui/selection_panel.hpp"
 #include "ui/stat_grid.hpp"      // BL-1454: verify.stat_grids, the grids on screen
+#include "ui/hover_card.hpp"     // freezable_tooltip_frozen: a Raise row's card frozen
 #include "ui/alerts.hpp"        // BL-1515: verify.alerts
 #include "ui/header_panel.hpp"   // BL-1472: verify.header_recruits, the header's readouts
 #include "ui/corporation_dashboard.hpp"
@@ -3201,6 +3202,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             e["x"] = r.x; e["y"] = r.y;
             e["fieldable"] = r.fieldable; e["enabled"] = r.enabled;
             e["price"] = r.price; e["reason"] = r.reason;
+            e["name_x"] = r.name_x; e["name_y"] = r.name_y;
             raises[++k] = e;
         }
         out["raises"] = raises;
@@ -3264,6 +3266,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             e["x"] = r.x; e["y"] = r.y;
             e["fieldable"] = r.fieldable; e["enabled"] = r.enabled;
             e["price"] = r.price; e["reason"] = r.reason;
+            e["name_x"] = r.name_x; e["name_y"] = r.name_y;
             araises[++k] = e;
         }
         out["air_raises"] = araises;
@@ -3293,9 +3296,12 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
             sol::table e = st.create_table();
             e["row"] = static_cast<int>(r.row); e["x"] = r.x; e["y"] = r.y;
             e["fieldable"] = r.fieldable; e["enabled"] = r.enabled; e["price"] = r.price; e["reason"] = r.reason;
+            e["name_x"] = r.name_x; e["name_y"] = r.name_y;
             sraises[++k] = e;
         }
         out["sea_raises"] = sraises;
+        // A row's card frozen now (hover_card.hpp freezable_tooltip): its cells take hover.
+        out["card_frozen"] = ui::freezable_tooltip_frozen();
         out["sea_message"] = m.sea_message;
         sol::table srows = st.create_table();
         k = 0;

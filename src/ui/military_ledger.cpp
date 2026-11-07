@@ -3,12 +3,15 @@
 #include "construction_sites.hpp" // site_options — the no-base door onto the site finder
 #include "detail_level.hpp"       // fold — closing the ledger closes the designer
 #include "foldout_column.hpp"
+#include "hover_card.hpp"         // freezable_tooltip: a row's card freezes for its cells
 #include "format.hpp"             // fmt::credits
 #include "nav_pane.hpp"           // close_all_panels — the no-base door takes the column
 #include "presentation.hpp"
 #include "unit_designer.hpp"      // the Design tab's class rows open it
 #include "wing_card.hpp"          // BL-1450: air class / mission names
 #include "ship_card.hpp" // BL-1534: the Sea tab's labels and rows
+#include "stat_grid.hpp" // a row's name opens its card on hover
+#include "world/corp_command.hpp" // read_*_hire_goods: the Raise's goods leg
 #include "world/sea_combat.hpp"
 
 #include "world/air_combat.hpp"   // BL-1450: the air roster, hire_wing_check
@@ -19,6 +22,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <map>
 #include <string>
@@ -40,11 +44,118 @@ const char* land_class_label(land_class c)
     return (i >= 0 && i < land_class_count) ? k_names[i] : "Unknown";
 }
 
-/// One line of a design's numbers: soft, hard, hardness (as a share), defence.
-void stats_line(char* out, std::size_t n, const land_combat_stats& st)
+/// A goods quantity as the shelves count it: whole where it is whole.
+std::string goods_amount(float v)
 {
-    std::snprintf(out, n, "soft %d  hard %d  hardness %d%%  defence %d",
-                  st.soft, st.hard, (st.hardness + 5) / 10, st.defence);
+    char b[32];
+    if (std::fabs(v - std::round(v)) < 0.05f) std::snprintf(b, sizeof b, "%.0f", v);
+    else                                       std::snprintf(b, sizeof b, "%.1f", v);
+    return b;
+}
+
+/// Why a hire's goods leg refuses, naming what is short: "Short of steel (0 of 6)
+/// and machinery (0 of 2)." The seam's quantity gate is `g.goods_ok`.
+std::string goods_short_text(const hire_goods_reading& g)
+{
+    std::vector<std::string> parts;
+    for (const hire_goods_line& l : g.lines)
+        if (l.have < l.need)
+            parts.push_back(std::string(resource_name(l.res)) + " (" + goods_amount(l.have) + " of "
+                            + goods_amount(l.need) + ")");
+    if (parts.empty())
+        return "The shelves cannot supply its goods.";
+    std::string out = "Short of ";
+    for (std::size_t i = 0; i < parts.size(); ++i)
+    {
+        if (i > 0) out += i + 1 == parts.size() ? " and " : ", ";
+        out += parts[i];
+    }
+    return out + ".";
+}
+
+/// The credit and goods legs a Raise checks, after its placement and recruit checks:
+/// the seam's own order (`hire_unit` / `hire_wing` / `hire_ship`), so the row cannot
+/// disagree with the press. Empty when both pass.
+std::string payment_reason(float price, float room, const hire_goods_reading& g)
+{
+    if (price > room)
+        return "The treasury cannot cover it.";
+    if (!g.goods_ok)
+        return goods_short_text(g);
+    if (price + g.price_bound > room)
+        return "The treasury cannot cover it and its goods.";
+    return {};
+}
+
+/// The Raise button's tooltip: why it is off, or why its last press was refused (@p why),
+/// then what the hire takes against what the nation holds - credits, then each good,
+/// a short one in the loss colour.
+void raise_tooltip(const std::string& why, float price, float room, const hire_goods_reading& g)
+{
+    ImGui::BeginTooltip();
+    if (!why.empty())
+    {
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 22.0f);
+        ImGui::TextUnformatted(why.c_str());
+        ImGui::PopTextWrapPos();
+        ImGui::Separator();
+    }
+    if (ImGui::BeginTable("##raise_takes", 3, ImGuiTableFlags_SizingFixedFit))
+    {
+        ImGui::TableSetupColumn("Takes");
+        ImGui::TableSetupColumn("Needs");
+        ImGui::TableSetupColumn("Held");
+        ImGui::TableHeadersRow();
+        const auto row = [](const char* name, const std::string& need, const std::string& have, bool short_) {
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            ImGui::TextUnformatted(name);
+            ImGui::TableSetColumnIndex(1);
+            ImGui::TextUnformatted(need.c_str());
+            ImGui::TableSetColumnIndex(2);
+            if (short_) ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "%s", have.c_str());
+            else        ImGui::TextUnformatted(have.c_str());
+        };
+        row("Credits", fmt::credits(price), fmt::credits(room), price > room);
+        for (const hire_goods_line& l : g.lines)
+            row(resource_name(l.res), goods_amount(l.need), goods_amount(l.have), l.have < l.need);
+        ImGui::EndTable();
+    }
+    if (g.lines.empty())
+        ImGui::TextDisabled("Takes no goods.");
+    else
+        ImGui::TextDisabled("Goods are bought off your shelves at hire.");
+    ImGui::EndTooltip();
+}
+
+/// The frame's dwell step for a freezable tooltip: the fixed verify step under `--verify`,
+/// else the frame's time, capped so a stall cannot freeze a card at once (hover_card.hpp).
+float dwell_step(const ui_state& s)
+{
+    return s.fixed_frame_clock ? kVerifyFrameSeconds
+                               : std::min(ImGui::GetIO().DeltaTime, kHoverMaxFrameSeconds);
+}
+
+/// A row's card, on hovering its name: the type, what it is, and the stat grid the unit
+/// card and the designer draw (stat_grid.hpp), so a row reads as the thing it raises.
+/// A freezable tooltip: 2 s on, it freezes and each grid cell names its stat on hover.
+/// @p door, when named, is a last dim line saying what the press does.
+void row_card_tooltip(const ui_state& s, const char* grid_id, const char* name, const std::string& what,
+                      const stat_bands& bands, const char* door = nullptr)
+{
+    freezable_tooltip("##row_card", dwell_step(s), [&]() {
+        ImGui::TextUnformatted(name);
+        ImGui::TextDisabled("%s", what.c_str());
+        ImGui::Spacing();
+        draw_stat_grid(grid_id, bands, ImGui::GetFontSize() * 20.0f);
+        if (door != nullptr)
+        {
+            ImGui::Spacing();
+            ImGui::PushTextWrapPos(ImGui::GetFontSize() * 20.0f);
+            ImGui::TextDisabled("%s", door);
+            ImGui::PopTextWrapPos();
+        }
+    });
 }
 
 /// Where a tile is, in the glossary's words: the population centre its province
@@ -137,15 +248,15 @@ std::vector<entity_id> player_ports(const world& w, entity_id actor)
     return out;
 }
 
-/// An air design's numbers on one line: the class's plus its live kit's.
-void air_stats_line(char* out, std::size_t n, const recipe_registry& reg, air_class c,
-                    const unit_design& d)
+/// An air design's numbers: the class's plus its live kit's, as the air designer totals them.
+air_combat_stats air_design_totals(const recipe_registry& reg, air_class c, const unit_design& d)
 {
     const air_class_stats& cs = reg.military().air.cls[static_cast<std::size_t>(c)];
     const air_combat_stats k  = air_kit_delta(c, d);
-    std::snprintf(out, n, "air %d  soft %d  hard %d  strategic %d  recon %d  range %d",
-                  cs.air + k.air, cs.soft + k.soft, cs.hard + k.hard, cs.strategic + k.strategic,
-                  cs.recon + k.recon, cs.range + k.range);
+    air_combat_stats t;
+    t.hp = cs.hp + k.hp;  t.air = cs.air + k.air;  t.soft = cs.soft + k.soft;  t.hard = cs.hard + k.hard;
+    t.strategic = cs.strategic + k.strategic;  t.recon = cs.recon + k.recon;  t.range = cs.range + k.range;
+    return t;
 }
 
 /// The missions class @p c flies, in words: "Tactical bombing, Recon".
@@ -343,16 +454,28 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
             // BL-1463 (MILITARY.md § Recruits): the seam's own refusal, in its words.
             reason = recruit_shortfall_text(hire_unit_recruits(idx),
                                             recruit_pool(w, actor, recruit_theatre::land)) + ".";
-        else if (price > room)
-            reason = "The treasury cannot cover it.";
+        const hire_goods_reading goods = read_land_hire_goods(w, actor, idx);
+        if (reason.empty())
+            reason = payment_reason(price, room, goods);
         const bool enabled = reason.empty();
 
-        // Line 1: name, then price and Raise at the right edge.
+        // One line: the name (its card on hover), then price and Raise at the right edge.
         const float line_x = ImGui::GetCursorPosX();
         const float avail_w = ImGui::GetContentRegionAvail().x;
         if (fieldable && !obsolete) ImGui::TextUnformatted(row.name);
         else if (obsolete)          ImGui::TextDisabled("%s (obsolete)", row.name);
         else                        ImGui::TextDisabled("%s", row.name);
+        const ImVec2 name_c = {(ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                               (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f};
+        {
+            // The unit this row raises: its type with its class's live design kit.
+            unit_component probe{};
+            probe.type = idx;
+            probe.kit  = design_of(w, actor, land_class_for(row));
+            const land_combat_stats st = unit_land_stats(probe);
+            row_card_tooltip(s, "raise_card", row.name, land_class_label(land_class_for(row)),
+                             land_design_stat_bands(reg, land_class_for(row), st, st));
+        }
         const std::string price_s = fmt::credits(price);
         const float price_w = ImGui::CalcTextSize(price_s.c_str()).x;
         ImGui::SameLine(line_x + avail_w - btn_w - price_w - ImGui::GetStyle().ItemSpacing.x);
@@ -377,26 +500,14 @@ void draw_recruit(const world& w, const recipe_registry& reg, ui_state& s)
         // button's tooltip - never ledger text (Ben, 2026-10-30).
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         {
-            if (!enabled)
-                ImGui::SetTooltip("%s", reason.c_str());
-            else if (m.raise_pressed && m.raise_refused && m.raise_row == static_cast<int>(idx)
-                     && !s.construction.last_message.empty())
-                ImGui::SetTooltip("%s", s.construction.last_message.c_str());
+            std::string why = reason;
+            if (enabled && m.raise_pressed && m.raise_refused && m.raise_row == static_cast<int>(idx))
+                why = s.construction.last_message;
+            raise_tooltip(why, price, room, goods);
         }
         m.raises.push_back({idx, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                             (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f,
-                            fieldable, enabled, price, reason});
-
-        // Line 2: the land class and its numbers on a unit of this type.
-        unit_component probe{};
-        probe.type = idx;
-        char stats[128];
-        stats_line(stats, sizeof stats, unit_land_stats(probe));
-        // Wrapped: the fold-out column's policy is WRAP (LAYOUT.md container 1),
-        // and at its narrowest width the numbers do not fit one line.
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("%s   %s", land_class_label(land_class_for(row)), stats);
-        ImGui::PopTextWrapPos();
+                            fieldable, enabled, price, reason, name_c.x, name_c.y});
         ImGui::Spacing();
         ImGui::PopID();
     }
@@ -527,14 +638,23 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
                                             recruit_pool(w, actor, recruit_theatre::air)) + ".";
         else if (hc != corp_command_result::applied)
             reason = "Cannot be raised at this airbase.";
-        else if (price > room)
-            reason = "The treasury cannot cover it.";
+        const hire_goods_reading goods = read_air_hire_goods(w, reg, actor, idx);
+        if (reason.empty())
+            reason = payment_reason(price, room, goods);
         const bool enabled = reason.empty();
 
         const float line_x  = ImGui::GetCursorPosX();
         const float avail_w = ImGui::GetContentRegionAvail().x;
         if (fieldable) ImGui::TextUnformatted(row.name);
         else           ImGui::TextDisabled("%s", row.name);
+        const ImVec2 name_c = {(ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                               (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f};
+        {
+            const air_combat_stats st = air_design_totals(reg, row.cls, air_design_of(w, nation, row.cls));
+            row_card_tooltip(s, "raise_card", row.name,
+                             std::string(air_class_label(row.cls)) + " - " + missions_of(reg, row.cls),
+                             air_design_stat_bands(st, st));
+        }
         const std::string price_s = fmt::credits(price);
         const float price_w = ImGui::CalcTextSize(price_s.c_str()).x;
         const float gap_x   = ImGui::GetStyle().ItemSpacing.x;
@@ -566,25 +686,18 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
         // As the land rows: a refusal is the Raise tooltip, never ledger text.
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         {
-            if (!enabled)
-                ImGui::SetTooltip("%s", reason.c_str());
-            else if (m.raise_pressed && m.air_raise_refused && m.air_raise_row == static_cast<int>(idx)
-                     && !m.air_message.empty())
-                ImGui::SetTooltip("%s", m.air_message.c_str());
+            std::string why = reason;
+            if (enabled && m.raise_pressed && m.air_raise_refused && m.air_raise_row == static_cast<int>(idx))
+                why = m.air_message;
+            raise_tooltip(why, price, room, goods);
         }
         m.air_raises.push_back({idx, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                 (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f,
-                                fieldable, enabled, price, reason});
+                                fieldable, enabled, price, reason, name_c.x, name_c.y});
 
-        char stats[160];
-        air_stats_line(stats, sizeof stats, reg, row.cls, air_design_of(w, nation, row.cls));
-        ImGui::PushTextWrapPos(0.0f);
+        // A long name pushes the price under it; the numbers are the name's card.
         if (!price_inline)
-            ImGui::TextDisabled("%s  %s - %s   %s", price_s.c_str(), air_class_label(row.cls),
-                                missions_of(reg, row.cls).c_str(), stats);
-        else
-            ImGui::TextDisabled("%s - %s   %s", air_class_label(row.cls), missions_of(reg, row.cls).c_str(), stats);
-        ImGui::PopTextWrapPos();
+            ImGui::TextDisabled("%s", price_s.c_str());
         ImGui::Spacing();
         ImGui::PopID();
     }
@@ -630,17 +743,15 @@ void draw_recruit_air(const world& w, const recipe_registry& reg, ui_state& s)
         ImGui::TextDisabled("No wings yet.");
 }
 
-/// A ship design's numbers on one line: the class's plus its live kit's.
-void ship_stats_line(char* out, std::size_t n, const recipe_registry& reg, ship_class c, const unit_design& d)
+/// A ship design's card bands: the class's numbers plus its live kit's, as the ship
+/// designer totals them.
+stat_bands ship_row_bands(const recipe_registry& reg, ship_class c, const unit_design& d)
 {
     sea_ship probe;
     probe.type = static_cast<std::uint16_t>(c); // the sea rows are one per class, in class order
     probe.kit  = d;
     const ship_live_stats st = ship_stats(reg, probe);
-    if (c == ship_class::transport)
-        std::snprintf(out, n, "hp %d  stealth %d  carries %d", st.hp, st.stealth, st.capacity);
-    else
-        std::snprintf(out, n, "hp %d  attack %d  detection %d  stealth %d", st.hp, st.attack, st.detection, st.stealth);
+    return ship_design_stat_bands(st, st, reg.military().sea.cls[static_cast<std::size_t>(c)].range);
 }
 
 /// What class @p c does, in words: "Patrol, Escort, Raid, Blockade"; a transport carries.
@@ -743,14 +854,20 @@ void draw_recruit_sea(const world& w, const recipe_registry& reg, ui_state& s)
             reason = "This port opens on no sea."; // a lake's shore: a mouth is sea water
         else if (hc != corp_command_result::applied)
             reason = "Cannot be raised at this port.";
-        else if (price > room)
-            reason = "The treasury cannot cover it.";
+        const hire_goods_reading goods = read_ship_hire_goods(w, reg, actor, idx);
+        if (reason.empty())
+            reason = payment_reason(price, room, goods);
         const bool enabled = reason.empty();
 
         const float line_x  = ImGui::GetCursorPosX();
         const float avail_w = ImGui::GetContentRegionAvail().x;
         if (fieldable) ImGui::TextUnformatted(row.name);
         else           ImGui::TextDisabled("%s", row.name);
+        const ImVec2 name_c = {(ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
+                               (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f};
+        row_card_tooltip(s, "raise_card", row.name,
+                         std::string(ship_class_label(row.cls)) + " - " + sea_missions_of(reg, row.cls),
+                         ship_row_bands(reg, row.cls, ship_design_of(w, nation, row.cls)));
         const std::string price_s = fmt::credits(price);
         const float price_w = ImGui::CalcTextSize(price_s.c_str()).x;
         const float gap_x   = ImGui::GetStyle().ItemSpacing.x;
@@ -779,25 +896,18 @@ void draw_recruit_sea(const world& w, const recipe_registry& reg, ui_state& s)
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
         {
-            if (!enabled)
-                ImGui::SetTooltip("%s", reason.c_str());
-            else if (m.raise_pressed && m.sea_raise_refused && m.sea_raise_row == static_cast<int>(idx)
-                     && !m.sea_message.empty())
-                ImGui::SetTooltip("%s", m.sea_message.c_str());
+            std::string why = reason;
+            if (enabled && m.raise_pressed && m.sea_raise_refused && m.sea_raise_row == static_cast<int>(idx))
+                why = m.sea_message;
+            raise_tooltip(why, price, room, goods);
         }
         m.sea_raises.push_back({idx, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                 (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f,
-                                fieldable, enabled, price, reason});
+                                fieldable, enabled, price, reason, name_c.x, name_c.y});
 
-        char stats[120];
-        ship_stats_line(stats, sizeof stats, reg, row.cls, ship_design_of(w, nation, row.cls));
-        ImGui::PushTextWrapPos(0.0f);
+        // A long name pushes the price under it; the numbers are the name's card.
         if (!price_inline)
-            ImGui::TextDisabled("%s  %s - %s   %s", price_s.c_str(), ship_class_label(row.cls),
-                                sea_missions_of(reg, row.cls).c_str(), stats);
-        else
-            ImGui::TextDisabled("%s - %s   %s", ship_class_label(row.cls), sea_missions_of(reg, row.cls).c_str(), stats);
-        ImGui::PopTextWrapPos();
+            ImGui::TextDisabled("%s", price_s.c_str());
         ImGui::Spacing();
         ImGui::PopID();
     }
@@ -842,20 +952,15 @@ void draw_design_sea(const world& w, const recipe_registry& reg, ui_state& s)
     for (int c = 0; c < ship_class_count; ++c)
     {
         const ship_class sc = static_cast<ship_class>(c);
-        char stats[120];
-        ship_stats_line(stats, sizeof stats, reg, sc, ship_design_of(w, nation, sc));
         ImGui::PushID(c + 0xA0000);
         if (ImGui::Selectable(ship_class_label(sc), ship_designer_open_on(s, sc)))
             toggle_ship_designer(s, sc);
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Open the designer for %s. Kit choices open as Naval research lands.", ship_class_label(sc));
+        row_card_tooltip(s, "design_card", ship_class_label(sc), sea_missions_of(reg, sc),
+                         ship_row_bands(reg, sc, ship_design_of(w, nation, sc)),
+                         "Press to open the designer. Kit choices open as Naval research lands.");
         m.sea_class_rows.push_back({c, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                     (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
         ImGui::PopID();
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("%s - %s", sea_missions_of(reg, sc).c_str(), stats);
-        ImGui::PopTextWrapPos();
-        ImGui::Spacing();
     }
 }
 
@@ -881,24 +986,21 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
             const land_class lc = static_cast<land_class>(c);
             if (lc == land_class::none)
                 continue;
-            // The design's numbers — the class's plus its live kit's (BL-1434).
-            char stats[128];
-            stats_line(stats, sizeof stats, design_stats(w, nation, lc));
             // The designer's door (military.md § The designer). Lit while the designer
-            // is open on this class, and a toggle: pressing the lit row closes it.
+            // is open on this class, and a toggle: pressing the lit row closes it. Its
+            // card - the class's plus its live kit's numbers (BL-1434) - is its hover.
             ImGui::PushID(c + 0x20000);
             if (ImGui::Selectable(land_class_label(lc), unit_designer_open_on(s, lc)))
                 toggle_unit_designer(s, lc);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Open the designer for %s. Kit choices open as military research lands.",
-                                  land_class_label(lc));
+            {
+                const land_combat_stats st = design_stats(w, nation, lc);
+                row_card_tooltip(s, "design_card", land_class_label(lc), "Land class - its live design",
+                                 land_design_stat_bands(reg, lc, st, st),
+                                 "Press to open the designer. Kit choices open as military research lands.");
+            }
             s.military.class_rows.push_back({c, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                              (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
             ImGui::PopID();
-            ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextDisabled("%s", stats);
-            ImGui::PopTextWrapPos();
-            ImGui::Spacing();
         }
 
         // BL-1437: UNIT TYPES — which the nation still raises. A ticked type is
@@ -946,21 +1048,18 @@ void draw_design(const world& w, const recipe_registry& reg, ui_state& s)
         for (int c = 0; c < air_class_count; ++c)
         {
             const air_class ac = static_cast<air_class>(c);
-            char stats[160];
-            air_stats_line(stats, sizeof stats, reg, ac, air_design_of(w, nation, ac));
             ImGui::PushID(c + 0x60000);
             if (ImGui::Selectable(air_class_label(ac), air_designer_open_on(s, ac)))
                 toggle_air_designer(s, ac);
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Open the designer for %s. Kit choices open as military research lands.",
-                                  air_class_label(ac));
+            {
+                const air_combat_stats st = air_design_totals(reg, ac, air_design_of(w, nation, ac));
+                row_card_tooltip(s, "design_card", air_class_label(ac), missions_of(reg, ac),
+                                 air_design_stat_bands(st, st),
+                                 "Press to open the designer. Kit choices open as military research lands.");
+            }
             m.air_class_rows.push_back({c, (ImGui::GetItemRectMin().x + ImGui::GetItemRectMax().x) * 0.5f,
                                         (ImGui::GetItemRectMin().y + ImGui::GetItemRectMax().y) * 0.5f});
             ImGui::PopID();
-            ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextDisabled("%s - %s", missions_of(reg, ac).c_str(), stats);
-            ImGui::PopTextWrapPos();
-            ImGui::Spacing();
         }
     }
 }

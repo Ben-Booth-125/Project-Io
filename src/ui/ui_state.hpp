@@ -386,6 +386,7 @@ struct military_ledger_state
         bool          enabled   = false; ///< The Raise press is live.
         float         price     = 0.0f;
         std::string   reason;            ///< Why the row is dimmed or Raise is off; empty when live.
+        float         name_x = -1.0f, name_y = -1.0f; ///< The name's centre: its hover is the row's card.
     };
     std::vector<drawn_base>  bases;
     std::vector<drawn_raise> raises; ///< One per roster row, drawn order.
@@ -422,6 +423,7 @@ struct military_ledger_state
         bool          fieldable = false, enabled = false;
         float         price = 0.0f;
         std::string   reason;
+        float         name_x = -1.0f, name_y = -1.0f; ///< The name's centre: its hover is the row's card.
     };
     std::vector<drawn_air_raise> air_raises;
     struct drawn_wing { entity_id id = null_entity; float x = -1.0f, y = -1.0f; };

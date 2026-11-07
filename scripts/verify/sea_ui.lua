@@ -78,8 +78,36 @@ print(string.format("sea_ui: port at grid %s,%s", tostring(port_x), tostring(por
 verify.center_tile(port_x, port_y, 6.0)
 print(string.format("sea_ui: %d port(s), sea_base %d", #led.ports, led.sea_base))
 
--- 2. A real Raise through hire_ship.
+-- 1b. The goods leg dims a row, naming what is short (the seam's own plan, read_ship_hire_goods).
 verify.grant_recruits("sea", 1000)
+settle()
+led = verify.military_ledger()
+for _, r in ipairs(led.sea_raises) do
+    print("sea_ui: before stock, row " .. r.row .. ": " .. (r.enabled and "lit" or r.reason))
+    if not r.enabled and r.reason:find("^Short of") then
+        check(r.reason:find("%(%d+ of %d+%)") ~= nil, "a short row names held and needed: " .. r.reason)
+    end
+end
+
+-- 1c. A row's name is its card: a glance, then frozen after 2 s, its cells taking hover.
+local nr = led.sea_raises[2]
+check(nr.name_x > 0, "the destroyer row publishes its name")
+verify.hover(nr.name_x, nr.name_y, 30)
+check(verify.stat_grids().raise_card ~= nil, "hovering the name shows the row's card")
+check(not verify.military_ledger().card_frozen, "half a second on, the card is still a glance")
+verify.hover(nr.name_x, nr.name_y, 100)
+check(verify.military_ledger().card_frozen, "two seconds on, the card freezes")
+local grid = verify.stat_grids().raise_card
+check(grid ~= nil and #grid > 0, "the frozen card draws its stat grid")
+if grid ~= nil and #grid > 0 then
+    verify.hover(grid[1].x, grid[1].y, 5)
+    check(verify.military_ledger().card_frozen, "the frozen card holds while the pointer is on its cells")
+    verify.capture("sea_row_card_frozen")
+end
+verify.hover(4, 4, 3)
+check(not verify.military_ledger().card_frozen, "leaving the frozen card closes it")
+
+-- 2. A real Raise through hire_ship.
 for _, g in ipairs({"steel", "machinery", "electronics", "alloys"}) do verify.grant_stock(g, 30) end
 settle()
 led = verify.military_ledger()

@@ -93,6 +93,24 @@ while construction placement mode is active (the ghost owns that moment).
 
 ---
 
+## The freezable tooltip (Ben, 2026-11-07)
+
+**A tooltip whose content has its own tooltips freezes, then takes the pointer.** The hover card
+never takes the pointer, so nothing inside it can be hovered. A tooltip carrying glyphs — the stat
+grid on a Military ledger row's card — needs its glyphs named, so it uses
+`freezable_tooltip(id, dt, content)` (`hover_card.hpp`) instead:
+
+- **Glance.** While its item is hovered it is an ordinary tooltip, shown at once and tracking the
+  pointer.
+- **Freeze.** After `kFreezableTooltipFreezeSec` (2 s) of hover it freezes where it stands, as a
+  plain window held in front, which takes the pointer. Its items are hoverable, so each carries its
+  own tooltip: a nested one.
+- **Close.** A frozen tooltip closes once the pointer is off its item and outside its rect
+  inflated by `kHoverCardExitPadPx` (26 px). One freezes at a time.
+
+Its dwell runs on the same clock as the hover card's: the fixed 1/60 s step under `--verify`,
+else the frame's time capped at `kHoverMaxFrameSeconds`.
+
 ## The frame — `draw_hover_card`
 
 `draw_hover_card(ImVec2 anchor, content, ImVec2* out_min, ImVec2* out_max)`
