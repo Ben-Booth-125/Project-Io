@@ -215,5 +215,42 @@
   "anchor": "the wider view stands \\(Ben, 2026-11-07\\)",
   "stale": [],
   "owner": "sprint 63 (tile resolution)"
+ },
+ {
+  "ruling": "Every major's kit holds a Marketplace on its steel mill's market",
+  "doc": "docs/generation/CORPORATION_GENERATION.md",
+  "anchor": "A Marketplace on the mill's market \\(Ben, 2026-11-07\\)",
+  "stale": [],
+  "owner": "sprint 63 (kit mill marketplace)"
+ },
+ {
+  "ruling": "Steel moves six units a trade point",
+  "doc": "docs/economy/TRADE.md",
+  "anchor": "Steel moves six a point \\(Ben, 2026-11-07\\)",
+  "stale": [],
+  "owner": "sprint 63 (steel trade six)"
+ },
+ {
+  "ruling": "A priced-out want sizes trade room",
+  "doc": "docs/economy/SUPPLY.md",
+  "anchor": "A priced-out want sizes room \\(Ben, 2026-11-07\\)",
+  "stale": [],
+  "owner": "sprint 63 (priced-out sizes room)"
+ },
+ {
+  "ruling": "A shipment draws Logistic Points where it leaves, not along its route",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "A shipment pays where it leaves \\(Ben, 2026-11-07\\)",
+  "stale": [
+   "It pays for its whole route"
+  ],
+  "owner": "sprint 63 (LP source-only doc)"
+ },
+ {
+  "ruling": "A shipment draws Logistic Points by cargo value",
+  "doc": "docs/economy/LOGISTICS.md",
+  "anchor": "Points are drawn by value \\(Ben, 2026-11-07\\)",
+  "stale": [],
+  "owner": "sprint 63 (LP by value)"
  }
 ]

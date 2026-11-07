@@ -74,6 +74,61 @@ bool stocks_equal(const unit_component& a, const unit_component& b)
 
 } // namespace
 
+namespace {
+
+/// A day's fall in a food stock at @p share_permille, in `stock_day`'s units (k_supply_unit
+/// to the per-mille): today's spend, less what the share delivers of spend + restock. At or
+/// below zero the stock does not fall.
+int64_t food_drain_per_day(const carried_supply_params& p, int share_permille)
+{
+    const int64_t spend_milli = int64_t{ std::max(0, p.food_per_day) } * 1000;
+    const int64_t need_u      = spend_milli + int64_t{ std::max(0, p.food_per_day) } * std::max(0, p.restock_permille);
+    return spend_milli * 1000 - clamp_pm(share_permille) * need_u;
+}
+
+/// The first day that ends under one WHOLE per-mille: `unit_starving` reads no remainder, and
+/// that day starves, the same order as the day. Requires @p drain > 0.
+int64_t food_empty_on(int food_permille, int64_t drain)
+{
+    const int64_t stock = int64_t{ clamp_pm(food_permille) } * k_supply_unit;
+    return stock >= k_supply_unit ? (stock - k_supply_unit) / drain + 1 : 1;
+}
+
+} // namespace
+
+int carried_hunger_loss_permille(const carried_supply_params& p, int food_permille, int share_permille, int days)
+{
+    const int64_t drain = food_drain_per_day(p, share_permille);
+    if (drain <= 0 || days <= 0)
+        return 0;
+    const int64_t starving = std::max<int64_t>(0, days - food_empty_on(food_permille, drain) + 1);
+    return static_cast<int>(std::min<int64_t>(1000, starving * 1000 / k_starvation_days));
+}
+
+int carried_food_after_days(const carried_supply_params& p, int food_permille, int share_permille, int days)
+{
+    const int64_t drain = food_drain_per_day(p, share_permille);
+    const int64_t stock = int64_t{ clamp_pm(food_permille) } * k_supply_unit - drain * std::max(0, days);
+    return static_cast<int>(std::clamp<int64_t>(stock, 0, 1000 * k_supply_unit) / k_supply_unit);
+}
+
+int carried_days_to_death(const carried_supply_params& p, int food_permille, int share_permille)
+{
+    const int64_t drain = food_drain_per_day(p, share_permille);
+    if (drain <= 0)
+        return -1;
+    return static_cast<int>(food_empty_on(food_permille, drain) + k_starvation_days - 1);
+}
+
+int carried_hunger_price_permille(const carried_supply_params& p, int food_permille, int share_permille)
+{
+    const int death = carried_days_to_death(p, food_permille, share_permille);
+    if (death < 0)
+        return 0;
+    const int64_t fastest = carried_days_to_death(p, 1000, 0);
+    return static_cast<int>(std::clamp<int64_t>(fastest * 1000 / death, 1, 1000));
+}
+
 int carried_combat_permille(const unit_component& u)
 {
     const int64_t ammo  = std::max(k_ammo_floor_permille, clamp_pm(u.ammo_permille));

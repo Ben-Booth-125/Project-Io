@@ -1072,10 +1072,13 @@
    "short_name": "RIVAL_MARCH_SUPPLY",
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "files": [
-    "src/world/corp_ai.cpp"
+    "src/world/corp_ai.cpp",
+    "src/world/fronts.cpp",
+    "src/world/carried_supplies.cpp",
+    "tools/verify/rival_march_census.cpp"
    ],
    "title": "Rival marches weigh supply",
-   "design": "Ben, 2026-11-07: a rival march's score reads supply at the destination and along the route. Rival marches starved 9-16% of opening armies in 8 quarters. New dated grant in AI_OPPONENT section 11."
+   "design": "Ben, 2026-11-07: a rival march's score reads its own network's cover at the destination, never the route or the pool; fall back allowed (\"Yes, allow fall back\"), narrowed so a front keeps its reason while either side holds ground of the other until peace. Grant in AI_OPPONENT section 11. Measured, 16 seeds: starved 22.4% -> 6.0% of opening units at 20 quarters. Merged after three cold reviews; open calls in NR-1150."
   },
   {
    "status": "in_progress",
@@ -1164,6 +1167,116 @@
    ],
    "title": "Every army starves in the verify world",
    "design": "The --verify world census runs 78 units, men 9841 to 0 by q4; real worlds keep most. Cause unconfirmed. Any check that needs a unit after q3 in that world is reading an empty field. scripts/verify/units_survive_quarters.lua prints the census."
+  },
+  {
+   "status": "in_progress",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: steel trade form)",
+   "requires": [],
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1545",
+   "short_name": "KIT_MILL_MARKETPLACE",
+   "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+   "files": [
+    "src/world/opening_kit.cpp"
+   ],
+   "title": "Every kit holds a Marketplace on its steel mill's market",
+   "design": "Ben, 2026-11-07: every major's kit gains a Planetary Marketplace on the market of its steel slot, the same for all. No major traded from its own mill market once; 39% of stranded steel had no trade building at the source."
+  },
+  {
+   "status": "in_progress",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: steel trade form)",
+   "requires": [],
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 1,
+   "id": "BL-1546",
+   "short_name": "STEEL_TRADE_SIX",
+   "authority_doc": "docs/economy/TRADE.md",
+   "files": [
+    "scripts/economy.lua"
+   ],
+   "title": "Steel moves six a trade point",
+   "design": "Ben, 2026-11-07: steel's trade capacity rises from 2.5 to 6 units a point a quarter. A mill-less market needs 70-200 steel a quarter."
+  },
+  {
+   "status": "in_progress",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: steel trade form)",
+   "requires": [],
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1547",
+   "short_name": "PRICED_OUT_SIZES_ROOM",
+   "authority_doc": "docs/economy/SUPPLY.md",
+   "files": [
+    "src/world/supply_system.cpp"
+   ],
+   "title": "A priced-out want sizes trade room",
+   "design": "Ben, 2026-11-07: when a processor is priced out and its want sits in the hauler-only register, that want sizes trade room, so trade can carry it the input. supply_system.cpp dispatch_absorbable returns 0 first today. 20% of coal-short mill cases."
+  },
+  {
+   "status": "in_progress",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: steel trade form)",
+   "requires": [],
+   "category": "Docs",
+   "priority": "B",
+   "difficulty": 1,
+   "id": "BL-1548",
+   "short_name": "LP_SOURCE_ONLY_DOC",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "docs/economy/LOGISTICS.md"
+   ],
+   "title": "Logistics doc: a shipment pays where it leaves",
+   "design": "Ben, 2026-11-07: the code wins. A shipment draws Logistic Points at the market it leaves, not along its whole route; LOGISTICS.md's whole-route sentence (NR-1060) is rewritten to match."
+  },
+  {
+   "status": "in_progress",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: steel trade form)",
+   "requires": [],
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1549",
+   "short_name": "LP_BY_VALUE",
+   "authority_doc": "docs/economy/LOGISTICS.md",
+   "files": [
+    "src/world/supply_system.cpp"
+   ],
+   "title": "Logistic Points drawn by cargo value",
+   "design": "Ben, 2026-11-07, this sprint: a shipment draws Logistic Points by its cargo's value, not its unit count. Per unit, coal costs about 8 times steel per credit; the cap refused 39-55% of shipments."
   }
  ]
 }

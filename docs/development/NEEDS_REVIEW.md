@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*27 entries — 26 open, 1 resolved.*
+*30 entries — 29 open, 1 resolved.*
 
 ---
 
@@ -297,6 +297,27 @@ WIND: a major at ring 2, cost 12, needing Fuel Economy III and V, the first node
 docs/economy/RESEARCH.md gains a sentence for a major that needs one node of each arm rather than two minors. The wording is the lane's, not yours.
 
 **Why it matters.** A grammar exception is how a tree loses its grammar.
+
+### NR-1148 — Rival march supply: the calibrations and readings inside your grant
+*decision · raised 2026-11-07 · from BL-1540 (rival march supply)*
+
+You allowed fall back on 2026-11-07. Taken inside the grant: plain ground is worth 500 and a goal 1000, so plain ground stops being worth a march at about share 590. A front stops being a reason once all of a nation's goals in that war are taken; a nation with no goals keeps its reason. A force with goals left but refused the push holds on hungry ground, because a fall back would re-assign straight back with no stored state. Liberation of own occupied ground is weighed as plain ground. The pool is not read, and 10 units starved on pool shortage at 20 quarters.
+
+**Why it matters.** These set when a rival goes hungry for a prize, and at 20 quarters 6.2% of opening units still starve.
+
+### NR-1149 — Novelty: the settle prices buildings separately from play
+*novel-work · raised 2026-11-07 · from BL-1497 (opening cost curve)*
+
+Foundings and every settle tick use the authored bills; play uses the raised curve, through a registry swap. That holds every kit identical, and it means 31 sites on 23 majors still building at handoff draw the live bill for their remaining days.
+
+**Why it matters.** Two price tables for one building are a new seam, and first-quarter bills are not perfectly equal between majors.
+
+### NR-1150 — Rival march supply: three calls after merge
+*question · raised 2026-11-07 · from BL-1540 (rival march supply)*
+
+CLOCK: rivals score fronts once a year, while a unit with no supply dies near day 210. Scoring fronts every quarter (and nothing else) takes men lost from 6.7% to 4.4% at 20 quarters, but the march-off-and-return loop count goes from 9 to 31. Not shipped. HOME LEAK: 5 of 21 fall backs at 20 quarters land in the capital province and are then posted home for good; telling them from the deliberate home garrison needs a new saved field. RANGE: ground within 8 straight hex steps of a goal is worth the goal; past it a hungry march holds, 7 refusals in 20 quarters across 16 seeds, all with a goal left.
+
+**Why it matters.** Each sets how often rivals lose men to hunger against how steadily they hold a war.
 
 ---
 

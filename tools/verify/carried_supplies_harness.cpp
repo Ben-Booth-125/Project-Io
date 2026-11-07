@@ -701,6 +701,55 @@ int main()
               "S14 on dunes the equipment drain is x1.5 the plains drain (15 against 10 over ten days)");
     }
 
+    // BL-1540 (rival march supply): the rival scorer reads these forward, so they must be the
+    // day's own arithmetic, walked out as far as the read looks: to the last man's death, which
+    // for a cover a hair under break-even is decades off.
+    std::printf("\nS15 - the hunger reads are what the days do\n");
+    {
+        bool loss_ok = true, food_ok = true, death_ok = true, price_ok = true;
+        int last_price = 1001;
+        for (const int share : { 0, 100, 300, 500, 555, 600, 640, 660, 666, 667, 800, 1000 })
+            for (const int start_food : { 1000, 400 })
+            {
+                camp c;
+                build_camp(c, 0);
+                { unit_component& u = c.w.units.at(c.u);
+                  u.count = 1800; u.establishment = 1800; u.food_permille = start_food; u.lp_share_permille = share; }
+                const std::set<entity_id> none;
+                const int read_death = carried_days_to_death(sp, start_food, share);
+                const int walk = read_death > 0 ? read_death + 5 : 720;
+                int death_day = -1;
+                for (int day = 1; day <= walk && c.w.units.at(c.u).count > 0; ++day)
+                {
+                    (void)run_carried_supplies_day(c.w, sp, none);
+                    const unit_component& u = c.w.units.at(c.u);
+                    if (day == 30 || day == 90 || day == 180 || day == 483)
+                    {
+                        loss_ok = loss_ok && (1800 - u.count) * 1000 / 1800
+                                                 == carried_hunger_loss_permille(sp, start_food, share, day);
+                        food_ok = food_ok && u.food_permille == carried_food_after_days(sp, start_food, share, day);
+                    }
+                    if (u.count <= 0)
+                        death_day = day;
+                }
+                const int price = carried_hunger_price_permille(sp, start_food, share);
+                std::printf("      share %4d, food %4d: dead on day %5d, the read says %5d; price %4d\n", share,
+                            start_food, death_day, read_death, price);
+                death_ok = death_ok && death_day == read_death;
+                price_ok = price_ok && (share >= 667 ? price == 0 : price > 0);
+                if (start_food == 1000)
+                {
+                    price_ok = price_ok && (share >= 667 || price < last_price);
+                    last_price = price;
+                }
+            }
+        check(loss_ok, "S15a the loss read is the men the days take, at 30, 90, 180 and 483 days");
+        check(food_ok, "S15b the food read is the stock the days leave");
+        check(death_ok, "S15c the death read is the day the last man goes, at every share, or never at break-even");
+        check(price_ok && carried_hunger_price_permille(sp, 1000, 0) == 1000,
+              "S15d every share below break-even is priced, falling as it rises; zero at 667 and past");
+    }
+
     std::printf("\n%d passed, %d failed\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;
 }
