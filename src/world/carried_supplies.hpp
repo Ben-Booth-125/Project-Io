@@ -68,12 +68,22 @@ inline constexpr int k_hunger_penalty_permille = 150; ///< Flat -15% attack and 
 inline constexpr int k_ammo_floor_permille     = 200; ///< Out of shells, it still fights with small arms.
 inline constexpr int k_starvation_days         = 180; ///< Days a starving unit takes to lose its establishment.
 
-/// RIVAL_MARCH_SUPPLY (AI_OPPONENT.md § 11, "A rival's march may weigh supply", Ben 2026-11-07):
-/// what standing at @p share_permille for @p days does to a unit holding @p food_permille of
-/// food, per-mille of its establishment lost to starvation. The day's own arithmetic read
-/// forward (`run_carried_supplies_day`), no second estimate: 0 at or past the break-even share,
-/// else the stock empties at the shortfall and every day from then on takes 1/180. Pure.
+/// BL-1540 (rival march supply; AI_OPPONENT.md § 11, Ben 2026-11-07): the day's own arithmetic
+/// read forward (`run_carried_supplies_day`), no second estimate. All pure; S15 proves each
+/// against the days. @p share_permille is the cover the stock stands on.
+///
+/// Per-mille of the establishment lost to starvation after @p days.
 int carried_hunger_loss_permille(const carried_supply_params& p, int food_permille, int share_permille, int days);
+/// The food stock after @p days, per-mille, holding at full at or past the break-even share.
+int carried_food_after_days(const carried_supply_params& p, int food_permille, int share_permille, int days);
+/// The day the last man is gone, day 1 being the next; -1 when that never comes (at or past
+/// the break-even share).
+int carried_days_to_death(const carried_supply_params& p, int food_permille, int share_permille);
+/// THE PRICE OF STANDING ON A SHARE: how fast it kills, against the fastest it can. 0 at or past
+/// break-even, else (a full stock's death day at share 0) / (this death day) x 1000, clamped to
+/// [1, 1000]. So every share below break-even costs, however far off that death is: a fixed
+/// horizon short of it would read it as free.
+int carried_hunger_price_permille(const carried_supply_params& p, int food_permille, int share_permille);
 
 /// True when the unit's food is below full: the flat hunger step applies.
 inline bool unit_hungry(const unit_component& u) { return u.food_permille < 1000; }

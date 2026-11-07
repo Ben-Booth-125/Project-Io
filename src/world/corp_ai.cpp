@@ -9,8 +9,8 @@
 #include "economy_system.hpp"  // economy_report, agency_event, solve_workforce_target
 #include "battle_system.hpp"   // unit_in_battle (BL-1427: a rival assigns only idle units)
 #include "fronts.hpp"          // BL-1427: a rival uses its fronts
-#include "carried_supplies.hpp" // RIVAL_MARCH_SUPPLY: what a march's supply does to the men
-#include "nation_generation.hpp" // RIVAL_MARCH_SUPPLY: unit_tile_cover_permille, the claim's own read
+#include "carried_supplies.hpp" // BL-1540: what a march's supply does to the men
+#include "nation_generation.hpp" // BL-1540: unit_tile_cover_permille, the claim's own read
 #include "air_combat.hpp"      // BL-1451: a rival flies air wings
 #include "campaign_settle.hpp" // BL-1452: k_campaign_settle_ticks - the settle assigns no fronts
 #include "stance.hpp"          // is_hostile (BL-1451)
@@ -1374,22 +1374,29 @@ ranked_site_map rank_extraction_sites(const world& w, const recipe_registry& reg
 //   exceeds `k_front_push_margin` times the target province's defence; otherwise
 //   HOLD. Issued only where it differs from the stored order.
 //
-// RIVAL_MARCH_SUPPLY (AI_OPPONENT.md § 11, "A rival's march may weigh supply", Ben
-// 2026-11-07; MILITARY.md § Fronts, "A rival's fronts"). Both scores read what the march
-// would cost in men: the share the unit's claim would be granted where it would stand
-// (`unit_tile_cover_permille`), run through the stock's own day for the 180 days starvation
-// takes (`carried_hunger_loss_permille`). No handicap and no cap: on ground its network
-// feeds the term is zero and both scores are the ones above.
+// BL-1540 (rival march supply; AI_OPPONENT.md § 11, "A rival's march may weigh supply", Ben
+// 2026-11-07; MILITARY.md § Fronts, "A rival's fronts"). Every score below reads what the march
+// would cost: the PRICE of the ground, the cover where the unit would stand
+// (`unit_tile_cover_permille`) run through the stock's own days to the unit's death
+// (`carried_hunger_price_permille`): 0 at or past break-even, and something at every cover below
+// it. The pool is not read. No handicap and no cap: on fed ground every term is zero.
+//   A REASON. A front has one when it is at odds with this nation, hostile either way, unless
+//   this nation's goals in a war across it are all taken: then no prize is ahead of it.
 //   ASSIGN. The hunger is what the assignment does to the front's whole slot set, since one
 //   more unit respaces the others. It counts as that share of one more unit in the
-//   fewest-per-span-tile preference. A front toward a nation at odds with this one (hostile
-//   either way) is a reason to march whatever the hunger; any other front is taken only if it
-//   costs no more than standing where the unit stands.
-//   ORDER. A push reads the tiles it would spread onto against where its units stand. Ground
-//   that costs more than standing is taken only for a prize, a province the war is being
-//   fought over, and then with the assigned strength discounted by the men hunger would take
-//   and by the flat hunger step on attack. A force no better fed where it stands pays nothing
-//   to go on.
+//   fewest-per-span-tile preference. A front with no reason is taken only at no price (or no
+//   more than standing, where the nation has no fed ground at all).
+//   RE-WEIGH. A unit on a front with no reason, its slot priced, comes off it (`assign_front`
+//   with a null tile), and is idle like any other.
+//   FALL BACK. An idle unit on priced ground that no front takes marches to its nation's nearest
+//   fed ground, if any. The next order only.
+//   ORDER. A push is scored unit by unit, at the tile `advance_fronts` would march THAT unit
+//   onto: strength x (worth - price). Ground is worth half a unit's men; a goal the neighbour
+//   still holds, stack or no stack, is worth all of them on it or next to it, falling toward
+//   half with distance (500 + 500/steps). The price has no credit for where the unit stands
+//   unless the nation has no fed ground to fall back to. The front pushes when the sum is not
+//   negative and the 3:2 passes. The 3:2 reads each unit's strength less what it would lose by
+//   the time it fights: its stock, on the share it holds, over the straight march's days.
 // ---------------------------------------------------------------------------
 
 /// How much stronger a front's assigned force must be than the weakest adjacent
@@ -1427,27 +1434,85 @@ void score_nation_defence(world& w, const recipe_registry& reg, entity_id nation
     }
 }
 
-/// A march's price, per-mille of the men: @p food_permille held on @p tile for the 180 days
-/// starvation takes to kill a unit (the `k_starvation_days` of the rule itself).
-int march_hunger_permille(world& w, const recipe_registry& reg, unit_draw_memo& memo, entity_id nation,
-                          entity_id tile, int food_permille)
+/// BL-1540: what @p tile costs a unit holding @p food_permille: the cover its claim would get
+/// there, through the stock's own days (`carried_hunger_price_permille`).
+int march_price_permille(world& w, const recipe_registry& reg, unit_draw_memo& memo, entity_id nation,
+                         entity_id tile, int food_permille)
 {
-    return carried_hunger_loss_permille(reg.military().supplies, food_permille,
-                                        unit_tile_cover_permille(w, memo, nation, tile), k_starvation_days);
+    return carried_hunger_price_permille(reg.military().supplies, food_permille,
+                                         unit_tile_cover_permille(w, memo, nation, tile));
 }
 
-/// True when @p prov is a goal of @p nation's in a war with @p neighbour: what the war is for.
-bool war_goal_of(const world& w, entity_id nation, entity_id neighbour, uint32_t prov)
+/// BL-1540: @p nation's goal provinces in a war with @p neighbour; empty when it has none.
+std::vector<uint32_t> war_goals_of(const world& w, entity_id nation, entity_id neighbour)
 {
-    if (const auto it = w.wars.find({ nation, neighbour }); it != w.wars.end()
-        && std::find(it->second.declarer_goals.begin(), it->second.declarer_goals.end(), prov)
-            != it->second.declarer_goals.end())
-        return true;
-    if (const auto it = w.wars.find({ neighbour, nation }); it != w.wars.end()
-        && std::find(it->second.defender_goals.begin(), it->second.defender_goals.end(), prov)
-            != it->second.defender_goals.end())
-        return true;
-    return false;
+    if (const auto it = w.wars.find({ nation, neighbour }); it != w.wars.end())
+        return it->second.declarer_goals;
+    if (const auto it = w.wars.find({ neighbour, nation }); it != w.wars.end())
+        return it->second.defender_goals;
+    return {};
+}
+
+/// BL-1540: the tiles of @p goals @p neighbour still holds, ascending.
+std::vector<entity_id> goal_tiles_left(const world& w, const std::vector<uint32_t>& goals, entity_id neighbour)
+{
+    std::vector<entity_id> out;
+    for (const uint32_t g : goals)
+        if (const province* p = w.provinces.find(g); p != nullptr)
+            for (const entity_id t : p->tiles)
+                if (w.tile_controller(t) == neighbour)
+                    out.push_back(t);
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+/// BL-1540: what taking @p tile is worth, per-mille of the men who take it (header above).
+int64_t ground_worth_permille(const world& w, const std::vector<entity_id>& goals_left, entity_id tile)
+{
+    constexpr int64_t k_ground = 500, k_prize = 1000;
+    int steps = -1;
+    for (const entity_id g : goals_left)
+    {
+        const int d = g == tile ? 0 : tile_hex_steps(w, tile, g);
+        if (d >= 0 && (steps < 0 || d < steps))
+            steps = d;
+    }
+    if (steps < 0)
+        return k_ground;
+    return steps <= 1 ? k_prize : k_ground + (k_prize - k_ground) / steps;
+}
+
+/// BL-1540: the nearest tile of @p nation's own ground a march would accept, on the unit's body,
+/// that feeds it (price 0). Hex steps, ties to the lower id; no plan past this order. Null when
+/// the nearest few fed tiles all refuse, or there are none.
+entity_id nearest_fed_ground(world& w, const recipe_registry& reg, unit_draw_memo& memo, entity_id nation, entity_id uid)
+{
+    const auto nit = w.nations.find(nation);
+    const unit_component& u = w.units.at(uid);
+    const auto here = w.tiles.find(u.position);
+    if (nit == w.nations.end() || here == w.tiles.end())
+        return null_entity;
+    std::vector<std::pair<int, entity_id>> order;
+    for (const entity_id t : nit->second.tiles)
+    {
+        const auto tit = w.tiles.find(t);
+        if (t != u.position && tit != w.tiles.end() && tit->second.body == here->second.body
+            && !is_water(tit->second.substrate) && w.tile_controller(t) == nation)
+            order.emplace_back(tile_hex_steps(w, u.position, t), t);
+    }
+    std::sort(order.begin(), order.end());
+    int asked = 0;
+    for (const auto& [d, t] : order)
+    {
+        (void)d;
+        if (march_price_permille(w, reg, memo, nation, t, u.food_permille) != 0)
+            continue;
+        if (march_check(w, nation, uid, t, null_entity, nullptr, &reg.military()) == corp_command_result::applied)
+            return t;
+        if (++asked == 8)
+            break;
+    }
+    return null_entity;
 }
 
 void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation, int tick)
@@ -1488,6 +1553,39 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         }
     }
 
+    rival_march_tally* const tally = rival_march_tally_sink(); // the census's, else null: nothing reads it
+
+    // BL-1540: does this nation hold ANY ground that feeds a unit? Read once, on the first ask.
+    int any_fed_memo = -1;
+    const auto any_fed = [&]() {
+        if (any_fed_memo < 0)
+        {
+            any_fed_memo = 0;
+            if (nit != w.nations.end())
+                for (const entity_id t : nit->second.tiles)
+                    if (const auto tit = w.tiles.find(t); tit != w.tiles.end() && !is_water(tit->second.substrate)
+                        && w.tile_controller(t) == nation
+                        && march_price_permille(w, reg, supply_memo, nation, t, 1000) == 0)
+                    {
+                        any_fed_memo = 1;
+                        break;
+                    }
+        }
+        return any_fed_memo == 1;
+    };
+
+    // A REASON (header above), per front, and each front's goals still held across it.
+    std::vector<char> reason(fronts.size(), 0);
+    std::vector<std::vector<entity_id>> goals_left(fronts.size());
+    for (std::size_t i = 0; i < fronts.size(); ++i)
+    {
+        const entity_id them = fronts[i].neighbour;
+        const std::vector<uint32_t> goals = war_goals_of(w, nation, them);
+        goals_left[i] = goal_tiles_left(w, goals, them);
+        reason[i] = (is_hostile(w, nation, them) || is_hostile(w, them, nation))
+                    && (goals.empty() || !goals_left[i].empty());
+    }
+
     // The hunger of @p members standing on f's slots, each at its index, ascending id.
     const auto slot_hunger = [&](const front& f, const std::vector<entity_id>& members) {
         int64_t sum = 0;
@@ -1495,11 +1593,48 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         {
             const unit_component& mu = w.units.at(members[m]);
             const entity_id slot = front_hold_slot(w, reg, mu, f, m, members.size());
-            sum += march_hunger_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : mu.position,
-                                         mu.food_permille);
+            sum += march_price_permille(w, reg, supply_memo, nation, slot != null_entity ? slot : mu.position,
+                                        mu.food_permille);
         }
         return sum;
     };
+
+    // RE-WEIGH (header above): off a front with no reason, where its slot is priced, while the
+    // nation has fed ground to stand on. The verb is the player's: a null tile unassigns.
+    for (std::size_t i = 0; i < fronts.size(); ++i)
+    {
+        if (reason[i] || assigned[i].empty() || !any_fed())
+            continue;
+        const std::vector<entity_id> members = assigned[i];
+        for (std::size_t m = 0; m < members.size(); ++m)
+        {
+            const entity_id uid = members[m];
+            const unit_component& u = w.units.at(uid);
+            if (u.count <= 0 || unit_refitting(u) || unit_in_battle(w, uid))
+                continue;
+            const entity_id slot = front_hold_slot(w, reg, u, fronts[i], m, members.size());
+            if (slot == null_entity || march_price_permille(w, reg, supply_memo, nation, slot, u.food_permille) == 0)
+                continue;
+            const int64_t s = unit_strength(w, u);
+            corp_command off;
+            off.tick = tick; off.corp = nation; off.as_nation = nation;
+            off.verb = corp_verb::assign_front; off.subject = uid; off.tile = null_entity;
+            if (apply_corp_command(w, reg, off) != corp_command_result::applied)
+                continue;
+            if (w.units.at(uid).order.dest != null_entity)
+            {
+                corp_command halt;
+                halt.tick = tick; halt.corp = nation; halt.as_nation = nation;
+                halt.verb = corp_verb::halt_unit; halt.subject = uid;
+                (void)apply_corp_command(w, reg, halt);
+            }
+            --count[i];
+            strength[i] -= s;
+            assigned[i].erase(std::find(assigned[i].begin(), assigned[i].end(), uid));
+            if (tally != nullptr)
+                ++tally->reweigh;
+        }
+    }
 
     // ASSIGN.
     for (const entity_id uid : own)
@@ -1516,18 +1651,21 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
         // a march onto its lone slot the game would accept). Assigning one it cannot
         // reach re-issued a refused march every tick. Fronts are tried in preference
         // order; the first reachable wins, and a unit that reaches none stays idle.
-        // RIVAL_MARCH_SUPPLY: what joining each front would cost in men (header above).
+        // BL-1540: what joining each front would cost (header above).
         std::vector<int64_t> hunger(fronts.size(), 0);
-        const int64_t here = march_hunger_permille(w, reg, supply_memo, nation, u.position, u.food_permille);
+        const int64_t here = march_price_permille(w, reg, supply_memo, nation, u.position, u.food_permille);
         std::vector<char> tried(fronts.size(), 0);
         for (std::size_t i = 0; i < fronts.size(); ++i)
         {
             std::vector<entity_id> joined = assigned[i];
             joined.insert(std::upper_bound(joined.begin(), joined.end(), uid), uid);
             hunger[i] = slot_hunger(fronts[i], joined) - slot_hunger(fronts[i], assigned[i]);
-            const bool at_odds = is_hostile(w, nation, fronts[i].neighbour) || is_hostile(w, fronts[i].neighbour, nation);
-            if (!at_odds && hunger[i] > here)
-                tried[i] = 1; // no reason to go hungry there: it stands where it is
+            if (!reason[i] && (hunger[i] > here || (hunger[i] > 0 && any_fed())))
+            {
+                tried[i] = 1; // no reason to go hungry there
+                if (tally != nullptr)
+                    ++tally->assign_refused;
+            }
         }
         const auto load = [&](std::size_t i) { // one unit is 1000; hunger is that share of one more
             return static_cast<int64_t>(count[i]) * 1000 + std::max<int64_t>(0, hunger[i]);
@@ -1556,7 +1694,25 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
             }
         }
         if (best == fronts.size())
+        {
+            // FALL BACK (header above): no front takes it, and it stands on priced ground.
+            if (here > 0 && any_fed())
+                if (const entity_id fed = nearest_fed_ground(w, reg, supply_memo, nation, uid); fed != null_entity)
+                {
+                    corp_command back;
+                    back.tick = tick; back.corp = nation; back.as_nation = nation;
+                    back.verb = corp_verb::march_unit; back.subject = uid; back.tile = fed;
+                    if (apply_corp_command(w, reg, back) == corp_command_result::applied && tally != nullptr)
+                        ++tally->fall_back;
+                }
             continue;
+        }
+        if (tally != nullptr && hunger[best] > 0 && reason[best])
+        {
+            ++tally->odds_hungry;
+            if (!at_war(w, nation, fronts[best].neighbour))
+                ++tally->odds_hungry_no_war;
+        }
         corp_command cmd;
         cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
         cmd.verb = corp_verb::assign_front; cmd.subject = uid; cmd.tile = fronts[best].key;
@@ -1579,28 +1735,53 @@ void score_nation_fronts(world& w, const recipe_registry& reg, entity_id nation,
             int64_t defence = 0;
             if (front_push_target(w, f, &defence) != null_entity) // the weakest tile (2026-10-27)
             {
-                // RIVAL_MARCH_SUPPLY: the mean price of the ground it would spread onto over
-                // the mean price of where its units stand, each read from a full stock, and
-                // whether any of that ground is what the war is for.
-                const std::vector<entity_id> ground = front_push_weakest(w, f);
-                int64_t there = 0;
-                bool prize = false;
-                for (const entity_id t : ground)
+                // BL-1540: scored unit by unit, at the tile the step would march THAT unit onto.
+                const std::vector<entity_id> targets = front_push_tiles(w, reg, f, assigned[i]);
+                const carried_supply_params& sp = reg.military().supplies;
+                int64_t score = 0, force = 0;
+                bool priced = false;
+                for (std::size_t m = 0; m < assigned[i].size(); ++m)
                 {
-                    there += march_hunger_permille(w, reg, supply_memo, nation, t, 1000);
-                    prize = prize || war_goal_of(w, nation, f.neighbour, w.provinces.province_of(t));
+                    const unit_component& u = w.units.at(assigned[i][m]);
+                    const int64_t s = unit_strength(w, u);
+                    const entity_id t = targets[m];
+                    if (t == null_entity)
+                    {
+                        force += s;
+                        continue;
+                    }
+                    // What those men have lost by the time they fight: the stock, on the share
+                    // it holds, over the straight march. `unit_strength` already reads any
+                    // hunger it has now; the flat step counts only if the march brings it on.
+                    const int days = static_cast<int>(std::ceil(
+                        static_cast<float>(tile_hex_steps(w, u.position, t)) * march_days_per_tile(reg.military(), u.type)));
+                    const int loss = carried_hunger_loss_permille(sp, u.food_permille, u.lp_share_permille, days);
+                    int64_t arrives = s * (1000 - loss) / 1000;
+                    if (!unit_hungry(u) && carried_food_after_days(sp, u.food_permille, u.lp_share_permille, days) < 1000)
+                        arrives = arrives * (1000 - k_hunger_penalty_permille) / 1000;
+                    force += arrives;
+                    // The price, with no credit for where it stands while fed ground is there.
+                    const int64_t there = march_price_permille(w, reg, supply_memo, nation, t, u.food_permille);
+                    const int64_t alternative = any_fed() ? 0 : march_price_permille(w, reg, supply_memo, nation, u.position, u.food_permille);
+                    const int64_t extra = std::max<int64_t>(0, there - alternative);
+                    priced = priced || extra > 0;
+                    score += s * (ground_worth_permille(w, goals_left[i], t) - extra) / 1000;
+                    if (tally != nullptr && extra > 0)
+                        if (const auto own = w.tile_to_nation.find(t); own != w.tile_to_nation.end() && own->second == nation)
+                            ++tally->liberation;
                 }
-                there /= std::max<int64_t>(1, static_cast<int64_t>(ground.size()));
-                int64_t here = 0;
-                for (const entity_id uid : assigned[i])
-                    here += march_hunger_permille(w, reg, supply_memo, nation, w.units.at(uid).position, 1000);
-                here /= std::max<int64_t>(1, static_cast<int64_t>(assigned[i].size()));
-                const int64_t extra = std::max<int64_t>(0, there - here);
-                const int64_t fed_strength = extra == 0
-                    ? strength[i]
-                    : strength[i] * (1000 - extra) / 1000 * (1000 - k_hunger_penalty_permille) / 1000;
-                push = (extra == 0 || prize)
-                    && fed_strength * k_front_push_margin_den > defence * k_front_push_margin_num;
+                const bool raw  = strength[i] * k_front_push_margin_den > defence * k_front_push_margin_num;
+                const bool land = force * k_front_push_margin_den > defence * k_front_push_margin_num;
+                push = score >= 0 && land;
+                if (tally != nullptr)
+                {
+                    if (push)
+                        ++(priced ? tally->prize_push : tally->fed_push);
+                    else if (raw && score < 0)
+                        ++tally->refused_supply;
+                    else if (raw)
+                        ++tally->refused_battle;
+                }
             }
         }
         const front_order want = push ? front_order::push : front_order::hold;

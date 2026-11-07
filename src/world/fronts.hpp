@@ -138,11 +138,37 @@ bool front_may_push(const world& w, const front& f);
 /// this is the front-wide reading a rival's scorer weighs.
 entity_id front_push_target(const world& w, const front& f, int64_t* defence = nullptr);
 
-/// RIVAL_MARCH_SUPPLY: every tile tied for weakest under `front_push_target`'s rule, ascending:
-/// the ground a push across `f` would actually spread over. Empty when there is none.
-std::vector<entity_id> front_push_weakest(const world& w, const front& f);
+/// BL-1540 (rival march supply): the tile `advance_fronts`' push would march each of @p members
+/// (ascending id, the front's units) onto: the weakest stack, nearest its slot, ties to the lower
+/// id, past what its class may not enter. null_entity for a unit the push would not march (busy,
+/// standing on the neighbour's ground with no war, nothing reachable). Read-only but for the
+/// march path cache: the same ranking and the same `march_check` the step asks.
+std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, const front& f,
+                                        const std::vector<entity_id>& members);
 
-/// RIVAL_MARCH_SUPPLY: the tile `advance_fronts`' hold gives @p unit as the @p i th of @p n on
+/// BL-1540: hex steps between two tiles of one body, the straight read a scorer may take of a
+/// march. No path is solved.
+int tile_hex_steps(const world& w, entity_id a, entity_id b);
+
+/// BL-1540: how often each path of a rival's march score fired. An opt-in sink for the census:
+/// nothing in the sim reads it, and it is never saved or hashed. Per unit where it names a unit,
+/// per front evaluation where it names a push.
+struct rival_march_tally
+{
+    long long fed_push = 0;       ///< A front set to push with no unit priced.
+    long long prize_push = 0;     ///< A front set to push with a unit priced: the prize was worth it.
+    long long refused_supply = 0; ///< 3:2 passes, and the hunger outweighs the ground: holds.
+    long long refused_battle = 0; ///< The ground is worth it, and 3:2 fails only on the men the march loses.
+    long long fall_back = 0;      ///< A unit marched off priced ground to its own fed ground.
+    long long reweigh = 0;        ///< A unit taken off a front with no reason left, its slot priced.
+    long long assign_refused = 0; ///< A unit left a front's slot it had no reason to go hungry on.
+    long long odds_hungry = 0;    ///< A unit sent to a priced slot on a front at odds.
+    long long odds_hungry_no_war = 0; ///< Of them, on a bare hostility: no war between the pair.
+    long long liberation = 0;     ///< A priced push target on its own occupied ground, weighed as plain ground.
+};
+rival_march_tally*& rival_march_tally_sink();
+
+/// BL-1540: the tile `advance_fronts`' hold gives @p unit as the @p i th of @p n on
 /// `f`, by its walls but not asking `march_check`: slot i, else the nearest tile to it its class
 /// may stand on. null_entity when the span has none. What a scorer reads supply at.
 entity_id front_hold_slot(world& w, const recipe_registry& reg, const unit_component& unit, const front& f,

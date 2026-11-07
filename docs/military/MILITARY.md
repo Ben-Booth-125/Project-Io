@@ -574,16 +574,26 @@ no front stays unassigned. A rival pushes where it is hostile to
 the neighbour and its assigned strength exceeds 3:2 over the push target's defence. Otherwise it
 holds. It never declares the hostility a push needs.
 
-**A rival weighs a march's supply (Ben, 2026-11-07; `../ai/AI_OPPONENT.md` § 11).** The price of a
-march is what § Carried supplies would do to the men at the share the unit's claim is granted where
-it would stand, over the 180 days starvation takes. Slots stay where they are; the rival chooses
-where to send units. A front's price is what one more unit does to its whole slot set, counted in
-the fewest-per-span-tile preference as that share of one more unit. A front toward a nation at odds
-with it, hostile either way, is a reason to go hungry. Any other front is taken only if it costs no
-more than standing where the unit stands. A push prices the weakest ground it would spread onto
-against where its units stand. Ground that costs more is taken only if it holds a goal of the war
-with that neighbour, and then the 3:2 reads the strength after those men and the flat hunger step.
-On ground its network feeds, the price is nothing and both choices are the ones above.
+**A rival weighs a march's supply (Ben, 2026-11-07; BL-1540, rival march supply; `../ai/AI_OPPONENT.md` § 11).**
+A march's price is how fast the ground would kill the unit: the cover where it would stand, run through
+§ Carried supplies to the day its last man goes, against the fastest that can happen. Cover at or past
+break-even costs nothing, and every cover below it costs something. The pool is not read, and the route is
+not read. Slots stay where they are; the rival chooses where to send units.
+
+A front has a **reason** when it is at odds with the nation, hostile either way, unless every goal of the
+nation's war with that neighbour is taken. A front's price is what one more unit does to its whole slot
+set, counted in the fewest-per-span-tile preference as that share of one more unit. A front with no reason
+is not taken at a price while the nation has fed ground. A unit on such a front whose slot is priced comes
+off it, by the assign verb's unassign. An idle unit on priced ground that no front takes marches to its
+nation's nearest fed ground that a march accepts.
+
+A push is scored unit by unit, at the tile that unit would march onto: its strength x (worth - price). Ground
+is worth half of the men who take it. A goal the neighbour still holds, under a stack or not, is worth all of
+them on it or next to it, falling toward half with distance. The price takes no credit for where the unit
+stands while the nation has fed ground: a starving force is weighed as a fed one is. The front pushes when
+the sum is not negative and the 3:2 passes. The 3:2 reads each unit's strength less what it will have lost by
+the time it fights: its stock, on the share it holds, over the straight march's days. So a full stock attacking
+across a border loses nothing. Liberating a nation's own occupied ground is weighed as plain ground.
 
 ### Defend province (Ben, 2026-11-05)
 

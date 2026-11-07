@@ -457,6 +457,23 @@ bool water_slot_for(uint16_t type, const tile_component& t)
         && (rows[type].domains & domain_bit(traversal_domain::land)) != 0;
 }
 
+/// A push's targets as each unit ranks them: weakest stack, then nearest its slot, then the
+/// lower tile id. One ranking, for the step and for the scorer that prices it (BL-1540).
+struct push_rank { int64_t s; int d; entity_id t; };
+std::vector<push_rank> push_order(const world& w, const std::map<entity_id, int64_t>& held, entity_id slot)
+{
+    std::vector<push_rank> order;
+    order.reserve(held.size());
+    for (const auto& [t, st] : held)
+        order.push_back({ st, hex_distance(w, slot, t), t });
+    std::sort(order.begin(), order.end(), [](const push_rank& a, const push_rank& b) {
+        if (a.s != b.s) return a.s < b.s;
+        if (a.d != b.d) return a.d < b.d;
+        return a.t < b.t;
+    });
+    return order;
+}
+
 /// The push's candidate tiles (Ben, 2026-10-27: "fronts and push use tiles too"):
 /// the LAND tiles of `f.neighbour` with a hex side onto `f`'s span, ascending id.
 std::set<entity_id> push_candidates(const world& w, raster_source& rs, const front& f)
@@ -748,20 +765,55 @@ entity_id front_push_target(const world& w, const front& f, int64_t* defence)
     return best;
 }
 
-std::vector<entity_id> front_push_weakest(const world& w, const front& f)
+rival_march_tally*& rival_march_tally_sink()
 {
+    static rival_march_tally* sink = nullptr;
+    return sink;
+}
+
+int tile_hex_steps(const world& w, entity_id a, entity_id b)
+{
+    return hex_distance(w, a, b);
+}
+
+std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, const front& f,
+                                        const std::vector<entity_id>& members)
+{
+    std::vector<entity_id> out(members.size(), null_entity);
+    if (f.span.empty() || members.empty())
+        return out;
     raster_source rs{ w, {} };
     const std::map<entity_id, int64_t> held = push_strengths(w, f.nation, push_candidates(w, rs, f));
-    int64_t low = std::numeric_limits<int64_t>::max();
-    for (const auto& [t, s] : held)
+    const std::size_t n = members.size(), len = f.span.size();
+    for (std::size_t i = 0; i < n; ++i)
     {
-        (void)t;
-        low = std::min(low, s);
+        const unit_component& u = w.units.at(members[i]);
+        if (u.count <= 0 || u.position == null_entity || unit_refitting(u) || unit_in_battle(w, members[i]))
+            continue;
+        if (owner_of(w, u.position) == f.neighbour && !at_war(w, f.nation, f.neighbour))
+            continue;
+        const std::vector<push_rank> order = push_order(w, held, f.span[((2 * i + 1) * len) / (2 * n)]);
+        const std::function<bool(const tile_component&)> wall =
+            march_wall(w, u.owner, u.type, class_wall(reg.military(), u.type));
+        for (const push_rank& r : order)
+        {
+            if (const auto tit = w.tiles.find(r.t); wall && tit != w.tiles.end() && wall(tit->second))
+                continue;
+            if (u.order.dest == r.t)
+            {
+                out[i] = r.t;
+                break;
+            }
+            const corp_command_result res = march_check(w, f.nation, members[i], r.t, null_entity, nullptr, &reg.military());
+            if (res == corp_command_result::applied)
+            {
+                out[i] = r.t;
+                break;
+            }
+            if (res != corp_command_result::rejected_terrain)
+                break;
+        }
     }
-    std::vector<entity_id> out;
-    for (const auto& [t, s] : held) // ascending
-        if (s == low)
-            out.push_back(t);
     return out;
 }
 
@@ -1188,19 +1240,10 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
                 // then the lower tile id. BL-1455: a target the unit's class cannot
                 // enter is skipped, and a target whose every route crosses its walls
                 // (rejected_terrain) gives way to the next; the first legal one wins.
-                struct ranked { int64_t s; int d; entity_id t; };
-                std::vector<ranked> order;
-                order.reserve(held.size());
-                for (const auto& [t, st] : held)
-                    order.push_back({ st, hex_distance(w, slot, t), t });
-                std::sort(order.begin(), order.end(), [](const ranked& a, const ranked& b) {
-                    if (a.s != b.s) return a.s < b.s;
-                    if (a.d != b.d) return a.d < b.d;
-                    return a.t < b.t;
-                });
+                const std::vector<push_rank> order = push_order(w, held, slot);
                 const wall_fn wall = march_wall(w, u.owner, u.type, class_wall(reg.military(), u.type));
                 bool done = false;
-                for (const ranked& r : order)
+                for (const push_rank& r : order)
                 {
                     if (walled_for(wall, r.t))
                         continue;

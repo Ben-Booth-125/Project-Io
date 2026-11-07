@@ -618,10 +618,10 @@ bool unit_tile_drawable(world& w, unit_draw_memo& memo, entity_id nation, entity
 /// of reach here: a tile this reads as fed is one the claim is paid in full at.
 bool unit_tile_fully_fed(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile);
 
-/// RIVAL_MARCH_SUPPLY: the cover, per-mille, a unit of @p nation on @p tile would be paid at: the
+/// BL-1540 (rival march supply): the cover, per-mille, a unit of @p nation on @p tile would be paid at: the
 /// same two steps as `unit_tile_fully_fed` (the tile it pays at, that tile's routed cover), and
-/// 0 past its roads. The share the claim is granted while the pool lasts, with the resolver's
-/// truncation and its tolerance. Memoised in @p memo.
+/// 0 past its roads, with the resolver's truncation and its tolerance. The pool is not read:
+/// this is the cover, what the claim is granted while the pool lasts. Memoised in @p memo.
 int unit_tile_cover_permille(world& w, unit_draw_memo& memo, entity_id nation, entity_id tile);
 
 /// What `repost_garrisons_on_cover` did, for the finish log and the harnesses.

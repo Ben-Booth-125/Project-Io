@@ -1153,6 +1153,19 @@ bash tools/verify/build_lua_harness.sh world_cursor_equivalence
 build_gen/verify/world_cursor_equivalence.exe                       # K2: the 16 library seeds
 build_gen/verify/world_cursor_equivalence.exe --measure --seeds 0,28 # K3: copy vs replay
 
+## rival_march_census (BL-1540, rival march supply) — a kept check
+
+Does a rival's march weigh its supply without losing its wars? On the app's start world, settled and seated
+as the app does it, then stepped as the app steps it, one `ROW` per seed at quarter 8 and at `--ticks`: the
+rivals' opening armies starved, by cause and by what they stood on; the wars, battles, cessions, occupied
+tiles and fronts moved; and `rival_march_tally`, how often each path of the score fired (fed push, prize push,
+refused on supply, refused at the battle, fall back, re-weigh, assign refused, a hungry march to a front at
+odds, a priced push onto its own occupied ground). A measurement: the exit code gates only that the player's
+nation is never acted on. Keep it: it is the one read of the starvation and the wars side by side, and the
+scorer's rows (`fronts_harness` F13, `carried_supplies_harness` S15) prove the arithmetic, not the campaign.
+
+    bash tools/verify/par_seeds.sh rival_march_census --tier full --build -- --ticks 20
+
 ## market_census (BL-1125 M1, BL-1003 R6)
 
 The market census on the world the player is handed: the shipped arc, built in app order as

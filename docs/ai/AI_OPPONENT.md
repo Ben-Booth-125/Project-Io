@@ -2456,16 +2456,25 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   ordering another nation's units, the player's included; choosing a province, war or target for the
   player's nation; a defence planned beyond the next move. Pure, seeded, deterministic, replayable,
   legal verbs only, never a planner.
-  **A rival's march may weigh supply — granted (Ben, 2026-11-07; `../military/MILITARY.md` § Fronts, "A
-  rival's fronts").** Raised on the measurement: rival marches starved 9-16% of their opening armies
-  in 8 quarters. His answer: *"Grant it, scorer weighs supply."* A new reading, on the standing terms.
-  A rival nation's scorer, weighing a march of its OWN units, may read its OWN network's supply at the
-  destination and along the route: the share its claim would be granted there, and what that share
-  does to the unit's stocks and men. A march onto ground its network cannot feed scores lower, by that
-  amount and no other; the brake is the hunger itself, so no handicap and no fixed cap on marches. A
-  rival still marches to war: a front toward a nation at odds with it stays a reason to go hungry, and
-  a war goal stays a prize worth it. **Not admitted:** any march, front or unit of the player's
-  nation; a new verb; bending a front's slots to supply (§ Nation garrisons' ruling stands, and a
-  rival meets it as a commander, by where it sends units); reading another nation's supply; a march
-  planned beyond the next order. Pure, seeded, deterministic, replayable, legal verbs only, never a
-  planner.
+  **A rival's march may weigh supply — granted (Ben, 2026-11-07; BL-1540, rival march supply;
+  `../military/MILITARY.md` § Fronts, "A rival's fronts").** Raised on the measurement: rival marches
+  starved 9-16% of their opening armies in 8 quarters. His answer: *"Grant it, scorer weighs supply."* A
+  new reading, on the standing terms. A rival nation's scorer, weighing a march of its OWN units, may
+  read its OWN network's **cover** at the destination (never the route, and not the pool), what that
+  cover does to the unit's stock and men, and the days of the straight march. The price is how fast the
+  ground would kill it, so every cover below break-even costs something; the brake is the hunger itself,
+  with no handicap and no fixed cap on marches. A push is scored unit by unit at the tile that unit
+  would march onto: strength x (what the ground is worth - its price), with a war goal worth more than
+  plain ground. On that read it may also take its own unit off its own front (`assign_front` with a
+  null tile) and march an idle unit from priced ground to its own nearest fed ground, the next order
+  only; both are verbs it already holds. A rival still marches to war: a front at odds with it, hostile
+  either way, stays a reason to go hungry, and a goal stays worth the hunger. **Two vetoes remain, and
+  they are named here.** A front with no reason (at peace, or every goal of its war with that neighbour
+  taken) is not taken at any price while its nation has fed ground, because there is nothing to set
+  against the hunger. The 3:2 stays a test, read on the men who arrive. A nation with no fed ground has
+  nothing to fall back to, so hunger prices no choice for it. **Under spectate** the seat's nation is
+  scored like any rival, by § 10i's general lift, and this grant then acts on it as on any rival; never
+  on a seated player's nation. **Not admitted:** any march, front or unit of a seated player's nation; a
+  new verb; bending a front's slots to supply (§ Nation garrisons' ruling stands, and a rival meets it
+  as a commander, by where it sends units); reading another nation's cover; a march planned beyond the
+  next order. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
