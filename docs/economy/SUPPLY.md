@@ -179,6 +179,18 @@ a shelf or anchor that admits nothing, or a trader who cannot pay leaves nothing
 clearing price on landing, less the source's posted price, less the haul. A margin is not
 guaranteed by sending: the landing moves the destination's price it is sold at.
 
+**A shipment is sized to what its destination wants.** A route ships no more than the destination
+can take at the landed cost plus the dispatch margin: the supply at which the destination's price
+target falls to that figure, less what it already lists and what is already on its way there
+(`trade_room`). A destination nobody wants the good at takes nothing.
+**A priced-out want sizes room (Ben, 2026-11-07).** A buyer the fair-price ceiling silenced — a
+processor priced out of its input this tick, or a site priced out of its materials — still came for
+it, and its want, held off the price in the hauler-only register (`MARKETS.md`, the shelf's share
+reads the want the ceiling silenced), counts toward the room whenever the
+landed cost plus the margin is under that buyer's ceiling. It counts when it is the destination's
+only want, so trade carries the input to a priced-out processor rather than waiting for the price to
+ease without it. The aim is unchanged: no cargo goes where nobody wants it, posted or silenced.
+
 **`hold_convoy` stops a convoy; nothing cancels one.** Cargo leaves the source shelf when the
 shipment leaves, so a cancel would have to invent a return leg or mint the goods back at the
 source. `hold_convoy` instead flips a `held` flag that `advance_convoys` skips: the convoy stops
