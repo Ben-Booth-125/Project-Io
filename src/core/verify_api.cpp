@@ -7422,7 +7422,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
     // (they call construct_building directly and reselect the result), so neither can
     // exercise it.
     //
-    // @param type   "extraction" / "processing" / "port" / "launchpad" / "hub".
+    // @param type   "extraction" / "processing" / "port" / "launchpad" / "hub" / "marketplace"
+    //               / "schooling" / "university".
     // @param target Extraction target resource name (ignored for other types).
     // @param recipe Processing recipe name, or "" for construct_building's default.
     v.set_function("ledger_build", [this](const std::string& type, const std::string& target,
@@ -7444,6 +7445,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (type == "launchpad")  bt = building_type::launchpad;
         else if (type == "hub")        bt = building_type::inland_logistics_hub;
         else if (type == "marketplace") bt = building_type::planetary_marketplace; // BL-1269
+        else if (type == "schooling")   bt = building_type::schooling;
+        else if (type == "university")  bt = building_type::university;
         else
         {
             SDL_Log("verify.ledger_build: unrecognised type '%s' — refusing", type.c_str());

@@ -289,7 +289,7 @@ profitability, updated each quarter with company balance sheets."*
 |---|---|
 | `income` / `expenditure` | the budget breakdown — the market cash flows from `clear_markets` |
 | `maintenance` / `wages` | the budget breakdown — summed `compute_building_opex` |
-| `upkeep` | the standing force: the garrison's pay since the last return, booked on the next one. A debit paid in the nation step after the return is written, booked as `research` is |
+| `upkeep` | the standing costs: the garrison's pay and each space asset's quarterly upkeep since the last return, booked on the next one (Ben, 2026-11-07). A debit paid in the nation step after the return is written, booked as `research` is |
 | `taxes` | the tier's share of the quarter's wages, returned to the treasury (`NATIONS.md` § Taxes and Discontent) |
 | `research` | Credits the nation's research line spent since its last return, booked on the next one. A debit: research is paid in the nation step, after the return is written (Ben, 2026-11-05: research counts inside net) |
 | `refunds` | Credits refunded to the nation since its last return, booked on the next one — a cancelled construction. A credit: `net` = the flows **+ refunds**, and the return's opening is taken from before the refund so it still telescopes |
@@ -333,8 +333,8 @@ writes it, so the record is a pure downstream observation of the loop and cannot
 
 The money loop is not the only thing that moves a treasury in a quarter. A return records
 `apply_budget`, and books the three figures above that land elsewhere: its `net` is the treasury's
-movement **across that call**, plus the refund, less the research and garrison pay paid since the last
-return. Every other debit or credit lands elsewhere in the tick and appears in **no** return:
+movement **across that call**, plus the refund, less the research, garrison pay and space upkeep paid
+since the last return. Every other debit or credit lands elsewhere in the tick and appears in **no** return:
 
 - **Construction** — the build press's charge: the site's whole flat credit cost, paid once at
   placement (Ben, 2026-10-25). (The site's materials are bought at the clear, at the shelf's posted
@@ -343,12 +343,15 @@ return. Every other debit or credit lands elsewhere in the tick and appears in *
 - **Hiring** — a unit's hire cost and the kit it buys off the shelves — and a unit's
   **movement credits**, priced per Logistic Point drawn.
 - **Survey dispatch** — debited upfront.
+- **A launch** — a space asset's launch cost, once, at the launch (`SPACE_ASSETS.md`). Its quarterly
+  upkeep is booked; the launch is a purchase, as construction is.
 - **Trade** — the haul a trade pays at dispatch (its purchase at the source shelf is billed at the
   clear and *is* in `expenditure`), and the **import tariff** a nation's goods pay on entering a
   foreign nation's market, credited to that market's nation (`NATIONS.md` § The import tariff).
 - **The national budget** — what `run_nation_step` spends on the nation's priority lines, after
-  `apply_budget` (`NATIONS.md` § 3). The academic-research line and garrison pay are the two it
-  books, as above (Ben, 2026-11-05: research counts inside net).
+  `apply_budget` (`NATIONS.md` § 3). The academic-research line, garrison pay and space upkeep are
+  the three it books, as above (Ben, 2026-11-05: research counts inside net; Ben, 2026-11-07: space
+  upkeep too).
 
 So a return explains the money loop's movement exactly and the **quarter's** only partly. That is
 right for reading the profitability of a nation's industry.

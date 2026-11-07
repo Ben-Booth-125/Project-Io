@@ -4990,13 +4990,16 @@
   {
    "id": "DG-PR-EN-W",
    "name": "Wind Power",
-   "tier": "minor",
+   "tier": "major",
    "ring": 2,
    "tree": "PR",
    "branch": "PR-EN",
    "requires": [
     [
      "DG-PR-EN-T3"
+    ],
+    [
+     "DG-PR-EN-T5"
     ]
    ],
    "advantage": "unlocks the Wind Turbine: land power with no fuel",
@@ -5006,7 +5009,7 @@
      "recipe": "wind_turbine"
     }
    ],
-   "cost_units": 4
+   "cost_units": 12
   }
  ]
 }

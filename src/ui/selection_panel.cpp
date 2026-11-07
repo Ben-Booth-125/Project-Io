@@ -2986,10 +2986,11 @@ std::string building_method_line(const world& w, const recipe_registry& reg,
         case building_type::bunker: // BL-1426
             return "Its owner's defenders here gain defence and hardness";
         case building_type::research_institute:
-        case building_type::university:
             return "Makes research points for its nation";
         case building_type::schooling:
-            return "Schooling for the centre it stands in";
+            return "Raises its nation's qualification";
+        case building_type::university:
+            return "Makes research points and raises its nation's qualification";
         default:
             return building_type_name(b.type);
     }
@@ -4762,8 +4763,11 @@ std::string candidate_effect_line(const recipe_registry& reg, building_type type
         case building_type::bunker: // BL-1426
             return "Its owner's defenders here gain defence and hardness";
         case building_type::research_institute:
-        case building_type::university:
             return "Makes research points for its nation";
+        case building_type::schooling:
+            return "Raises its nation's qualification";
+        case building_type::university:
+            return "Makes research points and raises its nation's qualification";
         default:
             return building_type_name(type);
     }
@@ -5051,6 +5055,8 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     cands.push_back({building_type::airbase,              resource_type::iron_ore, "Airbase"});              // BL-1450: the door to every wing
     cands.push_back({building_type::bunker,               resource_type::iron_ore, "Bunker"});               // BL-1426: cover for the units on the tile
     cands.push_back({building_type::research_institute,   resource_type::iron_ore, "Research Institute"});   // BL-332
+    cands.push_back({building_type::schooling,            resource_type::iron_ore, "Schooling"});            // Ben, 2026-11-07: any centre (the gate says where)
+    cands.push_back({building_type::university,           resource_type::iron_ore, "University"});           // Ben, 2026-11-07: a City or above
 
     // BL-433: drop types outside the campaign's era band, so a 0 CE player is never
     // offered a Launchpad. The processing rows above need no filtering — they are

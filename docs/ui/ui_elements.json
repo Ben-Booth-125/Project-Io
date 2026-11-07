@@ -1232,7 +1232,8 @@
     "air_gate",
     "construction_progress",
     "construction_folds",
-    "shelf_runway_warning"
+    "shelf_runway_warning",
+    "schooling_door"
    ]
   },
   {
@@ -1668,7 +1669,8 @@
    "interesting_question": "The arrival quarter is a projection at today's treasury and today's buildings, and quests never complete until their deeds have readers. Is a date that will move a promise the panel cannot keep?",
    "resolution": "It is labelled as what it is: the projection runs the quarterly pass's own accrual and queue flow on a copy of the state, holding the treasury where it stands, so it is the date AT THE CURRENT RATE (RESEARCH.md § The research queue: 'every entry shows its arrival date at the current research rate'). An entry that cannot complete says so ('on its deed', 'after a deed') instead of printing a date.",
    "checks": [
-    "tech_tree_panel"
+    "tech_tree_panel",
+    "wind_power_links"
    ]
   },
   {

@@ -401,6 +401,8 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
         {building_type::airbase, "Airbase"},
         {building_type::bunker, "Bunker"}, // BL-1426
         {building_type::research_institute, "Research Institute"},
+        {building_type::schooling, "Schooling"},   // the stratum gate decides where (Ben, 2026-11-07)
+        {building_type::university, "University"},
     };
     for (const auto& [t, name] : fixed)
         if (reg.building_available(t))
