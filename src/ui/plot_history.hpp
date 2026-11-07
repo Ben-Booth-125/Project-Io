@@ -53,6 +53,11 @@ struct resource_plot_series
     std::vector<float> price;
     std::vector<float> supply;
     std::vector<float> demand;
+    /// The shelf (`market_component::inventory`) at each sampled tick, the one honest
+    /// source of "is this shelf already falling": no flow field nets to it, since
+    /// `demand` is what was bid, not what was drawn. NOT SAVED: a loaded game starts
+    /// this series empty, and a reader says it has no reading rather than a zero.
+    std::vector<float> shelf;
 };
 
 /// Market history: one resource_plot_series per resource type, keyed by market entity_id.

@@ -694,7 +694,7 @@ struct unit_designer_state
 /// VIEW state, not serialised.
 struct construction_controls
 {
-    float     rail_track_x   = -1.0f; ///< BL-1255: the tile list's Track row Build press.
+    float     rail_track_x   = -1.0f; ///< BL-1255: the tile list's Railroad row Build press.
     float     rail_track_y   = -1.0f;
     float     rail_station_x = -1.0f; ///< BL-1255: the Railway Station row's Build press.
     float     rail_station_y = -1.0f;
@@ -761,6 +761,7 @@ struct construction_controls
         /// same height by construction.
         int         name_lines  = 0;
         bool        name_elided = false;
+        std::string fold;          ///< The fold it drew in ("Infrastructure", "Road", ...).
         /// BL-1368: one entry per COLUMN, in drawn order — the hover is per column
         /// now, so a check hovers each cell's own centre and asserts that column's
         /// own explainer. `hover` above stays the union of these, which is the one
@@ -769,7 +770,7 @@ struct construction_controls
     };
     std::vector<grid_row> queue_rows; ///< The in-flight queue's rows.
     std::vector<grid_row> door_rows;  ///< The build list's rows, in drawn order.
-    /// BL-1366: the two RAIL rows (Track, Railway Station) as grid rows. Separate
+    /// BL-1366: the two RAIL rows (Railroad, Railway Station) as grid rows. Separate
     /// from `door_rows` only because they are drawn by rail_tool.cpp outside the
     /// candidate loop; they are the same grid, the same metric and the same
     /// per-column cards, which is the property the check asserts.
@@ -785,6 +786,8 @@ struct construction_controls
     struct road_row
     {
         std::uint8_t tier    = 0;     ///< 1=Track, 2=Road, 3=Highway.
+        std::string  fold;            ///< The fold it drew in ("Road").
+        float        h       = 0.0f;  ///< The row height it drew at.
         std::string  name;            ///< "Track" / "Road" / "Highway".
         float        x       = -1.0f; ///< The Build press's centre, screen px.
         float        y       = -1.0f;
@@ -794,6 +797,7 @@ struct construction_controls
         std::string  explainer;       ///< The press's own one-or-two-sentence card.
     };
     std::vector<road_row> road_rows;
+    float road_fold_x = -1.0f, road_fold_y = -1.0f; ///< The Road fold's header, for a check to press.
 
     /// BL-1370: the armed targeting state as the CANVAS resolved it this frame —
     /// the tile the crossing starts from, the tier, and the grid position of every
@@ -864,6 +868,9 @@ struct site_row
     bool          priced   = false; ///< The quote's `has_data` (`quote_for_tile`).
     bool          starved  = false; ///< An input cannot be had here, so it would stand idle.
     resource_type short_of = resource_type::iron_ore; ///< The first such input, when starved.
+    /// `shelf_runway_for`'s warning, for a row that is not already starved.
+    bool          runway_warn = false;
+    std::string   runway_text;
     float         profit   = 0.0f;  ///< Est. net / qtr, Logistic Point cover applied.
     float         profit_full_cover = 0.0f; ///< The same estimate at cover 1.
     float         capex    = 0.0f;  ///< `construction_capex` - what the press charges.
@@ -927,7 +934,12 @@ struct site_finder_state
 
     /// Where the ledger's controls landed this frame (absent: x < 0).
     float         picker_x = -1.0f, picker_y = -1.0f;
-    struct drawn_row { entity_id tile = null_entity; float x = -1.0f, y = -1.0f; };
+    /// The picker's options as the OPEN combo drew them this frame (empty while it
+    /// is shut): the glyph's half-extent, the name's width against its room, and
+    /// where the row's press is.
+    struct picker_row { std::string name, category; float glyph_r = 0.0f, need = 0.0f, have = 0.0f, x = -1.0f, y = -1.0f; };
+    std::vector<picker_row> picker_rows;
+    struct drawn_row { entity_id tile = null_entity; float x = -1.0f, y = -1.0f; std::string net_text; };
     std::vector<drawn_row> drawn;   ///< Visible rows, in drawn order.
     int           map_marks = 0;    ///< No-logistics marks the canvas drew this frame.
     /// The class the canvas WASHED the selected tile with this frame (-1: it is
@@ -1681,6 +1693,17 @@ struct ui_state
         /// BL-1368: the stack row's per-COLUMN explainers, in drawn order.
         std::vector<ui_grid_col> cols;
     };
+    /// One row of the expanded card's recipe rows, as drawn.
+    struct tile_card_recipe_row
+    {
+        std::string good;    ///< As drawn: the good's display name.
+        std::string id;      ///< The good's id, which the verify staging calls take.
+        bool        input = true;
+        std::string figure;  ///< As drawn: "-12.0", "+8.0", or a dash for no quarter read.
+        std::string shelf;   ///< As drawn; "" on an output or a grid good.
+        std::string mark;    ///< "binding" (reported), "short" (estimated) or "".
+        std::vector<ui_grid_col> cols; ///< The per-column explainers.
+    };
     struct tile_card_readout
     {
         bool        drawn    = false;
@@ -1702,6 +1725,14 @@ struct ui_state
         int         population = 0;         ///< The province card's header figure, thousands.
         float       province_scroll_max = 0.0f; ///< The province card's OWN window scroll range (must be 0).
         std::string status;                 ///< The expanded card's status line, "" when none.
+        bool        recipe_drawn    = false; ///< The recipe rows drew (the player's own, with a recipe or a target).
+        bool        recipe_reported = false; ///< They read a quarter's report.
+        std::string recipe_heading;          ///< The heading as drawn.
+        int         recipe_hover_cards = 0;  ///< Recipe-row cards opened this frame: one, or a row bled.
+        std::string recipe_hover_who;        ///< The row (or "heading") whose card opened.
+        std::string recipe_hover_text;       ///< That card's text.
+        std::vector<tile_card_recipe_row> recipe_rows;
+        float       card_scroll_max = 0.0f;  ///< The expanded card's scroll range (the card is laid out to fit).
         /// BL-1368: the EXPANDED site row's per-column explainers (the under-
         /// construction card is one grid row), in drawn order. Empty on a card
         /// whose building is finished, which has no grid row at all.

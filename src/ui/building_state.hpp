@@ -31,6 +31,7 @@
 
 #include <imgui.h>
 #include <string>
+#include <vector>
 
 struct world;
 struct economy_report;
@@ -98,6 +99,42 @@ struct building_running_state
 building_running_state classify_building_running(const world& w, const recipe_registry* reg,
                                                  const economy_report* report, entity_id id,
                                                  const building_component& b);
+
+// --- The recipe rows (Ben, 2026-11-05; SELECTION.md § A selected building) ------
+//
+// What a building's recipe takes and makes, per quarter. THE SIM REPORTS ONE INPUT:
+// `building_report::limiting_input`, the scarcest, and the run it set. Every other
+// per-good figure here is a MIRROR of the recipe at this building's staffing
+// (`judged_batches`, the scorer's own reading) and is labelled an estimate on screen.
+
+/// One row: an input, or an output.
+struct building_recipe_row
+{
+    resource_type good  = resource_type::iron_ore;
+    bool  input         = true;
+    bool  has_figure    = true;  ///< False: an output with no quarter read, or an input with no draw. Never a zero.
+    float per_qtr       = 0.0f;  ///< Input: recipe x staffing. Output: the report's, by the recipe's or the site's split.
+    bool  estimated     = false; ///< An output whose share of the report's total is this file's split, not reported.
+    float total         = 0.0f;  ///< With `estimated`: the reported total it is a share of.
+    bool  grid_good     = false; ///< Power: filled off the grid, so one shelf is not the reading.
+    float shelf         = 0.0f;  ///< This market's shelf now (inputs).
+    bool  binding       = false; ///< REPORTED: the report's limiting input, and it held the run.
+    bool  short_mirror  = false; ///< ESTIMATED: what the shelf admits is under `per_qtr`.
+    input_short_cause cause = input_short_cause::unknown; ///< Why, for a flagged input.
+};
+
+struct building_recipe_read
+{
+    bool  reported = false; ///< An economy tick has a row for this building. False after a load.
+    float run      = 0.0f;  ///< The reported run fraction (processing, reported only).
+    const char* no_draw = nullptr; ///< Why the sim would run no batch; null when it would.
+    std::vector<building_recipe_row> rows; ///< Inputs, then outputs; resource order within each.
+};
+
+/// Read @p b's recipe rows. Empty for a building that runs no recipe and extracts nothing.
+building_recipe_read read_building_recipe(const world& w, const recipe_registry& reg,
+                                          const economy_report* report, entity_id id,
+                                          const building_component& b);
 
 /// The state word alone: "Running", "Understaffed", "Partial", "Idle",
 /// "Mothballed", "Under construction".

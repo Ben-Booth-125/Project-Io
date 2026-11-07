@@ -74,6 +74,29 @@ body's-air filter is applied per tile. **Each option draws its building glyph (B
 Power Generation recipes sit under Infrastructure, as they do in the door (`../SELECTION.md` § The tile
 construction ledger).
 
+**The shelf runway warning (Ben, 2026-11-05).** A site can look profitable today and starve soon, so
+the Build door row's hover and the site ledger's row warn when a building's recipe input has only a few
+quarters left on that market's shelf, naming the good and the quarters. One reading serves both
+(`shelf_runway_for`, `construction_sites.cpp`): for each input, the **shelf** over the **quarterly
+use this building would add**, at the staffing and Logistic Point cover the quote judges it at, plus the
+**market's net drain where the shelf is already falling**. The warning fires under
+`k_shelf_runway_warn_quarters`, **4 quarters**. It covers recipe inputs only: construction materials
+already have the state mark's stall reading. In the ledger the row's Net figure also carries an amber
+mark, and the sentence opens that column's hover; in the door it opens the bar column's hover. A row
+already reading *would likely stand idle* carries no second warning, and a tile with no Logistic Point
+cover carries none either: at no cover the plant would not run, so it draws nothing down. The hover
+reads amber while it warns, however good the net beneath it. A door row folds a group to its best recipe
+and the ledger reads the recipe chosen there, so the two can differ on one tile; the door's sentence
+names the recipe it quotes. A shelf that is rising earns no credit
+against the plant's own use.
+
+**The net drain's source.** No market flow field nets to the shelf: `demand` is what was bid, not what
+was drawn. So the drain is measured on the shelf itself: the economy tick samples `inventory` into the
+market history's `shelf` series, and the drain is the fall over the last four quarters at most, per
+quarter. The series is a view record and is not saved, so a loaded game, or a campaign's first quarter,
+has no trail. An unread trail is unknown, not flat: the reading is the plant's own use alone, and the sentence says it knows only that. A hover whose own use leaves the shelf past the threshold stays silent, since the warning fires on what is known and an unread fall is not known. Power
+comes off the grid, so one market's shelf is not its reading and it takes no warning.
+
 **The table.** One row per tile of the player's **own ground** on the active body that the **Build
 door accepts** the chosen building on — `placement_rules::can_place_in_world` with the player's
 actor named (own ground, tech, the road a building needs, stacks, the province ceiling), the
@@ -272,6 +295,7 @@ than a best-of-everything field.
 - **Estimated cost** — `compute_building_opex` (`budget_system.hpp`) over the same set, with `body_mean_habitability` feeding the workforce term.
 - **Build cost, arming, placement** — `recipe_registry::economics()` (`build_cost`, `resource_build_cost[]`) and `placement_rules::k_extractable`, read by the tile Selection card rather than here.
 - **Roster** — `player_building_groups` (`construction_panel.cpp`): every `is_player_owned` building, keyed by `building_group_name` (the Build door's own vocabulary — `extraction_building_name` for an extraction site, the active recipe's `group` for a processing facility, `building_type_name` otherwise). The per-building net is `estimate_building_profit(...).net()`, the SAME figure `rank_player_buildings_by_profit` ranks the Balance ledger on, so the two surfaces cannot report different profits for one building. A building the report cannot yet price contributes **zero** to its group's total, never a guess. Groups are walked in name order and members by net descending then entity id, so an unordered `world::buildings` cannot vary what a player or a check sees.
+- **Shelf runway** — `shelf_runway_for` (§ The site ledger): `market_component::inventory`, the recipe's `inputs` at `judged_batches`, and the `shelf` series of `market_plot_history`.
 - **Site ledger** — `construction_sites.cpp` (§ The site ledger): `can_place_in_world`, `construction_capex`, `construction_site_multiplier`, `quote_for_tile` (`world/site_quote.hpp`) with the tile's `lp_route_to` cover, `market_for_tile` / `market_city_name`, the tile's deposit and reserve, and the row's place from `population_centre_tile` / `population_centre_name` through `provinces.province_of`.
 - **Progress circle and site card** — `read_construction_site` (`construction_panel.cpp`): `construction_build_days`, `construction_days_left`, `build_arrears_milli`, `resource_build_cost_for`, and `read_construction`'s per-good `short_of`.
 - **Per-building configuration** — `building_component::workforce_target`, `active_recipe_index` / `recipe`, written through `try_switch_recipe` and the workforce verbs from this ledger's levers. `decommissioned` is written from the building Selection card's action grid.

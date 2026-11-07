@@ -324,7 +324,10 @@ nav-rail construction surface stays a broad overview (`docs/ui/MENU.md`). The eq
 placement-mode canvas click enqueues the same request.
 
 **Two folds were re-cut (Ben, 2026-11-05).** **Power Generation** sits in **Infrastructure**. A **Road**
-fold holds **Track, Road, Highway and Railroad**, with smaller glyphs than the building rows.
+fold holds **Track, Road, Highway and Railroad**, with smaller glyphs than the building rows, in the
+same grid and at the same row height. **Railroad** is the rail track row, in Ben's word: *Track* is the
+first road tier, and the two share the fold. The **Railway Station** stays in Infrastructure. The door
+and the finder read one mapping (`construction_fold_of`), so they cannot file a building twice.
 
 Placeability is gated by `placement_rules::can_place`, and a type's cost is **budget *and*
 materials** (e.g. `100 cr · 20 Steel`, from the registry `build_cost` + `resource_build_cost`).
@@ -387,7 +390,15 @@ The preview and the province card do not move; two columns change.
      what the column pair said, in a fraction of the height.
    - **The recipe (Ben, 2026-11-05)** — the recipe the building runs, as rows: its **inputs and
      outputs**, each input flagged when it is short. Owner only, under the recipe-disclosure rule
-     above.
+     above. The figures are **per quarter**. The economy report names **one** input, the one that
+     held the run, so that flag is a report and every other per-good figure is a mirror of the
+     recipe at the building's staffing, and the surface says so: the column reads *Est./qtr*, an
+     input short by the shelf carries an amber mark whose hover says *by estimate*, and the
+     reported one a red mark whose hover cites the report. An output's figure is the report's
+     total split by the recipe. An extraction site has no recipe and shows one output row per good it yields: every deposit on its tile with reserve left, its share by richness, as the sim shares it. The report gives the site's one total, so where a basket has more than one good the shares are labelled an estimate; a site with one good reads as reported.
+     **No quarter read is not zero.** Until a building has a report row, as after a load, the
+     heading says *no quarter yet* and an output reads a dash. Where the sim would run no batch (mothballed, standing idle, a retired recipe, no market, no staff, unsupplied, no labour reached it) an input reads a dash and no shortage, and its hover says why. Power comes off the grid, so its row
+     shows no shelf figure and no estimated flag.
    - **The workforce row** — the building's workforce target as a **read-only bar** with the
      percentage of full employment to its right (0–100 %, the internal target ÷ 2). The game sets it, one 25 % step a quarter toward the
      most profitable level (`../economy/PRODUCTION.md` § Workforce target and the auto-solver);

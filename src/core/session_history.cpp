@@ -335,6 +335,7 @@ void record_histories(const world& w, const recipe_registry& reg,
             ui::push_capped(mh[r].price,  mc.price[r]);
             ui::push_capped(mh[r].supply, mc.supply[r]);
             ui::push_capped(mh[r].demand, mc.demand[r]);
+            ui::push_capped(mh[r].shelf,  mc.inventory[r]);
         }
     }
 

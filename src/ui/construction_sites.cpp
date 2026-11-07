@@ -7,8 +7,8 @@
 #include "presentation.hpp"       // palette, extraction_building_name, value_colour
 #include "text_fit.hpp"           // fitted - the market column
 
-#include "world/resource_names.hpp"
 #include "world/building_profit.hpp"  // estimate_prospective_profit - THE profit figure (no second estimator)
+#include "world/input_reach.hpp"      // judged_batches - the plant's use, as the quote judges it
 #include "world/construction.hpp"     // construction_capex / construction_site_multiplier
 #include "world/logistic_points.hpp"  // lp_route_to - the routed cover
 #include "world/logistics.hpp"        // body_tile_grid
@@ -21,6 +21,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -73,7 +74,14 @@ struct quote_cache
     lp_stamp                          stamp;
     std::optional<site_quote_context> cx;
     std::map<std::tuple<entity_id, int, int, int, float>, site_quote> at;
+    std::map<std::tuple<entity_id, int, float>, shelf_runway> runway; ///< (market, recipe, cover)
 };
+
+const market_plot_history*& quote_history()
+{
+    static const market_plot_history* h = nullptr;
+    return h;
+}
 
 const economy_report*& quote_report()
 {
@@ -264,6 +272,13 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
         r.profit = bp.net();
         r.starved  = sq.starved;
         r.short_of = sq.short_of;
+        // ONE WARNING TO A ROW: a starved row already says it would stand idle.
+        if (bp.has_data && !sq.starved)
+            if (const shelf_runway sr = shelf_runway_for(w, reg, tid, c.type, c.recipe, r.cover); sr.warn)
+            {
+                r.runway_warn = true;
+                r.runway_text = shelf_runway_text(sr);
+            }
         r.profit_full_cover = (r.cover >= 1.0f)
             ? r.profit
             : quote_for_tile(w, reg, tid, c.type, c.target, c.recipe, 1.0f).profit.net();
@@ -330,12 +345,19 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
     sf.eval_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 }
 
-const char* category_of(building_type t)
+} // namespace
+
+const char* construction_fold_of(const recipe_registry& reg, building_type t, std::uint16_t recipe_id)
 {
     switch (t)
     {
     case building_type::extraction_site:     return "Extraction";
-    case building_type::processing_facility: return "Processing";
+    case building_type::processing_facility:
+        // Power Generation is infrastructure (Ben, 2026-11-05; SELECTION.md § The tile
+        // construction ledger): a grid is what other plants stand on.
+        if (const recipe* rc = reg.get_recipe(recipe_id); rc != nullptr && rc->group == "Power Generation")
+            return "Infrastructure";
+        return "Processing";
     case building_type::military_base:
     case building_type::airbase:
     case building_type::bunker:              // BL-1426
@@ -343,8 +365,6 @@ const char* category_of(building_type t)
     default:                                 return "Infrastructure";
     }
 }
-
-} // namespace
 
 std::vector<site_option> site_options(const world& w, const recipe_registry& reg)
 {
@@ -358,7 +378,7 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
             out.push_back({building_type::extraction_site, er, no_recipe,
                            er == resource_type::agricultural_produce ? std::string("Farm")
                                                                      : std::string(extraction_building_name(er)),
-                           "Extraction"});
+                           construction_fold_of(reg, building_type::extraction_site, no_recipe)});
     // Processing: one per RECIPE in the era-masked browse order the door walks, with
     // the door's unlock filter.
     if (reg.building_available(building_type::processing_facility))
@@ -369,7 +389,8 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
             if (!recipe_offered(w, reg, actor, id))
                 continue;
             out.push_back({building_type::processing_facility, resource_type::iron_ore, id,
-                           browsed.display_name, "Processing"});
+                           browsed.display_name,
+                           construction_fold_of(reg, building_type::processing_facility, id)});
         }
     const std::pair<building_type, const char*> fixed[] = {
         {building_type::port, "Port"},
@@ -383,7 +404,7 @@ std::vector<site_option> site_options(const world& w, const recipe_registry& reg
     };
     for (const auto& [t, name] : fixed)
         if (reg.building_available(t))
-            out.push_back({t, resource_type::iron_ore, no_recipe, name, category_of(t)});
+            out.push_back({t, resource_type::iron_ore, no_recipe, name, construction_fold_of(reg, t, no_recipe)});
     // The door's fold order: category, then name; stable so equal names keep the
     // authored order.
     std::stable_sort(out.begin(), out.end(), [](const site_option& a, const site_option& b) {
@@ -399,6 +420,125 @@ void set_quote_report(const economy_report* report)
     quote_report() = report;
 }
 
+void set_quote_history(const market_plot_history* history)
+{
+    quote_history() = history;
+}
+
+void invalidate_site_evaluation()
+{
+    quotes() = quote_cache{};
+    last_key() = eval_key{};
+}
+
+shelf_runway shelf_runway_for(const world& w, const recipe_registry& reg, entity_id tile,
+                              building_type type, std::uint16_t recipe_id, float lp_cover)
+{
+    shelf_runway out;
+    const recipe* rc = (type == building_type::processing_facility) ? reg.get_recipe(recipe_id) : nullptr;
+    const float cover = std::clamp(lp_cover, 0.0f, 1.0f);
+    const entity_id mid = market_for_tile(w, tile);
+    const auto mit = (mid != null_entity) ? w.markets.find(mid) : w.markets.end();
+    if (rc == nullptr || !(cover > 0.0f) || mit == w.markets.end())
+        return out;
+
+    // Cached with the quote, on its stamp, so the door and the finder stay stale together.
+    quote_cache& qc = quotes();
+    const lp_stamp now = make_lp_stamp(w);
+    if (!(now == qc.stamp))
+    {
+        qc.stamp = now;
+        qc.at.clear();
+        qc.runway.clear();
+        qc.cx.reset();
+    }
+    const auto key = std::make_tuple(mid, static_cast<int>(recipe_id), cover);
+    if (const auto it = qc.runway.find(key); it != qc.runway.end())
+        return it->second;
+
+    // The staffing the quote judges a new plant at, so the use is the plant it priced.
+    building_component bc{};
+    bc.tile               = tile;
+    bc.type               = type;
+    bc.recipe             = recipe_id;
+    bc.workforce_assigned = construction_initial_workforce(type);
+    bc.workforce_target   = default_workforce_target(type);
+    const float batches   = judged_batches(reg, bc) * cover;
+
+    const market_component& m = mit->second;
+    const std::array<resource_plot_series, resource_count>* trail = nullptr;
+    if (const market_plot_history* h = quote_history(); h != nullptr)
+        if (const auto hit = h->find(mid); hit != h->end())
+            trail = &hit->second;
+
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float use = rc->inputs[r] * batches;
+        if (!(use > 0.0f) || grid_good_crosses_markets(r))
+            continue;
+        bool  known = false;
+        float drain = 0.0f;
+        if (trail != nullptr)
+        {
+            const std::vector<float>& s = (*trail)[r].shelf;
+            if (s.size() >= 2)
+            {
+                const std::size_t span = std::min<std::size_t>(s.size() - 1, k_shelf_trail_quarters);
+                known = true;
+                drain = std::max(0.0f, (s[s.size() - 1 - span] - s.back()) / static_cast<float>(span));
+            }
+        }
+        const float shelf    = std::max(0.0f, m.inventory[r]);
+        const float quarters = shelf / (use + drain);
+        if (!(quarters < k_shelf_runway_warn_quarters))
+            continue;
+        if (!out.warn || quarters < out.quarters)
+        {
+            out.others     += out.warn ? 1 : 0;
+            out.warn        = true;
+            out.good        = static_cast<resource_type>(r);
+            out.quarters    = quarters;
+            out.shelf       = shelf;
+            out.plant_use   = use;
+            out.drain_known = known;
+            out.drain       = drain;
+        }
+        else
+            ++out.others;
+    }
+    qc.runway.emplace(key, out);
+    return out;
+}
+
+std::string shelf_runway_text(const shelf_runway& s)
+{
+    if (!s.warn)
+        return std::string();
+    const std::string good = resource_name(s.good);
+    char lead[120];
+    if (s.quarters < 1.0f)
+        std::snprintf(lead, sizeof lead, "Under a quarter of %s left on this market's shelf", good.c_str());
+    else if (s.quarters < 2.0f)
+        std::snprintf(lead, sizeof lead, "Only about 1 quarter of %s left on this market's shelf", good.c_str());
+    else
+        std::snprintf(lead, sizeof lead, "Only about %.0f quarters of %s left on this market's shelf",
+                      std::floor(s.quarters), good.c_str());
+    char tail[160];
+    if (s.drain > 0.0f)
+        std::snprintf(tail, sizeof tail, ": it would use %.1f a quarter, and the shelf is already falling %.1f.",
+                      static_cast<double>(s.plant_use), static_cast<double>(s.drain));
+    else if (s.drain_known)
+        std::snprintf(tail, sizeof tail, " at the %.1f a quarter it would use.", static_cast<double>(s.plant_use));
+    else // An unread trail is not a flat shelf, so the sentence does not read as one.
+        std::snprintf(tail, sizeof tail,
+                      " at the %.1f a quarter it would use. That is its own use alone: this shelf has no "
+                      "trail read yet, so a fall would not show.", static_cast<double>(s.plant_use));
+    std::string out = std::string(lead) + tail;
+    if (s.others > 0)
+        out += s.others == 1 ? " One more input is close too." : " More inputs are close too.";
+    return out;
+}
+
 site_quote quote_for_tile(world& w, const recipe_registry& reg, entity_id tile, building_type type,
                           resource_type target, std::uint16_t recipe, float lp_cover)
 {
@@ -407,6 +547,8 @@ site_quote quote_for_tile(world& w, const recipe_registry& reg, entity_id tile, 
     const lp_stamp now = make_lp_stamp(w);
     if (!(now == qc.stamp) || !qc.cx.has_value())
     {
+        if (!(now == qc.stamp))
+            qc.runway.clear();
         qc.stamp = now;
         qc.at.clear();
         qc.cx.emplace(make_site_quote_context(w, reg, report));
@@ -508,6 +650,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
 {
     site_finder_state& sf = ui.site_finder;
     sf.drawn.clear();
+    sf.picker_rows.clear();
     sf.picker_x = sf.picker_y = -1.0f;
 
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Find a site");
@@ -539,7 +682,25 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             const bool is_choice = sf.armed && sf.choice.type == o.type
                 && sf.choice.target == o.target && sf.choice.recipe == o.recipe;
             ImGui::PushID(static_cast<int>(i));
-            if (ImGui::Selectable(o.name.c_str(), is_choice))
+            // EACH OPTION DRAWS ITS BUILDING GLYPH (Ben, 2026-11-05; construction.md
+            // § The site ledger), on the door's identity rule: an extraction option's
+            // target, a recipe's primary output.
+            const float  lh = ImGui::GetTextLineHeight();
+            const float  gr = lh * 0.5f;
+            const ImVec2 op = ImGui::GetCursorScreenPos();
+            const float  text_x = lh + ImGui::GetStyle().ItemInnerSpacing.x;
+            const float  have   = std::max(16.0f, ImGui::GetContentRegionAvail().x - text_x);
+            const bool   pressed = ImGui::Selectable("##site_option", is_choice);
+            const recipe* orc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
+            ImDrawList*  odl = ImGui::GetWindowDrawList();
+            icons::building(odl, {op.x + gr, op.y + gr}, gr, o.type,
+                            orc != nullptr ? primary_output_resource(*orc) : o.target,
+                            IM_COL32(150, 235, 160, 255));
+            odl->AddText({op.x + text_x, op.y}, ImGui::GetColorU32(ImGuiCol_Text),
+                         fitted(o.name.c_str(), have).c_str()); // fit-exempt: fitted to the row
+            sf.picker_rows.push_back({o.name, o.category, gr, ImGui::CalcTextSize(o.name.c_str()).x, have,
+                                      op.x + text_x, op.y + gr});
+            if (pressed)
             {
                 if (is_choice)
                     sf.armed = false; // the toggle: the active choice, pressed again, clears
@@ -609,10 +770,12 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     // worst-case sample, because at the fold-out's narrowest every pixel a fixed
     // column does not need is a pixel the two named columns' headers do.
     float fig_net = 0.0f, fig_cost = 0.0f, fig_yield = 0.0f;
+    constexpr float k_runway_mark_w = 8.0f; // the amber mark beside a warned row's figure
     for (const site_row& r : sf.rows)
     {
         if (r.priced)
-            fig_net = std::max(fig_net, ImGui::CalcTextSize(fmt::abbreviate(static_cast<double>(r.profit)).c_str()).x);
+            fig_net = std::max(fig_net, ImGui::CalcTextSize(fmt::abbreviate(static_cast<double>(r.profit)).c_str()).x
+                                            + (r.runway_warn ? k_runway_mark_w : 0.0f));
         fig_cost = std::max(fig_cost, ImGui::CalcTextSize(fmt::abbreviate(static_cast<double>(r.capex)).c_str()).x);
         if (r.has_yield)
             fig_yield = std::max(fig_yield, ImGui::CalcTextSize(fmt::abbreviate(static_cast<double>(r.yield)).c_str()).x);
@@ -735,7 +898,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             }
             ImGui::SameLine(0.0f, 0.0f);
             ImGui::TextUnformatted(fitted(place.c_str(), pw).c_str());
-            sf.drawn.push_back({r.tile, rp.x + 12.0f, rp.y + ImGui::GetTextLineHeight() * 0.5f});
+            sf.drawn.push_back({r.tile, rp.x + 12.0f, rp.y + ImGui::GetTextLineHeight() * 0.5f, std::string()});
 
             // Net / qtr — the door's estimate, cover applied.
             ImGui::TableSetColumnIndex(1);
@@ -747,7 +910,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                     std::snprintf(buf, sizeof buf,
                                   "It would likely stand idle: this market cannot get it %s at a price it "
                                   "will pay. Est. net %+d cr / qtr is its upkeep alone.",
-                                  resource_names::name_of(r.short_of).c_str(),
+                                  resource_name(r.short_of),
                                   static_cast<int>(std::lround(r.profit)));
                 else if (r.cover < 1.0f)
                     std::snprintf(buf, sizeof buf,
@@ -762,12 +925,23 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                                   "Est. net %+d cr / qtr once its output is selling here, fully served.",
                                   static_cast<int>(std::lround(r.profit)));
                 const ImU32 ink = r.priced ? value_colour(static_cast<double>(r.profit)) : 0u;
-                cell("profit", w_net, buf, ink);
+                const std::string net_text = r.runway_warn ? r.runway_text + " " + buf : std::string(buf);
+                // A warning reads amber on its card, however good the net beneath it is.
+                cell("profit", w_net, net_text,
+                     r.runway_warn ? ImGui::ColorConvertFloat4ToU32(construction_rate_colour(0.5f)) : ink);
                 if (r.priced)
                     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ink), "%s",
                                        fmt::abbreviate(static_cast<double>(r.profit)).c_str());
                 else
                     ImGui::TextDisabled("-");
+                if (r.runway_warn)
+                {
+                    const ImVec2 fm = ImGui::GetItemRectMax();
+                    const float  lh = ImGui::GetTextLineHeight();
+                    icons::value_mark(dl, {fm.x + k_runway_mark_w * 0.5f, fm.y - lh * 0.5f}, 2.5f,
+                                      ImGui::ColorConvertFloat4ToU32(construction_rate_colour(0.5f)));
+                }
+                sf.drawn.back().net_text = net_text;
             }
 
             // Cost — the flat credits times the site multiplier, paid at placement,

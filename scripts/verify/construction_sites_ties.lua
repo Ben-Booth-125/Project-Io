@@ -21,7 +21,7 @@ local seeds = { 0, 46, 28 }
 local function pass(seed, tag)
   local rows, t_full, t_cover, t_cost, flagged, cov, t_cov = 0, 0, 0, 0, 0, 0, 0
   for _, o in ipairs(verify.site_options()) do
-    if o.category == "Extraction" or o.category == "Processing" then
+    if o.category == "Extraction" or o.category == "Processing" or o.group == "Power Generation" then
       verify.site_pick(o.name)
       verify.frames(1)
       local s = verify.site_finder()
