@@ -598,6 +598,11 @@ struct world
     /// TRANSIENT: not serialised, not hashed; a world is never saved mid-settle.
     bool                      settle_build_gate = false;
     std::map<entity_id, float> settle_chest;
+    /// The major opening kit's chest at the HANDOFF (NATION_GENERATION.md § Pass 7): set by
+    /// the kit's laying, consumed on the settle's last step, where every major's treasury
+    /// becomes this figure whatever the settle left it. Negative: no flat figure.
+    /// TRANSIENT, as `settle_chest`: not serialised, not hashed, -1 once consumed.
+    float handoff_chest = -1.0f;
     /// This settle step's PENDING garrison wage per nation (the credit half of every
     /// unit's upkeep, resolve_unit_upkeep), taken at the step's start: the scorer acts
     /// before the step's bills are paid, so the cap keeps it back as well as the chest.

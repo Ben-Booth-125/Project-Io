@@ -299,6 +299,9 @@ world_gen = {
             -- spare-input rule on the quick tier (opening_parity seeds 0/28/46/12).
             rich_core = {
                 treasury = 12000,
+                -- Every major starts play on this (Ben, 2026-11-05 and 2026-11-07), set after the
+                -- settle as the kit's grant; `treasury` above only carries it through the settle.
+                handoff_treasury = 4500,
                 logistics = { inland_logistics_hub = 2, railway_station = 1, port = 1 },
                 -- The fixed army (Ben, 2026-11-02; MILITARY.md § Nation garrisons): eight units
                 -- of 50 men, four at the capital post, the rest one each at the border posts in

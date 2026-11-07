@@ -464,6 +464,7 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
                 nc.treasury = kit->treasury;
                 ++flattened;
             }
+        w.handoff_chest = kit->handoff_treasury; // the settle's last step grants it
         // The reserve below refunds nothing into the flat figure, and nothing for a
         // founding the take-up or the cap removed (release_kit_foundings).
         release_kit_foundings(w, out.state);
