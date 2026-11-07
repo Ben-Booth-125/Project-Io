@@ -570,7 +570,7 @@
    "design": "Playtest item 2. Ruling (Ben, 2026-11-05) in the authority doc. Rank on GDP, market share, reach and total force; rival treasuries stay private. GDP comes out of the diplomacy cache (diplomacy_ledger.cpp:850-887); total force is new and must obey fog rules. A horizontal bar drawer, so the building card's stacked columns stay put. Note: fill_nation_rollups never sets force or upkeep (corporation_dashboard.cpp:171-180). Check: capture, question log."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -638,7 +638,7 @@
    "design": "Playtest item 11. Ruling (Ben, 2026-11-05) in the authority doc. header_panel.cpp:436-498. Draw TREASURY 1.2M (+34/qtr); one shared tooltip holds the PlotLines on hover of either number. Runway's fallback moves with it. Check: header goldens, live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -662,7 +662,7 @@
    "design": "Playtest items 13 and 16. Ruling (Ben, 2026-11-05) in the authority doc. Test group \"Power Generation\" at selection_panel.cpp:4764 and the finder's literal construction_sites.cpp:344; category_of (:305) duplicates the mapping. Wrap road rows (:5318) and rail Track (:5541) in a Road fold at row_h, dropping the 56 px img box (:4928). Rail's Track reads Railroad, in Ben's word. Stations stay in Infrastructure. Check: live click."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -956,7 +956,7 @@
    "design": "Found 2026-11-05, read not run: ACTIONS chrome.esc lists sticky-card rungs the code lacks; LAYOUT:150 calls Diplomacy reserved; MENU:156-160 places own buildings on the dashboard, code uses Construction; MENU:218 says no in-session save, F5 exists; corporation.md:36-38 a Force segment never filled; market.md:151 read 3 versus rank_trade_routes; SUPPLY:67 says convoys are outside state_hash but rail waypoints are folded (world.cpp:235-241); SUPPLY's table omits station_a and station_b; logistics.hpp:483 stale; AI_OPPONENT:2379 province versus MILITARY:549 tile for push; SELECTION:506 water no-op versus march_check. Reconcile each; skip any the rulings already fixed."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -1054,6 +1054,116 @@
    ],
    "title": "Research counts inside the quarterly return, so NET is the money left",
    "design": "Ben's ruling, in FINANCE § The quarterly return: research counts inside net. Today nation_tech.cpp:1059 takes it from the treasury after the return is written, a mean of 1,644 credits a major-quarter by BL-1496 (build payback census), against net of 1,000-2,500, so NET overstates free cash. Book it as refunds are booked: a running figure the nation step adds to, drained into the next return, with the return's opening taken so net still telescopes. Check garrison pay at nation_step.cpp:349 at the same time: any other direct spend outside the return makes NET lie the same way, and the census's resid column should read zero after this. quarterly_return is asserted sizeof 56 and hashed raw, so it is a save bump and moves the return digest: goes in the ECONOMY wave's shared re-bless. Do before BL-1497 (opening cost curve) sets the mine at six months of net, since that target now reads net after research. Check: census resid near zero; the retain property (returns replay onto the treasury) still holds; save round trip."
+  },
+  {
+   "status": "in_progress",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: sprint 63 form)",
+   "requires": [],
+   "category": "AI",
+   "priority": "B",
+   "difficulty": 3,
+   "id": "BL-1540",
+   "short_name": "RIVAL_MARCH_SUPPLY",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "src/world/corp_ai.cpp"
+   ],
+   "title": "Rival marches weigh supply",
+   "design": "Ben, 2026-11-07: a rival march's score reads supply at the destination and along the route. Rival marches starved 9-16% of opening armies in 8 quarters. New dated grant in AI_OPPONENT section 11."
+  },
+  {
+   "status": "in_progress",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: sprint 63 form)",
+   "requires": [],
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1541",
+   "short_name": "SCHOOLING_DOOR",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/ui/construction_sites.cpp"
+   ],
+   "title": "Schooling and University in the Build door",
+   "design": "Ben, 2026-11-07: offer both in the Build door under their existing placement gates. Rivals keep their current behaviour unless a grant says otherwise."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: sprint 63 form)",
+   "requires": [],
+   "category": "Economy",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1542",
+   "short_name": "CONSUMER_QUOTE_MYSTERY",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "tools/verify/build_payback_census.cpp"
+   ],
+   "title": "Consumer goods quote far above earnings",
+   "design": "The payback census read consumer goods at a median earned -4.2 against 378 quoted, a year after standing. Cause unknown: find whether the quote or the plant is wrong."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: sprint 63 form)",
+   "requires": [],
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 1,
+   "id": "BL-1543",
+   "short_name": "METHOD_LEVER_POSTED_PRICE",
+   "authority_doc": "docs/economy/PRODUCTION.md",
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "title": "Method lever prices at posted",
+   "design": "The Method lever at selection_panel.cpp ~:793 prices at the posted price, while the door now quotes obtainable. Bring it onto the same quote or justify the difference."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-07",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-07: sprint 63 form)",
+   "requires": [],
+   "category": "Military",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1544",
+   "short_name": "VERIFY_WORLD_ARMIES_STARVE",
+   "authority_doc": "docs/military/MILITARY.md",
+   "files": [
+    "scripts/verify/units_survive_quarters.lua"
+   ],
+   "title": "Every army starves in the verify world",
+   "design": "The --verify world census runs 78 units, men 9841 to 0 by q4; real worlds keep most. Cause unconfirmed. Any check that needs a unit after q3 in that world is reading an empty field. scripts/verify/units_survive_quarters.lua prints the census."
   }
  ]
 }
