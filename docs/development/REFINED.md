@@ -14,6 +14,15 @@ session merges them one at a time and takes one shared re-bless.
 
 ### Merged lanes (cold reviewed, on main; re-bless shared at the wave's end)
 
+- [x] Construction lane: FINDER_BUILDING_GLYPHS, CONSTRUCTION_FOLDS, BUILDING_RECIPE_ROWS, SHELF_RUNWAY_WARNING.
+- [ ] Picker glyphs; arm a road and close its fold to disarm; recipe rows on an idle plant, a basket site and after load; door "Quoted for" and the after-load sentence.
+
+### Rulings of 2026-11-07, in lanes
+
+- [ ] Opening lane stage 2: flat chest ladder, then the cost curve. Kits unchanged.
+- [ ] Rival marches weigh supply (new AI grant).
+- [ ] Wind Power a major; space upkeep in net; Schooling and University in the Build door.
+
 - [x] Market lane: TRADE_OFFERS_SOURCED, GOODS_TABLE_STOCK_SORT, RESOURCE_GLYPHS.
 - [ ] One glyph per good; sort cycles on goods-table headings; tabs; offers open and shut; trades from own markets within points.
 - [x] Canvas lane: CONVOYS_ON_MAP, UNIT_SMOOTH_MARCH, DRAG_SELECT_UNITS, NATION_STANDING_BARS, DIPLOMACY_NATION_SELECTOR.

@@ -642,6 +642,9 @@ animated overlays too, so motion cannot break the grade.
 
 ### Level of detail — one master, every zoom a downsample
 
+**Rungs halve from the 96 px master, and the wider view stands (Ben, 2026-11-07).** The widest view is about
+0.82x the old extent, past the 0.7x lag cap of 2026-08-12: Ben chose the wider view over the old floor.
+
 **Planetary zoom is STEPPED** (Ben, 2026-09-01, judging the first bake: *"C-F is a
 detailed image… we could approximate it with stepped zoom, rather than the continuous
 zoom we currently have (2.5D)"*): the player's wheel and keyboard move through a fixed
