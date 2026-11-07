@@ -48,7 +48,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 | Arg | Type | Meaning |
 |---|---|---|
 | `tile` | `entity_id` | The selected tile the building goes on. |
-| `type` | `building_type` | Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base, airbase, bunker, research_institute, schooling, university. Set by which row is pressed. A bunker (BL-1426, MILITARY.md § Fortifications) stands one to a tile on any land tile of the nation's own ground; its owner's units defending that tile gain defence and hardness by its condition. Schooling and university (BL-615) are passive education buildings with no ledger row yet; the seam accepts them and the stratum gate below decides where they may stand. |
+| `type` | `building_type` | Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub, military_base, airbase, bunker, research_institute, schooling, university. Set by which row is pressed. A bunker (BL-1426, MILITARY.md § Fortifications) stands one to a tile on any land tile of the nation's own ground; its owner's units defending that tile gain defence and hardness by its condition. Schooling and university (BL-615) are passive education buildings: each has a row in the ledger's Infrastructure fold (Ben, 2026-11-07), and the stratum gate below decides where they may stand. |
 | `target` | `resource_type` | Extraction rows only: the deposited resource the site extracts. Ignored for other types. |
 | `recipe` | `uint16 recipe id` | Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe. Forwarded through the seam since BL-388 (2026-08-13): the built facility carries exactly the recipe named. A recipe on any non-processing type, or an id the registry does not resolve, is rejected_invalid — stated-but-wrong is refused, never silently coerced. |
 
@@ -1917,7 +1917,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `ledger.construction_site_pick` — Construction ledger, Construction view, the 'Find a site' building picker (a combo above the tile build bar)
 
-**Press.** Open the combo and press a building (each row draws its building glyph beside its name): one per extractable good (by its building's name - 'Iron Mine', 'Farm', ...), one per processing recipe (its display name), then Port, Planetary Marketplace, Launchpad, Inland Logistics Hub, Military Base, Research Institute - whichever the era and tech allow. Pressing the CHOSEN building again, or 'None', clears it. Power Generation recipes are listed under Infrastructure, as in the Build door.
+**Press.** Open the combo and press a building (each row draws its building glyph beside its name): one per extractable good (by its building's name - 'Iron Mine', 'Farm', ...), one per processing recipe (its display name), then Port, Planetary Marketplace, Launchpad, Inland Logistics Hub, Military Base, Airbase, Bunker, Research Institute, Schooling, University - whichever the era and tech allow. Pressing the CHOSEN building again, or 'None', clears it. Power Generation recipes are listed under Infrastructure, as in the Build door.
 
 | Arg | Type | Meaning |
 |---|---|---|

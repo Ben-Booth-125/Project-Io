@@ -7444,6 +7444,8 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         else if (type == "launchpad")  bt = building_type::launchpad;
         else if (type == "hub")        bt = building_type::inland_logistics_hub;
         else if (type == "marketplace") bt = building_type::planetary_marketplace; // BL-1269
+        else if (type == "schooling")   bt = building_type::schooling;
+        else if (type == "university")  bt = building_type::university;
         else
         {
             SDL_Log("verify.ledger_build: unrecognised type '%s' — refusing", type.c_str());

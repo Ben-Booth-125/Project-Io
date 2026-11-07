@@ -328,6 +328,8 @@ fold holds **Track, Road, Highway and Railroad**, with smaller glyphs than the b
 same grid and at the same row height. **Railroad** is the rail track row, in Ben's word: *Track* is the
 first road tier, and the two share the fold. The **Railway Station** stays in Infrastructure. The door
 and the finder read one mapping (`construction_fold_of`), so they cannot file a building twice.
+**Schooling** and **University** sit in Infrastructure (Ben, 2026-11-07: both are offered, and their stratum
+gate refuses a tile with its reason, as any row does).
 
 Placeability is gated by `placement_rules::can_place`, and a type's cost is **budget *and*
 materials** (e.g. `100 cr · 20 Steel`, from the registry `build_cost` + `resource_build_cost`).
