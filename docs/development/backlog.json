@@ -1277,6 +1277,31 @@
    ],
    "title": "Logistic Points drawn by cargo value",
    "design": "Ben, 2026-11-07, this sprint: a shipment draws Logistic Points by its cargo's value, not its unit count. Per unit, coal costs about 8 times steel per credit; the cap refused 39-55% of shipments. Kept after measuring (Ben, 2026-11-08). Constant 3.98: base value per point that holds the summed q20 draw of rulings 1-3 (3,909 units). Merged."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": 63,
+   "version_goal": null,
+   "written": "2026-11-08",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-08: site finder redesign, build now)",
+   "requires": [],
+   "category": "UI",
+   "priority": "B",
+   "difficulty": 2,
+   "id": "BL-1553",
+   "short_name": "SITE_FINDER_GRID",
+   "authority_doc": "docs/ui/ledgers/construction.md",
+   "files": [
+    "src/ui/construction_sites.cpp",
+    "src/ui/construction_sites.hpp",
+    "src/ui/ui_state.hpp",
+    "scripts/verify/site_grid.lua"
+   ],
+   "title": "Site finder building grid with province scope",
+   "design": "Built and merged at 0fdd6a23; the design is in construction.md. Stays open for Ben's live click: a cell press arms the lens and a second clears it; a province tile narrows the grid and a table row press does not; Clear returns the whole body and deselects; the roughly 5 s pending fill is acceptable; wheel-scroll inside the grid; hover cards on figure, count and dimmed cells. Open for Ben: a selected tile scopes the grid, so the home surface opens scoped. Requested verify reads, none granted: picker_rows net_text and sites, the Clear press position, a pending-cell count."
   }
  ]
 }
