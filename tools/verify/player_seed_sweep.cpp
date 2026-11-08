@@ -887,24 +887,38 @@ struct world_digest_pin
 // clean tree at main f5cd40c9 with that library: no code moved, so seeds 0, 46, 31 and 13 read the
 // values pinned above them at f5cd40c9 and the twelve others are new rows, not moved ones. The
 // previous table (seeds 28, 11, 40, 12, 37, 41, 43, 32, 10, 25, 38, 9) is one commit back.
+// RE-PINNED 2026-11-08 (sprint 63's one re-bless; Ben's go "Yes, re-pin"). player_seed_sweep
+// --digest over the sixteen library seeds on main 6575f882, same toolchain. Every row seated
+// exactly one player. D_search is unmoved on all 16; D_land, D_settle and D_seat moved on all 16.
+// rebless_shape_probe, f5cd40c9 against 6575f882 (sums over 16 seeds; no row identical): player
+// balance 399625 -> 72861 and nation treasury sum -31% (the flat 4,500 chest, BL-1497 opening
+// cost curve); processing 1634 -> 1672 and under construction 135 -> 113 (the cost curve, build
+// days scaled, the steel trade rulings BL-1545..1549 incl. LP by value); extraction 4792 ->
+// 4777. Centres re-tier on 4 seeds (cities -187 net, seed 64 -154, seed 13 -34; centre total
+// unchanged): the settle ladder on the changed household supply, bracketed by bisect to the
+// money..rival lanes and the opening lane, none through the generation lane. Seed 7 one port
+// and 16 lane tiles fewer, roads +1 tile on two seeds: the tile cap (BL-1500) and its capital
+// slot fix, by inspection. Every history, firm, military-building and unit count is unmoved.
+// The probe's default seed list was the pre-re-curation set and is the library's from here.
+// The 2026-11-05 values are one commit back in git history.
 const std::vector<world_digest_pin> k_shipped_digest_pins = {
     //  seed  D_search               D_land                 D_settle               D_seat
-    {  0u, 0xE86877E6B4008EBFull, 0xAAEBD8FA082882D1ull, 0xFF687FD12766B67Dull, 0xCA79EE5127080C59ull },
-    { 46u, 0xA585DDC747DE6D2Aull, 0x8EC691A1B7D99ABAull, 0x9E8DE7EAA2344E6Full, 0x3ED96939A0729812ull },
-    {  7u, 0x12CF45920785860Full, 0x145E4CA54851D294ull, 0x2E437B67048722BEull, 0x57082EFE141CD731ull },
-    {  3u, 0x80E8EFF0016BAA77ull, 0xCDC3A59E46E08061ull, 0x440433B57CBF7EB4ull, 0xA49D39B037ADEBD3ull },
-    { 29u, 0xDF286FFBD8AD511Cull, 0x041CDF516A4316D5ull, 0xD55FB09E66B50ED8ull, 0x17E1A80536BF0A0Eull },
-    { 92u, 0x0E3831EC386C5A9Dull, 0x5E8A069A2AD94BBCull, 0x9C4FF21B47C7C644ull, 0x5D694BC6CBB136B4ull },
-    {  2u, 0x6D9334DE6947FFDFull, 0xCDCF98949133BF97ull, 0x9B17A3CFB1AC802Cull, 0xA697DB4AC4E96D19ull },
-    { 54u, 0x635EA3CAD5CA6754ull, 0x9E8D54415DBAE6DFull, 0x295FB8196E1A2E78ull, 0x6D7C117F33A83058ull },
-    { 17u, 0x6D6B5E86C3E751A6ull, 0x0012C4A587284A4Dull, 0x51A9A194B99CB917ull, 0x1DAD2574746FCE14ull },
-    { 27u, 0xEA0A99E1E3A80FCCull, 0x8BFB07B710637979ull, 0x5F5F2EA47B43AE75ull, 0xA89F750982B71F16ull },
-    { 31u, 0x1DEE03DF5A81076Bull, 0x030609FF17A20CF3ull, 0xD2B042AB0A91043Aull, 0x827E46D95780B985ull },
-    { 22u, 0xD4A4492995D927CEull, 0x3DC991D8E418DEB8ull, 0x4E730742AF14A0F6ull, 0x35B5C4C8292ABA54ull },
-    { 13u, 0x232849F69D92B741ull, 0x94F690E217F6B664ull, 0xF9C5FC06A62B5ECAull, 0xCC9646116A355C29ull },
-    { 64u, 0x510C64657F4CE800ull, 0x4B01C04ED8F970D3ull, 0x868BC5D0C22C4C6Bull, 0xEB99EF41CF1CF098ull },
-    { 63u, 0xE81FC4DFE2D8CE60ull, 0x6C961727A6616B73ull, 0xE44974D527416A72ull, 0xB818464EE3B84405ull },
-    { 60u, 0xFE32E5DCB6F3733Cull, 0x262C1A6BB2AD745Aull, 0x17E6A1BC1CD7827Dull, 0x39D6AB58A6FB3BE4ull },
+    {  0u, 0xE86877E6B4008EBFull, 0x9C467B7BEB9F7DF6ull, 0x355F20664F379D19ull, 0x843C74AF658766B4ull },
+    { 46u, 0xA585DDC747DE6D2Aull, 0x4286D51D0559E16Cull, 0x31E0E8580716DA43ull, 0xFCD01B807457D77Dull },
+    {  7u, 0x12CF45920785860Full, 0xF99603A47402A9CCull, 0x7E1FE5CEC1015786ull, 0x3EE1BB0F7AD5C758ull },
+    {  3u, 0x80E8EFF0016BAA77ull, 0x4D6586A8D989C48Bull, 0x5AF4BB84170ABA27ull, 0x7CE1D32A8695B5C8ull },
+    { 29u, 0xDF286FFBD8AD511Cull, 0x275A5B5DDCBEE38Bull, 0x1AD5578986EEB411ull, 0xC175DC639DD15576ull },
+    { 92u, 0x0E3831EC386C5A9Dull, 0x53FD2A8ED49889E6ull, 0x40C12D1DB5E1077Bull, 0x018FE1E354CDC65Cull },
+    {  2u, 0x6D9334DE6947FFDFull, 0x293CA7C3F83A78A0ull, 0x64C7EDFAB68B3B43ull, 0xA1A8FEC1AD91D12Dull },
+    { 54u, 0x635EA3CAD5CA6754ull, 0x21C31CABD8AF2CC0ull, 0x6BCD175BF6CC8DA4ull, 0xCC1FB4E4B341CF75ull },
+    { 17u, 0x6D6B5E86C3E751A6ull, 0x0582250FA8B6878Full, 0x5A1F54F9B956C01Bull, 0xFA9CB9F61538C7CEull },
+    { 27u, 0xEA0A99E1E3A80FCCull, 0x808C69B3D538C5F8ull, 0x204548772B1AC684ull, 0x81B98F666F7C061Eull },
+    { 31u, 0x1DEE03DF5A81076Bull, 0xB84877422B4493DAull, 0xB43EFBC67572C21Eull, 0xB1E5EE7EED7DC924ull },
+    { 22u, 0xD4A4492995D927CEull, 0x187551127286AB69ull, 0x0C5267A2C3ADEE17ull, 0xAD9EA41F5F4989F9ull },
+    { 13u, 0x232849F69D92B741ull, 0xFE4199A2E1BE74C4ull, 0x7335DBD5AA529174ull, 0x4FFC90B7E108CCF0ull },
+    { 64u, 0x510C64657F4CE800ull, 0x8BFFC4D04A301BEDull, 0x7B49A3218919FD97ull, 0x6367518DB93596A2ull },
+    { 63u, 0xE81FC4DFE2D8CE60ull, 0xA3DD400C59D1740Full, 0xA8E5251F7D76832Eull, 0x9B9AF799AB156683ull },
+    { 60u, 0xFE32E5DCB6F3733Cull, 0x457CE9D0EE1EB9F2ull, 0x931BCF0108D564CCull, 0xFE6D25FEA9775BACull },
 };
 
 const std::vector<world_digest_pin>& digest_pins()

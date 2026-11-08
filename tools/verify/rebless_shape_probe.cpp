@@ -153,7 +153,7 @@ long long pct(std::vector<long long> v, int q)
 
 int main(int argc, char** argv)
 {
-    std::vector<uint32_t> seeds = { 46, 28, 11, 31, 40, 12, 37, 13, 41, 43, 32, 10, 25, 38, 9, 0 };
+    std::vector<uint32_t> seeds = { 0, 46, 7, 3, 29, 92, 2, 54, 17, 27, 31, 22, 13, 64, 63, 60 };
     for (int i = 1; i < argc; ++i)
         if (std::strcmp(argv[i], "--seeds") == 0 && i + 1 < argc)
         {
