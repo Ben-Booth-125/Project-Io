@@ -8282,6 +8282,39 @@
      "evidence": "2026-11-08 rival_fleet_census over 16 seeds: [arms reserve] printed on every seed, 14 to 41 nations stocked; arms works 4 to 43 per seed."
     }
    ]
+  },
+  {
+   "brief": "force-sizing",
+   "title": "BL-1552 - Rival nations size their forces to income and threat (MILITARY.md § Force sizing)",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": 4,
+   "status": "complete",
+   "promoted_from": "BL-1552",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "A rival with income hires until running cost meets target; more income fields more; over target hires nothing and disbands nothing.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V2, F1, F5, F6 PASS (431 of 431)."
+    },
+    {
+     "id": "R2",
+     "text": "A neighbour with a larger force raises the share; a hostile nation counts as a neighbour; the player is never sized.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness F2, F3, F4, V2b, V2e PASS."
+    },
+    {
+     "id": "R3",
+     "text": "Forces read against income over the seed library, deterministically.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 rival_fleet_census 16 seeds at tick 40: mean share 0.30 to 0.39, all seeds field land and 15 of 16 sea, air 0 everywhere. world_determinism PASS."
+    }
+   ]
   }
  ]
 }

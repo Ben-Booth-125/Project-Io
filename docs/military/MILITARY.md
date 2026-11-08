@@ -1637,8 +1637,9 @@ income**. The player's nation is never sized; the player reads the same numbers 
 
 - **The running cost** is the wages of every unit, wing and ship it holds or has mustering, plus
   their running goods at posted prices.
-- **Income** is the nation's own income over its last returns (`../economy/FINANCE.md`
-  § The quarterly return), so a good or bad quarter does not swing the army.
+- **Income** is the nation's operating surplus over its last four returns: income and taxes less
+  expenditure, maintenance and wages, never below zero (`../economy/FINANCE.md`
+  § The quarterly return). A good or bad quarter does not swing the army.
 - **The target share** is a base share raised by threat. **Threat** is the largest **force value**
   among its neighbours over its own. Below 1 it adds nothing: a nation does not shrink its share
   for being the strongest. Above 1 the share climbs, to a ceiling.

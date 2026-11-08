@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*35 entries — 31 open, 4 resolved.*
+*36 entries — 32 open, 4 resolved.*
 
 ---
 
@@ -330,6 +330,11 @@ Taken inside your form answers so the item could build; each is one line of scri
 *decision taken on your behalf · raised 2026-11-08 · from FORCE_EQUIPMENT (BL-1551)*
 
 Most majors cannot feed an Arms Works at generation: their machinery slot itself fails for want of refined copper. The kit then substituted the arms slots into more steel, silicon or rations, so no major held a works. To honour "majors open with Arms Works" the arms recipes are exempt from the want and feed gates: the works stands idle until its inputs arrive, and pays its upkeep meanwhile.
+
+### NR-1154 — Force sizing: income read as operating surplus; the landing hire sits outside the target
+*decision taken on your behalf · raised 2026-11-08 · from FORCE_SIZING (BL-1552)*
+
+Two calls. Income is the mean of the last four returns of income plus taxes less expenditure, maintenance and wages, floored at zero, so a nation is not sized on gross takings it has already spent. The landing force hired for a ready transport (Ben, 2026-11-08) stays outside the target, since it is a mission need rather than a standing force.
 
 ---
 

@@ -538,6 +538,17 @@
    "what": "Most majors cannot feed an Arms Works at generation: their machinery slot itself fails for want of refined copper. The kit then substituted the arms slots into more steel, silicon or rations, so no major held a works. To honour \"majors open with Arms Works\" the arms recipes are exempt from the want and feed gates: the works stands idle until its inputs arrive, and pays its upkeep meanwhile.",
    "options": "A) Keep: the works stands, idle where unfed. B) Let it substitute, and rely on the reserve and imports. C) Fix the machinery chain in the kit first (work; a separate item).",
    "taken": "A, as the nearest reading of the ruling."
+  },
+  {
+   "id": "NR-1154",
+   "title": "Force sizing: income read as operating surplus; the landing hire sits outside the target",
+   "raised": "2026-11-08",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "FORCE_SIZING (BL-1552)",
+   "what": "Two calls. Income is the mean of the last four returns of income plus taxes less expenditure, maintenance and wages, floored at zero, so a nation is not sized on gross takings it has already spent. The landing force hired for a ready transport (Ben, 2026-11-08) stays outside the target, since it is a mission need rather than a standing force.",
+   "options": "A) Keep both. B) Size on gross income. C) Count the landing hire inside the target.",
+   "taken": "A. First-cut numbers: base share 0.20, ceiling 0.50, threat span 3."
   }
  ]
 }

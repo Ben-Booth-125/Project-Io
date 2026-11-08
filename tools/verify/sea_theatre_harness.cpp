@@ -2278,40 +2278,61 @@ int main()
         check(!names_gone, "V1f a ship that leaves the world leaves every sighting");
     }
 
-    std::printf("\nV2 - the rival sea pass: the gate, the player, the hire and the design\n");
+    // BL-1552 (Ben, 2026-11-08; MILITARY.md § Force sizing): hires follow income and neighbours.
+    recipe_registry waged = reg;
+    {
+        auto mil = waged.military();
+        mil.upkeep.credits_per_head = 1.0f;
+        waged.set_military(mil);
+    }
+    const std::map<entity_id, std::set<entity_id>> no_borders;
+    const auto give_income = [](fixture& f, entity_id n, float income) {
+        f.w.nations.at(n).returns.clear();
+        for (int i = 0; i < 4; ++i)
+        {
+            quarterly_return q;
+            q.income = income;
+            f.w.nations.at(n).returns.push_back(q);
+        }
+    };
+    const auto ships_of = [](const fixture& f, entity_id n) {
+        int c = 0;
+        for (const auto& [sid, s] : f.w.ships)
+            c += s.owner == n ? 1 : 0;
+        return c;
+    };
+    const auto size_rounds = [&](fixture& f, entity_id n, int rounds) {
+        for (int i = 1; i <= rounds; ++i)
+            score_nation_force(f.w, waged, n, i, no_borders);
+    };
+
+    std::printf("\nV2 - force sizing: income, peace, the player, the design\n");
     {
         fixture f; build(f);
         const std::string before = to_bytes(f.w);
-        score_nation_sea(f.w, reg, f.b, 1);
-        check(to_bytes(f.w) == before, "V2 at peace a rival hires nothing");
-        declare_hostile(f.w, f.a, f.b);
-        const std::string war = to_bytes(f.w);
-        score_nation_sea(f.w, reg, f.a, 1);
-        check(to_bytes(f.w) == war, "V2b the scorer never acts for the player's nation");
-        score_nation_sea(f.w, reg, f.b, 1);
-        int b_ships = 0;
-        entity_id first = null_entity;
-        for (const auto& [sid, s] : f.w.ships)
-            if (s.owner == f.b) { ++b_ships; if (first == null_entity) first = sid; }
-        check(b_ships == 1 && ship_class_of(f.w.ships.at(first)) == ship_class::destroyer
-                  && f.w.ships.at(first).tile == port_mouth_tile(f.w, f.b_port) && f.w.ships.at(first).muster_days > 0,
-              "V2c mobilised (the player's declaration), it hires one destroyer at its own port");
-        for (int i = 2; i < 8; ++i)
-            score_nation_sea(f.w, reg, f.b, i);
-        b_ships = 0;
-        for (const auto& [sid, s] : f.w.ships)
-            b_ships += s.owner == f.b ? 1 : 0;
-        check(b_ships == 3, "V2d it stops at the soft cap of three (" + std::to_string(b_ships) + ")");
-        int a_ships = 0;
-        for (const auto& [sid, s] : f.w.ships)
-            a_ships += s.owner == f.a ? 1 : 0;
-        check(a_ships == 0, "V2e nothing is hired for the player");
+        size_rounds(f, f.b, 3);
+        check(to_bytes(f.w) == before, "V2 with no income a rival hires nothing");
+        give_income(f, f.b, 2000.0f);
+        give_income(f, f.a, 2000.0f);
+        const std::string held = to_bytes(f.w);
+        score_nation_force(f.w, waged, f.a, 1, no_borders);
+        check(to_bytes(f.w) == held, "V2b the scorer never acts for the player's nation");
+        score_nation_force(f.w, waged, f.b, 1, no_borders);
+        check(ships_of(f, f.b) == 1, "V2c at peace, with income, it hires one ship at its own port in an evaluation");
+        size_rounds(f, f.b, 30);
+        const int settled = ships_of(f, f.b);
+        const force_reading r = read_nation_force(f.w, waged, f.b, no_borders);
+        const std::string at_rest = to_bytes(f.w);
+        size_rounds(f, f.b, 3);
+        check(settled > 1 && to_bytes(f.w) == at_rest, "V2d it stops at its target, not a fixed count (" + std::to_string(settled) + " ships, running "
+              + std::to_string(r.running) + " of " + std::to_string(r.target) + ")");
+        check(ships_of(f, f.a) == 0, "V2e nothing is hired for the player");
     }
     {
         fixture f; build(f);
-        declare_hostile(f.w, f.a, f.b);
+        give_income(f, f.b, 2000.0f);
         set_kit_research_waived_for_harness(true);
-        score_nation_sea(f.w, reg, f.b, 1);
+        score_nation_force(f.w, waged, f.b, 1, no_borders);
         set_kit_research_waived_for_harness(false);
         entity_id hired = null_entity;
         for (const auto& [sid, s] : f.w.ships)
@@ -2320,6 +2341,45 @@ int main()
         check(hired != null_entity && !live.is_base() && f.w.ships.at(hired).kit.fit == live.fit,
               "V2f with later kit researched it designs before it hires, and the hire carries the design");
         check(ship_design_of(f.w, f.a, ship_class::destroyer).is_base(), "V2g the player's design is untouched");
+    }
+    {
+        // More income, more ships: the size is earned.
+        fixture poor; build(poor); give_income(poor, poor.b, 1500.0f); size_rounds(poor, poor.b, 30);
+        fixture rich; build(rich); give_income(rich, rich.b, 6000.0f); size_rounds(rich, rich.b, 30);
+        check(ships_of(rich, rich.b) > ships_of(poor, poor.b),
+              "F1 a nation with more income fields more (" + std::to_string(ships_of(poor, poor.b)) + " -> " + std::to_string(ships_of(rich, rich.b)) + ")");
+    }
+    {
+        // A stronger neighbour raises the share; a weaker one does not lower it.
+        fixture f; build(f);
+        give_income(f, f.b, 2000.0f);
+        const std::map<entity_id, std::set<entity_id>> borders{{f.b, {f.a}}};
+        add_ship(f, f.b, f.b_port, DES, 71, 3);
+        const force_reading calm = read_nation_force(f.w, waged, f.b, borders);
+        for (int i = 0; i < 4; ++i)
+            add_ship(f, f.a, f.a_port, DES, 8, 3);
+        const force_reading feared = read_nation_force(f.w, waged, f.b, borders);
+        check(calm.threat == 0.0f && feared.threat == 4.0f && feared.share > calm.share,
+              "F2 a neighbour with a larger force raises its share (" + std::to_string(calm.share) + " -> " + std::to_string(feared.share) + ")");
+        const force_reading unbordered = read_nation_force(f.w, waged, f.b, no_borders);
+        check(unbordered.share == calm.share, "F3 a nation that neither borders it nor is hostile to it is not read");
+        declare_hostile(f.w, f.a, f.b);
+        check(read_nation_force(f.w, waged, f.b, no_borders).share == feared.share, "F4 a hostile nation counts as a neighbour");
+    }
+    {
+        // Over target: no hire, nothing disbanded. The shortfall limits what may arm.
+        fixture f; build(f);
+        give_income(f, f.b, 100.0f);
+        for (int i = 0; i < 3; ++i)
+            add_ship(f, f.b, f.b_port, DES, 71, 3);
+        const std::string over = to_bytes(f.w);
+        size_rounds(f, f.b, 3);
+        check(to_bytes(f.w) == over && ships_of(f, f.b) == 3, "F5 over target it hires nothing and disbands nothing");
+        fixture g; build(g);
+        give_income(g, g.b, 2000.0f);
+        g.w.nations.at(g.b).treasury = 500.0f; // under every hull's price
+        size_rounds(g, g.b, 3);
+        check(ships_of(g, g.b) == 0 && g.w.nations.at(g.b).treasury == 500.0f, "F6 what the shortfall may spend cannot buy a ship: nothing moves");
     }
 
     std::printf("\nV3 - missions: each warship's best zone, no thrash, recalled at peace\n");
@@ -2530,8 +2590,8 @@ int main()
         {
             // The goods leg: with bare shelves no ship is hired, though the credits are there.
             fixture f; build(f, 0.0f);
-            declare_hostile(f.w, f.a, f.b);
-            score_nation_sea(f.w, reg, f.b, 1);
+            give_income(f, f.b, 2000.0f);
+            score_nation_force(f.w, waged, f.b, 1, no_borders);
             int b_ships = 0;
             for (const auto& [sid, s] : f.w.ships)
                 b_ships += s.owner == f.b ? 1 : 0;

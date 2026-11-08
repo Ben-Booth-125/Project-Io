@@ -1394,7 +1394,7 @@
    "design": "MILITARY.md § What a force costs; CORPORATION_GENERATION.md § A major's opening kit. Base-kit equipment per land class, authored as data, drawn at hire and on refill. A wing's recruit brings its share of hire goods and kit. Majors open with Arms Works for small arms, armoured vehicles and artillery pieces; every nation opens with a reserve of the three on its shelves. Quantities are first-cut, read by BL-1552 (force sizing)'s census."
   },
   {
-   "status": "proposed",
+   "status": "complete",
    "glyph": "○",
    "sprint": "64",
    "version_goal": "v0.3.0",

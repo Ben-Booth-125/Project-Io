@@ -28,9 +28,9 @@ Runs beside sprint 63. The core has no money dependency; the sea trade reading a
 
 ### BL-1552 (force sizing)
 
-- [ ] Running cost, income, threat, target share, shortfall share, split by position.
-- [ ] Hire one per theatre an evaluation; land hire restored; retire the caps.
-- [ ] Census: force against income and neighbours over the library; settle the numbers.
+- [x] Running cost, income, threat, target share, shortfall share, split by position.
+- [x] Hire one per theatre an evaluation; land hire restored; retire the caps.
+- [x] Census: force against income and neighbours over the library; settle the numbers.
 
 ## Sprint 63 — UI, QOL and the opening (opened 2026-11-05)
 

@@ -2,6 +2,8 @@
 
 #include "components.hpp"
 #include "corp_command.hpp"
+#include <map>
+#include <set>
 #include "entity.hpp"
 
 #include <array>
@@ -533,6 +535,19 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
 /// for the harness - BL-1426: a province holding only a hostile bunker scores 0 for
 /// strategic bombing, the bunker grant admitting no strike on another's bunker.
 int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m, uint32_t province);
+
+/// BL-1552 (MILITARY.md § Force sizing): what sizes a nation's forces.
+struct force_reading
+{
+    float income = 0.0f, running = 0.0f, share = 0.0f, target = 0.0f, threat = 0.0f, own_value = 0.0f;
+};
+/// What a nation's whole force would cost to hire: the ONE number another nation may read.
+float nation_force_value(const world& w, const recipe_registry& reg, entity_id nation);
+force_reading read_nation_force(const world& w, const recipe_registry& reg, entity_id nation,
+                                const std::map<entity_id, std::set<entity_id>>& borders);
+/// At most one hire in each theatre towards the income target. Never the player's nation.
+void score_nation_force(world& w, const recipe_registry& reg, entity_id nation, int tick,
+                        const std::map<entity_id, std::set<entity_id>>& borders);
 
 /// BL-1533 (AI_OPPONENT.md § 11, "Rival nations sail fleets", Ben 2026-11-05, read
 /// 2026-11-08): a rival nation's sea pass - while mobilised, design and hire one ship

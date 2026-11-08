@@ -1351,3 +1351,14 @@ int run_nation_tax_ai(world& w, const recipe_registry& reg, const economy_report
     }
     return moved;
 }
+
+// BL-1552 (MILITARY.md § Force sizing): who borders whom, for the one neighbour read.
+std::map<entity_id, std::set<entity_id>> nation_land_borders(const world& w)
+{
+    std::map<entity_id, std::set<entity_id>> out;
+    const raster_map raster = build_raster(w);
+    for (const auto& [nation, row] : build_borders(w, raster))
+        for (const auto& [other, edges] : row)
+            out[nation].insert(other);
+    return out;
+}

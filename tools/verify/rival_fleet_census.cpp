@@ -29,6 +29,7 @@
 #include "world/corp_ai.hpp"
 #include "world/corp_command.hpp" // no_province
 #include "world/economy_system.hpp" // corp_is_mobilised
+#include "world/nation_ai.hpp" // nation_land_borders
 #include "world/orbital_system.hpp"
 #include "world/sea_combat.hpp"
 #include "world/spawn_seat.hpp"
@@ -255,6 +256,36 @@ seed_result run_seed(std::uint32_t seed, int last_tick)
             ++r.minor_ports;
             r.minor_pool += nc.sea_recruits > 0 ? 1 : 0;
         }
+    {
+        // BL-1552 (force sizing): armies against income, for the read that settles the numbers.
+        const auto borders = nation_land_borders(w);
+        int rivals = 0, earning = 0, at_target = 0, threatened = 0, broke = 0, land = 0, air = 0, sea = 0;
+        float income = 0.0f, running = 0.0f, target = 0.0f, share = 0.0f, treasury = 0.0f;
+        for (const auto& [nid, nc] : w.nations)
+        {
+            if (nid == player)
+                continue;
+            ++rivals;
+            const force_reading f = read_nation_force(w, reg, nid, borders);
+            income += f.income; running += f.running; target += f.target; share += f.share;
+            treasury += nc.treasury;
+            earning += f.income > 0.0f ? 1 : 0;
+            at_target += f.target > 0.0f && f.running >= f.target ? 1 : 0;
+            threatened += f.threat > 1.0f ? 1 : 0;
+            broke += nc.treasury <= 0.0f ? 1 : 0;
+        }
+        for (const auto& [uid, u] : w.units) land += u.owner != player && u.count > 0 ? 1 : 0;
+        for (const muster_order& m : w.musters) land += m.owner != player ? 1 : 0;
+        for (const auto& [wid, wg] : w.wings) air += wg.owner != player ? 1 : 0;
+        for (const auto& [sid, s] : w.ships) sea += s.owner != player ? 1 : 0;
+        int works = 0;
+        const uint16_t sa = reg.recipe_id("small_arms"), av = reg.recipe_id("armoured_vehicles"), ap = reg.recipe_id("artillery_pieces");
+        for (const auto& [bid, b] : w.buildings)
+            works += b.recipe == sa || b.recipe == av || b.recipe == ap ? 1 : 0;
+        std::printf("    seed %u forces: rivals %d, earning %d, at target %d, threat>1 %d, broke %d; sum income %.0f running %.0f target %.0f, mean share %.2f, treasury %.0f; land %d air %d sea %d; arms works %d\n",
+                    seed, rivals, earning, at_target, threatened, broke, income, running, target,
+                    rivals > 0 ? share / static_cast<float>(rivals) : 0.0f, treasury, land, air, sea, works);
+    }
     r.hash = w.state_hash(static_cast<uint64_t>(last_tick));
     return r;
 }
