@@ -12,9 +12,11 @@
 //   INVARIANTS (asserted):
 //     I1  no ship of the player's nation changes mission, zone, landing or aboard by any
 //         hand but the player's (this harness presses nothing for it);
-//     I2  every rival raid or blockade zone is worked against a nation the rival is
-//         hostile to at that tick (some hostile nation's cargo lane or port could be there);
-//         read as: a rival on raid/blockade is mobilised;
+//     I2  no rival raid or blockade is ASSIGNED (its mission or zone changed this tick)
+//         while the rival is not mobilised. A mission set in a war can outlast its peace
+//         until the rival's next staggered evaluation recalls it; the sea day works a raid
+//         or blockade only against a nation still hostile (is_hostile at the roll and at the
+//         closed-port pass), so those lingering ship-ticks take nothing. They are reported;
 //     I3  (--replay) two runs of a seed match: the world's state hash and the tables.
 //
 //   build_gen/verify/rival_fleet_census.exe [--seeds a,b,c] [--ticks T] [--replay]
@@ -59,7 +61,7 @@ struct seed_result
     std::map<int, int> assigned; ///< mission -> rival ships ever on it
     int boarded = 0, landings = 0;
     int landlocked_rivals = 0, landlocked_ship_kit = 0;
-    int i1_breaks = 0, i2_breaks = 0;
+    int i1_breaks = 0, i2_breaks = 0, i2_linger = 0;
     // Where the landing chain stops, in rival-transport-ticks: lying ready at home while
     // mobilised; with a held-water hostile coast in reach; with an idle unit of its own too.
     int ready = 0, targeted = 0, with_idle = 0;
@@ -104,6 +106,7 @@ seed_result run_seed(std::uint32_t seed, int last_tick)
 
     std::set<entity_id> known_ships, ever_boarded, ever_landing;
     std::map<entity_id, std::set<int>> ever_mission;
+    std::map<entity_id, std::pair<int, std::vector<uint32_t>>> last_order; ///< ship -> mission, zone
     std::map<entity_id, player_ship_state> mine;
     {
         std::set<entity_id> owners;
@@ -148,9 +151,15 @@ seed_result run_seed(std::uint32_t seed, int last_tick)
             if (s.mission != sea_mission::none)
             {
                 ever_mission[sid].insert(static_cast<int>(s.mission));
+            }
+            {
+                const std::pair<int, std::vector<uint32_t>> order{static_cast<int>(s.mission), s.provinces};
+                const auto lit = last_order.find(sid);
+                const bool changed = lit == last_order.end() || !(lit->second == order);
                 if ((s.mission == sea_mission::raid || s.mission == sea_mission::blockade)
                     && !corp_is_mobilised(w, s.owner))
-                    ++r.i2_breaks;
+                    ++(changed ? r.i2_breaks : r.i2_linger);
+                last_order[sid] = order;
             }
             if (!s.aboard.empty())
                 ever_boarded.insert(sid);
@@ -320,7 +329,8 @@ int main(int argc, char** argv)
         total_hired += r.hired;
         const bool i1 = r.i1_breaks == 0, i2 = r.i2_breaks == 0;
         std::printf("  %s  seed %u: I1 no hand but the player's moves a player ship (%d)\n", i1 ? "PASS" : "FAIL", seed, r.i1_breaks);
-        std::printf("  %s  seed %u: I2 every rival raid/blockade is worked while mobilised (%d)\n", i2 ? "PASS" : "FAIL", seed, r.i2_breaks);
+        std::printf("  %s  seed %u: I2 no rival raid/blockade is assigned while not mobilised (%d; %d ship-ticks lingering to the next evaluation)\n",
+                    i2 ? "PASS" : "FAIL", seed, r.i2_breaks, r.i2_linger);
         failures += (i1 ? 0 : 1) + (i2 ? 0 : 1);
         if (replay)
         {

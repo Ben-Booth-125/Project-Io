@@ -2028,6 +2028,59 @@ void rival_land_home(world& w, const recipe_registry& reg, entity_id nation, ent
         }
 }
 
+/// The landing force's hire (Ben, 2026-11-08; MILITARY.md § The muster interface: rival
+/// nations hire through the same verb): ONE land unit at the nation's lowest-id completed
+/// military base, of the available, non-obsolete row of highest power that may stand on
+/// @p target, ties to the lowest row, while its uncommitted treasury holds twice the price.
+/// The door (hire_unit_check, then the payment legs) refuses anything else and mutates nothing.
+void rival_hire_landing_unit(world& w, const recipe_registry& reg, entity_id nation, entity_id ship,
+                             entity_id target, int tick)
+{
+    entity_id base_tile = null_entity, base_id = null_entity;
+    const std::vector<entity_id>* assets = assets_of(w, nation);
+    if (assets == nullptr)
+        return;
+    for (const entity_id bid : *assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit != w.buildings.end() && bit->second.type == building_type::military_base
+            && bit->second.ticks_remaining <= 0 && !bit->second.decommissioned
+            && (base_id == null_entity || bid < base_id))
+        {
+            base_id = bid;
+            base_tile = bit->second.tile;
+        }
+    }
+    if (base_tile == null_entity)
+        return;
+    const military_capability_params& mil = reg.military();
+    const auto& table = unit_roster_table();
+    int best = -1, best_power = std::numeric_limits<int>::min();
+    for (const roster_row* row : available_rows(w, nation, campaign_roster_band_for(reg.era())))
+    {
+        const auto idx = static_cast<uint16_t>(row - table.data());
+        if (roster_row_obsolete(w, nation, idx) || (row->domains & domain_bit(traversal_domain::land)) == 0
+            || hire_unit_check(w, reg, nation, base_tile, idx) != corp_command_result::applied
+            || landing_would_admit(w, reg, nation, ship, target, idx) != corp_command_result::applied)
+            continue;
+        const float price = mil.hire_base_cost + mil.hire_cost_per_power * static_cast<float>(row->power_mod);
+        const hire_goods_reading g = read_land_hire_goods(w, nation, idx);
+        if (!g.goods_ok || state_uncommitted_treasury(w, nation) < 2.0f * price + g.price_bound)
+            continue;
+        if (row->power_mod > best_power || (row->power_mod == best_power && idx < best))
+        {
+            best = idx;
+            best_power = row->power_mod;
+        }
+    }
+    if (best < 0)
+        return;
+    corp_command cmd;
+    cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+    cmd.verb = corp_verb::hire_unit; cmd.tile = base_tile; cmd.unit_type = static_cast<uint16_t>(best);
+    (void)apply_corp_command(w, reg, cmd);
+}
+
 } // namespace
 
 void score_nation_sea(world& w, const recipe_registry& reg, entity_id nation, int tick)
@@ -2096,6 +2149,14 @@ void score_nation_sea(world& w, const recipe_registry& reg, entity_id nation, in
             const float price = sp.cls[static_cast<std::size_t>(c)].hire_cost;
             if (value <= 0.0 || price <= 0.0f || state_uncommitted_treasury(w, nation) < 2.0f * price)
                 continue;
+            // The goods a hire takes (Ben, 2026-11-08: "scorer checks goods; economy stays as
+            // is"): the seam's own reading of the hull's goods and its fit's, all on the
+            // shelves and their price inside the slack, or the row is passed.
+            {
+                const hire_goods_reading g = read_ship_hire_goods(w, reg, nation, row);
+                if (!g.goods_ok || state_uncommitted_treasury(w, nation) < 2.0f * price + g.price_bound)
+                    continue;
+            }
             entity_id tile = null_entity;
             for (const entity_id port : ports) // ascending: the lowest the door admits
                 if (hire_ship_check(w, reg, nation, w.buildings.at(port).tile, row) == corp_command_result::applied)
@@ -2245,17 +2306,25 @@ void score_nation_sea(world& w, const recipe_registry& reg, entity_id nation, in
                 rival_land_home(w, reg, nation, sid, tick); // nothing to take: put them back ashore
             continue;
         }
-        // Board its idle own units that may stand on that target, one verb each, ascending id.
-        std::vector<entity_id> idle;
-        for (const auto& [uid, u] : w.units)
-            if (u.owner == nation && u.count > 0 && u.front == null_entity && u.defend_province == no_province)
-                idle.push_back(uid);
-        std::sort(idle.begin(), idle.end());
-        for (const entity_id uid : idle)
+        // Its idle own units, ascending id: no front, no defend order, no march, out of battle.
+        const auto idle_units = [&]() {
+            std::vector<entity_id> v;
+            for (const auto& [uid, u] : w.units)
+                if (u.owner == nation && u.count > 0 && u.position != null_entity && u.front == null_entity
+                    && u.defend_province == no_province && u.order.dest == null_entity
+                    && !unit_refitting(u) && !unit_in_battle(w, uid))
+                    v.push_back(uid);
+            std::sort(v.begin(), v.end());
+            return v;
+        };
+        const auto may_land = [&](uint16_t type) {
+            return landing_would_admit(w, reg, nation, sid, target, type) == corp_command_result::applied;
+        };
+        // Board those beside the port that may stand on that target, one verb each.
+        for (const entity_id uid : idle_units())
         {
             const auto uit = w.units.find(uid);
-            if (uit == w.units.end()
-                || landing_would_admit(w, reg, nation, sid, target, uit->second.type) != corp_command_result::applied
+            if (uit == w.units.end() || !may_land(uit->second.type)
                 || embark_check(w, reg, nation, uid, sid) != corp_command_result::applied)
                 continue;
             corp_command cmd;
@@ -2264,7 +2333,46 @@ void score_nation_sea(world& w, const recipe_registry& reg, entity_id nation, in
             cmd.order = static_cast<uint32_t>(sid);
             (void)apply_corp_command(w, reg, cmd);
         }
+        // THE LANDING FORCE (Ben, 2026-11-08: "hire a landing force at the port"). Room still
+        // aboard is filled by units already marching to the port, then by the nation's musters
+        // under way, then by idle units marched to it, and last by ONE hire an evaluation at
+        // its own base. Each is its own verb; a marching unit is not idle, so no front takes it.
+        const sea_ship& s1 = w.ships.at(sid);
+        const auto hp = w.buildings.find(s1.home_port);
+        const entity_id port_tile = hp != w.buildings.end() ? hp->second.tile : null_entity;
+        int room = std::max(0, ship_stats(reg, s1).capacity - static_cast<int>(s1.aboard.size()));
+        int inbound = 0;
+        for (const auto& [uid, u] : w.units)
+            if (u.owner == nation && u.count > 0 && port_tile != null_entity && u.order.dest == port_tile)
+                ++inbound;
+        int mustering = 0;
+        for (const muster_order& m : w.musters)
+            mustering += m.owner == nation ? 1 : 0;
+        int need = room - inbound - mustering;
+        if (need > 0 && port_tile != null_entity)
+            for (const entity_id uid : idle_units())
+            {
+                if (need <= 0)
+                    break;
+                const auto uit = w.units.find(uid);
+                if (uit == w.units.end() || uit->second.position == port_tile || !may_land(uit->second.type))
+                    continue;
+                corp_command cmd;
+                cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
+                cmd.verb = corp_verb::march_unit; cmd.subject = uid; cmd.tile = port_tile;
+                if (apply_corp_command(w, reg, cmd) == corp_command_result::applied)
+                {
+                    --need;
+                    ++inbound;
+                }
+            }
+        if (need > 0)
+            rival_hire_landing_unit(w, reg, nation, sid, target, tick);
         if (w.ships.at(sid).aboard.empty())
+            continue;
+        // Sail once full, or once nothing more is on its way.
+        if (std::max(0, ship_stats(reg, w.ships.at(sid)).capacity - static_cast<int>(w.ships.at(sid).aboard.size())) > 0
+            && inbound + mustering > 0)
             continue;
         corp_command cmd;
         cmd.tick = tick; cmd.corp = nation; cmd.as_nation = nation;
@@ -3107,6 +3215,14 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_embargo(w, reg, corp, tick, p.spectating);
 
+        // BL-1533 (AI_OPPONENT.md § 11, "Rival nations sail fleets", Ben 2026-11-05,
+        // read 2026-11-08): its own ports, ships and landings. Past the player guard
+        // above, and score_nation_sea refuses the player's nation itself as well.
+        // BEFORE defence and the fronts (Ben, 2026-11-08: a landing force): a unit
+        // it marches to a ready transport is no longer idle when they look.
+        if (actor.is_nation)
+            score_nation_sea(w, reg, corp, tick);
+
         if (actor.is_nation && tick >= k_campaign_settle_ticks)
             score_nation_defence(w, reg, corp, tick); // BL-1504: before the front's assign
 
@@ -3118,12 +3234,6 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
         // above, and score_nation_air refuses the player's nation itself as well.
         if (actor.is_nation)
             score_nation_air(w, reg, corp, tick);
-
-        // BL-1533 (AI_OPPONENT.md § 11, "Rival nations sail fleets", Ben 2026-11-05,
-        // read 2026-11-08): its own ports, ships and landings. Past the player guard
-        // above, and score_nation_sea refuses the player's nation itself as well.
-        if (actor.is_nation)
-            score_nation_sea(w, reg, corp, tick);
 
         // BL-1426 (AI_OPPONENT.md § 11, "Rival nations build bunkers on their own
         // ground", Ben 2026-10-31): at most one bunker an evaluation, where its own

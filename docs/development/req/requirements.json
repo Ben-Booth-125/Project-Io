@@ -8200,6 +8200,20 @@
      "kind": "headless",
      "status": "complete",
      "evidence": "2026-11-08 rival_fleet_census --replay I3 PASS on seeds 46, 28, 11, 31 (hash equal); world_determinism ALL PASS; history_sim_harness red only on R3a2/R3a3, identical on a clean 2911972c checkout (pre-existing). Digest movement waits for the sprint re-bless (Ben's go)."
+    },
+    {
+     "id": "R8",
+     "text": "The landing force (Ben, 2026-11-08): a rival transport with a target and room aboard counts its units marching to its home port and its musters under way, marches idle own units there, then hires ONE land unit an evaluation at its own base; it sails once full or once nothing more is inbound. The sea pass runs before defence and the fronts. Never for the player.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V5-V5g PASS (420 of 420): an idle unit away from the port is marched to it and the transport waits; the unit inbound is counted; with none, one land unit is hired at its own base, one an evaluation, stopping at the room aboard (2 of 2); nothing for the player. 16-seed rival_fleet_census at tick 40: 3 rival landings ordered (seeds 63, 31, 29), from 0 before. --replay I3 PASS on 63 and 29; world_determinism ALL PASS; history_sim_harness red only on the pre-existing R3a2/R3a3."
+    },
+    {
+     "id": "R9",
+     "text": "The goods check (Ben, 2026-11-08): a rival scores a ship or land hire only when the seam's own goods reading (read_ship_hire_goods / read_land_hire_goods) holds, with the goods' price bound inside its treasury slack. The economy is unchanged.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V5h PASS: with bare shelves no ship is hired though the credits are there; V2c still hires with stocked shelves. The census I2 is split: 0 assignments while not mobilised on all 16 seeds; seed 54 carries 12 ship-ticks of a mission lingering to the next staggered evaluation, which the sea day works against no one (is_hostile at the roll and the closed-port pass)."
     }
    ]
   }

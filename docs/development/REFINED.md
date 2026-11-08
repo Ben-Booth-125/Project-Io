@@ -13,7 +13,8 @@ Runs beside sprint 63. The core has no money dependency; the sea trade reading a
 - [x] Research scorer: ship kit weighted by own ports and ships.
 - [x] Harness `rival_fleet_census`: who raises, assigns, embarks, lands, over the library.
 - [x] Cold review; fix round (no unit stranded aboard); ACTIONS.json / docs.
-- [ ] Ben's census calls: which units a transport takes; minors' hull goods; the ship cap.
+- [x] Ben's census calls (2026-11-08): the landing force (march, then one hire at the base); the scorer checks goods.
+- [ ] The ship cap: Ben weighing where the soft cap of three comes from.
 
 ## Sprint 63 — UI, QOL and the opening (opened 2026-11-05)
 

@@ -2430,6 +2430,81 @@ int main()
         }
     }
 
+    // Ben, 2026-11-08: "hire a landing force at the port"; "scorer checks goods".
+    std::printf("\nV5 - the landing force, and the goods a ship hire takes\n");
+    {
+        const auto islet = [](fixture& f, entity_id owner) {
+            for (int r = 2; r <= 4; ++r)
+                for (int c = 52; c <= 53; ++c)
+                {
+                    tile_component& tc = f.w.tiles.at(tile(f, c, r));
+                    tc.substrate = terrain_substrate::sedimentary;
+                    tc.cover = terrain_cover::grass;
+                    tc.cover_density = 150;
+                    f.w.set_tile_nation(tile(f, c, r), owner);
+                }
+            add_building(f, owner, 52, 3, building_type::port);
+        };
+        const entity_id port_tile_of = null_entity; (void)port_tile_of;
+        {
+            // An idle unit away from the port is marched to it; the transport waits for it.
+            fixture f; build(f); islet(f, f.a);
+            declare_hostile(f.w, f.b, f.a);
+            const entity_id tra = add_ship(f, f.b, f.b_port, TRA, 71, 3);
+            const entity_id men = add_soldiers(f, f.b, 78, 6);
+            add_on_station(f, f.b, f.b_port, DES, sea_mission::blockade, {12});
+            add_ship(f, f.b, f.b_port, SUB, 71, 3);
+            score_nation_sea(f.w, reg, f.b, 1);
+            const entity_id pt = f.w.buildings.at(f.b_port).tile;
+            check(f.w.units.count(men) != 0 && f.w.units.at(men).order.dest == pt,
+                  "V5 an idle unit away from the port is marched to it");
+            check(f.w.ships.at(tra).aboard.empty() && f.w.ships.at(tra).landing_tile == null_entity,
+                  "V5b the transport waits while it is on its way");
+            const std::string held = to_bytes(f.w);
+            score_nation_sea(f.w, reg, f.b, 2);
+            check(to_bytes(f.w) == held, "V5c the next evaluation marches nothing more: the unit inbound is counted");
+        }
+        {
+            // No idle unit at all: one land unit is hired at its own base, and the transport waits.
+            fixture f; build(f); islet(f, f.a);
+            declare_hostile(f.w, f.b, f.a);
+            f.w.nations.at(f.b).land_recruits = 100000;
+            add_building(f, f.b, 77, 6, building_type::military_base);
+            const entity_id tra = add_ship(f, f.b, f.b_port, TRA, 71, 3);
+            add_on_station(f, f.b, f.b_port, DES, sea_mission::blockade, {12});
+            add_ship(f, f.b, f.b_port, SUB, 71, 3);
+            score_nation_sea(f.w, reg, f.b, 1);
+            int musters = 0;
+            for (const muster_order& m : f.w.musters)
+                musters += m.owner == f.b ? 1 : 0;
+            check(musters == 1, "V5d with no idle unit it hires one land unit at its own base (" + std::to_string(musters) + ")");
+            check(f.w.ships.at(tra).landing_tile == null_entity, "V5e the transport waits for the muster");
+            const int cap = ship_stats(reg, f.w.ships.at(tra)).capacity;
+            for (int i = 2; i < 8; ++i)
+                score_nation_sea(f.w, reg, f.b, i);
+            musters = 0;
+            for (const muster_order& m : f.w.musters)
+                musters += m.owner == f.b ? 1 : 0;
+            check(cap >= 1 && musters == cap,
+                  "V5f one hire an evaluation, and the musters under way are counted: it stops at the room aboard ("
+                      + std::to_string(musters) + " of " + std::to_string(cap) + ")");
+            int a_musters = 0;
+            for (const muster_order& m : f.w.musters)
+                a_musters += m.owner == f.a ? 1 : 0;
+            check(a_musters == 0, "V5g nothing is hired for the player");
+        }
+        {
+            // The goods leg: with bare shelves no ship is hired, though the credits are there.
+            fixture f; build(f, 0.0f);
+            declare_hostile(f.w, f.a, f.b);
+            score_nation_sea(f.w, reg, f.b, 1);
+            int b_ships = 0;
+            for (const auto& [sid, s] : f.w.ships)
+                b_ships += s.owner == f.b ? 1 : 0;
+            check(b_ships == 0, "V5h with no hull goods on its shelves it hires no ship");
+        }
+    }
+
     std::printf("\n%d checks, %d failures\n", checks, failures);
     return failures == 0 ? 0 : 1;
 }

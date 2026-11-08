@@ -2421,6 +2421,15 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   treasury; it lands only on a hostile coast whose water it holds. A raid zone is scored on the
   hostile cargo whose sea legs cross it — the prize and the owner's loss, so a submarine, which
   sinks what it takes, scores half a surface raider's and never zero.
+  **The landing force and the goods (Ben, 2026-11-08, two calls).** (5) A transport with a target
+  and room aboard raises its own landing force: it counts its own units already marching to its home
+  port and its own musters under way, marches idle own units there, and past those hires ONE land
+  unit an evaluation at its own military base — a row that may stand on the target, of the highest
+  power, with twice the price and the goods' price bound in its treasury. It sails once full, or
+  once nothing more is on its way. The sea pass runs before defence and the fronts, so a unit it
+  marches is not idle when they look. (6) The scorer checks goods: a ship or land hire is scored only
+  when the seam's own goods reading says the shelves hold its hull or row goods with its live
+  design's kit. The economy is unchanged; a nation that cannot buy them hires nothing.
   **Rival nations wage war whole — granted (Ben, 2026-10-30, resolving NR-1100;
   `../politics/RELATIONS.md` § 7).** The stance grant (BL-450) already covers a rival declaring
   war, and Ben confirmed it does, goals included. The rest of a war is a new subject — territory,
