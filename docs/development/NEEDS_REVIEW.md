@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*30 entries — 29 open, 1 resolved.*
+*31 entries — 30 open, 1 resolved.*
 
 ---
 
@@ -318,6 +318,13 @@ Foundings and every settle tick use the authored bills; play uses the raised cur
 CLOCK: rivals score fronts once a year, while a unit with no supply dies near day 210. Scoring fronts every quarter (and nothing else) takes men lost from 6.7% to 4.4% at 20 quarters, but the march-off-and-return loop count goes from 9 to 31. Not shipped. HOME LEAK: 5 of 21 fall backs at 20 quarters land in the capital province and are then posted home for good; telling them from the deliberate home garrison needs a new saved field. RANGE: ground within 8 straight hex steps of a goal is worth the goal; past it a hungry march holds, 7 refusals in 20 quarters across 16 seeds, all with a goal left.
 
 **Why it matters.** Each sets how often rivals lose men to hunger against how steadily they hold a war.
+
+### NR-1151 — Opening climb: where it lands, and the calls taken inside it
+*decision · raised 2026-11-08 · from BL-1497 (opening cost curve) and BL-1545..1549 (steel trade rulings)*
+
+Measured on the merged lane, 16 seeds, 64 majors, 80 quarters: the reference mine costs 5.2 months of net at the opening and 3.9 at year 20; 10 of 64 majors reach 1 month; median 4 buildings completed by year 20; 7 majors never build; 1 below zero by q80. The target of about 1 month at year 20 is not met. Calls taken: the Logistic Point constant 3.98 was calibrated on the summed q20 draw (the median major draws 0); the dead corporation-era Marketplace estimate in corp_ai.cpp was converted to points, not deleted; settle-day construction arrears bill at the authored row. Late trade fell 17% and late stranded coal rose 8.0 -> 14.3 after the review fixes, cause untraced. The kit Marketplace laid a new building for only 4 majors.
+
+**Why it matters.** The climb is the sprint's top item and lands at about a third of the target pace.
 
 ---
 

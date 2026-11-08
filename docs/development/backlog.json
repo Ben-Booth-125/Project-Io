@@ -1188,7 +1188,7 @@
     "src/world/opening_kit.cpp"
    ],
    "title": "Every kit holds a Marketplace on its steel mill's market",
-   "design": "Ben, 2026-11-07: every major's kit gains a Planetary Marketplace on the market of its steel slot, the same for all. No major traded from its own mill market once; 39% of stranded steel had no trade building at the source."
+   "design": "Ben, 2026-11-07: every major's kit gains a Planetary Marketplace on the market of its steel slot, the same for all. No major traded from its own mill market once; 39% of stranded steel had no trade building at the source. Merged 2026-11-08 with the opening lane."
   },
   {
    "status": "in_progress",
@@ -1210,7 +1210,7 @@
     "scripts/economy.lua"
    ],
    "title": "Steel moves six a trade point",
-   "design": "Ben, 2026-11-07: steel's trade capacity rises from 2.5 to 6 units a point a quarter. A mill-less market needs 70-200 steel a quarter."
+   "design": "Ben, 2026-11-07: steel's trade capacity rises from 2.5 to 6 units a point a quarter. A mill-less market needs 70-200 steel a quarter. Merged 2026-11-08 with the opening lane."
   },
   {
    "status": "in_progress",
@@ -1232,7 +1232,7 @@
     "src/world/supply_system.cpp"
    ],
    "title": "A priced-out want sizes trade room",
-   "design": "Ben, 2026-11-07: when a processor is priced out and its want sits in the hauler-only register, that want sizes trade room, so trade can carry it the input. supply_system.cpp dispatch_absorbable returns 0 first today. 20% of coal-short mill cases."
+   "design": "Ben, 2026-11-07: when a processor is priced out and its want sits in the hauler-only register, that want sizes trade room, so trade can carry it the input. supply_system.cpp dispatch_absorbable returns 0 first today. 20% of coal-short mill cases. Merged 2026-11-08 with the opening lane."
   },
   {
    "status": "in_progress",
@@ -1254,7 +1254,7 @@
     "docs/economy/LOGISTICS.md"
    ],
    "title": "Logistics doc: a shipment pays where it leaves",
-   "design": "Ben, 2026-11-07: the code wins. A shipment draws Logistic Points at the market it leaves, not along its whole route; LOGISTICS.md's whole-route sentence (NR-1060) is rewritten to match."
+   "design": "Ben, 2026-11-07: the code wins. A shipment draws Logistic Points at the market it leaves, not along its whole route; LOGISTICS.md's whole-route sentence (NR-1060) is rewritten to match. Merged 2026-11-08 with the opening lane."
   },
   {
    "status": "in_progress",
@@ -1276,7 +1276,7 @@
     "src/world/supply_system.cpp"
    ],
    "title": "Logistic Points drawn by cargo value",
-   "design": "Ben, 2026-11-07, this sprint: a shipment draws Logistic Points by its cargo's value, not its unit count. Per unit, coal costs about 8 times steel per credit; the cap refused 39-55% of shipments."
+   "design": "Ben, 2026-11-07, this sprint: a shipment draws Logistic Points by its cargo's value, not its unit count. Per unit, coal costs about 8 times steel per credit; the cap refused 39-55% of shipments. Kept after measuring (Ben, 2026-11-08). Constant 3.98: base value per point that holds the summed q20 draw of rulings 1-3 (3,909 units). Merged."
   }
  ]
 }
