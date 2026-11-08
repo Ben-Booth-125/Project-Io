@@ -1923,11 +1923,12 @@
     "src/ui/construction_sites.hpp",
     "src/ui/construction_sites.cpp"
    ],
-   "summary": "In the Construction view, between the queue and the tile build bar: a building picker ('Find a site') and, with a building chosen, a sortable table of every tile of the player's own ground the Build door accepts it on - Tile (the press: select and frame), Net (est. net / qtr with the tile's Logistic Point cover), Cost, Market, LP (cover, with the struck-truck flag at zero) and Yield - sorted by Net descending, ties by tile id.",
+   "summary": "In the Construction view, between the queue and the tile build bar: a grid of buildings ('Find a site'), one cell per option with its best estimated net and site count, restricted with everything below it to the selected tile's province, and, with a building chosen, a sortable table of every tile of the player's own ground the Build door accepts it on - Tile (the press: select and frame), Net (est. net / qtr with the tile's Logistic Point cover), Cost, Market, LP (cover, with the struck-truck flag at zero) and Yield - sorted by Net descending, ties by tile id.",
    "interesting_question": "Many rows tie on Net where prices are per market; does the ledger want a finer price (province-level) or a second default key?",
    "resolution": "Open - Ben's call on province-level local prices (2026-10-25); the tie share is measured by construction_sites_ties.lua.",
    "checks": [
     "construction_sites",
+    "site_grid",
     "site_picker_glyphs",
     "shelf_runway_warning"
    ]

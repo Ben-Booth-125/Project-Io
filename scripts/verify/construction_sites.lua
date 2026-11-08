@@ -40,6 +40,7 @@ verify.econ_step(2)
 -- cannot afford anything would assert nothing.
 verify.set_balance(5000000.0)
 verify.show_panel("build", true) -- the Construction ledger, on its Construction view
+verify.clear_selection() -- a selected tile scopes the finder to its province (Ben, 2026-11-08)
 verify.frames(3)
 
 local function sites() return verify.site_finder() end

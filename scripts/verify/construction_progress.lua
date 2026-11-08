@@ -106,6 +106,7 @@ end
 -- default sort (profit, ties by tile id) is deterministic for a seed, and it follows
 -- the player's ground wherever generation moves it, so the pick cannot rot again.
 verify.show_panel("build", true)
+verify.clear_selection() -- a selected tile scopes the finder to its province (Ben, 2026-11-08)
 verify.frames(1)
 local picked_ok = verify.site_pick("Iron Mine")
 verify.frames(3)

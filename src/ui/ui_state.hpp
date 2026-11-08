@@ -898,11 +898,46 @@ struct site_option
     std::string   category;         ///< The door's fold ("Extraction", "Processing", ...).
 };
 
+/// One cell of the site finder's building grid (Ben, 2026-11-08): what the table would
+/// list for this option, summed up before any option is chosen.
+struct site_cell
+{
+    site_option option;
+    bool        pending   = true;   ///< Not yet evaluated: the first pass, or a new scope.
+    int         sites        = 0;   ///< Tiles the table would list.
+    int         no_lp        = 0;   ///< Of those, how many have no Logistic Points operating.
+    int         unaffordable = 0;   ///< Tiles that would take it but cost more than the treasury.
+    float       cheapest_unaffordable = 0.0f; ///< The lowest capex among those.
+    bool        has_figure = false; ///< Has an estimated net: it makes something and a site is priced.
+    float       best_net   = 0.0f;  ///< The highest Net any listed tile quotes.
+    float       best_cover = 0.0f;  ///< That tile's Logistic Point cover.
+    bool        best_starved = false; ///< That tile would likely stand idle.
+    std::string best_place;         ///< That tile's place name, as the table's row names it.
+    bool        best_near  = false;
+    std::string refusal;            ///< Why no tile takes it (the commonest refusal); empty if some do.
+};
+
 struct site_finder_state
 {
     // The choice (persists across frames; VIEW state, not serialised).
     bool          armed = false;    ///< A building is chosen.
     site_option   choice;
+
+    /// THE SCOPE (Ben, 2026-11-08): the province the finder is restricted to, 0 for the
+    /// whole body. Follows the selected tile's province; a press on a table row selects
+    /// a tile without narrowing the list it was pressed in (`row_pressed_tile`).
+    std::uint32_t scope_province = 0;
+    entity_id     row_pressed_tile = null_entity;
+    std::string   scope_name;       ///< The centre that names the province ("" if none is near).
+    bool          scope_near = false;
+    bool          scope_foreign = false; ///< The scoped province holds none of the player's ground.
+
+    /// The building grid, in option order; `cell_order` is the drawn order. Rebuilt on
+    /// its key over several frames (`step_site_grid`), never as one long frame.
+    std::vector<site_cell> cells;
+    std::vector<int>       cell_order;
+    double        grid_ms = 0.0;    ///< Wall time the last full grid pass spent evaluating.
+    int           grid_frames = 0;  ///< Frames that pass was spread across.
 
     /// Sort column (0 place, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield) and
     /// direction. Default: profit, descending; every tie broken by tile id ascending.
@@ -934,9 +969,9 @@ struct site_finder_state
 
     /// Where the ledger's controls landed this frame (absent: x < 0).
     float         picker_x = -1.0f, picker_y = -1.0f;
-    /// The picker's options as the OPEN combo drew them this frame (empty while it
-    /// is shut): the glyph's half-extent, the name's width against its room, and
-    /// where the row's press is.
+    /// The building grid's cells as drawn this frame, in drawn order: the glyph's
+    /// half-extent, the name's widest wrapped line against its room, and where the
+    /// cell's press is.
     struct picker_row { std::string name, category; float glyph_r = 0.0f, need = 0.0f, have = 0.0f, x = -1.0f, y = -1.0f; };
     std::vector<picker_row> picker_rows;
     struct drawn_row { entity_id tile = null_entity; float x = -1.0f, y = -1.0f; std::string net_text; };

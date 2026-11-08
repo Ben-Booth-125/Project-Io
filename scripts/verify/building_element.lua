@@ -48,6 +48,7 @@ verify.show_panel("build",        false)
 -- generation moves it. The same idiom as construction_progress.lua.
 verify.show_panel("build", true)
 verify.frames(1)
+verify.clear_selection() -- a selected tile scopes the finder to its province (Ben, 2026-11-08)
 local picked_ok = verify.site_pick("Iron Mine")
 verify.frames(3)
 local sites = verify.site_finder()
