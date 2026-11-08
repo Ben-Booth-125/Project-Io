@@ -1055,8 +1055,9 @@ reinstated: a shipment draws **by cargo value**.
 value — units times the good's base price at the market it leaves — over one constant, the value a
 point carries (`economy.trade.lp_value_per_point` in data). A unit draw charged a cartload of coal
 eight times the points of the same credits of steel, so the cap fell hardest on the bulk raws trade
-exists to move. The constant is set so the median major that trades draws what it drew under the
-unit rule at the opening's fifth year. A unit's supplies still draw by quantity (above): this rule
+exists to move. The constant is set so the majors' summed shipment draw at the opening's fifth
+year, holding the cargo they shipped under the unit rule, is what that cargo drew by the unit
+(Ben, 2026-11-08). A unit's supplies still draw by quantity (above): this rule
 is the shipment's alone.
 **A shipment pays where it leaves (Ben, 2026-11-07).** A shipment draws its Logistic Points at the
 market it leaves — its anchor, the source market's centre — and nowhere along the way; distance does

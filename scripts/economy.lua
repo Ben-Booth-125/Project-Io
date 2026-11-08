@@ -665,9 +665,12 @@ economy = {
     trade = {
         -- LOGISTICS.md § A shipment draws points again, "Points are drawn by value"
         -- (Ben, 2026-11-07): a shipment draws its cargo's authored base value over
-        -- this many credits, a Logistic Point each. 3.64 holds the median drawing
-        -- major's q20 draw on the baseline (623.4 base value / 171.4 units).
-        lp_value_per_point = 3.64,
+        -- this many credits, a Logistic Point each. Calibrated on the SUMMED draw
+        -- (Ben, 2026-11-08): all 64 majors' q20 shipments on the per-unit tree
+        -- (build_payback_census, 16 seeds, rulings 1+2+3) drew 3,909.4 points for
+        -- 3,909.4 units carrying 15,544.1 credits of base value; holding those
+        -- units, 15,544.1 / 3,909.4 = 3.976 draws the same 3,909 by value.
+        lp_value_per_point = 3.98,
         points = {
             planetary_marketplace = 20.0,
             port                  = 4.0,
