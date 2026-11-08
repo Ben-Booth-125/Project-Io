@@ -157,8 +157,8 @@ without reaching a shelf.
 2. **On a space leg, it buys the launch.** The trader must hold a Launchpad on the source body, and
    buys the launch's propellant off the same shelf (`PRODUCTION.md` § Launchpad). A cargo of
    propellant cannot burn itself: the launch's own draw comes off the shelf first.
-3. **It is capped by the place.** On an overland or sea leg the cargo draws **Logistic Points**,
-   one a unit, at its anchor — the source market's centre — from what the march and production
+3. **It is capped by the place.** On an overland or sea leg the cargo draws **Logistic Points**
+   by its base value ([LOGISTICS.md](LOGISTICS.md) § A shipment draws points again), at its anchor — the source market's centre — from what the march and production
    left in the pool of the nation whose ground that is ([LOGISTICS.md](LOGISTICS.md) § How a
    tile's points get to it): a cargo sized above what the anchor still admits this tick leaves at
    what it admits and pays that share of the leg's cost, rather than not leaving at all (Ben,

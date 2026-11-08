@@ -1209,6 +1209,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
             tp.marketplace_points = pts->get_or("planetary_marketplace", tp.marketplace_points);
             tp.port_points        = pts->get_or("port",                  tp.port_points);
         }
+        tp.lp_value_per_point = trade->get_or("lp_value_per_point", tp.lp_value_per_point);
+        if (!(std::isfinite(tp.lp_value_per_point) && tp.lp_value_per_point >= 0.0f))
+            throw std::runtime_error("recipe_registry: trade.lp_value_per_point must be finite and >= 0");
         if (!(std::isfinite(tp.marketplace_points) && tp.marketplace_points >= 0.0f)
             || !(std::isfinite(tp.port_points) && tp.port_points >= 0.0f))
             throw std::runtime_error("recipe_registry: trade.points must be finite and >= 0");

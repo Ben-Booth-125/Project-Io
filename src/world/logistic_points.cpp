@@ -774,10 +774,12 @@ std::size_t trader_pot(const world&, const lp_nation_row&, entity_id)
 } // namespace
 
 float lp_trade_admit(const world& w, const lp_tick& t, entity_id trader, entity_id market,
-                     float units)
+                     float units, float points_per_unit)
 {
     if (!std::isfinite(units) || !(units > 0.0f))
         return 0.0f;
+    if (!std::isfinite(points_per_unit) || !(points_per_unit > 0.0f))
+        points_per_unit = 1.0f;
     const auto ait = t.trade_anchors.find(market);
     if (ait == t.trade_anchors.end() || !(ait->second.cover > 0.0f))
         return 0.0f;
@@ -787,7 +789,7 @@ float lp_trade_admit(const world& w, const lp_tick& t, entity_id trader, entity_
     const lp_nation_row& r = t.nations[static_cast<std::size_t>(i)];
     const float pot   = r.left[trader_pot(w, r, trader)];
     const float share = units * std::min(1.0f, ait->second.cover);
-    const float admit = std::min(share, pot);
+    const float admit = std::min(share, pot / points_per_unit); // the units the pot pays for
     // The retired cap's crumb rule (BL-1186 E1): an anchor's last crumbs do not make a
     // convoy - nothing below one unit unless the cargo's covered share is itself
     // smaller (cold review: the uncovered cargo refused every sub-unit cargo at a
@@ -795,10 +797,14 @@ float lp_trade_admit(const world& w, const lp_tick& t, entity_id trader, entity_
     return (admit + 1e-6f >= std::min(share, 1.0f)) ? std::max(0.0f, admit) : 0.0f;
 }
 
-void lp_trade_draw(const world& w, lp_tick& t, entity_id trader, entity_id market, float units)
+void lp_trade_draw(const world& w, lp_tick& t, entity_id trader, entity_id market, float units,
+                   float points_per_unit)
 {
     if (!std::isfinite(units) || !(units > 0.0f))
         return;
+    if (!std::isfinite(points_per_unit) || !(points_per_unit > 0.0f))
+        points_per_unit = 1.0f;
+    const float points = units * points_per_unit;
     const auto ait = t.trade_anchors.find(market);
     if (ait == t.trade_anchors.end())
         return;
@@ -807,8 +813,8 @@ void lp_trade_draw(const world& w, lp_tick& t, entity_id trader, entity_id marke
         return;
     lp_nation_row& r = t.nations[static_cast<std::size_t>(i)];
     float& pot = r.left[trader_pot(w, r, trader)];
-    pot = std::max(0.0f, pot - units);
-    r.trade_drawn += units;
+    pot = std::max(0.0f, pot - points);
+    r.trade_drawn += points;
 }
 
 float lp_trade_left(const lp_tick& t, entity_id market)

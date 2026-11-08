@@ -663,6 +663,11 @@ economy = {
     --   and few of a dense product. Grid goods (power, construction capacity)
     --   are never cargo and carry none.
     trade = {
+        -- LOGISTICS.md § A shipment draws points again, "Points are drawn by value"
+        -- (Ben, 2026-11-07): a shipment draws its cargo's authored base value over
+        -- this many credits, a Logistic Point each. 3.64 holds the median drawing
+        -- major's q20 draw on the baseline (623.4 base value / 171.4 units).
+        lp_value_per_point = 3.64,
         points = {
             planetary_marketplace = 20.0,
             port                  = 4.0,

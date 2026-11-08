@@ -1050,7 +1050,14 @@ and unfed (`../military/MILITARY.md` § Carried supplies). The Logistics lens dr
 leg as a dashed line from that road tile to the unit (`../ui/LENSES.md` § Logistics lens).
 
 **A shipment draws points again (Ben, 2026-10-16).** The cap retired in BL-1309's cut is
-reinstated: a shipment draws **by cargo quantity**.
+reinstated: a shipment draws **by cargo value**.
+**Points are drawn by value (Ben, 2026-11-07).** A shipment's draw is its cargo's authored base
+value — units times the good's base price at the market it leaves — over one constant, the value a
+point carries (`economy.trade.lp_value_per_point` in data). A unit draw charged a cartload of coal
+eight times the points of the same credits of steel, so the cap fell hardest on the bulk raws trade
+exists to move. The constant is set so the median major that trades draws what it drew under the
+unit rule at the opening's fifth year. A unit's supplies still draw by quantity (above): this rule
+is the shipment's alone.
 **A shipment pays where it leaves (Ben, 2026-11-07).** A shipment draws its Logistic Points at the
 market it leaves — its anchor, the source market's centre — and nowhere along the way; distance does
 not enter the draw. This replaces the 2026-10-23 reading (NR-1060) that a shipment paid the points
@@ -1163,10 +1170,11 @@ Each rejected an earlier cut. Two are structural.
    cache happens to hold.
 3. **Specify the LP cost formula before the allocation sort key**, which is a function of it. If
    cost is proportional to distance, LP *is* haulage cost again; if flat, the sort degenerates.
-   **Settled (Ben, 2026-08-25): a convoy draw is its cargo quantity.** **A unit's draw is its
-   supplies' quantity (Ben, 2026-10-28, replacing "a march draw is its march points")**, so one rate
-   serves both and a unit of goods burdens an anchor equally whether it is freight or an army's
-   ration — the exchange rate kept as settled (Ben, 2026-10-23, NR-1049).
+   **A shipment's draw is its cargo's base value over the value a point carries (Ben, 2026-11-07,
+   replacing the 2026-08-25 cargo-quantity rule).** **A unit's draw is its supplies' quantity (Ben,
+   2026-10-28, replacing "a march draw is its march points")** — the exchange rate kept as settled
+   for supplies (Ben, 2026-10-23, NR-1049). Freight is charged by what it is worth, so a cheap bulk
+   raw does not pay a dense product's points for the same credits.
    **For a shipment, distance does not count (Ben, 2026-11-07):** it pays where it leaves
    (§ A shipment draws points again), so the draw is decided by what the cargo is, never by how far
    it goes.

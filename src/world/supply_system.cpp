@@ -1293,11 +1293,15 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     // (a fixture calling this directly) is resolved here first - a cache of this
     // tick's pool, not a change to the world.
     (void)src_body;
+    // BL-1549 (Ben, 2026-11-07): a unit costs its authored base value over the value a
+    // point carries; a world authoring no figure keeps one point a unit.
+    const float lp_value    = reg.trade().lp_value_per_point;
+    const float lp_per_unit = (lp_value > 0.0f && src.base_price[ri] > 0.0f) ? src.base_price[ri] / lp_value : 1.0f;
     if (leg.mode != convoy_mode::space)
     {
         if (!report.logistic_points.resolved)
             report.logistic_points = resolve_logistic_points(w);
-        send = lp_trade_admit(w, report.logistic_points, corp_id, src_market, send);
+        send = lp_trade_admit(w, report.logistic_points, corp_id, src_market, send, lp_per_unit);
         if (!(send > 0.0f))
         {
             if (out_refused_no_lp)
@@ -1324,7 +1328,7 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
 
     // Granted: the anchor's points are drawn (LP is the CAP, not a second PRICE).
     if (leg.mode != convoy_mode::space)
-        lp_trade_draw(w, report.logistic_points, corp_id, src_market, send);
+        lp_trade_draw(w, report.logistic_points, corp_id, src_market, send, lp_per_unit);
 
 
     // The purchase: off the shelf now, billed at the posted price by the clear

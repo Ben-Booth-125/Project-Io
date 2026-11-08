@@ -484,6 +484,11 @@ struct trade_params
     /// Trade points a completed Port makes per tick (Ben, 2026-10-10: "Ports
     /// make trade points too", at a lower rate). Flat: a Port staffs at zero.
     float port_points = 0.0f;
+    /// LOGISTICS.md § A shipment draws points again, "Points are drawn by value" (Ben,
+    /// 2026-11-07, BL-1549): the authored base value one Logistic Point carries. A
+    /// shipment's draw is its cargo's base value over this. 0 = the per-unit rule (one
+    /// point a unit), which a world authoring no figure keeps.
+    float lp_value_per_point = 0.0f;
 };
 
 /// BL-708 — what makes a good a GRID GOOD, as authored data.
