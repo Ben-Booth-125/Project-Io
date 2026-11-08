@@ -439,6 +439,7 @@ inline shipped_landscape apply_shipped_landscape(
             for (auto& [nid, nc] : w.nations)
                 if (nc.is_major)
                     nc.treasury = kit->treasury;
+            w.handoff_chest = kit->handoff_treasury; // finish_campaign_world's, verbatim
             release_kit_foundings(w, out.state); // finish_campaign_world's, verbatim
         }
         // BL-1439: finish_campaign_world's capital military bases, verbatim, right

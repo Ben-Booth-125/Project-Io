@@ -173,6 +173,20 @@ economy = {
                 hides  = { timber = 10.0 },
                 fibre  = { timber = 8.0  },
             },
+            -- THE CAMPS' OWN BILL (Ben, 2026-11-07; PRODUCTION.md § What construction costs at
+            -- the opening): added to a live build's scaled basket above. Their timber and stone
+            -- are too cheap for any scale to matter, so steel is what carries the curve to
+            -- them. About half a mine's: a camp is lighter than a shaft. Not on the settle's or
+            -- a founding's bill.
+            curve_materials = {
+                stone  = { steel = 42.0 },
+                timber = { steel = 42.0 },
+                sand   = { steel = 42.0 },
+                clay   = { steel = 42.0 },
+                peat   = { steel = 42.0 },
+                hides  = { steel = 42.0 },
+                fibre  = { steel = 42.0 },
+            },
         },
         processing_facility = {
             -- BL-744 (Ben, 2026-09-02): base_rate 8 -> 16 (ruled), halving the
@@ -649,6 +663,14 @@ economy = {
     --   and few of a dense product. Grid goods (power, construction capacity)
     --   are never cargo and carry none.
     trade = {
+        -- LOGISTICS.md § A shipment draws points again, "Points are drawn by value"
+        -- (Ben, 2026-11-07): a shipment draws its cargo's authored base value over
+        -- this many credits, a Logistic Point each. Calibrated on the SUMMED draw
+        -- (Ben, 2026-11-08): all 64 majors' q20 shipments on the per-unit tree
+        -- (build_payback_census, 16 seeds, rulings 1+2+3) drew 3,909.4 points for
+        -- 3,909.4 units carrying 15,544.1 credits of base value; holding those
+        -- units, 15,544.1 / 3,909.4 = 3.976 draws the same 3,909 by value.
+        lp_value_per_point = 3.98,
         points = {
             planetary_marketplace = 20.0,
             port                  = 4.0,
@@ -663,7 +685,9 @@ economy = {
             -- endemic goods
             tobacco = 8, spices = 8, coffee = 8, furs = 8,
             -- processed goods
-            charcoal = 6, iron_blooms = 1.6, trade_goods_misc = 5, steel = 2.5,
+            -- steel: six a point (Ben, 2026-11-07, BL-1546; TRADE.md § The capacity table),
+            -- set above the table's value line on purpose.
+            charcoal = 6, iron_blooms = 1.6, trade_goods_misc = 5, steel = 6,
             refined_fuel = 2.6, food_rations = 3, propellant = 0.6, silicon = 4,
             refined_copper = 3, ree_alloy = 1.6, clean_water = 5,
             medical_supplies = 2.9, ceramics = 6, dressed_stone = 6.5, planks = 5,
@@ -1988,6 +2012,14 @@ economy = {
     -- so a starved build takes up to max_stretch × its base duration, then stalls.
     construction = {
         max_stretch = 10.0, -- longest a starved build stretches to (×base duration); below 1/max_stretch it pauses.
+
+        -- THE OPENING COST CURVE (Ben, 2026-11-05 and 2026-11-07; PRODUCTION.md § What
+        -- construction costs at the opening): a mine costs about six months of a major's
+        -- net before research. What a LIVE build pays against the authored bills below;
+        -- the extra lives mostly in materials, so a planned steel chain is the edge.
+        -- Foundings stay on the authored bills: the curve never prices what ground opens with.
+        credit_cost_mult   = 2.0,
+        material_cost_mult = 4.75,
 
         -- BL-323 S2 — LOGISTICAL MAX BUILDING RANGE.
         -- The furthest a new building may sit from its nearest supply anchor (a

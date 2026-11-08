@@ -1293,11 +1293,15 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
     // (a fixture calling this directly) is resolved here first - a cache of this
     // tick's pool, not a change to the world.
     (void)src_body;
+    // BL-1549 (Ben, 2026-11-07): a unit costs its authored base value over the value a
+    // point carries; a world authoring no figure keeps one point a unit.
+    const float lp_value    = reg.trade().lp_value_per_point;
+    const float lp_per_unit = (lp_value > 0.0f && src.base_price[ri] > 0.0f) ? src.base_price[ri] / lp_value : 1.0f;
     if (leg.mode != convoy_mode::space)
     {
         if (!report.logistic_points.resolved)
             report.logistic_points = resolve_logistic_points(w);
-        send = lp_trade_admit(w, report.logistic_points, corp_id, src_market, send);
+        send = lp_trade_admit(w, report.logistic_points, corp_id, src_market, send, lp_per_unit);
         if (!(send > 0.0f))
         {
             if (out_refused_no_lp)
@@ -1324,7 +1328,7 @@ bool commit_trade_shipment(world& w, const recipe_registry& reg, economy_report&
 
     // Granted: the anchor's points are drawn (LP is the CAP, not a second PRICE).
     if (leg.mode != convoy_mode::space)
-        lp_trade_draw(w, report.logistic_points, corp_id, src_market, send);
+        lp_trade_draw(w, report.logistic_points, corp_id, src_market, send, lp_per_unit);
 
 
     // The purchase: off the shelf now, billed at the posted price by the clear
@@ -1466,44 +1470,29 @@ float dispatch_absorbable(const world& w, const recipe_registry& reg, entity_id 
     const float hi = base * reg.price_band().ceil_mult;
     if (aim < lo)
         return std::numeric_limits<float>::infinity();
-    if (aim >= hi || D <= 0.0f)
+    // A PRICED-OUT WANT SIZES ROOM (Ben, 2026-11-07, BL-1547; SUPPLY.md § A
+    // shipment). The suppressed want (`hauler_want`, W) is a buyer the fair-price
+    // ceiling silenced: a processor priced out still came for the input. It counts
+    // toward the room whenever the aim is under that buyer's ceiling — it will bid
+    // once a delivery brings the price there — including when it is the market's
+    // only want, so trade carries the input to a priced-out processor. BL-1203's aim
+    // stands: no cargo goes where nobody wants it, so with neither a posted bid nor
+    // a suppressed want the room is nothing. (This replaces the 2026-09-23 cold
+    // review's cap, which sized W off the first clear's posted bid and so gave a
+    // market whose only buyer was priced out no room at all.)
+    const float W        = dm.hauler_want[r];
+    const float res_mult = reg.price_band().reservation_mult;
+    const bool  w_counts = reg.hauler_room() && W > 0.0f && res_mult > 0.0f && aim <= base * res_mult;
+    if (aim >= hi || (D <= 0.0f && !w_counts))
         return 0.0f;
     // FIX 1 applies to the ZERO-SUPPLY case too: sending the whole unmet
     // demand into an empty market resolves its target to base x sqrt(D / D) =
     // base, below the aim whenever the landed cost is above base. S* is the
     // honest size there as well — S is simply 0.
     const float ratio  = base / aim;
-    float       s_star = D * ratio * ratio; // the W-silent size: target lands at the aim
-    // FIX 2 (cold review) — THE SUPPRESSED WANT (`hauler_want`, W) IS GATED ON
-    // THE PROJECTED POST-LANDING PRICE, NOT ON THE LANDED COST ALONE. Its buyers
-    // bid only once the POSTED price is under their ceiling, and a cargo sells
-    // at the clear of its arrival tick — while the posted price still stands
-    // where it stood and W is still silent. So W counts only (a) when the aim
-    // is under the buyers' ceiling (they will bid once a delivery has brought
-    // the price there) and (b) only up to the size whose FIRST clear, with W
-    // silent and the households bidding at the posted price (`demand` as it
-    // stands), still sells at or above the aim. That clear eases the posted
-    // price P toward its target by k_price_smoothing (resolve_price), so it
-    // sells at or above the aim while
-    //     target >= T* = P - (P - aim) / k_price_smoothing,
-    // i.e. supply <= demand x (base / T*)^2; a T* at or under the floor bounds
-    // nothing. This guards the cargo's own sale only: the main size above stays
-    // the TARGET-based one (the 2026-09-23 rule: never size off the eased price).
-    const float W        = dm.hauler_want[r];
-    const float res_mult = reg.price_band().reservation_mult;
-    if (reg.hauler_room() && W > 0.0f && res_mult > 0.0f && aim <= base * res_mult)
-    {
-        const float s_with = (D + W) * ratio * ratio;
-        const float P      = (dm.price[r] > 0.0f) ? dm.price[r] : base;
-        const float t_star = P - (P - aim) / k_price_smoothing;
-        float       cap    = std::numeric_limits<float>::infinity();
-        if (t_star > lo)
-        {
-            const float d_post = std::max(0.0f, dm.demand[r]);
-            cap = d_post * (base / t_star) * (base / t_star);
-        }
-        s_star = std::max(s_star, std::min(s_with, cap));
-    }
+    float       s_star = std::max(0.0f, D) * ratio * ratio; // the posted bid's size: target lands at the aim
+    if (w_counts)
+        s_star = std::max(s_star, (std::max(0.0f, D) + W) * ratio * ratio);
     return std::max(0.0f, s_star - std::max(0.0f, S));
 }
 

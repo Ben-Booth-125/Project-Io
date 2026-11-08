@@ -168,7 +168,7 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
     const site_option& c = sf.choice;
     const placement_gate gate = reg.placement_gate_for(c.type, c.recipe);
     const recipe* rc = (c.type == building_type::processing_facility) ? reg.get_recipe(c.recipe) : nullptr;
-    const float flat_cost = reg.economics(c.type).build_cost;
+    const float flat_cost = reg.live_build_credits(c.type);
 
     std::map<entity_id, std::string> market_names; // one name lookup per market
 

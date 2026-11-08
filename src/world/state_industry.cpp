@@ -2,7 +2,7 @@
 #include "recruits.hpp" // refund_muster_recruits
 
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability
-#include "construction.hpp"    // construct_state_building, construction_capex (the founding)
+#include "construction.hpp"    // construct_state_building, construction_founding_capex
 #include "input_reach.hpp"     // recipe_inputs_supplied (the founding is chain-feasible)
 #include "placement_rules.hpp" // is_water_tile
 #include "market_clearing.hpp" // market_for_tile
@@ -403,7 +403,7 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
                             continue; // pass 0 founds only where its own market feeds it
                         if (pass == 1 && !feasible)
                             continue; // pass 1 founds only where the chain runs
-                        const float price = construction_capex(w, reg, tile, building_type::processing_facility,
+                        const float price = construction_founding_capex(w, reg, tile, building_type::processing_facility,
                                                                resource_type::iron_ore, rid);
                         entity_id built = null_entity;
                         if (construct_state_building(w, reg, nid, tile, rid, built, /*founding=*/true)
@@ -504,7 +504,7 @@ state_handover_report hand_over_state_industry(world& w, const recipe_registry& 
             building_component& b = w.buildings.at(built);
             b.ticks_remaining       = 0; // founded standing, as every generation holding
             b.construction_progress = 0.0f;
-            const float price = construction_capex(w, reg, tile, building_type::port, resource_type::iron_ore);
+            const float price = construction_founding_capex(w, reg, tile, building_type::port, resource_type::iron_ore);
             const float paid  = std::min(std::max(0.0f, nc.treasury), price);
             nc.treasury        -= paid;
             b.construction_paid = paid;

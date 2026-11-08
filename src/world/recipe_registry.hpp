@@ -484,6 +484,11 @@ struct trade_params
     /// Trade points a completed Port makes per tick (Ben, 2026-10-10: "Ports
     /// make trade points too", at a lower rate). Flat: a Port staffs at zero.
     float port_points = 0.0f;
+    /// LOGISTICS.md § A shipment draws points again, "Points are drawn by value" (Ben,
+    /// 2026-11-07, BL-1549): the authored base value one Logistic Point carries. A
+    /// shipment's draw is its cargo's base value over this. 0 = the per-unit rule (one
+    /// point a unit), which a world authoring no figure keeps.
+    float lp_value_per_point = 0.0f;
 };
 
 /// BL-708 — what makes a good a GRID GOOD, as authored data.
@@ -703,6 +708,15 @@ struct endemic_demand_params
 struct construction_params
 {
     float max_stretch = 10.0f; ///< longest a material-starved build stretches to (×base duration); below 1/max_stretch it pauses.
+
+    /// THE OPENING COST CURVE (Ben, 2026-11-05; PRODUCTION.md § What construction costs at
+    /// the opening): what a live build pays against the authored rows. A building's authored
+    /// `build_cost` stays its book value and what a founding is priced at; `material_cost_mult`
+    /// is applied to every material row as it loads, so `resource_build_cost_for` is what a
+    /// live site draws (`authored_build_cost_for` keeps the row as authored). 1 in an unloaded
+    /// registry (a harness's hand-built economics).
+    float credit_cost_mult   = 1.0f;
+    float material_cost_mult = 1.0f;
 
     /// BL-323 S2: furthest a new building may sit from its nearest supply anchor,
     /// in `logistics.hpp`'s weighted cost units. Negative disables the rule.
@@ -1106,6 +1120,48 @@ public:
         return economics(type).resource_build_cost;
     }
 
+    /// The row as AUTHORED: what generation prices a founding at and what the settle's sites
+    /// draw (PRODUCTION.md § What construction costs at the opening). The live row where no
+    /// curve is loaded, so a harness's hand-built economics answer one bill.
+    const std::array<float, resource_count>&
+    authored_build_cost_for(building_type type, resource_type target, std::uint16_t recipe) const
+    {
+        if (!m_has_cost_curve)
+            return resource_build_cost_for(type, target, recipe);
+        if (type == building_type::extraction_site)
+        {
+            const auto it = m_authored_extraction_overrides.find(target);
+            if (it != m_authored_extraction_overrides.end())
+                return it->second;
+        }
+        else if (type == building_type::processing_facility)
+        {
+            const auto it = m_authored_processing_overrides.find(recipe);
+            if (it != m_authored_processing_overrides.end())
+                return it->second;
+        }
+        return m_authored_type_cost[static_cast<std::size_t>(type)];
+    }
+
+    /// True once a loaded table authored a cost curve.
+    bool has_cost_curve() const { return m_has_cost_curve; }
+
+    /// Puts THIS registry on the authored bills, credits and materials: the settle's prices
+    /// (`run_settle_tick`). The opening position is generation's, so the curve never reaches it.
+    /// In the header: the settle runs in the Lua-free world build.
+    void use_authored_costs()
+    {
+        if (!m_has_cost_curve)
+            return;
+        for (std::size_t t = 0; t < m_building_econ.size(); ++t)
+            m_building_econ[t].resource_build_cost = m_authored_type_cost[t];
+        m_extraction_material_overrides = m_authored_extraction_overrides;
+        m_processing_material_overrides = m_authored_processing_overrides;
+        m_construction.credit_cost_mult   = 1.0f;
+        m_construction.material_cost_mult = 1.0f;
+        m_has_cost_curve = false;
+    }
+
     /// BL-615: the stratum placement gate for a SPECIFIC named building — the
     /// type's authored gate, with a processing recipe's own
     /// `centre_proximity_radius` overriding the type's when non-zero. The same
@@ -1197,6 +1253,13 @@ public:
 
     /// BL-095 construction-gate tunables (economy.construction in Lua).
     const construction_params& construction() const { return m_construction; }
+
+    /// The flat credits a LIVE build pays, before the site multiplier. Not `build_cost`,
+    /// which is the authored figure: book value and a founding's price.
+    float live_build_credits(building_type type) const
+    {
+        return economics(type).build_cost * m_construction.credit_cost_mult;
+    }
 
     /// BL-332 capability-point accumulation rates (economy.military in Lua).
     const military_capability_params& military() const { return m_military; }
@@ -1745,6 +1808,11 @@ private:
     /// in either key.
     std::map<resource_type, std::array<float, resource_count>> m_extraction_material_overrides;
     std::map<std::uint16_t, std::array<float, resource_count>> m_processing_material_overrides;
+    /// The rows above before the cost curve (`authored_build_cost_for`), and each type's own.
+    std::map<resource_type, std::array<float, resource_count>> m_authored_extraction_overrides;
+    std::map<std::uint16_t, std::array<float, resource_count>> m_authored_processing_overrides;
+    std::array<std::array<float, resource_count>, building_type_count> m_authored_type_cost{};
+    bool m_has_cost_curve = false;
 
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;

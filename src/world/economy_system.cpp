@@ -1259,6 +1259,22 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
                    ? static_cast<float>(b.build_arrears_milli) / (1000.0f * static_cast<float>(q))
                    : 0.0f;
     };
+    // THE SETTLE'S DAYS ARE BILLED AT THE SETTLE'S PRICE (PRODUCTION.md § What construction
+    // costs at the opening: "a site still building at the handoff draws the live bill for the
+    // days it has left"). The first play tick draws, in arrears, the days the settle's last
+    // quarter built - days admitted, rated and claimed at the authored bill - so its owed
+    // row is the authored one; the quarter ahead, set this tick, is the first live quarter.
+    const bool owed_from_settle = w.current_econ_tick == k_campaign_settle_ticks;
+    auto owed_row = [&](const building_component& b, float duration) {
+        if (!owed_from_settle)
+            return row_for(b, duration, owed_share(b));
+        const auto& authored = reg.authored_build_cost_for(b.type, b.target_resource, b.recipe);
+        const float share = owed_share(b);
+        std::array<float, resource_count> row{};
+        for (std::size_t r = 0; r < resource_count; ++r)
+            row[r] = authored[r] / duration * share;
+        return row;
+    };
     // The quarter ahead (B's need): a quarter, or the days left in the last one.
     auto ahead_share = [&](const building_component& b) {
         return b.ticks_remaining > 0 ? construction_quarter_fraction(b.days_remaining) : 0.0f;
@@ -1442,7 +1458,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             if (!s.draws || b.build_arrears_milli <= 0)
                 continue;
             shelf_claimant c;
-            if (claimant_of(bid, s, row_for(b, s.duration, owed_share(b)), 0.0f, c))
+            if (claimant_of(bid, s, owed_row(b, s.duration), 0.0f, c))
                 claimants.push_back(c);
         }
         const shelf_ration_plan plan_a = plan_short_shelves(w, claimants);
@@ -1454,7 +1470,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             building_component& b = w.buildings.at(bid);
             if (!s.live || b.build_arrears_milli <= 0)
                 continue;
-            const std::array<float, resource_count> owed = row_for(b, s.duration, owed_share(b));
+            const std::array<float, resource_count> owed = owed_row(b, s.duration);
             owed_before.emplace(bid, owed);
             if (s.corp == null_entity || s.body == null_entity)
                 continue; // no owner to bill: the debt waits
@@ -1503,7 +1519,7 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
         const site_ref& s = refs.at(bid);
         if (b.build_arrears_milli <= 0 || s.mid == null_entity || s.duration <= 0.0f)
             continue;
-        const std::array<float, resource_count> owed = row_for(b, s.duration, owed_share(b));
+        const std::array<float, resource_count> owed = owed_row(b, s.duration);
         auto& h = held[s.mid];
         for (std::size_t r = 0; r < resource_count; ++r)
             if (owed[r] > 0.0f && admitted_at(s, r))
@@ -1686,7 +1702,7 @@ float construction_credit_cost(const recipe_registry& reg, const building_compon
     const float duration = reg.economics(b.type).build_duration_ticks;
     if (duration <= 0.0f || b.days_remaining <= 0)
         return 0.0f;
-    return reg.economics(b.type).build_cost * static_cast<float>(b.days_remaining)
+    return reg.live_build_credits(b.type) * static_cast<float>(b.days_remaining)
          / (duration * static_cast<float>(k_construction_quarter_days));
 }
 

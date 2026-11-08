@@ -617,15 +617,21 @@ exist — which is why `generate_population_centres` runs before `generate_natio
 
 ### Pass 7 — Starting treasury *(Ben, 2026-08-24; the source ruled BL-975, 2026-09-15)*
 
-**Every major starts play on the same credits (Ben, 2026-11-05; flat since Ben, 2026-11-02).** Every
-major's treasury is its kit's **one authored figure** (`CORPORATION_GENERATION.md` § A major's opening
-kit), in place of the chest its history folded. The figure holds **at the handoff, after the settle**:
-what the settle's ticks earned or spent does not carry into play, so an equal figure in the kit table
-is not enough on its own. The figure is the runway, about sixteen ticks of the kit's running bill and
-its army's wage, plus a **build fund of two to three buildings** at opening prices. Majors differ by
-ground, people and neighbours, not by their chests. **The opening cut does not run on a major**: its kit is sized to its chest by
-construction, so a major short of sixteen ticks of its bill is a defect in the kit table, not a nation
-to shrink. Everything below holds for every minor, and for every nation's chest *through* the
+**Every major starts play on 4,500 credits (Ben, 2026-11-07; the same credits since Ben, 2026-11-05;
+flat since Ben, 2026-11-02).** Ben: *"We can start with the same building kits, but we should start with
+much fewer opening credits."* The figure is a **build fund of two to three buildings** at opening prices
+(`../economy/PRODUCTION.md` § What construction costs at the opening), and nothing beyond it: a runway
+on top was offered and declined. The kit's own income carries its running bill from the first tick.
+
+**The figure is the kit's grant, set at the handoff, after the settle.** Whatever the settle's ticks left a
+major is replaced by the figure, and the difference is stated per major on the generation output. It is
+a grant in generation, not a flow of play: it stands outside the quarterly returns, and the first play
+return opens on the figure. The kit table's `treasury` only carries a major through the settle; its
+`handoff_treasury` is the figure.
+
+Majors differ by ground, people and neighbours, not by their chests. **The opening cut does not run on a
+major**: a kit is never shrunk to its chest, and a major's solvency is read by measurement
+(the `opening-parity` skill), with no floor or bailout behind it. Everything below holds for every minor, and for every nation's chest *through* the
 history: the spans still bank, tribute and fight with the chests as below. Only a major's figure at
 the handoff is replaced.
 

@@ -64,12 +64,26 @@ inline constexpr const char* k_campaign_settle_lap_names[k_campaign_settle_lap_c
 /// What one tick hands back to a caller that keeps presentation state: the
 /// app stores all three (the ledgers read the report, the Corporations panel
 /// the standings, the recorders the flows); a harness discards them.
+/// One major's line of the kit's grant at the handoff: what the settle left, what it became.
+struct handoff_grant
+{
+    entity_id nation = null_entity;
+    float     settle_close = 0.0f;
+    float     figure = 0.0f;
+    /// The settle's last nation-step debits and credits, moved through `settle_close` and
+    /// not yet on a return, which the grant drops so the first play return books none of them.
+    double    research_dropped = 0.0;
+    double    upkeep_dropped   = 0.0;
+    float     refunds_dropped  = 0.0f;
+};
+
 struct settle_tick_result
 {
     economy_report                                 report;
     std::unordered_map<entity_id, corp_cash_flow>  flows;
     std::vector<corp_standing>                     standings;
     trade_tick                                     trades; ///< BL-1266: this tick's trade pass
+    std::vector<handoff_grant>                     handoff_grants; ///< the settle's last step only
 };
 
 /// READ hooks into a tick. Neither may write the world.

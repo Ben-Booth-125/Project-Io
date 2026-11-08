@@ -63,6 +63,13 @@ float construction_capex(const world& w, const recipe_registry& reg, entity_id t
                          building_type type, resource_type target,
                          std::uint16_t recipe = no_recipe);
 
+/// What generation prices a FOUNDING at: the authored bill, without the live cost scales
+/// (PRODUCTION.md § What construction costs at the opening). The curve prices what a nation
+/// builds in play and never what its ground opens with.
+float construction_founding_capex(const world& w, const recipe_registry& reg, entity_id tile,
+                                  building_type type, resource_type target,
+                                  std::uint16_t recipe = no_recipe);
+
 /// Attempt to construct a building of `type` (targeting `target` for an extraction
 /// site) on `tile` for corporation `corp`, paying the registry build cost from the
 /// corporation's balance. The Layer 4 build front door (docs/ui/SELECTION.md, the

@@ -1011,6 +1011,74 @@ opening_kit_report lay_major_opening_kits(world& w, const recipe_registry& reg,
                 set_record(rm.slots[i], rec_outcome::unbuilt, "", why, null_entity);
         }
 
+        // e2. A MARKETPLACE ON THE MILL'S MARKET (Ben, 2026-11-07, BL-1545;
+        // CORPORATION_GENERATION.md § A major's opening kit). Every steel slot that
+        // stood a building names its market; a market none of the kit's Marketplaces
+        // already stands in gets one, on the free own tile in that market nearest the
+        // slot's building that admits it. One rule for every major; an unbuilt steel
+        // slot names no market. Trade points belong to the market a trade building
+        // stands in (TRADE.md), so this is what lets the mill's steel leave it.
+        {
+            std::set<entity_id> held; // markets a kit Marketplace already stands in
+            for (const entity_id c : mk.civic)
+                if (const auto ci = w.buildings.find(c);
+                    ci != w.buildings.end() && ci->second.type == building_type::planetary_marketplace)
+                    if (const entity_id cm = market_for_tile(w, ci->second.tile); cm != null_entity)
+                        held.insert(cm);
+            for (std::size_t i = 0; i < kit.slots.size(); ++i)
+            {
+                const opening_kit_slot& s = kit.slots[i];
+                if (s.category != kit_slot_category::processing || s.good != resource_type::steel)
+                    continue;
+                const auto bi = w.buildings.find(rm.slots[i].building);
+                if (bi == w.buildings.end())
+                {
+                    ++rm.mill_marketplace_no_slot;
+                    continue;
+                }
+                const entity_id m = market_for_tile(w, bi->second.tile);
+                if (m == null_entity)
+                {
+                    ++rm.mill_marketplace_no_site;
+                    continue;
+                }
+                if (held.count(m) != 0)
+                {
+                    ++rm.mill_marketplace_held;
+                    continue;
+                }
+                if (!L.reg.building_available(building_type::planetary_marketplace))
+                {
+                    ++rm.mill_marketplace_no_site;
+                    continue;
+                }
+                const placement_gate gate = L.reg.placement_gate_for(building_type::planetary_marketplace, no_recipe);
+                entity_id placed = null_entity;
+                for (const entity_id tid : tiles_nearest(L.w, mk.g, bi->second.tile))
+                {
+                    if (market_for_tile(w, tid) != m)
+                        continue;
+                    const tile_component& tc = L.w.tiles.at(tid);
+                    if (!L.occ.has_room(tc, tid, building_type::planetary_marketplace, k_no_target))
+                        continue;
+                    if (!placement_rules::can_place_in_world(L.w, tid, building_type::planetary_marketplace,
+                                                             k_no_target, -1.0f, null_entity, gate))
+                        continue;
+                    placed = author_building(L.w, tid, building_type::planetary_marketplace, L.occ);
+                    break;
+                }
+                if (placed == null_entity)
+                {
+                    ++rm.mill_marketplace_no_site;
+                    continue;
+                }
+                own_it(L.w, mk, placed);
+                mk.civic.push_back(placed);
+                held.insert(m);
+                ++rm.mill_marketplace_placed;
+            }
+        }
+
         // f. The opening stock.
         shelve_stock(w, mk.extractors, industrial_focus::extraction);
         shelve_stock(w, mk.processors, industrial_focus::processing);
@@ -1046,6 +1114,9 @@ void print_opening_kit(const opening_kit_report& r)
                     static_cast<unsigned long long>(m.nation), m.taken_up, m.placed, m.substituted,
                     m.unbuilt, m.proc_built, m.refused_no_site, m.refused_not_wanted,
                     m.refused_no_feed, m.refused_not_sized);
+        std::printf("; mill Marketplace: laid %d, market held %d, slot unbuilt %d, no site %d",
+                    m.mill_marketplace_placed, m.mill_marketplace_held, m.mill_marketplace_no_slot,
+                    m.mill_marketplace_no_site);
         for (const opening_kit_slot_record& s : m.slots)
         {
             if (s.result == opening_kit_slot_record::outcome::substituted)

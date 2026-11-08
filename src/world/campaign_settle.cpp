@@ -18,11 +18,23 @@
 
 #include <algorithm> // std::sort (BL-1321 readings)
 #include <atomic>
+#include <optional>
 
-settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int econ_step,
+settle_tick_result run_settle_tick(world& w, const recipe_registry& live_reg, int econ_step,
                                    int day_tick, bool spectating,
                                    const settle_tick_hooks* hooks)
 {
+    // THE SETTLE IS GENERATION'S (Ben, 2026-11-07: raising prices must not change what a major
+    // opens with; PRODUCTION.md § What construction costs at the opening). Its ticks build at the
+    // authored bills, so the opening position is what it would be with no cost curve at all.
+    std::optional<recipe_registry> settle_reg;
+    if (econ_step < k_campaign_settle_ticks && live_reg.has_cost_curve())
+    {
+        settle_reg.emplace(live_reg);
+        settle_reg->use_authored_costs();
+    }
+    const recipe_registry& reg = settle_reg ? *settle_reg : live_reg;
+
     using clk = std::chrono::steady_clock;
     const auto stamp = [&](int i) {
         if (hooks != nullptr && hooks->lap_clock != nullptr)
@@ -156,6 +168,39 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // province, from the posts just chosen.
     if (econ_step == k_campaign_settle_ticks - 1)
         (void)open_capital_defence(w);
+    // THE KIT'S GRANT (Ben, 2026-11-05; NATION_GENERATION.md § Pass 7): every major starts play
+    // on the same credits, so the settle's spread does not carry. Whatever the twelve ticks left
+    // is replaced by the kit's figure, here, after the last return is filed: the grant stands
+    // outside the returns, and the first play return opens on the figure. Stated per major.
+    if (econ_step == k_campaign_settle_ticks - 1 && w.handoff_chest >= 0.0f)
+    {
+        std::vector<entity_id> majors;
+        for (const auto& [nid, nc] : w.nations)
+            if (nc.is_major)
+                majors.push_back(nid);
+        std::sort(majors.begin(), majors.end());
+        for (const entity_id nid : majors)
+        {
+            nation_component& nc = w.nations.at(nid);
+            out.handoff_grants.push_back({nid, nc.treasury, w.handoff_chest, nc.research_unbooked,
+                                          nc.upkeep_unbooked, nc.refund_unbooked});
+            std::printf("[opening_kit] handoff grant: major %llu closed the settle on %.1f, starts play on %.1f (grant %+.1f)\n",
+                        static_cast<unsigned long long>(nid), static_cast<double>(nc.treasury),
+                        static_cast<double>(w.handoff_chest),
+                        static_cast<double>(w.handoff_chest) - static_cast<double>(nc.treasury));
+            nc.treasury = w.handoff_chest;
+            // The settle's last tick paid research and garrison wage (and took any refund) in
+            // its nation step, AFTER its return was filed, so `apply_budget` would book them on
+            // the first play return against the granted figure, which never held them, and that
+            // return's net would not be its treasury less the figure. The grant replaces the
+            // balance they moved, so they go with it (recorded on the grant line above).
+            nc.research_unbooked = 0.0;
+            nc.upkeep_unbooked   = 0.0;
+            nc.refund_unbooked   = 0.0f;
+            nc.refund_opening    = 0.0f;
+        }
+        w.handoff_chest = -1.0f;
+    }
     // The settle ends here: from the handoff every nation spends its whole treasury again.
     if (econ_step == k_campaign_settle_ticks - 1)
     {

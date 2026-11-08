@@ -154,6 +154,12 @@ Each resource's trade capacity is authored in data. The first table is proposed 
 values set, read on the market-viability gate across the curated seeds, and put to Ben for
 approval (Ben, 2026-10-10). No value is final until he has approved it.
 
+**Steel moves six a point (Ben, 2026-11-07).** Steel's trade capacity is six units a point. The
+table otherwise holds roughly one value per point (a point of coal and a point of steel each moved
+about forty credits of base value), and steel is set above that line on purpose: it is the good
+construction buys most, a market without a mill wants it by the hundred a quarter, and at the
+table's own line a whole Marketplace's points moved only a fraction of that.
+
 ## What trade replaces
 
 The owner's convoy (a pool hauling its own surplus), the market export (a market shipping

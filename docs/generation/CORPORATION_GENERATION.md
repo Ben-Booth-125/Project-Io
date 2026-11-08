@@ -407,7 +407,8 @@ The kit in play (`rich_core`) carries agricultural produce ×9, water, coal, pet
 iron ore ×2, copper ore ×3, silica ×5 and two flex slots (24); the Standard processors plus ordnance,
 a second food and steel line and silicon (10); `planetary_marketplace`, `research_institute` ×2,
 `schooling` and `university` (5); the same logistics and military slots: forty-four buildings and
-the source, about 460 credits a tick, and the one treasury figure every major starts play on.
+the source, and a Marketplace on each steel slot's market that lacks one (below), about 460 credits a tick, and the one treasury figure every major starts play on: 4,500
+credits (`NATION_GENERATION.md` § Pass 7).
 
 **Why these processors.** Each one runs on day one, which the hard rules of § Pass 3 require. The
 steel, copper and machinery slots are one chain: iron ore and coal make steel, copper ore makes
@@ -466,6 +467,16 @@ moved processor reads its feed where it now stands. A building no covered tile t
 stood, and the generation report counts it. Roads and track
 stay as the history left them.
 
+**A Marketplace on the mill's market (Ben, 2026-11-07).** Every steel slot that stands a building
+names the market its building stands in, and a market none of the kit's Planetary Marketplaces
+already stands in gets one more. It goes on the free own tile in that market nearest the slot's
+building that admits it. Trade points belong to the market a trade building stands in
+(`../economy/TRADE.md` § The Planetary Marketplace), so without it a mill's steel cannot leave its
+own market, however dear it is elsewhere. The rule is the same for every major; what it lays
+differs only by ground. A steel slot that stood nothing names no market, a market already holding
+the kit's Marketplace gets no second one, and a market with no admitting tile gets none. The
+generation report counts each case per major.
+
 **Opening stock follows the kit.** § Pass 4b's stock is generated once per kit category (extraction
 weights for the extraction slots, processing weights for the processing slots) and placed on the
 shelves of the markets the kit stands in. **The kit also stocks its processors' inputs (Ben,
@@ -476,8 +487,11 @@ buyer.
 
 **The kit opens with its own treasury and army.** The flat treasury is `NATION_GENERATION.md`
 § Pass 7's, and the fixed army is `../military/MILITARY.md` § Nation garrisons'. The settle then runs as
-it does for every nation, and every major still starts play on the same credits (Ben, 2026-11-05):
-the treasury is equal at the handoff, where the rest of parity is measured.
+it does for every nation, on a chest the table authors for it, and at the handoff every major is set to
+the same credits (Ben, 2026-11-05): the treasury is equal there, where the rest of parity is measured.
+**Construction prices never shrink a kit (Ben, 2026-11-07):** the kit is not bought, and foundings and
+the settle's sites stay on the authored bills (`../economy/PRODUCTION.md` § What construction costs at
+the opening).
 
 **The kit is data.** Its slots, counts, treasury and army are one authored table, so a configuration
 under test is an edit, not a code change. Standard (27 buildings) is the comparison point Rich-core

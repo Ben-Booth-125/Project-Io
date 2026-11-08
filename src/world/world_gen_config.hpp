@@ -127,7 +127,10 @@ struct opening_kit_slot
 struct opening_kit_config
 {
     std::string                   name;
-    float                         treasury = 0.0f; ///< every major's opening treasury (credits)
+    float                         treasury = 0.0f; ///< every major's chest through the SETTLE (credits)
+    /// Every major's treasury AT THE HANDOFF, set after the settle as the kit's grant
+    /// (NATION_GENERATION.md § Pass 7). Negative (the default): the settle's close stands.
+    float                         handoff_treasury = -1.0f;
     std::vector<opening_kit_slot> slots;           ///< extraction, then processing, then civic
     /// The logistics slots (Ben, 2026-11-03: "the count is a cap"), beside the
     /// capital's source: the nodes a major keeps after the Logistic Point seeding.

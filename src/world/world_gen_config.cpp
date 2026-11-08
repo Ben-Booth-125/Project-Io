@@ -154,7 +154,7 @@ void world_gen_config::load_from_lua(lua_state& lua)
                     }
                 };
                 const std::string where = "world_gen.opening_kit.configs." + kit;
-                keys_in(t, { "treasury", "logistics", "extraction", "processing", "civic", "army" }, where);
+                keys_in(t, { "treasury", "handoff_treasury", "logistics", "extraction", "processing", "civic", "army" }, where);
                 opening_kit_config c;
                 c.name = kit;
                 {
@@ -165,6 +165,15 @@ void world_gen_config::load_from_lua(lua_state& lua)
                 }
                 if (!(c.treasury >= 0.0f))
                     throw std::runtime_error("world_gen.opening_kit." + kit + ".treasury must be >= 0");
+                {
+                    const sol::object ht = t["handoff_treasury"];
+                    if (ht.valid())
+                    {
+                        if (ht.get_type() != sol::type::number || !(ht.as<float>() >= 0.0f))
+                            throw std::runtime_error(where + ".handoff_treasury must be credits >= 0");
+                        c.handoff_treasury = ht.as<float>();
+                    }
+                }
                 if (sol::optional<sol::table> ex = t["extraction"]) list_only(*ex, where + ".extraction");
                 if (sol::optional<sol::table> pr = t["processing"]) list_only(*pr, where + ".processing");
                 if (sol::optional<sol::table> cv = t["civic"])      list_only(*cv, where + ".civic");

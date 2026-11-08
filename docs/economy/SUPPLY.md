@@ -157,14 +157,14 @@ without reaching a shelf.
 2. **On a space leg, it buys the launch.** The trader must hold a Launchpad on the source body, and
    buys the launch's propellant off the same shelf (`PRODUCTION.md` § Launchpad). A cargo of
    propellant cannot burn itself: the launch's own draw comes off the shelf first.
-3. **It is capped by the place.** On an overland or sea leg the cargo draws **Logistic Points**,
-   one a unit, at its anchor — the source market's centre — from what the march and production
+3. **It is capped by the place.** On an overland or sea leg the cargo draws **Logistic Points**
+   by its base value ([LOGISTICS.md](LOGISTICS.md) § A shipment draws points again), at its anchor — the source market's centre — from what the march and production
    left in the pool of the nation whose ground that is ([LOGISTICS.md](LOGISTICS.md) § How a
    tile's points get to it): a cargo sized above what the anchor still admits this tick leaves at
    what it admits and pays that share of the leg's cost, rather than not leaving at all (Ben,
-   2026-10-05, NR-969). The draw covers **the whole route** to the market it trades with, not the
-   anchor alone (Ben, 2026-10-23, NR-1060; [LOGISTICS.md](LOGISTICS.md) § A shipment draws points
-   again). Trade points are the owner's capacity; Logistic Points are the place's; a
+   2026-10-05, NR-969). The draw is taken at the anchor alone, never along the route (Ben,
+   2026-11-07; [LOGISTICS.md](LOGISTICS.md) § A shipment draws points again). Trade points are the
+   owner's capacity; Logistic Points are the place's; a
    shipment passes both (`TRADE.md` § The Planetary Marketplace).
 4. **It pays the haul now.** The trading nation's treasury is charged the leg's cost when the shipment
    leaves (§ Logistical cost). A trader that cannot cover the haul and the purchase ships nothing.
@@ -178,6 +178,20 @@ a shelf or anchor that admits nothing, or a trader who cannot pay leaves nothing
 **The trader keeps the margin and pays the haul** (`TRADE.md` § A trade): the destination's
 clearing price on landing, less the source's posted price, less the haul. A margin is not
 guaranteed by sending: the landing moves the destination's price it is sold at.
+
+**A shipment is sized to what its destination wants.** A route ships no more than the destination
+can take at the landed cost plus the dispatch margin: the supply at which the destination's price
+target falls to that figure, less what it already lists and what is already on its way there
+(`trade_room`). A destination nobody wants the good at takes nothing.
+**A priced-out want sizes room (Ben, 2026-11-07).** A buyer the fair-price ceiling silenced — a
+processor priced out of its input this tick, or a site priced out of its materials — still came for
+it, and its want, held off the price in the hauler-only register (`MARKETS.md`, the shelf's share
+reads the want the ceiling silenced), counts toward the room whenever the
+landed cost plus the margin is under that buyer's ceiling. It counts when it is the destination's
+only want, so trade carries the input to a priced-out processor rather than waiting for the price to
+ease without it. The aim is unchanged: no cargo goes where nobody wants it, posted or silenced.
+The silenced buyer's want is not a bid, so a cargo sent to a priced-out buyer can sell below its
+landed cost at its first clear.
 
 **`hold_convoy` stops a convoy; nothing cancels one.** Cargo leaves the source shelf when the
 shipment leaves, so a cancel would have to invent a return leg or mint the goods back at the

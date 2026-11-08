@@ -534,6 +534,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
     {
         construction_params cp;
         cp.max_stretch = construction->get_or("max_stretch", cp.max_stretch);
+        cp.credit_cost_mult = construction->get_or("credit_cost_mult", cp.credit_cost_mult);
+        cp.material_cost_mult = construction->get_or("material_cost_mult", cp.material_cost_mult);
+        if (!(cp.credit_cost_mult > 0.0f) || !(cp.material_cost_mult > 0.0f))
+            throw std::runtime_error("economy.construction cost multipliers must be > 0");
+        m_has_cost_curve = cp.credit_cost_mult != 1.0f || cp.material_cost_mult != 1.0f;
         cp.max_logistics_reach = construction->get_or("max_logistics_reach", cp.max_logistics_reach);
         cp.site_time_reach_scale = construction->get_or("site_time_reach_scale", cp.site_time_reach_scale);
         cp.site_time_stack_discount = construction->get_or("site_time_stack_discount", cp.site_time_stack_discount);
@@ -597,8 +602,12 @@ void recipe_registry::load_from_lua(lua_state& lua)
             // Optional resource material cost (BL-044).
             sol::optional<sol::table> rcosts = (*b)["resource_costs"];
             if (rcosts)
+            {
                 read_resource_map(*rcosts, e.resource_build_cost,
                                   std::string("buildings.") + nt.key + ".resource_costs");
+                m_authored_type_cost[static_cast<std::size_t>(nt.type)] = e.resource_build_cost;
+                for (float& v : e.resource_build_cost) v *= m_construction.material_cost_mult;
+            }
             e.era = read_era(*b, std::string("buildings.") + nt.key); // BL-433
 
             // BL-615 stratum placement gate (POPULATION.md § Strata gate
@@ -641,7 +650,39 @@ void recipe_registry::load_from_lua(lua_state& lua)
                     std::array<float, resource_count> cost{};
                     read_resource_map(entry, cost,
                                       "buildings.extraction_site.material_overrides." + key);
+                    m_authored_extraction_overrides[target] = cost;
+                    for (float& v : cost) v *= m_construction.material_cost_mult;
                     m_extraction_material_overrides[target] = cost;
+                }
+            }
+            // The curve's own materials (Ben, 2026-11-07), added to a target's live bill: what
+            // reaches the camps, whose authored baskets are too cheap for any scale to matter.
+            if (sol::optional<sol::table> extra = (*b)["curve_materials"]; extra && nt.type == building_type::extraction_site)
+            {
+                for (const auto& kv : *extra)
+                {
+                    const std::string key = kv.first.as<std::string>();
+                    bool ok = false;
+                    const resource_type target = resource_names::resource_from_name(key, ok);
+                    if (!ok)
+                        throw std::runtime_error("recipe_registry: buildings.extraction_site."
+                                                 "curve_materials has an unknown target '" + key + "'");
+                    sol::table entry = kv.second.as<sol::table>();
+                    std::array<float, resource_count> add{};
+                    read_resource_map(entry, add, "buildings.extraction_site.curve_materials." + key);
+                    const auto it = m_extraction_material_overrides.find(target);
+                    if (it == m_extraction_material_overrides.end())
+                        throw std::runtime_error("recipe_registry: curve_materials." + key
+                                                 + " names a target with no material override");
+                    for (std::size_t r = 0; r < resource_count; ++r)
+                    {
+                        it->second[r] += add[r];
+                        // The curve's materials are a curve on their own: with both
+                        // multipliers at 1 the live row still differs from the authored
+                        // one, so the settle must be put back on the authored bill.
+                        if (add[r] != 0.0f)
+                            m_has_cost_curve = true;
+                    }
                 }
             }
             else if (overrides && nt.type == building_type::processing_facility)
@@ -658,6 +699,8 @@ void recipe_registry::load_from_lua(lua_state& lua)
                     std::array<float, resource_count> cost{};
                     read_resource_map(entry, cost,
                                       "buildings.processing_facility.material_overrides." + key);
+                    m_authored_processing_overrides[rid] = cost;
+                    for (float& v : cost) v *= m_construction.material_cost_mult;
                     m_processing_material_overrides[rid] = cost;
                 }
             }
@@ -1173,6 +1216,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
             tp.marketplace_points = pts->get_or("planetary_marketplace", tp.marketplace_points);
             tp.port_points        = pts->get_or("port",                  tp.port_points);
         }
+        tp.lp_value_per_point = trade->get_or("lp_value_per_point", tp.lp_value_per_point);
+        if (!(std::isfinite(tp.lp_value_per_point) && tp.lp_value_per_point >= 0.0f))
+            throw std::runtime_error("recipe_registry: trade.lp_value_per_point must be finite and >= 0");
         if (!(std::isfinite(tp.marketplace_points) && tp.marketplace_points >= 0.0f)
             || !(std::isfinite(tp.port_points) && tp.port_points >= 0.0f))
             throw std::runtime_error("recipe_registry: trade.points must be finite and >= 0");

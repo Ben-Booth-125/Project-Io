@@ -276,12 +276,18 @@ struct lp_tick
 /// any request); the trader's pot of what production left caps the rest. Never refused
 /// whole: it returns what is admitted, 0 only when nothing is - and, as the retired cap
 /// did, never a crumb below one unit unless the cargo's covered share is smaller. Pure.
+///
+/// BL-1549 (LOGISTICS.md § A shipment draws points again, "Points are drawn by value",
+/// Ben 2026-11-07): each unit costs @p points_per_unit points - its authored base value
+/// over `trade_params::lp_value_per_point`; 1 is the per-unit rule.
 float lp_trade_admit(const world& w, const lp_tick& t, entity_id trader, entity_id market,
-                     float units);
+                     float units, float points_per_unit = 1.0f);
 
-/// BL-1361: draw @p units points for a shipment @p trader sent from @p market, from
-/// the pot `lp_trade_admit` read. Call only with what it admitted.
-void lp_trade_draw(const world& w, lp_tick& t, entity_id trader, entity_id market, float units);
+/// BL-1361: draw @p units of cargo, at @p points_per_unit points each (BL-1549), for a
+/// shipment @p trader sent from @p market, from the pot `lp_trade_admit` read. Call
+/// only with what it admitted.
+void lp_trade_draw(const world& w, lp_tick& t, entity_id trader, entity_id market, float units,
+                   float points_per_unit = 1.0f);
 
 /// BL-1361: the points still left at @p market's anchor - its nation's pots together,
 /// 0 where the anchor has no cover or no nation. What `market_component::
