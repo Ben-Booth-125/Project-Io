@@ -866,7 +866,7 @@ the screen, rather than floating with the cursor."* The band is:
   player's nation exists before the first frame, so there is no bootstrap gap.
 - **Esc ends at the escape menu (Ben, 2026-11-05).** Esc closes **Menu, then Ledger, then
   Selection**. Its ladder is: exit warning → close the escape menu → back out of a declaration → pop
-  a drill level → fold overlay → close the ledger → clear the Selection to the resting nation → open
+  a drill level → fold overlay → disarm an armed tool → close the ledger → clear the Selection to the resting nation → open
   the escape menu. The escape menu is the pause screen (`MENU.md`).
 
 **Click-through.** The band draws as an ordinary ImGui window over the canvas; ImGui's

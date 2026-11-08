@@ -43,6 +43,8 @@ A convoy is a world ECS component. Each active convoy carries:
 | `held` | bool | While true `advance_convoys` skips the convoy: stopped, not slowed |
 | `cost_paid` | credits | What the haul was charged when the shipment left; read by the Convoys tab |
 | `origin_tile`, `port_a`, `port_b` | tile entities | An intra-body route's waypoints, fixed when the shipment leaves (the leg paths between them are not): the source market's centre, and the loading and unloading Ports of a route with a sea leg (none on a single overland leg). They make the lane the route the haul was priced on (§ Logistical cost) |
+| `station_a`, `station_b` | tile entities | The boarding and alighting railway stations of a road → rail → road route, fixed when the shipment leaves like the Ports; none on any other route |
+| `lane_head` | tile entity | Where the cargo is when its owner is at war, so the convoy can re-route when the lane under it re-solves; empty otherwise |
 
 The coupling is **market-to-market**, not body-to-body. A convoy is created only by a trade's
 shipment (`commit_trade_shipment`, the one place a convoy is made): the trade buys the cargo off
@@ -64,7 +66,7 @@ are committed — the trader has bought them, and the source shelf shrinks immed
 
 **Trade-route recording** (BL-088, persistent trade routes). Before retiring an arrived convoy, `credit_arrived_convoys` (`src/world/supply_system.cpp`) also upserts a persistent `trade_route` into `world.trade_routes` — keyed on the unordered `(body_a, body_b)` pair + `corp`, with `last_tick` set to the completion Tick and `convoy_count` incremented. Intra-body lanes (source and destination collapse to the same body) are excluded — they light nothing. A route is never erased once recorded; staleness is a **read-time** concern owned by the activity fog, not a write-time one here. See `docs/ui/DISCOVERY.md` (BL-089, activity fog) for the fog that reads this substrate.
 
-**Convoys are outside `world::state_hash`.** Their determinism check is `tools/verify/convoy_command.cpp` R5 (identical convoy sets across two runs) rather than the hash; folding them in would move the byte-identity baseline `spectator_determinism.cpp` pins.
+**Convoys are outside `world::state_hash`, save two sparse folds.** A convoy on a rail route folds its `id`, `station_a` and `station_b`, only in a world that carries track; a convoy holding a `lane_head` (its owner is at war) folds its `id` and that tile. Each is sparse so that a world without rail or war hashes as if the field did not exist. Everything else about a convoy is checked by `tools/verify/convoy_command.cpp` R5 (identical convoy sets across two runs) rather than the hash; folding it in would move the byte-identity baseline `spectator_determinism.cpp` pins.
 
 ---
 

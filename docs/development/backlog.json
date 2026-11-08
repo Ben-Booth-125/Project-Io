@@ -927,7 +927,7 @@
    "design": "Playtest item 19. Ruling (Ben, 2026-11-05) in the authority doc. stamp_trees (ground_bake.cpp:1011), canopy at :1164-1169. A cone coverage primitive, NW-lit, for forest; scrub stays round by default. Check margin (:1068) and tree_patch_boxes bound the taller crown, or chunks seam. Do after TILE_RES_96 so the shape is judged at its real resolution. Check: P8, live look."
   },
   {
-   "status": "proposed",
+   "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
    "version_goal": null,
@@ -953,7 +953,7 @@
     "src/world/logistics.hpp"
    ],
    "title": "Doc-versus-code drift found reading the playtest list",
-   "design": "Found 2026-11-05, read not run: ACTIONS chrome.esc lists sticky-card rungs the code lacks; LAYOUT:150 calls Diplomacy reserved; MENU:156-160 places own buildings on the dashboard, code uses Construction; MENU:218 says no in-session save, F5 exists; corporation.md:36-38 a Force segment never filled; market.md:151 read 3 versus rank_trade_routes; SUPPLY:67 says convoys are outside state_hash but rail waypoints are folded (world.cpp:235-241); SUPPLY's table omits station_a and station_b; logistics.hpp:483 stale; AI_OPPONENT:2379 province versus MILITARY:549 tile for push; SELECTION:506 water no-op versus march_check. Reconcile each; skip any the rulings already fixed."
+   "design": "Found 2026-11-05, read not run: ACTIONS chrome.esc lists sticky-card rungs the code lacks; LAYOUT:150 calls Diplomacy reserved; MENU:156-160 places own buildings on the dashboard, code uses Construction; MENU:218 says no in-session save, F5 exists; corporation.md:36-38 a Force segment never filled; market.md:151 read 3 versus rank_trade_routes; SUPPLY:67 says convoys are outside state_hash but rail waypoints are folded (world.cpp:235-241); SUPPLY's table omits station_a and station_b; logistics.hpp:483 stale; AI_OPPONENT:2379 province versus MILITARY:549 tile for push; SELECTION:506 water no-op versus march_check. Reconcile each; skip any the rulings already fixed. Reconciled 2026-11-08: stale doc entries corrected, the rest found already fixed. logistics.hpp:483 could not be identified as stale (the econ_tick_days_world mirror reads 90 days, correct). Two entries are calls, NR-1152."
   },
   {
    "status": "in_progress",

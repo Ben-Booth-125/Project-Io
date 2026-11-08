@@ -2377,7 +2377,7 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **Fronts move the player's assigned units — granted (Ben, 2026-10-26; `../military/MILITARY.md`
   § Fronts).** A new subject on the player's own nation: units **the player assigns** to a front are
   spread along its border tiles, refill gaps, fall back on retreat, and under a **push** order advance
-  into the weakest enemy province — every move a legal `march_unit`. **Not admitted:** any
+  onto the weakest adjacent enemy tile — every move a legal `march_unit`. **Not admitted:** any
   unit the player did not assign, save one it ordered to defend a province (the defend-province
   grant below); choosing a front, an order, a war or a target for the player's
   nation; a campaign planned beyond the next move. Pure, seeded, deterministic, replayable, legal

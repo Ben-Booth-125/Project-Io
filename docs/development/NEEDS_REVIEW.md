@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*31 entries — 30 open, 1 resolved.*
+*32 entries — 31 open, 1 resolved.*
 
 ---
 
@@ -325,6 +325,13 @@ CLOCK: rivals score fronts once a year, while a unit with no supply dies near da
 Measured on the merged lane, 16 seeds, 64 majors, 80 quarters: the reference mine costs 5.2 months of net at the opening and 3.9 at year 20; 10 of 64 majors reach 1 month; median 4 buildings completed by year 20; 7 majors never build; 1 below zero by q80. The target of about 1 month at year 20 is not met. Calls taken: the Logistic Point constant 3.98 was calibrated on the summed q20 draw (the median major draws 0); the dead corporation-era Marketplace estimate in corp_ai.cpp was converted to points, not deleted; settle-day construction arrears bill at the authored row. Late trade fell 17% and late stranded coal rose 8.0 -> 14.3 after the review fixes, cause untraced. The kit Marketplace laid a new building for only 4 majors.
 
 **Why it matters.** The climb is the sprint's top item and lands at about a third of the target pace.
+
+### NR-1152 — Doc drift: two claims the code cannot settle
+*question · raised 2026-11-08 · from BL-1525 (playtest doc drift)*
+
+WATER: SELECTION.md and resolve_unit_order ignore every water tile on a right-click, but march_check accepts a land unit onto its own coastal water, naval types exist, and MILITARY.md says the owned-coast rule stands for marches. So a right-click can never order a march the verb allows. COMPETITION: MENU.md says competitors' buildings appear in the Market Ledger; the ledger only uses buildings to list which nations are present (nations_in_market), and ledgers/market.md has no such surface.
+
+**Why it matters.** Each is either a doc to correct or code owed; the docs are the authority, so neither can be settled by reading the code.
 
 ---
 

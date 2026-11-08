@@ -158,8 +158,8 @@ fare stays on the canvas; the labour read is a roll-up on the
 - **Buildings have no dedicated ledger (settled 2026-06-15, [F4]).** A standalone buildings
   overview is more "good to know" than goal-driving, so it earns no reserved slot. Buildings are
   read in the two places a player cares about them: **own buildings** ("good for me") in the
-  **Nation overview dashboard** (slot 1); **competitors' buildings** ("competition") in the
-  **Market Ledger**. Slot 3 is construction *in progress*, not a buildings inventory.
+  **Construction ledger's Buildings view** (slot 3; `ledgers/construction.md`);
+  **competitors' buildings** ("competition") in the **Market Ledger**.
 - **Military** (slot 7; Ben, 2026-10-27) is two tabs, **Recruit** and **Design**
   (`ledgers/military.md`). **Diplomacy** (Ben, 2026-10-30) is two tabs, **Nations** and **Wars**
   (`ledgers/diplomacy.md`): every nation's sentiment, stance and power toward the player, and every
@@ -197,9 +197,9 @@ fare stays on the canvas; the labour read is a roll-up on the
     informational set) and a **post-generation advisory** read — the state of resources and
     workforce after generation, and advice approached from it. Closely relates to the
     **Generation Ledger** (`../generation/GENERATION_LEDGER.md`) — likely the same rail surface.
-  — **Construction** (slot 3): **construction-in-progress** — a build-queue / progress surface
-    (what is being built, its cost and progress). Own-building *inventory* stays in the
-    dashboard; this slot is the *active construction* view (the Construction Ledger of the [A4]
+  — **Construction** (slot 3): **the player's buildings and what is being built** — the Buildings
+    view holds the own-building inventory, and the Construction view is the build-queue / progress
+    surface (what is being built, its cost and progress; the Construction Ledger of the [A4]
     family).
 
 ## Application / system menu — session control
