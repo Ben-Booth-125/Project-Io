@@ -5,6 +5,12 @@
 // sortable by profit. This should take into account logistics points also, and flag
 // tiles which do not currently have logistics operating."
 //
+// THE GRID (Ben, 2026-11-08): "We should list building types in a grid, showing
+// estimated returns without having to select a building type. If a province is
+// clicked, it should restrict the search space to just buildings placed on that
+// province." The grid sums what the table would list for every option, through the
+// same gates and the same quote, spread over frames; a selected province scopes it.
+//
 // BUILDING FIRST. The player picks a building in the Construction view; the
 // Planetary canvas marks every tile of the player's own ground the Build door would
 // accept it on (`placement_rules::can_place_in_world`, the door's era / tech / air
@@ -99,7 +105,7 @@ shelf_runway shelf_runway_for(const world& w, const recipe_registry& reg, entity
 std::string shelf_runway_text(const shelf_runway& s);
 
 /// Rebuild the finder's evaluation when its key moves (the chosen building, the
-/// active body, the frame stamp, the treasury, the reach budget), and mark it live
+/// active body, the frame stamp, the treasury, the reach budget, the scope), and mark it live
 /// for this frame. A no-op key costs a comparison.
 void update_site_finder(world& w, const recipe_registry& reg, ui_state& ui);
 
@@ -107,7 +113,7 @@ void update_site_finder(world& w, const recipe_registry& reg, ui_state& ui);
 /// every tie broken by tile id ascending, and an unpriced row always last.
 void sort_site_rows(std::vector<site_row>& rows, int col, bool desc);
 
-/// Draw the finder: the building picker and, with a building chosen, the site ledger.
+/// Draw the finder: the scope line, the building grid and, with a building chosen, the site ledger.
 /// Calls `update_site_finder` itself.
 void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui);
 

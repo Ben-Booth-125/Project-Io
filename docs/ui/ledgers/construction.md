@@ -29,7 +29,7 @@ Two views behind a `nav_button` strip (`construction.panel_view`), inside `foldo
 | View | Answers (one question) | Content |
 |---|---|---|
 | **Buildings** *(default)* | "What do I own, and how much is each kind of it making me?" | One row per building **type** the player owns at least one of — the type's display name, its **count**, and the **summed per-quarter net** of its members, sign-coloured. The list takes the **whole height of the tab**, less exactly what the levers below it need, scrolling only past that (Ben, 2026-10-26). **Expanding a row** lists that type's own buildings, one line each carrying the tile and that building's own net, visibly summing to the header's total; **pressing one selects it**, and its **levers** draw below the roster. One group open at a time (an accordion). |
-| **Construction** | "What's in flight, what is it costing, where could this building go, and what could I put on this tile?" | A **collapsible** queue header carrying **N cr / qtr** (`estimated_quarterly_construction_cost` — `compute_building_opex` maintenance + wages summed over every player building with `ticks_remaining > 0`, the same formula the budget loop uses), then, when expanded, one row per in-progress build with a progress cell colour-coded dim (<25 %) / mid (25–75 %) / high (>75 %). Below it the **site finder** — a building picker and, with a building chosen, the **site ledger** (§ The site ledger, `construction_sites.cpp`) — and below that the **tile build bar** (`draw_construction_ledger_body`, `selection_panel.cpp`). |
+| **Construction** | "What's in flight, what is it costing, where could this building go, and what could I put on this tile?" | A **collapsible** queue header carrying **N cr / qtr** (`estimated_quarterly_construction_cost` — `compute_building_opex` maintenance + wages summed over every player building with `ticks_remaining > 0`, the same formula the budget loop uses), then, when expanded, one row per in-progress build with a progress cell colour-coded dim (<25 %) / mid (25–75 %) / high (>75 %). Below it the **site finder** — a grid of buildings with their estimated returns and, with a building chosen, the **site ledger** (§ The site ledger, `construction_sites.cpp`) — and below that the **tile build bar** (`draw_construction_ledger_body`, `selection_panel.cpp`). |
 
 **Why Buildings is the default.** The queue is empty most of the time and the player always owns
 buildings, so opening on the queue makes the ledger's front door an empty room.
@@ -61,18 +61,49 @@ This overturns the 2026-08-29 line that any ordering of the buildable tiles is a
 compare; it never acts for the player). The ledger orders; the player still picks a row and
 presses Build.
 
-**1. Top question.** *"Where could this building go on my ground, and which of those tiles would
-earn most?"*
+**1. Top question.** *"What would earn most on my ground, and where would it go?"* (Ben, 2026-11-08:
+*"redesign the construction helper element which asks the user to select a building type first. We
+should list building types in a grid, showing estimated returns without having to select a building
+type. If a province is clicked, it should restrict the search space to just buildings placed on that
+province."*)
 
-**2. Sub-levels.** None — one table under one selector. The **building picker** (a combo, "Find a
-site") offers every building the Build door offers, in the door's vocabulary and fold order: one
-extraction option per extractable good ("Farm" covers the coastal Fishing Wharf, the water option
-covers the Well), one **per processing recipe** (the profit turns on the recipe, so the finder
-prices a recipe, where the door folds recipes under their group and picks the best per tile), then
-the infrastructure and military types. The door's era, tech and recipe-unlock filters apply; the
-body's-air filter is applied per tile. **Each option draws its building glyph (Ben, 2026-11-05).**
-Power Generation recipes sit under Infrastructure, as they do in the door (`../SELECTION.md` § The tile
-construction ledger).
+**2. Sub-levels.** None — one table under one grid. The **building grid** ("Find a site") holds one
+cell for every building the Build door offers, in the door's vocabulary: one per extractable good
+("Farm" covers the coastal Fishing Wharf, the water option covers the Well), one **per processing
+recipe** (the profit turns on the recipe, so the finder prices a recipe, where the door folds recipes
+under their group and picks the best per tile), then the infrastructure and military types. The door's
+era, tech and recipe-unlock filters apply; the body's-air filter is applied per tile. Power Generation
+recipes count as Infrastructure, as they do in the door (`../SELECTION.md` § The tile construction
+ledger).
+
+**A cell** draws the building's glyph, its name whole (the column count is the most at which every name
+wraps inside its cell, and the cell is as tall as the tallest name needs), the **best estimated Net / qtr** among the tiles the table would list for it, and
+**how many such sites exist** (Ben, 2026-11-08). The figure is the table's own: every cell asks the
+table's gates and `quote_for_tile` at each tile's own Logistic Point cover, so a cell's count is its
+table's row count and its figure is that table's top Net.
+
+**A building that makes nothing to sell has no figure.** Infrastructure and military types, whose
+quote would be upkeep alone, show the count and no Net: a fake loss reads worse than no figure.
+
+**The order.** Priced options by best Net, descending; then options with sites and no figure; then
+options with **no site at all**, dimmed, each explaining why on its hover — the treasury and the
+cheapest cost, or the commonest refusal among its tiles. Every tie falls to the door's option order.
+
+**The grid is priced over several frames.** Pricing every option on every tile of the scope is far more
+work than the one chosen building, so the evaluation is spread across frames within a fixed budget and
+never spends one long frame. The first pass, and a pass for a new province or body, shows its cells
+pending as they fill; a re-pass (the treasury or the frame stamp moved) leaves the last figures standing
+until the fresh set swaps in whole, so a running game's grid does not flicker.
+
+**The province scope** (Ben, 2026-11-08). **A selected tile restricts the finder to its province's own
+ground**: the grid's figures and counts, the table's rows and the placement lens. A province is not a
+kind of selection (`../SELECTION.md` § The province is a section, not a selection): selecting a tile
+*is* selecting its province, so the scope follows the selected tile. A selected building or unit
+carries no province and does not restrict. A line above the grid says what the search covers — the
+province, by the centre that names it, or all the player's ground on the body — and a **Clear** press
+clears the selected tile, returning the whole body. Pressing a row of the table selects its tile
+without narrowing the list it was pressed in, because that press means "take me there", not "search
+here". A province holding none of the player's ground says so, and every cell reads no site.
 
 **The shelf runway warning (Ben, 2026-11-05).** A site can look profitable today and starve soon, so
 the Build door row's hover and the site ledger's row warn when a building's recipe input has only a few
@@ -161,13 +192,13 @@ colour from the one tile the player just chose read as the site being withdrawn 
 
 **4. Data sources.** `site_options` and the evaluation in `construction_sites.cpp`, over
 `body_tile_grid` filtered to `tile_to_nation == player_actor`. Rebuilt only when its key moves — the
-chosen building, the active body, the treasury, the reach budget, and the frame stamp (the economy tick,
+chosen building, the active body, the province scope, the treasury, the reach budget, and the frame stamp (the economy tick,
 the building count, the ground's owners, the logistics generation) — so a still frame pays a
 comparison. The Logistic Point cover is cached on the same stamp with one routing memo
 (`site_lp_cover`), which the Build door reads too.
 
-**5. Close / toggle.** The picker is a **selector**: choosing a building aims the finder at it, and
-choosing the **chosen** building again — or **None** — clears it, so its visible state is a toggle.
+**5. Close / toggle.** The grid is a **selector**: pressing a cell aims the finder at it, and pressing
+the **chosen** cell again clears it, so its visible state is a toggle.
 The lens is live only while the Construction view draws (switching to Buildings leaves the map
 plain), and **closing the ledger clears the choice**, the disarm-on-close every ledger-lens pair
 takes. A row press is a door, not a toggle: it selects and frames.
@@ -296,7 +327,7 @@ than a best-of-everything field.
 - **Build cost, arming, placement** — `recipe_registry::economics()` (`build_cost`, `resource_build_cost[]`) and `placement_rules::k_extractable`, read by the tile Selection card rather than here.
 - **Roster** — `player_building_groups` (`construction_panel.cpp`): every `is_player_owned` building, keyed by `building_group_name` (the Build door's own vocabulary — `extraction_building_name` for an extraction site, the active recipe's `group` for a processing facility, `building_type_name` otherwise). The per-building net is `estimate_building_profit(...).net()`, the SAME figure `rank_player_buildings_by_profit` ranks the Balance ledger on, so the two surfaces cannot report different profits for one building. A building the report cannot yet price contributes **zero** to its group's total, never a guess. Groups are walked in name order and members by net descending then entity id, so an unordered `world::buildings` cannot vary what a player or a check sees.
 - **Shelf runway** — `shelf_runway_for` (§ The site ledger): `market_component::inventory`, the recipe's `inputs` at `judged_batches`, and the `shelf` series of `market_plot_history`.
-- **Site ledger** — `construction_sites.cpp` (§ The site ledger): `can_place_in_world`, `construction_capex`, `construction_site_multiplier`, `quote_for_tile` (`world/site_quote.hpp`) with the tile's `lp_route_to` cover, `market_for_tile` / `market_city_name`, the tile's deposit and reserve, and the row's place from `population_centre_tile` / `population_centre_name` through `provinces.province_of`.
+- **Site ledger and building grid** — `construction_sites.cpp` (§ The site ledger; one gate and one quote serve both): `provinces.province_of` for the scope, `can_place_in_world`, `construction_capex`, `construction_site_multiplier`, `quote_for_tile` (`world/site_quote.hpp`) with the tile's `lp_route_to` cover, `market_for_tile` / `market_city_name`, the tile's deposit and reserve, and the row's place from `population_centre_tile` / `population_centre_name` through `provinces.province_of`.
 - **Progress circle and site card** — `read_construction_site` (`construction_panel.cpp`): `construction_build_days`, `construction_days_left`, `build_arrears_milli`, `resource_build_cost_for`, and `read_construction`'s per-good `short_of`.
 - **Per-building configuration** — `building_component::workforce_target`, `active_recipe_index` / `recipe`, written through `try_switch_recipe` and the workforce verbs from this ledger's levers. `decommissioned` is written from the building Selection card's action grid.
 

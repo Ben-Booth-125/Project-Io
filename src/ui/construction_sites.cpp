@@ -4,6 +4,7 @@
 #include "format.hpp"             // fmt::abbreviate / signed_delta
 #include "icons.hpp"              // icons::no_logistics, icons::building
 #include "market_ledger.hpp"      // market_city_name - a market, by city
+#include "nav_pane.hpp"           // clear_selection_to_resting - the scope line's clear
 #include "presentation.hpp"       // palette, extraction_building_name, value_colour
 #include "text_fit.hpp"           // fitted - the market column
 
@@ -105,6 +106,7 @@ struct eval_key
     std::uint16_t recipe  = no_recipe;
     float         balance = -1.0f;
     float         reach   = -2.0f;
+    std::uint32_t scope   = 0;
     bool operator==(const eval_key&) const = default;
 };
 
@@ -141,6 +143,102 @@ float market_price(const world& w, entity_id market, resource_type r)
     return mit->second.price[ri] > 0.0f ? mit->second.price[ri] : mit->second.base_price[ri];
 }
 
+/// THE ROW'S IDENTITY (Ben, 2026-10-26: "remove the tile x,y column ... use what
+/// the glossary offers, e.g. the province or nearest place name"). A province has
+/// no name of its own (GLOSSARY.md § Province) but it is its centre's ground
+/// (PROVINCES.md), so a row is named for the population centre its province
+/// holds - the lowest centre id where a province holds two, so the name is one
+/// answer - and, for ground no centre's province covers, the nearest named centre
+/// on the body ("near X"). Built once per evaluation, in id order.
+class place_index
+{
+public:
+    place_index(const world& w, entity_id body, int grid_w) : m_w(w), m_gw(grid_w)
+    {
+        std::vector<std::pair<entity_id, entity_id>> ct(w.population_centre_tile.begin(),
+                                                        w.population_centre_tile.end());
+        std::sort(ct.begin(), ct.end());
+        for (const auto& [cid, ctile] : ct)
+        {
+            const auto nm = w.population_centre_name.find(cid);
+            const auto tt = w.tiles.find(ctile);
+            if (nm == w.population_centre_name.end() || nm->second.empty() || tt == w.tiles.end()
+                || tt->second.body != body)
+                continue;
+            if (const std::uint32_t pid = w.provinces.province_of(ctile); pid != 0)
+                m_province.try_emplace(pid, nm->second);
+            m_centres.push_back({tt->second.grid_x, tt->second.grid_y, &nm->second});
+        }
+    }
+
+    std::string name(entity_id tid, int x, int y, bool& near) const
+    {
+        near = false;
+        if (const std::uint32_t pid = m_w.provinces.province_of(tid); pid != 0)
+            if (const auto it = m_province.find(pid); it != m_province.end())
+                return it->second;
+        // The nearest named centre, the grid wrapping east-west; ties to the lower id.
+        long best = -1;
+        const std::string* found = nullptr;
+        for (const named_centre& c : m_centres)
+        {
+            int dx = std::abs(c.x - x);
+            if (m_gw > 0)
+                dx = std::min(dx, m_gw - dx);
+            const int  dy = c.y - y;
+            const long d2 = static_cast<long>(dx) * dx + static_cast<long>(dy) * dy;
+            if (best < 0 || d2 < best)
+            {
+                best  = d2;
+                found = c.name;
+            }
+        }
+        near = true;
+        return found != nullptr ? *found : std::string();
+    }
+
+private:
+    struct named_centre { int x = 0, y = 0; const std::string* name = nullptr; };
+    const world&                         m_w;
+    int                                  m_gw = 0;
+    std::map<std::uint32_t, std::string> m_province;
+    std::vector<named_centre>            m_centres;
+};
+
+/// THE BUILD DOOR'S OWN GATES, in its order: the body's air (a propellant recipe this
+/// tile cannot run is a row the door never lists), then the world-level placement
+/// rules with the player's actor named (own ground, tech, roads, stacks, the province
+/// ceiling), then the treasury against the capex. The table and the grid both ask
+/// here, so a cell's count is the table's row count by construction.
+enum class site_verdict { air, refused, unaffordable, ok };
+struct site_gate_result
+{
+    site_verdict verdict = site_verdict::refused;
+    placement_rules::placement_reason why = placement_rules::placement_reason::ok;
+    float capex = 0.0f;
+};
+
+site_gate_result gate_site(const world& w, const recipe_registry& reg, const site_option& o, const recipe* rc,
+                           const placement_gate& gate, entity_id tid, float reach, entity_id actor, float balance)
+{
+    site_gate_result out;
+    if (rc != nullptr && !recipe_runs_at_tile(w, *rc, tid))
+    {
+        out.verdict = site_verdict::air;
+        return out;
+    }
+    const placement_rules::placement_result pr =
+        placement_rules::can_place_in_world(w, tid, o.type, o.target, reach, actor, gate);
+    if (!pr)
+    {
+        out.why = pr.reason;
+        return out;
+    }
+    out.capex   = construction_capex(w, reg, tid, o.type, o.target, o.recipe);
+    out.verdict = (balance < out.capex) ? site_verdict::unaffordable : site_verdict::ok;
+    return out;
+}
+
 void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 {
     site_finder_state& sf = ui.site_finder;
@@ -172,57 +270,7 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 
     std::map<entity_id, std::string> market_names; // one name lookup per market
 
-    // THE ROW'S IDENTITY (Ben, 2026-10-26: "remove the tile x,y column ... use what
-    // the glossary offers, e.g. the province or nearest place name"). A province has
-    // no name of its own (GLOSSARY.md § Province) but it is its centre's ground
-    // (PROVINCES.md), so a row is named for the population centre its province
-    // holds - the lowest centre id where a province holds two, so the name is one
-    // answer - and, for ground no centre's province covers, the nearest named centre
-    // on the body ("near X"). Built once per evaluation, in id order.
-    std::map<std::uint32_t, std::string> province_place;
-    struct named_centre { int x = 0, y = 0; const std::string* name = nullptr; };
-    std::vector<named_centre> centres;
-    {
-        std::vector<std::pair<entity_id, entity_id>> ct(w.population_centre_tile.begin(),
-                                                        w.population_centre_tile.end());
-        std::sort(ct.begin(), ct.end());
-        for (const auto& [cid, ctile] : ct)
-        {
-            const auto nm  = w.population_centre_name.find(cid);
-            const auto tt  = w.tiles.find(ctile);
-            if (nm == w.population_centre_name.end() || nm->second.empty() || tt == w.tiles.end()
-                || tt->second.body != ui.active_body)
-                continue;
-            if (const std::uint32_t pid = w.provinces.province_of(ctile); pid != 0)
-                province_place.try_emplace(pid, nm->second);
-            centres.push_back({tt->second.grid_x, tt->second.grid_y, &nm->second});
-        }
-    }
-    const int gw_wrap = sf.gw;
-    const auto place_of = [&](entity_id tid, int x, int y, bool& near) -> std::string {
-        near = false;
-        if (const std::uint32_t pid = w.provinces.province_of(tid); pid != 0)
-            if (const auto it = province_place.find(pid); it != province_place.end())
-                return it->second;
-        // The nearest named centre, the grid wrapping east-west; ties to the lower id.
-        long best = -1;
-        const std::string* name = nullptr;
-        for (const named_centre& c : centres)
-        {
-            int dx = std::abs(c.x - x);
-            if (gw_wrap > 0)
-                dx = std::min(dx, gw_wrap - dx);
-            const int  dy = c.y - y;
-            const long d2 = static_cast<long>(dx) * dx + static_cast<long>(dy) * dy;
-            if (best < 0 || d2 < best)
-            {
-                best = d2;
-                name = c.name;
-            }
-        }
-        near = true;
-        return name != nullptr ? *name : std::string();
-    };
+    const place_index places(w, ui.active_body, sf.gw);
     for (std::size_t idx = 0; idx < grid.size() && idx < sf.cls.size(); ++idx)
     {
         const entity_id tid = grid[idx];
@@ -233,20 +281,16 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
         const auto nit = w.tile_to_nation.find(tid);
         if (nit == w.tile_to_nation.end() || nit->second != actor)
             continue;
+        // THE SCOPE (Ben, 2026-11-08): a selected province narrows the search to its ground.
+        if (sf.scope_province != 0 && w.provinces.province_of(tid) != sf.scope_province)
+            continue;
         ++sf.own_tiles;
 
-        // THE BUILD DOOR'S OWN GATES, in its order: the body's air (a propellant
-        // recipe this tile cannot run is a row the door never lists), then the
-        // world-level placement rules with the player's actor named (own ground, tech,
-        // roads, stacks, the province ceiling), then the treasury against the capex.
-        if (rc != nullptr && !recipe_runs_at_tile(w, *rc, tid))
+        const site_gate_result sg = gate_site(w, reg, c, rc, gate, tid, ui.max_logistics_reach, actor, balance);
+        if (sg.verdict == site_verdict::air || sg.verdict == site_verdict::refused)
             continue;
-        const placement_rules::placement_result pr = placement_rules::can_place_in_world(
-            w, tid, c.type, c.target, ui.max_logistics_reach, actor, gate);
-        if (!pr)
-            continue;
-        const float capex = construction_capex(w, reg, tid, c.type, c.target, c.recipe);
-        if (balance < capex)
+        const float capex = sg.capex;
+        if (sg.verdict == site_verdict::unaffordable)
         {
             ++sf.unaffordable;
             continue;
@@ -257,7 +301,7 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
         r.tile = tid;
         r.x    = tc.grid_x;
         r.y    = tc.grid_y;
-        r.place = place_of(tid, r.x, r.y, r.place_near);
+        r.place = places.name(tid, r.x, r.y, r.place_near);
         r.capex     = capex;
         r.site_mult = construction_site_multiplier(w, reg, tid, c.type, c.target);
         r.flat      = flat_cost * r.site_mult;
@@ -343,6 +387,515 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 
     ++sf.evaluations;
     sf.eval_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+}
+
+// --- THE BUILDING GRID (Ben, 2026-11-08) -------------------------------------------
+// Every option scored over every tile in scope is far more work than the one chosen
+// building the table scores, so a pass is SPREAD OVER FRAMES (k_grid_frame_budget_ms,
+// resumable between tiles) and never one long frame. A pass for a new scope or body
+// shows its cells pending as they fill; a pass for the same scope (the treasury or the
+// frame stamp moved) keeps showing the last figures until the fresh set swaps in whole,
+// so a running game's grid does not flicker. Under --verify a pass completes in the
+// frame it starts, because a wall-clock budget would make a capture depend on the clock.
+
+constexpr double k_grid_frame_budget_ms = 3.0;
+constexpr int    k_grid_clock_every     = 8; ///< Tiles between looks at the clock.
+
+struct grid_key
+{
+    entity_id     body = null_entity;
+    lp_stamp      stamp;
+    float         balance = -1.0f;
+    float         reach   = -2.0f;
+    std::uint32_t scope   = 0;
+    bool operator==(const grid_key&) const = default;
+};
+
+struct grid_pass
+{
+    grid_key                key;
+    bool                    have_key = false;
+    bool                    running  = false;
+    bool                    provisional = false; ///< Publish each cell as it finishes.
+    std::vector<site_cell>  work;
+    std::vector<std::map<int, int>> refusals;    ///< Per option: reason -> tiles, for the commonest.
+    std::vector<int>        air_refused;
+    std::vector<entity_id>  tiles;               ///< Own ground in scope, in grid order.
+    std::size_t             option = 0, tile = 0;
+    double                  spent_ms = 0.0;
+    int                     frames   = 0;
+    std::optional<place_index> places;           ///< Built once per pass, not per frame.
+};
+
+grid_pass& pass_state()
+{
+    static grid_pass p;
+    return p;
+}
+
+bool same_option(const site_option& a, const site_option& b)
+{
+    return a.type == b.type && a.target == b.target && a.recipe == b.recipe;
+}
+
+bool same_options(const std::vector<site_cell>& cells, const std::vector<site_option>& opts)
+{
+    if (cells.size() != opts.size())
+        return false;
+    for (std::size_t i = 0; i < opts.size(); ++i)
+        if (!same_option(cells[i].option, opts[i]))
+            return false;
+    return true;
+}
+
+/// Only what makes something has an estimated net to compare: a Port's figure would
+/// be its upkeep alone, and a fake loss is worse than no figure.
+bool option_earns(const site_option& o)
+{
+    return o.type == building_type::extraction_site || o.type == building_type::processing_facility;
+}
+
+/// The drawn order: priced by best Net, descending, then sites with no figure, then
+/// options with no site at all; every tie by option order.
+void order_cells(site_finder_state& sf)
+{
+    sf.cell_order.resize(sf.cells.size());
+    for (std::size_t i = 0; i < sf.cells.size(); ++i)
+        sf.cell_order[i] = static_cast<int>(i);
+    const auto tier = [](const site_cell& c) { return c.sites == 0 ? 2 : (c.has_figure ? 0 : 1); };
+    std::stable_sort(sf.cell_order.begin(), sf.cell_order.end(), [&](int ia, int ib) {
+        const site_cell& a = sf.cells[static_cast<std::size_t>(ia)];
+        const site_cell& b = sf.cells[static_cast<std::size_t>(ib)];
+        if (tier(a) != tier(b))
+            return tier(a) < tier(b);
+        return tier(a) == 0 && a.best_net > b.best_net;
+    });
+}
+
+void finish_cell(grid_pass& p, std::size_t i, bool scope_empty)
+{
+    site_cell& c = p.work[i];
+    c.pending = false;
+    if (c.sites > 0)
+        return;
+    if (c.unaffordable > 0)
+    {
+        char buf[160];
+        std::snprintf(buf, sizeof buf, "%d %s would take it, but the cheapest costs %s cr, more than the treasury holds.",
+                      c.unaffordable, c.unaffordable == 1 ? "tile" : "tiles",
+                      fmt::abbreviate(static_cast<double>(c.cheapest_unaffordable)).c_str());
+        c.refusal = buf;
+        return;
+    }
+    if (scope_empty)
+    {
+        c.refusal = "None of this province is your ground.";
+        return;
+    }
+    // The commonest refusal; a tie goes to the lower reason, so the sentence is one answer.
+    int best_n = p.air_refused[i], best_reason = -1;
+    for (const auto& [reason, n] : p.refusals[i])
+        if (n > best_n)
+        {
+            best_n      = n;
+            best_reason = reason;
+        }
+    if (best_n == 0)
+        c.refusal = "You hold no ground on this body to build it on.";
+    else if (best_reason < 0)
+        c.refusal = "The air here cannot run this recipe.";
+    else
+        c.refusal = placement_rules::placement_reason_text(static_cast<placement_rules::placement_reason>(best_reason));
+}
+
+/// Advance the grid's pass by one frame's budget, starting a new pass when its key moves.
+void step_site_grid(world& w, const recipe_registry& reg, ui_state& ui, const std::vector<site_option>& opts)
+{
+    site_finder_state& sf = ui.site_finder;
+    grid_pass& p = pass_state();
+
+    const entity_id actor = player_actor(w);
+    float balance = 0.0f;
+    if (const float* b = purse_of(w, actor); b != nullptr)
+        balance = *b;
+    const grid_key key{ ui.active_body, make_lp_stamp(w), balance, ui.max_logistics_reach, sf.scope_province };
+
+    const bool options_moved = !same_options(p.running ? p.work : sf.cells, opts);
+    if (!p.have_key || !(key == p.key) || options_moved)
+    {
+        const bool new_view = !p.have_key || p.key.body != key.body || p.key.scope != key.scope
+                           || !same_options(sf.cells, opts);
+        p.key      = key;
+        p.have_key = true;
+        p.running  = true;
+        p.option   = 0;
+        p.tile     = 0;
+        p.spent_ms = 0.0;
+        p.frames   = 0;
+        p.work.assign(opts.size(), site_cell{});
+        for (std::size_t i = 0; i < opts.size(); ++i)
+            p.work[i].option = opts[i];
+        p.refusals.assign(opts.size(), {});
+        p.air_refused.assign(opts.size(), 0);
+
+        p.tiles.clear();
+        if (const auto bit = w.bodies.find(ui.active_body);
+            bit != w.bodies.end() && bit->second.grid_width > 0 && bit->second.grid_height > 0)
+        {
+            for (const entity_id tid : body_tile_grid(w, ui.active_body))
+            {
+                if (tid == null_entity)
+                    continue;
+                const auto nit = w.tile_to_nation.find(tid);
+                if (nit == w.tile_to_nation.end() || nit->second != actor)
+                    continue;
+                if (sf.scope_province != 0 && w.provinces.province_of(tid) != sf.scope_province)
+                    continue;
+                p.tiles.push_back(tid);
+            }
+        }
+        sf.scope_foreign = sf.scope_province != 0 && p.tiles.empty();
+
+        {
+            const auto gw_it = w.bodies.find(ui.active_body);
+            p.places.emplace(w, ui.active_body, gw_it != w.bodies.end() ? gw_it->second.grid_width : 0);
+        }
+        p.provisional = new_view;
+        if (new_view)
+        {
+            sf.cells = p.work; // every cell pending; order is the options' until settled
+            sf.cell_order.resize(sf.cells.size());
+            for (std::size_t i = 0; i < sf.cells.size(); ++i)
+                sf.cell_order[i] = static_cast<int>(i);
+        }
+    }
+    if (!p.running)
+        return;
+
+    const auto t0 = std::chrono::steady_clock::now();
+    const auto elapsed = [&]() {
+        return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+    };
+    const bool to_completion = ui.fixed_frame_clock;
+    ++p.frames;
+
+    int since_clock = 0;
+    bool out_of_budget = false;
+    while (p.option < p.work.size() && !out_of_budget)
+    {
+        site_cell& cell = p.work[p.option];
+        const site_option& o = cell.option;
+        const recipe* rc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
+        const placement_gate gate = reg.placement_gate_for(o.type, o.recipe);
+        const bool earns = option_earns(o);
+
+        while (p.tile < p.tiles.size())
+        {
+            const entity_id tid = p.tiles[p.tile++];
+            const site_gate_result sg = gate_site(w, reg, o, rc, gate, tid, ui.max_logistics_reach, actor, balance);
+            if (sg.verdict == site_verdict::air)
+                ++p.air_refused[p.option];
+            else if (sg.verdict == site_verdict::refused)
+                ++p.refusals[p.option][static_cast<int>(sg.why)];
+            else if (sg.verdict == site_verdict::unaffordable)
+            {
+                if (cell.unaffordable == 0 || sg.capex < cell.cheapest_unaffordable)
+                    cell.cheapest_unaffordable = sg.capex;
+                ++cell.unaffordable;
+            }
+            else
+            {
+                ++cell.sites;
+                // THE ROW'S OWN FIGURE: the same cover and the same quote the table asks for.
+                const float cover = site_lp_cover(w, tid);
+                if (!(cover > 0.0f))
+                    ++cell.no_lp;
+                if (earns)
+                {
+                    const site_quote sq = quote_for_tile(w, reg, tid, o.type, o.target, o.recipe, cover);
+                    if (sq.profit.has_data && (!cell.has_figure || sq.profit.net() > cell.best_net))
+                    {
+                        const tile_component& tc = w.tiles.at(tid);
+                        cell.has_figure   = true;
+                        cell.best_net     = sq.profit.net();
+                        cell.best_cover   = cover;
+                        cell.best_starved = sq.starved;
+                        cell.best_place   = p.places->name(tid, tc.grid_x, tc.grid_y, cell.best_near);
+                    }
+                }
+            }
+            if (!to_completion && ++since_clock >= k_grid_clock_every)
+            {
+                since_clock = 0;
+                if (elapsed() >= k_grid_frame_budget_ms)
+                {
+                    out_of_budget = true;
+                    break;
+                }
+            }
+        }
+        if (p.tile >= p.tiles.size())
+        {
+            finish_cell(p, p.option, sf.scope_province != 0 && p.tiles.empty());
+            if (p.provisional)
+                sf.cells[p.option] = p.work[p.option];
+            ++p.option;
+            p.tile = 0;
+        }
+    }
+    p.spent_ms += elapsed();
+
+    if (p.option >= p.work.size())
+    {
+        p.running = false;
+        sf.cells  = std::move(p.work);
+        p.work.clear();
+        order_cells(sf);
+        sf.grid_ms     = p.spent_ms;
+        sf.grid_frames = p.frames;
+    }
+}
+
+/// Where the finder is looking (Ben, 2026-11-08): the selected tile's province, unless
+/// that tile was selected by a press on the table, which must not narrow its own list.
+/// Read off the selection itself, not the canvas's mirror, per SELECTION.md.
+void resolve_scope(const world& w, ui_state& ui)
+{
+    site_finder_state& sf = ui.site_finder;
+    if (sf.row_pressed_tile != null_entity && ui.selected_entity == sf.row_pressed_tile)
+        return;
+    sf.row_pressed_tile = null_entity;
+    std::uint32_t pid = 0;
+    if (const auto tit = w.tiles.find(ui.selected_entity);
+        tit != w.tiles.end() && tit->second.body == ui.active_body)
+        pid = w.provinces.province_of(ui.selected_entity);
+    if (pid == sf.scope_province)
+        return;
+    sf.scope_province = pid;
+    sf.scope_name.clear();
+    sf.scope_near = false;
+    if (pid != 0)
+    {
+        const tile_component& tc = w.tiles.at(ui.selected_entity);
+        const auto bit = w.bodies.find(ui.active_body);
+        const place_index places(w, ui.active_body, bit != w.bodies.end() ? bit->second.grid_width : 0);
+        sf.scope_name = places.name(ui.selected_entity, tc.grid_x, tc.grid_y, sf.scope_near);
+    }
+}
+
+/// The grid: one cell per option, each its glyph, name, best Net and site count.
+void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
+{
+    site_finder_state& sf = ui.site_finder;
+    if (sf.cells.empty())
+        return;
+    const ImGuiStyle& st = ImGui::GetStyle();
+    const float lh    = ImGui::GetTextLineHeight();
+    const float pad   = 4.0f;
+    const float gap   = 3.0f;
+    const float glyph = std::ceil(lh * 1.5f);
+    const float avail = std::max(120.0f, ImGui::GetContentRegionAvail().x - st.ScrollbarSize);
+
+    // THE COLUMN COUNT IS MEASURED: the most columns of at least the minimum width at
+    // which every name wraps whole inside its cell (a word wider than the room would
+    // elide). The cell is then as tall as the tallest wrapped name needs, so no name
+    // is cut at any supported width.
+    constexpr int   k_max_cols   = 4;
+    constexpr float k_min_cell_w = 124.0f;
+    const auto cell_width = [&](int n) {
+        return (avail - gap * static_cast<float>(n - 1)) / static_cast<float>(n);
+    };
+    const auto room_of = [&](float cw) { return cw - pad * 2.0f - glyph - st.ItemInnerSpacing.x; };
+    int cols = 1;
+    for (int n = k_max_cols; n >= 2; --n)
+    {
+        if (cell_width(n) < k_min_cell_w)
+            continue;
+        const float room = room_of(cell_width(n));
+        bool fits = true;
+        for (const site_cell& c : sf.cells)
+            if (ImGui::CalcTextSize(c.option.name.c_str(), nullptr, false, room).x > room + 0.5f)
+            {
+                fits = false;
+                break;
+            }
+        if (fits)
+        {
+            cols = n;
+            break;
+        }
+    }
+    const float cell_w    = cell_width(cols);
+    const float name_room = room_of(cell_w);
+    float name_h = glyph;
+    for (const site_cell& c : sf.cells)
+        name_h = std::max(name_h, ImGui::CalcTextSize(c.option.name.c_str(), nullptr, false, name_room).y);
+    const float cell_h = std::ceil(name_h + lh) + pad * 2.0f + 2.0f;
+
+    // Height: what is left once the table and the Build door have the room they need,
+    // between a peek and a comparison's worth of rows. A part row shows that it scrolls.
+    const int   rows = (static_cast<int>(sf.cells.size()) + cols - 1) / cols;
+    const float row_step = cell_h + gap;
+    constexpr float k_door_reserve  = 380.0f;  // the Build door's caption and rows
+    constexpr float k_table_reserve = 260.0f;  // the site ledger's caption and table
+    const float reserve = (w.tiles.count(ui.selected_entity) != 0 ? k_door_reserve : 60.0f)
+                        + (sf.armed ? k_table_reserve : 0.0f);
+    const float room_rows = (ImGui::GetContentRegionAvail().y - reserve) / row_step;
+    const float want_rows = std::clamp(room_rows, 1.5f, 5.5f);
+    const float child_h = std::min(static_cast<float>(rows), want_rows) * row_step + gap;
+
+    if (!ImGui::BeginChild("##site_grid", {0.0f, child_h}, 0, ImGuiWindowFlags_AlwaysVerticalScrollbar))
+    {
+        ImGui::EndChild();
+        return;
+    }
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const ImU32 text_ink = ImGui::GetColorU32(ImGuiCol_Text);
+    const ImU32 dim_ink  = ImGui::GetColorU32(ImGuiCol_TextDisabled);
+
+    const int n_cells = static_cast<int>(sf.cell_order.size());
+    int chosen_at = -1;
+    for (int at = 0; at < n_cells; ++at)
+    {
+        const int idx = sf.cell_order[static_cast<std::size_t>(at)];
+        const site_cell& c = sf.cells[static_cast<std::size_t>(idx)];
+        const site_option& o = c.option;
+        const int col = at % cols, row = at / cols;
+        const ImVec2 mn{origin.x + static_cast<float>(col) * (cell_w + gap),
+                        origin.y + static_cast<float>(row) * row_step};
+        const ImVec2 mx{mn.x + cell_w, mn.y + cell_h};
+        const bool dim       = !c.pending && c.sites == 0;
+        const bool is_choice = sf.armed && same_option(sf.choice, o);
+        if (is_choice)
+            chosen_at = at;
+
+        ImGui::SetCursorScreenPos(mn);
+        ImGui::PushID(idx);
+        const bool pressed = ImGui::InvisibleButton("##cell", {cell_w, cell_h});
+        const bool hovered = ImGui::IsItemHovered();
+        ImGui::PopID();
+
+        dl->AddRectFilled(mn, mx, is_choice ? IM_COL32(60, 90, 70, 200)
+                                            : ImGui::GetColorU32(ImGuiCol_Text, hovered ? 0.16f : 0.07f), 3.0f);
+        if (is_choice)
+            dl->AddRect(mn, mx, palette::selection, 3.0f);
+
+        const float gr = glyph * 0.5f;
+        const recipe* orc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
+        icons::building(dl, {mn.x + pad + gr, mn.y + pad + gr}, gr, o.type,
+                        orc != nullptr ? primary_output_resource(*orc) : o.target,
+                        dim ? IM_COL32(150, 235, 160, 90) : IM_COL32(150, 235, 160, 255));
+        const ImVec2 name_at{mn.x + pad + glyph + st.ItemInnerSpacing.x, mn.y + pad};
+        dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(), name_at, dim ? dim_ink : text_ink, o.name.c_str(),
+                    nullptr, name_room); // fit-exempt: the column count is chosen so it wraps whole
+
+        const float   fig_y = mn.y + cell_h - pad - lh;
+        const ImVec2  net_at{mn.x + pad, fig_y};
+        if (c.pending)
+            dl->AddText(net_at, dim_ink, "...");
+        else if (c.has_figure)
+            dl->AddText(net_at, value_colour(static_cast<double>(c.best_net)),
+                        fmt::abbreviate(static_cast<double>(c.best_net)).c_str());
+
+        char count_text[32] = "";
+        if (!c.pending)
+        {
+            std::snprintf(count_text, sizeof count_text, "%d %s", c.sites, c.sites == 1 ? "site" : "sites");
+            dl->AddText({mx.x - pad - ImGui::CalcTextSize(count_text).x, fig_y}, dim_ink, count_text);
+        }
+
+        // EACH ELEMENT EXPLAINS ITSELF (construction.md): the figure, the count and the
+        // press each carry their own card; the first rect the pointer is in wins.
+        std::vector<grid_explainer> cards;
+        const auto card = [&](const char* key, ImVec2 a, ImVec2 b, std::string text, ImU32 ink = 0u) {
+            grid_explainer e;
+            e.key = key; e.mn = a; e.mx = b; e.text = std::move(text); e.ink = ink;
+            cards.push_back(std::move(e));
+        };
+        if (c.pending)
+            card("cell", mn, mx, "Still being priced.");
+        else if (dim)
+            card("cell", mn, mx, c.refusal + (is_choice ? " Press to clear it."
+                                                        : " Press to see it on the map anyway."));
+        else
+        {
+            const float mid = mx.x - pad - std::max(ImGui::CalcTextSize(count_text).x, 40.0f);
+            char count_card[220];
+            int  n = std::snprintf(count_card, sizeof count_card, "%d %s of your ground %s take it.", c.sites,
+                                   c.sites == 1 ? "tile" : "tiles",
+                                   sf.scope_province != 0 ? "in this province" : "on this body");
+            if (c.no_lp > 0)
+                n += std::snprintf(count_card + n, sizeof count_card - n,
+                                   " %d with no Logistic Points operating.", c.no_lp);
+            if (c.unaffordable > 0)
+                std::snprintf(count_card + n, sizeof count_card - n,
+                              " %d more cost more than the treasury.", c.unaffordable);
+            card("count", {mid, fig_y - 1.0f}, mx, count_card);
+            if (c.has_figure)
+            {
+                char buf[240];
+                const std::string where = c.best_place.empty() ? std::string("unnamed ground")
+                                        : c.best_near          ? "near " + c.best_place
+                                                               : c.best_place;
+                if (c.best_starved)
+                    std::snprintf(buf, sizeof buf,
+                                  "The best site, %s, would likely stand idle: its Est. net %+d cr / qtr is upkeep alone.",
+                                  where.c_str(), static_cast<int>(std::lround(c.best_net)));
+                else
+                    std::snprintf(buf, sizeof buf,
+                                  "Est. net %+d cr / qtr at the best site, %s, at %d%% Logistic Point cover.",
+                                  static_cast<int>(std::lround(c.best_net)), where.c_str(),
+                                  static_cast<int>(std::lround(c.best_cover * 100.0f)));
+                card("net", {mn.x, fig_y - 1.0f}, {mid, mx.y}, buf, value_colour(static_cast<double>(c.best_net)));
+            }
+            else
+                card("net", {mn.x, fig_y - 1.0f}, {mid, mx.y},
+                     option_earns(o) ? "No market prices its sites, so there is no estimate."
+                                     : "It makes nothing to sell, so it has no estimated net.");
+            card("name", mn, mx, is_choice ? "Press to clear it."
+                                           : "Press to list its sites and mark them on the map.");
+        }
+        construction_column_card(o.name.c_str(), cards);
+
+        sf.picker_rows.push_back({o.name, o.category, gr,
+                                  ImGui::CalcTextSize(o.name.c_str(), nullptr, false, name_room).x, name_room,
+                                  (mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f});
+        if (at == 0)
+        {
+            sf.picker_x = (mn.x + mx.x) * 0.5f;
+            sf.picker_y = (mn.y + mx.y) * 0.5f;
+        }
+        if (pressed)
+        {
+            if (is_choice)
+                sf.armed = false; // the toggle: the chosen cell, pressed again, clears
+            else
+            {
+                sf.armed  = true;
+                sf.choice = o;
+            }
+        }
+    }
+    // Reserve the grid's own extent so the child's scroll range is right.
+    ImGui::SetCursorScreenPos({origin.x, origin.y + static_cast<float>(rows) * row_step});
+    ImGui::Dummy({1.0f, 0.0f});
+
+    // A choice made elsewhere (the Military ledger's door) may sit off the visible part.
+    static std::string framed;
+    const std::string want = (sf.armed && chosen_at >= 0) ? sf.choice.name : std::string();
+    if (want != framed)
+    {
+        framed = want;
+        if (chosen_at >= 0)
+        {
+            const float top = static_cast<float>(chosen_at / cols) * row_step;
+            const float now = ImGui::GetScrollY();
+            if (top < now || top + cell_h > now + ImGui::GetWindowHeight())
+                ImGui::SetScrollY(top);
+        }
+    }
+    ImGui::EndChild();
 }
 
 } // namespace
@@ -639,7 +1192,7 @@ void update_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     if (const float* p = purse_of(w, actor); p != nullptr)
         balance = *p;
     const eval_key key{ ui.active_body, make_lp_stamp(w), sf.choice.type, sf.choice.target,
-                        sf.choice.recipe, balance, ui.max_logistics_reach };
+                        sf.choice.recipe, balance, ui.max_logistics_reach, sf.scope_province };
     if (!(key == last_key()) || sf.body != ui.active_body)
     {
         last_key() = key;
@@ -657,81 +1210,73 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
 
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Find a site");
 
-    // THE PICKER. A selector, not a state: the chosen row is the target the finder
-    // prices, and choosing it again (or "None") clears it, so the visible choice is
-    // a toggle as the standing rule asks.
-    const std::vector<site_option> opts = site_options(w, reg);
+    // THE SCOPE LINE (Ben, 2026-11-08): the search is the selected tile's province, or
+    // the whole body; the line names which, and clears it.
+    resolve_scope(w, ui);
+    if (sf.scope_province != 0)
     {
-        const ImVec2 pp = ImGui::GetCursorScreenPos();
-        sf.picker_x = pp.x + 40.0f;
-        sf.picker_y = pp.y + ImGui::GetFrameHeight() * 0.5f;
-    }
-    ImGui::SetNextItemWidth(-1.0f);
-    const char* preview = sf.armed ? sf.choice.name.c_str() : "Choose a building...";
-    if (ImGui::BeginCombo("##site_building", preview, ImGuiComboFlags_HeightLarge))
-    {
-        if (ImGui::Selectable("None", !sf.armed))
-            sf.armed = false;
-        std::string fold;
-        for (std::size_t i = 0; i < opts.size(); ++i)
+        const std::string where = sf.scope_name.empty() ? std::string("This province")
+                                : sf.scope_near         ? "The province near " + sf.scope_name
+                                                        : "Province of " + sf.scope_name;
+        const std::string text = sf.scope_foreign ? where + ": none of it is your ground" : where;
+        const float clear_w = ImGui::CalcTextSize("Clear").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        const float start_x = ImGui::GetCursorPosX();
+        const float room    = ImGui::GetContentRegionAvail().x;
+        ImGui::PushTextWrapPos(start_x + room - clear_w - 6.0f);
+        ImGui::TextUnformatted(text.c_str());
+        ImGui::PopTextWrapPos();
+        grid_explainer e;
+        e.key  = "scope";
+        e.mn   = ImGui::GetItemRectMin();
+        e.mx   = ImGui::GetItemRectMax();
+        e.text = "The buildings, their figures, the table and the map consider only this province's "
+                 "ground. It follows the selected tile.";
+        construction_column_card("Province", {std::move(e)});
+        ImGui::SameLine(start_x + room - clear_w);
+        if (ImGui::SmallButton("Clear##site_scope"))
         {
-            const site_option& o = opts[i];
-            if (o.category != fold)
-            {
-                fold = o.category;
-                ImGui::SeparatorText(fold.c_str());
-            }
-            const bool is_choice = sf.armed && sf.choice.type == o.type
-                && sf.choice.target == o.target && sf.choice.recipe == o.recipe;
-            ImGui::PushID(static_cast<int>(i));
-            // EACH OPTION DRAWS ITS BUILDING GLYPH (Ben, 2026-11-05; construction.md
-            // § The site ledger), on the door's identity rule: an extraction option's
-            // target, a recipe's primary output.
-            const float  lh = ImGui::GetTextLineHeight();
-            const float  gr = lh * 0.5f;
-            const ImVec2 op = ImGui::GetCursorScreenPos();
-            const float  text_x = lh + ImGui::GetStyle().ItemInnerSpacing.x;
-            const float  have   = std::max(16.0f, ImGui::GetContentRegionAvail().x - text_x);
-            const bool   pressed = ImGui::Selectable("##site_option", is_choice);
-            const recipe* orc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
-            ImDrawList*  odl = ImGui::GetWindowDrawList();
-            icons::building(odl, {op.x + gr, op.y + gr}, gr, o.type,
-                            orc != nullptr ? primary_output_resource(*orc) : o.target,
-                            IM_COL32(150, 235, 160, 255));
-            odl->AddText({op.x + text_x, op.y}, ImGui::GetColorU32(ImGuiCol_Text),
-                         fitted(o.name.c_str(), have).c_str()); // fit-exempt: fitted to the row
-            sf.picker_rows.push_back({o.name, o.category, gr, ImGui::CalcTextSize(o.name.c_str()).x, have,
-                                      op.x + text_x, op.y + gr});
-            if (pressed)
-            {
-                if (is_choice)
-                    sf.armed = false; // the toggle: the active choice, pressed again, clears
-                else
-                {
-                    sf.armed  = true;
-                    sf.choice = o;
-                }
-            }
-            ImGui::PopID();
+            clear_selection_to_resting(ui);
+            sf.row_pressed_tile = null_entity;
+            resolve_scope(w, ui);
         }
-        ImGui::EndCombo();
+        if (ImGui::IsItemHovered())
+            construction_row_card("Clear", [] {
+                ImGui::TextDisabled("Clears the selected tile, so the search covers all your ground on this body.");
+            });
     }
+    else
+    {
+        ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
+        ImGui::TextWrapped("All your ground on this body. Select a tile to narrow to its province.");
+        ImGui::PopStyleColor();
+    }
+
+    // THE BUILDING GRID (Ben, 2026-11-08): every option's best estimated net, before
+    // any is chosen. A selector, not a state: the chosen cell is the target the finder
+    // prices, and pressing it again clears it, so the visible choice is a toggle.
+    const std::vector<site_option> opts = site_options(w, reg);
+    step_site_grid(w, reg, ui, opts);
+    draw_site_grid(w, reg, ui);
 
     update_site_finder(w, reg, ui);
     if (!sf.armed)
     {
-        ImGui::TextDisabled("Choose a building to mark the tiles that take it.");
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
+        ImGui::TextWrapped("Press a building to list its sites and mark them on the map.");
+        ImGui::PopStyleColor();
         return;
     }
 
     // What the figures are, stated once (the door's caption, with the cover named).
     ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
     if (sf.rows.empty())
-        ImGui::TextWrapped("No tile of your ground on this body takes it.");
+        ImGui::TextWrapped("No tile of your ground %s takes it.",
+                           sf.scope_province != 0 ? "in this province" : "on this body");
     else
-        ImGui::TextWrapped("%d sites on your ground, by est. net / qtr at today's local prices "
+        ImGui::TextWrapped("%d sites %s, by est. net / qtr at today's local prices "
                            "(50%% staffing, no labour shortage, each tile's Logistic Point cover).",
-                           static_cast<int>(sf.rows.size()));
+                           static_cast<int>(sf.rows.size()),
+                           sf.scope_province != 0 ? "in this province" : "on your ground");
     if (sf.no_lp_rows > 0)
     {
         ImGui::PopStyleColor();
@@ -894,6 +1439,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                 ui.selected_entity          = r.tile;
                 ui.selected_province        = w.provinces.province_of(r.tile);
                 ui.province_sync_entity     = r.tile;
+                sf.row_pressed_tile         = r.tile; // selects it, without narrowing this list
                 ui.planetary_center_col     = r.x;
                 ui.planetary_center_row     = r.y;
                 ui.planetary_center_pending = true;

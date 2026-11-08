@@ -283,7 +283,7 @@
   ],
   [
    "ledger.construction_site_pick",
-   "Construction ledger, Construction view, the 'Find a site' building picker (a combo above the tile build bar)"
+   "Construction ledger, Construction view, the 'Find a site' building grid (above the tile build bar)"
   ],
   [
    "ledger.construction_site_sort",

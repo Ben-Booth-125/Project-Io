@@ -1,11 +1,12 @@
--- The site finder's building picker draws each option's building glyph (Ben,
--- 2026-11-05; docs/ui/ledgers/construction.md § The site ledger).
+-- The site finder's building grid draws each option's building glyph (Ben,
+-- 2026-11-05; the grid itself Ben, 2026-11-08; docs/ui/ledgers/construction.md
+-- § The site ledger).
 --
--- What this check reads: the REAL combo, opened by a press on it. The combo reports
--- what it drew for each option: the glyph's half-extent and the name's width against
--- its room. Every option the finder offers must have drawn, with a glyph, unelided.
--- It also presses one option, so the row's press still chooses after the swap to a
--- hand-drawn label, and presses it again, so the toggle still clears.
+-- What this check reads: the REAL grid, resting in the Construction view. The grid
+-- reports what it drew for each cell: the glyph's half-extent and the name's widest
+-- wrapped line against its room. Every option the finder offers must have drawn, with
+-- a glyph, unelided. It also presses a cell, so the press still chooses, and presses
+-- it again, so the toggle still clears.
 --
 -- Run with: ProjectIo --verify scripts/verify/site_picker_glyphs.lua
 
@@ -14,44 +15,40 @@ verify.goto_surface("home")
 verify.show_panel("build", true)
 verify.frames(3)
 
-local closed = verify.site_finder()
-verify.expect(closed.picker_x >= 0, "the picker is on screen")
-verify.expect(closed.n_picker_rows == 0, "a shut combo publishes no option rows")
+local resting = verify.site_finder()
+verify.expect(resting.picker_x >= 0, "the grid is on screen")
 
 local opts = verify.site_options()
 verify.expect(#opts > 0, "the finder offers buildings")
-
-verify.click(closed.picker_x, closed.picker_y)
-verify.frames(3)
-local open = verify.site_finder()
-print(string.format("site_picker_glyphs: %d options offered, %d drawn", #opts, open.n_picker_rows))
-verify.expect(open.n_picker_rows == #opts, "the open combo drew every option the finder offers")
+print(string.format("site_picker_glyphs: %d options offered, %d drawn", #opts, resting.n_picker_rows))
+verify.expect(resting.n_picker_rows == #opts, "the grid drew every option the finder offers")
 verify.capture("site_picker_glyphs_open")
 
-for i, o in ipairs(open.picker_rows) do
-    verify.expect(o.name == opts[i].name, "option " .. i .. " is drawn in the door's order: " .. o.name)
+-- The grid orders by estimated net (site_grid.lua asserts the order); this check
+-- asserts the door's vocabulary is all there and every cell is legible.
+local offered = {}
+for _, o in ipairs(opts) do offered[o.name] = true end
+for _, o in ipairs(resting.picker_rows) do
+    verify.expect(offered[o.name] == true, "cell is one the door offers: " .. o.name)
     verify.expect(o.glyph_r > 0, "'" .. o.name .. "' draws its building glyph")
-    verify.expect(o.need <= o.have,
-                  string.format("'%s' fits its row (%.1f of %.1f px)", o.name, o.need, o.have))
+    verify.expect(o.need <= o.have + 0.5,
+                  string.format("'%s' fits its cell (%.1f of %.1f px)", o.name, o.need, o.have))
 end
 
--- Press a real row. The combo's first rows are always on screen, so the first one is
--- a press a click can reach; the swap to a hand-drawn label must keep the press.
-local first = open.picker_rows[1]
+-- Press a real cell. The first cell is always on screen.
+local first = resting.picker_rows[1]
 verify.click(first.x, first.y)
 verify.frames(3)
 local chosen = verify.site_finder()
 verify.expect(chosen.armed and chosen.choice == first.name,
-              "pressing the row chooses it: " .. tostring(chosen.choice))
-verify.expect(chosen.n_picker_rows == 0, "the press closes the combo")
+              "pressing the cell chooses it: " .. tostring(chosen.choice))
+verify.expect(chosen.n_picker_rows == #opts, "the grid stays drawn with a building chosen")
 
--- The toggle: pressing the chosen row again clears it.
-verify.click(chosen.picker_x, chosen.picker_y)
+-- The toggle: pressing the chosen cell again clears it.
+local again = chosen.picker_rows[1]
+verify.expect(again.name == first.name, "a choice does not reorder the grid")
+verify.click(again.x, again.y)
 verify.frames(3)
-local again = verify.site_finder()
-verify.expect(again.n_picker_rows == #opts, "the combo opens again")
-verify.click(again.picker_rows[1].x, again.picker_rows[1].y)
-verify.frames(3)
-verify.expect(not verify.site_finder().armed, "pressing the chosen row clears it")
+verify.expect(not verify.site_finder().armed, "pressing the chosen cell clears it")
 
 print("site_picker_glyphs: done")

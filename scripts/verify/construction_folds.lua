@@ -12,6 +12,7 @@ verify.window(1720, 1080)
 verify.goto_surface("home")
 verify.set_balance(5000000.0)
 verify.show_panel("build", true)
+verify.clear_selection() -- a selected tile scopes the finder to its province (Ben, 2026-11-08)
 verify.frames(3)
 
 -- THE FINDER'S HALF: one mapping, so a Power Generation recipe is never in Processing.
