@@ -566,8 +566,42 @@ int apply_wing_refills(world& w, const recipe_registry& reg, const std::vector<w
             continue;
         int n = std::min(sit->recruits_delivered, r.planned);
         n = std::min<int>(n, std::max<int32_t>(0, nit->second.air_recruits));
+        // BL-1551 (MILITARY.md § What a force costs): each recruit brings his share of the
+        // wing's goods, over its crew, bought off the nation's shelves as a land refill's are.
+        std::array<float, resource_count> per = air_kit_goods(air_roster_table()[wg.type].cls, wg.kit);
+        {
+            const air_class_stats& cs = reg.military().air.cls[static_cast<std::size_t>(air_roster_table()[wg.type].cls)];
+            for (std::size_t g = 0; g < resource_count; ++g)
+                per[g] = (per[g] + cs.hire_goods[g]) / static_cast<float>(crew);
+        }
+        {
+            std::array<float, resource_count> avail{};
+            float per_cost = 0.0f;
+            for (const entity_id mid : corp_markets(w, r.nation))
+            {
+                const market_component& mc = w.markets.at(mid);
+                for (std::size_t g = 0; g < resource_count; ++g)
+                    if (per[g] > 0.0f && mc.base_price[g] > 0.0f && shelf_admits(mc, g, 0.0f, true))
+                        avail[g] += std::max(0.0f, mc.inventory[g]);
+            }
+            for (std::size_t g = 0; g < resource_count; ++g)
+                if (per[g] > 0.0f)
+                    per_cost += per[g] * shelf_price_bound(w, r.nation, g);
+            n = std::min(n, men_equipped(avail, per));
+            if (per_cost > 0.0f)
+                n = std::min<int>(n, static_cast<int>(std::max(0.0f, std::floor(purse_room_of(w, r.nation) / per_cost))));
+        }
         if (n <= 0)
             continue;
+        {
+            std::array<float, resource_count> bought{};
+            for (std::size_t g = 0; g < resource_count; ++g)
+                if (per[g] > 0.0f)
+                    bought[g] = buy_from_corp_shelves(w, r.nation, g, per[g] * static_cast<float>(n), 0.0f);
+            n = std::min(n, men_equipped(bought, per));
+            if (n <= 0)
+                continue;
+        }
         const int64_t gain = n >= r.lacks
             ? static_cast<int64_t>(k_wing_hp_full) - wg.hp_ppm
             : static_cast<int64_t>(n) * k_wing_hp_full / crew;

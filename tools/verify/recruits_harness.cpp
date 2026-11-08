@@ -514,8 +514,9 @@ int main()
             if (with[i].unit == u_eight) d_eight = with[i].need - without[i].need;
         }
         std::printf("      LP added to the request: on the road %.3f, 8 off %.3f\n", d_on, d_eight);
-        check(d_on > 19.999f && d_on < 20.001f && d_eight > 9.999f && d_eight < 10.001f,
-              "R5b each recruit adds 1 LP to its unit's supply request (20 and 10)");
+        // BL-1551: a man's equipment joins the request by its quantity (2 small arms / 50 men).
+        check(d_on > 20.799f && d_on < 20.801f && d_eight > 10.399f && d_eight < 10.401f,
+              "R5b each recruit adds 1 LP and his equipment's 0.04 to its unit's supply request (20.8 and 10.4)");
         check(collect_supply_claims(f.w, reg).size() == with.size(),
               "R5c the plan-less form computes the same plan itself");
 
@@ -542,8 +543,8 @@ int main()
               "R5f 9 tiles off: past its roads, nothing refills (10 stays 10)");
         check(r.delivered == 30 && nat(f).land_recruits == 970,
               "R5g 30 recruits delivered, 30 taken from the pool (1000 -> 970); the unfilled 40 stay in it");
-        check(granted > base_granted + 29.99f && granted < base_granted + 30.01f,
-              "R5h the nation's pool granted exactly 30 more points for the 30 recruits");
+        check(granted > base_granted + 31.19f && granted < base_granted + 31.21f,
+              "R5h the nation's pool granted exactly 31.2 more points for the 30 recruits and their equipment");
 
         // A short pool: ascending unit id while it lasts.
         fixture g; build(g);
@@ -589,9 +590,9 @@ int main()
                     sh1, d1, x1, d6, x6);
         check(sh1 > 0 && sh1 < 1000 && d1 == 0 && x1 > -1e-4f && x1 < 1e-4f,
               "R5k a fractional share on ONE missing man delivers none and draws no point for it");
-        check(sh6 == sh1 && d6 == 6 * sh6 / 1000 && x6 > static_cast<float>(d6) - 1e-3f
-                  && x6 < static_cast<float>(d6) + 1e-3f,
-              "R5l on six missing it delivers floor(6 x share) whole recruits and draws exactly 1 point each");
+        check(sh6 == sh1 && d6 == 6 * sh6 / 1000 && x6 > static_cast<float>(d6) * 1.04f - 1e-3f
+                  && x6 < static_cast<float>(d6) * 1.04f + 1e-3f,
+              "R5l on six missing it delivers floor(6 x share) whole recruits and draws 1.04 points each (a man and his equipment)");
     }
 
     // -----------------------------------------------------------------------

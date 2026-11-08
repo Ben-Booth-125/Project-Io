@@ -1367,7 +1367,7 @@
    "design": "MILITARY.md § What a force costs. run_nation_garrison_upkeep stops taking its share from the military_research weight: the whole bill is owed, paid from the treasury as far as it goes, and a short payment weakens every unit, wing and ship by the one decay rule. Crews join the bill at the same wage per head."
   },
   {
-   "status": "proposed",
+   "status": "complete",
    "glyph": "○",
    "sprint": "64",
    "version_goal": "v0.3.0",

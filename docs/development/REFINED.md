@@ -22,9 +22,9 @@ Runs beside sprint 63. The core has no money dependency; the sea trade reading a
 
 ### BL-1551 (force equipment)
 
-- [ ] Base-kit equipment per land class, drawn at hire and on refill.
-- [ ] A wing's recruit brings its equipment; check a ship's mend draws its share.
-- [ ] Majors open with three Arms Works; every nation opens with a reserve.
+- [x] Base-kit equipment per land class, drawn at hire and on refill.
+- [x] A wing's recruit brings its equipment; check a ship's mend draws its share.
+- [x] Majors open with three Arms Works; every nation opens with a reserve.
 
 ### BL-1552 (force sizing)
 

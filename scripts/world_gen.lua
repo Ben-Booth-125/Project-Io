@@ -344,6 +344,10 @@ world_gen = {
                     { good = "food_rations",   recipes = { "food_rations" } },
                     { good = "silicon",        recipes = { "silicon" } },           -- Refinery, from silica
                     { good = "steel",          recipes = { "steel" } },
+                    -- BL-1551 (Ben, 2026-11-08): every class is raised and refilled with its arms.
+                    { good = "small_arms",        recipes = { "small_arms" } },        -- Arms Works
+                    { good = "armoured_vehicles", recipes = { "armoured_vehicles" } }, -- Arms Works
+                    { good = "artillery_pieces",  recipes = { "artillery_pieces" } },  -- Arms Works
                 },
                 civic = {
                     "planetary_marketplace", "research_institute", "research_institute",

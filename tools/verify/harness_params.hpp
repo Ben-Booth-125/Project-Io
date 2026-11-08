@@ -467,6 +467,8 @@ inline shipped_landscape apply_shipped_landscape(
         // BL-1532: finish_campaign_world's major opening fleet, verbatim, right after it.
         if (kit != nullptr && kit->has_fleet())
             print_opening_fleets(seed_major_opening_fleets(w, kit->fleet, kit->fleet_per_port, kit->sea_recruits));
+        // BL-1551: finish_campaign_world's arms reserve, verbatim, right after it.
+        seed_arms_reserve(w);
     }
 
     return out;

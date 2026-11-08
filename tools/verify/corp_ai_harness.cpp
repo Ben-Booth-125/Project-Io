@@ -41,6 +41,7 @@
 #include "world/nation_budget.hpp" // budget_claim (R6, Sprint N3 T5)
 #include "world/recipe_registry.hpp"
 #include "world/survey_system.hpp"  // survey_cost (R6)
+#include "world/unit_designs.hpp" // set_class_equipment_waived_for_harness
 #include "world/unit_roster.hpp"
 #include "world/world.hpp"
 
@@ -385,6 +386,8 @@ chain_result run_chain_scene(int rich_col, float max_reach)
 int main()
 {
     std::printf("BL-202 corp-AI scored-utility harness\n");
+    // BL-1551: these rows pin the hire's own goods; class equipment is pinned in unit_designs_harness.
+    set_class_equipment_waived_for_harness(true);
 
     // =====================================================================
     // R1 — the command seam

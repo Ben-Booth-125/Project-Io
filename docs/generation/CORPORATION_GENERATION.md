@@ -413,7 +413,7 @@ the source, about 460 credits a tick, and the one treasury figure every major st
 steel, copper and machinery slots are one chain: iron ore and coal make steel, copper ore makes
 refined copper, and the two make machinery. Ordnance, which every unit draws, is machinery and steel,
 so a major can make it as its first build. **Arms Works are in the kit (Ben, 2026-11-08):** one each for small arms, armoured vehicles and
-artillery pieces, since every class is raised and refilled with its equipment
+artillery pieces, since every class is raised and refilled with its equipment. A works whose inputs are out of reach still opens, idle until they arrive
 (`../military/MILITARY.md` § What a force costs). **Every nation, major or minor, opens with a reserve
 of those three goods on its shelves**, so a nation can raise its first force before its works or its
 imports arrive.

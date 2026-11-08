@@ -8249,6 +8249,39 @@
      "evidence": "2026-11-08 sea_theatre_harness W4, W5 PASS for land; wings and ships read nation_wages_short in their own pass. unit_upkeep 60 of 60, move_by_days 45 of 45."
     }
    ]
+  },
+  {
+   "brief": "force-equipment",
+   "title": "BL-1551 - Every class is raised and refilled with its equipment, and arms have a maker on day one (MILITARY.md § What a force costs)",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": 4,
+   "status": "complete",
+   "promoted_from": "BL-1551",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "A land unit is raised and refilled with its class equipment, on top of its kit.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 unit_designs_harness U4b/c/g/h PASS (51 of 51); recruits_harness R5b/h/l PASS (116 of 116)."
+    },
+    {
+     "id": "R2",
+     "text": "A wing recruit brings its share of the goods; a ship repair draws its refit goods.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 recruits_harness PASS for the wing path. Ship repair already drew refit_goods (sea_combat.cpp step 5); no change needed."
+    },
+    {
+     "id": "R3",
+     "text": "Majors open with an Arms Works per good, and every nation with a reserve at its capital market.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 rival_fleet_census over 16 seeds: [arms reserve] printed on every seed, 14 to 41 nations stocked; arms works 4 to 43 per seed."
+    }
+   ]
   }
  ]
 }

@@ -587,12 +587,21 @@ entity_id place_processor(kit_layer& L, major_kit& mk, const std::vector<int>& c
         for (const int i : gated)
         {
             const recipe& rc = L.reg.recipe_at(building_type::processing_facility, i);
-            if (!mk.want.short_for(L.w, rc, site))
+            // BL-1551 (Ben, 2026-11-08): no market asks for arms before the first hire, so the
+            // want gate cannot speak for them. The kit's arms slots are the ruling's own want.
+            const bool arms = rc.outputs[static_cast<std::size_t>(resource_type::small_arms)] > 0.0f
+                || rc.outputs[static_cast<std::size_t>(resource_type::armoured_vehicles)] > 0.0f
+                || rc.outputs[static_cast<std::size_t>(resource_type::artillery_pieces)] > 0.0f;
+            if (!arms && !mk.want.short_for(L.w, rc, site))
             {
                 if (why) ++why->not_wanted;
                 continue;
             }
-            const int t = chain_recipe_placeable(L.w, L.reg, L.cr, bid, market, rc, &mk.own);
+            int t = chain_recipe_placeable(L.w, L.reg, L.cr, bid, market, rc, &mk.own);
+            // The same ruling, for the feed: a works whose steel or machinery is not yet in
+            // reach still opens, idle, and runs when they arrive. Last among the feasible.
+            if (t == chain_tier_none && arms)
+                t = chain_tier_none - 1;
             if (t == chain_tier_none && why)
             {
                 if (chain_recipe_tier(L.w, L.reg, L.cr, bid, market, rc, &mk.own) == chain_tier_none)

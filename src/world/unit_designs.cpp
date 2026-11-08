@@ -466,9 +466,34 @@ void add_goods(std::array<float, resource_count>& out, uint16_t item)
 
 } // namespace
 
+static bool g_class_equipment_waived = false;
+void set_class_equipment_waived_for_harness(bool waived) { g_class_equipment_waived = waived; }
+
+std::array<float, resource_count> land_class_equipment(land_class c)
+{
+    if (g_class_equipment_waived)
+        return {}; // a harness testing the queue or the scorer, not the shelves
+    // BL-1551 (Ben, 2026-11-08; MILITARY.md § What a force costs): by kind, per unit raised.
+    // First-cut quantities on the catalogue's own scale (AP(2), AV(2)); read by the census.
+    std::array<float, resource_count> out{};
+    const auto put = [&](resource_type r, float q) { out[static_cast<std::size_t>(r)] = q; };
+    switch (c)
+    {
+        case land_class::infantry:     put(resource_type::small_arms, 2.0f); break;
+        case land_class::motorised:    put(resource_type::small_arms, 2.0f); put(resource_type::armoured_vehicles, 1.0f); break;
+        case land_class::mechanised:   put(resource_type::small_arms, 1.0f); put(resource_type::armoured_vehicles, 2.0f); break;
+        case land_class::armour:       put(resource_type::armoured_vehicles, 4.0f); break;
+        case land_class::light_armour: put(resource_type::armoured_vehicles, 2.0f); break;
+        case land_class::artillery:    put(resource_type::artillery_pieces, 3.0f); break;
+        case land_class::air_defence:  put(resource_type::artillery_pieces, 2.0f); break;
+        case land_class::none:         break;
+    }
+    return out;
+}
+
 std::array<float, resource_count> kit_goods(land_class c, const unit_design& d)
 {
-    std::array<float, resource_count> out{};
+    std::array<float, resource_count> out = land_class_equipment(c);
     for (int slot = 0; slot < slot_count(c); ++slot)
         add_goods(out, kit_item_at(c, slot, d.fit[static_cast<std::size_t>(slot)]));
     return out;

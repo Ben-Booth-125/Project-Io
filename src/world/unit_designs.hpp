@@ -130,6 +130,12 @@ land_combat_stats kit_stats(land_class c, const unit_design& d);
 land_combat_stats design_stats(const world& w, entity_id nation, land_class c);
 
 /// The goods of every non-base item in @p d, resource-indexed: what a hire to it buys.
+/// BL-1551: the goods a unit of @p c is raised with, whatever its kit.
+std::array<float, resource_count> land_class_equipment(land_class c);
+/// Harness only: a fixture testing something other than the goods leg raises units free.
+void set_class_equipment_waived_for_harness(bool waived);
+/// The goods a unit of @p c on design @p d is raised with: its class's equipment and each
+/// slot's kit item on top.
 std::array<float, resource_count> kit_goods(land_class c, const unit_design& d);
 
 /// The goods a refit from @p from to @p to buys: each slot whose item changes buys
