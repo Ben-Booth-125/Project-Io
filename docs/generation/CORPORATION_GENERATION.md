@@ -453,7 +453,10 @@ is kept, again and again while one adds any. Cover is read over the kept nodes a
 the capital. A kit building the cap strands has no cover, so it runs at zero output and idles. The
 remaining slots fill in the order the Logistic Point seeding lays them out from the capital
 (`../economy/LOGISTICS.md` § Where generation puts the sources). The seeding lays any slot still
-open, and a node beyond the slot count is taken up.
+open, and a node beyond the slot count is taken up. **The last port slot is a sea berth (Ben,
+2026-11-07).** The kit's fleet lies at a port with a sea mouth, and a lake's shore is none. While a
+sea-mouthed port stands on the major's ground and none is kept, the last open port slot takes only a
+sea-mouthed port; kit cover still decides which one.
 
 **The kit stands within the capped network's reach (Ben, 2026-11-04).** A kit extractor or processor
 the cap leaves without cover is laid again on covered ground of the major's. An extractor digs the
@@ -471,12 +474,13 @@ go on the shelf of its own market. A fresh chain otherwise starts empty-shelved 
 before its feeders deliver; the reflex then idles the processor, and with it the feeder that had no
 buyer.
 
-**The kit opens with its own treasury and army.** The flat treasury is `NATION_GENERATION.md`
-§ Pass 7's, and the fixed army is `../military/MILITARY.md` § Nation garrisons'. The settle then runs as
+**The kit opens with its own treasury, army and fleet.** The flat treasury is `NATION_GENERATION.md`
+§ Pass 7's, the fixed army is `../military/MILITARY.md` § Nation garrisons', and the fixed fleet is
+`../military/MILITARY.md` § Sea's. The settle then runs as
 it does for every nation, and every major still starts play on the same credits (Ben, 2026-11-05):
 the treasury is equal at the handoff, where the rest of parity is measured.
 
-**The kit is data.** Its slots, counts, treasury and army are one authored table, so a configuration
+**The kit is data.** Its slots, counts, treasury, army and fleet are one authored table, so a configuration
 under test is an edit, not a code change. Standard (27 buildings) is the comparison point Rich-core
 was chosen over (Ben, 2026-11-03).
 

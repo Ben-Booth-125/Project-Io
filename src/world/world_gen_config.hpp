@@ -143,6 +143,14 @@ struct opening_kit_config
     int army_men      = 50; ///< men in each unit (`hire_batch_manpower`'s figure)
     int land_recruits = 0;  ///< the major's land pool at the opening
     bool has_army() const { return !army_capital.empty() || !army_border.empty(); }
+    /// THE FIXED FLEET (MILITARY.md § Sea, "A major's opening fleet is fixed", Ben
+    /// 2026-11-07), authored with the kit. Each entry a `ship_class` as its integer, in
+    /// berthing order: the capital port takes the first `fleet_per_port`, the next-nearest
+    /// sea-mouthed port the next, wrapping. Empty (no `fleet` table authored): no ships.
+    std::vector<std::uint8_t> fleet;
+    int fleet_per_port = 3; ///< opening ships one port berths before the rest spill
+    int sea_recruits   = 0; ///< the major's sea pool at the opening
+    bool has_fleet() const { return !fleet.empty(); }
 };
 
 struct opening_kit_table

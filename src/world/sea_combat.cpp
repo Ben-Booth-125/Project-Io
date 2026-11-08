@@ -17,10 +17,12 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <deque>
 #include <limits>
 #include <map>
 #include <set>
+#include <tuple>
 
 // ---------------------------------------------------------------------------
 // The sea roster. One row per class; numbers are the class's (Lua). The gate is the
@@ -1573,4 +1575,69 @@ ship_upkeep_tick run_ship_upkeep(world& w, const recipe_registry& reg, economy_r
         ++out.disbanded;
     }
     return out;
+}
+
+// ---- The opening fleet (BL-1532; MILITARY.md § Sea) ------------------------------
+
+opening_fleet_report seed_major_opening_fleets(world& w, const std::vector<std::uint8_t>& fleet,
+                                               int per_port, int sea_recruits)
+{
+    opening_fleet_report out;
+    per_port = std::max(1, per_port);
+    std::vector<entity_id> majors;
+    for (const auto& [nid, nc] : w.nations)
+        if (nc.is_major)
+            majors.push_back(nid);
+    std::sort(majors.begin(), majors.end());
+    for (const entity_id nid : majors)
+    {
+        nation_component& nc = w.nations.at(nid);
+        nc.sea_recruits = sea_recruits;
+        ++out.majors;
+        const uint32_t capital_province = w.provinces.province_of(nc.capital_tile);
+        // (not in the capital's province, distance, tile, id): the capital port first.
+        std::vector<std::tuple<int, int, entity_id, entity_id, entity_id>> berths;
+        for (const entity_id bid : own_ports(w, nid))
+        {
+            const entity_id mouth = port_mouth_tile(w, bid);
+            if (mouth == null_entity)
+                continue; // a lake's shore: no ship lies there
+            const entity_id tile = w.buildings.at(bid).tile;
+            const bool at_capital = capital_province != 0 && w.provinces.province_of(tile) == capital_province;
+            const int d = air_tile_distance(w, nc.capital_tile, tile);
+            berths.emplace_back(at_capital ? 0 : 1, d < 0 ? std::numeric_limits<int>::max() : d, tile, bid, mouth);
+        }
+        if (berths.empty())
+        {
+            ++out.no_sea_port;
+            continue;
+        }
+        std::sort(berths.begin(), berths.end());
+        if (std::get<0>(berths.front()) != 0)
+            ++out.off_capital;
+        for (std::size_t i = 0; i < fleet.size(); ++i)
+        {
+            const std::size_t at = (i / static_cast<std::size_t>(per_port)) % berths.size();
+            const ship_class cls = static_cast<ship_class>(fleet[i]);
+            sea_ship s;
+            s.owner     = nid;
+            s.home_port = std::get<3>(berths[at]);
+            s.tile      = std::get<4>(berths[at]);
+            s.type      = static_cast<uint16_t>(fleet[i]); // one row per class, in class order
+            s.kit       = ship_design_of(w, nid, cls);
+            w.ships.emplace(w.create_entity(), std::move(s));
+            ++out.ships;
+            if (at != 0)
+                ++out.spilled;
+        }
+    }
+    return out;
+}
+
+void print_opening_fleets(const opening_fleet_report& r)
+{
+    std::printf("[opening_kit] fleet: %d major(s), %d ship(s) laid (%d past the capital port); %d major(s) "
+                "with no sea port; %d with none in the capital's province\n",
+                r.majors, r.ships, r.spilled, r.no_sea_port, r.off_capital);
+    std::fflush(stdout);
 }

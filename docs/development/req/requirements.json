@@ -8094,6 +8094,53 @@
     }
    ],
    "resolved": "2026-11-07"
+  },
+  {
+   "brief": "opening-fleets",
+   "title": "BL-1532 - A major opens with the fixed fleet of its kit, berthed from its capital port",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "active",
+   "promoted_from": "backlog.json BL-1532 - sprint 64 (Ben, 2026-11-07 form)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Every major holding a sea-mouthed port opens with the kit fleet: two destroyers, one capital ship, one submarine, one transport, raised (muster 0), on its live base design, at port mouths. Every major's sea pool opens on 100. Minors open with no ship.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "tools/verify/opening_fleet_settle F0-F3, 16 library seeds, 0 failures: 85 of 94 majors open with the five kit ships, raised on the live design at their home port mouth; 9 hold no sea-mouthed port and open with none; every major's pool is 100; no minor has a ship."
+    },
+    {
+     "id": "R2",
+     "text": "The ships berth at the capital port first (own sea-mouthed port in the capital province, else nearest), three to a port, spilling to the next-nearest and wrapping.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "opening_fleet_settle F4 re-derives the berthing order (capital province, distance, tile, id; three a port, wrapping) for every ship: 0 failures over 16 seeds."
+    },
+    {
+     "id": "R3",
+     "text": "The kit cap's last port slot admits only a sea-mouthed port while one stands and none is kept, kit cover still choosing which; no major whose ground has a sea port opens with only a lake port. Cover lost after the cap is measured before and after.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "tools/verify/port_mouth_census, 16 seeds, before -> after: majors with no port 11 -> 8, with only lake ports 4 -> 1 (seed 54, whose ground keeps no sea port), kit buildings uncovered after the cap 76 -> 76. A first cut that forced the berth before cover cost one (77); cold review caught it, and the rule became \"the last port slot admits only a sea port\"."
+    },
+    {
+     "id": "R4",
+     "text": "Deterministic: two builds of one seed lay byte-identical ships; the fleet survives the settle and a save round-trip.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "opening_fleet_settle D1 (two builds of seed 0: equal hash and ships), S1 (every ship survives the 12-tick settle; none lost HP, 16 seeds), S2 (snapshot round-trip keeps every ship field and the state hash)."
+    },
+    {
+     "id": "R5",
+     "text": "Live: on a fresh seat the Sea tab lists the five opening ships and a ship card opens; a transport can take a unit aboard.",
+     "kind": "visual",
+     "status": "pending",
+     "evidence": ""
+    }
+   ]
   }
  ]
 }

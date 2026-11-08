@@ -279,6 +279,13 @@ world_gen = {
                     border  = { "motorised", "infantry", "infantry", "infantry" },
                     men = 50, land_recruits = 200,
                 },
+                -- The fixed fleet (Ben, 2026-11-07; MILITARY.md § Sea): all four classes in
+                -- fixed shares, raised on base kit, three to a port from the capital port out;
+                -- the sea pool opens on 100 recruits.
+                fleet = {
+                    ships = { "destroyer", "destroyer", "capital", "submarine", "transport" },
+                    per_port = 3, sea_recruits = 100,
+                },
                 extraction = {
                     "agricultural_produce", "agricultural_produce", "agricultural_produce",
                     "agricultural_produce", "agricultural_produce", "water", "coal",
@@ -310,6 +317,13 @@ world_gen = {
                     capital = { "infantry", "infantry", "artillery", "light_armour" },
                     border  = { "motorised", "infantry", "infantry", "infantry" },
                     men = 50, land_recruits = 200,
+                },
+                -- The fixed fleet (Ben, 2026-11-07; MILITARY.md § Sea): all four classes in
+                -- fixed shares, raised on base kit, three to a port from the capital port out;
+                -- the sea pool opens on 100 recruits.
+                fleet = {
+                    ships = { "destroyer", "destroyer", "capital", "submarine", "transport" },
+                    per_port = 3, sea_recruits = 100,
                 },
                 extraction = {
                     "agricultural_produce", "agricultural_produce", "agricultural_produce",

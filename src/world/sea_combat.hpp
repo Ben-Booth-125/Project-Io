@@ -228,3 +228,30 @@ struct ship_upkeep_tick
 /// draws `ship_upkeep_goods` at its home port, its supply steps toward the share met,
 /// and one lying there damaged refits by drawing goods.
 ship_upkeep_tick run_ship_upkeep(world& w, const recipe_registry& reg, economy_report& report);
+
+// ---- The opening fleet --------------------------------------------------------
+
+/// What `seed_major_opening_fleets` did.
+struct opening_fleet_report
+{
+    int majors       = 0; ///< majors given the fleet
+    int ships        = 0; ///< ships laid, all majors
+    int no_sea_port  = 0; ///< majors with no sea-mouthed port: no ship
+    int off_capital  = 0; ///< majors whose capital province holds no sea-mouthed port
+    int spilled      = 0; ///< ships berthed past the capital port
+};
+
+/// BL-1532 — A MAJOR'S OPENING FLEET IS FIXED (MILITARY.md § Sea, Ben 2026-11-07). On each
+/// major (ascending id) the kit's @p fleet (ship_class integers) is laid raised, each on
+/// its class's base kit (the nation's live design), at the mouth of a port: the major's
+/// own completed sea-mouthed ports are ordered capital port first (in the capital's
+/// province), then by straight-line distance from the capital, then by tile and id; the
+/// first @p per_port ships berth at the first port, the next @p per_port at the second,
+/// wrapping round. A major with no sea-mouthed port opens with no ship. Its sea pool
+/// opens at @p sea_recruits either way. Minors are untouched. RNG-free. Run after the
+/// last generation step that places or removes a port.
+opening_fleet_report seed_major_opening_fleets(world& w, const std::vector<std::uint8_t>& fleet,
+                                               int per_port, int sea_recruits);
+
+/// Print the `[opening_kit] fleet` line.
+void print_opening_fleets(const opening_fleet_report& r);

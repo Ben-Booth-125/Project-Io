@@ -10,6 +10,29 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## 2026-11-08 — BL-1532 (opening fleets): a major opens with the fleet of its kit
+
+**Runtime:** one session, Delivery Full on the naval worktree, across a crash.
+
+**What was built.** Ben's form overturned "fleets from history": every major opens with a fixed fleet authored
+with its kit (`scripts/world_gen.lua`, `fleet = { ships, per_port, sea_recruits }`), two destroyers, a capital
+ship, a submarine and a transport, raised, at the capital port first and three a port after. Minors open with
+none. `seed_major_opening_fleets` (sea_combat.cpp) runs before the settle, in finish_campaign_world and in the
+harness mirror (harness_params.hpp, which is a second copy of the start pipeline: the first census read no ships
+because only one copy had it). The kit's port cap now keeps its last port slot for a sea-mouthed port.
+
+**Measured.** `port_mouth_census` (new), 16 seeds: majors with only lake ports 4 -> 1, with no port 11 -> 8; 425
+ships on 85 of 94 majors; kit cover after the cap 76 -> 76 uncovered. `opening_fleet_settle` (new): class, berth,
+pool and minor checks, the settle, a save round-trip and a two-build determinism check, 0 failures.
+
+**Review.** The cold review caught the first cap rule forcing the nearest sea port into the one slot before kit
+cover chose, costing cover (77 uncovered); it also asked for the assertions the first harness lacked.
+
+**Left open.** The live click (R5). Calls in NR-1150, notably docked ships fighting from day one. Ships are hashed,
+so every digest pin moves: held for the sprint's one re-bless in BL-1535 (naval war reading).
+
+---
+
 ## 2026-11-07 — BL-1534 (sea UI): ships on the map, and a card to order them
 
 **Runtime:** one session, Delivery Full on the naval worktree.

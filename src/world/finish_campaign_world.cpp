@@ -8,6 +8,7 @@
 #include "world/history_log.hpp"            // seed_genesis_history
 #include "world/nation_generation.hpp"      // BL-1474: seed_major_opening_armies
 #include "world/recipe_registry.hpp"
+#include "world/sea_combat.hpp"            // BL-1532: seed_major_opening_fleets
 #include "world/road_generation.hpp"        // BL-1347: lay_site_roads, after the stampers
 #include "world/survey_system.hpp"          // init_survey_states
 #include "world/world.hpp"
@@ -546,6 +547,12 @@ finish_campaign_result finish_campaign_world(world& w, generation_report& report
                     s.sites_roadless, s.sites_joined, s.sites_failed, s.crossings_laid);
         std::fflush(stdout);
     }
+    // BL-1532 (MILITARY.md § Sea, "A major's opening fleet is fixed", Ben 2026-11-07): the
+    // kit's ships at each major's ports. After every step that places or removes a port (the
+    // seeding, the stacked hubs, the cut), before the settle, so the settle's upkeep draws on
+    // the fleet the handoff carries.
+    if (kit != nullptr && kit->has_fleet())
+        print_opening_fleets(seed_major_opening_fleets(w, kit->fleet, kit->fleet_per_port, kit->sea_recruits));
     out.ms_search = ms_between(t_search, fin_clock::now());
     report_step_ms(progress, k_label_search, out.ms_search);
 

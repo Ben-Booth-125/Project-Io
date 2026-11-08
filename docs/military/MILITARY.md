@@ -761,9 +761,18 @@ still stands feeds no army camped beside it, and a port it occupies does (`../ec
 § A unit draws off the road). A blockade reads a port's holder, its occupier where it has one, so the
 occupier's fleet does not close it and its former owner's may.
 
-**Fleets open from history (Ben, 2026-11-05).** A nation opens with ships at its ports, drawn from the
-standing navy its history left it and sized to its chest
-(`../generation/NATION_GENERATION.md`, the opening sizing). A nation with no port opens with no ship.
+**A major's opening fleet is fixed (Ben, 2026-11-07).** As its army is (§ Nation garrisons), every
+major opens with the same fleet, authored with its kit (`../generation/CORPORATION_GENERATION.md`
+§ A major's opening kit), and no history decides it. The fleet holds **all four classes in fixed
+shares**: the Standard kit's is two destroyers, one capital ship, one submarine and one transport,
+each raised on its class's base kit. The ships lie at the **capital port** first: the major's own
+port with a sea mouth in the capital's province, or failing one, its sea-mouthed port nearest the
+capital. Each port takes three opening ships before the rest spill to the next-nearest sea-mouthed
+port; with too few ports the spill wraps round, so a major with one sea port berths the whole fleet
+there. A major with no sea-mouthed port opens with no ship. Every major's sea pool opens holding
+**100 recruits**, ships or none. Minors open with no ship. The kit's port cap keeps a sea-mouthed
+port where one stands, so a lake port never leaves a major without a berth
+(`../generation/CORPORATION_GENERATION.md` § A major's opening kit).
 **Rival nations sail fleets** under the grant in `../ai/AI_OPPONENT.md` § 11.
 
 ### Missiles

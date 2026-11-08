@@ -1227,7 +1227,7 @@
    "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
-   "status": "proposed",
+   "status": "built",
    "glyph": "○",
    "sprint": "64",
    "version_goal": "v0.3.0",
@@ -1246,11 +1246,17 @@
    "priority": "A",
    "difficulty": 3,
    "files": [
-    "src/world/history_sim.cpp",
-    "src/world/hard_coded_world.cpp"
+    "src/world/sea_combat.cpp",
+    "src/world/finish_campaign_world.cpp",
+    "src/world/world_gen_config.cpp",
+    "src/world/opening_kit.cpp",
+    "scripts/world_gen.lua",
+    "tools/verify/harness_params.hpp",
+    "tools/verify/opening_fleet_settle.cpp",
+    "tools/verify/port_mouth_census.cpp"
    ],
-   "title": "Nations open with ships from their history, sized to the chest",
-   "design": "NATION_GENERATION.md, the opening sizing; MILITARY.md § Sea. Read first whether navy_stock survives to the handoff and reaches a nation, because the fold may not carry it. Ships are priced at upkeep in the sizing. A world-mover: measure before and after, and land it in the sprint's one re-bless, not alone."
+   "title": "A major opens with the fixed fleet of its kit, berthed from its capital port",
+   "design": "MILITARY.md § Sea, \"A major's opening fleet is fixed\" (Ben, 2026-11-07); NATION_GENERATION.md, \"History leaves no fleet\"; CORPORATION_GENERATION.md § A major's opening kit. The kit authors the ships (all four classes in fixed shares), the berths per port and the sea pool. The kit's one-port cap must keep a sea-mouthed port where the major holds one, so the fleet has a berth (Ben, 2026-11-07: prefer the sea, inside this item). A world-mover: measure before and after, and land it in the sprint's one re-bless."
   },
   {
    "status": "proposed",

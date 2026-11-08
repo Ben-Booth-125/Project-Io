@@ -10,6 +10,7 @@
 #include "world/recipe_registry.hpp"
 #include "world/resource_names.hpp"
 #include "world/road_generation.hpp" // lay_port_lanes -- a port the cap lays lanes as the seeding's does
+#include "world/sea_combat.hpp"      // port_mouth_tile -- the cap keeps a sea berth (BL-1532)
 #include "world/state_industry.hpp"  // state_handover_report -- the flat treasury's foundings
 #include "world/world.hpp"
 
@@ -1328,6 +1329,31 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
                 used[i] = 1;
             }
 
+        // THE LAST PORT SLOT IS A SEA BERTH (BL-1532; MILITARY.md § Sea, Ben 2026-11-07:
+        // "prefer the sea"). The kit's fleet lies at a port with a sea mouth, and a lake's
+        // shore is none. While a sea-mouthed port stands on the major's ground and none is
+        // kept, the LAST open port slot admits only a sea-mouthed port: a lake port, or a
+        // station or hub climbing the ladder, may take any port slot but that one. Every pass
+        // below asks `admits`, so kit cover still chooses WHICH sea port is kept.
+        std::vector<char> sea(nodes.size(), 0);
+        bool sea_standing = false;
+        for (std::size_t i = 0; i < nodes.size(); ++i)
+            if (nodes[i].slot == 0 && port_mouth_tile(w, nodes[i].bid) != null_entity)
+            {
+                sea[i] = 1;
+                sea_standing = true;
+            }
+        const auto admits = [&](std::size_t i, int s) {
+            if (filled[s] >= count[s])
+                return false;
+            if (s != 0 || sea[i] || !sea_standing || filled[0] + 1 < count[0])
+                return true;
+            for (std::size_t k = 0; k < nodes.size(); ++k)
+                if (used[k] && sea[k])
+                    return true; // a sea berth is kept already
+            return false;
+        };
+
         // KIT COVER FIRST (Ben, 2026-11-04: "Keep covering nodes"): before the seeding's
         // order fills the slots, the standing node that brings the most of the kit's
         // buildings under cover is kept, again and again while one adds any, each into
@@ -1387,7 +1413,7 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
             };
             const auto slot_for = [&](std::size_t i) {
                 for (int s = nodes[i].slot; s >= 0; --s)
-                    if (filled[s] < count[s])
+                    if (admits(i, s))
                         return s;
                 return -1;
             };
@@ -1424,6 +1450,7 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
                             continue;
                         const int si = slot_for(i);
                         ++filled[si];
+                        used[i] = 1; // held for the pair's second pick, so `admits` reads it
                         kept.push_back(i);
                         for (std::size_t j = i + 1; j < nodes.size(); ++j)
                         {
@@ -1440,6 +1467,7 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
                             }
                         }
                         kept.pop_back();
+                        used[i] = 0;
                         --filled[si];
                     }
                 if (best == nodes.size())
@@ -1467,7 +1495,7 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
             const node& n = nodes[i];
             if (used[i])
                 continue;
-            if (filled[n.slot] < count[n.slot])
+            if (admits(i, n.slot))
             {
                 ++filled[n.slot];
                 ++m.nodes_kept;
@@ -1477,7 +1505,7 @@ void cap_major_logistics(world& w, const recipe_registry& reg, const opening_kit
         for (int s = 0; s < 3; ++s)
             for (int rung = s + 1; rung < 3 && filled[s] < count[s]; ++rung)
                 for (std::size_t i = 0; i < nodes.size() && filled[s] < count[s]; ++i)
-                    if (!used[i] && nodes[i].slot == rung)
+                    if (!used[i] && nodes[i].slot == rung && admits(i, s))
                     {
                         used[i] = 1;
                         ++filled[s];
