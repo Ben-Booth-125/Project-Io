@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*34 entries — 31 open, 3 resolved.*
+*34 entries — 30 open, 4 resolved.*
 
 ---
 
@@ -326,13 +326,6 @@ Taken inside your form answers so the item could build; each is one line of scri
 
 **Why it matters.** Call (7) decides whether a fleet can be sunk in harbour before its owner has given an order. Measured: 16 seeds, 425 ships, 85 of 94 majors with a fleet, cover unchanged by the cap rule (76 -> 76).
 
-### NR-1152 — Rival nations' land hire: MILITARY.md says the build scorer hires, the code hires only for corporations
-*question · raised 2026-11-08 · from RIVAL_FLEETS (BL-1533) landing force*
-
-MILITARY.md § The muster interface says rival nations hire land units through the build scorer, carried to the nation unchanged (Ben, 2026-10-23), under a soft cap of three. The scorer in src/world/corp_ai.cpp scores a hire only when the actor is not a nation (a BL-1401 comment: a corporation's only), and corporations are retired. So today no rival nation hires a land unit in the build pass. The landing force (Ben, 2026-11-08) now hires one for a ready transport, inside the sea pass; that is the only rival land hire running.
-
-> **Recommendation:** A reads truest to the 2026-10-23 ruling, but it is a world-mover; B is a doc edit today. Your call.
-
 ---
 
 ## Resolved
@@ -366,4 +359,13 @@ Live click, Quick Start seat Keitoheim Meido, 1960 Jan 26. The kit lists the tra
 > **Recommendation:** A, cheapest and always legible; C is worth a backlog item on its own merits.
 
 > **RESOLVED.** Ben, 2026-11-08: A, transport first. Both kits list the transport first, so it berths at the capital port; written into MILITARY.md § Sea.
+
+### NR-1152 — Rival nations' land hire: MILITARY.md says the build scorer hires, the code hires only for corporations
+*question · raised 2026-11-08 · from RIVAL_FLEETS (BL-1533) landing force*
+
+MILITARY.md § The muster interface says rival nations hire land units through the build scorer, carried to the nation unchanged (Ben, 2026-10-23), under a soft cap of three. The scorer in src/world/corp_ai.cpp scores a hire only when the actor is not a nation (a BL-1401 comment: a corporation's only), and corporations are retired. So today no rival nation hires a land unit in the build pass. The landing force (Ben, 2026-11-08) now hires one for a ready transport, inside the sea pass; that is the only rival land hire running.
+
+> **Recommendation:** A reads truest to the 2026-10-23 ruling, but it is a world-mover; B is a doc edit today. Your call.
+
+> **RESOLVED.** Ben, 2026-11-08, by the force-sizing form: rival nations hire land units again, up to the income target (MILITARY.md § Force sizing). The work is BL-1552 (force sizing).
 

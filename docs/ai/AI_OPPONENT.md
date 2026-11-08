@@ -2416,9 +2416,8 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   is weighted by its own ships as land kit is by its own units. (2) A rival designs: the design
   door admits any nation for its own designs, not the seat's alone. (3) "Detected" means the
   nation's own **sightings** (`../military/MILITARY.md` § Sea), a saved per-nation record; the
-  scorer reads no other ship of another nation. (4) The air pattern gates it: a rival hires, designs
-  and assigns only while mobilised, under a soft cap of three ships, with twice the price in its
-  treasury; it lands only on a hostile coast whose water it holds. A raid zone is scored on the
+  scorer reads no other ship of another nation. (4) A rival assigns only while mobilised (hiring is
+  force sizing's, below); it lands only on a hostile coast whose water it holds. A raid zone is scored on the
   hostile cargo whose sea legs cross it — the prize and the owner's loss, so a submarine, which
   sinks what it takes, scores half a surface raider's and never zero.
   **The landing force and the goods (Ben, 2026-11-08, two calls).** (5) A transport with a target
@@ -2430,6 +2429,14 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   marches is not idle when they look. (6) The scorer checks goods: a ship or land hire is scored only
   when the seam's own goods reading says the shelves hold its hull or row goods with its live
   design's kit. The economy is unchanged; a nation that cannot buy them hires nothing.
+  **Rival nations size their forces to income and threat — granted (Ben, 2026-11-08;
+  `../military/MILITARY.md` § Force sizing).** A new subject, a relation rather than an action: the
+  soft caps of three (land, wings, ships) are replaced by a target share of the nation's own income.
+  A rival nation's scorer may hire land units, wings and ships in peace as in war up to that target,
+  and **may read one number about another nation: the force value of each neighbour** (a nation that
+  borders it or is hostile to it), through fog, with no position, type or count. **Not admitted:** any
+  other read of another nation's force; disbanding to meet the target; sizing the player's nation;
+  a plan beyond the next hire. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
   **Rival nations wage war whole — granted (Ben, 2026-10-30, resolving NR-1100;
   `../politics/RELATIONS.md` § 7).** The stance grant (BL-450) already covers a rival declaring
   war, and Ben confirmed it does, goals included. The rest of a war is a new subject — territory,

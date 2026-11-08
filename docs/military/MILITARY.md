@@ -343,7 +343,7 @@ tab (`../ui/ledgers/military.md`).
   side are a later step. A nation's design is its own: the seat sets it (`set_unit_design`), and
   rival nations field base kit, since no AI grant lets a rival design.
 - **The kit catalogue.** Every slot of every class lists its items: the **base item** first — the
-  1960 standard, adding nothing and costing no goods — then **two to four later items**. A later
+  1960 standard, adding nothing beyond its class's equipment (§ What a force costs) — then **two to four later items**. A later
   item carries a **stat delta** (soft attack, hard attack, hardness, defence, breakthrough, recon, stealth), its
   **goods** and the **research node** that opens it. A design's stats are its class's plus its
   kit's deltas, before the roster row's quality scale; hardness stays inside 0..1000. The catalogue
@@ -995,8 +995,7 @@ Era −1's too.
 `military_strength` (summed derived strengths, an integer sum) — in `src/world/condition_set.cpp`,
 available to laws, techs and quests. The Selection element's unit card (Strength / Roster pages)
 and the hover summary in `src/ui/entity_summary.cpp`, both printing the derived strength with its
-`count × quality × supply` derivation. A rival nation's build scorer, counting its own units against a soft cap of
-three. The battle pass, the march pass, the upkeep pass and the budget's `upkeep` term. The
+`count × quality × supply` derivation. A rival nation's force sizing, counting its own units' running cost. The battle pass, the march pass, the upkeep pass and the budget's `upkeep` term. The
 blackboard export, for a nation's own units.
 
 **The unit on the canvas.** A unit has its own marker and command surface — BL-471 (unit marker
@@ -1114,7 +1113,7 @@ ledger's **Recruit** tab (rail slot 7, `../ui/ledgers/military.md`) shows the qu
 door to every hire. A muster takes **90 days** for infantry, motorised infantry and light armour,
 **135** for artillery and air defence, and **180** for mechanised infantry and armour — a quarter
 a tick, so one, two or two ticks (`muster_days_for`). A hire still mustering counts against a
-rival nation's soft cap of three units. An order whose base is demolished or decommissioned is
+rival nation's force sizing (§ What a force costs). An order whose base is demolished or decommissioned is
 dropped with no unit, as a unit whose base is torn down is disbanded. On completion: a new unit entity at the muster tile with
 `count = hire_batch_manpower`, returned through `apply_corp_command`'s out-param. The verb records the base it was raised at as the unit's
 `muster_base`; where the tile carries more than one qualifying base, the **lowest entity id**
@@ -1129,8 +1128,7 @@ carried to the nation unchanged, Ben 2026-10-23; `../ai/AI_OPPONENT.md` § 11). 
 (`src/world/corp_ai.cpp`) scores hiring alongside build, demolish, survey and road. Every nation
 opens with a completed base at its capital (Ben, 2026-10-27; § Nation garrisons); a nation that has
 lost it has no muster tile and must build one first on its own ground, priced by the ordinary
-build-candidate machinery. A soft cap of three units per nation keeps hiring from becoming an
-unconditional extra action every evaluation. Availability is decided by the stock on the shelves of
+build-candidate machinery. How many units it hires is § Force sizing's. Availability is decided by the stock on the shelves of
 the markets the nation's buildings sit in alone; the credit cost is subject to the solvency gate like every other spend
 (Ben, 2026-08-13, NR-218).
 
@@ -1594,13 +1592,70 @@ a garrison is drawn into battle whenever its nation is the target of a directed 
 province. Hostility is a state a party opts into (Ben, 2026-08-17), which is exactly the shape the
 retired trigger bypassed.
 
-**Upkeep is a budget claim, not the hired-unit vector.** A garrison does not draw the credits+goods
-vector `run_unit_upkeep` charges hired units (§ Upkeep, below) — its upkeep is a `military_research`
-line claim in the nation's own budget pass ([`../politics/NATIONS.md`](../politics/NATIONS.md) § A
-budget), paid the same way every other priority line is. A garrison whose nation cannot fund the
-line weakens by the ordinary budget-shortfall reading; there is no second mechanism.
+**A garrison is paid as every force is (Ben, 2026-11-08):** by the flat wage bill on the treasury
+(§ What a force costs). A garrison whose nation cannot pay weakens by § Upkeep's one rule; there is no
+second mechanism.
 
 *Owner: BL-571 (nation garrisons).*
+
+---
+
+## What a force costs and how large it grows (Ben, 2026-11-08)
+
+A force is paid for three times: its **equipment** when it is raised, the **equipment** of every
+man or crew that replaces a loss, and its **wages** for as long as it stands. How large a nation's
+force grows follows from what it earns and whom it lives beside, not from a fixed count.
+
+**Wages are a flat bill on the treasury.** Every land unit, wing and ship is paid the one wage per
+head per tick (`credits_per_head`, § Upkeep), a crew member the same as a soldier. The bill is
+owed whatever the budget weights say, and it is not a share of any line. A nation that cannot pay
+the whole bill pays what it holds; every unit, wing and ship of that nation then weakens by § Upkeep's
+one decay rule. A unit aboard a transport and a force still mustering are not exempt once they stand.
+
+**Every class has equipment.** Base kit stays the 1960 standard and adds no stats, but it is not
+free. Each land class names the goods a unit of it is raised with, by kind: infantry small arms;
+motorised infantry small arms and armoured vehicles; mechanised infantry and armour armoured
+vehicles; light armour armoured vehicles; artillery and air defence artillery pieces. Ships and
+wings already name theirs (§ Sea, § Air). A later kit item's goods are added on top. A hire takes
+them off the shelves as it takes any kit (§ The muster interface); a hire the shelves cannot equip
+is refused.
+
+**A loss is replaced with equipment.** Each man a land unit regains brings his share of what the
+unit was raised with (§ Land — equipment, refit and manpower). A wing's recruit brings the same
+share of its class's hire goods and kit, over its crew. A ship's HP mends at its home port by the
+same share of its hull's goods. What the shelves cannot equip stays lost.
+
+**Arms have a maker on day one.** A major opens with Arms Works for small arms, armoured vehicles
+and artillery pieces (`../generation/CORPORATION_GENERATION.md` § A major's opening kit). Every
+nation, major or minor, opens with a reserve of those goods on its shelves. A minor with no works
+imports once its reserve is spent, so arms are real trade.
+
+### Force sizing (a rival nation's)
+
+A rival nation grows its forces until their **running cost** reaches a **target share of its
+income**. The player's nation is never sized; the player reads the same numbers and decides.
+
+- **The running cost** is the wages of every unit, wing and ship it holds or has mustering, plus
+  their running goods at posted prices.
+- **Income** is the nation's own income over its last returns (`../economy/FINANCE.md`
+  § The quarterly return), so a good or bad quarter does not swing the army.
+- **The target share** is a base share raised by threat. **Threat** is the largest **force value**
+  among its neighbours over its own. Below 1 it adds nothing: a nation does not shrink its share
+  for being the strongest. Above 1 the share climbs, to a ceiling.
+- **Force value** is what a force would cost to hire: every unit, wing and ship at its hire price.
+  A **neighbour** is a nation that shares a border with it, or that is hostile to it. A scorer
+  reads one total per neighbour and nothing more: no position, no type, no count.
+- **Building against arming.** The further the running cost is below target, the larger the part of
+  its uncommitted treasury that may arm: nothing at target, all of it at no force at all. What is
+  not armed is left for the build pass. It hires only what keeps the running cost within target.
+- **Peace and war alike.** Hiring follows the target whether or not it is mobilised, one hire in
+  each theatre an evaluation at most. Missions stay as they were: only while mobilised.
+- **Over target it stops hiring and disbands nothing.** Its wages squeeze it until income catches up.
+- **Split by position.** The target divides across land, air and sea. Sea is worth nothing without
+  a standing port of its own, and grows with its ports and with the cargo it sends over water. Air
+  needs a standing airbase of its own. Land takes the rest. A theatre under its part hires first.
+- **The goods door binds.** A nation that cannot equip a hire does not make it, however far below
+  target it stands (`../ai/AI_OPPONENT.md` § 11).
 
 ---
 
@@ -1619,17 +1674,14 @@ The authored table, `scripts/economy.lua` § `economy.military.unit_upkeep`:
 
 | Rate | Authored | Meaning |
 |---|---|---|
-| `credits_per_head` | `0.0` | Flat wage per head per tick |
-| `credits_per_head_per_power` | `0.0` | Wage scaled by the roster row's `power_mod` |
-| `goods_per_head.ordnance` | `0.0` | The **ordnance** draw |
-| `goods_per_head.food_rations` | `0.0` | The sanctioned second line |
-| `supply_decay_permille` | `0` | The one decay subtraction, per tick |
-| `supply_recovery_permille` | `0` | Regained per tick while supplied |
-| `out_of_supply_reach` | `0.0` | Reach cost past which a unit is out of supply; ≤ 0 disables the trigger |
+| `credits_per_head` | `0.1041` | Flat wage per head per tick |
+| `credits_per_head_per_power` | `0.00007` | Wage scaled by the roster row's `power_mod` |
+| `goods_per_head.ordnance` | `0.000875` | The **ordnance** draw |
+| `goods_per_head.food_rations` | `0.00625` | The sanctioned second line |
+| `supply_decay_permille` | `50` | The one decay subtraction, per tick |
+| `supply_recovery_permille` | `100` | Regained per tick while supplied |
+| `out_of_supply_reach` | `24.0` | Reach cost past which a unit is out of supply; ≤ 0 disables the trigger |
 
-**Every rate is authored at zero, deliberately**, so the pricing is tuned by playtest against a
-measured baseline rather than guessed. At zero nothing is charged, no shelf is drawn, no draw can go
-unmet, and no supply factor moves; turning upkeep on is editing this table, not a code change.
 The numbers are anchored by BL-543 (value anchor) — a unit's annual equipment costs twice its
 annual salary (Ben, 2026-08-22, [`NATIONS.md`](../politics/NATIONS.md)) — and the ordnance rate
 rides battle consumption (BL-496, ordnance rate; NR-321). `tools/verify/unit_upkeep_rates.cpp`

@@ -521,12 +521,12 @@
    "title": "Rival nations' land hire: MILITARY.md says the build scorer hires, the code hires only for corporations",
    "raised": "2026-11-08",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "RIVAL_FLEETS (BL-1533) landing force",
    "what": "MILITARY.md § The muster interface says rival nations hire land units through the build scorer, carried to the nation unchanged (Ben, 2026-10-23), under a soft cap of three. The scorer in src/world/corp_ai.cpp scores a hire only when the actor is not a nation (a BL-1401 comment: a corporation's only), and corporations are retired. So today no rival nation hires a land unit in the build pass. The landing force (Ben, 2026-11-08) now hires one for a ready transport, inside the sea pass; that is the only rival land hire running.",
    "options": "A) The doc is right: restore the build pass's land hire for rival nations (work; moves every digest pin, inside a re-bless). B) The code is right: strike the sentence from MILITARY.md and leave land hiring to the landing force and the opening army. C) Leave both until BL-1535 (naval war reading) shows whether armies run short.",
    "recommendation": "A reads truest to the 2026-10-23 ruling, but it is a world-mover; B is a doc edit today. Your call.",
-   "resolution": null
+   "resolution": "Ben, 2026-11-08, by the force-sizing form: rival nations hire land units again, up to the income target (MILITARY.md § Force sizing). The work is BL-1552 (force sizing)."
   }
  ]
 }

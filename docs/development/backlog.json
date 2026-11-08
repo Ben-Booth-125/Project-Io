@@ -1327,7 +1327,8 @@
    "author": "main session (Ben, 2026-11-05: sprint 64 naval design form)",
    "requires": [
     "BL-1533",
-    "BL-1534"
+    "BL-1534",
+    "BL-1552"
    ],
    "id": "BL-1535",
    "category": "Military",
@@ -1341,6 +1342,82 @@
    ],
    "title": "Close the sprint on a measured war at sea and the one re-bless",
    "design": "v0.3.0 needs the naval system and a playtest with a few wars. Sweep the library: fleets raised, raids landed, ports closed, landings made, treasuries under fleet upkeep. Then the sprint's one re-bless, described by rebless_shape_probe, ruling-check, and a live war played to a landing. It also owes the one reading the blockade could not show on a fixture: a clearing price moving at a blockaded market on a real seed. It also owes a landed army on a real seed: its stocks running down with no port, and holding once it takes one."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-08",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-08: force sizing and pay forms)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1550",
+   "short_name": "FORCE_PAY",
+   "requires": [],
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "src/world/nation_step.cpp",
+    "tools/verify/"
+   ],
+   "title": "Wages are a flat bill on the treasury, and ship and air crews draw them",
+   "design": "MILITARY.md § What a force costs. run_nation_garrison_upkeep stops taking its share from the military_research weight: the whole bill is owed, paid from the treasury as far as it goes, and a short payment weakens every unit, wing and ship by the one decay rule. Crews join the bill at the same wage per head."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-08",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-08: force sizing and pay forms)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1551",
+   "short_name": "FORCE_EQUIPMENT",
+   "requires": [],
+   "priority": "A",
+   "difficulty": 4,
+   "files": [
+    "src/world/unit_designs.cpp",
+    "src/world/corp_command.cpp",
+    "src/world/recruits.cpp",
+    "src/world/air_combat.cpp",
+    "scripts/economy.lua",
+    "scripts/world_gen.lua"
+   ],
+   "title": "Every class is raised and refilled with its equipment, and arms have a maker on day one",
+   "design": "MILITARY.md § What a force costs; CORPORATION_GENERATION.md § A major's opening kit. Base-kit equipment per land class, authored as data, drawn at hire and on refill. A wing's recruit brings its share of hire goods and kit. Majors open with Arms Works for small arms, armoured vehicles and artillery pieces; every nation opens with a reserve of the three on its shelves. Quantities are first-cut, read by BL-1552 (force sizing)'s census."
+  },
+  {
+   "status": "proposed",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-08",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-08: force sizing and pay forms)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1552",
+   "short_name": "FORCE_SIZING",
+   "requires": [
+    "BL-1550",
+    "BL-1551"
+   ],
+   "priority": "A",
+   "difficulty": 4,
+   "files": [
+    "src/world/corp_ai.cpp",
+    "tools/verify/"
+   ],
+   "title": "A rival sizes land, air and sea to its income and its neighbours, replacing the caps of three",
+   "design": "MILITARY.md § Force sizing; AI_OPPONENT.md § 11 grant of 2026-11-08. One pass computes running cost, income, target share with threat, the shortfall share of uncommitted treasury and the split by position, then hires at most one per theatre an evaluation through the legal verbs. Retires k_rival_wing_cap and k_rival_ship_cap, and restores land hiring for nations. A census reads forces against income over the seed library before any number is settled."
   }
  ]
 }

@@ -14,7 +14,23 @@ Runs beside sprint 63. The core has no money dependency; the sea trade reading a
 - [x] Harness `rival_fleet_census`: who raises, assigns, embarks, lands, over the library.
 - [x] Cold review; fix round (no unit stranded aboard); ACTIONS.json / docs.
 - [x] Ben's census calls (2026-11-08): the landing force (march, then one hire at the base); the scorer checks goods.
-- [ ] The ship cap: Ben weighing where the soft cap of three comes from.
+- [x] The ship cap: replaced by force sizing (Ben, 2026-11-08).
+
+### BL-1550 (force pay)
+
+- [ ] Flat wage bill on the treasury; crews paid at the same wage; short payment weakens all.
+
+### BL-1551 (force equipment)
+
+- [ ] Base-kit equipment per land class, drawn at hire and on refill.
+- [ ] A wing's recruit brings its equipment; check a ship's mend draws its share.
+- [ ] Majors open with three Arms Works; every nation opens with a reserve.
+
+### BL-1552 (force sizing)
+
+- [ ] Running cost, income, threat, target share, shortfall share, split by position.
+- [ ] Hire one per theatre an evaluation; land hire restored; retire the caps.
+- [ ] Census: force against income and neighbours over the library; settle the numbers.
 
 ## Sprint 63 — UI, QOL and the opening (opened 2026-11-05)
 

@@ -412,9 +412,11 @@ the source, about 460 credits a tick, and the one treasury figure every major st
 **Why these processors.** Each one runs on day one, which the hard rules of § Pass 3 require. The
 steel, copper and machinery slots are one chain: iron ore and coal make steel, copper ore makes
 refined copper, and the two make machinery. Ordnance, which every unit draws, is machinery and steel,
-so a major can make it as its first build. **No Arms Works is in the kit:** each class opens on its base kit, which costs no
-goods (`../military/MILITARY.md` § Land — the classes), so nothing would buy its output until kit is
-researched, and an idle plant the player inherits reads as a broken economy (§ Pass 3).
+so a major can make it as its first build. **Arms Works are in the kit (Ben, 2026-11-08):** one each for small arms, armoured vehicles and
+artillery pieces, since every class is raised and refilled with its equipment
+(`../military/MILITARY.md` § What a force costs). **Every nation, major or minor, opens with a reserve
+of those three goods on its shelves**, so a nation can raise its first force before its works or its
+imports arrive.
 
 **Every kit placement passes § Pass 3's rules, with want read at the major's own markets (Ben,
 2026-11-03).** Own ground, `can_place`, chain-feasible and sized to spare input bind a kit building
