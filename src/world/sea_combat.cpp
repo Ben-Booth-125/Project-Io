@@ -8,6 +8,7 @@
 #include "hex_neighbors.hpp"
 #include "logistics.hpp"       // convoy_route_tiles, econ_tick_days_world, invalidate_logistics_caches
 #include "market_clearing.hpp" // market_for_tile
+#include "nation_step.hpp"     // BL-1550: nation_wages_short
 #include "province.hpp"
 #include "recipe_registry.hpp"
 #include "stance.hpp"          // is_hostile
@@ -1694,7 +1695,9 @@ ship_upkeep_tick run_ship_upkeep(world& w, const recipe_registry& reg, economy_r
         const int share = draw_goods_at_tile(w, reg, report, s.owner, port_tile, sp.ship_upkeep_goods);
         if (share < 1000)
             ++out.unmet;
-        s.supply_factor_permille = step_unit_supply_toward(s.supply_factor_permille, share, up);
+        // BL-1550: an unpaid crew weakens by the same rule as an unsupplied one.
+        s.supply_factor_permille = step_unit_supply_toward(
+            s.supply_factor_permille, nation_wages_short(w, reg, s.owner) ? 0 : share, up);
 
         // Lying at home damaged, it refits by drawing goods.
         if (s.muster_days <= 0 && s.hp_ppm < k_ship_hp_full && s.route.empty()

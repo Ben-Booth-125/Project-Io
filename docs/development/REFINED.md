@@ -18,7 +18,7 @@ Runs beside sprint 63. The core has no money dependency; the sea trade reading a
 
 ### BL-1550 (force pay)
 
-- [ ] Flat wage bill on the treasury; crews paid at the same wage; short payment weakens all.
+- [x] Flat wage bill on the treasury; crews paid at the same wage; short payment weakens all.
 
 ### BL-1551 (force equipment)
 

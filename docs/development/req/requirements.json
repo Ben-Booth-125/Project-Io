@@ -8216,6 +8216,39 @@
      "evidence": "2026-11-08 sea_theatre_harness V5h PASS: with bare shelves no ship is hired though the credits are there; V2c still hires with stocked shelves. The census I2 is split: 0 assignments while not mobilised on all 16 seeds; seed 54 carries 12 ship-ticks of a mission lingering to the next staggered evaluation, which the sea day works against no one (is_hostile at the roll and the closed-port pass)."
     }
    ]
+  },
+  {
+   "brief": "force-pay",
+   "title": "BL-1550 - Wages are a flat bill on the treasury, crews included (MILITARY.md § What a force costs)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "promoted_from": "BL-1550",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "The whole wage bill is owed whatever the budget weights say; the treasury pays what it holds.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness W1, W5 PASS (425 of 425)."
+    },
+    {
+     "id": "R2",
+     "text": "A standing wing or ship crew draws the same wage per head; one still mustering draws none.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness W2, W3 PASS. Wing path shares nation_crew_wage_bill; not separately fixtured."
+    },
+    {
+     "id": "R3",
+     "text": "A short payment weakens every unit, wing and ship by the one decay rule.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness W4, W5 PASS for land; wings and ships read nation_wages_short in their own pass. unit_upkeep 60 of 60, move_by_days 45 of 45."
+    }
+   ]
   }
  ]
 }

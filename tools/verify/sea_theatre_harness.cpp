@@ -1917,7 +1917,7 @@ int main()
         // The wage still falls on the nation while aboard, at rates that are not zero.
         recipe_registry paying = make_registry();
         military_capability_params mil = paying.military();
-        mil.upkeep.credits_per_head = 0.5f;
+        mil.upkeep.credits_per_head = 0.5f; mil.upkeep.supply_decay_permille = 50;
         paying.set_military(mil);
         const auto paid = [&](bool afloat) {
             fixture f; build(f);
@@ -1932,7 +1932,41 @@ int main()
             return before - f.w.nations.at(f.a).treasury;
         };
         const float ashore = paid(false), afloat = paid(true);
-        check(afloat > 0.0f && ashore == afloat, "L19 aboard its wage is still paid: " + std::to_string(afloat) + " against " + std::to_string(ashore));
+        check(afloat > 0.0f && ashore == afloat,
+              "L19 aboard its wage is still paid: " + std::to_string(afloat) + " afloat against " + std::to_string(ashore) + " ashore");
+
+        // BL-1550 (Ben, 2026-11-08): the wage is a flat bill, whatever the budget says, and crews draw it.
+        const float head = paying.military().upkeep.credits_per_head;
+        {
+            fixture f; build(f); // no budget at all: the line's weight cannot excuse the bill
+            add_soldiers(f, f.a, 7, 3, 500);
+            const float before = f.w.nations.at(f.a).treasury;
+            run_nation_garrison_upkeep(f.w, paying, nullptr);
+            check(before - f.w.nations.at(f.a).treasury == nation_wage_bill(f.w, paying, f.a) && nation_wage_bill(f.w, paying, f.a) > 0.0f,
+                  "W1 a nation with no budget weights still pays its land wages in full");
+        }
+        {
+            fixture f; build(f);
+            const entity_id d = add_ship(f, f.a, f.a_port, DES, 8, 3);
+            const float before = f.w.nations.at(f.a).treasury;
+            run_nation_garrison_upkeep(f.w, paying, nullptr);
+            check(before - f.w.nations.at(f.a).treasury == head * static_cast<float>(ship_crew(paying, f.w.ships.at(d).type)),
+                  "W2 a standing ship's crew draws the same wage per head");
+            f.w.ships.at(d).muster_days = 10;
+            const float b2 = f.w.nations.at(f.a).treasury;
+            run_nation_garrison_upkeep(f.w, paying, nullptr);
+            check(b2 == f.w.nations.at(f.a).treasury, "W3 a ship still mustering draws none");
+        }
+        {
+            fixture f; build(f);
+            const entity_id u = add_soldiers(f, f.a, 7, 3, 500);
+            f.w.nations.at(f.a).treasury = 1.0f;
+            check(nation_wages_short(f.w, paying, f.a), "W4 a treasury under the bill reads as short");
+            const int s0 = f.w.units.at(u).supply_factor_permille;
+            run_nation_garrison_upkeep(f.w, paying, nullptr);
+            check(f.w.nations.at(f.a).treasury == 0.0f && f.w.units.at(u).supply_factor_permille < s0,
+                  "W5 it pays what it holds, and the unit weakens by the one rule");
+        }
     }
     {
         // The save: passengers, the order and the surf.
