@@ -426,6 +426,13 @@ struct world
     /// next day.
     std::set<entity_id> ships_found_by_player;
 
+    /// BL-1533 (MILITARY.md § Sea, "A side's sightings"; Ben, 2026-11-08): (viewer nation,
+    /// ship) for every HOSTILE ship the viewer's side found on the last sea day, rolled or
+    /// revealed by held water. Rewritten each sea day; a sunk or dropped ship leaves it at
+    /// once. The one read of another nation's ships the rival sea scorer is granted, so
+    /// unlike the map's set above it is SIMULATION state: hashed, and saved (v81 tail).
+    std::set<std::pair<entity_id, entity_id>> sea_sightings;
+
     /// BL-1449: each nation's AIR SUPERIORITY power over each province as the last
     /// air day flew it, keyed (province, nation), milli-HP of air attack a day. The
     /// share it gives (`air_share_permille`) scales a side's bombing, slows its

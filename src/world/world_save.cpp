@@ -1023,6 +1023,20 @@ bool r_id_pair(std::istream& i, std::pair<entity_id, entity_id>& k)
     return r_id(i, k.first) && r_id(i, k.second);
 }
 
+/// BL-1533: the sightings the stream carries: a nation's, of a ship the stream writes (one
+/// whose owner is a nation). Ascending, as the set is.
+std::vector<std::pair<entity_id, entity_id>> saved_sightings(const world& w)
+{
+    std::vector<std::pair<entity_id, entity_id>> v;
+    for (const auto& k : w.sea_sightings)
+    {
+        const auto sit = w.ships.find(k.second);
+        if (w.nations.count(k.first) != 0 && sit != w.ships.end() && w.nations.count(sit->second.owner) != 0)
+            v.push_back(k);
+    }
+    return v;
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -2181,6 +2195,14 @@ void write_world_snapshot_at(const world& w, std::ostream& out, uint32_t version
             w_id(out, uid);
             w_id(out, w.units.at(uid).landing_ship);
         }
+        // BL-1533: the sides' sightings, ascending (viewer, ship), closing the section.
+        const std::vector<std::pair<entity_id, entity_id>> seen = saved_sightings(w);
+        w_u32(out, static_cast<uint32_t>(seen.size()));
+        for (const auto& [viewer, ship] : seen)
+        {
+            w_id(out, viewer);
+            w_id(out, ship);
+        }
     }
 }
 
@@ -2206,6 +2228,12 @@ std::size_t surf_section_bytes(const world& w)
     return n;
 }
 
+/// BL-1533: the sightings section, which closes the v81 tail.
+std::size_t sightings_section_bytes(const world& w)
+{
+    return 4 + 8 * saved_sightings(w).size();
+}
+
 std::size_t ship_design_section_bytes(const world& w)
 {
     std::size_t n = 4;
@@ -2226,7 +2254,8 @@ std::size_t world_save_ship_hulls_bytes(const world& w)
         refit_bytes += w.nations.count(s.owner) != 0 ? 1u + ship_landing_bytes(s) : 0u;
     return wide.str().size() - narrow.str().size() - ship_design_section_bytes(w) - refit_bytes
            - (4 + 4 * w.closed_ports.size()) // BL-1530: the closed ports close the v81 section
-           - surf_section_bytes(w);          // BL-1531: and the surf after them
+           - surf_section_bytes(w)           // BL-1531: and the surf after them
+           - sightings_section_bytes(w);     // BL-1533: and the sightings last
 }
 
 void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
@@ -2238,7 +2267,8 @@ void write_world_snapshot_pre_ships(const world& w, std::ostream& out)
 // BL-1527: the whole tail from the ship section on, the ship designs included.
 std::size_t world_save_ships_section_bytes(const world& w)
 {
-    std::size_t n = 4 + ship_design_section_bytes(w) + 4 + 4 * w.closed_ports.size() + surf_section_bytes(w);
+    std::size_t n = 4 + ship_design_section_bytes(w) + 4 + 4 * w.closed_ports.size() + surf_section_bytes(w)
+                  + sightings_section_bytes(w);
     for (const auto& [sid, s] : w.ships)
     {
         if (w.nations.count(s.owner) == 0)
@@ -4616,6 +4646,24 @@ bool read_world_snapshot(world& w, std::istream& in, const military_capability_p
                 return false;
             prev_surf = uid;
             it->second.landing_ship = ship;
+        }
+        // BL-1533: the sightings. Untrusted: strictly ascending pairs, each a nation of the
+        // stream and a ship of the stream that is not its own.
+        uint32_t sightings = 0;
+        if (!r_u32(in, sightings) || sightings > s.nations.size() * std::max<std::size_t>(1, s.ships.size()))
+            return false;
+        s.sea_sightings.clear();
+        std::pair<entity_id, entity_id> prev_seen{null_entity, null_entity};
+        for (uint32_t k = 0; k < sightings; ++k)
+        {
+            std::pair<entity_id, entity_id> p{null_entity, null_entity};
+            if (!r_id_pair(in, p) || (k > 0 && p <= prev_seen) || s.nations.count(p.first) == 0)
+                return false;
+            const auto sit = s.ships.find(p.second);
+            if (sit == s.ships.end() || sit->second.owner == p.first)
+                return false;
+            prev_seen = p;
+            s.sea_sightings.insert(p);
         }
     }
 

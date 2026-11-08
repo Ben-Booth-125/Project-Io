@@ -1259,7 +1259,7 @@
    "design": "MILITARY.md § Sea, \"A major's opening fleet is fixed\" (Ben, 2026-11-07); NATION_GENERATION.md, \"History leaves no fleet\"; CORPORATION_GENERATION.md § A major's opening kit. The kit authors the ships (all four classes in fixed shares), the berths per port and the sea pool. The kit's one-port cap must keep a sea-mouthed port where the major holds one, so the fleet has a berth (Ben, 2026-11-07: prefer the sea, inside this item). A world-mover: measure before and after, and land it in the sprint's one re-bless."
   },
   {
-   "status": "proposed",
+   "status": "complete",
    "glyph": "○",
    "sprint": "64",
    "version_goal": "v0.3.0",

@@ -57,6 +57,16 @@ std::vector<uint16_t> available_ship_rows(const world& w, entity_id nation)
     return out;
 }
 
+namespace {
+/// BL-1533: a ship that leaves the world leaves every side's sightings with it, so a sighting
+/// always names a standing ship (the reader refuses one that does not).
+void forget_sightings_of(world& w, entity_id ship)
+{
+    for (auto it = w.sea_sightings.begin(); it != w.sea_sightings.end();)
+        it = it->second == ship ? w.sea_sightings.erase(it) : std::next(it);
+}
+} // namespace
+
 ship_class ship_class_of(const sea_ship& s)
 {
     const auto& t = ship_roster_table();
@@ -82,7 +92,9 @@ ship_live_stats ship_stats(const recipe_registry& reg, const sea_ship& s)
 corp_command_result ship_design_check(const world& w, entity_id nation, uint32_t cls,
                                       uint16_t slot, uint16_t item)
 {
-    if (w.nations.find(nation) == w.nations.end() || nation != player_nation(w))
+    // BL-1533 (AI_OPPONENT.md § 11, the fleet grant read 2026-11-08): any nation, for its
+    // own designs. The seam has already pinned the actor to the nation it acts as.
+    if (w.nations.find(nation) == w.nations.end())
         return corp_command_result::rejected_not_owner;
     if (cls >= static_cast<uint32_t>(ship_class_count) || slot >= k_ship_kit_slot_count)
         return corp_command_result::rejected_invalid;
@@ -389,6 +401,114 @@ bool sea_province_in_range(const world& w, entity_id nation, uint32_t province_i
         frontier = std::move(next);
     }
     return false;
+}
+
+std::vector<entity_id> own_standing_ports(const world& w, entity_id nation)
+{
+    return own_ports(w, nation);
+}
+
+std::set<uint32_t> sea_provinces_in_range(const world& w, entity_id nation, int range)
+{
+    // The same walk as `sea_province_in_range`, from every port at once and per body: a
+    // province is in reach when the walk touches one of its tiles within @p range steps.
+    std::set<uint32_t> out;
+    std::map<entity_id, std::vector<entity_id>> mouths_by_body; // ordered
+    for (const entity_id port : own_ports(w, nation))
+    {
+        const entity_id mouth = port_mouth_tile(w, port);
+        const auto mit = w.tiles.find(mouth);
+        if (mit != w.tiles.end())
+            mouths_by_body[mit->second.body].push_back(mouth);
+    }
+    for (const auto& [body, mouths] : mouths_by_body)
+    {
+        const auto bodyit = w.bodies.find(body);
+        if (bodyit == w.bodies.end())
+            continue;
+        const int gw = bodyit->second.grid_width, gh = bodyit->second.grid_height;
+        std::vector<entity_id> local;
+        const std::vector<entity_id>& grid = raster_of(w, body, local);
+        if (grid.empty())
+            continue;
+        std::vector<int> frontier;
+        std::set<int> seen;
+        for (const entity_id mouth : mouths)
+        {
+            const tile_component& t = w.tiles.at(mouth);
+            const int cell = t.grid_y * gw + t.grid_x;
+            if (seen.insert(cell).second)
+                frontier.push_back(cell);
+            if (const uint32_t p = w.provinces.province_of(mouth); p != 0)
+                out.insert(p);
+        }
+        for (int step = 0; step < range && !frontier.empty(); ++step)
+        {
+            std::vector<int> next;
+            for (const int cell : frontier)
+            {
+                int nb[6];
+                neighbour_cells(cell % gw, cell / gw, gw, gh, nb);
+                for (const int n : nb)
+                {
+                    if (n < 0 || seen.count(n) != 0)
+                        continue;
+                    const entity_id t = grid[static_cast<std::size_t>(n)];
+                    if (t == null_entity || !is_sea_tile_id(w, t))
+                        continue;
+                    seen.insert(n);
+                    next.push_back(n);
+                    if (const uint32_t p = w.provinces.province_of(t); p != 0)
+                        out.insert(p);
+                }
+            }
+            frontier = std::move(next);
+        }
+    }
+    return out;
+}
+
+std::vector<entity_id> held_water_hostile_coast(const world& w, const recipe_registry& reg,
+                                                entity_id nation, int range)
+{
+    std::set<entity_id> out;
+    for (const uint32_t pid : sea_provinces_in_range(w, nation, range))
+    {
+        if (province_kind_of(w, pid) == province_kind::land || !sea_holds(w, reg, pid, nation))
+            continue;
+        const ::province* pr = w.provinces.find(pid);
+        if (pr == nullptr)
+            continue;
+        const auto bodyit = w.bodies.find(pr->body);
+        if (bodyit == w.bodies.end())
+            continue;
+        const int gw = bodyit->second.grid_width, gh = bodyit->second.grid_height;
+        std::vector<entity_id> local;
+        const std::vector<entity_id>& grid = raster_of(w, pr->body, local);
+        if (grid.empty())
+            continue;
+        for (const entity_id st : pr->tiles)
+        {
+            const auto sit = w.tiles.find(st);
+            if (sit == w.tiles.end() || !is_sea_tile_id(w, st))
+                continue;
+            int nb[6];
+            neighbour_cells(sit->second.grid_x, sit->second.grid_y, gw, gh, nb);
+            for (const int n : nb)
+            {
+                if (n < 0)
+                    continue;
+                const entity_id t = grid[static_cast<std::size_t>(n)];
+                if (t == null_entity || is_sea_tile_id(w, t))
+                    continue;
+                const auto own = w.tile_to_nation.find(t);
+                if (own != w.tile_to_nation.end() && own->second != nation
+                    && is_hostile(w, nation, own->second))
+                    out.insert(t);
+            }
+        }
+    }
+    return std::vector<entity_id>(out.begin(), out.end());
 }
 
 // ---------------------------------------------------------------------------
@@ -804,8 +924,11 @@ void embark_unit(world& w, entity_id unit, entity_id ship)
     a.insert(at, {unit, std::move(u)});
 }
 
-corp_command_result land_units_check(const world& w, const recipe_registry& reg, entity_id nation,
-                                     entity_id ship, entity_id tile)
+namespace {
+/// The landing door's legs. @p allow_empty lets an empty ship pass the "units aboard" leg;
+/// @p extra_type, when >= 0, is a land row taken as aboard too: what a landing WOULD be.
+corp_command_result landing_check_core(const world& w, const recipe_registry& reg, entity_id nation,
+                                       entity_id ship, entity_id tile, bool allow_empty, int extra_type)
 {
     const auto sit = w.ships.find(ship);
     if (sit == w.ships.end())
@@ -819,7 +942,7 @@ corp_command_result land_units_check(const world& w, const recipe_registry& reg,
         return corp_command_result::rejected_state;
     if (tile == null_entity)
         return s.landing_tile != null_entity ? corp_command_result::applied : corp_command_result::rejected_state;
-    if (s.muster_days > 0 || s.returning || s.aboard.empty())
+    if (s.muster_days > 0 || s.returning || (s.aboard.empty() && !allow_empty))
         return corp_command_result::rejected_state;
     const std::vector<entity_id> mouths = landing_mouths(w, tile);
     if (mouths.empty() || landing_ground_of(w, nation, tile) == landing_ground::refused)
@@ -838,7 +961,25 @@ corp_command_result land_units_check(const world& w, const recipe_registry& reg,
     for (const auto& [uid, u] : s.aboard)
         if (terrain_class_effects_for_type(reg.military(), u.type, ground).walled)
             return corp_command_result::rejected_terrain;
+    if (extra_type >= 0
+        && terrain_class_effects_for_type(reg.military(), static_cast<uint16_t>(extra_type), ground).walled)
+        return corp_command_result::rejected_terrain;
     return corp_command_result::applied;
+}
+} // namespace
+
+corp_command_result land_units_check(const world& w, const recipe_registry& reg, entity_id nation,
+                                     entity_id ship, entity_id tile)
+{
+    return landing_check_core(w, reg, nation, ship, tile, false, -1);
+}
+
+corp_command_result landing_would_admit(const world& w, const recipe_registry& reg, entity_id nation,
+                                        entity_id ship, entity_id tile, int unit_type)
+{
+    if (tile == null_entity)
+        return corp_command_result::rejected_invalid;
+    return landing_check_core(w, reg, nation, ship, tile, true, unit_type);
 }
 
 void set_ship_landing(world& w, const recipe_registry& reg, sea_ship& s, entity_id tile)
@@ -1281,6 +1422,7 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
 {
     sea_day_tick out;
     w.ships_found_by_player.clear(); // BL-1534: the map reads today's, written below
+    w.sea_sightings.clear();         // BL-1533: so do the sides' own sightings
     const entity_id map_viewer = player_nation(w);
     if (w.ships.empty())
     {
@@ -1357,6 +1499,7 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
                 if (seen && hostile)
                 {
                     found[viewer].push_back(&pc);
+                    w.sea_sightings.insert({viewer, pc.ship}); // BL-1533
                     ++out.detections;
                 }
             }
@@ -1456,6 +1599,7 @@ sea_day_tick run_sea_day(world& w, const recipe_registry& reg, int day_tick)
     for (const entity_id sid : sunk)
     {
         out.troops_lost += lose_passengers(w, sid, w.ships.at(sid)); // BL-1531
+        forget_sightings_of(w, sid); // BL-1533
         w.ships.erase(sid);
         ++out.sunk;
     }
@@ -1571,6 +1715,7 @@ ship_upkeep_tick run_ship_upkeep(world& w, const recipe_registry& reg, economy_r
     for (const entity_id sid : drop)
     {
         out.troops_lost += lose_passengers(w, sid, w.ships.at(sid)); // BL-1531
+        forget_sightings_of(w, sid); // BL-1533
         w.ships.erase(sid);
         ++out.disbanded;
     }

@@ -183,7 +183,7 @@ bool wire_nation_verb(corp_verb v)
         case corp_verb::hire_ship:          // BL-1430: the actor's own port
         case corp_verb::assign_sea_mission: // BL-1430: the actor's own ship; the zone rides `provinces=`
         case corp_verb::set_air_design:     // BL-1449: the seat's nation; the seam refuses any other
-        case corp_verb::set_ship_design:    // BL-1527: the seat's nation; the seam refuses any other
+        case corp_verb::set_ship_design:    // BL-1527: the actor's own designs (BL-1533: any nation)
         case corp_verb::refit_ship:         // BL-1527: the actor's own ship
         case corp_verb::embark_unit:        // BL-1531: the actor's own unit; the ship rides `order=`
         case corp_verb::land_units:         // BL-1531: the actor's own ship

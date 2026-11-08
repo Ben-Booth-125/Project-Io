@@ -2411,6 +2411,16 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   above zero. **Not admitted:** any ship, port or unit of another nation, the player's included; declaring
   the hostility a mission needs; reading a ship the rival has not detected; an invasion planned beyond the
   next verb. Pure, seeded, deterministic, replayable, legal verbs only, never a planner.
+  **Read and bounded (Ben, 2026-11-08, four calls).** (1) The research scorer may read a nation's
+  OWN ports and ships: ship kit is worth nothing to a nation with no standing port of its own, and
+  is weighted by its own ships as land kit is by its own units. (2) A rival designs: the design
+  door admits any nation for its own designs, not the seat's alone. (3) "Detected" means the
+  nation's own **sightings** (`../military/MILITARY.md` § Sea), a saved per-nation record; the
+  scorer reads no other ship of another nation. (4) The air pattern gates it: a rival hires, designs
+  and assigns only while mobilised, under a soft cap of three ships, with twice the price in its
+  treasury; it lands only on a hostile coast whose water it holds. A raid zone is scored on the
+  hostile cargo whose sea legs cross it — the prize and the owner's loss, so a submarine, which
+  sinks what it takes, scores half a surface raider's and never zero.
   **Rival nations wage war whole — granted (Ben, 2026-10-30, resolving NR-1100;
   `../politics/RELATIONS.md` § 7).** The stance grant (BL-450) already covers a rival declaring
   war, and Ben confirmed it does, goals included. The rest of a war is a new subject — territory,

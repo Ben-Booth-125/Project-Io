@@ -33,6 +33,7 @@
 #include "unit_roster.hpp"  // roster_gate
 
 #include <cstdint>
+#include <set>
 #include <vector>
 
 struct world;
@@ -97,6 +98,19 @@ std::vector<entity_id> sea_route(const world& w, entity_id from,
 /// standing ports?
 bool sea_province_in_range(const world& w, entity_id nation, uint32_t province, int range);
 
+/// BL-1533: @p nation's own completed, standing ports, ascending id.
+std::vector<entity_id> own_standing_ports(const world& w, entity_id nation);
+
+/// BL-1533: every province `sea_province_in_range` admits for @p nation at @p range, in one
+/// walk (water and coast provinces alike; the caller filters).
+std::set<uint32_t> sea_provinces_in_range(const world& w, entity_id nation, int range);
+
+/// BL-1533 (AI_OPPONENT.md § 11, read 2026-11-08: "lands only on a hostile coast whose water
+/// it holds"): every land tile of a nation @p nation is hostile to that touches a sea tile of a
+/// water province in its reach at @p range that it HOLDS (`sea_holds`). Ascending id.
+std::vector<entity_id> held_water_hostile_coast(const world& w, const recipe_registry& reg,
+                                                entity_id nation, int range);
+
 // ---- The doors --------------------------------------------------------------
 
 /// @p nation's own COMPLETED, not decommissioned port on @p tile — the lowest id
@@ -122,8 +136,8 @@ corp_command_result sea_mission_check(const world& w, const recipe_registry& reg
                                       const uint32_t* provinces, std::size_t n,
                                       std::vector<uint32_t>* out_set = nullptr);
 
-/// BL-1527: every check `set_ship_design` makes, READ-ONLY: the seat's nation alone
-/// (rejected_not_owner; no grant lets a rival design); the class, slot and item exist and
+/// BL-1527: every check `set_ship_design` makes, READ-ONLY: a nation, for its own designs
+/// (rejected_not_owner; BL-1533, the fleet grant lets a rival design); the class, slot and item exist and
 /// fit (rejected_invalid); the item is researched (rejected_tech_locked); the slot does
 /// not already hold it (rejected_state).
 corp_command_result ship_design_check(const world& w, entity_id nation, uint32_t cls,
@@ -158,6 +172,13 @@ void embark_unit(world& w, entity_id unit, entity_id ship);
 /// (rejected_placement); every unit aboard may stand on it (rejected_terrain).
 corp_command_result land_units_check(const world& w, const recipe_registry& reg, entity_id nation,
                                      entity_id ship, entity_id tile);
+
+/// BL-1533: what `land_units_check` WOULD answer for @p tile were a unit of land row
+/// @p unit_type aboard too (an empty ship passes the "units aboard" leg); @p unit_type < 0
+/// asks only the placement legs. READ-ONLY. A null @p tile is rejected_invalid. The rival
+/// scorer asks before it boards, since nothing takes a unit off a ship but a landing.
+corp_command_result landing_would_admit(const world& w, const recipe_registry& reg, entity_id nation,
+                                        entity_id ship, entity_id tile, int unit_type);
 
 /// Write a checked landing order onto @p s and set its course; a null @p tile sails it home.
 void set_ship_landing(world& w, const recipe_registry& reg, sea_ship& s, entity_id tile);

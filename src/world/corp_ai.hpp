@@ -534,6 +534,15 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
 /// strategic bombing, the bunker grant admitting no strike on another's bunker.
 int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m, uint32_t province);
 
+/// BL-1533 (AI_OPPONENT.md § 11, "Rival nations sail fleets", Ben 2026-11-05, read
+/// 2026-11-08): a rival nation's sea pass - while mobilised, design and hire one ship
+/// at its own port under a soft cap of three, give each of its own raised warships the
+/// one best zone its class works, and board and land its idle units on a hostile coast
+/// beside water it holds - all through the legal verbs. Of other nations' ships it reads
+/// only its own sightings. Does nothing for the player's nation (or an unknown one).
+/// Called by run_corp_strategic_step after the air pass; exported for the harness.
+void score_nation_sea(world& w, const recipe_registry& reg, entity_id nation, int tick);
+
 /// BL-1426 (AI_OPPONENT.md § 11, "Rival nations build bunkers on their own ground",
 /// Ben 2026-10-31; MILITARY.md § Fortifications): a rival nation's bunker pass - in
 /// live play, at most ONE bunker an evaluation, through the build verb, on a tile of

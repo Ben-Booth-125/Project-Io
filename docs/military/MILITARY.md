@@ -700,6 +700,11 @@ There is no battle record, and no withdrawal is priced: a ship past its class's 
 off and sails home. A sunk ship is gone. Hostility gates all of it, as on land. Tactical bombing reaches a
 detected ship in the province as it reaches a land unit (§ Air), and a ship cannot shoot back.
 
+**A side's sightings (Ben, 2026-11-08).** What each nation found on the last sea day is kept as its
+**sightings**: every hostile ship its side detected, or revealed by holding the water. They are a
+fact of the world, saved and replayed, and rewritten each sea day. A sighting is what a nation may
+know of another's ships; a ship it did not find, it does not know is there.
+
 **Sea control is a share (Ben, 2026-11-05).** In a sea province it is each hostile side's share of the
 surface attack on patrol, escort or blockade there, as air superiority is a share of air attack. An
 uncontested side holds all of it. Submarines and transports count for nothing, so submarines deny water

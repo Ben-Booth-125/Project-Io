@@ -8141,6 +8141,67 @@
      "evidence": "2026-11-08 live click, fresh Quick Start seat Keitoheim Meido after the transport-first ruling (NR-1151): the Sea tab lists Tukornom 3 ships and Dutum 2, Fleet Transport first, all five lying at their home port; the card reads Transport, home at Tukornom; Ready to board lists seven units with Board; pressing Board on a Rifle Infantry answered Unit aboard and Aboard (1 of 2). Earlier the same day the old order berthed the transport on the island port Dutum, where no unit could reach it."
     }
    ]
+  },
+  {
+   "brief": "rival-fleets",
+   "title": "BL-1533 - A rival nation hires, designs, assigns and lands with its own fleet (AI_OPPONENT.md § 11, the fleet grant, read 2026-11-08)",
+   "difficulty": 4,
+   "importance": "S",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "promoted_from": "backlog.json BL-1533 - sprint 64 (Ben, 2026-11-08 form: own ports+ships, rivals design, saved sightings, air gating)",
+   "batch": "sprint-64",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Sightings: each sea day writes, per viewer nation, every hostile ship its side found (rolled, or revealed by held water). Saved (v81 tail) and hashed; a save round-trips them; a malformed stream is refused whole. The player map keeps reading its own UI set unchanged.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V1..V1f: a patrolling side sights a hostile capital ship on 23 of 30 days, never its own; round-trips byte-identically; hashed; a self-sighting stream is refused whole; a ship leaving the world leaves every sighting. save_roundtrip and world_determinism PASS."
+    },
+    {
+     "id": "R2",
+     "text": "The design door admits any nation for its own designs (ship_design_check no longer seat-only). A rival fits, per slot of a class it is about to hire, the latest researched item whose goods its shelves cover; a no-op press is refused (rejected_state) and mutates nothing.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness K2b/K2b' (a rival designs its own; the same fit again is rejected_state and mutates nothing), V2f (designs before it hires; the hire carries the design), V2g (the player design untouched). ACTIONS.json gameplay.set_ship_design updated."
+    },
+    {
+     "id": "R3",
+     "text": "score_nation_sea never acts for the player nation (nor under spectate beyond the standing rule), acts only while mobilised, hires at most one ship an evaluation under a soft cap of 3 own ships with treasury >= 2x price, every action through apply_corp_command as the nation.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V2..V2e: at peace hires nothing; never acts for the player; mobilised, one destroyer an evaluation at its own port; stops at 3. rival_fleet_census I1 PASS on all 16 library seeds (no hand but the player moves a player ship)."
+    },
+    {
+     "id": "R4",
+     "text": "Missions: each raised warship gets the best (patrol, escort, raid, blockade) zone its class works by: patrol 50 per ship in its own sightings there (any class: a destroyer hunts submarines) + 25 an own port mouth; escort its own cargo (whole units) whose sea legs cross it; raid hostile cargo crossing it x2 surface / x1 submarine; blockade 100 per hostile standing port mouth there. Switch only past 1250 per-mille; a zone out of reach is recalled. Raids and blockades only against nations already hostile. (Weights recalibrated 2026-11-08 from a 1000/500/2000 draft so cargo and ports trade at one scale; in-band call, logged.)",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V3..V3h: raid over blockade, a submarine raids, a transport takes none, no thrash, recalled at peace, blockade or own-mouth patrol with no cargo, a sighting draws a patrol and an unsighted ship draws none. Census: 33 rival ship-missions over 7 seeds (patrol 17, escort 3, raid 3, blockade 13 summed per-seed rows); I2 PASS on 16 seeds."
+    },
+    {
+     "id": "R5",
+     "text": "Landing: a rival transport at its port commits to ONE hostile-held coast tile beside water it holds (sea_holds) whose landing legs admit it from where it lies, boards only own idle units that may stand there, and lands them; with no target (water lost, or peace) units aboard land on its own ground - nothing is ever stranded aboard. Measured over the seed library: report how many rivals raise, assign, embark and land.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 sea_theatre_harness V4..V4f (no boarding unheld; boards and lands blockading A's islet port; never a non-hostile coast; never a defender; with no target or at peace units aboard land at home). MEASURED, rival_fleet_census 16 seeds to tick 40: 0 hires, 0 boardings, 0 landings. The chain stops at idle units: 42 transport-ticks ready with a held-water target, 0 with an idle unit (every rival unit on a front or defend order). Minors' hires all rejected_funds on hull goods (seed 25: 79 of 79). Majors open over the cap. Calls raised to Ben 2026-11-08."
+    },
+    {
+     "id": "R6",
+     "text": "Research: ship kit items are worth 0 to a nation with no own standing port; otherwise weighted 0.5 x military share + 0.5 x own ships/(ships+half), as land kit by units. Never reads another nation.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 code: a ship kit row (ship_kit_item_by_id) is weighted by own ships and is 0 with no own standing port (nation_ai.cpp). Census: 349 landlocked rival nation-ends over 16 seeds hold 0 ship kit items beyond base. No before-reading was taken."
+    },
+    {
+     "id": "R7",
+     "text": "Determinism: two runs of the same seed produce identical digests with the scorer live; the harness gates (history_sim_harness, determinism) pass apart from the expected digest movement, which waits for the sprint re-bless.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-08 rival_fleet_census --replay I3 PASS on seeds 46, 28, 11, 31 (hash equal); world_determinism ALL PASS; history_sim_harness red only on R3a2/R3a3, identical on a clean 2911972c checkout (pre-existing). Digest movement waits for the sprint re-bless (Ben's go)."
+    }
+   ]
   }
  ]
 }

@@ -5,6 +5,16 @@
 Runs beside sprint 63. The core has no money dependency; the sea trade reading and the tuning wait on
 63's economy wave.
 
+### BL-1533 (rival fleets)
+
+- [x] Sightings: per-nation found set, written by the sea day, saved in the v81 tail, hashed.
+- [x] Design door open to any nation for its own designs; rival kit pick.
+- [x] `score_nation_sea`: hire, missions, embark, land; wired after the air pass.
+- [x] Research scorer: ship kit weighted by own ports and ships.
+- [x] Harness `rival_fleet_census`: who raises, assigns, embarks, lands, over the library.
+- [x] Cold review; fix round (no unit stranded aboard); ACTIONS.json / docs.
+- [ ] Ben's census calls: which units a transport takes; minors' hull goods; the ship cap.
+
 ## Sprint 63 — UI, QOL and the opening (opened 2026-11-05)
 
 Scoped by Ben's 24-item playtest. The opening climb leads. Seven lanes run in worktrees; the main

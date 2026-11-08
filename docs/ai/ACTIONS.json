@@ -4097,7 +4097,7 @@
     }
    ],
    "preconditions": [
-    "The actor is the seat's nation (rejected_not_owner otherwise): no grant lets a rival design, so rivals sail base kit.",
+    "The actor is a nation, designing its own (rejected_not_owner otherwise). BL-1533 (AI_OPPONENT.md § 11, the fleet grant read 2026-11-08): a rival designs too, fitting before it hires.",
     "The class, slot and item exist and the item fits that class and slot (rejected_invalid otherwise).",
     "The item is researched (rejected_tech_locked otherwise); base kit always is.",
     "The slot does not already hold it (rejected_state otherwise). A refusal mutates nothing."

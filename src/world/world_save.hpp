@@ -722,7 +722,9 @@ inline constexpr uint32_t k_world_save_version_pre_recruits = 71;
 /// element longer; and the live ship designs follow the ships as a last section (a u32 count,
 /// each designed nation ascending as id, u32 n, n ascending u16 ship kit ids), and last the
 /// tiles of the ports a blockade has closed (BL-1530: a u32 count, ascending ids, each a tile of
-/// the stream; v81 had not left its branch when this joined it). A v76..v80 stream is read 55
+/// the stream; v81 had not left its branch when this joined it), then the surf (BL-1531) and last
+/// the sides' sightings (BL-1533: a u32 count, ascending (viewer, ship) id pairs, each a nation
+/// of the stream and a ship of the stream it does not own). A v76..v80 stream is read 55
 /// wide, ship hulls zero, with no ship design and no closed port.
 inline constexpr uint32_t world_save_version = 81;
 

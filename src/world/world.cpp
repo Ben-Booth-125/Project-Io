@@ -671,6 +671,15 @@ uint64_t world::state_hash(int tick) const
         for (const entity_id t : closed_ports) // std::set: ascending
             fnv1a_u32(h, t);
     }
+    if (!sea_sightings.empty()) // BL-1533: only when non-empty, as the ships are
+    {
+        fnv1a_u32(h, 0x53534545u); // "SSEE"
+        for (const auto& [viewer, ship] : sea_sightings) // std::set: ascending pairs
+        {
+            fnv1a_u32(h, viewer);
+            fnv1a_u32(h, ship);
+        }
+    }
     if (!air_superiority.empty())
     {
         fnv1a_u32(h, 0x41535550u); // "ASUP"

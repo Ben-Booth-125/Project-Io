@@ -18,6 +18,7 @@
 #include "world/air_combat.hpp"
 #include "world/battle_system.hpp"
 #include "world/components.hpp"
+#include "world/corp_ai.hpp"      // BL-1533: score_nation_sea
 #include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/logistic_points.hpp"
@@ -935,7 +936,13 @@ int main()
         const uint32_t T = static_cast<uint32_t>(ship_class::transport);
         refused(f, [&] { return fit(f.a, D, 0, gas); }, corp_command_result::rejected_tech_locked, "K2 a later item is locked until researched");
         set_kit_research_waived_for_harness(true);
-        refused(f, [&] { return fit(f.b, D, 0, gas); }, corp_command_result::rejected_not_owner, "K2b a rival cannot design");
+        {
+            // BL-1533 (AI_OPPONENT.md § 11, read 2026-11-08): the door admits any nation for its own designs.
+            const corp_command_result r = fit(f.b, D, 0, gas);
+            check(r == corp_command_result::applied && ship_design_fitted(f.w, f.b, ship_class::destroyer, 0) == gas,
+                  "K2b a rival designs its own");
+            refused(f, [&] { return fit(f.b, D, 0, gas); }, corp_command_result::rejected_state, "K2b' the same fit again changes nothing");
+        }
         refused(f, [&] { return fit(f.a, 9, 0, gas); }, corp_command_result::rejected_invalid, "K2c no such class");
         refused(f, [&] { return fit(f.a, D, 9, gas); }, corp_command_result::rejected_invalid, "K2d no such slot");
         refused(f, [&] { return fit(f.a, D, 1, gas); }, corp_command_result::rejected_invalid, "K2e the item fits another slot");
@@ -1033,7 +1040,7 @@ int main()
                   && loaded.ships.at(d).kit.fit == f.w.ships.at(d).kit.fit && loaded.ships.at(d).refitting
                   && to_bytes(loaded) == b && loaded.state_hash(1) == f.w.state_hash(1),
               "K9 v81 round trips the designs and a ship's kit");
-        const std::size_t sec = b.size() - 14 - 4 - 4; // count, nation, n, one id, then the closed ports' count and the surf's
+        const std::size_t sec = b.size() - 14 - 4 - 4 - 4; // count, nation, n, one id, then the closed ports' count, the surf's and the sightings' (BL-1533)
         const auto spoil = [&](std::size_t off, uint32_t v, int width) {
             std::string c = b;
             for (int i = 0; i < width; ++i)
@@ -2191,6 +2198,236 @@ int main()
         f.w.ships.clear();
         run_sea_day(f.w, reg, 1);
         check(f.w.ships_found_by_player.empty(), "F4c a day with no ships clears it");
+    }
+
+    // -----------------------------------------------------------------------
+    // BL-1533 (rival fleets; AI_OPPONENT.md § 11, the fleet grant read 2026-11-08). B is the
+    // rival; A, the player, never acts through the scorer.
+    std::printf("\nV1 - a side's sightings: rolled each sea day, saved, hashed, refused when malformed\n");
+    {
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        const entity_id mine  = add_on_station(f, f.a, f.a_port, DES, sea_mission::patrol, {7});
+        const entity_id their = add_ship(f, f.b, f.b_port, CAP, 29, 3);
+        int seen = 0, own = 0;
+        for (int d = 0; d < 30; ++d)
+        {
+            f.w.ships.at(their).hp_ppm = k_ship_hp_full;
+            f.w.ships.at(their).morale_permille = 1000;
+            f.w.ships.at(their).returning = false;
+            f.w.ships.at(their).route.clear();
+            run_sea_day(f.w, reg, d);
+            seen += f.w.sea_sightings.count({f.a, their}) != 0 ? 1 : 0;
+            own  += f.w.sea_sightings.count({f.a, mine}) != 0 || f.w.sea_sightings.count({f.b, their}) != 0 ? 1 : 0;
+        }
+        check(seen > 0, "V1 a hostile capital ship lands in the patrolling side's sightings (" + std::to_string(seen) + " of 30)");
+        check(own == 0, "V1b no side ever sights its own ship");
+        f.w.sea_sightings.insert({f.a, their});
+        world loaded;
+        const std::string bytes = to_bytes(f.w);
+        check(from_bytes(bytes, loaded) && loaded.sea_sightings == f.w.sea_sightings && to_bytes(loaded) == bytes,
+              "V1c the sightings round-trip byte-identically");
+        const std::uint64_t h = f.w.state_hash(1);
+        f.w.sea_sightings.clear();
+        check(f.w.state_hash(1) != h, "V1d the sightings are hashed");
+        f.w.sea_sightings.insert({f.b, their}); // its own ship: no stream may carry this
+        world bad;
+        check(!from_bytes(to_bytes(f.w), bad), "V1e a sighting of the viewer's own ship is refused whole");
+        f.w.sea_sightings.clear();
+        f.w.sea_sightings.insert({f.a, their});
+        f.w.ships.at(their).hp_ppm = 0; // sunk today
+        f.w.ships.at(mine).hp_ppm = k_ship_hp_full;
+        run_sea_day(f.w, reg, 40);
+        bool names_gone = false;
+        for (const auto& k : f.w.sea_sightings)
+            names_gone |= f.w.ships.count(k.second) == 0;
+        check(!names_gone, "V1f a ship that leaves the world leaves every sighting");
+    }
+
+    std::printf("\nV2 - the rival sea pass: the gate, the player, the hire and the design\n");
+    {
+        fixture f; build(f);
+        const std::string before = to_bytes(f.w);
+        score_nation_sea(f.w, reg, f.b, 1);
+        check(to_bytes(f.w) == before, "V2 at peace a rival hires nothing");
+        declare_hostile(f.w, f.a, f.b);
+        const std::string war = to_bytes(f.w);
+        score_nation_sea(f.w, reg, f.a, 1);
+        check(to_bytes(f.w) == war, "V2b the scorer never acts for the player's nation");
+        score_nation_sea(f.w, reg, f.b, 1);
+        int b_ships = 0;
+        entity_id first = null_entity;
+        for (const auto& [sid, s] : f.w.ships)
+            if (s.owner == f.b) { ++b_ships; if (first == null_entity) first = sid; }
+        check(b_ships == 1 && ship_class_of(f.w.ships.at(first)) == ship_class::destroyer
+                  && f.w.ships.at(first).tile == port_mouth_tile(f.w, f.b_port) && f.w.ships.at(first).muster_days > 0,
+              "V2c mobilised (the player's declaration), it hires one destroyer at its own port");
+        for (int i = 2; i < 8; ++i)
+            score_nation_sea(f.w, reg, f.b, i);
+        b_ships = 0;
+        for (const auto& [sid, s] : f.w.ships)
+            b_ships += s.owner == f.b ? 1 : 0;
+        check(b_ships == 3, "V2d it stops at the soft cap of three (" + std::to_string(b_ships) + ")");
+        int a_ships = 0;
+        for (const auto& [sid, s] : f.w.ships)
+            a_ships += s.owner == f.a ? 1 : 0;
+        check(a_ships == 0, "V2e nothing is hired for the player");
+    }
+    {
+        fixture f; build(f);
+        declare_hostile(f.w, f.a, f.b);
+        set_kit_research_waived_for_harness(true);
+        score_nation_sea(f.w, reg, f.b, 1);
+        set_kit_research_waived_for_harness(false);
+        entity_id hired = null_entity;
+        for (const auto& [sid, s] : f.w.ships)
+            if (s.owner == f.b) hired = sid;
+        const unit_design live = ship_design_of(f.w, f.b, ship_class::destroyer);
+        check(hired != null_entity && !live.is_base() && f.w.ships.at(hired).kit.fit == live.fit,
+              "V2f with later kit researched it designs before it hires, and the hire carries the design");
+        check(ship_design_of(f.w, f.a, ship_class::destroyer).is_base(), "V2g the player's design is untouched");
+    }
+
+    std::printf("\nV3 - missions: each warship's best zone, no thrash, recalled at peace\n");
+    {
+        fixture f; build(f);
+        declare_hostile(f.w, f.b, f.a);
+        // Three ships of B's at the cap, raised at its mouth, and A's cargo crossing.
+        const entity_id des = add_ship(f, f.b, f.b_port, DES, 71, 3);
+        const entity_id sub = add_ship(f, f.b, f.b_port, SUB, 71, 3);
+        const entity_id tra = add_ship(f, f.b, f.b_port, TRA, 71, 3);
+        add_crossing(f, f.a, 100.0f);
+        score_nation_sea(f.w, reg, f.b, 1);
+        check(f.w.ships.at(des).mission == sea_mission::raid, "V3 a destroyer raids hostile cargo (x2: prize and loss) over a blockade (100)");
+        check(f.w.ships.at(sub).mission == sea_mission::raid, "V3b a submarine raids: sunk cargo scores above zero");
+        check(f.w.ships.at(tra).mission == sea_mission::none, "V3c a transport takes no mission");
+        const std::string held = to_bytes(f.w);
+        score_nation_sea(f.w, reg, f.b, 2);
+        check(to_bytes(f.w) == held, "V3d the next evaluation changes nothing: no thrash");
+        f.w.convoys.clear();
+        return_to_neutral(f.w, f.b, f.a);
+        score_nation_sea(f.w, reg, f.b, 3);
+        check(f.w.ships.at(des).mission == sea_mission::none && f.w.ships.at(sub).mission == sea_mission::none,
+              "V3e out of the war its ships are recalled");
+    }
+    {
+        fixture f; build(f);
+        declare_hostile(f.w, f.b, f.a);
+        const entity_id des = add_ship(f, f.b, f.b_port, DES, 71, 3);
+        add_ship(f, f.b, f.b_port, SUB, 71, 3);
+        add_ship(f, f.b, f.b_port, TRA, 71, 3);
+        score_nation_sea(f.w, reg, f.b, 1);
+        const sea_ship& d = f.w.ships.at(des);
+        // No cargo, no sighting: a destroyer in reach of A's port blockades it, else patrols home.
+        const uint32_t a_mouth = f.w.provinces.province_of(port_mouth_tile(f.w, f.a_port));
+        const uint32_t b_mouth = f.w.provinces.province_of(port_mouth_tile(f.w, f.b_port));
+        const bool blockades = d.mission == sea_mission::blockade && d.provinces == std::vector<uint32_t>{a_mouth};
+        const bool patrols   = d.mission == sea_mission::patrol && d.provinces == std::vector<uint32_t>{b_mouth};
+        check(blockades || patrols, "V3f with no cargo it blockades a hostile port in reach, or patrols its own mouth");
+        // An own sighting draws a patrol (50) above its mouth (25).
+        f.w.ships.at(des).mission = sea_mission::none; f.w.ships.at(des).provinces.clear();
+        const entity_id spotted = add_ship(f, f.a, f.a_port, DES, 66, 3);
+        f.w.sea_sightings.insert({f.b, spotted});
+        f.w.nations.at(f.a).state_assets.clear(); // no port of A's to blockade
+        score_nation_sea(f.w, reg, f.b, 2);
+        check(f.w.ships.at(des).mission == sea_mission::patrol
+                  && f.w.ships.at(des).provinces == std::vector<uint32_t>{f.w.provinces.province_of(tile(f, 66, 3))},
+              "V3g a hostile ship in its own sightings draws a patrol to its water");
+        f.w.sea_sightings.clear();
+        f.w.ships.at(des).mission = sea_mission::none; f.w.ships.at(des).provinces.clear();
+        f.w.ships.at(des).route.clear();
+        score_nation_sea(f.w, reg, f.b, 3);
+        check(!(f.w.ships.at(des).mission == sea_mission::patrol
+                && f.w.ships.at(des).provinces == std::vector<uint32_t>{f.w.provinces.province_of(tile(f, 66, 3))}),
+              "V3h the same ship, unsighted, draws nothing there: it reads no ship it has not found");
+    }
+
+    std::printf("\nV4 - landings: only on a hostile coast beside water it holds\n");
+    {
+        const auto islet = [](fixture& f, entity_id owner) {
+            for (int r = 2; r <= 4; ++r)
+                for (int c = 52; c <= 53; ++c)
+                {
+                    tile_component& tc = f.w.tiles.at(tile(f, c, r));
+                    tc.substrate = terrain_substrate::sedimentary;
+                    tc.cover = terrain_cover::grass;
+                    tc.cover_density = 150;
+                    f.w.set_tile_nation(tile(f, c, r), owner);
+                }
+            add_building(f, owner, 52, 3, building_type::port); // its mouth lies in strip 12
+        };
+        {
+            fixture f; build(f); islet(f, f.a);
+            declare_hostile(f.w, f.b, f.a);
+            const entity_id tra = add_ship(f, f.b, f.b_port, TRA, 71, 3);
+            const entity_id men = add_soldiers(f, f.b, 72, 3);
+            add_ship(f, f.b, f.b_port, DES, 71, 3);
+            add_ship(f, f.b, f.b_port, SUB, 71, 3);
+            score_nation_sea(f.w, reg, f.b, 1);
+            check(f.w.ships.at(tra).aboard.empty() && f.w.units.count(men) != 0,
+                  "V4 with the water unheld nothing boards");
+        }
+        {
+            fixture f; build(f); islet(f, f.a);
+            declare_hostile(f.w, f.b, f.a);
+            const entity_id tra = add_ship(f, f.b, f.b_port, TRA, 71, 3);
+            const entity_id men = add_soldiers(f, f.b, 72, 3);
+            add_on_station(f, f.b, f.b_port, DES, sea_mission::blockade, {12});
+            add_ship(f, f.b, f.b_port, SUB, 71, 3);
+            score_nation_sea(f.w, reg, f.b, 1);
+            const sea_ship& t = f.w.ships.at(tra);
+            const bool on_islet = t.landing_tile != null_entity && f.w.tiles.at(t.landing_tile).grid_x == 52;
+            check(t.aboard.size() == 1 && t.aboard[0].first == men && on_islet,
+                  "V4b blockading the port on A's islet holds its water: it boards its idle unit and sails to land there");
+        }
+        {
+            fixture f; build(f); islet(f, f.a);
+            // Not hostile to A, but mobilised against a third nation: A's coast is never a target.
+            const entity_id c3 = f.w.create_entity();
+            nation_component nc{}; nc.name = "Cairn"; f.w.nations[c3] = nc;
+            declare_hostile(f.w, f.b, c3);
+            const entity_id tra = add_ship(f, f.b, f.b_port, TRA, 71, 3);
+            add_soldiers(f, f.b, 72, 3);
+            add_on_station(f, f.b, f.b_port, DES, sea_mission::blockade, {12});
+            add_ship(f, f.b, f.b_port, SUB, 71, 3);
+            score_nation_sea(f.w, reg, f.b, 1);
+            check(f.w.ships.at(tra).aboard.empty() && f.w.ships.at(tra).landing_tile == null_entity,
+                  "V4c a coast of a nation it is not hostile to is never landed on");
+        }
+        {
+            fixture f; build(f); islet(f, f.a);
+            declare_hostile(f.w, f.b, f.a);
+            const entity_id tra = add_ship(f, f.b, f.b_port, TRA, 71, 3);
+            const entity_id men = add_soldiers(f, f.b, 72, 3);
+            f.w.units.at(men).defend_province = f.w.provinces.province_of(tile(f, 72, 3));
+            add_on_station(f, f.b, f.b_port, DES, sea_mission::blockade, {12});
+            add_ship(f, f.b, f.b_port, SUB, 71, 3);
+            score_nation_sea(f.w, reg, f.b, 1);
+            check(f.w.ships.at(tra).aboard.empty(), "V4d a unit under a defend order is not taken");
+        }
+        {
+            // Never stranded: units aboard with no target go back ashore on its own ground.
+            fixture f; build(f); islet(f, f.a);
+            declare_hostile(f.w, f.b, f.a);
+            const entity_id tra = add_ship(f, f.b, f.b_port, TRA, 71, 3);
+            const entity_id men = add_soldiers(f, f.b, 72, 3);
+            check(embark(f, reg, f.b, men, tra) == corp_command_result::applied, "  (fixture) B boards by hand");
+            add_ship(f, f.b, f.b_port, DES, 71, 3);
+            add_ship(f, f.b, f.b_port, SUB, 71, 3);
+            score_nation_sea(f.w, reg, f.b, 1); // the water by A's islet is not held: no target
+            const sea_ship& t = f.w.ships.at(tra);
+            check(t.landing_tile == f.w.buildings.at(f.b_port).tile,
+                  "V4e at war with no target, a transport holding units lands them on its own port");
+        }
+        {
+            fixture f; build(f);
+            const entity_id tra = add_ship(f, f.b, f.b_port, TRA, 71, 3);
+            const entity_id men = add_soldiers(f, f.b, 72, 3);
+            check(embark(f, reg, f.b, men, tra) == corp_command_result::applied, "  (fixture) B boards by hand");
+            score_nation_sea(f.w, reg, f.b, 1); // at peace
+            check(f.w.ships.at(tra).landing_tile == f.w.buildings.at(f.b_port).tile,
+                  "V4f at peace, it puts units aboard back ashore at home");
+        }
     }
 
     std::printf("\n%d checks, %d failures\n", checks, failures);

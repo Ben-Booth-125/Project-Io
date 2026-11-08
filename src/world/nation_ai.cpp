@@ -7,7 +7,9 @@
 #include "nation_tech.hpp"     // BL-1275: the research pick's verb and reads
 #include "placement_rules.hpp" // BL-1275: is_depositless_site (the named-site scope)
 #include "recipe_registry.hpp"
+#include "sea_combat.hpp"    // BL-1533: own_standing_ports (the ship kit weight)
 #include "stance.hpp"
+#include "unit_designs.hpp"  // BL-1533: ship_kit_item_by_id
 #include "world.hpp"
 
 #include <algorithm>
@@ -758,7 +760,10 @@ std::map<entity_id, nation_budget> score_national_budgets(const world& w,
 //                       research_kit_units_half). No floor: a nation that funds no
 //                       force research and fields nothing gives kit no worth. Read
 //                       from the node's own rows, never the catalogue, and never
-//                       another nation's kit, units or queue
+//                       another nation's kit, units or queue. A SHIP kit row
+//                       (BL-1533, Ben 2026-11-08) is weighted with U read from its
+//                       own ships instead, and is worth 0 with no standing port of
+//                       its own
 //     the next cluster  (a major) research_cluster_relief x E(res) x the cost units of
 //                       the nodes it brings within reach (a node needing two groups
 //                       counts half per group it completes), plus
@@ -825,6 +830,8 @@ struct home_profile
     int universities = 0; ///< Staffed Universities on its ground (advance_research's count).
     int total        = 0;
     int fielded      = 0; ///< BL-1486: its OWN unit groups standing (count > 0), for the kit weight.
+    int ports        = 0; ///< BL-1533: its OWN completed, standing ports, for the ship kit weight.
+    int ships        = 0; ///< BL-1533: its OWN ships, for the ship kit weight.
 };
 
 home_profile build_home_profile(const world& w, entity_id nation)
@@ -864,6 +871,12 @@ home_profile build_home_profile(const world& w, entity_id nation)
     for (const auto& [uid, u] : w.units)
         if (u.count > 0 && owner_home_nation(w, u.owner) == nation)
             ++hp.fielded;
+    // BL-1533 (AI_OPPONENT.md § 11, read 2026-11-08): its own ports and ships, and no
+    // other nation's. Integer counts.
+    hp.ports = static_cast<int>(own_standing_ports(w, nation).size());
+    for (const auto& [sid, sh] : w.ships)
+        if (sh.owner == nation)
+            ++hp.ships;
     return hp;
 }
 
@@ -1017,15 +1030,30 @@ double direct_relief(const scorer_ctx& c, int n)
     // BL-1486: the kit the node opens, one catalogue item per `unlock_kit` row
     // (tech_tree_store.js --check holds the rows and the catalogue equal), so
     // the scorer needs no link to the catalogue.
-    int kit_items = 0;
+    // BL-1533 (Ben, 2026-11-08): a SHIP kit row is weighted by the nation's own fleet, not
+    // its land units, and is worth nothing to a nation with no standing port of its own.
+    int kit_items = 0, ship_items = 0;
     for (std::uint16_t i = nd.effect_begin; i < nd.effect_end; ++i)
-        kit_items += io::dg::effects[i].kind == io::dg::effect_kind::unlock_kit ? 1 : 0;
+        if (io::dg::effects[i].kind == io::dg::effect_kind::unlock_kit)
+        {
+            const char* id = io::dg::effects[i].target;
+            if (id != nullptr && ship_kit_item_by_id(id) != k_no_kit_item)
+                ++ship_items;
+            else
+                ++kit_items;
+        }
+    const double half = c.p.research_kit_units_half > 0.0f ? static_cast<double>(c.p.research_kit_units_half) : 1.0;
     if (kit_items > 0)
     {
-        const double half = c.p.research_kit_units_half > 0.0f ? static_cast<double>(c.p.research_kit_units_half) : 1.0;
         const double u    = static_cast<double>(c.hp.fielded);
         const double kit_weight = 0.5 * e.milres + 0.5 * (u / (u + half));
         relief += static_cast<double>(c.p.research_kit_relief) * kit_items * kit_weight;
+    }
+    if (ship_items > 0 && c.hp.ports > 0)
+    {
+        const double sh = static_cast<double>(c.hp.ships);
+        const double ship_weight = 0.5 * e.milres + 0.5 * (sh / (sh + half));
+        relief += static_cast<double>(c.p.research_kit_relief) * ship_items * ship_weight;
     }
 
     if (nd.t == io::dg::tier::major)
