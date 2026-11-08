@@ -190,6 +190,8 @@ reads the want the ceiling silenced), counts toward the room whenever the
 landed cost plus the margin is under that buyer's ceiling. It counts when it is the destination's
 only want, so trade carries the input to a priced-out processor rather than waiting for the price to
 ease without it. The aim is unchanged: no cargo goes where nobody wants it, posted or silenced.
+The silenced buyer's want is not a bid, so a cargo sent to a priced-out buyer can sell below its
+landed cost at its first clear.
 
 **`hold_convoy` stops a convoy; nothing cancels one.** Cargo leaves the source shelf when the
 shipment leaves, so a cancel would have to invent a return leg or mint the goods back at the

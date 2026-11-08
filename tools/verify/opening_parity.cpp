@@ -54,6 +54,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -255,6 +256,33 @@ int main(int argc, char** argv)
     lua.load("scripts/recipes.lua");
     lua.load("scripts/economy.lua");
     reg.load_from_lua(lua);
+
+    int failures = 0;
+    auto row = [&](bool ok, const char* what) {
+        std::printf("  %s  %s\n", ok ? "PASS" : "FAIL", what);
+        if (!ok) ++failures;
+    };
+    // Cold review (2026-11-08): the camps' curve materials are a curve on their own. With
+    // both multipliers at 1 a live camp still carries its steel, so the registry must
+    // know it has a curve and the settle must put its camps back on the authored bill.
+    {
+        sol::table cons = lua.state()["economy"]["construction"];
+        const float c0 = cons["credit_cost_mult"].get_or(1.0f), m0 = cons["material_cost_mult"].get_or(1.0f);
+        cons["credit_cost_mult"]   = 1.0;
+        cons["material_cost_mult"] = 1.0;
+        recipe_registry flat;
+        flat.load_from_lua(lua);
+        cons["credit_cost_mult"]   = c0;
+        cons["material_cost_mult"] = m0;
+        const std::size_t st = static_cast<std::size_t>(resource_type::steel);
+        const float live_steel = flat.resource_build_cost_for(building_type::extraction_site, resource_type::timber, no_recipe)[st];
+        const float auth_steel = flat.authored_build_cost_for(building_type::extraction_site, resource_type::timber, no_recipe)[st];
+        std::printf("curve materials at multipliers 1: has_cost_curve=%d timber camp steel live %.1f authored %.1f\n",
+                    flat.has_cost_curve() ? 1 : 0, live_steel, auth_steel);
+        row(flat.has_cost_curve() && live_steel > auth_steel,
+            "curve materials alone make a cost curve: the settle's timber camp is billed without them");
+    }
+    int grant_rows = 0, grant_bad = 0, grant_both = 0;
 
     std::printf("opening_parity - BL-1475: majors at the handoff and over %d play quarters (spectating); kit %s\n",
                 quarters, cfg.opening_kit.active_config() ? cfg.opening_kit.active.c_str() : "none");
@@ -467,13 +495,57 @@ int main(int argc, char** argv)
                 advance_orbits(w, static_cast<double>(k_econ_tick_days));
                 advance_surveys(w, k_econ_tick_days);
                 w.current_day_tick = day;
-                (void)run_settle_tick(w, seed_reg, k_campaign_settle_ticks + (k - 1), day, /*spectating=*/true);
+                // The first play tick is also read at the start of apply_budget (after lap 2, the
+                // clear): a return's net is the movement from there, and the movers before it in
+                // the tick (FINANCE.md § What a return does not carry) sit outside every return.
+                std::map<entity_id, double> pre_tick, at_budget;
+                settle_tick_hooks grant_hooks;
+                if (k == 1)
+                {
+                    for (const auto& [nid, nc] : w.nations) pre_tick[nid] = nc.treasury;
+                    grant_hooks.ctx = &at_budget;
+                    grant_hooks.after_lap = [](const world& cw, int lap, void* ctx) {
+                        if (lap != 2) return;
+                        auto* m = static_cast<std::map<entity_id, double>*>(ctx);
+                        for (const auto& [nid, nc] : cw.nations) (*m)[nid] = nc.treasury;
+                    };
+                }
+                (void)run_settle_tick(w, seed_reg, k_campaign_settle_ticks + (k - 1), day, /*spectating=*/true,
+                                      k == 1 ? &grant_hooks : nullptr);
                 for (const entity_id nid : majors)
                 {
                     const auto it = w.nations.find(nid);
                     if (it == w.nations.end() || it->second.returns.empty()) continue;
                     nets[nid].push_back(it->second.returns.back().net);
                 }
+                // Cold review (2026-11-08): the grant drops the settle's last unbooked debits,
+                // so the first play return's net is its treasury less the granted figure, on
+                // a major that researched or paid garrison wage on the settle's last tick.
+                if (k == 1)
+                    for (const handoff_grant& g : fin.readings.last.handoff_grants)
+                    {
+                        if (!(g.research_dropped > 0.0 || g.upkeep_dropped > 0.0)) continue;
+                        const auto it = w.nations.find(g.nation);
+                        if (it == w.nations.end() || it->second.returns.empty()) continue;
+                        const quarterly_return& qr = it->second.returns.back();
+                        // The quarter must open on the figure, and the net from apply_budget's
+                        // opening must reach the balance. Before the grant dropped them, the
+                        // settle's last debits were charged again inside this net.
+                        const double opened      = pre_tick.count(g.nation) ? pre_tick.at(g.nation) : -1.0;
+                        const double budget_open = at_budget.count(g.nation) ? at_budget.at(g.nation) : 0.0;
+                        const double gap = (qr.net + budget_open - static_cast<double>(qr.balance))
+                                         + (opened - static_cast<double>(g.figure));
+                        ++grant_rows;
+                        if (g.research_dropped > 0.0 && g.upkeep_dropped > 0.0) ++grant_both;
+                        if (!(std::fabs(gap) <= 0.01))
+                        {
+                            ++grant_bad;
+                            std::printf("GRANTNET seed=%d nation=%llu research_dropped=%.2f upkeep_dropped=%.2f net=%.2f figure=%.1f opened=%.2f budget_open=%.2f balance=%.2f gap=%.3f\n",
+                                        seed, static_cast<unsigned long long>(g.nation), g.research_dropped,
+                                        g.upkeep_dropped, qr.net, static_cast<double>(g.figure), opened,
+                                        budget_open, static_cast<double>(qr.balance), gap);
+                        }
+                    }
             }
             force = force_by_owner(w);
 
@@ -535,5 +607,10 @@ int main(int argc, char** argv)
                         median_of(minor_treasury), median_of(minor_built), median_of(minor_men));
             std::fflush(stdout);
         }
-    return 0;
+    std::printf("grant net rows: %d majors with debits dropped at the grant (%d both research and wage), %d off\n",
+                grant_rows, grant_both, grant_bad);
+    row(grant_rows > 0 && grant_bad == 0,
+        "first play return: opens on the granted figure, and its net from apply_budget's opening reaches its balance, where the settle's last tick researched or paid wage");
+    std::printf("=== opening_parity: %d failure(s) ===\n", failures);
+    return failures == 0 ? 0 : 1;
 }

@@ -675,7 +675,14 @@ void recipe_registry::load_from_lua(lua_state& lua)
                         throw std::runtime_error("recipe_registry: curve_materials." + key
                                                  + " names a target with no material override");
                     for (std::size_t r = 0; r < resource_count; ++r)
+                    {
                         it->second[r] += add[r];
+                        // The curve's materials are a curve on their own: with both
+                        // multipliers at 1 the live row still differs from the authored
+                        // one, so the settle must be put back on the authored bill.
+                        if (add[r] != 0.0f)
+                            m_has_cost_curve = true;
+                    }
                 }
             }
             else if (overrides && nt.type == building_type::processing_facility)

@@ -4674,15 +4674,21 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         // A leg on the body (land or sea) draws the anchor's Logistic
                         // Points (BL-1361); a space lane draws none.
                         const bool on_body = w.markets.at(o.b).body == um.body;
+                        // `lp_left` is POINTS, and a unit costs its base value over the
+                        // value a point carries (LOGISTICS.md, "Points are drawn by
+                        // value"), as the shipment's own draw prices it.
+                        const float lp_value = tp.lp_value_per_point;
+                        const float lp_per_unit = (lp_value > 0.0f && um.base_price[o.r] > 0.0f)
+                                                      ? um.base_price[o.r] / lp_value : 1.0f;
                         float units = std::min({pts_left * cap, spare[o.r], room});
                         if (on_body)
-                            units = std::min(units * lp_cover, lp_left);
+                            units = std::min(units * lp_cover, lp_left / lp_per_unit);
                         if (!(units > 1e-4f) || !(cap > 0.0f))
                             continue;
                         earn       += o.margin_per_unit * units;
                         spare[o.r] -= units;
                         if (on_body)
-                            lp_left -= units;
+                            lp_left -= units * lp_per_unit;
                         pts_left   -= units / cap;
                     }
                     const float net = earn - mex.maintenance - mex.base_wage * mp_wf - upkeep_cost;

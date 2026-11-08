@@ -182,12 +182,22 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& live_reg, in
         for (const entity_id nid : majors)
         {
             nation_component& nc = w.nations.at(nid);
-            out.handoff_grants.push_back({nid, nc.treasury, w.handoff_chest});
+            out.handoff_grants.push_back({nid, nc.treasury, w.handoff_chest, nc.research_unbooked,
+                                          nc.upkeep_unbooked, nc.refund_unbooked});
             std::printf("[opening_kit] handoff grant: major %llu closed the settle on %.1f, starts play on %.1f (grant %+.1f)\n",
                         static_cast<unsigned long long>(nid), static_cast<double>(nc.treasury),
                         static_cast<double>(w.handoff_chest),
                         static_cast<double>(w.handoff_chest) - static_cast<double>(nc.treasury));
             nc.treasury = w.handoff_chest;
+            // The settle's last tick paid research and garrison wage (and took any refund) in
+            // its nation step, AFTER its return was filed, so `apply_budget` would book them on
+            // the first play return against the granted figure, which never held them, and that
+            // return's net would not be its treasury less the figure. The grant replaces the
+            // balance they moved, so they go with it (recorded on the grant line above).
+            nc.research_unbooked = 0.0;
+            nc.upkeep_unbooked   = 0.0;
+            nc.refund_unbooked   = 0.0f;
+            nc.refund_opening    = 0.0f;
         }
         w.handoff_chest = -1.0f;
     }

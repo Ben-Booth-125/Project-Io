@@ -70,6 +70,11 @@ struct handoff_grant
     entity_id nation = null_entity;
     float     settle_close = 0.0f;
     float     figure = 0.0f;
+    /// The settle's last nation-step debits and credits, moved through `settle_close` and
+    /// not yet on a return, which the grant drops so the first play return books none of them.
+    double    research_dropped = 0.0;
+    double    upkeep_dropped   = 0.0;
+    float     refunds_dropped  = 0.0f;
 };
 
 struct settle_tick_result

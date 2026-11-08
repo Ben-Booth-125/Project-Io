@@ -931,7 +931,8 @@ value (FINANCE.md § The quarterly return) and the size of a building for what r
 **The curve never prices what a nation's ground opens with (Ben, 2026-11-07).** A founding and every
 site the settle places are on the authored bills, so the kit, the minors' walks and the opening
 position are what they would be with no curve. A site still building at the handoff draws the live
-bill for the days it has left.
+bill for the days it has left. The days the settle built are the settle's: their materials,
+drawn in arrears at the first play tick, are billed at the authored bill they were admitted at.
 
 **The extra cost lives mostly in materials.** Materials are bought off the shelf at the tile market's
 price, so a nation that planned a steel chain has a real edge over one that did not, and a nation

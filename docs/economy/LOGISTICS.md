@@ -1058,7 +1058,9 @@ eight times the points of the same credits of steel, so the cap fell hardest on 
 exists to move. The constant is set so the majors' summed shipment draw at the opening's fifth
 year, holding the cargo they shipped under the unit rule, is what that cargo drew by the unit
 (Ben, 2026-11-08). A unit's supplies still draw by quantity (above): this rule
-is the shipment's alone.
+is the shipment's alone. Where there is no value to divide, the draw falls back to one point a
+unit: a good whose base price at the market it leaves is 0, and every good in a world whose
+constant is 0 or not authored.
 **A shipment pays where it leaves (Ben, 2026-11-07).** A shipment draws its Logistic Points at the
 market it leaves — its anchor, the source market's centre — and nowhere along the way; distance does
 not enter the draw. This replaces the 2026-10-23 reading (NR-1060) that a shipment paid the points
