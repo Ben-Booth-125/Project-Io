@@ -8007,7 +8007,7 @@
      "text": "Live click: embark and land from the app.",
      "kind": "visual",
      "status": "pending",
-     "evidence": "No press exists yet. BL-1534 (sea UI) owns the embark and land presses and their live click."
+     "evidence": "No press exists yet. BL-1534 (sea UI) owns the embark and land presses and their live click. 2026-11-08: embark passed live (Unit aboard); the land press queued nothing though its hover offered the landing - see sea-ui R10."
     }
    ],
    "resolved": "2026-11-06"
@@ -8090,7 +8090,7 @@
      "text": "Live click in the built app: Sea tab, Raise, card, right-click, board, land, a contested landing, the off-road dash on a landed unit by a hostile port, and shift-clicking a Naval node in the research panel. Also the per-frame cost of the preview line.",
      "kind": "visual",
      "status": "pending",
-     "evidence": "PARTLY DONE 2026-11-07 in the built app. PASSED: the Sea tab opens with two ports and four rows; the ring's rim labels print clear; a Naval node's hover reads. NOT REACHABLE: card, zone right-click, board, land, contested landing and the landed unit's dash, since no ship could be raised (R1). INCONCLUSIVE: shift-click queued no node at all, Naval or otherwise, which points at the input tool's shift rather than the panel; Ben to try by hand. Preview per-frame cost not measured."
+     "evidence": "PARTLY DONE 2026-11-07 in the built app. PASSED: the Sea tab opens with two ports and four rows; the ring's rim labels print clear; a Naval node's hover reads. NOT REACHABLE: card, zone right-click, board, land, contested landing and the landed unit's dash, since no ship could be raised (R1). INCONCLUSIVE: shift-click queued no node at all, Naval or otherwise, which points at the input tool's shift rather than the panel; Ben to try by hand. Preview per-frame cost not measured. 2026-11-08 in the built app, transport-first seat: PASSED card (destroyer and transport), board (Unit aboard, Aboard 1 of 2), zone right-click (destroyer on Patrol: right-click a sea province -> Mission assigned, Zone 1 of 8, Sailing to its zone). FAILED land: the coast hover reads Right-click: land 1 unit at Tukornom, but three right-clicks on it queued nothing - no answer line, the transport stays Lying at its home port. The same right-click works for a warship zone, so the defect is in the transport press path."
     }
    ],
    "resolved": "2026-11-07"
@@ -8101,7 +8101,7 @@
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "active",
+   "status": "complete",
    "promoted_from": "backlog.json BL-1532 - sprint 64 (Ben, 2026-11-07 form)",
    "batch": "sprint-64",
    "requirements": [
@@ -8137,8 +8137,8 @@
      "id": "R5",
      "text": "Live: on a fresh seat the Sea tab lists the five opening ships and a ship card opens; a transport can take a unit aboard.",
      "kind": "visual",
-     "status": "pending",
-     "evidence": "2026-11-08 live click, Quick Start seat Keitoheim Meido: the Sea tab lists Tukornom 3 ships and Dutum 2, all five lying at their home port; sea Raise dims with Short of Machinery (0 of 2); the transport card reads Transport, home at Dutum, Aboard 0 of 2; the coast hover reads Nothing aboard. Boarding and landing NOT clicked: Dutum is an island with no base or land unit, so no unit can reach the transport (NR-1151)."
+     "status": "complete",
+     "evidence": "2026-11-08 live click, fresh Quick Start seat Keitoheim Meido after the transport-first ruling (NR-1151): the Sea tab lists Tukornom 3 ships and Dutum 2, Fleet Transport first, all five lying at their home port; the card reads Transport, home at Tukornom; Ready to board lists seven units with Board; pressing Board on a Rifle Infantry answered Unit aboard and Aboard (1 of 2). Earlier the same day the old order berthed the transport on the island port Dutum, where no unit could reach it."
     }
    ]
   }

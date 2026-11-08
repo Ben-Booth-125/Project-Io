@@ -769,7 +769,9 @@ each raised on its class's base kit. The ships lie at the **capital port** first
 port with a sea mouth in the capital's province, or failing one, its sea-mouthed port nearest the
 capital. Each port takes three opening ships before the rest spill to the next-nearest sea-mouthed
 port; with too few ports the spill wraps round, so a major with one sea port berths the whole fleet
-there. A major with no sea-mouthed port opens with no ship. Every major's sea pool opens holding
+there. **The transport berths first (Ben, 2026-11-08)**, so it always lies at the capital port:
+a spilled transport could lie at an island port no land unit can reach, where it could never be
+boarded. A major with no sea-mouthed port opens with no ship. Every major's sea pool opens holding
 **100 recruits**, ships or none. Minors open with no ship. The kit's port cap keeps a sea-mouthed
 port where one stands, so a lake port never leaves a major without a berth
 (`../generation/CORPORATION_GENERATION.md` § A major's opening kit).

@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*33 entries — 31 open, 2 resolved.*
+*33 entries — 30 open, 3 resolved.*
 
 ---
 
@@ -326,13 +326,6 @@ Taken inside your form answers so the item could build; each is one line of scri
 
 **Why it matters.** Call (7) decides whether a fleet can be sunk in harbour before its owner has given an order. Measured: 16 seeds, 425 ships, 85 of 94 majors with a fleet, cover unchanged by the cap rule (76 -> 76).
 
-### NR-1151 — Opening fleets: the transport can berth where no land unit can reach it
-*question · raised 2026-11-08 · from OPENING_FLEETS (BL-1532) live click*
-
-Live click, Quick Start seat Keitoheim Meido, 1960 Jan 26. The kit lists the transport fifth, so with three ships to a berth it spills to the second sea port. Here that is Dutum, a small island port with no military base and no land unit. Boarding needs a land unit on or beside the transport's own port, a transport takes no order to sail to another port, and land units are raised only at a base. So this seat's transport can never be boarded, and the landing can never be clicked. Tukornom, the capital port and the only base, holds the three warships.
-
-> **Recommendation:** A, cheapest and always legible; C is worth a backlog item on its own merits.
-
 ---
 
 ## Resolved
@@ -357,4 +350,13 @@ You ruled offshore drilling lands with the naval system, and it is parked on tha
 **Why it matters.** Adding it enlarges an already five-difficulty sprint and adds a second world-mover to its re-bless.
 
 > **RESOLVED.** Ben, 2026-11-05: keep it out of sprint 64. BL-1522 (offshore drilling) stays parked.
+
+### NR-1151 — Opening fleets: the transport can berth where no land unit can reach it
+*question · raised 2026-11-08 · from OPENING_FLEETS (BL-1532) live click*
+
+Live click, Quick Start seat Keitoheim Meido, 1960 Jan 26. The kit lists the transport fifth, so with three ships to a berth it spills to the second sea port. Here that is Dutum, a small island port with no military base and no land unit. Boarding needs a land unit on or beside the transport's own port, a transport takes no order to sail to another port, and land units are raised only at a base. So this seat's transport can never be boarded, and the landing can never be clicked. Tukornom, the capital port and the only base, holds the three warships.
+
+> **Recommendation:** A, cheapest and always legible; C is worth a backlog item on its own merits.
+
+> **RESOLVED.** Ben, 2026-11-08: A, transport first. Both kits list the transport first, so it berths at the capital port; written into MILITARY.md § Sea.
 

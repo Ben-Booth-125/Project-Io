@@ -508,11 +508,13 @@
    "title": "Opening fleets: the transport can berth where no land unit can reach it",
    "raised": "2026-11-08",
    "kind": "question",
-   "status": "open",
+   "status": "resolved",
    "source": "OPENING_FLEETS (BL-1532) live click",
    "what": "Live click, Quick Start seat Keitoheim Meido, 1960 Jan 26. The kit lists the transport fifth, so with three ships to a berth it spills to the second sea port. Here that is Dutum, a small island port with no military base and no land unit. Boarding needs a land unit on or beside the transport's own port, a transport takes no order to sail to another port, and land units are raised only at a base. So this seat's transport can never be boarded, and the landing can never be clicked. Tukornom, the capital port and the only base, holds the three warships.",
    "options": "A) Put the transport first in the kit list (one line of scripts/world_gen.lua): it always berths at the capital port. Moves every digest pin like the rest of the fleet, inside the same BL-1535 (naval war reading) re-bless. B) Berth the transport at the first berth that a base or land unit can reach overland: a new rule in seed_major_opening_fleets. C) Give transports an order to sail to another own port: a new verb, BL-1534 (sea UI) scope. D) Accept it: an island transport waits for a base built on the island.",
-   "recommendation": "A, cheapest and always legible; C is worth a backlog item on its own merits."
+   "recommendation": "A, cheapest and always legible; C is worth a backlog item on its own merits.",
+   "resolution": "Ben, 2026-11-08: A, transport first. Both kits list the transport first, so it berths at the capital port; written into MILITARY.md § Sea.",
+   "resolved": "2026-11-08"
   }
  ]
 }

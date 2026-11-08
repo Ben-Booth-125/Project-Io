@@ -283,7 +283,7 @@ world_gen = {
                 -- fixed shares, raised on base kit, three to a port from the capital port out;
                 -- the sea pool opens on 100 recruits.
                 fleet = {
-                    ships = { "destroyer", "destroyer", "capital", "submarine", "transport" },
+                    ships = { "transport", "destroyer", "destroyer", "capital", "submarine" },
                     per_port = 3, sea_recruits = 100,
                 },
                 extraction = {
@@ -322,7 +322,7 @@ world_gen = {
                 -- fixed shares, raised on base kit, three to a port from the capital port out;
                 -- the sea pool opens on 100 recruits.
                 fleet = {
-                    ships = { "destroyer", "destroyer", "capital", "submarine", "transport" },
+                    ships = { "transport", "destroyer", "destroyer", "capital", "submarine" },
                     per_port = 3, sea_recruits = 100,
                 },
                 extraction = {

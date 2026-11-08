@@ -1227,7 +1227,7 @@
    "archived": "docs/development/archive/backlog-design-2026-Q4.json"
   },
   {
-   "status": "built",
+   "status": "complete",
    "glyph": "○",
    "sprint": "64",
    "version_goal": "v0.3.0",
