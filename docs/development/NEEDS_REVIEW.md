@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*32 entries — 30 open, 2 resolved.*
+*33 entries — 31 open, 2 resolved.*
 
 ---
 
@@ -325,6 +325,13 @@ Taken so the item could land; each is small to change. (1) A refitting ship is i
 Taken inside your form answers so the item could build; each is one line of scripts/world_gen.lua or one rule to change. (1) Minors open with no ship: "fixed kit fleet" read as no history fleet at all, and the kit is a major's. Minors will raise fleets only through BL-1533 (rival fleets). (2) The fixed shares are two destroyers, one capital ship, one submarine, one transport: five ships, list value 7,200 credits at hire prices. (3) A port berths three opening ships; the rest spill to the next-nearest sea port. With the kit capped at one port, most majors berth all five at one port. (4) "Nearest the capital" is straight-line hex distance, tile id breaking ties. (5) The sea pool opens on 100 recruits, enough to raise one capital ship or three destroyers. (6) "Prefer the sea": the kit cap's LAST port slot admits only a sea-mouthed port while one stands on the major's ground and none is kept; kit cover still picks which. A lake port is still legitimate logistics (lanes cross lakes), so generation still places them. (7) Opening ships lie docked at their mouths with no mission, and a docked ship counts as present in its mouth's province, so two majors hostile at the opening that share a coastal sea province would fight from day one. None did in the 16 seeds' settle (no ship lost HP), but play may. Alternative: docked ships with no mission are not engaged until a war is declared in play.
 
 **Why it matters.** Call (7) decides whether a fleet can be sunk in harbour before its owner has given an order. Measured: 16 seeds, 425 ships, 85 of 94 majors with a fleet, cover unchanged by the cap rule (76 -> 76).
+
+### NR-1151 — Opening fleets: the transport can berth where no land unit can reach it
+*question · raised 2026-11-08 · from OPENING_FLEETS (BL-1532) live click*
+
+Live click, Quick Start seat Keitoheim Meido, 1960 Jan 26. The kit lists the transport fifth, so with three ships to a berth it spills to the second sea port. Here that is Dutum, a small island port with no military base and no land unit. Boarding needs a land unit on or beside the transport's own port, a transport takes no order to sail to another port, and land units are raised only at a base. So this seat's transport can never be boarded, and the landing can never be clicked. Tukornom, the capital port and the only base, holds the three warships.
+
+> **Recommendation:** A, cheapest and always legible; C is worth a backlog item on its own merits.
 
 ---
 

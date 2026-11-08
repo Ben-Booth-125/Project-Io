@@ -8138,7 +8138,7 @@
      "text": "Live: on a fresh seat the Sea tab lists the five opening ships and a ship card opens; a transport can take a unit aboard.",
      "kind": "visual",
      "status": "pending",
-     "evidence": ""
+     "evidence": "2026-11-08 live click, Quick Start seat Keitoheim Meido: the Sea tab lists Tukornom 3 ships and Dutum 2, all five lying at their home port; sea Raise dims with Short of Machinery (0 of 2); the transport card reads Transport, home at Dutum, Aboard 0 of 2; the coast hover reads Nothing aboard. Boarding and landing NOT clicked: Dutum is an island with no base or land unit, so no unit can reach the transport (NR-1151)."
     }
    ]
   }
