@@ -536,6 +536,11 @@ void score_nation_air(world& w, const recipe_registry& reg, entity_id nation, in
 /// strategic bombing, the bunker grant admitting no strike on another's bunker.
 int64_t rival_air_province_score(const world& w, entity_id nation, air_mission m, uint32_t province);
 
+/// BL-1552 (MILITARY.md § Force sizing): the most of its income a nation's force may cost.
+inline constexpr float k_force_max_share = 0.50f; ///< The ceiling threat climbs to. First cut.
+/// Its operating surplus before military pay, averaged over a year of returns; never negative.
+float nation_force_income(const nation_component& nc);
+
 /// BL-1552 (MILITARY.md § Force sizing): what sizes a nation's forces.
 struct force_reading
 {

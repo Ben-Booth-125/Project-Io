@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*36 entries — 32 open, 4 resolved.*
+*37 entries — 33 open, 4 resolved.*
 
 ---
 
@@ -335,6 +335,11 @@ Most majors cannot feed an Arms Works at generation: their machinery slot itself
 *decision taken on your behalf · raised 2026-11-08 · from FORCE_SIZING (BL-1552)*
 
 Two calls. Income is the mean of the last four returns of income plus taxes less expenditure, maintenance and wages, floored at zero, so a nation is not sized on gross takings it has already spent. The landing force hired for a ready transport (Ben, 2026-11-08) stays outside the target, since it is a mission need rather than a standing force.
+
+### NR-1155 — Minor income: floor applies to every nation; garrisons use the 0.50 ceiling; digests moved
+*decision taken on your behalf · raised 2026-11-09 · from MINOR_PLANT_FLOOR (BL-1554), GARRISON_INCOME (BL-1555)*
+
+Three calls. The plant floor visits every nation, because majors are not known until after the walk; the kit then replaces a major's floor firm. Garrisons are paid at the 0.50 force ceiling, not the threat-scaled share, so a minor is not stripped by its first reading. The opening chest cut now reserves only the 20-man token's pay. Measured on four seeds: 22 of 112 minors still open plantless, and 15 of the 23 broke rivals at tick 40 are among those. World digests moved and wait on the re-bless.
 
 ---
 

@@ -2257,7 +2257,6 @@ void score_nation_sea(world& w, const recipe_registry& reg, entity_id nation, in
 namespace {
 
 constexpr float k_force_base_share = 0.20f;  ///< Of income, with no neighbour stronger. First cut.
-constexpr float k_force_max_share  = 0.50f;  ///< The ceiling threat climbs to. First cut.
 constexpr float k_force_threat_span = 3.0f;  ///< Threat over 1 that reaches the ceiling. First cut.
 constexpr int   k_force_income_returns = 4;  ///< Returns averaged: a year.
 
@@ -2521,14 +2520,9 @@ float nation_force_value(const world& w, const recipe_registry& reg, entity_id n
     return v;
 }
 
-force_reading read_nation_force(const world& w, const recipe_registry& reg, entity_id nation,
-                                const std::map<entity_id, std::set<entity_id>>& borders)
+float nation_force_income(const nation_component& nc)
 {
-    force_reading r;
-    const auto nit = w.nations.find(nation);
-    if (nit == w.nations.end())
-        return r;
-    const auto& returns = nit->second.returns;
+    const auto& returns = nc.returns;
     const int n = std::min<int>(k_force_income_returns, static_cast<int>(returns.size()));
     float sum = 0.0f;
     for (int i = 0; i < n; ++i)
@@ -2536,7 +2530,17 @@ force_reading read_nation_force(const world& w, const recipe_registry& reg, enti
         const quarterly_return& q = returns[returns.size() - 1 - static_cast<std::size_t>(i)];
         sum += q.income + q.taxes - q.expenditure - q.maintenance - q.wages;
     }
-    r.income = n > 0 ? std::max(0.0f, sum / static_cast<float>(n)) : 0.0f;
+    return n > 0 ? std::max(0.0f, sum / static_cast<float>(n)) : 0.0f;
+}
+
+force_reading read_nation_force(const world& w, const recipe_registry& reg, entity_id nation,
+                                const std::map<entity_id, std::set<entity_id>>& borders)
+{
+    force_reading r;
+    const auto nit = w.nations.find(nation);
+    if (nit == w.nations.end())
+        return r;
+    r.income = nation_force_income(nit->second);
     const theatre_cost c = nation_running_by_theatre(w, reg, nation);
     r.running = c.land + c.air + c.sea;
     r.own_value = nation_force_value(w, reg, nation);

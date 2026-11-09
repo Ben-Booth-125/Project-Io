@@ -137,6 +137,8 @@ settle_tick_result run_settle_tick(world& w, const recipe_registry& reg, int eco
     // on its post is re-chosen on covered ground. Inside the lap, so a digest after it
     // sees the posted world. A no-op on a world with no generation record (a load).
     if (econ_step == k_campaign_settle_ticks - 1 && !w.gen_garrisons.empty())
+        print_garrison_income(size_garrisons_to_income(w, reg)); // BL-1555: its returns are filed
+    if (econ_step == k_campaign_settle_ticks - 1 && !w.gen_garrisons.empty())
         print_garrison_repost(repost_garrisons_on_cover(w, &reg.military()));
     // BL-1504 (MILITARY.md § Defend province): a major opens defending its capital
     // province, from the posts just chosen.

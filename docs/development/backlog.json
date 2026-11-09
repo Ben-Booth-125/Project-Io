@@ -1442,6 +1442,33 @@
    ],
    "title": "Every nation opens with a plant, so a minor has income",
    "design": "CORPORATION_GENERATION.md § Pass 6, the plant floor. A floor visit runs before the walk proper and buys one firm per nation from its richest placeable centre, paid from that centre's firm budget."
+  },
+  {
+   "status": "complete",
+   "glyph": "○",
+   "sprint": "64",
+   "version_goal": "v0.3.0",
+   "written": "2026-11-09",
+   "parked": false,
+   "blocked_on": null,
+   "author": "main session (Ben, 2026-11-09: minors should have income; token garrison)",
+   "category": "Military",
+   "authority_doc": "docs/military/MILITARY.md",
+   "id": "BL-1555",
+   "short_name": "GARRISON_INCOME",
+   "requires": [
+    "BL-1554"
+   ],
+   "priority": "A",
+   "difficulty": 3,
+   "files": [
+    "src/world/nation_generation.cpp",
+    "src/world/campaign_settle.cpp",
+    "src/world/state_industry.cpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "title": "A minor's garrisons are cut to what its income pays at the handoff",
+   "design": "MILITARY.md § Nation garrisons. Income at the force ceiling share pays the men; the capital keeps a 20-man token; border posts split the rest or stand down. The opening cut reserves only the token's pay."
   }
  ]
 }

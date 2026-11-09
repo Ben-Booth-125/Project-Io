@@ -1564,10 +1564,16 @@ never raised at a base. So the player's major opens on the same eight as every r
 seat neither takes a major's units nor arms the nation it leaves. A seat move takes a force only
 from a nation holding one raised at a base, and only then arms the nation it leaves.
 
-**A minor's sizing is treasury-scaled against the value anchor.** BL-543's (value anchor) unit-equipment-
-costs-twice-annual-salary anchor prices a garrison's count off the nation's own
-`nation_component::treasury`, so a rich minor fields a bigger standing force and a poor one a
-token one — no separate garrison-strength dial. A garrison holds its seeded tile until it is
+**A minor's garrisons are seeded on its treasury and sized to its income (Ben, 2026-11-09).**
+Generation has no income to read, so BL-543's (value anchor) unit-equipment-costs-twice-annual-salary
+anchor prices each garrison's count off the nation's own `nation_component::treasury`, as a ceiling.
+At the handoff, once the settle's returns are filed, the garrisons are cut to what income pays: the
+nation's operating surplus (§ Force sizing) at the force ceiling share pays the men. The capital
+garrison is served first and never falls below the **20-man token**, so a minor with no income keeps
+one token garrison at its capital. The rest is split evenly across the border posts, and a post that
+cannot keep 20 men stands down. This only ever shrinks a garrison; a minor grows past it by hiring
+under § Force sizing. The opening chest is asked to carry only the token's pay.
+A garrison holds its seeded tile until it is
 assigned to a front (§ Fronts). A rival assigns its border garrisons and keeps its capital's home.
 
 **No unit is assigned to a front by default (Ben, 2026-10-29).** Generation and the settle assign

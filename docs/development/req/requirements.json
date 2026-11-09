@@ -8339,6 +8339,30 @@
      "evidence": "2026-11-09 landscape_search_harness and world_determinism PASS."
     }
    ]
+  },
+  {
+   "brief": "garrison-income",
+   "title": "BL-1555 - A minor's garrisons are sized to its income (MILITARY.md § Nation garrisons)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "At the handoff income pays the men; the capital keeps a 20-man token; border posts that cannot keep 20 stand down.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-09 rival_fleet_census seeds 0,13,17,29, tick 40, against the 2026-11-08 A/B: [garrisons to income] 112 minors, 60 trimmed, 57 stood down, men 27599 to 16516."
+    },
+    {
+     "id": "R2",
+     "text": "Broke rivals fall, with no new harness failure.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-09 rival_fleet_census seeds 0,13,17,29, tick 40, against the 2026-11-08 A/B: broke at tick 40 55 to 23 of 129; earning 104 of 129. Gate 2026-11-09: only the known reds; nation_tech_harness timed out with no FAIL."
+    }
+   ]
   }
  ]
 }
