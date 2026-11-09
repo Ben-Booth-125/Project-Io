@@ -1,4 +1,5 @@
 #include "logistics.hpp"
+#include "fronts.hpp" // reanchor_fronts: a bridge moves a span
 #include "war.hpp" // BL-1505: at_war
 #include "river_generation.hpp"
 #include "hex_neighbors.hpp" // BL-1186: a port reaches its sea across any hex side
@@ -279,11 +280,30 @@ bool lay_road_edge(world& w, entity_id tile, int side, std::uint8_t tier)
     // A BRIDGE OPENS A SPAN (Ben, 2026-11-09; MILITARY.md § Fronts): a water tile taking
     // its first road becomes front ground, so the front cache must re-derive here. Else a
     // run that loaded after the bridge and one that did not would hold different spans.
-    if ((is_water(tit->second.substrate) && !tile_has_road(tit->second))
-        || (is_water(oit->second.substrate) && !tile_has_road(oit->second)))
+    const bool opens_span = (is_water(tit->second.substrate) && !tile_has_road(tit->second))
+                         || (is_water(oit->second.substrate) && !tile_has_road(oit->second));
+    // A SAVE NEVER HOLDS A KEY ON A MOVED FRONT (the rule `occupy_on_entry`'s pass keeps,
+    // fronts.hpp): the road verb is instant and a save can land before the next day's
+    // re-anchor, and a load has no old fronts to remap a key against. So the keys are
+    // remapped around the write. Only where one is stored: generation lays its bridges
+    // before any exists, and needs no derivation per tile.
+    bool key_stored = opens_span && !w.front_orders.empty();
+    if (opens_span && !key_stored)
+        for (const auto& [uid, u] : w.units)
+            if (u.front != null_entity)
+            {
+                (void)uid;
+                key_stored = true; // an existence test: the walk's order cannot reach it
+                break;
+            }
+    if (key_stored)
+        reanchor_fronts(w); // the old fronts, before the write
+    if (opens_span)
         ++w.territory_generation;
     set_road_tier_on_side(tit->second, side, tier);
     set_road_tier_on_side(oit->second, opposite_hex_side(side), tier);
+    if (key_stored)
+        reanchor_fronts(w);
     return true;
 }
 

@@ -277,6 +277,11 @@ std::vector<front> fronts_of(const world& w, raster_source& rs, entity_id nation
             const entity_id o = owner_of(w, n);
             if (o == null_entity || o == nation)
                 continue;
+            // Both sides of the line read the same: unroaded water across it makes no
+            // border, so a border running only along water carries no front on either.
+            if (const auto nit = w.tiles.find(n);
+                nit != w.tiles.end() && is_water(nit->second.substrate) && !tile_has_road(nit->second))
+                continue;
             std::vector<entity_id>& v = border[o];
             if (v.empty() || v.back() != t)
                 v.push_back(t);
