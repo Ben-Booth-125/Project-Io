@@ -26,6 +26,7 @@
 #include "world/condition_set.hpp"   // condition_text — the contract card's predicate (BL-577)
 #include "world/corp_ai.hpp"         // corp_reserve_floor / corp_should_have_buffer — god-view corp readout (BL-408)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
+#include <optional>
 #include "body_surface_canvas.hpp"    // logistic_points_or_fallback (BL-1354)
 #include "world/market_clearing.hpp"
 #include "world/construction.hpp"    // demolish path (the building element's Demolish)
@@ -699,7 +700,8 @@ const char* method_grid_status(entity_id id)
     return "Switch refused.";
 }
 
-void draw_production_method_section(world& w, const recipe_registry& reg, entity_id id)
+void draw_production_method_section(world& w, const recipe_registry& reg,
+                                     const economy_report& report, entity_id id)
 {
     s_status_drawn_for = null_entity;
     const auto bit = w.buildings.find(id);
@@ -764,6 +766,29 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
     const float row_h   = ImGui::GetFrameHeight() * 1.5f;
     const float glyph_w = row_h; // the Switch control's own square, right edge of the row
 
+    // The Method figure is the door's quote, asked for this running plant. Its context
+    // is built once per stamp: the per-frame cost is the rows' own lookups.
+    static struct
+    {
+        int           tick = 0;
+        std::size_t   buildings = 0;
+        std::uint64_t generation = 0;
+        const economy_report* report = nullptr;
+        std::optional<site_quote_context> cx;
+    } s_lever_quote;
+    if (!s_lever_quote.cx.has_value() || s_lever_quote.tick != w.current_econ_tick
+        || s_lever_quote.buildings != w.buildings.size()
+        || s_lever_quote.generation != w.logistics_cache_generation
+        || s_lever_quote.report != &report)
+    {
+        s_lever_quote.tick       = w.current_econ_tick;
+        s_lever_quote.buildings  = w.buildings.size();
+        s_lever_quote.generation = w.logistics_cache_generation;
+        s_lever_quote.report     = &report;
+        s_lever_quote.cx.emplace(make_site_quote_context(w, reg, &report));
+    }
+    const float lever_cover = site_lp_cover(w, b.tile);
+
     for (int idx : candidates)
     {
         const recipe& ri     = reg.play_recipe_at(b.type, idx);
@@ -787,14 +812,13 @@ void draw_production_method_section(world& w, const recipe_registry& reg, entity
         const float  name_x       = 6.0f + pipr * 2.0f + 6.0f;
         const float  profit_col_w = row_w - glyph_w - 6.0f;
 
-        // Expected profit for a recipe switch. It prices at the posted price, not
-        // the Build door's quote_site, so the two can differ on a scarce good. `&b`
-        // prices it at the
-        // building's REAL staffing (not the hypothetical 0.5/100 default) and
-        // excludes it from double-counting its own extraction-site stack rank.
+        // Expected profit for a recipe switch: the Build door's quote (obtainable
+        // inputs, settling output price, the tile's Logistic Point cover), asked for
+        // THIS plant - its real staffing, supply and condition, and a market with its
+        // own last quarter taken out. A row it cannot feed reads upkeep alone.
         constexpr float profit_scale = 1.1f;
-        const building_profit fp = estimate_prospective_profit(
-            w, reg, b.tile, b.type, b.target_resource, reg.recipe_id(ri.name), &b);
+        const building_profit fp = quote_site(w, reg, *s_lever_quote.cx, b.tile, b.type, b.target_resource,
+                                              reg.recipe_id(ri.name), lever_cover, id, &b).profit;
 
         char        profit_buf[32];
         ImU32       profit_col = palette::neutral;

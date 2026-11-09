@@ -916,7 +916,7 @@ bool draw_group_member_row(const world& w, entity_id id, float net, bool known,
 //
 // The two selectors COMPOSE: this reads `ui.selected_entity`, so a building selected
 // from a row here and a building selected on the map both land on the same levers.
-void draw_building_levers(world& w, const recipe_registry& reg, ui_state& ui)
+void draw_building_levers(world& w, const recipe_registry& reg, const economy_report& report, ui_state& ui)
 {
     const entity_id sel = ui.selected_entity;
     const auto bit = w.buildings.find(sel);
@@ -942,7 +942,7 @@ void draw_building_levers(world& w, const recipe_registry& reg, ui_state& ui)
         return;
     }
 
-    draw_production_method_section(w, reg, sel); // draws nothing for a non-processing type
+    draw_production_method_section(w, reg, report, sel); // draws nothing for a non-processing type
     ImGui::Spacing();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Workforce");
     // BL-1322: read-only — the game sets it (the slider retired).
@@ -1052,7 +1052,7 @@ void draw_buildings_view(world& w, const recipe_registry& reg,
     ImGui::EndChild();
 
     const float levers_y0 = ImGui::GetCursorPosY();
-    draw_building_levers(w, reg, ui);
+    draw_building_levers(w, reg, report, ui);
     ui.construction_ui.levers_h = (ui.construction_ui.levers_for != null_entity)
                                       ? ImGui::GetCursorPosY() - levers_y0
                                       : 0.0f;

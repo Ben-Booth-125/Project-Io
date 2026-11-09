@@ -114,7 +114,8 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
 /// ledger's Buildings view can call THE SAME BODY rather than grow a second recipe
 /// switcher: two sets of controls writing the same field is how two surfaces come to
 /// disagree.
-void draw_production_method_section(world& w, const recipe_registry& reg, entity_id id);
+void draw_production_method_section(world& w, const recipe_registry& reg,
+                                     const economy_report& report, entity_id id);
 
 /// The method grid's OFFER for building @p b: the browse indices (recipe_at) of
 /// the rows the grid lists — same group as the active recipe, and runnable on

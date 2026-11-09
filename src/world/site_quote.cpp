@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
+#include <optional>
 
 site_quote_context make_site_quote_context(world& w, const recipe_registry& reg, const economy_report* report)
 {
@@ -66,11 +67,59 @@ bool own_bid_admitted(const recipe_registry& reg, const market_component& m, std
     return price_target(m.base_price[r], supply, demand, band.floor_mult, band.ceil_mult)
            <= band.reservation_mult * m.base_price[r];
 }
+
+/// The market as it would read without @p b's last quarter: what it listed off supply,
+/// what it bid off demand (or off the silenced want, where the ceiling refused the bid,
+/// as `run_processing` files it). Its goods already on the shelf stay: they are stock.
+/// Nothing to take out without a report row, since then it has not been in the market.
+std::optional<market_component> market_without_plant(const recipe_registry& reg, const site_quote_context& cx,
+                                                     const market_component& m, entity_id self,
+                                                     const building_component& b)
+{
+    if (cx.reach.report == nullptr)
+        return std::nullopt;
+    const auto& rows = cx.reach.report->buildings;
+    const auto row = std::find_if(rows.begin(), rows.end(),
+                                  [&](const building_report& br) { return br.building == self; });
+    if (row == rows.end())
+        return std::nullopt;
+
+    market_component out = m;
+    const auto take = [](float& v, float amount) { v = std::max(0.0f, v - amount); };
+    if (b.type == building_type::extraction_site)
+    {
+        take(out.supply[static_cast<std::size_t>(b.target_resource)], row->output_quantity);
+        return out;
+    }
+    const recipe* cur = reg.get_recipe(b.recipe);
+    if (b.type != building_type::processing_facility || cur == nullptr)
+        return out;
+
+    float output_units = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        output_units += cur->outputs[r];
+    const float full_batches = reg.economics(b.type).base_rate * row->effective_workforce
+                             * std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f)
+                             * building_supply_scalar(b);
+    const float reservation = reg.price_band().reservation_mult;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (cur->outputs[r] > 0.0f && output_units > 0.0f)
+            take(out.supply[r], row->output_quantity * cur->outputs[r] / output_units);
+        if (cur->inputs[r] <= 0.0f)
+            continue;
+        // The full-run need, whether or not the draw went on to fill (BL-441).
+        const float bid = cur->inputs[r] * full_batches;
+        take(shelf_admits(m, r, reservation, /*off_buys=*/true) ? out.demand[r] : out.hauler_want[r], bid);
+    }
+    return out;
+}
 } // namespace
 
 site_quote quote_site(world& w, const recipe_registry& reg, site_quote_context& cx,
                       entity_id tile, building_type type, resource_type target,
-                      std::uint16_t recipe_id, float lp_cover, entity_id self)
+                      std::uint16_t recipe_id, float lp_cover, entity_id self,
+                      const building_component* running)
 {
     site_quote q;
     const entity_id mid = market_for_tile(w, tile);
@@ -78,10 +127,15 @@ site_quote quote_site(world& w, const recipe_registry& reg, site_quote_context& 
     const recipe* rc = (type == building_type::processing_facility) ? reg.get_recipe(recipe_id) : nullptr;
     if (mit == w.markets.end() || (type == building_type::processing_facility && rc == nullptr))
     {
-        q.profit = estimate_prospective_profit(w, reg, tile, type, target, recipe_id, nullptr, nullptr, lp_cover);
+        q.profit = estimate_prospective_profit(w, reg, tile, type, target, recipe_id, running, nullptr, lp_cover);
         return q;
     }
-    const market_component& m = mit->second;
+    const std::optional<market_component> netted =
+        running != nullptr ? market_without_plant(reg, cx, mit->second, self, *running) : std::nullopt;
+    const market_component& m = netted.has_value() ? *netted : mit->second;
+    // `self` tells the forecast a plant under construction is already in the pending
+    // pool. A running plant is not in it, so it must not be taken back out of it.
+    const entity_id pending_self = running != nullptr ? null_entity : self;
 
     if (rc != nullptr)
     {
@@ -91,7 +145,16 @@ site_quote quote_site(world& w, const recipe_registry& reg, site_quote_context& 
         bc.recipe             = recipe_id;
         bc.workforce_assigned = construction_initial_workforce(type);
         bc.workforce_target   = default_workforce_target(type);
-        const float batches   = judged_batches(reg, bc) * std::clamp(lp_cover, 0.0f, 1.0f);
+        if (running != nullptr)
+        {
+            bc.workforce_assigned     = running->workforce_assigned;
+            bc.workforce_target       = running->workforce_target;
+            bc.supply_factor_permille = running->supply_factor_permille;
+            bc.condition_permille     = running->condition_permille;
+        }
+        float batches = judged_batches(reg, bc) * std::clamp(lp_cover, 0.0f, 1.0f);
+        if (running != nullptr)
+            batches *= building_supply_scalar(bc);
 
         // Can it run? Measured against what ordered plants went on to earn (the
         // build_payback_census holdout, 2026-11-06, 549 processors): stock or supply, with
@@ -125,7 +188,7 @@ site_quote quote_site(world& w, const recipe_registry& reg, site_quote_context& 
                 q.short_of = static_cast<resource_type>(r);
             }
         }
-        q.profit = estimate_prospective_profit(w, reg, tile, type, target, recipe_id, nullptr, &cost, lp_cover);
+        q.profit = estimate_prospective_profit(w, reg, tile, type, target, recipe_id, running, &cost, lp_cover);
         if (q.starved)
         {
             // It would stand idle: upkeep and nothing else.
@@ -141,7 +204,7 @@ site_quote quote_site(world& w, const recipe_registry& reg, site_quote_context& 
             if (rc->outputs[r] <= 0.0f)
                 continue;
             const float v = rc->outputs[r] * market_price_now(m, r);
-            after  += v * price_share_after_supply(reg, cx, m, mid, r, rc->outputs[r] * batches, self);
+            after  += v * price_share_after_supply(reg, cx, m, mid, r, rc->outputs[r] * batches, pending_self);
             before += v;
         }
         q.price_share = before > 0.0f ? after / before : 1.0f;
@@ -149,13 +212,13 @@ site_quote quote_site(world& w, const recipe_registry& reg, site_quote_context& 
         return q;
     }
 
-    q.profit = estimate_prospective_profit(w, reg, tile, type, target, recipe_id, nullptr, nullptr, lp_cover);
+    q.profit = estimate_prospective_profit(w, reg, tile, type, target, recipe_id, running, nullptr, lp_cover);
     if (type == building_type::extraction_site)
     {
         const std::size_t r = static_cast<std::size_t>(target);
         const float p = market_price_now(m, r);
         const float rate = p > 0.0f ? q.profit.revenue / p : 0.0f;
-        q.price_share = price_share_after_supply(reg, cx, m, mid, r, rate, self);
+        q.price_share = price_share_after_supply(reg, cx, m, mid, r, rate, pending_self);
         q.profit.revenue *= q.price_share;
     }
     return q;

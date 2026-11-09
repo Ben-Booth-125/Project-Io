@@ -178,7 +178,10 @@ finder open, which rests the whole reward for searching on these figures).
 - **A plant that fails that test would likely stand idle** (`../../economy/MARKETS.md` § Settled: every draw BUYS). It quotes its upkeep alone, and the
   hover names the good it is short of.
 
-The question is the door's and the finder's only. The rival scorer keeps its own glut forecast.
+The question is the door's, the finder's and the Method lever's. The lever asks it of a plant already
+running (Ben, 2026-11-09): the plant's real staffing, supply factor and condition, against a market
+with what it listed and bid last quarter taken out, so its own goods and bids are not counted twice.
+The rival scorer keeps its own glut forecast.
 
 **3. Lens.** Choosing a building arms the **placement lens** (`../LENSES.md` § The placement lens):
 the same tiles the table lists are marked on the map — green, amber with the struck truck where no
