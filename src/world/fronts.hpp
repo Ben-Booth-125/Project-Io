@@ -14,8 +14,9 @@ class recipe_registry;
 // Fronts (BL-1427; MILITARY.md § Fronts).
 //
 // A front is one contiguous span of a nation's border with one neighbour. A
-// nation's border tiles toward neighbour B are its own tiles with a hex side onto
-// B's ground; those tiles, joined wherever two touch, fall into spans, and each
+// nation's border tiles toward neighbour B are its own LAND tiles, a bridge being
+// land (Ben, 2026-11-09), with a hex side onto B's ground; those tiles, joined
+// wherever two touch, fall into spans, and each
 // span is a front. Fronts are DERIVED from owner or occupier (`world::tile_controller`,
 // BL-1502; MILITARY.md § Occupation), never stored: the same map always gives the same
 // fronts in the same order.

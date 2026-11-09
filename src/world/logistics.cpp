@@ -276,6 +276,12 @@ bool lay_road_edge(world& w, entity_id tile, int side, std::uint8_t tier)
     // TILE property; an edge between two centres can span the water between them.
     if (road_tier_on_side(tit->second, side) >= tier)
         return false; // raises only — max on overlap
+    // A BRIDGE OPENS A SPAN (Ben, 2026-11-09; MILITARY.md § Fronts): a water tile taking
+    // its first road becomes front ground, so the front cache must re-derive here. Else a
+    // run that loaded after the bridge and one that did not would hold different spans.
+    if ((is_water(tit->second.substrate) && !tile_has_road(tit->second))
+        || (is_water(oit->second.substrate) && !tile_has_road(oit->second)))
+        ++w.territory_generation;
     set_road_tier_on_side(tit->second, side, tier);
     set_road_tier_on_side(oit->second, opposite_hex_side(side), tier);
     return true;

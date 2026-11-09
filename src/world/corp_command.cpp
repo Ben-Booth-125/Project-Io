@@ -870,22 +870,16 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
         return corp_command_result::rejected_invalid;
 
     // BL-778: MAY THIS TYPE BE THERE. A unit type declares the domains it
-    // may cross (docs/military/MILITARY.md § Domains and traversal). A land
-    // type may enter coastal water its OWN polity holds and no other water.
+    // may cross (docs/military/MILITARY.md § Domains and traversal). A LAND
+    // UNIT MARCHES ON LAND (Ben, 2026-11-09): no water at all, its own shore
+    // included, a bridge crossed as land.
     // BL-1466 fix round: the ONE test the path is solved around
-    // (`tile_domain_blocks`): the tile's domain off its substrate, coastal water
-    // owned PER TILE (`tile_to_nation`; a water province has no holder, so the
-    // province accessor read every shore unowned), a bridge crossed as land.
+    // (`tile_domain_blocks`).
     {
         const std::vector<roster_row>& rows = unit_roster_table();
         if (uit->second.type >= rows.size())
             return corp_command_result::rejected_invalid; // no such row to ask
-        const roster_row& row = rows[uit->second.type];
-        // BL-1402: owner-generic - a corporation's home nation, or the
-        // nation itself when it marches as itself.
-        const entity_id home = owner_home_nation(w, actor);
-        const bool land_row = (row.domains & domain_bit(traversal_domain::land)) != 0;
-        if (tile_domain_blocks(w, row, land_row, home, dit->second))
+        if (tile_domain_blocks(rows[uit->second.type], dit->second))
             return corp_command_result::rejected_invalid;
     }
 
@@ -925,8 +919,8 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
     //
     // DOMAINS ALONG THE WAY (BL-1466; MILITARY.md § Domains and traversal): the domain
     // test above reads the destination; the PATH is solved around every tile the class
-    // may not stand on (`domain_wall`) - a land class never routes over open ocean or
-    // another polity's shore. A destination reachable only across such water is
+    // may not stand on (`domain_wall`) - a land class never routes over water, its own
+    // shore included (a bridge is a road). A destination reachable only across water is
     // unreachable for this class: rejected_invalid, the domain refusal's own reason.
     const std::set<entity_id> foreign = foreign_held_tiles(w, uit->second.owner);
     std::function<bool(const tile_component&)> cwall;
@@ -937,9 +931,9 @@ corp_command_result march_check(world& w, entity_id actor, entity_id unit, entit
             return corp_command_result::rejected_terrain; // the class cannot enter it
     }
     const std::function<bool(const tile_component&)> dwall =
-        domain_wall(w, uit->second.owner, uit->second.type);
+        domain_wall(uit->second.type);
     const std::function<bool(const tile_component&)> wall =
-        march_wall(w, uit->second.owner, uit->second.type, cwall);
+        march_wall(uit->second.type, cwall);
     const std::vector<entity_id> path =
         march_path(w, sit->second.body, uit->second.position, tile, foreign,
                    wall ? &wall : nullptr);

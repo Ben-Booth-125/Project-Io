@@ -4843,9 +4843,9 @@ unit_march_tick run_unit_march(world& w, const recipe_registry& reg, int day_tic
         // TERRAIN AND THE CLASSES (BL-1455; MILITARY.md § Terrain and the classes): the
         // class's wall - ground it cannot enter without a road - for every re-path below.
         // BL-1466 (MILITARY.md § Domains and traversal): and the class's DOMAIN wall, so
-        // a re-path never routes a land class over open ocean or another polity's shore.
+        // a re-path never routes a land class over water (Ben, 2026-11-09), bridges excepted.
         const std::function<bool(const tile_component&)> wall =
-            march_wall(w, u.owner, u.type, class_wall(mil, u.type));
+            march_wall(u.type, class_wall(mil, u.type));
 
         // Walked until the bank no longer covers the next hop (the else branch below
         // banks it and stops) - NOT while the bank is positive: a unit that steps onto

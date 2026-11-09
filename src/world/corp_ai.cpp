@@ -1533,7 +1533,7 @@ entity_id nearest_fed_ground(world& w, const recipe_registry& reg, unit_draw_mem
     if (nit == w.nations.end() || here == w.tiles.end())
         return null_entity;
     const std::function<bool(const tile_component&)> wall =
-        march_wall(w, u.owner, u.type, class_wall(reg.military(), u.type));
+        march_wall(u.type, class_wall(reg.military(), u.type));
     constexpr int k_home_last = 1 << 20; // past any hex distance
     const uint32_t capital = nit->second.capital_tile != null_entity ? w.provinces.province_of(nit->second.capital_tile) : 0u;
     std::vector<std::pair<int, entity_id>> order;
@@ -3028,7 +3028,15 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
         // Staggered cadence (Victoria-3 tick-task idea): due this tick?
         if ((tick % k) != (static_cast<int>(index) % k))
+        {
+            // A RIVAL SCORES ITS FRONTS EVERY QUARTER (Ben, 2026-11-09; AI_OPPONENT.md § 11,
+            // "A rival's march may weigh supply"): that one pass, on the live-only gate it
+            // has below. Everything else in the evaluation keeps the staggered clock, and a
+            // due actor still scores its fronts after its war, embargo and defence passes.
+            if (actor.is_nation && tick >= k_campaign_settle_ticks)
+                score_nation_fronts(w, reg, corp, tick);
             continue;
+        }
         report.corps_evaluated.push_back(corp);
 
         // BL-1427 (AI_OPPONENT.md § 11, "Rival nations use fronts", Ben 2026-10-27):

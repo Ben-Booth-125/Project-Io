@@ -263,6 +263,12 @@ std::vector<front> fronts_of(const world& w, raster_source& rs, entity_id nation
         const auto tit = w.tiles.find(t);
         if (tit == w.tiles.end())
             continue;
+        // A FRONT FITS LAND TILES ONLY, BRIDGES EXCEPTED (Ben, 2026-11-09; MILITARY.md §
+        // Fronts, Slots): a coast or lake tile never enters a span, and a roaded water
+        // tile is land (a bridge is a road; `lay_road_edge` bumps the generation this
+        // cache keys on when a bridge opens).
+        if (is_water(tit->second.substrate) && !tile_has_road(tit->second))
+            continue;
         for (int side = 0; side < 6; ++side)
         {
             const entity_id n = neighbour_of(w, rs, tit->second, side);
@@ -440,21 +446,6 @@ void warm_rasters(world& w)
     std::sort(bodies.begin(), bodies.end());
     for (const entity_id b : bodies)
         (void)body_tile_grid(w, b);
-}
-
-/// BL-1503 (MILITARY.md § Fronts, Slots; Ben, 2026-11-05): a land unit never takes a
-/// WATER slot, bridges excepted. `march_wall` lets a land class onto its own shore
-/// (the owned-coast ruling, which stands for a march), and owned shore water is in
-/// `tile_to_nation`, so a span can hold it: this is the slot's own stricter test, read
-/// by hold and by `front_reachable`. A naval row is untouched, and a roaded water tile
-/// is land to a land class (`tile_domain_blocks`: a bridge is a road).
-bool water_slot_for(uint16_t type, const tile_component& t)
-{
-    if (!is_water(t.substrate) || tile_has_road(t))
-        return false;
-    const auto& rows = unit_roster_table();
-    return type < rows.size()
-        && (rows[type].domains & domain_bit(traversal_domain::land)) != 0;
 }
 
 /// A push's targets as each unit ranks them: weakest stack, then nearest its slot, then the
@@ -794,7 +785,7 @@ std::vector<entity_id> front_push_tiles(world& w, const recipe_registry& reg, co
             continue;
         const std::vector<push_rank> order = push_order(w, held, f.span[((2 * i + 1) * len) / (2 * n)]);
         const std::function<bool(const tile_component&)> wall =
-            march_wall(w, u.owner, u.type, class_wall(reg.military(), u.type));
+            march_wall(u.type, class_wall(reg.military(), u.type));
         for (const push_rank& r : order)
         {
             if (const auto tit = w.tiles.find(r.t); wall && tit != w.tiles.end() && wall(tit->second))
@@ -824,10 +815,10 @@ entity_id front_hold_slot(world& w, const recipe_registry& reg, const unit_compo
     if (len == 0 || n == 0 || i >= n)
         return null_entity;
     const std::function<bool(const tile_component&)> wall =
-        march_wall(w, unit.owner, unit.type, class_wall(reg.military(), unit.type));
+        march_wall(unit.type, class_wall(reg.military(), unit.type));
     const auto open = [&](entity_id t) {
         const auto tit = w.tiles.find(t);
-        return tit != w.tiles.end() && !(wall && wall(tit->second)) && !water_slot_for(unit.type, tit->second);
+        return tit != w.tiles.end() && !(wall && wall(tit->second));
     };
     const std::size_t s = ((2 * i + 1) * len) / (2 * n); // the slot, as advance_fronts spaces them
     for (std::size_t d = 0; d < len; ++d) // nearest first, ties to the lower index, as hold walks
@@ -851,7 +842,7 @@ bool front_reachable(world& w, const recipe_registry& reg, entity_id unit, const
     // nearest first, ties to the lower index.
     const std::size_t len = f.span.size(), s = len / 2;
     const std::function<bool(const tile_component&)> wall =
-        march_wall(w, uit->second.owner, uit->second.type, class_wall(reg.military(), uit->second.type));
+        march_wall(uit->second.type, class_wall(reg.military(), uit->second.type));
     std::vector<entity_id> order;
     order.reserve(len);
     for (std::size_t d = 0; d < len; ++d)
@@ -866,7 +857,7 @@ bool front_reachable(world& w, const recipe_registry& reg, entity_id unit, const
     for (const entity_id t : order)
     {
         if (const auto tit = w.tiles.find(t); tit != w.tiles.end()
-            && ((wall && wall(tit->second)) || water_slot_for(uit->second.type, tit->second)))
+            && wall && wall(tit->second))
             continue;
         if (uit->second.position == t)
             return true;
@@ -1149,9 +1140,9 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
         // front routes as a march does, so a tile the unit's class cannot enter (blocked
         // unless roaded, no road) is never its slot or its target. `walled_for` is the
         // class's wall test; an empty test (a class the ground never walls) walls nothing.
-        // BL-1466: the wall is `march_wall` - the class's DOMAIN too, so a slot on water
-        // the unit may not stand on (open ocean, another polity's shore) is skipped for
-        // the next candidate, not asked of march_check and refused every day.
+        // BL-1466: the wall is `march_wall` - the class's DOMAIN too, so a slot the unit
+        // may not stand on is skipped for the next candidate, not asked of march_check
+        // and refused every day.
         using wall_fn = std::function<bool(const tile_component&)>;
         const auto walled_for = [&](const wall_fn& wall, entity_id t) {
             if (!wall)
@@ -1171,7 +1162,7 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
             const unit_component& u = w.units.at(uid);
             if (busy(uid, u))
                 return;
-            const wall_fn wall = march_wall(w, u.owner, u.type, class_wall(reg.military(), u.type));
+            const wall_fn wall = march_wall(u.type, class_wall(reg.military(), u.type));
             const std::size_t s = slot_index(i);
             std::vector<entity_id> slots; // nearest first, ties to the lower index
             slots.reserve(len);
@@ -1187,11 +1178,6 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
             for (const entity_id slot : slots)
             {
                 if (walled_for(wall, slot))
-                    continue;
-                // BL-1503: nor water, bridges excepted. An all-water span runs off the
-                // end of this list, and the unit holds where it stands, below.
-                if (const auto st = w.tiles.find(slot);
-                    st != w.tiles.end() && water_slot_for(u.type, st->second))
                     continue;
                 if (u.position == slot)
                 {
@@ -1241,7 +1227,7 @@ front_step advance_fronts(world& w, const recipe_registry& reg)
                 // enter is skipped, and a target whose every route crosses its walls
                 // (rejected_terrain) gives way to the next; the first legal one wins.
                 const std::vector<push_rank> order = push_order(w, held, slot);
-                const wall_fn wall = march_wall(w, u.owner, u.type, class_wall(reg.military(), u.type));
+                const wall_fn wall = march_wall(u.type, class_wall(reg.military(), u.type));
                 bool done = false;
                 for (const push_rank& r : order)
                 {

@@ -39,6 +39,7 @@
 #include "world/economy_system.hpp"
 #include "world/fronts.hpp"
 #include "world/hex_neighbors.hpp"
+#include "world/logistics.hpp" // lay_road_edge (F10f)
 #include "world/nation_generation.hpp" // BL-1540: unit_tile_cover_permille
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
@@ -856,8 +857,10 @@ int main()
         std::size_t wet = 0;
         const corp_command_result own = strait_case(strait::own_coast, wet);
         std::printf("  [info] F9k own strait: march_check %d, %zu water tile(s) on the path\n", static_cast<int>(own), wet);
-        check(own == corp_command_result::applied && wet > 0,
-              "F9k a land unit's march across its OWN nation's coastal strait is accepted, the path crossing it");
+        // A LAND UNIT MARCHES ON LAND (Ben, 2026-11-09): this row said the opposite, on the
+        // owned-coast ruling that ruling overturned.
+        check(own == corp_command_result::rejected_invalid && wet == 0,
+              "F9k a land unit's march across its OWN nation's coastal strait is refused (rejected_invalid), no path");
         const corp_command_result foreign = strait_case(strait::foreign_coast, wet);
         check(foreign == corp_command_result::rejected_invalid,
               "F9l a march across ANOTHER nation's coastal water is refused (rejected_invalid)");
@@ -964,6 +967,10 @@ int main()
         for (const entity_id t : owned)
             for (const entity_id n : g.neighbours(w, t))
             {
+                // A front fits land tiles only, bridges excepted (Ben, 2026-11-09).
+                const tile_component& own_tile = w.tiles.at(t);
+                if (is_water(own_tile.substrate) && !tile_has_road(own_tile))
+                    continue;
                 const entity_id a = owner(w, t), b = owner(w, n);
                 if (a != null_entity && b != null_entity && a != b) border[{ a, b }].insert(t);
             }
@@ -1168,41 +1175,63 @@ int main()
 
     // -----------------------------------------------------------------------
     // F10 - BL-1503 (MILITARY.md § Fronts, Slots): a land unit on hold never takes a
-    // water slot, bridges excepted, and an all-water span leaves it where it stands.
-    // The owned-coast marching rule still stands: a march by hand onto own shore applies.
-    std::printf("\nF10 - hold never walks into water\n");
+    // water slot, bridges excepted. Ben, 2026-11-09: a front fits land tiles only, at the
+    // span's own construction, and a land unit marches on land, its own shore included.
+    std::printf("\nF10 - fronts fit land, land units march on it\n");
     {
         // Row 2 is A's border with B. Make it A's OWN shore water, save column 7 (land).
-        // Every slot but that one is owned coast, which domain_wall lets a land class on.
+        // The span is that one land tile.
         fixture f; build(f);
         for (int x = 0; x < W; ++x)
             if (x != 7)
                 f.w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::coast;
+        ++f.w.territory_generation; // a fixture's substrate edit: the cache keys on this
         reanchor_fronts(f.w);
+        check(nation_fronts(f.w, f.A).size() == 1 && nation_fronts(f.w, f.A).front().span.size() == 1
+                  && nation_fronts(f.w, f.A).front().span[0] == f.at(7, 2),
+              "F10a0 the span holds the land tile and no shore water");
         const entity_id u = add_unit(f, f.A, f.at(7, 0));
-        (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+        (void)cmd_assign(f.w, reg, f.A, u, f.at(7, 2));
         step(f.w, reg, 12);
         check(f.w.units.at(u).position == f.at(7, 2),
               "F10a one land tile on a shore span: the unit takes it, not the water slot in the middle");
         const entity_id v = add_unit(f, f.A, f.at(3, 0));
         corp_command m; m.corp = f.A; m.as_nation = f.A; m.verb = corp_verb::march_unit;
         m.subject = v; m.tile = f.at(3, 2);
+        check(apply_corp_command(f.w, reg, m) == corp_command_result::rejected_invalid
+                  && f.w.units.at(v).order.dest == null_entity,
+              "F10b a land unit's march onto its own shore is refused (rejected_invalid), no order");
+        // A unit already standing on water (an old save) walks off onto land; a march to
+        // the next water tile is refused, whatever it stands on.
+        const entity_id wet = add_unit(f, f.A, f.at(3, 2));
+        m.subject = wet; m.tile = f.at(4, 2);
+        check(apply_corp_command(f.w, reg, m) == corp_command_result::rejected_invalid,
+              "F10b2 a land unit standing on water may not march to another water tile");
+        m.tile = f.at(3, 1);
         check(apply_corp_command(f.w, reg, m) == corp_command_result::applied,
-              "F10b the owned-coast ruling stands: a march by hand onto own shore still applies");
+              "F10b3 a land unit standing on water may march off it onto land");
     }
     {
-        // ALL WATER: no slot at all. The unit stands where it is, and is not reachable.
+        // ALL WATER: the border is not a front at all, and no assignment can name it.
         fixture f; build(f);
         for (int x = 0; x < W; ++x)
             f.w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::coast;
+        ++f.w.territory_generation;
         reanchor_fronts(f.w);
         const entity_id u = add_unit(f, f.A, f.at(4, 0));
-        const front fr = nation_fronts(f.w, f.A).front();
-        check(!front_reachable(f.w, reg, u, fr), "F10c an all-water span is no front a land unit can reach");
-        (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+        check(front_toward(nation_fronts(f.w, f.A), f.B) == nullptr,
+              "F10c a border running only along water carries no front");
+        check(cmd_assign(f.w, reg, f.A, u, f.at(0, 2)) == corp_command_result::rejected_invalid,
+              "F10d an assignment naming it is refused");
         step(f.w, reg, 12);
         check(f.w.units.at(u).position == f.at(4, 0) && f.w.units.at(u).order.dest == null_entity,
-              "F10d assigned anyway, it stays where it stands, with no standing order");
+              "F10d2 the unit stays where it stands, with no standing order");
+        // A BRIDGE OPENED AFTER THE FRONTS WERE READ (the cache must see it): lay_road_edge
+        // bumps the generation, so a run that never loads holds the span a loaded run does.
+        check(lay_road_edge(f.w, f.at(4, 2), 0, 1), "F10f0 the bridge is laid");
+        const front* bridged = front_toward(nation_fronts(f.w, f.A), f.B);
+        check(bridged != nullptr && bridged->span.size() == 2,
+              "F10f a bridge laid after the fronts were derived opens a two-tile span at once");
     }
     {
         // A BRIDGE IS A ROAD: every shore tile roaded, the slot in the middle is taken.
@@ -2252,16 +2281,27 @@ int main()
         }
         // (ii) No slot at all on a no-reason front: where it stands is priced, and it comes off.
         {
-            wide f; build_wide(f, false);
+            // Every span tile a roadless mountain the gun cannot enter: water no longer enters
+            // a span (Ben, 2026-11-09), so a class wall is how a front has no slot. The mutation
+            // is wall_world's; its whole-world handover is not wanted here.
+            wide f; recipe_registry rr = reg;
+            {
+                military_capability_params mp = rr.military();
+                mp.terrain.rows[static_cast<std::size_t>(land_class::artillery)][static_cast<std::size_t>(class_terrain::mountain)]
+                    .blocked_unless_roaded = true;
+                rr.set_military(mp);
+            }
+            build_wide(f, false);
             for (int x = 0; x < WW; ++x)
-                f.w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::coast;
+                f.w.tiles.at(f.at(x, 2)).landform = terrain_landform::mountain;
+            ++f.w.territory_generation;
             reanchor_fronts(f.w);
             add_hub(f, f.at(0, 0));
-            const entity_id u = add_wide_unit(f, f.A, f.at(30, 1), 40);
+            const entity_id u = add_gun(f, f.at(30, 1));
             const front fr = nation_fronts(f.w, f.A).front();
             (void)cmd_assign(f.w, reg, f.A, u, fr.key);
             const entity_id was = f.w.units.at(u).front;
-            score_once(f.w);
+            score_with(f.w, rr);
             const entity_id dest = f.w.units.at(u).order.dest;
             check(was != null_entity && f.w.units.at(u).front == null_entity && dest != null_entity && cover_at(f.w, f.A, dest) >= 667,
                   "F13ii a no-reason front with no slot for the unit: priced where it stands, it comes off to fed ground");

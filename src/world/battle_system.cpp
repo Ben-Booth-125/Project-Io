@@ -601,22 +601,18 @@ std::function<bool(const tile_component&)> class_wall(const military_capability_
     };
 }
 
-std::function<bool(const tile_component&)> domain_wall(world& w, entity_id owner, uint16_t type)
+std::function<bool(const tile_component&)> domain_wall(uint16_t type)
 {
     const auto& rows = unit_roster_table();
     if (type >= rows.size())
         return {};
     const roster_row* row = &rows[type];
-    const entity_id home = owner_home_nation(w, owner);
-    const bool land_row = (row->domains & domain_bit(traversal_domain::land)) != 0;
-    return [&w, row, home, land_row](const tile_component& t) {
-        return tile_domain_blocks(w, *row, land_row, home, t);
-    };
+    return [row](const tile_component& t) { return tile_domain_blocks(*row, t); };
 }
 
-bool tile_domain_blocks(world& w, const roster_row& row, bool land_row, entity_id home,
-                        const tile_component& t)
+bool tile_domain_blocks(const roster_row& row, const tile_component& t)
 {
+    const bool land_row = (row.domains & domain_bit(traversal_domain::land)) != 0;
     traversal_domain d = traversal_domain::land;
     if (is_open_ocean(t.substrate))
         d = traversal_domain::open_ocean;
@@ -628,34 +624,17 @@ bool tile_domain_blocks(world& w, const roster_row& row, bool land_row, entity_i
     // reads the water under it.
     if (d != traversal_domain::land && land_row && tile_has_road(t))
         d = traversal_domain::land;
-    bool owned = false;
-    if (d == traversal_domain::coastal_water && home != null_entity)
-    {
-        // WATER IS OWNED PER TILE (PROVINCES.md § Who owns water): the shoreline ring and
-        // lakes carry their owner in `tile_to_nation` (derive_water_ownership); a water
-        // province has no holder, so the province accessor would read every shore unowned.
-        const auto bit = w.bodies.find(t.body);
-        if (bit != w.bodies.end())
-        {
-            const int gw = bit->second.grid_width;
-            const std::vector<entity_id>& grid = body_tile_grid(w, t.body);
-            const std::size_t idx = static_cast<std::size_t>(t.grid_y) * static_cast<std::size_t>(gw)
-                                  + static_cast<std::size_t>(t.grid_x);
-            if (gw > 0 && idx < grid.size() && grid[idx] != null_entity)
-            {
-                const auto it = w.tile_to_nation.find(grid[idx]);
-                owned = it != w.tile_to_nation.end() && it->second == home;
-            }
-        }
-    }
-    return !row_can_traverse(row, d, owned);
+    // A LAND UNIT MARCHES ON LAND (Ben, 2026-11-09; MILITARY.md § Domains and traversal):
+    // no coast or lake tile, its own included, so a campaign march never reads ownership.
+    // The owned-water case in `row_can_traverse` is not asked here; a naval row needs no
+    // permission either way.
+    return !row_can_traverse(row, d, /*owned_by_mover=*/false);
 }
 
 std::function<bool(const tile_component&)>
-march_wall(world& w, entity_id owner, uint16_t type,
-           const std::function<bool(const tile_component&)>& class_wall_fn)
+march_wall(uint16_t type, const std::function<bool(const tile_component&)>& class_wall_fn)
 {
-    std::function<bool(const tile_component&)> dom = domain_wall(w, owner, type);
+    std::function<bool(const tile_component&)> dom = domain_wall(type);
     if (!class_wall_fn)
         return dom;
     if (!dom)
