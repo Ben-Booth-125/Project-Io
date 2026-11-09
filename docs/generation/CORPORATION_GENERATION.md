@@ -281,6 +281,14 @@ buildings carry their nation.
 The walk fills the home economy: centre by centre, it spends each charter budget on charters, each
 placed under Pass 3's rules on its nation's ground. Every building it places is the nation's.
 
+**The plant floor: every nation opens with a plant (Ben, 2026-11-09).** The walk spends from the
+richest centres down and fills the body's gaps, so a poor nation's centres would find the gaps
+already served and open with no plant, and so with no income. So before the walk proper every
+budgeted centre is visited once in the same order, and each buys **one firm** for a nation that
+has not yet had its floor: the nation's richest centre first, the next if that one finds no ground.
+The firm is chosen and placed by the walk's own rules and paid from the centre's own firm budget. A
+nation none of whose centres can afford a firm or place one still opens without a plant.
+
 **The legacy per-resource cap retires with the legacy path (Ben, 2026-10-23).** It capped a body at 8
 firms per demanded good, which made density a function of the basket's breadth (Ben, 2026-09-06;
 no 0.90 production-to-demand ratio ever bound). On the one path that remains, the per-good cap

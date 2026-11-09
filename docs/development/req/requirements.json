@@ -8315,6 +8315,30 @@
      "evidence": "2026-11-08 rival_fleet_census 16 seeds at tick 40: mean share 0.30 to 0.39, all seeds field land and 15 of 16 sea, air 0 everywhere. world_determinism PASS."
     }
    ]
+  },
+  {
+   "brief": "minor-plant-floor",
+   "title": "BL-1554 - Every nation opens with a plant (CORPORATION_GENERATION.md § Pass 6)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "requirements": [
+    {
+     "id": "R1",
+     "text": "Before the walk proper each nation buys one firm from its own richest placeable centre.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-09 rival_fleet_census seeds 0,13,17,29, tick 40, against the 2026-11-08 A/B: minors with no extractor or processor at handoff 66 of 112 to 22; minors with income 46 to 91."
+    },
+    {
+     "id": "R2",
+     "text": "The walk stays conservative and deterministic.",
+     "kind": "headless",
+     "status": "complete",
+     "evidence": "2026-11-09 landscape_search_harness and world_determinism PASS."
+    }
+   ]
   }
  ]
 }

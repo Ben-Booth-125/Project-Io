@@ -5253,6 +5253,11 @@ struct charter_centre
     /// charters), which is summed into the body's `firm_points`.
     int32_t      points_after_specialist = 0;
 
+    /// BL-1554 (CORPORATION_GENERATION.md § Pass 6, the plant floor): the price of the one
+    /// firm this centre bought for its nation before the walk proper, taken off its firm
+    /// budget when the walk reaches it. 0 for every other centre.
+    int32_t      floor_spent = 0;
+
     /// NR-913 (`charter_spend_params::pool`; 0 unless the spend pools): the
     /// structural remainder this centre SENDS to its group's richest centre,
     /// and the group's pooled remainders it RECEIVES as that richest centre
@@ -6896,10 +6901,26 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         int64_t                set_aside    = 0;
     };
     std::map<entity_id, pending_fallback> pending_champion;
+
+    // BL-1554 (Ben, 2026-11-09; § Pass 6, the plant floor): EVERY NATION OPENS WITH A PLANT.
+    // The walk fills the body's gaps from its richest centres down, so a poor nation's
+    // centres find the gaps already filled. So before the walk proper every centre is
+    // visited once in the same order, each buying ONE firm for a nation that has none from
+    // this floor yet: a nation's richest centre first, the next if that one finds no ground.
+    std::vector<std::pair<std::size_t, bool>> visits;
+    visits.reserve(order.size() * 2);
     for (const std::size_t oi : order)
+        visits.emplace_back(oi, true);
+    for (const std::size_t oi : order)
+        visits.emplace_back(oi, false);
+    std::set<entity_id> floored;
+
+    for (const auto& [oi, floor_visit] : visits)
     {
         charter_centre& cc = centres[oi];
         if (cc.nation == null_entity)
+            continue;
+        if (floor_visit && floored.count(cc.nation) != 0)
             continue;
         const nation_component& nc = w.nations.at(cc.nation);
         cc.points_after_specialist = cc.points;
@@ -6926,6 +6947,11 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         const auto pending_it  = pending_champion.find(cc.nation);
         const bool is_fallback = !is_champion && pending_it != pending_champion.end()
                                  && static_cast<int64_t>(cc.points) >= specialist_price;
+        // BL-1554: a floor visit buys one firm, out of what this centre has for firms.
+        if (floor_visit
+            && charter_centre_firm_points(cc.points, spend, cc.centre, is_champion)
+                   + charter_pool_whole(pool, cc.centre, spend) < static_cast<int64_t>(fp))
+            continue;
         // BL-1298 / BL-1283 (2026-10-13): the champion stands only where the
         // seat floor would read above zero (`champion_floor`, applied inside
         // `charter_specialist_at` on its placed holdings). A champion centre
@@ -6937,7 +6963,7 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         // shares -- counted the champion on the pre-walk champion centre's
         // body; a pass-over moves it within the nation, almost always on the
         // same body. Known, kept.)
-        if (is_champion || is_fallback)
+        if (!floor_visit && (is_champion || is_fallback))
         {
             const int32_t price = static_cast<int32_t>(specialist_price);   // <= points
             if (is_champion)
@@ -7003,8 +7029,9 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         // --- then what remains buys this centre's background firms -------------
         // NR-913: a pooling centre has sent its remainder to its group's richest
         // centre, which spends the group's here; both terms are 0 without pooling.
-        const int64_t firm_budget =
-            static_cast<int64_t>(cc.points_after_specialist) - cc.pool_out + cc.pool_in;
+        const int64_t firm_budget = floor_visit
+            ? static_cast<int64_t>(fp)
+            : static_cast<int64_t>(cc.points_after_specialist) - cc.pool_out + cc.pool_in - cc.floor_spent;
         if (firm_budget <= 0)
             continue;
 
@@ -7019,9 +7046,18 @@ std::vector<entity_id> charter_web_from_budget(world& w,
         // walk, the consumer half of its demand included (see above).
         charter_body_state& bs = bodies.at(cc.body);
 
-        std::mt19937 asset_rng = charter_stream(seed, k_charter_salt_firm_asset, cc.centre);
-        std::mt19937 name_rng  = charter_stream(seed, k_charter_salt_firm_name,  cc.centre);
-        std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_firm_stock, cc.centre);
+        // BL-1554: a floor visit draws its own streams, so a centre's two visits differ.
+        const entity_id stream_key = floor_visit ? (cc.centre ^ 0x464C4F52u) : cc.centre;
+        std::mt19937 asset_rng = charter_stream(seed, k_charter_salt_firm_asset, stream_key);
+        std::mt19937 name_rng  = charter_stream(seed, k_charter_salt_firm_name,  stream_key);
+        std::mt19937 stock_rng = charter_stream(seed, k_charter_salt_firm_stock, stream_key);
+
+        // BL-1554: a floor visit that places nothing leaves no booking behind; the walk
+        // proper books this centre's whole firm budget when it reaches it.
+        const std::size_t firms_before = rep.firms.size();
+        const auto        unspent_before = cc.unspent;
+        const int32_t     stop_points_before = cc.firm_stop_points;
+        const charter_unspent_reason stop_reason_before = cc.firm_stop_reason;
 
         // NR-903 (the turn only): the goods skipped at THIS centre for the rest
         // of it, and the reason each skip named. Never set under a legacy rule,
@@ -7621,6 +7657,21 @@ std::vector<entity_id> charter_web_from_budget(world& w,
                 charter_holding& opened = w.gen_charters.at(corp_id);
                 opened.starting_capital = background_working_capital(w, pool_key, stock);
                 opened.balance          = opened.starting_capital;
+            }
+        }
+
+        if (floor_visit)
+        {
+            if (rep.firms.size() > firms_before)
+            {
+                cc.floor_spent = fp;
+                floored.insert(cc.nation);
+            }
+            else
+            {
+                cc.unspent          = unspent_before;
+                cc.firm_stop_points = stop_points_before;
+                cc.firm_stop_reason = stop_reason_before;
             }
         }
     }
