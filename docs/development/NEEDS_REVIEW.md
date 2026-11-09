@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*32 entries — 29 open, 3 resolved.*
+*33 entries — 30 open, 3 resolved.*
 
 ---
 
@@ -326,6 +326,22 @@ WATER: SELECTION.md and resolve_unit_order ignore every water tile on a right-cl
 **Why it matters.** Each is either a doc to correct or code owed; the docs are the authority, so neither can be settled by reading the code.
 
 > **RESOLVED.** Ben, 2026-11-09: WATER: right-click stays land only; the march verb and doc narrow to match. COMPETITION was not asked.
+
+### NR-1153 — Elimination defaults: treasury to the conqueror, debt written off, a lost campaign spectates
+*decision taken on your behalf · raised 2026-11-09 · from main session, designing elimination on Ben's form answer*
+
+Ben asked to design elimination of a landless nation. Taken: wars close as white peace with no truce; relation rows clear; units disband; a positive treasury passes to the conqueror (conserves money); a debt is written off; the nation stays a flagged record; the player's end is a lost campaign, then spectate.
+
+**Why it matters.** Each default moves what conquest pays and what losing means.
+
+- Keep the defaults
+- Treasury destroyed instead of passed
+- Debt inherited by the conqueror
+- Player's end returns to the menu instead of spectating
+
+> **Recommendation:** Keep the defaults.
+
+*Files: `docs/politics/NATIONS.md`, `docs/politics/RELATIONS.md`*
 
 ---
 

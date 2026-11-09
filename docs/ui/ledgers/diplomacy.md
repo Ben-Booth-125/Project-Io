@@ -76,14 +76,16 @@ Each war shows declarer and defender, each side's goals and who holds each, the 
 centred bar, each side's exhaustion, and days since it opened. Every war is public (Ben,
 2026-10-30). On a war the player is party to:
 
-- **Offer peace** — white peace, or cession of named goals the receiving side holds. A goal that is
-  the loser's last province is disabled with its reason (RELATIONS § 7). **Impose**
+- **Offer peace** — white peace, or cession of named goals the receiving side holds. Terms that would
+  take the loser's last province are allowed and marked: the loser's nation ends (RELATIONS § 7,
+  Ben, 2026-11-09). **Impose**
   replaces Offer while the score is 100 in the player's favour. For four quarters after the other
   side refuses the player's offer, **Offer peace** is disabled, its tooltip naming the quarters left
   (RELATIONS § 7, the offer cooldown). The composer says what imposing would take, the score it
-  stands at, and that a last province cannot be ceded (Ben, 2026-11-09).
+  stands at, and when the terms would end the loser's nation (Ben, 2026-11-09).
 - **Answer** — on a war declared against the player that it has not yet answered: name goals among
-  the declarer's provinces. Answering is free. The front card and the war notice both open it (Ben,
+  the declarer's provinces. Answering is free. The declaration already made the player hostile, so
+  Answer adds goals, not the right to fight (Ben, 2026-11-09). The front card and the war notice both open it (Ben,
   2026-11-09; `../SELECTION.md` § The front element, `../LAYOUT.md` § War notice).
 - A pending offer from the other side shows its terms with **Accept** and **Refuse**.
 

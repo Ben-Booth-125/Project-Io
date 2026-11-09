@@ -315,7 +315,8 @@ out-of-range byte is rejected rather than cast): a declared war outlives the ses
 
 Note the care taken in the interdiction check: it tests `is_hostile(unit_owner, cargo_owner)`, in
 that direction only. *"An actor that has been declared against but has not answered is a victim, not
-a raider."*
+a raider."* That holds for a bare `declare_hostile`; a declaration of **war** writes both rows
+(§ 7, Ben, 2026-11-09), so both sides of a war intercept.
 
 **What friendship permits — two things** (Ben, 2026-08-22): **passage through territory** and
 **immunity from interdiction**. Both consumers read an existing predicate at an existing site.
@@ -475,8 +476,10 @@ the war gives it a purpose and an end. There is one war per pair, with a **decla
 it opened, and it is in the world snapshot. A nation may be party to several wars at once. There are
 no alliances: a friend is never drawn in, though a friend attacked is a justification (below).
 
-**Declaring.** `declare_war(declarer, defender, goals)` writes the declarer's hostility row and opens
-the record in one call. It is refused — mutating nothing — when the pair is already at war, a truce
+**Declaring.** `declare_war(declarer, defender, goals)` writes **both** hostility rows and opens the
+record in one call: **a declaration of war makes both sides hostile (Ben, 2026-11-09).** The defender
+can push, intercept and fight from the first day, without answering first. A bare `declare_hostile`,
+with no war, stays directed (§ 1). It is refused — mutating nothing — when the pair is already at war, a truce
 stands between them, or a goal is invalid. Friendship dissolves as § 1 says. While a war stands,
 `return_to_neutral` between its parties is refused: **a war ends only in peace.** The right-click
 declare-and-attack (`../military/MILITARY.md` § Marching) opens the same declaration, with the
@@ -487,13 +490,16 @@ defender's provinces — **any** of them, with no reach rule, and the capital in
 
 **Ceding a capital moves it (Ben, 2026-10-30, NR-1102).** A nation whose capital province is ceded
 takes as its new capital the remaining province with the largest population centre, ties to the
-lower province id; the capital's free logistics hub moves with it. **A nation's last province can
-never be ceded:** a peace that would cede it is refused, and no nation leaves the map by war.
-Removing a nation is a subject of its own, not a side effect of a peace.
+lower province id; the capital's free logistics hub moves with it.
 
-**The defender answers, for free.** Its hostility back costs nothing — it is the act of being
-attacked. Answering names its own goals among the declarer's provinces, by the same rule. Until it
-answers it is a victim, not a raider: § 1's interdiction note holds.
+**A nation's last province may be ceded, and the nation ends (Ben, 2026-11-09).** This overturns
+NR-1102's refusal; newest-dated wins. A peace may name every province the loser still owns, and
+what follows is the loser's elimination (`NATIONS.md` § Elimination).
+
+**The defender answers, for free.** Its hostility back is written by the declaration and costs
+nothing — it is the act of being attacked. Answering names its own goals among the declarer's
+provinces, by the same rule. An unanswered defender is hostile but has no goals, so it can win
+ground back and fight, but cannot take any at a peace.
 
 **The price of declaring.** A declaration is conduct (§ Who emits each factor):
 `hostility_declared` on the defender's row, and `war_declared` on every other nation's — Trust
@@ -585,7 +591,8 @@ declaration on or by the player also raises a notice on the canvas (Ben, 2026-11
 2. **Which reading does passage take** — reach-field contribution (recommended) or placement
    permission? Owned by BL-549 (friendship permits two things).
 
-3. **Can a nation ever leave the map?** Not by war (§ 7, NR-1102); elimination is undesigned.
+3. **Can a nation ever leave the map?** Yes, by a peace that cedes its last province (§ 7, Ben,
+   2026-11-09); `NATIONS.md` § Elimination owns what follows.
 
 ---
 

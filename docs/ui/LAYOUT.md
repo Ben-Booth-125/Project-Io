@@ -178,6 +178,10 @@ per war. It is an announcement, not a dialog: it pauses nothing and changes noth
 was declared on and has not answered, it offers **Answer** (`ledgers/diplomacy.md`); otherwise a door
 to the Wars tab. A war already standing on a new or loaded world raises no notice.
 
+A nation's end raises the same notice when the player's nation took part in its last war (Ben,
+2026-11-09). When the ended nation is the player's own, the notice says the campaign is lost and
+offers to spectate or return to the menu.
+
 ---
 
 ## UI scale (Ben, 2026-11-05)

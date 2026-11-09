@@ -171,8 +171,11 @@ finder open, which rests the whole reward for searching on these figures).
   itself aims at, with this building's output and the plants already under construction added to
   the market's supply, against demand and the want the ceiling silenced. A good priced high because
   nobody makes it stops reading as a fortune, and does not read as worthless either.
-- **Inputs are what the tile can get.** An input must be obtainable, from supply in reach or from
-  the market's shelf, and priced at its landed cost where a producer lands it. The plant's own shelf
+- **Inputs are what the tile can get.** An input must be obtainable, and priced at its landed cost
+  where a producer lands it. **Obtainable is local evidence (Ben, 2026-11-09):** the plant's own
+  market shelf holds the good, or supply in reach is left over after that market's own demand for
+  it. Supply in reach that local buyers already take does not count, because the plant draws from
+  its own shelf and that shelf would stay empty. The plant's own shelf
   must offer it at a price a plant pays, and the plant's own bid must not take it over that price.
   This is what a plant would do, not the stricter test a rival builds by: a plant bids goods away
   from other buyers, so a good with no spare output can still feed it.

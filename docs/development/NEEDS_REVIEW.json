@@ -510,6 +510,28 @@
    "why_it_matters": "Each is either a doc to correct or code owed; the docs are the authority, so neither can be settled by reading the code.",
    "recommended": "Water: have the resolver ask the verb, since the verb is the rule. Competition: drop the MENU claim unless a competition surface is wanted.",
    "resolution": "Ben, 2026-11-09: WATER: right-click stays land only; the march verb and doc narrow to match. COMPETITION was not asked."
+  },
+  {
+   "id": "NR-1153",
+   "title": "Elimination defaults: treasury to the conqueror, debt written off, a lost campaign spectates",
+   "raised": "2026-11-09",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "main session, designing elimination on Ben's form answer",
+   "what": "Ben asked to design elimination of a landless nation. Taken: wars close as white peace with no truce; relation rows clear; units disband; a positive treasury passes to the conqueror (conserves money); a debt is written off; the nation stays a flagged record; the player's end is a lost campaign, then spectate.",
+   "why_it_matters": "Each default moves what conquest pays and what losing means.",
+   "options": [
+    "Keep the defaults",
+    "Treasury destroyed instead of passed",
+    "Debt inherited by the conqueror",
+    "Player's end returns to the menu instead of spectating"
+   ],
+   "recommendation": "Keep the defaults.",
+   "files": [
+    "docs/politics/NATIONS.md",
+    "docs/politics/RELATIONS.md"
+   ],
+   "resolution": null
   }
  ]
 }

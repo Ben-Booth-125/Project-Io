@@ -77,6 +77,11 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   may write what they name for a fixture. A recipe row touches the no-tile-data rule, and it stands here
   because the card draws it for a tile the player already pressed. Reason: a check cannot aim at a convoy,
   a glide, an alert, a recipe row or a shelf reading it cannot find. Verify-only, behind `--verify`.
+  **Tenth (Ben, 2026-11-09):** the site finder's reads may report the Site Finder tab's press
+  position in the construction ledger, and the count and text of the Net labels drawn over map
+  tiles, and nothing else: no tile position beyond what the ninth grant's rows already give. Reason:
+  the finder moved to its own tab and draws its figures on the map, and a check cannot press a tab
+  it cannot find, or test labels it cannot count. Verify-only, behind `--verify`.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
 - Do **not** build AI faction behaviour beyond the data-model minimum stub. A **register of

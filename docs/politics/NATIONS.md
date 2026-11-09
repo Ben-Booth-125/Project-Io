@@ -137,6 +137,27 @@ sentiment model, not two.
 
 `world::tile_to_nation` is the reverse index, and it is what gives a law its **jurisdiction**.
 
+### Elimination — a nation with no ground ends (Ben, 2026-11-09)
+
+A nation that owns no province has **ended**. Its one cause is a peace that cedes its last province
+(`RELATIONS.md` § 7); nothing else takes a nation's last ground. Elimination runs once, at the end
+of that peace, after the ground has moved:
+
+- **Its wars close.** Every other war it is party to closes as a white peace, and its pending peace
+  and friendship offers drop. No truce is written: there is nobody left to declare.
+- **Its relations clear.** Hostility, friendship, embargo and tariff rows to and from it are
+  removed, and nobody's sentiment toward it is read again.
+- **Its force ends.** Its units disband where they stand, and its convoys and trades are cancelled.
+- **Its treasury passes to the conqueror.** A positive balance goes to the nation that took its
+  last province, an actor-to-actor transfer that conserves (§ 2 of the settled rulings). A debt is
+  written off, not inherited.
+- **It stays a record.** The nation keeps its id, name and history, flagged as ended, so saves and
+  the history log stay readable. It drops out of every scorer, ledger, lens and picker. The history
+  log writes one entry, and every nation reads it as a public event.
+
+**The player's nation can end.** Then the campaign is lost: a notice says so, and the session goes
+on as a spectator (`../ui/LAYOUT.md` § War notice).
+
 ### GDP
 
 **A nation's GDP is the value of production on its tiles at local market prices** (NR-774, promoted
