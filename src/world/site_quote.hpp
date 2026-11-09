@@ -49,6 +49,13 @@ struct site_quote
 /// The quote for a hypothetical building of @p type on @p tile, at the tile's
 /// Logistic Point cover @p lp_cover. @p self names a building already ordered there, for
 /// a harness asking what its site was worth: its own draw and output are taken out.
+///
+/// @p running names a plant ALREADY PRODUCING there, for the Method lever asking what it
+/// would earn on recipe @p recipe_id (Ben, 2026-11-09). @p self must then be its id. The
+/// quote takes its real staffing, supply factor and condition, and reads the market with
+/// what the plant listed and bid last quarter taken back out, so a recipe's own footprint
+/// is added to a market that no longer holds this plant's. Null: a building not yet running.
 site_quote quote_site(world& w, const recipe_registry& reg, site_quote_context& cx,
                       entity_id tile, building_type type, resource_type target,
-                      std::uint16_t recipe_id, float lp_cover, entity_id self = null_entity);
+                      std::uint16_t recipe_id, float lp_cover, entity_id self = null_entity,
+                      const building_component* running = nullptr);
