@@ -341,7 +341,7 @@ whole ownership rule, and it replaces the deferral this section used to carry.
 | Domain | Owned? | Who can be there |
 |---|---|---|
 | **`land`** | Yes, as always | Land units; buildings |
-| **`coastal_water`** | **Yes** — derived from the shore that claims it | Coastal units, and land units crossing **owned** coastal water |
+| **`coastal_water`** | **Yes** — derived from the shore that claims it | Coastal units; in the Era −1 sim, land units crossing **owned** coastal water |
 | **`open_ocean`** | **No, structurally** | Coastal/naval units only; never a territory |
 
 **The ownership half is DERIVED, and derived is not the same as claimed.** A province's owner comes

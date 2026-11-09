@@ -47,7 +47,7 @@
  {
   "ruling": "A land unit on hold never takes a water front slot, bridges excepted",
   "doc": "docs/military/MILITARY.md",
-  "anchor": "A land unit on hold never takes a water slot, bridges excepted \\(Ben,",
+  "anchor": "A front fits land tiles only, bridges excepted \\(Ben, 2026-11-09\\)",
   "stale": [],
   "owner": "sprint 63 (hold into water item, filed by the main session)"
  },
@@ -252,5 +252,15 @@
   "anchor": "Points are drawn by value \\(Ben, 2026-11-07\\)",
   "stale": [],
   "owner": "sprint 63 (LP by value)"
+ },
+ {
+  "ruling": "A land unit marches on land: no coast or lake tile, its own included, bridges excepted; the right-click and the verb agree",
+  "doc": "docs/military/MILITARY.md",
+  "anchor": "A land unit marches on land \\(Ben, 2026-11-09\\)",
+  "stale": [
+   "The owned-coast marching rule",
+   "you can walk your own"
+  ],
+  "owner": "sprint 63 (war rulings of 2026-11-09)"
  }
 ]

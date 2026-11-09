@@ -411,11 +411,12 @@
    "title": "Sprint 63 defaults taken without a form question: overturn any you dislike",
    "raised": "2026-11-07",
    "kind": "decision",
-   "status": "open",
+   "status": "resolved",
    "source": "Sprint 63 lanes",
    "what": "MARKET: pip rather than glyph on the Build door; name column 72 px. CANVAS: rival convoy card; Total force reads a unit count; no hover on a convoy marker. SHELL: UI scale 0.875; exit warnings; a single quicksave behind Load. WAR: stranded cargo rule; retreats occupy; muster allowed on occupied ground; no territory tint for occupation. ART: default framing off the ladder (zoom 4/3); top rung 2x at 4K; scrub round, forest fringe pointed. CONSTRUCTION: 0-cover rows never warn; a rising shelf gets no credit; a 7-good basket may scroll. GENERATION: seed 25 loses one station.",
    "why_it_matters": "Each was small enough to take as a default, and each is visible in play.",
-   "recommended": "Leave them unless the playtest says otherwise."
+   "recommended": "Leave them unless the playtest says otherwise.",
+   "resolution": "Ben, 2026-11-09: defaults accepted, with one addition: fronts fit land tiles only, not coast."
   },
   {
    "id": "NR-1145",
@@ -437,18 +438,20 @@
    "source": "Sprint 63 small lane (WIND_TURBINE, RESEARCH_IN_RETURN, SCHOOLING_DOOR)",
    "what": "WIND: a major at ring 2, cost 12, needing Fuel Economy III and V, the first node of each arm. Grammar says two minors, so this is a new shape; the alternative is a real cluster with two new minors you author. Rivals first differ at quarter 132 on seed 46, none within 40 quarters on seeds 0 and 46. UPKEEP: the Balance segment \"Force\" became \"Upkeep\", because one figure holds garrison and space; a separate line needs a new saved field. LAUNCH COST stays outside the return, as construction does. UNIVERSITY: 100 RP a quarter against an institute's 50, at 400 cr against 300, on a constant still marked unmeasured, and it also raises qualification, so it is better on both counts. No tree node gates Schooling or University, so both open on day one subject only to the stratum gate. On the verify world the player holds no City, so University mostly refuses. OLD SAVES: a queued Wind Power with Fuel Economy V not held waits forever and reads \"not in 120 y\"; a shift-click off and on recovers it, and a rival in that state stops picking. The state needs an old save.",
    "why_it_matters": "University is now reachable on an unmeasured number, and wind is a new shape in the tree's grammar.",
-   "recommended": "Keep the wind shape and Upkeep. Measure University before trusting 100 RP. Leave old saves alone unless you carry saves across this version."
+   "recommended": "Keep the wind shape and Upkeep. Measure University before trusting 100 RP. Leave old saves alone unless you carry saves across this version.",
+   "resolution": "Ben, 2026-11-09: WIND keeps the new shape. The Upkeep, launch cost and University calls were not asked."
   },
   {
    "id": "NR-1147",
    "title": "Novelty: a major with no cluster of its own enters the tree grammar",
    "raised": "2026-11-07",
    "kind": "novel-work",
-   "status": "open",
+   "status": "resolved",
    "source": "Sprint 63 small lane",
    "what": "docs/economy/RESEARCH.md gains a sentence for a major that needs one node of each arm rather than two minors. The wording is the lane's, not yours.",
    "why_it_matters": "A grammar exception is how a tree loses its grammar.",
-   "recommended": "Read the sentence; it stands for Wind Power alone unless you widen it."
+   "recommended": "Read the sentence; it stands for Wind Power alone unless you widen it.",
+   "resolution": "Ben, 2026-11-09: keep the new shape (one node of each arm)."
   },
   {
    "id": "NR-1148",
@@ -481,7 +484,8 @@
    "source": "BL-1540 (rival march supply)",
    "what": "CLOCK: rivals score fronts once a year, while a unit with no supply dies near day 210. Scoring fronts every quarter (and nothing else) takes men lost from 6.7% to 4.4% at 20 quarters, but the march-off-and-return loop count goes from 9 to 31. Not shipped. HOME LEAK: 5 of 21 fall backs at 20 quarters land in the capital province and are then posted home for good; telling them from the deliberate home garrison needs a new saved field. RANGE: ground within 8 straight hex steps of a goal is worth the goal; past it a hungry march holds, 7 refusals in 20 quarters across 16 seeds, all with a goal left.",
    "why_it_matters": "Each sets how often rivals lose men to hunger against how steadily they hold a war.",
-   "recommended": "Keep the yearly clock until a playtest shows rivals starving; leave the home leak; keep 8 steps."
+   "recommended": "Keep the yearly clock until a playtest shows rivals starving; leave the home leak; keep 8 steps.",
+   "resolution": "Ben, 2026-11-09: CLOCK: score fronts quarterly. HOME LEAK and RANGE were not asked."
   },
   {
    "id": "NR-1151",
@@ -492,7 +496,8 @@
    "source": "BL-1497 (opening cost curve) and BL-1545..1549 (steel trade rulings)",
    "what": "Measured on the merged lane, 16 seeds, 64 majors, 80 quarters: the reference mine costs 5.2 months of net at the opening and 3.9 at year 20; 10 of 64 majors reach 1 month; median 4 buildings completed by year 20; 7 majors never build; 1 below zero by q80. The target of about 1 month at year 20 is not met. Calls taken: the Logistic Point constant 3.98 was calibrated on the summed q20 draw (the median major draws 0); the dead corporation-era Marketplace estimate in corp_ai.cpp was converted to points, not deleted; settle-day construction arrears bill at the authored row. Late trade fell 17% and late stranded coal rose 8.0 -> 14.3 after the review fixes, cause untraced. The kit Marketplace laid a new building for only 4 majors.",
    "why_it_matters": "The climb is the sprint's top item and lands at about a third of the target pace.",
-   "recommended": "Playtest the opening as merged before tuning further; trace the late coal rise only if the playtest shows it."
+   "recommended": "Playtest the opening as merged before tuning further; trace the late coal rise only if the playtest shows it.",
+   "resolution": "Ben, 2026-11-09: playtest the opening first, then decide."
   },
   {
    "id": "NR-1152",
@@ -503,7 +508,8 @@
    "source": "BL-1525 (playtest doc drift)",
    "what": "WATER: SELECTION.md and resolve_unit_order ignore every water tile on a right-click, but march_check accepts a land unit onto its own coastal water, naval types exist, and MILITARY.md says the owned-coast rule stands for marches. So a right-click can never order a march the verb allows. COMPETITION: MENU.md says competitors' buildings appear in the Market Ledger; the ledger only uses buildings to list which nations are present (nations_in_market), and ledgers/market.md has no such surface.",
    "why_it_matters": "Each is either a doc to correct or code owed; the docs are the authority, so neither can be settled by reading the code.",
-   "recommended": "Water: have the resolver ask the verb, since the verb is the rule. Competition: drop the MENU claim unless a competition surface is wanted."
+   "recommended": "Water: have the resolver ask the verb, since the verb is the rule. Competition: drop the MENU claim unless a competition surface is wanted.",
+   "resolution": "Ben, 2026-11-09: WATER: right-click stays land only; the march verb and doc narrow to match. COMPETITION was not asked."
   }
  ]
 }

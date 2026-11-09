@@ -547,8 +547,8 @@ side. Tiles off that line sit beside their nearest line tile. Every tie goes to 
 **Slots.** A front with *n* assigned units cuts its span into *n* equal stretches. Unit *i*, in
 ascending unit id, takes the middle tile of stretch *i*. A unit is on its slot once it stands on
 the slot tile; a march ends on its tile (§ Marching). The front re-issues a march whenever a unit's
-order points anywhere else. **A land unit on hold never takes a water slot, bridges excepted (Ben,
-2026-11-05).** The owned-coast marching rule (§ Domains and traversal) still stands for marches. To
+order points anywhere else. **A front fits land tiles only, bridges excepted (Ben, 2026-11-09).** Coast and lake
+tiles never enter a land front's span, so a land unit is never given a water slot. To
 move an assigned unit by hand, unassign it first. A unit in a battle or refitting is left alone. A dead unit frees its slot, and
 the rest re-space on the next tick.
 
@@ -909,14 +909,13 @@ units are land-bound, and it is what makes water a place rather than a wall.
 | Domain | Land classes | Coastal/naval classes |
 |---|---|---|
 | `land` | Yes | No |
-| `coastal_water` | **Only where OWNED** (`docs/generation/PROVINCES.md` § Who owns water) | Yes |
+| `coastal_water` | **No, bridges excepted** | Yes |
 | `open_ocean` | No | Yes |
 
-**Land units crossing owned coastal water is the deliberate middle case.** A shoreline your polity
-holds is a shallow, bridged, causewayed thing — the road layer already reasons this way, treating a
-short crossing with no open ocean in it as a strait rather than a sea. Making the crossing depend on
-*ownership* rather than on distance gives it a cause the player can read: you can walk your own
-shore, not someone else's.
+**A land unit marches on land (Ben, 2026-11-09).** It stays off every coast and lake tile, its own
+included, and a roaded water tile counts as land because a bridge is a road. A right-click on water
+never orders a march, so the verb and the press now agree. The Era −1 sim keeps its own crossing
+rule, in [`../generation/MILITARY_HISTORY.md`](../generation/MILITARY_HISTORY.md).
 
 **Campaign-era naval is § The campaign force model's Sea (Ben, 2026-10-26)**, which overturns
 the 2026-09-06 reading that the campaign raises no fleet. The Era −1 sim's naval rows stay

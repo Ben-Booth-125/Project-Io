@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*32 entries — 31 open, 1 resolved.*
+*32 entries — 29 open, 3 resolved.*
 
 ---
 
@@ -270,13 +270,6 @@ Ben ruled the master at 96 px and the top rung lowered to about 96 px. Written b
 
 **Why it matters.** Halving lowers every zoom level, not only the closest, and 4K play looks softer than the accepted figure.
 
-### NR-1144 — Sprint 63 defaults taken without a form question: overturn any you dislike
-*decision · raised 2026-11-07 · from Sprint 63 lanes*
-
-MARKET: pip rather than glyph on the Build door; name column 72 px. CANVAS: rival convoy card; Total force reads a unit count; no hover on a convoy marker. SHELL: UI scale 0.875; exit warnings; a single quicksave behind Load. WAR: stranded cargo rule; retreats occupy; muster allowed on occupied ground; no territory tint for occupation. ART: default framing off the ladder (zoom 4/3); top rung 2x at 4K; scrub round, forest fringe pointed. CONSTRUCTION: 0-cover rows never warn; a rising shelf gets no credit; a 7-good basket may scroll. GENERATION: seed 25 loses one station.
-
-**Why it matters.** Each was small enough to take as a default, and each is visible in play.
-
 ### NR-1145 — Novelty: research is priced as a share of the chest, so a smaller chest cuts research
 *novel-work · raised 2026-11-07 · from Opening lane stage 1*
 
@@ -291,12 +284,7 @@ WIND: a major at ring 2, cost 12, needing Fuel Economy III and V, the first node
 
 **Why it matters.** University is now reachable on an unmeasured number, and wind is a new shape in the tree's grammar.
 
-### NR-1147 — Novelty: a major with no cluster of its own enters the tree grammar
-*novel-work · raised 2026-11-07 · from Sprint 63 small lane*
-
-docs/economy/RESEARCH.md gains a sentence for a major that needs one node of each arm rather than two minors. The wording is the lane's, not yours.
-
-**Why it matters.** A grammar exception is how a tree loses its grammar.
+> **RESOLVED.** Ben, 2026-11-09: WIND keeps the new shape. The Upkeep, launch cost and University calls were not asked.
 
 ### NR-1148 — Rival march supply: the calibrations and readings inside your grant
 *decision · raised 2026-11-07 · from BL-1540 (rival march supply)*
@@ -319,6 +307,8 @@ CLOCK: rivals score fronts once a year, while a unit with no supply dies near da
 
 **Why it matters.** Each sets how often rivals lose men to hunger against how steadily they hold a war.
 
+> **RESOLVED.** Ben, 2026-11-09: CLOCK: score fronts quarterly. HOME LEAK and RANGE were not asked.
+
 ### NR-1151 — Opening climb: where it lands, and the calls taken inside it
 *decision · raised 2026-11-08 · from BL-1497 (opening cost curve) and BL-1545..1549 (steel trade rulings)*
 
@@ -326,12 +316,16 @@ Measured on the merged lane, 16 seeds, 64 majors, 80 quarters: the reference min
 
 **Why it matters.** The climb is the sprint's top item and lands at about a third of the target pace.
 
+> **RESOLVED.** Ben, 2026-11-09: playtest the opening first, then decide.
+
 ### NR-1152 — Doc drift: two claims the code cannot settle
 *question · raised 2026-11-08 · from BL-1525 (playtest doc drift)*
 
 WATER: SELECTION.md and resolve_unit_order ignore every water tile on a right-click, but march_check accepts a land unit onto its own coastal water, naval types exist, and MILITARY.md says the owned-coast rule stands for marches. So a right-click can never order a march the verb allows. COMPETITION: MENU.md says competitors' buildings appear in the Market Ledger; the ledger only uses buildings to list which nations are present (nations_in_market), and ledgers/market.md has no such surface.
 
 **Why it matters.** Each is either a doc to correct or code owed; the docs are the authority, so neither can be settled by reading the code.
+
+> **RESOLVED.** Ben, 2026-11-09: WATER: right-click stays land only; the march verb and doc narrow to match. COMPETITION was not asked.
 
 ---
 
@@ -348,4 +342,22 @@ The research line takes a weighted share of the treasury, up to what the queue o
 **Why it matters.** A player with a research queue may have little left for construction under the new prices, and a share of treasury shrinks as the opening treasury falls. This sets how research and construction compete at the opening.
 
 > **RESOLVED.** Ben: "Yes, count research." Research counts inside net; written into FINANCE § The quarterly return; the work is BL-1539 (research in return).
+
+### NR-1144 — Sprint 63 defaults taken without a form question: overturn any you dislike
+*decision · raised 2026-11-07 · from Sprint 63 lanes*
+
+MARKET: pip rather than glyph on the Build door; name column 72 px. CANVAS: rival convoy card; Total force reads a unit count; no hover on a convoy marker. SHELL: UI scale 0.875; exit warnings; a single quicksave behind Load. WAR: stranded cargo rule; retreats occupy; muster allowed on occupied ground; no territory tint for occupation. ART: default framing off the ladder (zoom 4/3); top rung 2x at 4K; scrub round, forest fringe pointed. CONSTRUCTION: 0-cover rows never warn; a rising shelf gets no credit; a 7-good basket may scroll. GENERATION: seed 25 loses one station.
+
+**Why it matters.** Each was small enough to take as a default, and each is visible in play.
+
+> **RESOLVED.** Ben, 2026-11-09: defaults accepted, with one addition: fronts fit land tiles only, not coast.
+
+### NR-1147 — Novelty: a major with no cluster of its own enters the tree grammar
+*novel-work · raised 2026-11-07 · from Sprint 63 small lane*
+
+docs/economy/RESEARCH.md gains a sentence for a major that needs one node of each arm rather than two minors. The wording is the lane's, not yours.
+
+**Why it matters.** A grammar exception is how a tree loses its grammar.
+
+> **RESOLVED.** Ben, 2026-11-09: keep the new shape (one node of each arm).
 
