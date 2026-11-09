@@ -54,6 +54,7 @@ local function pick_best()
   for _, o in ipairs(verify.site_options()) do
     if o.category == "Extraction" and o.name ~= "Farm" and not o.name:find("Water", 1, true)
        and not o.name:find("Well", 1, true) then
+      verify.construction_view(2)
       verify.site_pick(o.name)
       verify.frames(2)
       local s = sites()
@@ -84,6 +85,7 @@ if choice and not mixed then
 end
 verify.expect(choice ~= nil, "S1: some extraction building has sites on the player's ground")
 if not choice then return end
+verify.construction_view(2)
 verify.site_pick(choice)
 verify.frames(4)
 local s = sites()
@@ -157,7 +159,9 @@ for _, i in ipairs(sample) do
   local r = s.rows[i]
   verify.select_tile(r.x, r.y)
   verify.frames(3)
+  verify.construction_view(0); verify.frames(2)
   local door = verify.build_door()
+  verify.construction_view(2)
   local ok, quoted = false, nil
   if door.drawn then
     for _, dr in ipairs(door.rows) do
@@ -233,6 +237,7 @@ verify.frame_reset()
 verify.frames(120)
 local up = verify.frame_summary()
 verify.site_clear()
+verify.construction_view(0)
 verify.frames(10)
 verify.frame_reset()
 verify.frames(120)
@@ -243,6 +248,7 @@ print(string.format("[construction_sites] FRAME lens up: build %.2f ms mean / %.
       down.total_mean, up.frames))
 
 -- S5 - the toggle and the disarm.
+verify.construction_view(2)
 verify.site_pick(choice)
 verify.frames(2)
 verify.expect(sites().live, "S5: re-armed")
@@ -255,12 +261,14 @@ verify.expect(not s5.live and not s5.armed, "S5: closing the ledger disarms the 
 verify.window(1280, 720)
 verify.frames(3)
 verify.show_panel("build", true)
+verify.construction_view(2)
 verify.site_pick(choice)
 verify.frames(4)
 assert_headers(sites(), "1280x720")
 verify.hover(900, 400, 2)
 shot("construction_sites_ledger_1280")
 verify.site_clear()
+verify.construction_view(0)
 verify.show_panel("construction", false)
 verify.window(1720, 1080)
 verify.frames(3)
@@ -269,6 +277,7 @@ verify.frames(3)
 -- Iron Mine site through the Build door's own seam (ledger_build writes the fields
 -- the press writes), let a tick run, and read the canvas's marks.
 verify.show_panel("build", true)
+verify.construction_view(2)
 verify.site_pick("Iron Mine")
 verify.frames(3)
 local si = sites()
@@ -276,6 +285,7 @@ verify.expect(si.n_rows > 0, "S9: the site finder lists an Iron Mine site to sta
 if si.n_rows > 0 then
   local t = si.rows[1]
   verify.site_clear()
+  verify.construction_view(0)
   verify.select_tile(t.x, t.y)
   verify.frames(2)
   verify.ledger_build("extraction", "iron_ore", "")

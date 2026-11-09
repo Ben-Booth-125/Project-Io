@@ -2,7 +2,7 @@
 -- 2026-11-05; the grid itself Ben, 2026-11-08; docs/ui/ledgers/construction.md
 -- § The site ledger).
 --
--- What this check reads: the REAL grid, resting in the Construction view. The grid
+-- What this check reads: the REAL grid, resting in the Site Finder view (Ben, 2026-11-09). The grid
 -- reports what it drew for each cell: the glyph's half-extent and the name's widest
 -- wrapped line against its room. Every option the finder offers must have drawn, with
 -- a glyph, unelided. It also presses a cell, so the press still chooses, and presses
@@ -13,6 +13,7 @@
 verify.window(1720, 1080)
 verify.goto_surface("home")
 verify.show_panel("build", true)
+verify.construction_view(2)
 verify.frames(3)
 
 local resting = verify.site_finder()

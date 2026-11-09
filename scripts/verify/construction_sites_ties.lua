@@ -22,6 +22,7 @@ local function pass(seed, tag)
   local rows, t_full, t_cover, t_cost, flagged, cov, t_cov = 0, 0, 0, 0, 0, 0, 0
   for _, o in ipairs(verify.site_options()) do
     if o.category == "Extraction" or o.category == "Processing" or o.group == "Power Generation" then
+      verify.construction_view(2)
       verify.site_pick(o.name)
       verify.frames(1)
       local s = verify.site_finder()
@@ -46,6 +47,7 @@ local function pass(seed, tag)
         100 * t_cost / math.max(1, rows), 100 * flagged / math.max(1, rows), cov,
         100 * t_cov / math.max(1, cov)))
   verify.site_clear()
+  verify.construction_view(0)
 end
 
 for si, seed in ipairs(seeds) do

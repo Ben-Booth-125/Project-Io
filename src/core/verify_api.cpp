@@ -7407,7 +7407,7 @@ int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
         return true;
     });
     // Switch the construction panel's sub-view (0 = Construction/queue, 1 = Buildings/
-    // management detail) so a script can capture the building-management screen, which
+    // management detail, 2 = Site Finder) so a script can capture the building-management screen, which
     // otherwise opens on the queue view. UI state only.
     v.set_function("construction_view", [this](int view) {
         m_ui.construction.panel_view = view;

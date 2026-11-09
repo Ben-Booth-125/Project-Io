@@ -165,7 +165,7 @@ void open_site_finder_for(const world& w, const recipe_registry& reg, ui_state& 
 {
     close_all_panels(s);
     s.show_construction_panel = true;
-    s.construction.panel_view = 0; // Construction: the queue, the finder, the build bar
+    s.construction.panel_view = 2; // Site Finder: the grid and the table
     for (const site_option& o : site_options(w, reg))
         if (o.type == type)
         {

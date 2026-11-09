@@ -308,6 +308,7 @@ do
     verify.construction_view(0)
     verify.frames(2)
     for _, o in ipairs(verify.site_options()) do
+        verify.construction_view(2)
         verify.site_pick(o.name)
         verify.frames(2)
         local s = verify.site_finder()
@@ -317,6 +318,7 @@ do
         end
     end
     verify.site_clear()
+    verify.construction_view(0)
     close_column()
 end
 verify.expect(door_tile ~= nil, "C8 the site finder names a tile the player can build on")

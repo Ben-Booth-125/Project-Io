@@ -283,15 +283,19 @@
   ],
   [
    "ledger.construction_site_pick",
-   "Construction ledger, Construction view, the 'Find a site' building grid (above the tile build bar)"
+   "Construction ledger, Site Finder view, the 'Find a site' building grid"
   ],
   [
    "ledger.construction_site_sort",
-   "Construction ledger, Construction view, the site ledger's column headers (Place, Net, Cost, Market, LP, Yield)"
+   "Construction ledger, Site Finder view, the site ledger's column headers (Place, Net, Cost, Market, LP, Yield)"
   ],
   [
    "ledger.construction_site_row",
-   "Construction ledger, Construction view, a site ledger row (its Place cell; the press spans the row)"
+   "Construction ledger, Site Finder view, a site ledger row (its Place cell; the press spans the row)"
+  ],
+  [
+   "ledger.construction_site_place",
+   "Planetary canvas, while the Site Finder view has a building chosen (the placement lens is up)"
   ],
   [
    "ledger.corp_card_expand",

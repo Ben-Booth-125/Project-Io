@@ -49,6 +49,7 @@ verify.show_panel("build",        false)
 verify.show_panel("build", true)
 verify.frames(1)
 verify.clear_selection() -- a selected tile scopes the finder to its province (Ben, 2026-11-08)
+verify.construction_view(2)
 local picked_ok = verify.site_pick("Iron Mine")
 verify.frames(3)
 local sites = verify.site_finder()
@@ -58,6 +59,7 @@ if not (picked_ok and (sites.n_rows or 0) > 0) then
     error("building_element.lua: the site finder lists no player ground for an Iron Mine")
 end
 verify.site_clear()
+verify.construction_view(0)
 verify.show_panel("build", false)
 verify.frames(2)
 

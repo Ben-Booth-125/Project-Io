@@ -30,6 +30,7 @@ print(string.format("construction_folds: %d Power Generation options in the find
 local aimed = false
 for _, o in ipairs(verify.site_options()) do
     if o.category == "Extraction" then
+        verify.construction_view(2)
         verify.site_pick(o.name)
         verify.frames(2)
         local s = verify.site_finder()
@@ -42,6 +43,7 @@ for _, o in ipairs(verify.site_options()) do
 end
 verify.expect(aimed, "the site finder found the player's own ground")
 verify.site_clear()
+verify.construction_view(0)
 verify.frames(3)
 verify.capture("construction_folds_top")
 

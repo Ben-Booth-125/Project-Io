@@ -4940,12 +4940,12 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     ImGui::Separator();
 
     // The player's money — the affordability context for every Build button below.
-    // BL-1406: its nation's treasury once folded (HEADER.md § Contents).
+    // BL-1406: its nation's treasury once folded. The header shows it (HEADER.md § Contents;
+    // Ben, 2026-11-09: no second figure here).
     const entity_id actor = player_actor(w);
     float balance = 0.0f;
     if (const float* p = purse_of(w, actor); p != nullptr)
         balance = *p;
-    ImGui::TextDisabled("Treasury: %.0f cr", static_cast<double>(balance));
 
     // Last construction outcome (set by app after executing a request).
     if (!ui.construction.last_message.empty())
@@ -5230,7 +5230,7 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
             peak = std::max(peak, std::fabs(c.profit.net()));
     const float ceiling = charts::tight_ceil(peak);
 
-    // What the bars mean, stated once. The market's response is modelled (site_quote.hpp);
+    // What the bars mean: the market's response is modelled (site_quote.hpp);
     // staffing and labour remain named assumptions.
     //
     // "before auto-staffing" is doing real work (NR-001): the estimate mirrors
@@ -5241,15 +5241,8 @@ void draw_construction_ledger_body(world& w, const recipe_registry& reg, ui_stat
     // same factor, so the RANKING the chart exists for is unaffected; the magnitude is a
     // floor, not a ceiling, and a player reads a profit bar as a prediction. Three words
     // stop it reading as the most the building will ever earn (Ben's call, 2026-08-01).
-    ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
-    // BL-1344: the payback clause is gone from the rows, so the caption's pointer at
-    // it goes with it. What replaced it is the cost said in full — goods and credits
-    // — which is the honest version of the same sentence: the bar is earnings, the
-    // cost lines above it are cost.
-    ImGui::TextWrapped("Est. net / qtr once it is selling here: its own output moves the price, and "
-                       "inputs it cannot get mean it stands idle. Before auto-staffing; 50%% staffing, "
-                       "no labour shortage, this tile's Logistic Point cover.");
-    ImGui::PopStyleColor();
+    // The caption that said so is gone (Ben, 2026-11-09); the bar column's hover carries
+    // the estimate's assumptions.
 
     // ONE LINE A ROW, AND IT IS A GRID (BL-1365; construction.md § "One line a
     // row, and the words live in the hover", § "The line is a grid, not a

@@ -11,13 +11,13 @@
 // province." The grid sums what the table would list for every option, through the
 // same gates and the same quote, spread over frames; a selected province scopes it.
 //
-// BUILDING FIRST. The player picks a building in the Construction view; the
+// BUILDING FIRST. The player picks a building in the Site Finder view; the
 // Planetary canvas marks every tile of the player's own ground the Build door would
 // accept it on (`placement_rules::can_place_in_world`, the door's era / tech / air
 // filters, and the treasury), flags the ones no Logistic Point source reaches, and a
 // ledger lists those tiles - estimated profit (the door's own figure, cover applied),
 // cost, market, Logistic Point cover, yield - sorted by profit. A row press selects
-// and frames the tile; the place action stays the tile's Build door below it.
+// and frames the tile; a press on a marked tile places the building (Ben, 2026-11-09).
 //
 // docs/ui/ledgers/construction.md § The site ledger owns the surface;
 // docs/ui/LENSES.md § The placement lens owns the map half.
@@ -112,6 +112,11 @@ void update_site_finder(world& w, const recipe_registry& reg, ui_state& ui);
 /// Order @p rows by @p col (0 place, 1 profit, 2 cost, 3 market, 4 logistics, 5 yield);
 /// every tie broken by tile id ascending, and an unpriced row always last.
 void sort_site_rows(std::vector<site_row>& rows, int col, bool desc);
+
+/// Why a press on @p tile places nothing while a building is chosen: the gate's own
+/// sentence for the chosen option (construction.md § The site ledger). "" when the tile
+/// would take it.
+std::string site_press_refusal(const world& w, const recipe_registry& reg, const ui_state& ui, entity_id tile);
 
 /// Draw the finder: the scope line, the building grid and, with a building chosen, the site ledger.
 /// Calls `update_site_finder` itself.

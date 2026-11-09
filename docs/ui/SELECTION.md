@@ -532,7 +532,8 @@ every unit of the group, one command each in ascending id.
 
 **A unit assigned to a front is unassigned and obeys**: `assign_front` with a null tile goes first,
 then the march (§ The front element). A right-click with nothing of the player's selected does
-nothing; nor does one while placement mode, an armed road or an armed March pick owns the canvas.
+nothing; nor does one while placement mode, an armed road, an armed March pick or a chosen site-finder
+building owns the canvas.
 
 **The hover says which before the press.** While the order would apply, the hovered hex is outlined
 in the order's colour — green for a move (`palette::order_move`, the March pick's green), red with
