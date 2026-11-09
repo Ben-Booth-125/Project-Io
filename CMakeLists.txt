@@ -370,7 +370,7 @@ target_compile_options(io_ground_bake PRIVATE ${IO_WARNING_FLAGS})
 # that quietly grows past the limit still reports it here instead of being
 # absorbed silently.
 if(MSVC)
-    set_source_files_properties(src/core/verify_api.cpp
+    set_source_files_properties(src/core/verify_api.cpp src/ui/startup_screens.cpp
         PROPERTIES COMPILE_OPTIONS "/bigobj")
 endif()
 
