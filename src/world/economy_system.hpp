@@ -72,6 +72,12 @@ struct building_report
     /// Processing: the run fraction drawn and produced this tick (0 idle, 1 full).
     /// BL-1209: the top-up raises it; report-only.
     float run = 0.0f;
+
+    /// Processing: what this draw filed with the market this tick, per good, split as
+    /// `run_processing` split it: `wanted` bid on the price, `suppressed` was silenced
+    /// by the fair-price ceiling. Report-only, read by `quote_site` alone: never saved.
+    std::array<float, resource_count> wanted{};
+    std::array<float, resource_count> suppressed{};
 };
 
 /// Per-corporation budget breakdown retained from the budget step (BL-072): the

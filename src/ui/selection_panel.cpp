@@ -776,8 +776,20 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
         std::size_t   buildings = 0;
         std::uint64_t generation = 0;
         const economy_report* report = nullptr;
+        std::uint64_t plants = 0;
         std::optional<site_quote_context> cx;
     } s_lever_quote;
+    // The reach index describes every building as first asked, and a Switch or a dial
+    // writes one at once, inside the tick: a commutative sum, as the map is unordered.
+    std::uint64_t plants_now = 0;
+    for (const auto& [plant_id, p] : w.buildings)
+        plants_now += std::hash<std::uint64_t>{}((static_cast<std::uint64_t>(plant_id) << 32)
+                                                 ^ (static_cast<std::uint64_t>(p.recipe) << 16)
+                                                 ^ (p.decommissioned ? 0x8000u : 0u)
+                                                 ^ static_cast<std::uint64_t>(p.ticks_remaining > 0))
+                    + std::hash<float>{}(p.workforce_assigned) * 3u + std::hash<float>{}(static_cast<float>(p.workforce_target)) * 5u
+                    + static_cast<std::uint64_t>(p.supply_factor_permille) * 7u
+                    + static_cast<std::uint64_t>(p.condition_permille) * 11u;
     if (!s_lever_quote.cx.has_value() || s_lever_quote.tick != w.current_econ_tick
         || s_lever_quote.buildings != w.buildings.size()
         || s_lever_quote.generation != w.logistics_cache_generation
@@ -787,7 +799,13 @@ void draw_production_method_section(world& w, const recipe_registry& reg,
         s_lever_quote.buildings  = w.buildings.size();
         s_lever_quote.generation = w.logistics_cache_generation;
         s_lever_quote.report     = &report;
+        s_lever_quote.plants     = plants_now;
         s_lever_quote.cx.emplace(make_site_quote_context(w, reg, &report));
+    }
+    else if (s_lever_quote.plants != plants_now)
+    {
+        s_lever_quote.plants = plants_now;
+        input_reach_invalidate(s_lever_quote.cx->reach);
     }
     const float lever_cover = site_lp_cover(w, b.tile);
 

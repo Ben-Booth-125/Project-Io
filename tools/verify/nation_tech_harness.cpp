@@ -104,6 +104,7 @@
 #include <fstream>
 #include <initializer_list>
 #include "world/site_quote.hpp"
+#include "world/market_clearing.hpp" // price_target, pricing_supply (the running-plant quote rows)
 
 #include <limits>
 #include <map>
@@ -1201,6 +1202,173 @@ void rows_t2(const recipe_registry& reg)
     }
 }
 
+/// Q1-Q2 (BL-1543, method lever price): `quote_site` with no running building is the
+/// door's quote untouched, and with one it reads the market with exactly what the plant's
+/// report row filed taken out. The expectation is worked here from the price law; the
+/// market is staged and restored, so the caller's world is unmoved.
+void rows_quote_running(world& w, const recipe_registry& reg)
+{
+    std::printf("\nQ1-Q2 quote_site for a running plant\n");
+    entity_id tile = null_entity;
+    for (const auto& [mid, m] : w.markets)
+        if (m.centre_tile != null_entity && (tile == null_entity || m.centre_tile < tile))
+            tile = m.centre_tile;
+    const entity_id mid = tile != null_entity ? market_for_tile(w, tile) : null_entity;
+    const std::uint16_t ra = reg.recipe_id("refined_copper"), rb = reg.recipe_id("steel");
+    const recipe* a = reg.get_recipe(ra);
+    const recipe* b = reg.get_recipe(rb);
+    if (mid == null_entity || a == nullptr || b == nullptr)
+    {
+        check(false, "Q0 the fixture has a market and both recipes");
+        return;
+    }
+    const auto only_output = [](const recipe& r) {
+        int out = -1, n = 0;
+        for (std::size_t i = 0; i < resource_count; ++i)
+            if (r.outputs[i] > 0.0f) { out = static_cast<int>(i); ++n; }
+        return n == 1 ? out : -1;
+    };
+    const int oa = only_output(*a), ob = only_output(*b);
+    market_component& mc = w.markets.at(mid);
+    const market_component saved = mc;
+    if (oa < 0 || ob < 0 || oa == ob || !(mc.base_price[oa] > 0.0f) || !(mc.base_price[ob] > 0.0f))
+    {
+        check(false, "Q0 each recipe makes one distinct priced good");
+        return;
+    }
+
+    // Inputs ample and at base, so neither recipe starves; the outputs' books are staged.
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (a->inputs[r] > 0.0f || b->inputs[r] > 0.0f)
+        {
+            mc.inventory[r] = 1.0e7f;
+            mc.price[r]     = mc.base_price[r];
+        }
+    for (const int o : {oa, ob})
+    {
+        mc.price[o]       = mc.base_price[o];
+        mc.inventory[o]   = 0.0f;
+        mc.supply[o]      = 40.0f;
+        mc.demand[o]      = 30.0f;
+        mc.hauler_want[o] = 0.0f;
+    }
+
+    const auto same = [](const site_quote& x, const site_quote& y) {
+        return x.starved == y.starved && x.short_of == y.short_of && x.price_share == y.price_share
+            && x.profit.has_data == y.profit.has_data && x.profit.revenue == y.profit.revenue
+            && x.profit.input_cost == y.profit.input_cost && x.profit.maintenance == y.profit.maintenance
+            && x.profit.wages == y.profit.wages;
+    };
+    const entity_id self = 0x7FFFFF01u;
+    {
+        site_quote_context cx = make_site_quote_context(w, reg, nullptr);
+        cx.pending.clear();
+        const site_quote d  = quote_site(w, reg, cx, tile, building_type::processing_facility, resource_type::iron_ore, ra, 0.8f);
+        const site_quote e  = quote_site(w, reg, cx, tile, building_type::processing_facility, resource_type::iron_ore, ra, 0.8f, null_entity, nullptr);
+        const site_quote ds = quote_site(w, reg, cx, tile, building_type::processing_facility, resource_type::iron_ore, ra, 0.8f, self);
+        const site_quote es = quote_site(w, reg, cx, tile, building_type::processing_facility, resource_type::iron_ore, ra, 0.8f, self, nullptr);
+        std::printf("  door quote: share %.6f revenue %.6f\n", d.price_share, d.profit.revenue);
+        check(same(d, e) && same(ds, es), "Q1 a null running plant is the defaulted quote, field for field");
+    }
+
+    building_component plant{};
+    plant.tile = tile;
+    plant.type = building_type::processing_facility;
+    plant.recipe = ra;
+    plant.workforce_assigned = 0.7f;
+    plant.workforce_target = 100;
+    plant.supply_factor_permille = 800;
+    plant.condition_permille = 1000;
+    const price_band_params& band = reg.price_band();
+
+    /// The share the price law gives output good @p o, added to the market @p view.
+    const auto expected = [&](const market_component& view, int o, const recipe& rc) {
+        const float added = rc.outputs[o] * judged_batches(reg, plant) * building_supply_scalar(plant);
+        const float supply = pricing_supply(view, o, band.shelf_supply_ticks) + added;
+        const float demand = std::max(0.0f, view.demand[o]) + std::max(0.0f, view.hauler_want[o]);
+        return price_target(view.base_price[o], supply, demand, band.floor_mult, band.ceil_mult) / view.price[o];
+    };
+    const auto share = [&](const building_report& row, bool with_row, std::uint16_t recipe) {
+        economy_report rep;
+        building_report other;
+        other.building = self + 1;
+        rep.buildings.push_back(other);
+        if (with_row)
+            rep.buildings.push_back(row);
+        site_quote_context cx = make_site_quote_context(w, reg, &rep);
+        cx.pending.clear();
+        const site_quote q = quote_site(w, reg, cx, tile, building_type::processing_facility,
+                                        resource_type::iron_ore, recipe, 1.0f, self, &plant);
+        if (q.starved)
+            std::printf("  unexpected starve on %s\n", resource_names::name_of(q.short_of));
+        return q.price_share;
+    };
+    const auto near = [](float x, float y) { return std::fabs(x - y) < 1.0e-5f; };
+    const float output = 12.0f, bid = 9.0f;
+
+    building_report row;
+    row.building = self;
+    row.type     = building_type::processing_facility;
+    row.recipe   = ra;
+    row.active   = true;
+    row.output_quantity = output;
+    row.wanted[oa] = bid;
+
+    {
+        market_component v = mc;
+        v.supply[oa] -= output;
+        v.demand[oa] -= bid;
+        const float got = share(row, true, ra), want = expected(v, oa, *a), plain = expected(mc, oa, *a);
+        std::printf("  Q2a same recipe: got %.6f want %.6f unnetted %.6f\n", got, want, plain);
+        check(near(got, want) && !near(got, plain), "Q2a a running plant's listing and bid come out of the book");
+        check(near(share(row, false, ra), plain), "Q2b no report row: nothing is netted");
+    }
+    {
+        // Switched from A to B: the building says B, the report and the book still say A.
+        plant.recipe = rb;
+        market_component v = mc;
+        v.supply[oa] -= output;
+        v.demand[oa] -= bid;
+        market_component wrong = mc;
+        wrong.supply[ob] -= output;
+        const float got_b = share(row, true, rb), want_b = expected(v, ob, *b), bad_b = expected(wrong, ob, *b);
+        std::printf("  Q2c switched, new recipe: got %.6f want %.6f wrong-good %.6f\n", got_b, want_b, bad_b);
+        check(near(got_b, want_b) && !near(got_b, bad_b),
+              "Q2c after a Switch the new recipe's good keeps its book: the row's recipe is what comes out");
+        const float got_a = share(row, true, ra), want_a = expected(v, oa, *a);
+        std::printf("  Q2d switched, old recipe: got %.6f want %.6f\n", got_a, want_a);
+        check(near(got_a, want_a), "Q2d after a Switch the old recipe's good is the one netted");
+        plant.recipe = ra;
+    }
+    {
+        // An idle row filed its want and listed nothing.
+        building_report idle = row;
+        idle.active = false;
+        idle.idle   = true;
+        idle.output_quantity = 0.0f;
+        market_component v = mc;
+        v.demand[oa] -= bid;
+        const float got = share(idle, true, ra), want = expected(v, oa, *a);
+        std::printf("  Q2e idle row: got %.6f want %.6f\n", got, want);
+        check(near(got, want), "Q2e an idle plant takes its filed bid out and no listing");
+    }
+    {
+        // The ceiling silenced the bid: it comes off the silenced want, never demand.
+        mc.demand[oa]      = 0.0f;
+        mc.hauler_want[oa] = bid + 10.0f;
+        building_report silenced = row;
+        silenced.output_quantity = 0.0f;
+        silenced.wanted[oa]      = 0.0f;
+        silenced.suppressed[oa]  = bid;
+        market_component v = mc;
+        v.hauler_want[oa] -= bid;
+        const float got = share(silenced, true, ra), want = expected(v, oa, *a), plain = expected(mc, oa, *a);
+        std::printf("  Q2f silenced bid: got %.6f want %.6f unnetted %.6f\n", got, want, plain);
+        check(near(got, want) && !near(got, plain), "Q2f a silenced bid comes off the silenced want");
+    }
+    mc = saved;
+}
+
 /// T2 (live) — logistics_cost through its real read site, price_trade_leg, on
 /// a generated world (a hand fixture cannot route a leg). The corp's home nation
 /// holds Freight Practice I (-1% logistics cost): an overland leg costs x0.99;
@@ -1237,6 +1405,7 @@ bool rows_t2_live(std::uint32_t seed, bool overland_rows)
             quoted = !q.starved && q.profit.input_cost == 0.0f && q.price_share == 1.0f && q.profit.revenue > 0.0f;
         }
         check(quoted, "T2z the door quotes the wind turbine as running, buying nothing, selling at the post");
+        rows_quote_running(w, reg);
     }
 
     const logistics_nodes nodes = collect_logistics_nodes(w);
@@ -2379,11 +2548,13 @@ int main(int argc, char** argv)
     int ai_years = 0; // BL-1275: --ai Y runs R7 over Y years
     std::vector<std::uint32_t> seeds;
     bool fixture_only = false; // --fixture-only: R1-R3, R5, T1-T3, R6 and nothing generated
+    bool quote_running = false; // --quote-running: only the running-plant quote rows, seed 1
     for (int i = 1; i < argc; ++i)
     {
         const bool more = i + 1 < argc;
         if (!std::strcmp(argv[i], "--seeds") && more) seed_count = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--fixture-only")) fixture_only = true; // BL-1432 review
+        else if (!std::strcmp(argv[i], "--quote-running")) quote_running = true;
         else if (!std::strcmp(argv[i], "--seed-list") && more) seeds = parse_list(argv[++i]);
         else if (!std::strcmp(argv[i], "--quarters") && more) quarters = std::atoi(argv[++i]);
         else if (!std::strcmp(argv[i], "--once")) twice = false;
@@ -2407,6 +2578,41 @@ int main(int argc, char** argv)
                                  " [--age Y] [--age-only] [--ai Y] [--relief K] [--unlock U] [--cluster C] [--majorw M]\n");
             return 2;
         }
+    }
+
+    if (quote_running)
+    {
+        lua_state lua;
+        world_params wp;
+        wp.seed = 1;
+        auto start = std::make_unique<app_start_world>();
+        build_app_start_world(lua, wp, *start);
+        run_app_validation_settle(start->w, start->reg);
+        rows_quote_running(start->w, start->reg);
+
+        // Q3: what a row carries is what the tick filed, on real ticks.
+        double rows = 0.0, filed = 0.0;
+        int plants = 0;
+        for (int tick = 0; tick < 2; ++tick)
+        {
+            const economy_report rep = run_economy_step(start->w, start->reg);
+            for (const building_report& br : rep.buildings)
+            {
+                if (br.type != building_type::processing_facility)
+                    continue;
+                ++plants;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    rows += static_cast<double>(br.wanted[r]) + br.suppressed[r];
+            }
+            for (const auto& [key, wants] : rep.processor_wants)
+                for (const float v : wants)
+                    filed += static_cast<double>(v);
+        }
+        std::printf("  Q3 %d plant rows over 2 ticks: rows carry %.6f, processor_wants %.6f\n", plants, rows, filed);
+        check(plants > 0 && filed > 0.0 && std::fabs(rows - filed) < 1.0e-3 * filed,
+              "Q3 the rows' filed wants sum to the tick's processor_wants");
+        std::printf("\n%d failure(s)\n", g_failures);
+        return g_failures == 0 ? 0 : 1;
     }
 
     std::printf("nation_tech_harness (BL-1273): %d nodes in the Digitisation tree\n", io::dg::node_count);

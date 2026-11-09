@@ -759,6 +759,8 @@ building_report run_processing(world& w, const recipe_registry& reg,
     // precisely when the market most needs to hear it.
     if (has_input)
     {
+        rep.wanted     = wanted;
+        rep.suppressed = suppressed;
         auto& want_row = out.wants[std::make_pair(corp, market_id)];
         for (std::size_t r = 0; r < resource_count; ++r)
             want_row[r] += wanted[r];
