@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*223 entries — 54 gameplay · 39 canvas · 15 lens · 75 ledger · 40 chrome.*
+*224 entries — 54 gameplay · 39 canvas · 15 lens · 76 ledger · 40 chrome.*
 
 ---
 
@@ -1902,20 +1902,20 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 ### `ledger.construction_view_tab` — Construction ledger, view tab strip
 
-**Press.** Click the 'Buildings' or 'Construction' tab button
+**Press.** Click the 'Buildings', 'Construction' or 'Site Finder' tab button
 
 | Arg | Type | Meaning |
 |---|---|---|
-| `view` | `enum` | 'Buildings' (the estate by type; the default) or 'Construction' (the build queue, the site finder and the tile build bar) |
+| `view` | `enum` | 'Buildings' (the estate by type; the default), 'Construction' (the build queue and the tile build bar: manual construction) or 'Site Finder' (the building grid and the site ledger) |
 
 **Valid when:**
 - Construction ledger is open
 
-**Expected output.** Switches the view. Re-clicking the currently-active tab CLOSES the whole ledger (toggle rule) rather than collapsing to an overview; switching to the other tab is an ordinary view change.
+**Expected output.** Switches the view. Re-clicking the currently-active tab CLOSES the whole ledger (toggle rule) rather than collapsing to an overview; switching to another tab is an ordinary view change.
 
-**Reason to select.** Buildings answers 'what do I operate and how is each doing?'; Construction answers 'what is on the way, what does it cost, where could a building go, and what could I put on this tile?'
+**Reason to select.** Buildings answers 'what do I operate and how is each doing?'; Construction answers 'what is on the way, what does it cost, and what could I put on this tile?'; Site Finder answers 'what would earn most on my ground, and where would it go?'
 
-### `ledger.construction_site_pick` — Construction ledger, Construction view, the 'Find a site' building grid (above the tile build bar)
+### `ledger.construction_site_pick` — Construction ledger, Site Finder view, the 'Find a site' building grid
 
 **Press.** Press a cell of the 'Find a site' grid. There is one cell per building the door offers - one per extractable good (by its building's name - 'Iron Mine', 'Farm', ...), one per processing recipe (its display name), then Port, Planetary Marketplace, Launchpad, Inland Logistics Hub, Military Base, Airbase, Bunker, Research Institute, Schooling, University - whichever the era and tech allow. Each cell shows the building glyph, its name, the best estimated net per quarter among the tiles the table would list for it, and how many such sites there are, with no building chosen first. Pressing the CHOSEN cell again clears it. Cells are ordered by best net descending, then those with sites and no figure (a building that makes nothing to sell), then those with no site at all, dimmed, with the reason on hover. A selected tile restricts the grid, its figures, the table and the lens to that tile's province; the line above the grid names the province, and its Clear press clears the selected tile, returning the whole body. A press on a table row selects its tile without narrowing.
 
@@ -1924,13 +1924,13 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 | `building` | `enum` | A building in the Build door's vocabulary - an extraction good, a processing recipe, or an infrastructure / military type |
 
 **Valid when:**
-- The Construction ledger is open on its Construction view
+- The Construction ledger is open on its Site Finder view
 
-**Expected output.** Arms the site finder on that building. The site ledger beneath lists every tile of the player's own ground on the active body, or in the selected tile's province, that the Build door would accept it on (placement rules with the player's actor, the recipe's air, and the treasury against the capex), sorted by estimated net per quarter descending, ties by tile id; a caption counts the sites, the ones with no Logistic Points operating, and the ones that would fit but cost more than the treasury. On the Planetary rung the placement lens marks the same tiles on the map: green for a site, amber with a struck-truck flag where no Logistic Point source reaches it, everything else dimmed. Pure view state - nothing is built or charged. The choice clears when the ledger closes; switching to the Buildings view leaves the map plain while it lasts. A row whose recipe input has under 4 quarters left on its market's shelf (shelf over this plant's use plus the shelf's net fall) carries an amber mark beside its Net figure, and that column's hover opens by naming the good and the quarters; a row that would likely stand idle carries no second warning.
+**Expected output.** Arms the site finder on that building. The site ledger beneath lists every tile of the player's own ground on the active body, or in the selected tile's province, that the Build door would accept it on (placement rules with the player's actor, the recipe's air, and the treasury against the capex), sorted by estimated net per quarter descending, ties by tile id; lines above the table count the ones with no Logistic Points operating and the ones that would fit but cost more than the treasury. On the Planetary rung the placement lens marks the same tiles on the map: green for a site, amber with a struck-truck flag where no Logistic Point source reaches it, everything else dimmed. Each site also carries its estimated Net per quarter over the tile, in green with its sign, where the figure fits the hex (Ben, 2026-11-09). Pure view state - nothing is built or charged. The choice clears when the ledger closes, on a second press of the chosen cell, or on Esc while it owns the map press; switching to another view leaves the map plain while it lasts. A row whose recipe input has under 4 quarters left on its market's shelf (shelf over this plant's use plus the shelf's net fall) carries an amber mark beside its Net figure, and that column's hover opens by naming the good and the quarters; a row that would likely stand idle carries no second warning.
 
 **Reason to select.** Answers 'what would earn most on my ground, and where?' without choosing a building first or sweeping the map tile by tile; selecting a tile narrows the same question to its province. The estimate is today's prices with each tile's Logistic Point cover applied - one input among several, not the move.
 
-### `ledger.construction_site_sort` — Construction ledger, Construction view, the site ledger's column headers (Place, Net, Cost, Market, LP, Yield)
+### `ledger.construction_site_sort` — Construction ledger, Site Finder view, the site ledger's column headers (Place, Net, Cost, Market, LP, Yield)
 
 **Press.** Click a column header; click it again to reverse the direction
 
@@ -1945,7 +1945,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Compare sites on the axis that matters to this decision - the cheapest, the best served, the richest deposit - rather than only the estimated net.
 
-### `ledger.construction_site_row` — Construction ledger, Construction view, a site ledger row (its Place cell; the press spans the row)
+### `ledger.construction_site_row` — Construction ledger, Site Finder view, a site ledger row (its Place cell; the press spans the row)
 
 **Press.** Click a row
 
@@ -1956,9 +1956,25 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Valid when:**
 - A building is chosen in the site finder and the row is listed
 
-**Expected output.** Selects that tile (the tile Selection element and the province outline follow, exactly as a map click) and centres the Planetary canvas on it at the current zoom. The selected site KEEPS its placement-lens wash - green, or amber where no Logistic Points operate - with the selection mark drawn over it (Ben, 2026-10-26). The tile's Build door, below the site ledger, then lists the buildings for that tile - the chosen one among them - and its Build press places it. The row press builds nothing.
+**Expected output.** Selects that tile (the tile Selection element and the province outline follow, exactly as a map click) and centres the Planetary canvas on it at the current zoom. The selected site KEEPS its placement-lens wash - green, or amber where no Logistic Points operate - with the selection mark drawn over it (Ben, 2026-10-26). The row press builds nothing; a press on the tile on the map places the chosen building (ledger.construction_site_place).
 
-**Reason to select.** Takes a site from the comparison to the one place a building is placed, in one press.
+**Reason to select.** Takes a site from the comparison to the map, framed, in one press.
+
+### `ledger.construction_site_place` — Planetary canvas, while the Site Finder view has a building chosen (the placement lens is up)
+
+**Press.** Left-press a tile the placement lens marks (green, or amber with the struck truck). The press does not select or cycle: it builds the chosen building on that tile. Press another tile to place another; press the chosen cell again or Esc to disarm (Ben, 2026-11-09).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `tile` | `tile` | A site the placement lens marks |
+
+**Valid when:**
+- A building is chosen in the site finder and the Planetary canvas is showing the site's body
+- The tile is a listed site; any other tile places nothing and says why on the line above the table
+
+**Expected output.** Places the chosen building through the same construction request and construct_nation as the Build door, charged the same: the flat cost at placement and the materials in arrears. The selection is untouched and the choice stays armed, so several can be placed. A press on an unmarked tile builds nothing and leaves the selection alone; the reason appears on the line above the table: the placement gate's refusal, the recipe's air, the treasury shortfall, or that the tile is outside the selected province. Esc disarms before it closes the ledger.
+
+**Reason to select.** Builds where the comparison pointed, without going through the tile's Build door one tile at a time.
 
 ### `ledger.corp_card_expand` — Nation overview (rail slot 1), the Balance card's title row
 

@@ -55,7 +55,7 @@ Identity colours live in `presentation.hpp`.
 
 Two build-flow surfaces mark the map without being `overlay_mode` values, so they are on neither
 the strip nor the cycle: the **placement lens** (§ The placement lens), armed by choosing a
-building in the Construction view's site finder, and the **placement-suitability surface**
+building in the Site Finder view's site finder, and the **placement-suitability surface**
 (§ Placement-suitability surface), armed by placement mode.
 
 ---
@@ -1096,7 +1096,7 @@ already outlined as the selection).
 ## The placement lens *(not a strip lens)*
 
 **Intent.** *Where on my ground could this building go, and which of those tiles have no logistics?*
-The map half of the Construction view's site ledger (`ledgers/construction.md` § The site ledger;
+The map half of the Site Finder view's site ledger (`ledgers/construction.md` § The site ledger;
 Ben, 2026-10-25: *"we should use a lens to show which tiles are valid … and flag tiles which do not
 currently have logistics operating"*). Building first: the player presses a building in the view's
 site finder, and the lens marks exactly the tiles the ledger beside it lists, narrowed with it to the
@@ -1144,4 +1144,6 @@ no draw pass of its own.
 none of it.
 
 **Interaction notes.** Planetary only; no selector of its own (the site finder's grid is the
-selector). Verified by `scripts/verify/construction_sites.lua`.
+selector). A press on a marked tile builds the chosen building there, and each site carries its Net /
+qtr over the tile where the figure fits the hex (Ben, 2026-11-09; `ledgers/construction.md` § The site
+ledger). Verified by `scripts/verify/construction_sites.lua`.

@@ -17,6 +17,13 @@
 --   G4  clearing the selection returns the whole body.
 --   G5  a press on a table row selects its tile WITHOUT narrowing the table.
 --   G6  a treasury that cannot pay puts every paid option in the no-site tier.
+--   G7  with a building chosen a press on a marked tile BUILDS there: one more building,
+--       the choice still armed, the selection untouched (Ben, 2026-11-09).
+--   G8  a press on a tile the finder does not mark builds nothing and keeps the selection.
+--   G9  Esc disarms the choice and leaves the ledger open.
+--
+-- A map press is what G7-G9 prove; the green Net figures over the tiles are a capture read
+-- (site_grid_net_over_tiles), since no verify read reports a label.
 --
 -- Run with: ProjectIo --verify scripts/verify/site_grid.lua
 
@@ -25,6 +32,7 @@ verify.goto_surface("home")
 verify.econ_step(2)
 verify.set_balance(5000000.0)
 verify.show_panel("build", true)
+verify.construction_view(2) -- the finder's own tab (Ben, 2026-11-09)
 verify.clear_selection() -- the home surface opens with a tile selected, which would scope G1
 verify.frames(3)
 
@@ -172,10 +180,64 @@ verify.expect(any_blocked, "G6: an empty treasury leaves options with no afforda
 verify.set_balance(5000000.0)
 verify.frames(3)
 
+-- G7-G9: the map press constructs. Close the zoom so the figure rungs draw.
+verify.site_pick(pick)
+verify.frames(4)
+local placing = verify.site_finder()
+verify.expect(placing.armed and placing.n_rows > 0, "G7: the choice is armed with sites to press")
+local site = placing.rows[1]
+local before = #verify.buildings()
+verify.set_zoom(3.0)
+verify.frames(3)
+local aim = verify.tile_screen(site.x, site.y)
+verify.expect(aim.ok, "G7: the site is on screen")
+local sx, sy = aim.x, aim.y
+verify.hover(sx, sy, 2)
+shot("site_grid_net_over_tiles")
+verify.click(sx, sy)
+verify.frames(4)
+local after_build = verify.site_finder()
+verify.expect(#verify.buildings() == before + 1,
+              string.format("G7: a press on a marked tile builds (%d buildings, was %d)", #verify.buildings(), before))
+verify.expect(after_build.armed and after_build.choice == pick, "G7: the choice stays armed after a build")
+verify.expect(verify.pointer_target().selected_province == 0, "G7: the press leaves the selection alone")
+
+-- G8: find a tile the table does not list, and press it.
+local listed = {}
+for _, r in ipairs(after_build.rows) do listed[r.x .. "," .. r.y] = true end
+local miss_x, miss_y
+for dy = -3, 3 do
+  for dx = -3, 3 do
+    local tx, ty = site.x + dx, site.y + dy
+    if not listed[tx .. "," .. ty] and not (dx == 0 and dy == 0) and miss_x == nil then
+      miss_x, miss_y = tx, ty
+    end
+  end
+end
+verify.expect(miss_x ~= nil, "G8: some nearby tile is not a site")
+if miss_x then
+  local count = #verify.buildings()
+  local m = verify.tile_screen(miss_x, miss_y)
+  verify.click(m.x, m.y)
+  verify.frames(4)
+  verify.expect(#verify.buildings() == count, "G8: an unmarked tile builds nothing")
+  verify.expect(verify.site_finder().armed, "G8: the choice stays armed")
+  verify.expect(verify.pointer_target().selected_province == 0, "G8: the press leaves the selection alone")
+end
+
+-- G9: Esc disarms before it closes anything.
+verify.press_escape()
+verify.frames(3)
+local esc = verify.site_finder()
+verify.expect(not esc.armed, "G9: Esc disarms the chosen building")
+verify.expect(esc.picker_x >= 0, "G9: Esc leaves the ledger open")
+verify.site_clear()
+
 -- The narrow end: every cell still legible at 1280.
 verify.window(1280, 720)
 verify.frames(3)
 verify.show_panel("build", true)
+verify.construction_view(2)
 verify.frames(3)
 local narrow = verify.site_finder()
 verify.expect(narrow.n_picker_rows == #opts, "1280: every option draws")

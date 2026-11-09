@@ -24,12 +24,13 @@ depended on which control they happened to press.
 
 ## 2. Sub-levels — views & default
 
-Two views behind a `nav_button` strip (`construction.panel_view`), inside `foldout_begin("Construction")`.
+Three views behind a `nav_button` strip (`construction.panel_view`), inside `foldout_begin("Construction")`.
 
 | View | Answers (one question) | Content |
 |---|---|---|
 | **Buildings** *(default)* | "What do I own, and how much is each kind of it making me?" | One row per building **type** the player owns at least one of — the type's display name, its **count**, and the **summed per-quarter net** of its members, sign-coloured. The list takes the **whole height of the tab**, less exactly what the levers below it need, scrolling only past that (Ben, 2026-10-26). **Expanding a row** lists that type's own buildings, one line each carrying the tile and that building's own net, visibly summing to the header's total; **pressing one selects it**, and its **levers** draw below the roster. One group open at a time (an accordion). |
-| **Construction** | "What's in flight, what is it costing, where could this building go, and what could I put on this tile?" | A **collapsible** queue header carrying **N cr / qtr** (`estimated_quarterly_construction_cost` — `compute_building_opex` maintenance + wages summed over every player building with `ticks_remaining > 0`, the same formula the budget loop uses), then, when expanded, one row per in-progress build with a progress cell colour-coded dim (<25 %) / mid (25–75 %) / high (>75 %). Below it the **site finder** — a grid of buildings with their estimated returns and, with a building chosen, the **site ledger** (§ The site ledger, `construction_sites.cpp`) — and below that the **tile build bar** (`draw_construction_ledger_body`, `selection_panel.cpp`). |
+| **Construction** | "What's in flight, what is it costing, and what could I put on this tile?" | A **collapsible** queue header carrying **N cr / qtr** (`estimated_quarterly_construction_cost` — `compute_building_opex` maintenance + wages summed over every player building with `ticks_remaining > 0`, the same formula the budget loop uses), then, when expanded, one row per in-progress build with a progress cell colour-coded dim (<25 %) / mid (25–75 %) / high (>75 %). Below it the **tile build bar** (`draw_construction_ledger_body`, `selection_panel.cpp`): manual construction on the selected tile, with no caption of its own and no treasury figure, the header carrying the treasury and each column's hover its explanation (Ben, 2026-11-09). |
+| **Site Finder** | "What would earn most on my ground, and where would it go?" | The **site finder** — a grid of buildings with their estimated returns and, with a building chosen, the **site ledger** (§ The site ledger, `construction_sites.cpp`). It has its own tab so it does not hide manual construction (Ben, 2026-11-09). |
 
 **Why Buildings is the default.** The queue is empty most of the time and the player always owns
 buildings, so opening on the queue makes the ledger's front door an empty room.
@@ -41,7 +42,7 @@ and the build bar below it is what a player meets; open it says when things land
 ### The two empty states differ, deliberately
 
 - **Construction, no tile selected** → the build bar says **"Select a tile"**, and nothing else.
-  The tiles the player *could* build on are the **site ledger's**, directly above it: building
+  The tiles the player *could* build on are the **site ledger's**, on the Site Finder tab: building
   first, then the tile (Ben, 2026-10-25). The build bar stays a targeted surface — it prices one
   tile — and the site ledger is how a tile is found.
 - **Buildings, a type row expanded** → the type's **own buildings**, each pressable. It lists what
@@ -58,8 +59,8 @@ which do not currently have logistics operating."*
 
 This overturns the 2026-08-29 line that any ordering of the buildable tiles is a recommendation
 (`../../CONCEPT.md` § Player identity now holds the rule that stands: the interface may rank and
-compare; it never acts for the player). The ledger orders; the player still picks a row and
-presses Build.
+compare; it never acts for the player). The ledger orders; the player still picks the tile and
+presses it.
 
 **1. Top question.** *"What would earn most on my ground, and where would it go?"* (Ben, 2026-11-08:
 *"redesign the construction helper element which asks the user to select a building type first. We
@@ -132,12 +133,12 @@ comes off the grid, so one market's shelf is not its reading and it takes no war
 door accepts** the chosen building on — `placement_rules::can_place_in_world` with the player's
 actor named (own ground, tech, the road a building needs, stacks, the province ceiling), the
 recipe's air, and the treasury against `construction_capex`, exactly the door's enabled-press
-test. Tiles that fit but cost more than the treasury are counted under the caption, not listed.
+test. Tiles that fit but cost more than the treasury are counted on a line above the table, not listed.
 Six columns, **every one sortable** by its header, and **every header legible at every supported width** (Ben, 2026-10-26: no "Yi…" elision) — each fixed column is sized to the wider of its widest figure and its header, the two named columns share the rest in proportion to their headers, and the sort arrow's width is reserved only on the column the rows are sorted by — the one place the arrow draws — so a header never loses its tail to it:
 
 | Column | Figure |
 |---|---|
-| **Place** | The row's identity: the named **population centre whose province holds the tile**, or, where no centre's province covers it, the nearest named centre on the body, read **"near X"**. There is no grid-position column (Ben, 2026-10-26): an x,y is an address only the map can read, and a place name is one the player already knows. A province has no name of its own (`../../GLOSSARY.md` § Province) but it is its centre's ground, so the centre names it; where a province holds two centres, the lower id names it, so the name is one answer. The row's press: it **selects the tile and frames it** on the map; the tile's Build door below places the building. The press is the whole row. Sorted by name, ties by tile id. |
+| **Place** | The row's identity: the named **population centre whose province holds the tile**, or, where no centre's province covers it, the nearest named centre on the body, read **"near X"**. There is no grid-position column (Ben, 2026-10-26): an x,y is an address only the map can read, and a place name is one the player already knows. A province has no name of its own (`../../GLOSSARY.md` § Province) but it is its centre's ground, so the centre names it; where a province holds two centres, the lower id names it, so the name is one answer. The row's press: it **selects the tile and frames it** on the map; a press on the tile places the building. The press is the whole row. Sorted by name, ties by tile id. |
 | **Net** | Est. net / qtr — `quote_site`, the door's own figure with the same assumptions (§ What the quote asks; 50 % staffing, no labour shortage), **with the tile's Logistic Point cover applied** (below). Sign-coloured. The default sort, **descending**. |
 | **Cost** | `construction_capex` — the flat cost times the site multiplier, paid once at placement, plus the materials at the local market's posted price, bought in arrears as each tick draws them (Ben, 2026-10-26: costs depend on market prices; PRODUCTION.md § Construction is measured in days). The hover splits the two halves and names the multiplier. |
 | **Market** | The market the tile clears in, by its city's name (`market_city_name`). |
@@ -189,6 +190,31 @@ Logistic Points operate — and every other tile is dimmed. It is a mode of the 
 placement lens keeps that tile green (or amber) with the selection mark drawn over it — dropping the
 colour from the one tile the player just chose read as the site being withdrawn (`../LENSES.md`
 § The placement lens).
+
+**A press on a marked tile builds there** (Ben, 2026-11-09): *"Clicking on a tile with the building selected
+should construct there rather than cycling through selection."* While a building is chosen, a left press
+on the Planetary canvas is a construction gesture, not a selection: a tile the lens marks is built on
+through the same request and the same `construct_nation` as the Build door, on the same recipe, target
+and treasury test. The selection is untouched, so the province scope and the table hold while the player
+places several. **The choice stays armed**: a second press on the chosen cell or Esc disarms
+(`../SELECTION.md` § Esc: the armed-tool rung). A press on a tile the lens does not mark places nothing
+and leaves the selection alone; it reports why on the line above the table, in the door's own
+sentence — the gate's refusal, the recipe's air, the treasury, or the province scope. The struck-truck
+tile is a marked tile: it builds, and the flag says it will not run.
+
+**The return over the tile** (Ben, 2026-11-09): *"We can also render the expected return over each tile in
+green."* Each site carries its table Net / qtr over the tile, in the table's abbreviation, in green on
+a dark backing, upper-centre on the hex; it stays upright on the tilted rungs. A figure draws only where
+it fits the hex (roughly 22 px radius and up for a four-character figure), so zoomed out the wash
+alone reads. A negative figure is **green text with its sign**, not sign-coloured: green says "the
+quote", the sign says which way, and only this map figure breaks the table's sign colouring. An option
+that makes nothing to sell has no map figure, the grid's rule for a fake loss.
+
+**No descriptive sentences** (Ben, 2026-11-09): *"we don't need the text descriptions of what each does, or the
+text / treasury figure in construction below it."* The finder carries a state line and counts, not
+instructions: the scope line reads what the search covers and the instruction to narrow it is its
+hover; the no-Logistic-Point and over-treasury counts stay as figures; the empty-state line stays because
+it is what is true of the table, and the estimate's assumptions are the Net header's hover.
 
 **4. Data sources.** `site_options` and the evaluation in `construction_sites.cpp`, over
 `body_tile_grid` filtered to `tile_to_nation == player_actor`. Rebuilt only when its key moves — the
@@ -314,7 +340,7 @@ grid and workforce slider are levers on the selected building, not sub-views; th
 headers are an accordion, and a `CollapsingHeader` is already a toggle.
 
 ## 3. Lens on open
-**None on open; the placement lens while a building is chosen** (Ben, 2026-10-25). The Construction
+**None on open; the placement lens while a building is chosen** (Ben, 2026-10-25). The Site Finder
 view arms the placement lens the moment its site finder has a building chosen, and it disarms when
 the choice clears, the view changes or the ledger closes (§ The site ledger). The Buildings view arms
 nothing. The 2026-08 proposal to arm the retired `opportunity` / `production` lenses is withdrawn:
@@ -336,7 +362,7 @@ than a best-of-everything field.
 ## 5. Close / toggle semantics
 Rail slot 3 icon toggles the whole Construction ledger open/closed. Re-clicking the
 **currently-active tab closes the ledger entirely** (releases the column), per the universal
-toggle rule — not "collapse to Buildings". Switching to the *other* tab just changes view.
+toggle rule — not "collapse to Buildings". Switching to another tab just changes view.
 
 The queue header and the type-group headers are `CollapsingHeader`s, so each is already a toggle
 in its own right; the levers (method grid, workforce slider) are exempt, being controls on a

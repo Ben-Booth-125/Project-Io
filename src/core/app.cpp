@@ -2358,6 +2358,8 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
             m_ui.construction.road_arm_tile = null_entity;    // an armed tool disarms before its ledger goes
         else if (m_ui.pending_march_unit != null_entity)
             m_ui.pending_march_unit = null_entity;
+        else if (m_ui.site_finder.armed && m_ui.site_finder.live)
+            m_ui.site_finder.armed = false;                   // the finder's chosen building, while it owns the map press
         else if (ui::any_panel_open(m_ui))
             ui::close_all_panels(m_ui);                       // the Ledger rung
         else if (ui::any_selection(m_ui))
@@ -3129,10 +3131,12 @@ void app::render()
                 // on it (a rich tile stacks up to 4 extraction sites), and would lose
                 // "Construction started.", which is drawn inside the bar. So reselect
                 // only when some OTHER surface (a placement-mode canvas click) initiated
-                // the build, i.e. when the build bar is not the surface on screen.
+                // the build, i.e. when the build bar is not the surface on screen. The
+                // Site Finder keeps the selection too: it scopes the finder's province.
                 {
                     const bool bar_showing = m_ui.show_construction_panel &&
-                                             m_ui.construction.panel_view == 0;
+                                             (m_ui.construction.panel_view == 0
+                                              || m_ui.construction.panel_view == 2);
                     if (!bar_showing)
                         m_ui.selected_entity = built;         // inspect the new building
                 }

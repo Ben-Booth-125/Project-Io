@@ -26,6 +26,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <map>
 #include <unordered_map>
 
@@ -239,6 +240,8 @@ site_gate_result gate_site(const world& w, const recipe_registry& reg, const sit
     return out;
 }
 
+bool option_earns(const site_option& o); // the grid's rule, below
+
 void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 {
     site_finder_state& sf = ui.site_finder;
@@ -246,6 +249,7 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
 
     sf.rows.clear();
     sf.cls.clear();
+    sf.cell_net.clear();
     sf.own_tiles = sf.unaffordable = sf.no_lp_rows = 0;
     sf.body = ui.active_body;
     sf.gw = sf.gh = 0;
@@ -257,6 +261,7 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
     sf.gh = bit->second.grid_height;
     const std::vector<entity_id>& grid = body_tile_grid(w, ui.active_body);
     sf.cls.assign(static_cast<std::size_t>(sf.gw) * static_cast<std::size_t>(sf.gh), 0);
+    sf.cell_net.assign(sf.cls.size(), std::numeric_limits<float>::quiet_NaN());
 
     const entity_id actor = player_actor(w);
     float balance = 0.0f;
@@ -355,6 +360,10 @@ void evaluate(world& w, const recipe_registry& reg, ui_state& ui)
         }
 
         sf.cls[idx] = r.no_logistics ? 2 : 1;
+        // The map draws the table's Net (Ben, 2026-11-09), under the grid's own rule: a
+        // building that makes nothing to sell has no figure.
+        if (r.priced && option_earns(c))
+            sf.cell_net[idx] = r.profit;
         if (r.no_logistics)
             ++sf.no_lp_rows;
         sf.rows.push_back(std::move(r));
@@ -732,16 +741,14 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
         name_h = std::max(name_h, ImGui::CalcTextSize(c.option.name.c_str(), nullptr, false, name_room).y);
     const float cell_h = std::ceil(name_h + lh) + pad * 2.0f + 2.0f;
 
-    // Height: what is left once the table and the Build door have the room they need,
-    // between a peek and a comparison's worth of rows. A part row shows that it scrolls.
+    // Height: what is left once the table has the room it needs. The tab is the finder's
+    // alone (Ben, 2026-11-09). A part row shows that it scrolls.
     const int   rows = (static_cast<int>(sf.cells.size()) + cols - 1) / cols;
     const float row_step = cell_h + gap;
-    constexpr float k_door_reserve  = 380.0f;  // the Build door's caption and rows
     constexpr float k_table_reserve = 260.0f;  // the site ledger's caption and table
-    const float reserve = (w.tiles.count(ui.selected_entity) != 0 ? k_door_reserve : 60.0f)
-                        + (sf.armed ? k_table_reserve : 0.0f);
+    const float reserve = 30.0f + (sf.armed ? k_table_reserve : 0.0f);
     const float room_rows = (ImGui::GetContentRegionAvail().y - reserve) / row_step;
-    const float want_rows = std::clamp(room_rows, 1.5f, 5.5f);
+    const float want_rows = std::max(room_rows, 1.5f);
     const float child_h = std::min(static_cast<float>(rows), want_rows) * row_step + gap;
 
     if (!ImGui::BeginChild("##site_grid", {0.0f, child_h}, 0, ImGuiWindowFlags_AlwaysVerticalScrollbar))
@@ -854,7 +861,8 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
                      option_earns(o) ? "No market prices its sites, so there is no estimate."
                                      : "It makes nothing to sell, so it has no estimated net.");
             card("name", mn, mx, is_choice ? "Press to clear it."
-                                           : "Press to list its sites and mark them on the map.");
+                                           : "Press to list its sites and mark them on the map, then press a "
+                                             "marked tile to build there.");
         }
         construction_column_card(o.name.c_str(), cards);
 
@@ -875,6 +883,7 @@ void draw_site_grid(const world& w, const recipe_registry& reg, ui_state& ui)
                 sf.armed  = true;
                 sf.choice = o;
             }
+            ui.construction.last_message.clear(); // a verdict for the previous choice
         }
     }
     // Reserve the grid's own extent so the child's scroll range is right.
@@ -1201,6 +1210,35 @@ void update_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     sf.live = (ui.primary_level == canvas_level::planetary) && sf.body == ui.active_body;
 }
 
+std::string site_press_refusal(const world& w, const recipe_registry& reg, const ui_state& ui, entity_id tile)
+{
+    const site_finder_state& sf = ui.site_finder;
+    const site_option&       o  = sf.choice;
+    if (sf.scope_province != 0 && w.provinces.province_of(tile) != sf.scope_province)
+        return "That is outside the selected province. Clear the selection to search all your ground.";
+    const entity_id actor = player_actor(w);
+    float balance = 0.0f;
+    if (const float* p = purse_of(w, actor); p != nullptr)
+        balance = *p;
+    const recipe* rc = (o.type == building_type::processing_facility) ? reg.get_recipe(o.recipe) : nullptr;
+    const site_gate_result sg = gate_site(w, reg, o, rc, reg.placement_gate_for(o.type, o.recipe), tile,
+                                          ui.max_logistics_reach, actor, balance);
+    char buf[160];
+    switch (sg.verdict)
+    {
+    case site_verdict::air:
+        return "The air here cannot run this recipe.";
+    case site_verdict::refused:
+        return placement_rules::placement_reason_text(sg.why);
+    case site_verdict::unaffordable:
+        std::snprintf(buf, sizeof buf, "Can't afford it: the press charges %d cr and the balance is short.",
+                      static_cast<int>(std::lround(sg.capex)));
+        return buf;
+    default:
+        return std::string();
+    }
+}
+
 void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
 {
     site_finder_state& sf = ui.site_finder;
@@ -1247,8 +1285,14 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
     else
     {
         ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
-        ImGui::TextWrapped("All your ground on this body. Select a tile to narrow to its province.");
+        ImGui::TextUnformatted("All your ground on this body");
         ImGui::PopStyleColor();
+        grid_explainer e;
+        e.key  = "scope";
+        e.mn   = ImGui::GetItemRectMin();
+        e.mx   = ImGui::GetItemRectMax();
+        e.text = "Select a tile to narrow the search to its province.";
+        construction_column_card("Scope", {std::move(e)});
     }
 
     // THE BUILDING GRID (Ben, 2026-11-08): every option's best estimated net, before
@@ -1260,23 +1304,18 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
 
     update_site_finder(w, reg, ui);
     if (!sf.armed)
-    {
-        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
-        ImGui::TextWrapped("Press a building to list its sites and mark them on the map.");
-        ImGui::PopStyleColor();
         return;
-    }
 
-    // What the figures are, stated once (the door's caption, with the cover named).
+    // The last map press's verdict: what the door says, here where the press was aimed.
+    if (!ui.construction.last_message.empty())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral), "%s",
+                           ui.construction.last_message.c_str());
+
+    // The counts the table cannot show. The assumptions are the Net header's card.
     ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
     if (sf.rows.empty())
         ImGui::TextWrapped("No tile of your ground %s takes it.",
                            sf.scope_province != 0 ? "in this province" : "on this body");
-    else
-        ImGui::TextWrapped("%d sites %s, by est. net / qtr at today's local prices "
-                           "(50%% staffing, no labour shortage, each tile's Logistic Point cover).",
-                           static_cast<int>(sf.rows.size()),
-                           sf.scope_province != 0 ? "in this province" : "on your ground");
     if (sf.no_lp_rows > 0)
     {
         ImGui::PopStyleColor();
@@ -1382,6 +1421,16 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
         std::snprintf(id, sizeof id, "##site_hdr%d", ci);
         ImGui::TableHeader(id); // the press, the hover and the sorted column's arrow
         ImGui::GetWindowDrawList()->AddText(at, ImGui::GetColorU32(ImGuiCol_Text), name);
+        if (ci == 1) // the assumptions every Net in the column shares (Ben, 2026-11-09)
+        {
+            grid_explainer e;
+            e.key  = "net_header";
+            e.mn   = ImGui::GetItemRectMin();
+            e.mx   = ImGui::GetItemRectMax();
+            e.text = "Est. net / qtr at today's local prices, at 50% staffing, no labour shortage and "
+                     "each tile's Logistic Point cover.";
+            construction_column_card("Net", {std::move(e)});
+        }
         sf.headers.push_back({name, header_need(name, ci), have});
     }
 
@@ -1417,7 +1466,7 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
             };
 
             // Place — the row's identity and its press: select the tile and frame
-            // it. The place action stays the tile's Build door below.
+            // it. A press on the map places the building.
             ImGui::TableSetColumnIndex(0);
             const std::string place = r.place.empty() ? std::string("Unnamed ground")
                                     : r.place_near   ? "near " + r.place
@@ -1429,8 +1478,8 @@ void draw_site_finder(world& w, const recipe_registry& reg, ui_state& ui)
                   : r.place_near  ? "No centre's province holds this tile; " + r.place
                                         + " is the nearest place. "
                                   : "In the province of " + r.place + ". ")
-                     + "Press to select the tile and frame it on the map; its Build door "
-                       "below places the building.");
+                     + "Press to select the tile and frame it on the map; press the tile "
+                       "on the map to build there.");
             char label[32];
             std::snprintf(label, sizeof label, "##site%u", static_cast<unsigned>(r.tile));
             if (ImGui::Selectable(label, ui.selected_entity == r.tile,

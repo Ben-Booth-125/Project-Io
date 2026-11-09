@@ -108,6 +108,7 @@ end
 verify.show_panel("build", true)
 verify.clear_selection() -- a selected tile scopes the finder to its province (Ben, 2026-11-08)
 verify.frames(1)
+verify.construction_view(2)
 local picked_ok = verify.site_pick("Iron Mine")
 verify.frames(3)
 local sites = verify.site_finder()
@@ -121,6 +122,7 @@ print(string.format("construction_progress: picked (%d,%d), the first of %d Iron
 -- Disarm and close, so the staging below and the captures after it see the ledger as
 -- every earlier pass did: no lens skinning the map, no site rows above the build door.
 verify.site_clear()
+verify.construction_view(0)
 verify.show_panel("build", false)
 verify.frames(2)
 

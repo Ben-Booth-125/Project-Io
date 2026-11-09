@@ -1138,7 +1138,8 @@ std::vector<building_group> player_building_groups(const world& w,
 // opening on the queue makes this ledger's front door an empty room (the fix BL-176
 // made and the 2026-08-15 rework deleted along with the tab it lived on).
 //
-// The Construction view draws the collapsible queue and then the SAME build bar the
+// Three views (Ben, 2026-11-09: the site finder took its own tab). The Construction
+// view draws the collapsible queue and then the SAME build bar the
 // tile Selection element's Construct button opens — that button opens this view
 // rather than a second surface, so there is one build bar with two doors.
 void draw_construction_panel(world& w,
@@ -1161,7 +1162,7 @@ void draw_construction_panel(world& w,
     ui.construction_ui.rail_station_x = ui.construction_ui.rail_station_y = -1.0f;
 
     // The site finder's lens describes THIS frame: it is live only while the
-    // Construction view draws it below, so a closed ledger or the other tab leaves
+    // Site Finder view draws it below, so a closed ledger or the other tab leaves
     // the map plain the same frame.
     ui.site_finder.live = false;
     ui.site_finder.drawn.clear();
@@ -1196,6 +1197,9 @@ void draw_construction_panel(world& w,
         ui::nav_button("Construction", 0, view, p_open);
         ui.construction_ui.tab_x[0] = p1.x + ImGui::GetItemRectSize().x * 0.5f;
         ui.construction_ui.tab_y[0] = p1.y + h * 0.5f;
+        // THE FINDER'S OWN TAB (Ben, 2026-11-09): "they're hiding manual construction."
+        ImGui::SameLine();
+        ui::nav_button("Site Finder", 2, view, p_open);
     }
     ImGui::Separator();
 
@@ -1203,15 +1207,16 @@ void draw_construction_panel(world& w,
     // no body in that case — the column releases this frame, not the next.
     if (p_open == nullptr || *p_open)
     {
-        if (view == 0)
+        if (view == 2)
+        {
+            // BUILDING FIRST (Ben, 2026-10-25; its own tab 2026-11-09): pick a building,
+            // see every tile that takes it on the map and in a ledger sorted by profit,
+            // and a press on a marked tile places it.
+            draw_site_finder(w, reg, ui);
+        }
+        else if (view == 0)
         {
             draw_queue_section(w, reg, ui);
-            ImGui::Spacing();
-            ImGui::Separator();
-            // BUILDING FIRST (Ben, 2026-10-25): pick a building, see every tile that
-            // takes it on the map and in a ledger sorted by profit, press a row to
-            // select the tile - and the tile's Build door below places it.
-            draw_site_finder(w, reg, ui);
             ImGui::Spacing();
             ImGui::Separator();
             // The door prices the selected tile at its own Logistic Point cover, the

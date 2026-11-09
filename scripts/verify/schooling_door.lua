@@ -34,6 +34,7 @@ verify.expect(seen["Schooling"], "the finder offers Schooling")
 verify.expect(seen["University"], "the finder offers University")
 
 local function rows_of(name)
+    verify.construction_view(2)
     verify.expect(verify.site_pick(name), "the finder arms " .. name)
     verify.frames(3)
     local s = verify.site_finder()
@@ -106,6 +107,7 @@ local centre = other_centre(town, city)
 verify.expect(centre ~= nil, "a third centre for the Schooling press")
 
 verify.site_clear()
+verify.construction_view(0)
 verify.frames(2)
 
 local function door_row(name)
@@ -166,6 +168,7 @@ verify.expect(count_type("University") == unis_before, "a town refuses a Univers
 -- CITY: the finder and the door agree, and the press stands it. A moved balance is what makes
 -- the finder re-read the ground it cached.
 verify.set_balance(4000000.0)
+verify.construction_view(2)
 verify.expect(verify.site_pick("University"), "the finder arms University")
 verify.frames(3)
 local sites = verify.site_finder()
@@ -177,6 +180,7 @@ end
 print(string.format("schooling_door: University sites with the City: %d", sites.n_rows))
 verify.expect(found, "the finder lists a University site at the City")
 verify.site_clear()
+verify.construction_view(0)
 verify.frames(2)
 look_at(city)
 local cu = door_row("University")

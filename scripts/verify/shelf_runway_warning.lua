@@ -52,6 +52,7 @@ local function census(label)
     local warned, starved, clean, no_cover, double = 0, 0, 0, 0, 0
     for _, o in ipairs(verify.site_options()) do
         if o.group ~= "" then
+            verify.construction_view(2)
             verify.site_pick(o.name)
             verify.frames(2)
             local cand = nil
@@ -110,6 +111,7 @@ local k_stage = 0.0
 local ladder = { 1.0, 4.0, 16.0, 64.0, 256.0, 1024.0 }
 for _, c in ipairs(candidates) do
     local market = verify.market_at(c.row.x, c.row.y)
+    verify.construction_view(2)
     verify.site_pick(c.option.name)
     for _, shelf in ipairs(ladder) do
         local wrote = verify.set_input_shelf(c.option.name, market, shelf)
@@ -169,6 +171,8 @@ verify.hover(10, 10, 1)
 -- market and match the door's sentence against the finder's rows for that group on that
 -- tile. A door that said anything of its own would match none of them.
 local function bar_of(group)
+    verify.construction_view(0)
+    verify.frames(2)
     for _, dr in ipairs(verify.build_door().rows) do
         if dr.name == group then
             for _, c in ipairs(dr.cols) do if c.key == "bar" then return c end end
@@ -188,6 +192,7 @@ for _, c in ipairs(candidates) do
         end
         for _, o in ipairs(all_options) do
             if o.group == c.option.group then
+                verify.construction_view(2)
                 verify.site_pick(o.name)
                 verify.frames(2)
                 local fr = row_at(c.row.x, c.row.y)
@@ -233,6 +238,7 @@ end
 print(string.format("shelf_runway_warning: W3 door: matched=%s, %d starved door rows on the way", tostring(matched), idle_seen))
 verify.expect(matched, "W3: a door row warned, with the finder's sentence")
 
+verify.construction_view(2)
 verify.site_pick(picked.option.name)
 verify.frames(2)
 
@@ -285,6 +291,7 @@ verify.expect(saved, "W6: the save is written")
 if saved then
     verify.expect(verify.load(path), "the save loads")
     verify.show_panel("build", true)
+    verify.construction_view(2)
     verify.site_pick(picked.option.name)
     verify.frames(2)
     verify.set_input_shelf(picked.option.name, picked.market, k_stage)
@@ -300,4 +307,5 @@ if saved then
 end
 
 verify.site_clear()
+verify.construction_view(0)
 print("shelf_runway_warning: done")

@@ -3,6 +3,8 @@
 #include "text_fit.hpp"
 
 #include "construction_panel.hpp" // the build-progress circle and its site card (Ben, 2026-10-26)
+#include "construction_sites.hpp" // site_press_refusal: why a press with a building chosen placed nothing
+#include "format.hpp"             // fmt::abbreviate, the table's own figure on the map
 #include "entity_summary.hpp"
 #include "highlight.hpp"
 #include "hover_card.hpp"
@@ -3355,6 +3357,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     };
     state.site_finder.map_marks = 0;
     state.site_finder.selected_wash = -1;
+    // The Net figures the tile pass collects (Ben, 2026-11-09); drawn with the map chrome.
+    struct site_net_label { float x, y, net; };
+    std::vector<site_net_label> site_net_labels;
+    constexpr float k_site_net_min_r = 14.0f; // below this no figure can fit a hex
 
     // ARMED ROAD TARGETING (BL-1370; construction.md § "A road is built from a road
     // to a tile, in two presses"). The road row's press armed a TILE and a TIER; the
@@ -6368,6 +6374,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                                     palette::site_no_logistics);
                 ++state.site_finder.map_marks;
             }
+            // THE RETURN OVER THE TILE (Ben, 2026-11-09): the table's Net, collected here
+            // and drawn after the tile pass outside the camera squash, so the figure stays
+            // upright on the tilted rungs.
+            if (site_active && revealed && draw_r >= k_site_net_min_r)
+            {
+                const float net = site_f.cell_net[static_cast<std::size_t>(t_row) * static_cast<std::size_t>(gw)
+                                                  + static_cast<std::size_t>(t_col)];
+                if (!std::isnan(net))
+                    site_net_labels.push_back({cx, cy, net});
+            }
 
             // Province outline (BL-511). The OUTER boundary of the cell, drawn
             // edge by edge on every side facing a different province, never the
@@ -7960,6 +7976,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // are cut out of the camera squash (BL-1246 — lenses ride the one angle
     // now, their legends do not).
     v_key_start = dl->VtxBuffer.Size;
+    // THE RETURN OVER THE TILE (Ben, 2026-11-09): the table's own Net, in green, in the
+    // chrome range so the camera's squash leaves the digits upright. Only where the figure
+    // fits the hex: at a coarser rung the wash alone reads.
+    for (const site_net_label& lab : site_net_labels)
+    {
+        const std::string txt = fmt::abbreviate(static_cast<double>(lab.net));
+        const ImVec2 ts = ImGui::CalcTextSize(txt.c_str());
+        if (ts.x + 4.0f > draw_r * 1.73f)
+            continue;
+        const float y = tilt_pivot + (lab.y - draw_r * 0.42f - tilt_pivot) * tilt_sy;
+        const ImVec2 at{lab.x - ts.x * 0.5f, y - ts.y * 0.5f};
+        dl->AddRectFilled({at.x - 2.0f, at.y}, {at.x + ts.x + 2.0f, at.y + ts.y}, IM_COL32(8, 14, 10, 170), 2.0f);
+        dl->AddText(at, palette::positive, txt.c_str()); // fit-exempt: the guard above is the fit
+    }
     if (state.overlay == overlay_mode::resource)
         draw_resource_key(w, state);
     else if (state.overlay == overlay_mode::market)
@@ -8390,6 +8420,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (hovered_tile != null_entity && resolve_unit_order(w, armed, hovered_tile).kind != 0)
             {
                 state.pending_march_dest_tile = hovered_tile;
+            }
+        }
+        else if (site_active && site_f.armed)
+        {
+            // THE FINDER'S PRESS (Ben, 2026-11-09: "Clicking on a tile with the building
+            // selected should construct there rather than cycling through selection").
+            // A marked tile queues the build; app::render runs the same construct_nation
+            // the Build door does, and the choice stays armed so several can be placed
+            // (Esc or a second press on the cell disarms). Any other tile places nothing
+            // and says why, in the finder, without touching the selection.
+            if (hovered_tile != null_entity)
+            {
+                const tile_component& ht = w.tiles.at(hovered_tile);
+                if (site_class(ht.grid_x, ht.grid_y) != 0)
+                {
+                    state.construction.pending_tile   = hovered_tile;
+                    state.construction.pending_type   = site_f.choice.type;
+                    state.construction.pending_target = site_f.choice.target;
+                    state.construction.pending_recipe = site_f.choice.recipe;
+                }
+                else
+                {
+                    state.construction.last_message = site_press_refusal(w, reg, state, hovered_tile);
+                }
             }
         }
         else if (!state.construction.active && ImGui::GetIO().KeyShift

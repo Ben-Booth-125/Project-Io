@@ -311,7 +311,7 @@ struct construction_state
     ///
     /// Defaults to **Buildings**: the queue is empty most of the time, so opening
     /// on it makes the ledger's front door an empty room, while the player always
-    /// owns buildings.
+    /// owns buildings. 0 Construction, 1 Buildings, 2 Site Finder (Ben, 2026-11-09).
     int           panel_view = 1;
 
     /// Which type group the Buildings view has expanded — the group's display
@@ -945,12 +945,16 @@ struct site_finder_state
     bool          sort_desc = true;
 
     // Published by the evaluation, rebuilt only when its key moves.
-    bool          live = false;     ///< The lens draws THIS frame (ledger on the Construction view, a building chosen).
+    bool          live = false;     ///< The lens draws THIS frame (ledger on the Site Finder view, a building chosen).
     entity_id     body = null_entity;
     int           gw = 0, gh = 0;
     /// Per grid cell (y * gw + x): 0 = not a site for this building (dimmed),
     /// 1 = a site with Logistic Points operating, 2 = a site with none (flagged).
     std::vector<std::uint8_t> cls;
+    /// Per grid cell: the row's Net / qtr for the canvas to draw over the tile (Ben,
+    /// 2026-11-09). NaN where the map carries no figure: not a site, no market prices
+    /// it, or an option that makes nothing to sell (the grid's own rule).
+    std::vector<float>        cell_net;
     std::vector<site_row>     rows; ///< In the ledger's CURRENT sort order.
     int           own_tiles    = 0; ///< Tiles of the player's own ground on this body.
     int           unaffordable = 0; ///< Tiles that would take it but cost more than the treasury.

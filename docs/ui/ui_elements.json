@@ -2150,6 +2150,25 @@
    "checks": [
     "alert_strip"
    ]
+  },
+  {
+   "id": "UI-140",
+   "name": "Site Finder tab (Construction ledger)",
+   "kind": "sub-element",
+   "parent": "UI-074",
+   "source": [
+    "docs/ui/ledgers/construction.md § The site ledger",
+    "src/ui/construction_panel.cpp",
+    "src/ui/construction_sites.cpp"
+   ],
+   "summary": "The Construction ledger's third tab, beside Buildings and Construction: the building grid and the site ledger, moved off the Construction view so they do not hide manual construction (Ben, 2026-11-09). With a building chosen a press on a marked tile builds it there and the map draws each site's Net / qtr over the tile; the choice stays armed until Esc or a second press on the cell.",
+   "interesting_question": "Does a press that builds on the map need a separate confirmation, given a selection press looks the same?",
+   "resolution": "No: the mode is visible, the lens is up and the cell is lit, and Esc disarms; a press on an unmarked tile refuses and places nothing.",
+   "checks": [
+    "site_grid",
+    "site_picker_glyphs",
+    "construction_sites"
+   ]
   }
  ]
 }
