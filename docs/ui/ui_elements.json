@@ -2150,6 +2150,22 @@
    "checks": [
     "alert_strip"
    ]
+  },
+  {
+   "id": "UI-140",
+   "name": "War notice",
+   "kind": "element",
+   "parent": null,
+   "source": [
+    "docs/ui/LAYOUT.md § War notice",
+    "src/ui/alerts.cpp"
+   ],
+   "summary": "Top centre of the canvas area, below the alert strip: one notice per war the player's nation has become party to, by either side's declaration, naming both parties, with Dismiss and a door to answering or to the Wars tab. It pauses nothing and changes nothing.",
+   "interesting_question": "The alert strip already says At war and the chat already logs the declaration. What does a notice add that those do not?",
+   "resolution": "The strip names no one and a chat line scrolls away at 16x. The notice names both parties, waits to be dismissed, and is the door to the free answer. It draws only for a war that opened in this session, so a loaded war is not news.",
+   "checks": [
+    "war_notice"
+   ]
   }
  ]
 }

@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*223 entries — 54 gameplay · 39 canvas · 15 lens · 75 ledger · 40 chrome.*
+*224 entries — 54 gameplay · 39 canvas · 15 lens · 75 ledger · 41 chrome.*
 
 ---
 
@@ -785,9 +785,9 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 
 **Reason to select.** Hold a border without placing every unit by hand: the front spreads its units along the span and refills gaps as units die or fall back.
 
-### `gameplay.defend_province` — Defend this province in the Assign to front menu on the unit card (and the stack panel for a stack) in the Selection element, for the player's own unit. Also a corp_verb (corp_verb::defend_province, 54) on the command seam.
+### `gameplay.defend_province` — Defend province: a cell of the unit card's action grid (the shield glyph) and the Defend press on the unit group's bar, in the Selection element, for the player's own units. Also a corp_verb (corp_verb::defend_province, 54) on the command seam.
 
-**Press.** Select your unit, press Assign to front, and pick Defend this province; the unit defends the province it stands in, and pressing the checked entry clears the order. Over the seam: COMMAND corp=<nation> verb=54 subject=<unit id> province=<province id>; an omitted province clears the order.
+**Press.** Select your unit and press the Defend province cell (or a group's Defend press); each unit defends the province it stands in, and pressing it again while they all do clears the order. Over the seam: COMMAND corp=<nation> verb=54 subject=<unit id> province=<province id>; an omitted province clears the order.
 
 | Arg | Type | Meaning |
 |---|---|---|
@@ -2309,14 +2309,14 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** The bridge from 'I am reading about it' to 'take me to where it lives' - the Host axis of the disclosure model.
 
-### `ledger.selection_locate` — Selection band, market/unit kind's action column, 'Go to' button
+### `ledger.selection_locate` — Selection band, market kind's action column, 'Go to' button; the unit group's and the stack's '>' bar press
 
-**Press.** Click 'Go to'
+**Press.** Click 'Go to', or the '>' press on a unit group or stack
 
 **Valid when:**
-- A market or unit is selected
+- A market, unit group or stack is selected
 
-**Expected output.** Navigates the canvas to the entity's position (its body's surface / location) via the same focus routing as the header '>' button. No world change.
+**Expected output.** Navigates the canvas to the entity's position via the same focus routing as the header '>' button: a market to its body's surface, a unit to its own tile, centred. No world change.
 
 **Reason to select.** Places the abstract row on the map - where IS this market or unit, and what surrounds it?
 
@@ -2511,7 +2511,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Valid when:**
 - A front of the player nation is selected (canvas.front_select).
-- Push is DISABLED toward a neighbour the nation is not hostile to; the card reads 'Not hostile' beneath the pair. A front already pushing keeps its Push enabled so it can be returned to hold.
+- Push is DISABLED toward a neighbour the nation is not hostile to; the card reads 'Not hostile' beneath the pair, or 'War unanswered' with an 'Answer' press (ledger.diplomacy_answer) when that neighbour declared on the player's nation and has not been answered. A front already pushing keeps its Push enabled so it can be returned to hold.
 - The verb's own preconditions apply (gameplay.set_front_order); a refusal mutates nothing and is worded on the status line.
 
 **Expected output.** The front's order is set; the lit button moves. Status line: 'Front ordered to push.' / 'Front ordered to hold.', or 'Can't push there: not hostile.' / 'No such front.' on a refusal.
@@ -2782,7 +2782,7 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 
 **Reason to select.** Shut a nation's goods out of your markets (see gameplay.set_embargo), or lift it to let them back in.
 
-### `ledger.diplomacy_answer` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Answer' on a war declared on the player that it has not answered.
+### `ledger.diplomacy_answer` — Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Answer' on a war declared on the player that it has not answered. The front card's 'Answer' and the war notice's 'Answer' open the same flow.
 
 **Press.** Press 'Answer', click 1 to 3 of the declarer's provinces on the canvas (canvas.diplomacy_goal_pick), then press the picker's 'Answer'.
 
@@ -2894,6 +2894,17 @@ TRADES (BL-1269; TRADE.md) shows FIVE headed sections in one scroller, the long 
 **Expected output.** Opens the surface that answers the alert, closing any other ledger: Research not set opens Research; idle buildings and exhausted deposits open the Construction ledger on Buildings; a stalled site opens it on Construction; a war opens the Diplomacy ledger on Wars; low runway (under 8 quarters) opens the Budget; trades exceeding trade points opens the Market ledger on Trades, arming its lens. Nothing is acted on: the press only opens a surface. Hovering says why it is up.
 
 **Reason to select.** To go straight from what wants attention to where it is answered. Offers of peace or friendship are not alerts (Ben, 2026-11-05).
+
+### `chrome.war_notice` — War notice, top centre of the canvas area below the alert strip: one per war the player's nation has become party to, by either side's declaration, naming both parties (docs/ui/LAYOUT.md § War notice).
+
+**Press.** Press 'Dismiss', or 'Answer' on a war declared on the player and not yet answered, or 'Open Wars' on any other.
+
+**Valid when:**
+- App is in game, a nation is seated, and a war the player's nation is party to has opened since the world was created or loaded.
+
+**Expected output.** Dismiss removes that notice. Answer opens the Diplomacy ledger's answer flow (ledger.diplomacy_answer) on that war; Open Wars opens the Wars tab; both also remove the notice. The notice leaves by itself if the war ends. It issues no command, and neither pauses nor changes the simulation.
+
+**Reason to select.** To learn that a war has begun where the eye already is, and step straight to answering it.
 
 ### `chrome.f10_options` — Keyboard; opens the centred Options window
 

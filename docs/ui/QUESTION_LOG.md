@@ -9,7 +9,7 @@ space**, with the backlog item that demanded it. The pair is required. Enforceme
 authorship, not machinery — there is deliberately no audit check against this file
 (BL-260, Ben 2026-08-01: *"the docs are the audit"*).
 
-**79 surfaces** — 4 settled, 75 awaiting Ben's wording.
+**80 surfaces** — 4 settled, 76 awaiting Ben's wording.
 
 ---
 
@@ -529,6 +529,14 @@ THE SEAM'S ANSWER IS SHOWN, because set_trade validates what the form cannot (bo
 **Because:** Ben, 2026-10-27 (BL-1443, tile contact orders): every march goes to a tile, one nation stands on a tile, and an attack is a march onto the defender's tile. That makes the right-click the natural order: the player points at ground and the selected unit or stack goes there. The preview earns its space because the same press means three different things — a move, an attack, or a declaration of hostility that every other surface reads — and the player must know which BEFORE pressing: a green hex outline for a move, a red one with the battle glyph for an attack, an orange one for a declare, and a line at the cursor naming the target nation. The confirm earns its space because declaring hostility changes a stance, not just a position, and is not a thing to do by mis-click (the withdraw confirm's precedent): 'Declare hostility toward <nation> and attack?' with Declare and attack / Cancel. Water, the units' own tile, and a selection that is not the player's show nothing and the press does nothing.
 
 *Demanded by BL-1443 · `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp`, `src/ui/presentation.hpp`, `src/core/app.cpp` · id `unit_right_click_orders`*
+
+### War notice: top centre of the canvas area, below the alert strip; one per war the player's nation has become party to
+
+**Answers:** Has a war just started that involves me, and with whom?
+
+**Because:** Ben, 2026-11-09: a rival declared on him and he could not tell why his front read Not hostile. The alert strip names nobody and the chat line scrolls away at speed, so the one moment that changes what his fronts may do passed unmarked. The notice earns canvas space because it names both parties, waits to be dismissed, and is the door to the free answer. It is announced only for a war that opens in play, and it pauses nothing.
+
+*Demanded by Ben's 2026-11-09 playtest · `src/ui/alerts.cpp`, `src/ui/ui_state.hpp`, `src/core/app.cpp` · id `war_notice`*
 
 ### Selection band — the water tile variant (owner / domain centre column)
 

@@ -10,6 +10,7 @@
 #include <array>
 #include <cstdint>
 #include <map>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -441,6 +442,16 @@ struct military_ledger_state
 /// presses app::render sends through `player_command`, two UI-side ring buffers,
 /// and where its controls landed this frame so a verify script presses the REAL
 /// control. VIEW state, never serialised.
+/// The war notice (Ben, 2026-11-09; LAYOUT.md § War notice). UI only, never saved: `seen`
+/// is every war on the map as of the last frame, `open` the player's undismissed notices.
+/// `armed` false seeds `seen` from the map without a notice (a new world, a load).
+struct war_notice_state
+{
+    std::set<std::pair<entity_id, entity_id>>    seen;
+    std::vector<std::pair<entity_id, entity_id>> open;
+    bool armed = false;
+};
+
 struct diplomacy_ledger_state
 {
     /// 0 = Nations (default), 1 = Wars.
@@ -1423,9 +1434,10 @@ struct ui_state
     /// pair is (unit, a tile of the chosen front's span — or null_entity to
     /// unassign). app::render sends one `assign_front` per pair and clears it.
     std::vector<std::pair<entity_id, entity_id>> pending_front_assign;
-    /// BL-1504: the same menu's Defend this province: (unit, province or `no_province`
-    /// to clear). app::render sends one `defend_province` per pair and clears it.
+    /// BL-1504: the unit card's and unit group's Defend province press: (unit, province or
+    /// `no_province` to clear). app::render sends one `defend_province` per pair and clears it.
     std::vector<std::pair<entity_id, uint32_t>> pending_defend_province;
+    war_notice_state war_notices; ///< The war notice's bookkeeping (Ben, 2026-11-09).
 
     // --- The selected deposit and plate (BL-659 / BL-660) -----------------
     // Ben, 2026-08-28, choosing option A: follow the battle precedent rather

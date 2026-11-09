@@ -49,4 +49,9 @@ void draw_alert_strip(const world& w, const recipe_registry& reg,
 /// The rows the strip drew on its last frame.
 const std::vector<alert_drawn>& alerts_drawn();
 
+/// The war notice (Ben, 2026-11-09; LAYOUT.md § War notice): when a war the player's nation
+/// is party to opens, by either side's declaration, a dismissible notice on the canvas
+/// names both parties. A read of `w.wars` only: it pauses nothing and changes nothing.
+void draw_war_notices(const world& w, ui_state& ui, float left, float right);
+
 } // namespace ui
