@@ -892,18 +892,16 @@ void app::verify_lay_roster()
                                            : "");
     }
 
-    // BL-1347 -- THE VERIFY PATH IS NOT ROADED HERE, AND THAT IS OWED. This path is a
-    // THIRD stamper of generated buildings (the roster, or the charter web above), laid
-    // after world generation's own `lay_site_roads` at its tail, so the verified world can
-    // hold a site no road reaches -- which the shipped paths (generation's tail and
-    // `finish_campaign_world`) do not. The obvious fix is to run the pass here too, and it
-    // was tried: measured 2026-10-17 on the run_verify world it joins 130 of 131 unroaded
-    // site tiles with 135 crossings, cheaply. It is left out because the run it was tried
-    // in did not finish: `roads.lua`'s FIRST wide capture stopped returning, the process
-    // climbing past 5 GB with no further output. The pass is NOT established as the cause --
-    // the same stall then reproduced with the call removed, on a machine that had just run
-    // two 16-shard sweeps -- so this is an unattributed stall, and wiring the verify world
-    // to the rule waits on someone naming it. Flagged rather than guessed at.
+    // BL-1544 (the verify world's armies starved) -- THE ROADS, THEN THE LOGISTIC POINT
+    // SOURCES, in `finish_campaign_world`'s order. This path is a third stamper of
+    // generated buildings (the roster, or the charter web above), laid after generation's
+    // own `lay_site_roads`, and it runs no seeding: measured on the unmodified world, 0 hubs
+    // and one port, every pool 0, all 78 units past the draw, so every unit's share was 0
+    // from the first resolve and the whole army was dead by the fourth quarter. The site
+    // roads run first because the seeding covers only what a road reaches: seeded without
+    // them it stands 319 hubs, against 96 with them, for the same armies.
+    (void)lay_site_roads_every_body(m_world);
+    print_lp_seed_report(seed_logistics_sources(m_world));
 }
 
 int app::run_verify_scripts(const std::vector<std::string>& scripts, bool bless)
