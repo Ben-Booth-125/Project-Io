@@ -8,6 +8,8 @@
 #include "building_state.hpp" // BL-1239: the one running-state classification (hover card, Production, Status)
 #include "charts.hpp"
 #include "construction_panel.hpp" // building_group_name - the aim of the open-in-ledger button
+#include "diplomacy_ledger.hpp"   // open_declaration - the front card's Answer door
+#include "world/war.hpp"          // war_between - the front card's unanswered war
 
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "format.hpp"         // fmt::credits — the god-view corp readout (BL-408)
@@ -1367,9 +1369,8 @@ namespace {
 
 // The unit card body: the 3-column band shape the building card once had —
 // left placeholder image, centre paged accordion, right action grid — but
-// read-only (a unit is not yet operable) and with only "Go to" wired for real
-// in the action grid, the rest reserved (matching the tile/building cards'
-// own reserved-slot idiom).
+// read-only (a unit is not yet operable), its orders in the action grid
+// (matching the tile/building cards' own slot idiom).
 // ASSIGN TO FRONT (BL-1427; MILITARY.md § Fronts, SELECTION.md § The front
 // element): the popup the unit card and the unit group share. It lists the fronts
 // of the units' own nation, each named by neighbour and span (front_view.cpp's
@@ -1430,28 +1431,43 @@ void draw_assign_front_popup(const world& w, ui_state& ui, const char* popup_id,
     if (ImGui::MenuItem("Unassign", nullptr, none))
         queue(null_entity);
     ImGui::EndDisabled();
+    ImGui::EndPopup();
+}
 
-    // BL-1504 (MILITARY.md § Defend province): an ability beside a front assignment, for
-    // ground a front does not cover. Each unit defends the province it stands in; the
-    // entry is checked when they all already do, and pressing it then clears the order
-    // (the toggle rule). A unit that cannot is refused by the verb.
-    bool all_defending = !units.empty();
+// BL-1504 (MILITARY.md § Defend province): an ability beside a front assignment, for ground
+// a front does not cover. True when every unit already defends the province it stands in.
+bool units_all_defending(const world& w, const std::vector<entity_id>& units)
+{
+    bool all = !units.empty();
     for (const entity_id u : units)
     {
         const auto it = w.units.find(u);
-        all_defending = all_defending && it != w.units.end() && it->second.defend_province != no_province
-                     && it->second.defend_province == w.provinces.province_of(it->second.position);
+        all = all && it != w.units.end() && it->second.defend_province != no_province
+           && it->second.defend_province == w.provinces.province_of(it->second.position);
     }
-    if (ImGui::MenuItem("Defend this province", nullptr, all_defending))
-    {
-        ui.pending_defend_province.clear();
-        for (const entity_id u : units)
-            if (const auto it = w.units.find(u); it != w.units.end())
-                ui.pending_defend_province.emplace_back(
-                    u, all_defending ? no_province : w.provinces.province_of(it->second.position));
-        ImGui::CloseCurrentPopup();
-    }
-    ImGui::EndPopup();
+    return all;
+}
+
+// The press: each unit defends the province it stands in, or, when they all already do,
+// the order clears (the toggle rule). A unit that cannot is refused by the verb.
+void queue_defend_province(const world& w, ui_state& ui, const std::vector<entity_id>& units)
+{
+    const bool clearing = units_all_defending(w, units);
+    ui.pending_defend_province.clear();
+    for (const entity_id u : units)
+        if (const auto it = w.units.find(u); it != w.units.end())
+            ui.pending_defend_province.emplace_back(
+                u, clearing ? no_province : w.provinces.province_of(it->second.position));
+}
+
+// A shield with a post at its centre - the Defend province glyph: "stand here", apart from
+// March's arrow and Assign to front's flag.
+void glyph_defend(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    const float top = c.y - r * 0.70f, shoulder = c.y + r * 0.10f, tip = c.y + r * 0.80f, half = r * 0.62f;
+    const ImVec2 outline[] = {{c.x - half, top}, {c.x + half, top}, {c.x + half, shoulder}, {c.x, tip}, {c.x - half, shoulder}};
+    dl->AddPolyline(outline, 5, col, ImDrawFlags_Closed, 2.2f);
+    dl->AddLine({c.x, top + r * 0.30f}, {c.x, shoulder + r * 0.20f}, col, 2.2f);
 }
 
 // A flag over a staff — the Assign to front glyph (BL-1427): "stand on a line",
@@ -1566,7 +1582,7 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
     }
     ImGui::SameLine();
 
-    // ── Right quarter: 2x3 action grid — Go to, plus March/Halt/Disband
+    // ── Right quarter: 2x3 action grid — Defend province, plus March/Halt/Disband
     // (BL-575, replacing three of the five reserved slots) ──
     {
         ImGui::BeginChild("##unit_actions", {right_w, total_h}, false,
@@ -1581,8 +1597,23 @@ void draw_unit_selection_body(const world& w, const recipe_registry& reg, ui_sta
         // unit). A rival's unit is intel-only: every press below is disabled.
         const bool owned = is_player_side(w, uit->second.owner); // BL-1406: the nation's unit
 
-        if (tile_icon_button("##unit_goto", bsz, /*enabled=*/true, "Go to", glyph_goto))
-            focus_on_entity(w, ui, sel);
+        // Defend province (Ben, 2026-11-09: it replaced Go to here): a toggle, lit while the
+        // unit defends the province it stands in, as March is lit while armed.
+        {
+            const std::vector<entity_id> one{ sel };
+            const bool  defending = owned && units_all_defending(w, one);
+            const char* tip = !owned    ? "Competitor unit - intel only"
+                            : defending ? "Defending this province - press to clear the order"
+                                        : "Defend province - hold the province this unit stands in";
+            if (defending)
+            {
+                const ImVec2 pmin = ImGui::GetCursorScreenPos();
+                dl->AddRect({pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                           palette::selection, 4.0f, 0, 2.0f);
+            }
+            if (tile_icon_button("##unit_defend", bsz, owned, tip, glyph_defend) && owned)
+                queue_defend_province(w, ui, one);
+        }
         ImGui::SameLine();
 
         // March (BL-575): arms province-picking mode on the Planetary canvas
@@ -1834,9 +1865,25 @@ void draw_unit_group_selection(const world& w, const recipe_registry& reg, ui_st
         // player's own groups only. Left of 'go to', as the card's "< Group" is.
         if (own)
         {
+            const float gap = ImGui::GetStyle().ItemSpacing.x;
+            const float pad = ImGui::GetStyle().FramePadding.x * 2.0f;
             const char* lbl = "Assign to front";
-            const float bw  = ui::fit_width(lbl) + ImGui::GetStyle().FramePadding.x * 2.0f;
-            ImGui::SameLine(bar_w - frame_h - ImGui::GetStyle().ItemSpacing.x - bw);
+            const float bw  = ui::fit_width(lbl) + pad;
+            const char* dlb = "Defend";
+            const float dw  = ui::fit_width(dlb) + pad;
+            // Defend province (Ben, 2026-11-09): the group's own press, as the card's is.
+            ImGui::SameLine(bar_w - frame_h - gap - bw - gap - dw);
+            const bool group_defending = units_all_defending(w, group);
+            if (group_defending)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            if (ImGui::Button("Defend##unit_group_defend", {dw, frame_h}))
+                queue_defend_province(w, ui, group);
+            if (group_defending)
+                ImGui::PopStyleColor();
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip(group_defending ? "Defending their provinces - press to clear the orders"
+                                                  : "Every unit of this group defends the province it stands in");
+            ImGui::SameLine(bar_w - frame_h - gap - bw);
             if (ImGui::Button("Assign to front##unit_group_front", {bw, frame_h}))
                 ImGui::OpenPopup("unit_group_front_menu");
             if (ImGui::IsItemHovered())
@@ -4452,15 +4499,29 @@ bool draw_front_selection(const world& w, ui_state& ui)
         }
         ImGui::SameLine();
         const bool pushing = cur == front_order::push;
+        // Declared on and not yet answered (RELATIONS.md § 7): the war stands, but this
+        // nation has no hostility of its own until it answers, so the front says that
+        // and offers the free answer rather than reading "Not hostile" (Ben, 2026-11-09).
+        const war_record* war = own ? war_between(w, nation, view.f.neighbour) : nullptr;
+        const bool unanswered = war != nullptr && war->defender == nation && !war->answered;
         if (order_button("Push##front_push", pushing, own && (open || pushing),
-                         pushing ? "Pushing - press to hold instead"
-                         : open  ? "Push - march into the neighbour's weakest province"
-                                 : "Not hostile - a front can only hold toward this neighbour"))
+                         pushing     ? "Pushing - press to hold instead"
+                         : open      ? "Push - march into the neighbour's weakest province"
+                         : unanswered ? "Answer this war first: answering is free and opens the push"
+                                      : "Not hostile - a front can only hold toward this neighbour"))
         {
             ui.pending_front_order_tile  = view.f.key;
             ui.pending_front_order_value = pushing ? 0 : 1;
         }
-        if (!open && !pushing)
+        if (!open && !pushing && unanswered)
+        {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "War unanswered");
+            if (ImGui::Button("Answer##front_answer", {ImGui::GetContentRegionAvail().x, 0.0f}))
+                open_declaration(w, ui, view.f.neighbour);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Name goals among their provinces. Answering is free.");
+        }
+        else if (!open && !pushing)
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "Not hostile");
         else
             ImGui::TextDisabled(pushing ? "Pushing" : "Holding");

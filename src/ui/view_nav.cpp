@@ -67,6 +67,13 @@ void focus_on_tile(const world& w, ui_state& ui, entity_id tile)
         return;
 
     focus_on_surface(w, ui, it->second.body);
+
+    // Land ON the tile (Ben's 2026-11-09 playtest): focus_on_surface alone resets the
+    // pan to the grid's centre, so a 'go to' framed whatever tile sits there. The
+    // canvas applies this on its next draw, where the grid transform is known.
+    ui.planetary_center_col     = it->second.grid_x;
+    ui.planetary_center_row     = it->second.grid_y;
+    ui.planetary_center_pending = true;
 }
 
 void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
@@ -88,9 +95,8 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
     }
     if (auto u = w.units.find(entity); u != w.units.end())
     {
-        // position is a tile id (BL-157/BL-324) — resolve the body through it.
-        if (auto t = w.tiles.find(u->second.position); t != w.tiles.end())
-            focus_on_surface(w, ui, t->second.body);
+        // position is a tile id (BL-157/BL-324): the unit's own tile, centred.
+        focus_on_tile(w, ui, u->second.position);
         return;
     }
     if (auto m = w.markets.find(entity); m != w.markets.end())

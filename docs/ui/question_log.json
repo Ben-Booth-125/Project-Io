@@ -1287,6 +1287,18 @@
    ],
    "status": "drafted"
   },
+  "war_notice": {
+   "surface": "War notice: top centre of the canvas area, below the alert strip; one per war the player's nation has become party to",
+   "answers": "Has a war just started that involves me, and with whom?",
+   "because": "Ben, 2026-11-09: a rival declared on him and he could not tell why his front read Not hostile. The alert strip names nobody and the chat line scrolls away at speed, so the one moment that changes what his fronts may do passed unmarked. The notice earns canvas space because it names both parties, waits to be dismissed, and is the door to the free answer. It is announced only for a war that opens in play, and it pauses nothing.",
+   "backlog_item": "Ben's 2026-11-09 playtest",
+   "files": [
+    "src/ui/alerts.cpp",
+    "src/ui/ui_state.hpp",
+    "src/core/app.cpp"
+   ],
+   "status": "drafted"
+  },
   "escape_menu": {
    "surface": "Escape menu: the full-canvas pause screen behind the gear and Esc, with Save, Options, Exit to Menu and Exit Game; and Load on the main menu",
    "answers": "How do I stop, keep what I have, and leave?",

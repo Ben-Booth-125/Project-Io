@@ -572,7 +572,9 @@ otherwise a war against it would never be answered and never end.
 **The public record** (Ben, 2026-11-03, NR-1120). Every declaration and every peace writes an entry
 in the world history log (`../ai/AI_OPPONENT.md` § 8a), one per party, tagged by its nation. When
 the player's nation is a party, the same event is raised as a dispatch on the chat's Field channel
-(`../ui/CHAT.md`), so the player learns of a war on them from the feed, not only the ledger.
+(`../ui/CHAT.md`), so the player learns of a war on them from the feed, not only the ledger. A
+declaration on or by the player also raises a notice on the canvas (Ben, 2026-11-09;
+`../ui/LAYOUT.md` § War notice).
 
 ## Open questions
 

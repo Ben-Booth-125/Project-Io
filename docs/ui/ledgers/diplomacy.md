@@ -80,9 +80,11 @@ centred bar, each side's exhaustion, and days since it opened. Every war is publ
   the loser's last province is disabled with its reason (RELATIONS § 7). **Impose**
   replaces Offer while the score is 100 in the player's favour. For four quarters after the other
   side refuses the player's offer, **Offer peace** is disabled, its tooltip naming the quarters left
-  (RELATIONS § 7, the offer cooldown).
+  (RELATIONS § 7, the offer cooldown). The composer says what imposing would take, the score it
+  stands at, and that a last province cannot be ceded (Ben, 2026-11-09).
 - **Answer** — on a war declared against the player that it has not yet answered: name goals among
-  the declarer's provinces. Answering is free.
+  the declarer's provinces. Answering is free. The front card and the war notice both open it (Ben,
+  2026-11-09; `../SELECTION.md` § The front element, `../LAYOUT.md` § War notice).
 - A pending offer from the other side shows its terms with **Accept** and **Refuse**.
 
 ## 3. Lens on open

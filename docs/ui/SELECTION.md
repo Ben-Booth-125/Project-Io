@@ -467,9 +467,11 @@ card's shape is built ahead of units carrying much in the live economy (Ben's di
    (`unit_roster_display_name`; on the player's own unit, the designer's door), the land class it
    fights as and the owner; then the four bands of numbers; then a line each for what the grid
    does not hold — an older design, a refit in progress, the front it holds, a supply shortfall.
-3. **Right quarter — a 2×3 action grid**: **Go to** (`focus_on_entity`), **March**, **Halt**,
-   **Disband**, **Refit** and **Assign to front** (§ The front element), matching the
-   tile/building cards' pattern.
+3. **Right quarter — a 2×3 action grid**: **Defend province** (Ben, 2026-11-09: a toggle, lit
+   while the unit defends the province it stands in; `../military/MILITARY.md` § Defend province),
+   **March**, **Halt**, **Disband**, **Refit** and **Assign to front** (§ The front element),
+   matching the tile/building cards' pattern. Going to a unit is the unit group's and stack's
+   **go to** press; it centres the canvas on the unit's own tile (`focus_on_entity`).
 
 **The stat grid takes the centre (Ben, 2026-10-29).** Every stat the unit fights with is in one
 grid, so the card has no pages: the Strength and Roster pages that held them fold into it. A
@@ -588,7 +590,10 @@ rule keeps the rest, so the nation is still reached a little inside each side.
 3. **Right — the order**: **Hold** and **Push**, a toggle pair with the active order lit. Pressing
    an active Push returns the front to hold; an active Hold has nothing beneath it. **Push is
    disabled toward a neighbour the nation is not hostile to**, and the card says *Not hostile*
-   beneath the pair. A press sends `set_front_order` through the player's seat.
+   beneath the pair. **Declared on and not yet answered, it says *War unanswered* instead and
+   offers the free **Answer** (Ben, 2026-11-09; `../politics/RELATIONS.md` § 7)**: a defender has
+   no hostility of its own until it answers. A press sends `set_front_order` through the player's
+   seat.
 
 **Assign to front** is on the unit card (the action grid's sixth cell) and on the header of a
 group of the player's own units. It opens a menu of the units' own nation's fronts, each named by

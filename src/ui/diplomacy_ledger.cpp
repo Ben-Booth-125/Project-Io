@@ -1224,6 +1224,13 @@ void draw_peace(const world& w, ui_state& s, const war_record& war, entity_id me
     const bool any_give = pick_list("You cede to them", their_goals, other, me, d.peace_give, d.peace_gain);
     if (!any_gain && !any_give)
         ImGui::TextDisabled("No goal is held: only a white peace.");
+    // Why the war cannot be simply won (Ben, 2026-11-09): every goal held is 50 of the score,
+    // and the rest is the battles; a last province is never ceded (RELATIONS.md § 7).
+    if (!impose)
+        ImGui::TextDisabled("Imposing terms takes a score of 100 (now %+d).", mine);
+    if (any_gain && owned(other) <= 1)
+        ImGui::TextWrapped("%s holds its last province: it cannot be ceded. A white peace returns what you occupy.",
+                           name_of(w, other));
 
     const corp_verb verb = impose ? corp_verb::impose_peace : corp_verb::offer_peace;
     if (press(d, impose ? "Impose white peace" : "Offer white peace", impose ? "impose_white" : "offer_white",

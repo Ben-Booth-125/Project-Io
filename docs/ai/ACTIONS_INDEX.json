@@ -407,7 +407,7 @@
   ],
   [
    "ledger.selection_locate",
-   "Selection band, market/unit kind's action column, 'Go to' button"
+   "Selection band, market kind's action column, 'Go to' button; the unit group's and the stack's '>' bar press"
   ],
   [
    "chrome.esc",
@@ -416,6 +416,10 @@
   [
    "chrome.alert_press",
    "Alert strip, top centre of the canvas area just below the header. Each alert is one press; the strip draws nothing with nothing to say."
+  ],
+  [
+   "chrome.war_notice",
+   "War notice, top centre of the canvas area below the alert strip: one per war the player's nation has become party to, by either side's declaration, naming both parties (docs/ui/LAYOUT.md § War notice)."
   ],
   [
    "chrome.f10_options",
@@ -675,7 +679,7 @@
   ],
   [
    "gameplay.defend_province",
-   "Defend this province in the Assign to front menu on the unit card (and the stack panel for a stack) in the Selection element, for the player's own unit. Also a corp_verb (corp_verb::defend_province, 54) on the command seam."
+   "Defend province: a cell of the unit card's action grid (the shield glyph) and the Defend press on the unit group's bar, in the Selection element, for the player's own units. Also a corp_verb (corp_verb::defend_province, 54) on the command seam."
   ],
   [
    "gameplay.set_front_order",
@@ -879,7 +883,7 @@
   ],
   [
    "ledger.diplomacy_answer",
-   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Answer' on a war declared on the player that it has not answered."
+   "Diplomacy ledger (nav rail slot 8; docs/ui/ledgers/diplomacy.md), Wars tab, 'Answer' on a war declared on the player that it has not answered. The front card's 'Answer' and the war notice's 'Answer' open the same flow."
   ],
   [
    "ledger.diplomacy_offer_peace",

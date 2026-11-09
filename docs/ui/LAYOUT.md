@@ -170,6 +170,14 @@ strip draws nothing with nothing to say. One press stands for each kind, its cou
 a dozen idle mines are one alert. It wraps rather than clips. Low runway is the header's own red bar,
 under 8 quarters (`HEADER.md` § Contents).
 
+## War notice — on the canvas, below the alert strip (Ben, 2026-11-09)
+
+When a war the player's nation is party to opens, by either side's declaration, a notice appears at
+the top centre of the canvas area. It names both parties and stays until it is dismissed, one notice
+per war. It is an announcement, not a dialog: it pauses nothing and changes nothing. Where the player
+was declared on and has not answered, it offers **Answer** (`ledgers/diplomacy.md`); otherwise a door
+to the Wars tab. A war already standing on a new or loaded world raises no notice.
+
 ---
 
 ## UI scale (Ben, 2026-11-05)

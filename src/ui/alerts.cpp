@@ -1,6 +1,7 @@
 #include "alerts.hpp"
 
 #include "construction_panel.hpp" // read_construction: the site's own stall test
+#include "diplomacy_ledger.hpp"   // open_declaration: the war notice's Answer
 #include "header_panel.hpp"       // player_runway_quarters: one runway, in two places
 #include "market_ledger.hpp"      // collect_trade_points: the Trades tab's own read
 #include "nav_pane.hpp"           // close_all_panels: a click-through yields the column
@@ -274,5 +275,88 @@ void draw_alert_strip(const world& w, const recipe_registry& reg,
 }
 
 const std::vector<alert_drawn>& alerts_drawn() { return drawn_rows(); }
+
+void draw_war_notices(const world& w, ui_state& ui, float left, float right)
+{
+    war_notice_state& ns = ui.war_notices;
+    const entity_id me = player_nation(w);
+    if (me == null_entity)
+        return; // nobody seated (spectating): no war is the player's
+    if (!ns.armed)
+    {
+        // The wars already standing on a new world or a load are not news.
+        ns.seen.clear();
+        ns.open.clear();
+        for (const auto& [key, war] : w.wars)
+            ns.seen.insert(key);
+        ns.armed = true;
+        return;
+    }
+    for (const auto& [key, war] : w.wars)
+    {
+        const bool mine = war.declarer == me || war.defender == me;
+        if (ns.seen.insert(key).second && mine)
+            ns.open.push_back(key);
+    }
+    // A war that ended leaves nothing to notice, and may be declared afresh.
+    for (auto it = ns.seen.begin(); it != ns.seen.end();)
+        it = w.wars.count(*it) == 0 ? ns.seen.erase(it) : std::next(it);
+    ns.open.erase(std::remove_if(ns.open.begin(), ns.open.end(),
+                                 [&](const std::pair<entity_id, entity_id>& k) { return w.wars.count(k) == 0; }),
+                  ns.open.end());
+    if (ns.open.empty())
+        return;
+
+    const auto name_of = [&](entity_id n) {
+        const auto it = w.nations.find(n);
+        std::string s = it != w.nations.end() && !it->second.name.empty() ? it->second.name : std::string("A nation");
+        if (n == me)
+            s += " (you)";
+        return s;
+    };
+    const float width = 420.0f;
+    ImGui::SetNextWindowPos({(left + right - width) * 0.5f, header_panel_height + ImGui::GetFrameHeight() * 2.2f});
+    ImGui::SetNextWindowSize({width, 0.0f});
+    constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                                       ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_AlwaysAutoResize;
+    ImGui::Begin("##war_notice", nullptr, flags);
+    std::pair<entity_id, entity_id> dismissed{null_entity, null_entity};
+    for (std::size_t i = 0; i < ns.open.size(); ++i)
+    {
+        const auto key = ns.open[i];
+        const war_record& war = w.wars.at(key);
+        const entity_id other = war.declarer == me ? war.defender : war.declarer;
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::front_hostile), "War declared");
+        ImGui::TextWrapped("%s has declared war on %s.", name_of(war.declarer).c_str(), name_of(war.defender).c_str());
+        const bool to_answer = war.defender == me && !war.answered;
+        if (ImGui::Button(to_answer ? "Answer" : "Open Wars"))
+        {
+            if (to_answer)
+                open_declaration(w, ui, other);
+            else
+            {
+                close_all_panels(ui);
+                ui.show_diplomacy_ledger = true;
+                ui.diplomacy.view = 1; // Wars
+            }
+            dismissed = key;
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(to_answer ? "Name goals among their provinces. Answering is free, and opens your fronts to push."
+                                        : "Opens the Wars tab.");
+        ImGui::SameLine();
+        if (ImGui::Button("Dismiss"))
+            dismissed = key;
+        if (i + 1 < ns.open.size())
+            ImGui::Separator();
+        ImGui::PopID();
+    }
+    ImGui::End();
+    if (dismissed.first != null_entity)
+        ns.open.erase(std::remove(ns.open.begin(), ns.open.end(), dismissed), ns.open.end());
+}
 
 } // namespace ui

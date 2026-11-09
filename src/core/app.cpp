@@ -2197,6 +2197,7 @@ void app::setup_presentation(const world_params& params)
     // not the corporations operating quietly beneath them.
     m_chat = ui::chat_state{};
     m_war_log_cursor = m_world.history_log.size(); // BL-1480: no dispatch for what came before
+    m_ui.war_notices = war_notice_state{}; // no notice for what came before
     ui::chat_post(m_chat, 0, null_entity, 0,
                   std::to_string(m_world.nations.size()) +
                       " nations on the public channel.");
@@ -2608,6 +2609,7 @@ bool app::load_game_from(const std::string& path)
     ui::chat_post(m_chat, static_cast<int>(env.day_tick), null_entity,
                   ui::chat_state::k_field_channel, "Loaded " + path);
     m_war_log_cursor = m_world.history_log.size(); // BL-1480: a loaded log's wars are past
+    m_ui.war_notices = war_notice_state{}; // a loaded world's wars are not news
     m_last_save_day  = static_cast<long long>(env.day_tick);
     m_menu_message.clear();
 
@@ -2966,6 +2968,7 @@ void app::render()
         // The alert strip (BL-1515; LAYOUT.md § Alert strip): centred under the header.
         ui::draw_alert_strip(m_world, m_registry, m_balance_history, m_last_econ_report, m_ui,
                              header_left, header_right);
+        ui::draw_war_notices(m_world, m_ui, header_left, header_right); // LAYOUT.md § War notice
     }
 
     // Comms chat log (BL-205) — BL-227 re-homed it from the right chrome column
