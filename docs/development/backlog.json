@@ -372,34 +372,6 @@
    "design": "Playtest item 6. MILITARY already promises a unit starts fed. Suspected: repost_garrisons_on_cover tests any cover above zero (nation_generation.cpp:2505), asserts lp_share_permille = 1000 (:2648) so the shortfall appears a quarter later, and leaves rep.uncovered units in place (:2641). Also read: no write to force_unsupplied was found in src/world, so confirm whether the flag is live at all. Measure first with a harness: actual share and starving units over the first live quarters. Then tighten the predicate to fully fed. Front slots do not bend to supply (MILITARY rule stands). Shares the re-bless."
   },
   {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [],
-   "category": "Military",
-   "priority": "A",
-   "difficulty": 5,
-   "id": "BL-1502",
-   "short_name": "OCCUPATION_MOVES_FRONT",
-   "authority_doc": "docs/military/MILITARY.md",
-   "files": [
-    "src/world/components.hpp",
-    "src/world/fronts.cpp",
-    "src/world/economy_system.cpp",
-    "src/world/battle_system.cpp",
-    "src/world/war.cpp",
-    "src/world/world_save.cpp"
-   ],
-   "title": "At war, marching past a front occupies ground and moves the front",
-   "design": "Playtest item 5. Ruling (Ben, 2026-11-05) in the authority doc. Three causes confirmed by reading: run_unit_march changes only position (economy_system.cpp:4901); a pushing unit on enemy ground stops for good (fronts.cpp:865); set_tile_nation outside generation is only cession (war.cpp:1112), and fronts read tile_to_nation. THE WORK: a saved per-tile occupation map, written at the march step and battle advance, cleared at peace; fronts derive from owner-or-occupier (owner_of); push continues past the first tile. Defaults on review: empty tile occupied on entry; output denied to the owner, not gained. Rivals' pushes now take ground under the existing push: no new verb, but flagged. Save version bump; state_hash takes the field; sim outcomes move once a war runs. Check: war_census, save_roundtrip, world_determinism, live click. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
-  },
-  {
    "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
@@ -500,29 +472,6 @@
    "design": "Playtest item 22, first half. Ruling (Ben, 2026-11-05) in the authority doc. Convoys have no entity or stored position; derive it with convoy_route_tiles and convoy_lane_index. Selection by a selected_convoy id field, like the battle triple. A marker at the lane head with a hit zone, and a convoy card. Rival convoys obey the commercial fog (DISCOVERY). Watch clutter. UI only. Check: capture, live click, question log, ACTIONS."
   },
   {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [],
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 3,
-   "id": "BL-1507",
-   "short_name": "UNIT_SMOOTH_MARCH",
-   "authority_doc": "docs/ui/RENDERING.md",
-   "files": [
-    "src/ui/body_surface_canvas.cpp"
-   ],
-   "title": "Units glide from tile centre to tile centre",
-   "design": "Playtest item 12. Ruling (Ben, 2026-11-05) in the authority doc. Counters group by position and draw at the hex (body_surface_canvas.cpp:3084,6165). Offset = order.progress / next hop's edge_traversal_cost, with class-move and air-slow factors, plus a fraction of the day from sim_now_days; expose the cost through one shared helper. A moving unit draws apart from its tile's stack; hit zones follow the drawn point. UI only. Check: live click. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
-  },
-  {
    "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
@@ -572,29 +521,6 @@
    "design": "Playtest item 2. Ruling (Ben, 2026-11-05) in the authority doc. Rank on GDP, market share, reach and total force; rival treasuries stay private. GDP comes out of the diplomacy cache (diplomacy_ledger.cpp:850-887); total force is new and must obey fog rules. A horizontal bar drawer, so the building card's stacked columns stay put. Note: fill_nation_rollups never sets force or upkeep (corporation_dashboard.cpp:171-180). Check: capture, question log."
   },
   {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [],
-   "category": "UI",
-   "priority": "C",
-   "difficulty": 1,
-   "id": "BL-1510",
-   "short_name": "FINDER_BUILDING_GLYPHS",
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "files": [
-    "src/ui/construction_sites.cpp"
-   ],
-   "title": "Building glyphs in the Choose a building dropdown",
-   "design": "Playtest item 3. Replace the text Selectable (construction_sites.cpp:488) with icons::building plus the name, identity from primary_output_resource as at selection_panel.cpp:5018. Check: live click. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
-  },
-  {
    "status": "in_progress",
    "glyph": "○",
    "sprint": 63,
@@ -617,78 +543,6 @@
    ],
    "title": "Diplomacy is a nation dropdown, paired with the Nations lens",
    "design": "Playtest item 4. Ruling (Ben, 2026-11-05) in the authority doc. Combo replaces the Nations list and shows draw_expanded (:984, :1426). Opening arms overlay_mode::nations, closing disarms (nav_pane.cpp:98). A press under the lens aims the ledger, opening it if closed. Wars stays. The side-by-side scan goes, and the question log's reason changes with it. The lens is Planetary-row only: name what happens on other rows. Declaration flow must survive. Check: live click, question log, ACTIONS."
-  },
-  {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [],
-   "category": "UI",
-   "priority": "C",
-   "difficulty": 1,
-   "id": "BL-1512",
-   "short_name": "HEADER_NET_BRACKETS",
-   "authority_doc": "docs/ui/HEADER.md",
-   "files": [
-    "src/ui/header_panel.cpp"
-   ],
-   "title": "NET in brackets beside the treasury, graph in a tooltip",
-   "design": "Playtest item 11. Ruling (Ben, 2026-11-05) in the authority doc. header_panel.cpp:436-498. Draw TREASURY 1.2M (+34/qtr); one shared tooltip holds the PlotLines on hover of either number. Runway's fallback moves with it. Check: header goldens, live click. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
-  },
-  {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [],
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 2,
-   "id": "BL-1513",
-   "short_name": "CONSTRUCTION_FOLDS",
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "files": [
-    "src/ui/selection_panel.cpp",
-    "src/ui/rail_tool.cpp",
-    "src/ui/construction_sites.cpp"
-   ],
-   "title": "Power moves to Infrastructure; a Road fold holds all road tiers",
-   "design": "Playtest items 13 and 16. Ruling (Ben, 2026-11-05) in the authority doc. Test group \"Power Generation\" at selection_panel.cpp:4764 and the finder's literal construction_sites.cpp:344; category_of (:305) duplicates the mapping. Wrap road rows (:5318) and rail Track (:5541) in a Road fold at row_h, dropping the 56 px img box (:4928). Rail's Track reads Railroad, in Ben's word. Stations stay in Infrastructure. Check: live click. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
-  },
-  {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [],
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 3,
-   "id": "BL-1514",
-   "short_name": "BUILDING_RECIPE_ROWS",
-   "authority_doc": "docs/ui/SELECTION.md",
-   "files": [
-    "src/ui/selection_panel.cpp",
-    "src/ui/building_state.cpp"
-   ],
-   "title": "A selected building shows its recipe with shortages",
-   "design": "Playtest item 15. Ruling (Ben, 2026-11-05) in the authority doc. Own buildings only (SELECTION's recipe-disclosure rule). Rows per input and output from recipe inputs and outputs, the report row (economy_system.hpp:62-75), m->inventory and shelf_admits via input_cause_of, modelled on read_construction's short_of (construction_panel.cpp:100-119). Only the single binding input is sim-reported, so per-good need is a mirror: label accordingly. The report is empty after load until a tick. Per quarter. Check: live click, question log. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
   },
   {
    "status": "in_progress",
@@ -735,57 +589,6 @@
    ],
    "title": "Potential trades offer only routes our markets can supply",
    "design": "Playtest item 18. Ruling (Ben, 2026-11-05) in the authority doc. derive_potential_trades (market_ledger.cpp:442) has no ownership or points check, so + offers what trade_is_valid refuses (trade.cpp:159). Gate in the ledger on market_trade_points (trade.hpp:62) above zero, with its own empty-state line; trade_points_of is a nation sum and cannot gate. Do NOT change rank_trade_routes: run_trades and corp_ai.cpp:4230,4538 share it. Check: live click."
-  },
-  {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [
-    "BL-1495"
-   ],
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 2,
-   "id": "BL-1517",
-   "short_name": "GOODS_TABLE_STOCK_SORT",
-   "authority_doc": "docs/ui/ledgers/market.md",
-   "files": [
-    "src/ui/market_ledger.cpp",
-    "scripts/verify/goods_table.lua"
-   ],
-   "title": "Goods table shows shelf stock and sorts on every heading",
-   "design": "Playtest item 21. Ruling (Ben, 2026-11-05) in the authority doc. Add mc.inventory[r] (market_ledger.cpp:1611-1653); sort via the finder's pattern (construction_sites.cpp:542,624), key in ui_state. The word is shelf. market.md measured name-column fit, so it depends on BL-1495 (UI scale down). The 8 qtr column sorts by its change. Check: goods_table, live click. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
-  },
-  {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [],
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 4,
-   "id": "BL-1518",
-   "short_name": "RESOURCE_GLYPHS",
-   "authority_doc": "docs/ui/ICONS.md",
-   "files": [
-    "src/ui/icons.cpp",
-    "src/ui/icons.hpp",
-    "src/ui/market_ledger.cpp"
-   ],
-   "title": "One glyph per good, full set",
-   "design": "Playtest item 21. Ruling (Ben, 2026-11-05) in the authority doc. Overturns ICONS § 2b's four silhouettes. About 45 goods; 19 have identity shapes on building glyphs only (icons.cpp:495-517), which seed the set; icons::resource (:593) stops being a diamond and Goods' dashed placeholder (:1489) goes. Check: a contact-sheet capture for Ben, icon_silhouettes golden. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
   },
   {
    "status": "in_progress",
@@ -837,33 +640,6 @@
    "design": "Playtest item 24. Ruling (Ben, 2026-11-05) in the authority doc. app.cpp:2308-2323 today: confirm, menu, declaration, drill, fold, open menu. Add ledger (close_all_panels), then selection clear (unit, battle, front, convoy), then open the escape menu. Selection rests on the player's nation, so no hide rung appears. Armed tools disarm before the ledger, by default. Also corrects ACTIONS chrome.esc. Check: live click."
   },
   {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [
-    "BL-1499"
-   ],
-   "category": "Economy",
-   "priority": "C",
-   "difficulty": 2,
-   "id": "BL-1521",
-   "short_name": "WIND_TURBINE",
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "files": [
-    "scripts/recipes.lua",
-    "scripts/economy.lua",
-    "src/world/nation_tech.cpp"
-   ],
-   "title": "Wind turbine: a land power building with no fuel",
-   "design": "Playtest item 1. Ruling (Ben, 2026-11-05) in the authority doc. A Power Generation recipe with no input, beside oil (recipes.lua:775) and coal (:784). No wind node exists; Energy branch DG-PR-EN is its natural home (tech_tree_store.js). Which ring is open. Ben's \"supplied by ports nearby\" applies to offshore, not this. Check: recipe_margin, market-viability. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
-  },
-  {
    "status": "proposed",
    "glyph": "○",
    "sprint": null,
@@ -886,56 +662,6 @@
    ],
    "title": "Offshore drilling, supplied by nearby ports",
    "design": "Playtest item 1. Ben, 2026-11-05: lands with the naval system. PARKED until then. Amends TILES' no-buildings-on-water; adds sea petroleum (worldgen moves); DG-PR-EX-A already promises oil platforms on shelf sea. Port points ride lanes and land only on port tiles, so \"supplied by ports nearby\" needs a new rule (a rig tile counts as landed, or a radius). Offshore wind has no grid (power rides roads). Not settled: shelf only or open ocean."
-  },
-  {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [],
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 2,
-   "id": "BL-1523",
-   "short_name": "TILE_RES_96",
-   "authority_doc": "docs/ui/RENDERING.md",
-   "files": [
-    "src/ui/ground_bake.hpp",
-    "tools/verify/ground_bake_check.cpp"
-   ],
-   "title": "Master bake at 96 px, top zoom lowered so nothing magnifies",
-   "design": "Playtest item 9. Ruling (Ben, 2026-11-05) in the authority doc. Overturns 128 over 96 (2026-10-10). k_master_ppr and the ladder (ground_bake.hpp:483-486) become 96/48/24/12/6; the bottom level equals the 6 px far page, so check it is not redundant. Top rung falls from about 110 px to about 96. Choose_level expectations and P22 (ground_bake_check.cpp:449-472). Computed, not measured: about 5 GB to 2.8 GB, home re-bake about 71 s to 40 s. Trees, crags and installations lose detail. No sim digest. Check: measured memory and bake time, goldens, live look. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
-  },
-  {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest list and design form)",
-   "requires": [
-    "BL-1523"
-   ],
-   "category": "UI",
-   "priority": "C",
-   "difficulty": 1,
-   "id": "BL-1524",
-   "short_name": "POINTED_TREES",
-   "authority_doc": "docs/ui/RENDERING.md",
-   "files": [
-    "src/ui/ground_bake.cpp",
-    "tools/verify/ground_bake_check.cpp"
-   ],
-   "title": "Forest trees are pointed, not bushy",
-   "design": "Playtest item 19. Ruling (Ben, 2026-11-05) in the authority doc. stamp_trees (ground_bake.cpp:1011), canopy at :1164-1169. A cone coverage primitive, NW-lit, for forest; scrub stays round by default. Check margin (:1068) and tree_patch_boxes bound the taller crown, or chunks seam. Do after TILE_RES_96 so the shape is judged at its real resolution. Check: P8, live look. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
   },
   {
    "status": "in_progress",
@@ -965,30 +691,6 @@
    ],
    "title": "Doc-versus-code drift found reading the playtest list",
    "design": "Found 2026-11-05, read not run: ACTIONS chrome.esc lists sticky-card rungs the code lacks; LAYOUT:150 calls Diplomacy reserved; MENU:156-160 places own buildings on the dashboard, code uses Construction; MENU:218 says no in-session save, F5 exists; corporation.md:36-38 a Force segment never filled; market.md:151 read 3 versus rank_trade_routes; SUPPLY:67 says convoys are outside state_hash but rail waypoints are folded (world.cpp:235-241); SUPPLY's table omits station_a and station_b; logistics.hpp:483 stale; AI_OPPONENT:2379 province versus MILITARY:549 tile for push; SELECTION:506 water no-op versus march_check. Reconcile each; skip any the rulings already fixed. Reconciled 2026-11-08: stale doc entries corrected, the rest found already fixed. logistics.hpp:483 could not be identified as stale (the econ_tick_days_world mirror reads 90 days, correct). Two entries are calls, NR-1152."
-  },
-  {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-05",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-05: playtest follow-up)",
-   "requires": [],
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 2,
-   "id": "BL-1538",
-   "short_name": "SHELF_RUNWAY_WARNING",
-   "authority_doc": "docs/ui/ledgers/construction.md",
-   "files": [
-    "src/ui/selection_panel.cpp",
-    "src/ui/construction_sites.cpp"
-   ],
-   "title": "Construction tooltip warns when a building's supply has only a few quarters left on the shelf",
-   "design": "Ben, 2026-11-05: \"warnings on tooltip for construction when a building's supply has only a few quarters left on that market's stockpile\". READING, to confirm: a building's supply means its recipe inputs at the tile's market. For each input: shelf (market inventory) over the quarterly use this building would add, plus that market's net drain where it is already falling. Under the threshold, the Build door row's tooltip (selection_panel.cpp near :4818) names the good and the quarters left; the site ledger's row carries the same reading from one shared helper. OPEN: the threshold (4 quarters as the default until Ben reads it live), and whether construction materials count too. It serves the search reward in PRODUCTION § What construction costs at the opening: it shows a site that looks profitable today but will starve. The word on screen is shelf (GLOSSARY). UI only. Check: live click, question log. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
   },
   {
    "status": "in_progress",
@@ -1091,29 +793,6 @@
    ],
    "title": "Rival marches weigh supply",
    "design": "Ben, 2026-11-07: a rival march's score reads its own network's cover at the destination, never the route or the pool; fall back allowed (\"Yes, allow fall back\"), narrowed so a front keeps its reason while either side holds ground of the other until peace. Grant in AI_OPPONENT section 11. Measured, 16 seeds: starved 22.4% -> 6.0% of opening units at 20 quarters. Merged after three cold reviews; open calls in NR-1150."
-  },
-  {
-   "status": "delivered",
-   "glyph": "○",
-   "sprint": 63,
-   "version_goal": null,
-   "written": "2026-11-07",
-   "parked": false,
-   "blocked_on": null,
-   "author": "main session (Ben, 2026-11-07: sprint 63 form)",
-   "requires": [],
-   "category": "UI",
-   "priority": "B",
-   "difficulty": 2,
-   "id": "BL-1541",
-   "short_name": "SCHOOLING_DOOR",
-   "authority_doc": "docs/economy/PRODUCTION.md",
-   "files": [
-    "src/ui/construction_sites.cpp"
-   ],
-   "title": "Schooling and University in the Build door",
-   "design": "Ben, 2026-11-07: offer both in the Build door under their existing placement gates. Rivals keep their current behaviour unless a grant says otherwise. CLOSED on Ben's live click, 2026-11-09.",
-   "closed": "2026-11-09"
   },
   {
    "status": "proposed",
