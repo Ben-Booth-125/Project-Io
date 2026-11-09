@@ -15,7 +15,7 @@ session merges them one at a time and takes one shared re-bless.
 ### Merged lanes (cold reviewed, on main; re-bless shared at the wave's end)
 
 - [x] Construction lane: FINDER_BUILDING_GLYPHS, CONSTRUCTION_FOLDS, BUILDING_RECIPE_ROWS, SHELF_RUNWAY_WARNING.
-- [ ] Picker glyphs; arm a road and close its fold to disarm; recipe rows on an idle plant, a basket site and after load; door "Quoted for" and the after-load sentence.
+- [x] Picker glyphs; arm a road and close its fold to disarm; recipe rows on an idle plant, a basket site and after load; door "Quoted for" and the after-load sentence.
 
 ### Rulings of 2026-11-07, in lanes
 
@@ -23,7 +23,7 @@ session merges them one at a time and takes one shared re-bless.
 - [ ] Playtest the opening (Ben): a mine at about 5 months of net; Build door bills; the first quarter's return opens on 4,500.
 - [x] Rival marches weigh supply (new AI grant). Merged after three cold reviews.
 - [x] Wind Power a major; space upkeep in net; Schooling and University in the Build door. Merged after cold review.
-- [ ] Live click: wind's links at zoom; press the Schooling and University rows; Balance card "Upkeep" at a nonzero figure.
+- [x] Live click: wind's links at zoom; press the Schooling and University rows; Balance card "Upkeep" at a nonzero figure.
 
 - [x] Market lane: TRADE_OFFERS_SOURCED, GOODS_TABLE_STOCK_SORT, RESOURCE_GLYPHS.
 - [ ] One glyph per good; sort cycles on goods-table headings; tabs; offers open and shut; trades from own markets within points.
@@ -34,7 +34,7 @@ session merges them one at a time and takes one shared re-bless.
 - [x] War lane: OCCUPATION_MOVES_FRONT, HOLD_NOT_INTO_WATER, DEFEND_PROVINCE, CONVOY_REROUTES_FRONTS.
 - [ ] Defend this province menu; a front moves under a push; Trade flow reads front closed; set_trade refusal text; a hand march on a defender.
 - [x] Art lane: TILE_RES_96, POINTED_TREES.
-- [ ] Live look at 96 px through the zoom ladder; the zoom-out floor; firs at the closest rungs.
+- [x] Live look at 96 px through the zoom ladder; the zoom-out floor; firs at the closest rungs.
 - [x] Generation lane: NODES_COUNT_TO_CAP, UNITS_START_SUPPLIED.
 - [x] No click: world-side. Digests await the shared re-bless.
 - [x] Money lane: RESEARCH_IN_RETURN, BUILD_DAYS_SCALED, WIND_TURBINE.
