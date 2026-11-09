@@ -6,6 +6,12 @@
 -- campaign to the main menu, and Load opens the save again, twice over. The Esc queue
 -- closes Menu, then Ledger, then Selection, one press a rung.
 --
+-- Save names itself in a form (Ben, 2026-11-09): Save opens it, its Save writes, an
+-- existing name asks first, Esc or Cancel step back. Load lists saves, and a row opens one.
+--
+-- The name is left at its default, as verify has no way to type into the field; the
+-- name rule itself is tools/verify/save_names_check.cpp.
+--
 -- Run:     ProjectIo --verify scripts/verify/escape_menu.lua
 -- Writes:  a quicksave beside the exe. Captures: esc_*.png.
 
@@ -69,7 +75,40 @@ press("options")
 check(not verify.escape_menu().options_open, "and closes again")
 
 -- 4. Save, then the exit warning and its way back.
+-- Save names itself: the form replaces the presses, and steps back with Cancel or Esc.
 press("save")
+verify.capture("esc_03a_save_form")
+m = verify.escape_menu()
+check(m.options.x < 0 and m.warn_cancel.x >= 0, "Save opens the name form in place of the presses")
+press("warn_cancel")
+check(verify.escape_menu().options.x >= 0, "Cancel backs out of the form")
+press("save")
+verify.press_escape()
+verify.capture("esc_frame")
+m = verify.escape_menu()
+check(m.open and m.options.x >= 0, "Esc backs out of the form and leaves the menu open")
+
+-- The first write of the run may or may not meet an existing quicksave.
+local function write_save()
+    press("save")
+    press("save")
+    if verify.escape_menu().warn_confirm.x >= 0 then
+        verify.capture("esc_03b_overwrite")
+        press("warn_confirm")
+    end
+    check(verify.escape_menu().options.x >= 0, "the form closes once the save lands")
+end
+write_save()
+press("save")
+press("save")
+check(verify.escape_menu().warn_confirm.x >= 0, "an existing name asks before it overwrites")
+verify.capture("esc_03b_overwrite")
+press("warn_cancel")
+m = verify.escape_menu()
+check(m.warn_confirm.x < 0 and m.options.x < 0, "Cancel goes back to the name, not the menu")
+press("save")
+press("warn_confirm")
+check(verify.escape_menu().options.x >= 0, "Overwrite writes the save")
 verify.capture("esc_03_saved")
 press("exit_menu")
 m = verify.escape_menu()
@@ -90,6 +129,9 @@ for round = 1, 2 do
     press("warn_confirm")
     verify.capture("esc_05_menu_" .. round)
     check(verify.screen() == "menu", "round " .. round .. ": the warning's Exit to Menu leaves for the main menu")
+    press("main_load")
+    verify.capture("esc_05b_list_" .. round)
+    check(verify.screen() == "menu", "round " .. round .. ": Load lists the saves first")
     press("main_load")
     verify.capture("esc_06_loaded_" .. round)
     check(verify.screen() == "in_game", "round " .. round .. ": Load opens the save")

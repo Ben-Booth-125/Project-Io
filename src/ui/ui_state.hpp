@@ -1903,6 +1903,14 @@ struct ui_state
     enum escape_press { esc_save, esc_options, esc_exit_menu, esc_exit_game,
                         esc_warn_confirm, esc_warn_cancel, esc_gear, esc_main_load, esc_press_count };
     struct { float x = -1.0f, y = -1.0f; } escape_drawn[esc_press_count];
+    float escape_gear_w = 0.0f, escape_gear_h = 0.0f; ///< The time panel's gear, which the menu redraws in place.
+    // Naming a save on the escape menu (Ben, 2026-11-09; MENU.md). A press of Save
+    // opens the form; its Save and overwrite presses read esc_save and esc_warn_*.
+    bool save_form_open          = false;
+    bool save_form_focus         = false; ///< Put the keyboard in the name field this frame.
+    bool save_overwrite_pending  = false; ///< The typed name exists: asking first.
+    bool save_failed             = false; ///< The last write did not land.
+    char save_name[65]           = {};    ///< Holds save_name_max_len and its terminator.
 
     // --- frame-budget HUD (BL-249) ---
     // The v0.1.0 quality audit's frame-time instrument, toggled by F11 (app.cpp
@@ -2053,6 +2061,7 @@ struct ui_state
         float         x = 0.0f, y = 0.0f;
         int           count = 1;
         bool          mine  = false;
+        ImVec2        box_min{}, box_max{}; ///< The count's rectangle; empty with no count drawn.
     };
     std::vector<convoy_zone> convoy_zones;
     std::uint32_t hovered_convoy = 0; ///< The convoy the pointer's marker names; 0 none.

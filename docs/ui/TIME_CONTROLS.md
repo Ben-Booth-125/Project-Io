@@ -96,7 +96,7 @@ mirroring the on-screen buttons. These route through the shared canvas-command v
 ## The escape menu (Ben, 2026-11-05)
 
 The session gear sits **to the right of the time controls**, inside the right end of this panel,
-because the panel is flush to the screen edge. It opens the full-canvas escape menu and pauses the
+because the panel is flush to the screen edge. It opens the full-window escape menu and pauses the
 game (`MENU.md`).
 
 ## Related

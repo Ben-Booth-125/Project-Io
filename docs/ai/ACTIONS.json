@@ -1818,7 +1818,7 @@
     "App is in game. On the main menu and the wizard, Esc does nothing (the key handler returns before Esc handling on those screens).",
     "Works even while an ImGui panel holds keyboard focus — Esc is handled before the ImGui keyboard guard."
    ],
-   "expected_output": "Exactly one rung fires, highest first (SELECTION.md § Layout & chrome): (1) an exit warning backs out; (2) an open escape menu closes, restoring the remembered speed; (3) an open declaration backs out; (4) a drilled roll-up returns to the roll-up; (5) a full-canvas overlay folds up; (6) an armed tool disarms (a road's two presses, a march awaiting its tile); (7) the open ledger closes; (8) the Selection clears to the resting nation; (9) with nothing open, the escape menu opens and pauses. One press never does two of these.",
+   "expected_output": "Exactly one rung fires, highest first (SELECTION.md § Layout & chrome): an overwrite prompt goes back to the save's name; an open name form goes back to the menu; then (1) an exit warning backs out; (2) an open escape menu closes, restoring the remembered speed; (3) an open declaration backs out; (4) a drilled roll-up returns to the roll-up; (5) a full-canvas overlay folds up; (6) an armed tool disarms (a road's two presses, a march awaiting its tile); (7) the open ledger closes; (8) the Selection clears to the resting nation; (9) with nothing open, the escape menu opens and pauses. One press never does two of these.",
    "reason_to_select": "The universal step-out key: close the Menu, then the Ledger, then the Selection, one press at a time - or, with nothing open, reach the escape menu."
   },
   {
@@ -1941,7 +1941,7 @@
    "preconditions": [
     "App is in game (app_screen::in_game)."
    ],
-   "expected_output": "Toggles the full-canvas escape menu, lit while it is open. Opening it pauses the game; closing it restores the remembered speed, and a clock that was already stopped stays stopped. Closing it also takes back an exit warning. While the menu is open the speed buttons are disabled, and the only hotkeys that answer are F5, F1 and F10.",
+   "expected_output": "Toggles the full-window escape menu, lit while it is open; the menu redraws the gear in place, so a second press closes it. Opening it pauses the game; closing it restores the remembered speed, and a clock that was already stopped stays stopped. Closing it also takes back an exit warning. While the menu is open the speed buttons are disabled, and the only hotkeys that answer are F5, F1 and F10.",
    "reason_to_select": "Mouse route to the session controls (Save, Options, Exit to Menu, Exit Game); Esc is the keyboard parity."
   },
   {
@@ -1978,7 +1978,7 @@
     "App is on the main menu screen.",
     "A save exists: the press is disabled, with the tooltip Nothing saved yet, until one does."
    ],
-   "expected_output": "Opens the campaign in the in-game save (quicksave.iosave, the file Save and F5 write) and enters play. A save that cannot be read leaves the menu up with the reason beneath its presses.",
+   "expected_output": "Replaces the button with the list of saves by name, newest first, and a Back press; pressing a row opens that save. Opening one shows the loading screen (Loading the save) while the home world's ground bakes, then enters play. A save that cannot be read leaves the list up with the reason beneath it.",
    "reason_to_select": "To go back to a saved campaign from the entry screen, after Exit to Menu or a fresh launch."
   },
   {
@@ -2038,7 +2038,7 @@
    "preconditions": [
     "Options window open; Fullscreen is off (the combo is disabled while fullscreen)."
    ],
-   "expected_output": "The SDL window resizes immediately and the choice persists to options.cfg at once.",
+   "expected_output": "The SDL window resizes immediately, un-maximising it first if it was maximised, and the choice persists to options.cfg at once.",
    "reason_to_select": "To fit the window to the display or to a capture-friendly size."
   },
   {
@@ -2134,7 +2134,7 @@
    "preconditions": [
     "App is in game; the escape menu is open; no exit warning is up."
    ],
-   "expected_output": "Writes the in-game save F5 writes (quicksave.iosave, beside the executable), posts 'Saved to ...' to the Field channel and updates the menu's 'Last saved' line. The menu stays open.",
+   "expected_output": "Opens the name form on the menu: a name field offering the last saved or loaded name, or quicksave, with Save and Cancel. Save writes <name>.iosave beside the executable, posts 'Saved to ...' to the Field channel, updates the 'Last saved' line and returns to the presses; the menu stays open. A name the file system could not hold exactly is refused with the reason and Save is disabled. A name already on disk asks first (Overwrite / Cancel).",
    "reason_to_select": "To keep the campaign before leaving it."
   },
   {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/save_names.hpp"
 #include "ui/plot_history.hpp"
 #include "ui/ui_state.hpp"
 #include "world/hard_coded_world.hpp" // world_params, generation_report
@@ -357,9 +358,8 @@ inline constexpr uint32_t save_game_version_pre_kit_goods = 23;
 /// The earliest layout `read_save_game` still accepts (see LAYOUT 23).
 inline constexpr uint32_t save_game_version_prefix_compatible = 22;
 
-/// Default extension for a save file. One place, so the CLI, the quick-save
-/// binding and the verify API cannot disagree about it.
-inline constexpr const char* save_game_extension = ".iosave";
+// save_game_extension: the one place the CLI, the quick-save binding, the named-save
+// rule and the verify API read it, in core/save_names.hpp.
 
 /// Everything a save carries that does not live on `world`.
 ///

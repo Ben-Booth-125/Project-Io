@@ -2,6 +2,8 @@
 
 #include <imgui.h>
 
+#include <string>
+
 class sim_loop;
 struct ui_state;
 
@@ -26,14 +28,14 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
 /// options, the session teardown and the quit are all app members.
 struct escape_menu_press
 {
-    bool save         = false;
+    std::string save_name;        ///< Non-empty: write the save under this checked name.
     bool options      = false;
     bool exit_to_menu = false; ///< Confirmed past the unsaved-progress warning.
     bool exit_game    = false; ///< Confirmed past the unsaved-progress warning.
 };
 
 /// Draw the escape menu (BL-1519; MENU.md § Application / system menu) over the
-/// canvas region: Save, Options, Exit to Menu, Exit Game. No-op unless
+/// whole window: Save (with its name form), Options, Exit to Menu, Exit Game. No-op unless
 /// st.show_system_menu.
 ///
 /// @param st           UI state (show_system_menu and the exit warning).

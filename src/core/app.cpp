@@ -1282,8 +1282,9 @@ void app::draw_painting_screen()
     m_paint_wait.weight_total.store(std::max(total, 1), std::memory_order_relaxed);
     m_paint_wait.weight_done.store(ready, std::memory_order_relaxed);
 
+    // THE TOP BAND (STARTUP.md § Main menu), as the building screen hangs its bar.
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
-    ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
+    ImGui::SetNextWindowPos({disp.x * 0.5f, 0.0f}, ImGuiCond_Always, {0.5f, 0.0f});
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
@@ -1291,7 +1292,9 @@ void app::draw_painting_screen()
         ImGuiWindowFlags_NoBackground;
     if (ImGui::Begin("##painting", nullptr, flags))
     {
-        const char* title = "BUILDING THE WORLD";
+        const float sp = ImGui::GetStyle().ItemSpacing.y;
+        ui::pad_to_loading_band(ImGui::GetTextLineHeightWithSpacing() + 2.0f * (10.0f + sp));
+        const char* title = m_loading_save ? "LOADING THE SAVE" : "BUILDING THE WORLD";
         const float tw = ImGui::CalcTextSize(title).x;
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (420.0f - tw) * 0.5f);
         ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(225, 230, 240, 255));
@@ -1314,7 +1317,22 @@ void app::draw_painting_screen()
                     std::chrono::duration<double>(std::chrono::steady_clock::now()
                                                   - m_paint_wait.wait_began).count());
         std::fflush(stdout);
-        finish_new_game(); // passes the gate now, rebases the clock, opens play
+        if (m_loading_save)
+        {
+            // A load already holds its clock and its series; a new game's opening
+            // would clear them. The wait must not land as game days, and sim_loop
+            // measures from its own last tick, so only that is re-seeded.
+            m_loading_save = false;
+            sim_loop resumed;
+            resumed.restore(m_sim_loop.sim_tick(), m_sim_loop.day_tick(), m_sim_loop.econ_tick(),
+                            m_sim_loop.elapsed_days(), m_sim_loop.speed());
+            m_sim_loop = resumed;
+            m_screen   = app_screen::in_game;
+        }
+        else
+        {
+            finish_new_game(); // passes the gate now, rebases the clock, opens play
+        }
     }
 }
 
@@ -2344,7 +2362,11 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     if (key.scancode == SDL_SCANCODE_ESCAPE)
     {
         // The band is always open (BL-266) and has no hide rung.
-        if (m_ui.confirm_exit_pending)
+        if (m_ui.save_overwrite_pending)
+            m_ui.save_overwrite_pending = false;              // back to the name
+        else if (m_ui.save_form_open)
+            m_ui.save_form_open = false;                      // back to the menu's presses
+        else if (m_ui.confirm_exit_pending)
             m_ui.confirm_exit_pending = false;
         else if (m_ui.show_system_menu)
             m_ui.show_system_menu = false;
@@ -2600,7 +2622,29 @@ bool app::load_game_from(const std::string& path)
     ui::reset_wing_ui(m_ui);       // BL-1450: so do a wing card's held missions and queued order
     ui::reset_diplomacy_ui(m_ui);  // BL-1462: and the Diplomacy ledger's declaration, history and caches
 
+    // Remember the save's own name, so the Save form offers it next.
+    if (const std::string stem = std::filesystem::path(path).stem().string(); save_name_error(stem) == nullptr)
+        std::snprintf(m_ui.save_name, sizeof m_ui.save_name, "%s", stem.c_str());
+
+    // A loaded save opens through the loading screen while the ground bakes (Ben,
+    // 2026-11-09; STARTUP.md § Main menu). The frame loop's --verify path has no pump,
+    // so m_ground_prebake_on is off there and a load goes straight to play.
+    m_loading_save = false;
     m_screen = app_screen::in_game;
+    if (m_ground_prebake_on && !m_ground_bake_all)
+    {
+        start_ground_prebake(m_world, /*wizard=*/false);
+        int paint_ready = 0, paint_total = 0;
+        m_ground.master_progress(m_world.home_body, paint_ready, paint_total);
+        if (paint_total > 0 && !m_ground.master_current(m_world.home_body))
+        {
+            m_paint_wait.begin_wait();
+            m_paint_wait.stage_count.store(1, std::memory_order_relaxed);
+            m_paint_t0     = std::chrono::steady_clock::now();
+            m_loading_save = true;
+            m_screen       = app_screen::painting_ground;
+        }
+    }
     open_play_log(path);
 
     ui::chat_post(m_chat, static_cast<int>(env.day_tick), null_entity,
@@ -2631,7 +2675,9 @@ void app::sync_escape_menu_pause()
     }
     else
     {
-        m_ui.confirm_exit_pending = false;
+        m_ui.confirm_exit_pending   = false;
+        m_ui.save_form_open         = false;
+        m_ui.save_overwrite_pending = false;
         if (m_menu_paused_it && m_sim_loop.paused())
             dispatch_action(ui::canvas_command::pause_toggle);
         m_menu_paused_it = false;
@@ -2690,6 +2736,8 @@ void app::exit_to_menu()
     m_menu_paused_it  = false;
     m_last_save_day   = -1;
     m_menu_message.clear();
+    m_load_list_open  = false;
+    m_save_list_frame = -1000; // the save this session wrote lists on the menu's first frame
 
     m_screen = app_screen::menu;
 }
@@ -3998,8 +4046,14 @@ void app::render()
         }
         const ui::escape_menu_press press =
             ui::draw_escape_menu(m_ui, m_show_options, last_saved.c_str());
-        if (press.save)
-            save_game_to(quick_save_path());
+        if (!press.save_name.empty())
+        {
+            // The form closes on a write that landed; one that failed stays up and says so.
+            const bool wrote = save_game_to(save_name_path(press.save_name));
+            m_ui.save_failed = !wrote;
+            if (wrote)
+                m_ui.save_form_open = false;
+        }
         if (press.options)
             m_show_options = !m_show_options;
         if (press.exit_to_menu)
@@ -4016,10 +4070,8 @@ void app::render()
         // on them, so the press that opened it can close it (the toggle rule).
         if (m_ui.show_system_menu)
         {
-            const ui::foldout_rect canvas = ui::canvas_rect();
-            ImGui::SetNextWindowPos(
-                ImVec2{canvas.x + canvas.w * 0.5f - 156.0f, canvas.y + canvas.h * 0.5f},
-                ImGuiCond_Appearing, ImVec2{1.0f, 0.5f});
+            ImGui::SetNextWindowPos(ImVec2{disp.x * 0.5f - 156.0f, disp.y * 0.5f},
+                                    ImGuiCond_Appearing, ImVec2{1.0f, 0.5f});
             // No size set: the right-edge pivot reads the window's real width. A set
             // width would seat it from that width on every reopening, over the presses.
         }
@@ -4058,7 +4110,14 @@ void app::render()
                     {
                         m_settings.window_w = presets[i].w;
                         m_settings.window_h = presets[i].h;
+                        // SDL refuses a size on a maximised window (Ben, 2026-11-09:
+                        // the pick changed nothing on screen), so the pick restores it
+                        // first. Here and not in apply_display_settings: VSync and
+                        // Fullscreen must not un-maximise.
+                        if (SDL_GetWindowFlags(m_window) & SDL_WINDOW_MAXIMIZED)
+                            SDL_RestoreWindow(m_window);
                         apply_display_settings();
+                        SDL_SyncWindow(m_window);
                         save_settings();
                     }
                 }

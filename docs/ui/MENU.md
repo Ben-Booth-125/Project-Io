@@ -213,12 +213,24 @@ hotkey (`src/ui/time_panel.cpp`, `src/ui/ui_state.hpp`).
   right end of the time column, because the column is flush to the screen edge
   (`TIME_CONTROLS.md` § The escape menu).
 - **The escape menu (Ben, 2026-11-05).** Pressing the gear, or Esc with nothing open, opens a
-  **full-canvas** menu and pauses the game: **Save**, **Options**, **Exit to Menu**, **Exit Game**.
+  **full-window** menu and pauses the game: **Save**, **Options**, **Exit to Menu**, **Exit Game**.
+  It covers the whole window, shell included (Ben, 2026-11-09). The gear keeps its place on the
+  menu, lit, so the control that opened it closes it.
   Closing it restores the remembered speed, through the one `pause_toggle` session-control flag the
   Space hotkey uses. This overturns the corner popup and the rejection of a centred modal.
 - **Unsaved progress is warned.** Exit to Menu and Exit Game each warn about unsaved progress before
   they act. Exit to Menu returns to the main menu, which offers Load (`STARTUP.md` § Main menu).
-- **Options** is the display-options window below, and **Save** writes the in-game save F5 writes.
+- **Options** is the display-options window below.
+- **Named saves (Ben, 2026-11-09).** **Save** opens a name field on the menu; the player types a
+  name and saves. The name **is** the file name, `<name>.iosave` beside the executable, so the save
+  payload carries nothing new and an existing `quicksave.iosave` is simply the save named
+  "quicksave". The field offers the name last saved or loaded, and "quicksave" until there is one.
+  A name the file system could not hold exactly (empty, over 64 characters, a character outside
+  plain printable ASCII, any of `< > : " / \ | ? *`, a leading space, a trailing space or dot, a
+  reserved Windows device name) is **refused with the reason, never altered**. A name already on
+  disk **asks before it overwrites**. Esc and Cancel step back one rung. F5 still writes
+  `quicksave` without asking, because a quick save is a press and not a decision; the Load list on
+  the main menu shows every save by name (`STARTUP.md` § Main menu).
 - **Keyboard (Ben, 2026-11-05).** Esc closes what is open in a queue: **Menu, then Ledger, then
   Selection**. With nothing open it opens the escape menu. The full ladder is
   `SELECTION.md` § Layout & chrome.
@@ -232,7 +244,9 @@ and from the session menu above.
   cheat-sheet). A floating ImGui window with a **Display** section: resolution preset combo
   (1280×720 / 1600×900 / 1920×1080 / 2560×1440, "Custom" when the live size matches no preset),
   **Fullscreen** (borderless-desktop) and **VSync** toggles, a live `Window: W×H` readout, and
-  Close. Resolution is disabled while fullscreen is on.
+  Close. Resolution is disabled while fullscreen is on. Picking a preset **restores a maximised
+  window first**, because a maximised window takes no size and the pick would otherwise change
+  nothing on screen (Ben, 2026-11-09); VSync and Fullscreen leave a maximised window alone.
 - **Persistence** — settings are stored in a flat `options.cfg` (key=value: `window_w`, `window_h`,
   `fullscreen`, `vsync`) in the working directory, loaded at interactive startup only (never in the
   `--verify` path, so golden captures stay at the fixed default). Preset/toggle changes save

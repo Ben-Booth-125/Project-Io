@@ -558,6 +558,12 @@ that convoy: its cargo, owner, route and arrival. A convoy is not an entity and 
 selection holds. What the player may see of another nation's convoy follows the visibility rules
 (`DISCOVERY.md`).
 
+**The marker's scale and count (Ben, 2026-11-09).** A convoy marker is a zoomed size: it grows with
+the map, at a quarter of the hex radius, with a floor so it stays legible zoomed out. Where several
+convoys share a tile the count sits **in a rectangle beside the circle**, sized from its own number
+and scaling with the marker, rather than floating behind it. The press answers on the whole of what
+is drawn, circle and rectangle alike.
+
 ### The front element
 
 A **front** (`../military/MILITARY.md` § Fronts) is one contiguous span of a nation's border with
@@ -865,7 +871,7 @@ the screen, rather than floating with the cursor."* The band is:
   substitutes the player's nation at draw time and never renders `selection_kind::none`. The
   player's nation exists before the first frame, so there is no bootstrap gap.
 - **Esc ends at the escape menu (Ben, 2026-11-05).** Esc closes **Menu, then Ledger, then
-  Selection**. Its ladder is: exit warning → close the escape menu → back out of a declaration → pop
+  Selection**. Its ladder is: the save form's overwrite prompt → the save's name form → exit warning → close the escape menu → back out of a declaration → pop
   a drill level → fold overlay → disarm an armed tool → close the ledger → clear the Selection to the resting nation → open
   the escape menu. The escape menu is the pause screen (`MENU.md`).
 
