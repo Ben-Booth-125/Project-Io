@@ -68,14 +68,17 @@ bool own_bid_admitted(const recipe_registry& reg, const market_component& m, std
            <= band.reservation_mult * m.base_price[r];
 }
 
-/// The market as it would read without @p b's last quarter: what it listed off supply,
-/// what it bid off demand (or off the silenced want, where the ceiling refused the bid,
-/// as `run_processing` files it). Its goods already on the shelf stay: they are stock.
-/// Nothing to take out without a report row, since then it has not been in the market.
+/// The market as it would read without the plant @p self's last quarter: exactly what
+/// its report row says it listed and filed, by the recipe THE ROW ran, since a Switch
+/// writes the building at once and the market still holds the old recipe's trade. Its
+/// goods already on the shelf stay: they are stock. Nothing to take out without a row.
+/// Processing only: the lever is the one caller, and a mine's co-extracted goods are not split.
 std::optional<market_component> market_without_plant(const recipe_registry& reg, const site_quote_context& cx,
                                                      const market_component& m, entity_id self,
                                                      const building_component& b)
 {
+    if (b.type != building_type::processing_facility)
+        return std::nullopt;
     if (cx.reach.report == nullptr)
         return std::nullopt;
     const auto& rows = cx.reach.report->buildings;
@@ -86,31 +89,17 @@ std::optional<market_component> market_without_plant(const recipe_registry& reg,
 
     market_component out = m;
     const auto take = [](float& v, float amount) { v = std::max(0.0f, v - amount); };
-    if (b.type == building_type::extraction_site)
-    {
-        take(out.supply[static_cast<std::size_t>(b.target_resource)], row->output_quantity);
-        return out;
-    }
-    const recipe* cur = reg.get_recipe(b.recipe);
-    if (b.type != building_type::processing_facility || cur == nullptr)
-        return out;
-
+    const recipe* ran = reg.get_recipe(row->recipe);
     float output_units = 0.0f;
-    for (std::size_t r = 0; r < resource_count; ++r)
-        output_units += cur->outputs[r];
-    const float full_batches = reg.economics(b.type).base_rate * row->effective_workforce
-                             * std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f)
-                             * building_supply_scalar(b);
-    const float reservation = reg.price_band().reservation_mult;
+    if (ran != nullptr)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            output_units += ran->outputs[r];
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (cur->outputs[r] > 0.0f && output_units > 0.0f)
-            take(out.supply[r], row->output_quantity * cur->outputs[r] / output_units);
-        if (cur->inputs[r] <= 0.0f)
-            continue;
-        // The full-run need, whether or not the draw went on to fill (BL-441).
-        const float bid = cur->inputs[r] * full_batches;
-        take(shelf_admits(m, r, reservation, /*off_buys=*/true) ? out.demand[r] : out.hauler_want[r], bid);
+        if (output_units > 0.0f && ran->outputs[r] > 0.0f)
+            take(out.supply[r], row->output_quantity * ran->outputs[r] / output_units);
+        take(out.demand[r], row->wanted[r]);
+        take(out.hauler_want[r], row->suppressed[r]);
     }
     return out;
 }
