@@ -1242,8 +1242,8 @@
     "src/ui/body_surface_canvas.cpp",
     "src/ui/selection_panel.cpp"
    ],
-   "title": "Convoy box covers icon; capital under units; wheel over UI; tile action tooltips",
-   "design": "Ben, 2026-11-09: the convoy count box grows to cover the convoy icon; the capital icon draws below units; a wheel over a menu or table never zooms the canvas; every tile action button carries a tooltip saying what it does, and a disabled Construct says why (e.g. no road).",
+   "title": "Convoy box covers icon; capital under units; wheel over UI; tile action tooltips; smooth glides",
+   "design": "Ben, 2026-11-09: the convoy count box grows to cover the convoy icon; the capital icon draws below units; a wheel over a menu or table never zooms the canvas; every tile action button carries a tooltip saying what it does, and a disabled Construct says why (e.g. no road). Ben, 2026-11-09, added: units and convoys jitter on the map, both when stacking or unstacking and for single movers; motion should be continuous.",
    "author": "main session (Ben, 2026-11-09)"
   },
   {
