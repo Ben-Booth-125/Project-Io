@@ -2548,6 +2548,14 @@ bool app::load_game_from(const std::string& path)
         m_lua.load("scripts/world_gen.lua");
         m_worldgen_cfg.load_from_lua(m_lua);
     }
+    // THE RECIPE REGISTRY, the same way (2026-11-09 stall). Only a new game loaded it
+    // (start_new_game / load_economy), so a save opened from the main menu of a fresh
+    // process -- or by --load -- stepped on an EMPTY registry: every recipe lookup
+    // missed, every site completed at once on zero build days, and every nation's
+    // income fell to nothing within six quarters. Loaded BEFORE the read, which
+    // takes the registry's military walls (BL-1455).
+    if (m_registry.recipe_count() == 0)
+        load_recipe_registry();
     if (!read_save_game(path, w, env, &m_registry.military(), // BL-1455: legacy step-offs read the walls
                         &m_worldgen_cfg.kepler_base_price))
     {
@@ -2574,6 +2582,10 @@ bool app::load_game_from(const std::string& path)
     // `any` — had left in it, and a save could open on a roster its world did
     // not earn.
     m_registry.set_era(campaign_band_from_world(m_world)); // BL-1101: the one band body, on load as on a new game
+    // And the registry's presentation half, as load_economy runs it after its band:
+    // the reach mirror the placement surfaces filter on, the works table, the
+    // persona bench. A fresh-process load had none of them.
+    finish_economy_presentation();
 
     m_sim_loop.restore(env.sim_tick, env.day_tick, env.econ_tick, env.elapsed_days, env.speed);
     m_prev_speed     = (env.speed > 0) ? env.speed : 1;
