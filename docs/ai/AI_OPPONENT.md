@@ -2459,7 +2459,8 @@ boilerplate: pure, seeded, deterministic, replayable, legal verbs only, never a 
   **A rival's march may weigh supply — granted (Ben, 2026-11-07; BL-1540, rival march supply;
   `../military/MILITARY.md` § Fronts, "A rival's fronts").** Raised on the measurement: rival marches
   starved 9-16% of their opening armies in 8 quarters. His answer: *"Grant it, scorer weighs supply."* A
-  new reading, on the standing terms. A rival nation's scorer, weighing a march of its OWN units, may
+  new reading, on the standing terms. **A rival scores its fronts every quarter (Ben, 2026-11-09)**: that
+  pass alone leaves the yearly evaluation clock. A rival nation's scorer, weighing a march of its OWN units, may
   read its OWN network's **cover** at the destination (never the route, and not the pool), what that
   cover does to the unit's stock and men, and the days of the straight march. The price is how fast the
   ground would kill it, so every cover below break-even costs something; the brake is the hunger itself,

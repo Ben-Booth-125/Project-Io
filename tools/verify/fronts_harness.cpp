@@ -39,6 +39,7 @@
 #include "world/economy_system.hpp"
 #include "world/fronts.hpp"
 #include "world/hex_neighbors.hpp"
+#include "world/logistics.hpp" // lay_road_edge (F10f)
 #include "world/nation_generation.hpp" // BL-1540: unit_tile_cover_permille
 #include "world/province.hpp"
 #include "world/recipe_registry.hpp"
@@ -803,13 +804,11 @@ int main()
               "F9g a march on the unit's own landmass still applies, its path crossing no water");
     }
     {
-        // F9k-F9n (BL-1466 fix round; MILITARY.md § Domains and traversal, PROVINCES.md §
-        // Who owns water): WATER IS OWNED PER TILE. Column 0 is ocean pole to pole (no way
-        // round the cylinder) and column 6 is a strait: rows 0-2 the test's water, rows 3-5
-        // ocean. A land unit at (4,1) marches to (9,1); the strait is the only crossing.
-        // The province holders are seeded as `seed_province_holders` seeds them - land
-        // provinces held, WATER PROVINCES NULL - so a province-holder reading of ownership
-        // (the bug) reads every shore unowned, and F9k/F9n fail under it.
+        // F9k-F9n (MILITARY.md § Domains and traversal; Ben, 2026-11-09): A LAND UNIT
+        // MARCHES ON LAND. Column 0 is ocean pole to pole (no way round the cylinder) and
+        // column 6 is a strait: rows 0-2 the test's water, rows 3-5 ocean. A land unit at
+        // (4,1) marches to (9,1); the strait is the only crossing. Whoever owns the water,
+        // a land class may not cross it; only a road does. Ownership is not read at all.
         enum class strait { own_coast, foreign_coast, own_ocean, foreign_bridge };
         const auto strait_case = [&](strait kind, std::size_t& wet_out) {
             fixture f; build(f);
@@ -826,25 +825,6 @@ int main()
                 if (kind == strait::foreign_bridge)
                     t.road_edges = road_edges_on_every_side(1);
             }
-            f.w.province_holder.assign(f.w.provinces.provinces.size(), null_entity);
-            for (std::size_t i = 0; i < f.w.provinces.provinces.size(); ++i)
-            {
-                const province& p = f.w.provinces.provinces[i];
-                const tile_component& t0 = f.w.tiles.at(p.tiles.front());
-                if (is_water(t0.substrate))
-                {
-                    // A water province holds nobody (seed_province_holders). F9l instead
-                    // gives C's strait a holder that DISAGREES with its tiles (A), so a
-                    // province reading would let A wade C's water: only the per-tile
-                    // owner refuses it.
-                    if (kind == strait::foreign_coast)
-                        f.w.province_holder[i] = f.A;
-                    continue;
-                }
-                const auto tn = f.w.tile_to_nation.find(p.tiles.front());
-                if (tn != f.w.tile_to_nation.end())
-                    f.w.province_holder[i] = tn->second;
-            }
             const entity_id u = add_unit(f, f.A, f.at(4, 1));
             std::vector<entity_id> path;
             const corp_command_result r =
@@ -856,8 +836,10 @@ int main()
         std::size_t wet = 0;
         const corp_command_result own = strait_case(strait::own_coast, wet);
         std::printf("  [info] F9k own strait: march_check %d, %zu water tile(s) on the path\n", static_cast<int>(own), wet);
-        check(own == corp_command_result::applied && wet > 0,
-              "F9k a land unit's march across its OWN nation's coastal strait is accepted, the path crossing it");
+        // A LAND UNIT MARCHES ON LAND (Ben, 2026-11-09): this row said the opposite, on the
+        // owned-coast ruling that ruling overturned.
+        check(own == corp_command_result::rejected_invalid && wet == 0,
+              "F9k a land unit's march across its OWN nation's coastal strait is refused (rejected_invalid), no path");
         const corp_command_result foreign = strait_case(strait::foreign_coast, wet);
         check(foreign == corp_command_result::rejected_invalid,
               "F9l a march across ANOTHER nation's coastal water is refused (rejected_invalid)");
@@ -964,6 +946,14 @@ int main()
         for (const entity_id t : owned)
             for (const entity_id n : g.neighbours(w, t))
             {
+                // A front fits land tiles only, bridges excepted, on both sides of the
+                // line (Ben, 2026-11-09).
+                const tile_component& own_tile = w.tiles.at(t);
+                if (is_water(own_tile.substrate) && !tile_has_road(own_tile))
+                    continue;
+                const tile_component& across_tile = w.tiles.at(n);
+                if (is_water(across_tile.substrate) && !tile_has_road(across_tile))
+                    continue;
                 const entity_id a = owner(w, t), b = owner(w, n);
                 if (a != null_entity && b != null_entity && a != b) border[{ a, b }].insert(t);
             }
@@ -1168,41 +1158,96 @@ int main()
 
     // -----------------------------------------------------------------------
     // F10 - BL-1503 (MILITARY.md § Fronts, Slots): a land unit on hold never takes a
-    // water slot, bridges excepted, and an all-water span leaves it where it stands.
-    // The owned-coast marching rule still stands: a march by hand onto own shore applies.
-    std::printf("\nF10 - hold never walks into water\n");
+    // water slot, bridges excepted. Ben, 2026-11-09: a front fits land tiles only, at the
+    // span's own construction, and a land unit marches on land, its own shore included.
+    std::printf("\nF10 - fronts fit land, land units march on it\n");
     {
         // Row 2 is A's border with B. Make it A's OWN shore water, save column 7 (land).
-        // Every slot but that one is owned coast, which domain_wall lets a land class on.
+        // The span is that one land tile.
         fixture f; build(f);
         for (int x = 0; x < W; ++x)
             if (x != 7)
                 f.w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::coast;
+        ++f.w.territory_generation; // a fixture's substrate edit: the cache keys on this
         reanchor_fronts(f.w);
+        check(nation_fronts(f.w, f.A).size() == 1 && nation_fronts(f.w, f.A).front().span.size() == 1
+                  && nation_fronts(f.w, f.A).front().span[0] == f.at(7, 2),
+              "F10a0 the span holds the land tile and no shore water");
         const entity_id u = add_unit(f, f.A, f.at(7, 0));
-        (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+        (void)cmd_assign(f.w, reg, f.A, u, f.at(7, 2));
         step(f.w, reg, 12);
         check(f.w.units.at(u).position == f.at(7, 2),
               "F10a one land tile on a shore span: the unit takes it, not the water slot in the middle");
         const entity_id v = add_unit(f, f.A, f.at(3, 0));
         corp_command m; m.corp = f.A; m.as_nation = f.A; m.verb = corp_verb::march_unit;
         m.subject = v; m.tile = f.at(3, 2);
+        check(apply_corp_command(f.w, reg, m) == corp_command_result::rejected_invalid
+                  && f.w.units.at(v).order.dest == null_entity,
+              "F10b a land unit's march onto its own shore is refused (rejected_invalid), no order");
+        // A unit already standing on water (an old save) walks off onto land; a march to
+        // the next water tile is refused, whatever it stands on.
+        const entity_id wet = add_unit(f, f.A, f.at(3, 2));
+        m.subject = wet; m.tile = f.at(4, 2);
+        check(apply_corp_command(f.w, reg, m) == corp_command_result::rejected_invalid,
+              "F10b2 a land unit standing on water may not march to another water tile");
+        m.tile = f.at(3, 1);
         check(apply_corp_command(f.w, reg, m) == corp_command_result::applied,
-              "F10b the owned-coast ruling stands: a march by hand onto own shore still applies");
+              "F10b3 a land unit standing on water may march off it onto land");
     }
     {
-        // ALL WATER: no slot at all. The unit stands where it is, and is not reachable.
+        // ALL WATER: the border is not a front at all, and no assignment can name it.
         fixture f; build(f);
         for (int x = 0; x < W; ++x)
             f.w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::coast;
+        ++f.w.territory_generation;
         reanchor_fronts(f.w);
         const entity_id u = add_unit(f, f.A, f.at(4, 0));
-        const front fr = nation_fronts(f.w, f.A).front();
-        check(!front_reachable(f.w, reg, u, fr), "F10c an all-water span is no front a land unit can reach");
-        (void)cmd_assign(f.w, reg, f.A, u, f.at(0, 2));
+        check(front_toward(nation_fronts(f.w, f.A), f.B) == nullptr
+                  && front_toward(nation_fronts(f.w, f.B), f.A) == nullptr,
+              "F10c a border running only along water carries no front, on either side");
+        check(cmd_assign(f.w, reg, f.A, u, f.at(0, 2)) == corp_command_result::rejected_invalid,
+              "F10d an assignment naming it is refused");
         step(f.w, reg, 12);
         check(f.w.units.at(u).position == f.at(4, 0) && f.w.units.at(u).order.dest == null_entity,
-              "F10d assigned anyway, it stays where it stands, with no standing order");
+              "F10d2 the unit stays where it stands, with no standing order");
+        // A BRIDGE OPENED AFTER THE FRONTS WERE READ (the cache must see it): lay_road_edge
+        // bumps the generation, so a run that never loads holds the span a loaded run does.
+        check(lay_road_edge(f.w, f.at(4, 2), 0, 1), "F10f0 the bridge is laid");
+        const front* bridged = front_toward(nation_fronts(f.w, f.A), f.B);
+        check(bridged != nullptr && bridged->span.size() == 2,
+              "F10f a bridge laid after the fronts were derived opens a two-tile span at once");
+    }
+    {
+        // F10g A SAVE IN THE BRIDGE'S WINDOW. The road verb is instant and a save can land
+        // before the next day's re-anchor. A bridge laid on lower-id water moves the span's
+        // key, so a key still on the old front at the save would be dropped by the load,
+        // which has no old fronts to remap it against. Saved and loaded right after the
+        // write, the world must match the run that never loaded.
+        fixture f; build(f);
+        for (int x = 0; x < 3; ++x)
+            f.w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::coast;
+        ++f.w.territory_generation;
+        reanchor_fronts(f.w);
+        (void)declare_hostile(f.w, f.A, f.B);
+        const entity_id u = add_unit(f, f.A, f.at(4, 1));
+        const entity_id old_key = front_toward(nation_fronts(f.w, f.A), f.B)->key;
+        check(old_key == f.at(3, 2), "F10g0 the span opens at the first land tile");
+        (void)cmd_assign(f.w, reg, f.A, u, old_key);
+        (void)cmd_order(f.w, reg, f.A, old_key, 1);
+        check(lay_road_edge(f.w, f.at(1, 2), 0, 1), "F10g1 the bridge is laid");
+        const std::string saved = to_bytes(f.w); // the window: no day has run since the write
+        world loaded;
+        const bool ok = from_bytes(saved, loaded);
+        reanchor_fronts(loaded);
+        reanchor_fronts(f.w);
+        check(f.w.units.at(u).front == f.at(1, 2), "F10g2 the unbroken run's key moved onto the bridge");
+        check(ok && loaded.units.at(u).front == f.w.units.at(u).front,
+              "F10g3 the loaded run keeps the unit's assignment, as the unbroken run does");
+        check(ok && front_order_of(loaded, f.A, f.at(1, 2)) == front_order::push
+                  && front_order_of(f.w, f.A, f.at(1, 2)) == front_order::push,
+              "F10g4 the loaded run keeps the push order, as the unbroken run does");
+        check(ok && to_bytes(loaded) == to_bytes(f.w) && loaded.state_hash(9) == f.w.state_hash(9),
+              "F10g5 loaded and unbroken are byte-identical");
     }
     {
         // A BRIDGE IS A ROAD: every shore tile roaded, the slot in the middle is taken.
@@ -2252,19 +2297,66 @@ int main()
         }
         // (ii) No slot at all on a no-reason front: where it stands is priced, and it comes off.
         {
-            wide f; build_wide(f, false);
+            // Every span tile a roadless mountain the gun cannot enter: water no longer enters
+            // a span (Ben, 2026-11-09), so a class wall is how a front has no slot. The mutation
+            // is wall_world's; its whole-world handover is not wanted here.
+            wide f; recipe_registry rr = reg;
+            {
+                military_capability_params mp = rr.military();
+                mp.terrain.rows[static_cast<std::size_t>(land_class::artillery)][static_cast<std::size_t>(class_terrain::mountain)]
+                    .blocked_unless_roaded = true;
+                rr.set_military(mp);
+            }
+            build_wide(f, false);
             for (int x = 0; x < WW; ++x)
-                f.w.tiles.at(f.at(x, 2)).substrate = terrain_substrate::coast;
+                f.w.tiles.at(f.at(x, 2)).landform = terrain_landform::mountain;
+            ++f.w.territory_generation;
             reanchor_fronts(f.w);
             add_hub(f, f.at(0, 0));
-            const entity_id u = add_wide_unit(f, f.A, f.at(30, 1), 40);
+            const entity_id u = add_gun(f, f.at(30, 1));
             const front fr = nation_fronts(f.w, f.A).front();
             (void)cmd_assign(f.w, reg, f.A, u, fr.key);
             const entity_id was = f.w.units.at(u).front;
-            score_once(f.w);
+            score_with(f.w, rr);
             const entity_id dest = f.w.units.at(u).order.dest;
             check(was != null_entity && f.w.units.at(u).front == null_entity && dest != null_entity && cover_at(f.w, f.A, dest) >= 667,
                   "F13ii a no-reason front with no slot for the unit: priced where it stands, it comes off to fed ground");
+        }
+        // (kk) THE CLOCK (Ben, 2026-11-09): a nation not due this quarter still scores its
+        // fronts, and nothing else. B has one unit in its capital province (the defence pass
+        // would post it) and one away from it (the front pass would take it).
+        {
+            const auto clock_world = [&](wide& f, entity_id& home, entity_id& away) {
+                build_wide(f, false);
+                f.w.nations.at(f.B).capital_tile = f.at(0, 3);
+                war_record rec; rec.declarer = f.A; rec.defender = f.B; rec.declarer_goals = { f.at(0, 3) };
+                f.w.wars[{ f.A, f.B }] = rec;
+                (void)declare_hostile(f.w, f.A, f.B);
+                (void)declare_hostile(f.w, f.B, f.A);
+                home = add_wide_unit(f, f.B, f.at(5, 4), 40);
+                away = add_wide_unit(f, f.B, f.at(25, 3), 40);
+            };
+            corp_ai_params p; p.cadence_k = 1000;
+            int not_due = -1, due = -1;
+            {
+                wide probe; entity_id h = null_entity, a = null_entity; clock_world(probe, h, a);
+                for (int t = k_campaign_settle_ticks; t < k_campaign_settle_ticks + 2000 && (not_due < 0 || due < 0); ++t)
+                    (corp_strategic_eval_due(probe.w, probe.B, t, p) ? due : not_due) = t;
+            }
+            check(not_due >= 0 && due >= 0, "F13clock0 the fixture finds a due and a not-due quarter");
+            wide nd; entity_id nh = null_entity, na = null_entity; clock_world(nd, nh, na);
+            economy_report r1;
+            run_corp_strategic_step(nd.w, reg, r1, not_due, p);
+            const bool listed = std::find(r1.corps_evaluated.begin(), r1.corps_evaluated.end(), nd.B) != r1.corps_evaluated.end();
+            check(!listed && nd.w.units.at(na).front != null_entity,
+                  "F13clock a nation not due this quarter still scores its fronts: the idle unit is assigned");
+            check(nd.w.units.at(nh).defend_province == no_province,
+                  "F13clock2 and only its fronts: the defence pass did not post the capital's unit");
+            wide dd; entity_id dh = null_entity, da = null_entity; clock_world(dd, dh, da);
+            economy_report r2;
+            run_corp_strategic_step(dd.w, reg, r2, due, p);
+            check(dd.w.units.at(dh).defend_province != no_province,
+                  "F13clock3 the same world on a due quarter does post it: the row can see the pass");
         }
         // (jj, jj2) A unit that cannot stand fed, already on a no-reason front: the joiner's test.
         // A slot costlier than standing takes it off; one no costlier leaves it there.

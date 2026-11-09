@@ -106,7 +106,9 @@ roster_band campaign_roster_band_for(era_band band);
 // mask, but only crosses it where its OWN polity owns the water — a shore you
 // hold is shallow, bridged, causewayed. Ownership rather than distance is what
 // gives the crossing a cause a player can read. `row_can_traverse` is the one
-// place that asymmetry is expressed, so no caller re-derives it.
+// place that asymmetry is expressed, so no caller re-derives it. The campaign
+// does not grant it: a land unit there marches on land (Ben, 2026-11-09;
+// `tile_domain_blocks` asks with no ownership), bridges excepted.
 
 enum class traversal_domain : uint8_t
 {

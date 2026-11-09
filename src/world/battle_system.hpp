@@ -415,28 +415,22 @@ std::function<bool(const tile_component&)> class_wall(const military_capability_
                                                       uint16_t type);
 
 /// THE DOMAIN WALL (BL-1466; MILITARY.md § Domains and traversal): true for a tile a
-/// unit of roster row @p type, owned by @p owner, may not stand on - so a march path
-/// solved through it never crosses one. The tile's domain is its own substrate (open
-/// ocean, coastal water, else land: a province never spans two domains, so this is its
-/// province's kind); coastal water counts as owned where the TILE is the owner's home
-/// nation's (`tile_to_nation`, PROVINCES.md § Who owns water; `row_can_traverse`), and a
-/// roaded water tile is land to a land class (a bridge is a road). A land class therefore
-/// never paths over open ocean or another polity's shore, and may cross its own. An unknown row is walled nowhere. @p w must
-/// outlive the test.
-std::function<bool(const tile_component&)> domain_wall(world& w, entity_id owner, uint16_t type);
+/// unit of roster row @p type may not stand on - so a march path solved through it never
+/// crosses one. The tile's domain is its own substrate (open ocean, coastal water, else
+/// land: a province never spans two domains, so this is its province's kind). A LAND UNIT
+/// MARCHES ON LAND (Ben, 2026-11-09): a land class never stands on open ocean, a coast or
+/// a lake, its own included; a roaded water tile is land to it (a bridge is a road). A
+/// naval row reads the water under it. An unknown row is walled nowhere.
+std::function<bool(const tile_component&)> domain_wall(uint16_t type);
 
-/// The domain wall's test for one tile (`domain_wall`): true when roster row @p row
-/// (@p land_row: it holds the land bit) may not stand on @p t for a mover whose home
-/// nation is @p home. Coastal water is owned per tile (`tile_to_nation`); a roaded water
-/// tile is land to a land class (a bridge is a road).
-bool tile_domain_blocks(world& w, const roster_row& row, bool land_row, entity_id home,
-                        const tile_component& t);
+/// The domain wall's test for one tile (`domain_wall`): true when roster row @p row may
+/// not stand on @p t. The campaign's rule; the Era -1 sim keeps its own.
+bool tile_domain_blocks(const roster_row& row, const tile_component& t);
 
 /// The domain wall and, when given and non-empty, @p class_wall_fn in one test: what a
 /// march's path search is solved around.
 std::function<bool(const tile_component&)>
-march_wall(world& w, entity_id owner, uint16_t type,
-           const std::function<bool(const tile_component&)>& class_wall_fn);
+march_wall(uint16_t type, const std::function<bool(const tile_component&)>& class_wall_fn);
 
 /// THE TERRAIN HOOK for a unit standing where it stands (BL-1455): all five effects of
 /// its tile on its class (`terrain_class_effects_for_type` at `u.position`). Neutral
