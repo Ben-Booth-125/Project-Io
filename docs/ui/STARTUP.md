@@ -71,6 +71,15 @@ settings hub. **It offers Load (Ben, 2026-11-05)**, because Exit to Menu must no
 - **Bodies** — a disabled slider, fixed at 5; the count knob is phased to a
   later update. The nation targets are set on the setup round, not here (§ Rounds).
 - **New Game** → `open_new_world_wizard()` (commits nothing); **Quick Start**; **Load**; **Quit**.
+- **Load lists the saves by name (Ben, 2026-11-09)**, newest first, in place of its button, with a
+  **Back** press; a row opens that save. Every `*.iosave` beside the executable is on the list, so
+  an existing quicksave lists as "quicksave". Disabled with the tooltip *Nothing saved yet* when
+  there are none. Names are `MENU.md` § Application / system menu.
+- **A loaded save opens through the loading screen (Ben, 2026-11-09).** A save holds no baked
+  ground, so loading one — from this list or by F6 — starts the home master and waits on the same
+  top-band wait surface as a new game's last step (§ Handoff, "Painting the ground"), under the
+  title *Loading the save*, then enters play. The save's clock and series stand as they were: the
+  wait is not a new game's start and lands no game days.
 - **Quick Start (Ben, 2026-10-08)** — generates the world straight through with no wizard rounds
   drawn but the setup round, which it opens alone (§ Rounds): the cold build behind one loading bar, then the **seat
   screen**, so the player still chooses the nation. It is the same world the wizard builds

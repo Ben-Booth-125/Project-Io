@@ -136,7 +136,7 @@ alphabetical order.
 
 **Answers:** What is moving on this ground, whose is it, what does it carry, where is it bound and when does it land?
 
-**Because:** Ben, 2026-11-05 (SELECTION.md § The convoy element): convoys are drawn on the map as they move, and a press selects one. Trade is half the game and until now it moved invisibly: the vision beam lit the ground under the player's own cargo and the Convoys ledger listed it, but nothing on the map was the shipment. The marker sits at the lane's head, on the clock the beam uses, so it stands where the sim says the cargo is. Several on one tile are one marker with a count, the clutter guard, and a repeat press walks them as the wing marker walks its wings. Another nation's marker draws only on ground the player's own vision lights (DISCOVERY.md), and its card names only the owner and how it travels: the cargo and route stay private. A convoy is not an entity, so the selection holds its id in a field of its own, as the battle's triple does, and an arrived id clears itself.
+**Because:** Ben, 2026-11-05 (SELECTION.md § The convoy element): convoys are drawn on the map as they move, and a press selects one. Ben, 2026-11-09: the marker is a zoomed size and its count sits in a rectangle beside the circle, because a count floating behind a marker read as nothing. Trade is half the game and until now it moved invisibly: the vision beam lit the ground under the player's own cargo and the Convoys ledger listed it, but nothing on the map was the shipment. The marker sits at the lane's head, on the clock the beam uses, so it stands where the sim says the cargo is. Several on one tile are one marker with a count, the clutter guard, and a repeat press walks them as the wing marker walks its wings. Another nation's marker draws only on ground the player's own vision lights (DISCOVERY.md), and its card names only the owner and how it travels: the cargo and route stay private. A convoy is not an entity, so the selection holds its id in a field of its own, as the battle's triple does, and an arrived id clears itself.
 
 *Demanded by BL-1506 · `src/ui/body_surface_canvas.cpp`, `src/ui/selection_panel.cpp`, `src/ui/ui_state.hpp` · id `convoy_marker`*
 
@@ -164,13 +164,13 @@ alphabetical order.
 
 *Demanded by BL-031, BL-145 · `src/ui/entity_summary.cpp` · id `entity_summary`*
 
-### Escape menu: the full-canvas pause screen behind the gear and Esc, with Save, Options, Exit to Menu and Exit Game; and Load on the main menu
+### Escape menu: the full-window pause screen behind the gear and Esc, with the Save name form, Options, Exit to Menu and Exit Game; and the Load list on the main menu
 
 **Answers:** How do I stop, keep what I have, and leave?
 
-**Because:** A player must be able to reach save, settings and the way out without knowing a hotkey (BL-070), and leaving a campaign has to be a thing the game can do short of closing the window: until this surface a campaign had no way back to the main menu, and the save it could write had no door on the screen a player would look for it on. It takes the whole canvas rather than a corner popup because it is the pause screen (Ben, 2026-11-05): the world under it has stopped, so the map earns nothing while it is up. It says when the campaign was last saved, because that is the one fact the choice in front of the player turns on. Both exits warn every time, not only when the world moved, because a paused player can still place a build and 'nothing changed' is a claim the surface cannot make. The main menu gains Load because Exit to Menu must not strand a save (STARTUP.md § Main menu).
+**Because:** A player must be able to reach save, settings and the way out without knowing a hotkey (BL-070), and leaving a campaign has to be a thing the game can do short of closing the window: until this surface a campaign had no way back to the main menu, and the save it could write had no door on the screen a player would look for it on. It takes the whole canvas rather than a corner popup because it is the pause screen (Ben, 2026-11-05): the world under it has stopped, so the map earns nothing while it is up. It says when the campaign was last saved, because that is the one fact the choice in front of the player turns on. Both exits warn every time, not only when the world moved, because a paused player can still place a build and 'nothing changed' is a claim the surface cannot make. The main menu gains Load because Exit to Menu must not strand a save (STARTUP.md § Main menu). Ben, 2026-11-09: it covers the whole window, shell included, so a pause screen reads as one; Save asks for a name and Load lists saves by name, because a campaign worth keeping is worth more than one slot, and the name is the file name, so a save stays a file the player can recognise.
 
-*Demanded by BL-1519 · `src/ui/time_panel.cpp`, `src/ui/startup_screens.cpp`, `src/core/app.cpp`, `src/ui/icons.cpp` · id `escape_menu`*
+*Demanded by BL-1519 · `src/ui/time_panel.cpp`, `src/ui/startup_screens.cpp`, `src/core/save_names.hpp`, `src/core/app.cpp`, `src/ui/icons.cpp` · id `escape_menu`*
 
 ### Field channel (comms dock)
 

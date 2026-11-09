@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include "save_names.hpp"    // the Load list's rows
 #include "agent_seam.hpp"
 #include "ground_layer.hpp" // BL-732: baked-ground chunk cache
 #include "play_log.hpp"     // the seated session's write-only play log
@@ -683,6 +684,11 @@ private:
     bool       m_quit_requested = false;  ///< Set by the menu's Quit button; breaks the run() loop.
     // --- The escape menu (BL-1519; MENU.md § Application / system menu) ---
     bool       m_exit_to_menu_requested = false; ///< Pressed inside a frame; acted on at the next frame's head.
+    /// The Load list on the main menu (Ben, 2026-11-09; STARTUP.md § Main menu).
+    bool                      m_load_list_open  = false;
+    std::vector<save_listing> m_save_list;      ///< Newest first; re-read while the menu stands.
+    int                       m_save_list_frame = -1000; ///< The ImGui frame m_save_list was read on.
+    bool       m_loading_save    = false; ///< The paint wait is a load's: it opens play without a new game's start.
     bool       m_menu_was_open   = false; ///< The escape menu's open state last seen, for its open and close edges.
     bool       m_menu_paused_it  = false; ///< The menu's open edge is what stopped the clock, so its close restarts it.
     long long  m_last_save_day   = -1;    ///< day_tick of this session's last save or load; -1 before either.

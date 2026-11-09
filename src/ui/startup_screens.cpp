@@ -1764,19 +1764,63 @@ void app::draw_main_menu()
                               "straight through, past the rounds, and choose your corporation.");
         ImGui::Dummy({0.0f, 6.0f});
         {
-            // Load (BL-1519; STARTUP.md § Main menu): the save the escape menu and F5
-            // write. Disabled with nothing to load, and the tooltip says why.
-            std::error_code ec;
-            const bool have_save = std::filesystem::exists(quick_save_path(), ec);
-            ImGui::BeginDisabled(!have_save);
-            const ImVec2 load_at = ImGui::GetCursorScreenPos();
-            if (ImGui::Button("Load", btn) && !load_game_from(quick_save_path()))
-                m_menu_message = "That save could not be read: it is missing, corrupt, or from another version.";
-            ImGui::EndDisabled();
-            m_ui.escape_drawn[ui_state::esc_main_load].x = load_at.x + btn.x * 0.5f;
-            m_ui.escape_drawn[ui_state::esc_main_load].y = load_at.y + btn.y * 0.5f;
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
-                ImGui::SetTooltip(have_save ? "Open your saved campaign." : "Nothing saved yet.");
+            // Load (STARTUP.md § Main menu; Ben, 2026-11-09): every save, by name. The
+            // list is re-read twice a second while the menu stands, as a press of F5 in
+            // another window would add to it; disabled with nothing to load.
+            if (ImGui::GetFrameCount() - m_save_list_frame >= 30)
+            {
+                m_save_list       = list_saves();
+                m_save_list_frame = ImGui::GetFrameCount();
+            }
+            const bool have_save = !m_save_list.empty();
+            if (!have_save)
+                m_load_list_open = false;
+            if (!m_load_list_open)
+            {
+                ImGui::BeginDisabled(!have_save);
+                const ImVec2 load_at = ImGui::GetCursorScreenPos();
+                if (ImGui::Button("Load", btn))
+                {
+                    m_load_list_open = true;
+                    m_menu_message.clear();
+                }
+                ImGui::EndDisabled();
+                m_ui.escape_drawn[ui_state::esc_main_load].x = load_at.x + btn.x * 0.5f;
+                m_ui.escape_drawn[ui_state::esc_main_load].y = load_at.y + btn.y * 0.5f;
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                    ImGui::SetTooltip(have_save ? "Choose a saved campaign." : "Nothing saved yet.");
+            }
+            else
+            {
+                // Newest first. The list scrolls past five rows; the first row is the
+                // press verify's main_load aims at while the list stands.
+                const float row_h = btn.y + ImGui::GetStyle().ItemSpacing.y;
+                const float list_h = std::min(row_h * 5.0f, row_h * static_cast<float>(m_save_list.size()));
+                const std::vector<save_listing> shown = m_save_list; // a row's press may reload the list
+                ImGui::BeginChild("##save_list", {btn.x, list_h});
+                for (int i = 0; i < static_cast<int>(shown.size()); ++i)
+                {
+                    ImGui::PushID(i);
+                    if (ImGui::Button(shown[static_cast<std::size_t>(i)].name.c_str(),
+                                      {ImGui::GetContentRegionAvail().x, btn.y}))
+                    {
+                        if (load_game_from(shown[static_cast<std::size_t>(i)].path))
+                            m_load_list_open = false;
+                        else
+                            m_menu_message = "That save could not be read: it is missing, corrupt, or from another version.";
+                    }
+                    if (i == 0)
+                    {
+                        const ImVec2 mn = ImGui::GetItemRectMin(), sz = ImGui::GetItemRectSize();
+                        m_ui.escape_drawn[ui_state::esc_main_load].x = mn.x + sz.x * 0.5f;
+                        m_ui.escape_drawn[ui_state::esc_main_load].y = mn.y + sz.y * 0.5f;
+                    }
+                    ImGui::PopID();
+                }
+                ImGui::EndChild();
+                if (ImGui::Button("Back", btn))
+                    m_load_list_open = false;
+            }
         }
         ImGui::Dummy({0.0f, 6.0f});
         if (ImGui::Button("Quit", btn))

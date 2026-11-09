@@ -40,6 +40,14 @@ if own == 0 then
     print("convoy_map: zoomed out: own " .. own .. ", rival " .. rival)
 end
 verify.capture("convoy_map_overview")
+-- The marker and its count box grow with the zoom (Ben, 2026-11-09): read the pair.
+verify.set_zoom(8.0)
+verify.center_tile(anchor.col + 5, anchor.row + 14, 8.0) -- onto the staged convoy, so the zoomed marker is in frame
+verify.frames(3)
+print("convoy_map: zoomed in markers: " .. #verify.convoy_markers())
+verify.capture("convoy_map_zoom_in")
+verify.center_tile(anchor.col, anchor.row, 3.0)
+verify.frames(3)
 verify.expect(own > 0, "the player's convoy draws a marker")
 
 local target = nil

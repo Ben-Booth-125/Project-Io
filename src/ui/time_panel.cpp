@@ -4,7 +4,7 @@
 #include "ui/time_panel.hpp"
 
 #include "core/sim_loop.hpp"
-#include "ui/foldout_column.hpp" // canvas_rect, what the escape menu takes
+#include "core/save_names.hpp"   // the named-save rule the escape menu's form asks
 #include "ui/format.hpp"
 #include "ui/icons.hpp"
 #include "ui/presentation.hpp"
@@ -18,7 +18,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 namespace {
 
@@ -268,6 +270,8 @@ void draw_time_panel(ui_state& state, sim_loop& sim, int& prev_speed, const ImVe
                                             : IM_COL32(170, 178, 192, 255);
             state.escape_drawn[ui_state::esc_gear].x = g0.x + gear_w * 0.5f;
             state.escape_drawn[ui_state::esc_gear].y = g0.y + time_btn_h * 0.5f;
+            state.escape_gear_w = gear_w;
+            state.escape_gear_h = time_btn_h;
             icons::gear(ImGui::GetWindowDrawList(),
                         {g0.x + gear_w * 0.5f, g0.y + time_btn_h * 0.5f},
                         time_btn_h * 0.36f, gear_col);
@@ -307,12 +311,11 @@ escape_menu_press draw_escape_menu(ui_state& st, bool options_open, const char* 
     if (!st.show_system_menu)
         return out;
 
-    // The whole canvas region (LAYOUT.md § Canvas area), the shell standing around
-    // it: the gear in the time panel stays pressable, so the control that opened
-    // this closes it (the toggle rule).
-    const foldout_rect canvas = canvas_rect();
-    ImGui::SetNextWindowPos({canvas.x, canvas.y});
-    ImGui::SetNextWindowSize({canvas.w, canvas.h});
+    // The whole window, shell included (Ben, 2026-11-09): the pause screen stands over
+    // everything. The gear keeps its place on it below (the toggle rule).
+    const ImVec2 area = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowPos({0.0f, 0.0f});
+    ImGui::SetNextWindowSize(area);
     ImGui::SetNextWindowBgAlpha(0.94f);
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
@@ -325,22 +328,22 @@ escape_menu_press draw_escape_menu(ui_state& st, bool options_open, const char* 
     if (ImGui::IsWindowAppearing())
         ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
 
-    const ImVec2 btn{std::min(280.0f, canvas.w - 32.0f), 40.0f};
+    const ImVec2 btn{std::min(280.0f, area.x - 32.0f), 40.0f};
     const float  line = ImGui::GetTextLineHeightWithSpacing();
     const float  gap  = 6.0f;
     // Title, last-saved line, then four presses or the warning; the hint beneath.
     const float  body_h = line * 3.0f + (btn.y + gap) * 4.0f
                         + (st.spectating ? ImGui::GetFrameHeightWithSpacing() : 0.0f);
-    ImGui::SetCursorPosY(std::max(8.0f, (canvas.h - body_h) * 0.5f));
+    ImGui::SetCursorPosY(std::max(8.0f, (area.y - body_h) * 0.5f));
 
     const auto centred_text = [&](const char* text, ImU32 col) {
-        ImGui::SetCursorPosX((canvas.w - ImGui::CalcTextSize(text).x) * 0.5f);
+        ImGui::SetCursorPosX((area.x - ImGui::CalcTextSize(text).x) * 0.5f);
         ImGui::PushStyleColor(ImGuiCol_Text, col);
         ImGui::TextUnformatted(text);
         ImGui::PopStyleColor();
     };
     const auto press = [&](const char* label, ui_state::escape_press which, bool lit = false) {
-        ImGui::SetCursorPosX((canvas.w - btn.x) * 0.5f);
+        ImGui::SetCursorPosX((area.x - btn.x) * 0.5f);
         if (lit)
             ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
         const bool pressed = ImGui::Button(label, btn);
@@ -356,9 +359,73 @@ escape_menu_press draw_escape_menu(ui_state& st, bool options_open, const char* 
     centred_text(last_saved, palette::text_secondary);
     ImGui::Dummy({0.0f, 6.0f});
 
-    if (!st.confirm_exit_pending)
+    if (st.save_form_open)
     {
-        out.save = press("Save", ui_state::esc_save);
+        // Naming the save (Ben, 2026-11-09): the name is the file name, so a name the
+        // file system could not hold is refused with the reason, never altered.
+        const char* name_error = save_name_error(st.save_name);
+        bool confirm = false;
+        ImGui::SetCursorPosX((area.x - btn.x) * 0.5f);
+        ImGui::SetNextItemWidth(btn.x);
+        ImGui::BeginDisabled(st.save_overwrite_pending);
+        if (st.save_form_focus)
+        {
+            ImGui::SetKeyboardFocusHere();
+            st.save_form_focus = false;
+        }
+        if (ImGui::InputTextWithHint("##save_name", "Name this save", st.save_name, sizeof st.save_name,
+                                     ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll))
+            confirm = name_error == nullptr;
+        ImGui::EndDisabled();
+        if (name_error != nullptr)
+            centred_text(name_error, palette::negative);
+        else if (st.save_failed)
+            centred_text("That save could not be written.", palette::negative);
+        else
+            ImGui::Dummy({0.0f, ImGui::GetTextLineHeight()});
+
+        if (st.save_overwrite_pending)
+        {
+            centred_text("A save with that name exists. Overwrite it?", palette::negative);
+            if (press("Overwrite", ui_state::esc_warn_confirm))
+            {
+                st.save_overwrite_pending = false;
+                out.save_name = st.save_name;
+            }
+            if (press("Cancel", ui_state::esc_warn_cancel))
+                st.save_overwrite_pending = false;
+        }
+        else
+        {
+            ImGui::BeginDisabled(name_error != nullptr);
+            confirm = press("Save", ui_state::esc_save) || confirm;
+            ImGui::EndDisabled();
+            if (press("Cancel", ui_state::esc_warn_cancel))
+            {
+                st.save_form_open = false;
+                st.save_failed    = false;
+                confirm           = false;
+            }
+            if (confirm)
+            {
+                std::error_code ec;
+                if (std::filesystem::exists(save_name_path(st.save_name), ec))
+                    st.save_overwrite_pending = true;
+                else
+                    out.save_name = st.save_name;
+            }
+        }
+    }
+    else if (!st.confirm_exit_pending)
+    {
+        if (press("Save", ui_state::esc_save))
+        {
+            st.save_form_open  = true;
+            st.save_form_focus = true;
+            st.save_failed     = false;
+            if (st.save_name[0] == '\0')
+                std::snprintf(st.save_name, sizeof st.save_name, "quicksave");
+        }
         out.options = press("Options", ui_state::esc_options, options_open);
         ImGui::SetItemTooltip("Display and UI scale (F10).");
         if (press("Exit to Menu", ui_state::esc_exit_menu))
@@ -395,7 +462,7 @@ escape_menu_press draw_escape_menu(ui_state& st, bool options_open, const char* 
     // exactly what re-clicking undoes.
     if (st.spectating)
     {
-        ImGui::SetCursorPosX((canvas.w - btn.x) * 0.5f);
+        ImGui::SetCursorPosX((area.x - btn.x) * 0.5f);
         ImGui::Checkbox("God view", &st.god_view);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Spectator only: read every nation's internals and see\n"
@@ -404,6 +471,21 @@ escape_menu_press draw_escape_menu(ui_state& st, bool options_open, const char* 
     }
 
     centred_text("Esc to resume", palette::neutral);
+
+    // The gear stands where the time panel drew it, on top of the menu that now covers
+    // it: the control that opened this closes it (the toggle rule).
+    if (st.escape_gear_w > 0.0f)
+    {
+        const ImVec2 c{st.escape_drawn[ui_state::esc_gear].x, st.escape_drawn[ui_state::esc_gear].y};
+        ImGui::SetCursorScreenPos({c.x - st.escape_gear_w * 0.5f, c.y - st.escape_gear_h * 0.5f});
+        if (ImGui::InvisibleButton("##escape_gear_close", {st.escape_gear_w, st.escape_gear_h}))
+        {
+            st.show_system_menu     = false;
+            st.confirm_exit_pending = false;
+        }
+        icons::gear(ImGui::GetWindowDrawList(), c, st.escape_gear_h * 0.36f, palette::selection);
+        ImGui::SetItemTooltip("Close the menu (Esc)");
+    }
     ImGui::End();
     return out;
 }
