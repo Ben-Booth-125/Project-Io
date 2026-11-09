@@ -21,6 +21,7 @@
 #include <cstring> // std::strcmp — the Good column's order
 #include <map>
 #include <string>
+#include <tuple>   // the automatic-trades route key
 #include <vector>
 
 namespace ui {
@@ -215,7 +216,7 @@ namespace {
 //
 // THE READS ARE NOT EQUALLY CHEAP AND ARE NOT ONE TABLE. The trade-points line is
 // a read of one corporation record; read 1 is a filter on the player's own trades;
-// read 2 is the same list past a gate; read 3 is a derivation with no store behind
+// read 2 is the automatic cargo in transit, past a gate; read 3 is a derivation with no store behind
 // it at all. They get headed sections and distinct record types, because
 // presenting them as one list would be claiming they cost the same to know.
 //
@@ -251,7 +252,6 @@ int         g_cache_tick    = -1;
 std::size_t g_cache_markets = 0;
 std::size_t g_cache_assets  = 0;
 entity_id   g_cache_player  = null_entity; // a seat change re-prices: the haul is the corp's
-bool        g_cache_sourced = false;       // trade points here opened or shut the offers
 
 // The add-trade form's state. Namespace-scope, not function-local, so a potential
 // trade's "+" press can PREFILL it (good, from here, to there) — read 3 answers
@@ -280,7 +280,6 @@ void clear_trade_records()
     g_cache_markets      = 0;
     g_cache_assets       = 0;
     g_cache_player       = null_entity;
-    g_cache_sourced      = false;
 }
 
 /// A corporation's display name; "Corp #n" when it has none.
@@ -403,6 +402,62 @@ std::vector<trade_row_record> collect_trades(const world& w, const recipe_regist
     return out;
 }
 
+/// READ 2 — the automatic trades touching market @p mid (Ben, 2026-11-09;
+/// ledgers/market.md § 2b), every owner's, largest cargo first.
+///
+/// AUTO TRADE IS STORED NOWHERE: `run_trades` chooses it afresh each tick, and only
+/// the manual trades are world state. What it leaves behind is its shipments, and
+/// every convoy is the shipment of a trade (`commit_trade_shipment` is the one place
+/// they are made). So a row is the cargo in transit on one route, folded per owner,
+/// source, destination and good; re-running the ranking here would be a second
+/// answer to what the pass did.
+///
+/// A convoy does not say which half of the pass sent it, so a route with a manual
+/// trade standing on it is read as manual and left out: an auto shipment on the same
+/// route is the one thing this cannot show.
+std::vector<trade_row_record> collect_automatic_trades(const world& w, entity_id mid)
+{
+    const entity_id player = player_actor(w);
+    using route_key = std::tuple<entity_id, entity_id, entity_id, resource_type>;
+    std::map<route_key, trade_row_record> routes; // ordered: the tie-break below
+    for (const convoy_component& c : w.convoys)
+    {
+        if (c.arrived || c.corp == null_entity)
+            continue;
+        if (c.source_market != mid && c.dest_market != mid)
+            continue;
+        const bool manual = std::any_of(w.trades.begin(), w.trades.end(), [&c](const standing_trade& t) {
+            return t.owner == c.corp && t.from_market == c.source_market && t.to_market == c.dest_market
+                   && t.resource == c.cargo_resource;
+        });
+        if (manual)
+            continue;
+        trade_row_record& r = routes[route_key{c.source_market, c.dest_market, c.corp, c.cargo_resource}];
+        if (r.convoys == 0)
+        {
+            r.corp        = c.corp;
+            r.corp_name   = corp_display_name(w, c.corp);
+            r.resource    = c.cargo_resource;
+            r.name        = presentation_of(c.cargo_resource).name;
+            r.from_market = c.source_market;
+            r.from_name   = market_city_name(w, c.source_market);
+            r.to_market   = c.dest_market;
+            r.to_name     = market_city_name(w, c.dest_market);
+            r.mine        = (c.corp == player || c.corp == w.player_entity);
+        }
+        r.units += c.cargo_qty;
+        ++r.convoys;
+    }
+    std::vector<trade_row_record> out;
+    out.reserve(routes.size());
+    for (auto& [key, r] : routes)
+        out.push_back(std::move(r));
+    std::stable_sort(out.begin(), out.end(), [](const trade_row_record& x, const trade_row_record& y) {
+        return x.units > y.units;
+    });
+    return out;
+}
+
 } // namespace
 
 /// The player's trade-points read (TRADE.md § Auto and reserved trade).
@@ -451,10 +506,10 @@ namespace {
 /// against the econ tick.
 ///
 /// THE RANKING ITSELF HAS NO OWNER CHECK AND MUST NOT GROW ONE HERE: the trade pass
-/// and the scorer share it. So the caller asks this only for a market the acting
-/// nation makes trade points in (Ben, 2026-11-05; ledgers/market.md § 2b), which is
-/// also what `trade_is_valid` requires of a trade's source, and a `+` is never an
-/// offer the verb refuses.
+/// and the scorer share it. The list is asked for every market, whatever points the
+/// acting nation has there (Ben, 2026-11-09; ledgers/market.md § 2b). Points gate
+/// TAKING a row: its `+` is disabled at a market that makes none, which also keeps
+/// `trade_is_valid`'s source rule, so a live `+` is never an offer the verb refuses.
 std::vector<potential_trade_record> derive_potential_trades(
     world& w, const recipe_registry& reg, entity_id here_mid)
 {
@@ -480,7 +535,7 @@ std::vector<potential_trade_record> derive_potential_trades(
     // the most profitable' is a red herring"). A potential trade is one input
     // among several — the player still weighs reach, stock, competition and what
     // the price does next. The ORDER is the trade pass's own: margin per point,
-    // ties by source, destination, good.
+    // which the table heads Profit, ties by source, destination, good.
     std::sort(offers.begin(), offers.end(), [](const trade_route_offer& x, const trade_route_offer& y) {
         if (x.score != y.score) return x.score > y.score;
         if (x.a != y.a)         return x.a < y.a;
@@ -772,8 +827,11 @@ void draw_add_trade_form(const world& w, const recipe_registry& reg, ui_state& s
 ///                   would print the same name on every row.
 /// @param removable  Read 1 only. You cannot clear a rival's trade, and a press
 ///                   that could not succeed has no business being drawn.
+/// @param automatic  Read 2's rows hold no points: the last column is the cargo
+///                   in transit on the route.
 void draw_trade_table(const char* table_id, const std::vector<trade_row_record>& rows,
-                      bool show_owner, bool removable, ui_state& state, entity_id corp)
+                      bool show_owner, bool removable, ui_state& state, entity_id corp,
+                      bool automatic = false)
 {
     constexpr ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
     const int n_cols = 3 + (show_owner ? 1 : 0) + (removable ? 1 : 0);
@@ -786,23 +844,25 @@ void draw_trade_table(const char* table_id, const std::vector<trade_row_record>&
     // a guessed font size — NR-709 is the failure this avoids. No item glyph, for
     // the measured reason the old order table gave: two names share the row.
     const float pad   = ImGui::GetStyle().CellPadding.x * 2.0f;
-    const float w_pts = ImGui::CalcTextSize("000.0").x + pad;
+    const float w_pts = ImGui::CalcTextSize(automatic ? "0000.0" : "000.0").x + pad;
     const float w_rm  = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.0f + pad;
 
     ImGui::TableSetupColumn("Good",  ImGuiTableColumnFlags_WidthStretch, 1.0f);
     if (show_owner)
         ImGui::TableSetupColumn("Holder", ImGuiTableColumnFlags_WidthStretch, 0.8f);
     ImGui::TableSetupColumn("Route", ImGuiTableColumnFlags_WidthStretch, 1.6f);
-    ImGui::TableSetupColumn("Pts",   ImGuiTableColumnFlags_WidthFixed, w_pts);
+    ImGui::TableSetupColumn(automatic ? "Units" : "Pts", ImGuiTableColumnFlags_WidthFixed, w_pts);
     if (removable)
         ImGui::TableSetupColumn("##x", ImGuiTableColumnFlags_WidthFixed, w_rm);
     ImGui::TableHeadersRow();
 
+    int automatic_row = 0;
     for (const trade_row_record& r : rows)
     {
         // PushID on the TRADE ID, not the loop index: the id is what clear_trade
-        // names, and it is stable across the erase a press causes.
-        ImGui::PushID(static_cast<int>(r.trade_id));
+        // names, and it is stable across the erase a press causes. An automatic
+        // row has no id and no press.
+        ImGui::PushID(automatic ? automatic_row++ : static_cast<int>(r.trade_id));
         ImGui::TableNextRow();
 
         const resource_presentation& rp = presentation_of(r.resource);
@@ -840,16 +900,27 @@ void draw_trade_table(const char* table_id, const std::vector<trade_row_record>&
         {
             ImGui::Text("%s from %s to %s", r.name, r.from_name.c_str(), r.to_name.c_str());
             ImGui::Separator();
-            ImGui::Text("Trade points  %.1f", static_cast<double>(r.points));
-            ImGui::Text("Ships up to   %.1f units a tick", static_cast<double>(r.units));
+            if (automatic)
+            {
+                ImGui::Text("In transit    %.1f units", static_cast<double>(r.units));
+                ImGui::Text("Convoys       %d", r.convoys);
+            }
+            else
+            {
+                ImGui::Text("Trade points  %.1f", static_cast<double>(r.points));
+                ImGui::Text("Ships up to   %.1f units a tick", static_cast<double>(r.units));
+            }
             ImGui::EndTooltip();
         }
 
         ImGui::TableSetColumnIndex(col++);
-        ImGui::Text("%.1f", static_cast<double>(r.points));
+        ImGui::Text("%.1f", static_cast<double>(automatic ? r.units : r.points));
         if (ImGui::BeginItemTooltip())
         {
-            ImGui::Text("%.1f units a tick", static_cast<double>(r.units));
+            if (automatic)
+                ImGui::Text("%.1f units in transit on %d convoys", static_cast<double>(r.units), r.convoys);
+            else
+                ImGui::Text("%.1f units a tick", static_cast<double>(r.units));
             ImGui::EndTooltip();
         }
 
@@ -871,22 +942,49 @@ void draw_trade_table(const char* table_id, const std::vector<trade_row_record>&
     ImGui::EndTable();
 }
 
-/// READ 3's table. Ranked by margin, best first, with the three terms behind a
-/// hover rather than in three more columns the width cannot hold. Each row's
-/// "+" prefills the add-trade form with it (good, from here, to there).
-void draw_potential_table(const std::vector<potential_trade_record>& rows, entity_id here_mid)
+/// READ 3's hover: the arithmetic behind a row, and why it cannot be taken when it
+/// cannot. Every cell of the row carries it.
+void potential_row_tooltip(const potential_trade_record& r, const std::string& no_take_reason)
+{
+    if (!ImGui::BeginItemTooltip())
+        return;
+    ImGui::Text("%s to %s", r.name, r.dest_name.c_str());
+    ImGui::Separator();
+    ImGui::Text("Buy here      %.2f", static_cast<double>(r.buy_price));
+    ImGui::Text("Sell there    %.2f", static_cast<double>(r.sell_price));
+    ImGui::Text("Haulage /unit %.2f", static_cast<double>(r.haulage));
+    ImGui::Text("Margin /unit  %.2f", static_cast<double>(r.margin));
+    ImGui::Text("Profit /point %.2f", static_cast<double>(r.margin_per_point));
+    if (!no_take_reason.empty())
+    {
+        ImGui::Separator();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 22.0f);
+        ImGui::TextUnformatted(no_take_reason.c_str());
+        ImGui::PopTextWrapPos();
+    }
+    ImGui::EndTooltip();
+}
+
+/// READ 3's table. Highest profit first: PROFIT IS THE RANKING'S OWN FIGURE, margin
+/// per trade point, so the column a player reads is the key the rows sort by. The
+/// terms behind it sit under a hover rather than in columns the width cannot hold.
+/// Each row's "+" prefills the add-trade form (good, from here, to there), and is
+/// disabled when @p no_take_reason is non-empty: points gate taking a row, not
+/// listing it (Ben, 2026-11-09; ledgers/market.md § 2b).
+void draw_potential_table(const std::vector<potential_trade_record>& rows, entity_id here_mid,
+                          const std::string& no_take_reason)
 {
     constexpr ImGuiTableFlags flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
     if (!ImGui::BeginTable("##potential", 4, flags))
         return;
 
     const float pad    = ImGui::GetStyle().CellPadding.x * 2.0f;
-    const float w_marg = ImGui::CalcTextSize("+000.00").x + pad;
+    const float w_marg = std::max(ImGui::CalcTextSize("+0000.00").x, ImGui::CalcTextSize("Profit").x) + pad;
     const float w_use  = ImGui::CalcTextSize("+").x + ImGui::GetStyle().FramePadding.x * 2.0f + pad;
 
     ImGui::TableSetupColumn("Good",    ImGuiTableColumnFlags_WidthStretch, 1.0f);
     ImGui::TableSetupColumn("To",      ImGuiTableColumnFlags_WidthStretch, 1.0f);
-    ImGui::TableSetupColumn("Margin",  ImGuiTableColumnFlags_WidthFixed, w_marg);
+    ImGui::TableSetupColumn("Profit",  ImGuiTableColumnFlags_WidthFixed, w_marg);
     ImGui::TableSetupColumn("##use",   ImGuiTableColumnFlags_WidthFixed, w_use);
     ImGui::TableHeadersRow();
 
@@ -902,30 +1000,22 @@ void draw_potential_table(const std::vector<potential_trade_record>& rows, entit
         ui::fit_text(ui::text_box::table_cell, "market.trades.potential_good", r.name,
                      ImGui::GetContentRegionAvail().x);
         ImGui::PopStyleColor();
+        potential_row_tooltip(r, no_take_reason);
 
         ImGui::TableSetColumnIndex(1);
         ui::fit_text(ui::text_box::table_cell, "market.trades.potential_to", r.dest_name.c_str(),
                      ImGui::GetContentRegionAvail().x);
+        potential_row_tooltip(r, no_take_reason);
 
         ImGui::TableSetColumnIndex(2);
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(IM_COL32(90, 200, 140, 255)),
-                           "+%.2f", static_cast<double>(r.margin));
-
-        // The three terms, one hover away — the row is a ranking, the tooltip is
-        // the arithmetic behind it, so nothing is asserted that cannot be checked.
-        if (ImGui::BeginItemTooltip())
-        {
-            ImGui::Text("%s to %s", r.name, r.dest_name.c_str());
-            ImGui::Separator();
-            ImGui::Text("Buy here      %.2f", static_cast<double>(r.buy_price));
-            ImGui::Text("Sell there    %.2f", static_cast<double>(r.sell_price));
-            ImGui::Text("Haulage /unit %.2f", static_cast<double>(r.haulage));
-            ImGui::Text("Margin /unit  %.2f", static_cast<double>(r.margin));
-            ImGui::Text("Margin /point %.2f", static_cast<double>(r.margin_per_point));
-            ImGui::EndTooltip();
-        }
+                           "+%.2f", static_cast<double>(r.margin_per_point));
+        // The row is a ranking; the hover is the arithmetic behind it, so nothing
+        // is asserted that cannot be checked.
+        potential_row_tooltip(r, no_take_reason);
 
         ImGui::TableSetColumnIndex(3);
+        ImGui::BeginDisabled(!no_take_reason.empty());
         if (ImGui::SmallButton("+"))
         {
             g_form_good         = static_cast<int>(r.resource);
@@ -933,7 +1023,9 @@ void draw_potential_table(const std::vector<potential_trade_record>& rows, entit
             g_form_to           = r.dest_market;
             g_form_open_request = true;
         }
-        ImGui::SetItemTooltip("Fill the trade form with this route.");
+        ImGui::EndDisabled();
+        ImGui::SetItemTooltip("%s", no_take_reason.empty() ? "Fill the trade form with this route."
+                                                           : no_take_reason.c_str());
         ImGui::PopID();
     }
     ImGui::EndTable();
@@ -1057,7 +1149,7 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
     g_points             = collect_trade_points(w);
     g_my_trades          = collect_trades(w, reg, mid, true);
     g_market_trades_open = player_operates_on_body(w, body);
-    g_market_trades      = g_market_trades_open ? collect_trades(w, reg, mid, false)
+    g_market_trades      = g_market_trades_open ? collect_automatic_trades(w, mid)
                                                : std::vector<trade_row_record>{};
 
     // READ 3 AND THE HISTORY ARE CACHED AGAINST THE ECON TICK, and that is a
@@ -1075,29 +1167,33 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
     const std::vector<entity_id>* owned = assets_of(w, player_actor(w)); // BL-1406
     const std::size_t assets = (owned != nullptr) ? owned->size() : 0;
 
-    // THE GATE ON READ 3, read every frame rather than with the cache: a building
-    // going idle or being staffed is a press between econ ticks, and it changes
-    // whether this market can source anything. Null report: each building at its own
-    // assignment, the same structural read the scorer takes.
+    // THE GATE ON TAKING A READ 3 ROW, read every frame rather than with the cache:
+    // a building going idle or being staffed is a press between econ ticks, and it
+    // changes whether this market can source anything. Null report: each building at
+    // its own assignment, the same structural read the scorer takes.
     {
         const std::map<entity_id, float> here = market_trade_points(w, reg, nullptr, player_actor(w));
         const auto it = here.find(mid);
         g_potential_points = (it != here.end()) ? it->second : 0.0f;
     }
-    const bool sourced = g_potential_points > 0.0f;
+    // Empty when a row can be taken. The sentence is the one place the rule is said.
+    const std::string no_take_reason =
+        (g_potential_points > 0.0f)
+            ? std::string{}
+            : "You make no trade points in " + market_city_name(w, mid)
+                  + ", so no trade can leave it. A trade leaves a market where you hold a working "
+                    "Planetary Marketplace or Port.";
 
     if (g_cache_market != mid || g_cache_tick != w.current_econ_tick
         || g_cache_markets != w.markets.size() || g_cache_assets != assets
-        || g_cache_player != corp || g_cache_sourced != sourced)
+        || g_cache_player != corp)
     {
-        g_cache_sourced = sourced;
         g_cache_player  = corp;
         g_cache_market  = mid;
         g_cache_tick    = w.current_econ_tick;
         g_cache_markets = w.markets.size();
         g_cache_assets  = assets;
-        g_potential     = sourced ? derive_potential_trades(w, reg, mid)
-                                  : std::vector<potential_trade_record>{};
+        g_potential     = derive_potential_trades(w, reg, mid);
         g_exchanges     = derive_exchange_rows(w, mid);
     }
 
@@ -1161,8 +1257,8 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
             ImGui::PopTextWrapPos();
         }
 
-        // --- READ 2: every trade here ------------------------------------------
-        ImGui::SeparatorText("All trades here");
+        // --- READ 2: the automatic trades here ----------------------------------
+        ImGui::SeparatorText("Automatic Trades");
         if (!g_market_trades_open)
         {
             // THE GATE, STATED. A shut gate and an empty list are different
@@ -1172,38 +1268,37 @@ void draw_trades_tab(world& w, const recipe_registry& reg, ui_state& state,
         }
         else if (g_market_trades.empty())
         {
-            ImGui::TextDisabled("No manual trade leaves or lands here.");
+            ImGui::TextDisabled("No automatic trade is in transit here.");
         }
         else
         {
             ImGui::BeginChild("##all_box", {0.0f, table_height(k_book_cap)}, false);
-            draw_trade_table("##all", g_market_trades, true, false, state, corp);
+            draw_trade_table("##all", g_market_trades, true, false, state, corp, true);
             ImGui::EndChild();
-            ImGui::TextDisabled("%d manual, mine included.",
+            ImGui::TextDisabled("%d in transit, mine included.",
                                 static_cast<int>(g_market_trades.size()));
         }
 
         // --- READ 3: potential trades -----------------------------------------
         ImGui::SeparatorText("Potential trades");
-        if (!sourced)
-        {
-            // A shut gate and an empty list are different answers (§ 2b): this one
-            // says what would open it.
-            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
-            ImGui::TextWrapped("You make no trade points here. A working Planetary Marketplace or Port "
-                               "in this market would.");
-            ImGui::PopStyleColor();
-        }
-        else if (g_potential.empty())
+        if (g_potential.empty())
         {
             ImGui::TextDisabled("No route from here clears its haulage.");
         }
         else
         {
-            ImGui::TextDisabled("Routes the trade pass would rank from here, best per point.");
+            ImGui::TextDisabled("Routes from here, highest profit per trade point first.");
             ImGui::BeginChild("##pot_box", {0.0f, table_height(k_pot_cap)}, false);
-            draw_potential_table(g_potential, mid);
+            draw_potential_table(g_potential, mid, no_take_reason);
             ImGui::EndChild();
+        }
+        // No points and an empty list are different answers (§ 2b): the line says
+        // what is missing above whatever the list shows.
+        if (!no_take_reason.empty())
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+            ImGui::TextWrapped("%s", no_take_reason.c_str());
+            ImGui::PopStyleColor();
         }
 
         // --- The history half --------------------------------------------------

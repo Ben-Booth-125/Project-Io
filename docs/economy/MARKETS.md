@@ -810,8 +810,8 @@ one table.**
 1. **My trades.** Every trade the player's nation holds, manual and auto, with its route.
    Trades are world state (`world::trades`), written by the player and by rivals through the same
    verbs, so the population this reads exists.
-2. **The market's trades.** Every trade touching a market the player **operates in**, whoever owns
-   it. *Operates in* is the gate, and it must be a real predicate rather than "every market": a
+2. **The market's automatic trades.** Auto-trade cargo in transit to or from a market the player
+   **operates in**, whoever owns it (Ben, 2026-11-09). *Operates in* is the gate, and it must be a real predicate rather than "every market": a
    player reads the trades of markets they trade at, not of the whole system.
 3. **Potential trades.** Not a record at all — a **derivation**: for each good the player can
    reach, the destination's price less the source's, less the haul the route would cost

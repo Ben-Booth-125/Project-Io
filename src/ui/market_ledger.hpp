@@ -179,9 +179,11 @@ struct trade_row_record
     std::string   from_name;                   ///< `market_city_name` of the source.
     entity_id     to_market   = null_entity;
     std::string   to_name;                     ///< `market_city_name` of the destination.
-    float         points   = 0.0f;             ///< Trade points assigned per tick.
+    float         points   = 0.0f;             ///< Trade points assigned per tick. An automatic row holds none.
     float         units    = 0.0f;             ///< points x capacity(resource): the most it ships a tick.
-    bool          mine     = false;            ///< Read 1 (the player's) vs read 2 (the market's).
+                                               ///< An automatic row: the units in transit on the route.
+    bool          mine     = false;            ///< Owned by the player, tinted in read 2.
+    int           convoys  = 0;                ///< An automatic row: the convoys in transit on the route.
 };
 
 /// The player's TRADE POINTS as drawn (TRADE.md § Auto and reserved trade): what
@@ -267,8 +269,11 @@ struct exchange_row_record
 /// Read 1 — the player's manual trades touching the selected market, as drawn.
 const std::vector<trade_row_record>& my_trades();
 
-/// Read 2 — every manual trade touching that market, whoever owns it. EMPTY when
-/// the gate is shut; `market_trades_open()` distinguishes "shut" from "none standing".
+/// Read 2 — the AUTOMATIC trades touching that market, whoever owns them (Ben,
+/// 2026-11-09; ledgers/market.md § 2b). Auto trade is chosen afresh each tick and
+/// stored nowhere, so a row is the cargo auto trade has in transit on one route,
+/// `trade_id` 0, `points` 0. EMPTY when the gate is shut; `market_trades_open()`
+/// distinguishes "shut" from "none in transit".
 const std::vector<trade_row_record>& market_trades();
 
 /// Whether read 2's gate is open: THE PLAYER OWNS A BUILDING ON THAT BODY (Ben,
@@ -282,8 +287,9 @@ bool market_trades_open();
 /// where the top row is one input among several, not where it IS the move).
 const std::vector<potential_trade_record>& potential_trades();
 
-/// The acting nation's trade points at the Trades tab's market, the gate on
-/// `potential_trades` (BL-1516; ledgers/market.md § 2b). Zero: no offers.
+/// The acting nation's trade points at the Trades tab's market, the gate on TAKING
+/// a `potential_trades` row (Ben, 2026-11-09; ledgers/market.md § 2b). Zero: the
+/// rows still list, and their `+` is disabled.
 float potential_trade_points();
 
 /// The history half — exchanges at the selected market, NEWEST FIRST.

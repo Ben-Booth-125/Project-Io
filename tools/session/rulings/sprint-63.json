@@ -162,13 +162,23 @@
   "owner": "sprint 63 (resource glyphs item, filed by the main session)"
  },
  {
-  "ruling": "The goods table carries shelf stock and sorts by every heading; potential trades offer only routes from a market where the acting nation has trade points",
+  "ruling": "The goods table carries shelf stock and sorts by every heading",
   "doc": "docs/ui/ledgers/market.md",
   "anchor": "Goods carries shelf stock and sorts \\(Ben, 2026-11-05\\)",
   "stale": [
    "\\*\\*item glyph · name · price · price vs base · 8-quarter graph\\*\\*"
   ],
-  "owner": "sprint 63 (market goods and potential trades items, filed by the main session)"
+  "owner": "sprint 63 (market goods item, filed by the main session)"
+ },
+ {
+  "ruling": "Potential trades list regardless of trade points, by profit highest first, points gating only the take, overturning the 2026-11-05 list-only-where-it-has-points rule; All trades here becomes Automatic Trades",
+  "doc": "docs/ui/ledgers/market.md",
+  "anchor": "Potential trades list regardless of points \\(Ben, 2026-11-09\\)",
+  "stale": [
+   "Offers come only from a market the acting nation can supply",
+   "All trades here"
+  ],
+  "owner": "sprint 63 (market ledger trades feedback, Ben 2026-11-09 live click)"
  },
  {
   "ruling": "Construction door: Power Generation in Infrastructure; a Road fold holds Track, Road, Highway and Railroad with smaller glyphs; the finder picker draws building glyphs",

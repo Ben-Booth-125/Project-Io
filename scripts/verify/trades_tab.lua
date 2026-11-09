@@ -17,7 +17,7 @@
 --      app::render and land in WORLD state; the seam's answer is shown.
 --   2. THE TRADE-POINTS LINE IS THE WORLD'S. made / reserve / auto are the
 --      corporation record's, with the reserve clamped to what is made.
---   3. THE READS ARE DISTINCT, AND THE GATE ON READ 2 IS REAL - including SHUT.
+--   3. THE READS ARE DISTINCT (read 2 is automatic cargo), AND THE GATE ON READ 2 IS REAL - including SHUT.
 --   4. AN ABSENT COUNTERPARTY IS THE MARKET; NO ROW PRINTS A PROFIT.
 --   5. READ 3's ARITHMETIC AND RANKING.
 --
@@ -192,11 +192,28 @@ verify.expect(touches == 0, "every row of 'my trades' leaves or lands on this ma
 verify.expect(all.open == verify.player_operates_on(home_body),
     "the gate agrees with the world on the home body (open=" .. tostring(all.open) .. ")")
 if all.open then
-    local in_all = {}
-    for _, r in ipairs(all.rows) do in_all[r.trade_id] = true end
-    local missing = 0
-    for _, r in ipairs(mine) do if not in_all[r.trade_id] then missing = missing + 1 end end
-    verify.expect(missing == 0, "every trade in 'my trades' also stands in 'all trades here' (" .. missing .. " missing)")
+    -- Automatic Trades (Ben, 2026-11-09): the auto cargo in transit here, never a
+    -- manual route. Replaces the check that this list repeated 'my trades'.
+    local manual = {}
+    for _, r in ipairs(mine) do manual[r.from_market .. ">" .. r.to_market .. ":" .. r.good_key] = true end
+    local with_id, off_market, a_manual_route, empty_row, not_in_transit = 0, 0, 0, 0, 0
+    local my_lanes = {}
+    for _, c in ipairs(verify.convoys()) do
+        if not c.arrived then my_lanes[c.src .. ">" .. c.dst] = true end
+    end
+    for _, r in ipairs(all.rows) do
+        if r.trade_id ~= 0 or r.points ~= 0 then with_id = with_id + 1 end
+        if r.from_market ~= here and r.to_market ~= here then off_market = off_market + 1 end
+        if r.mine and manual[r.from_market .. ">" .. r.to_market .. ":" .. r.good_key] then a_manual_route = a_manual_route + 1 end
+        if not (r.units > 0.0) then empty_row = empty_row + 1 end
+        if r.mine and not my_lanes[r.from_market .. ">" .. r.to_market] then not_in_transit = not_in_transit + 1 end
+    end
+    print(string.format("MEASURED automatic trades here: %d rows", #all.rows))
+    verify.expect(with_id == 0, "an automatic row holds no trade id and no points (" .. with_id .. " do)")
+    verify.expect(off_market == 0, "every automatic row leaves or lands on this market (" .. off_market .. " do not)")
+    verify.expect(a_manual_route == 0, "no automatic row is one of my manual routes (" .. a_manual_route .. " are)")
+    verify.expect(empty_row == 0, "every automatic row carries cargo (" .. empty_row .. " do not)")
+    verify.expect(not_in_transit == 0, "every automatic row of mine is a lane my convoys are on (" .. not_in_transit .. " are not)")
 end
 
 -- Read 3 shares no identity with the lists: a potential trade has no id.
@@ -248,7 +265,7 @@ if #pot > 0 then
         prev = r.margin_per_point
     end
     verify.expect(bad_margin == 0, "margin is sell there - buy here - haulage (" .. bad_margin .. " wrong)")
-    verify.expect(out_of_order == 0, "potential trades are in the trade pass's order: margin per point, best first")
+    verify.expect(out_of_order == 0, "potential trades are in the trade pass's order: profit per point, highest first")
     verify.expect(non_positive == 0, "a listed potential trade clears its haulage")
 else
     print("MEASURED: no potential trade clears its haulage from this market")
