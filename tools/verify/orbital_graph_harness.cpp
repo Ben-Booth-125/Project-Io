@@ -15,8 +15,9 @@
 //   O6  repeated calls are bit-identical (links, paths, positions).
 //   O7  slot capacities match the table.
 //   O8  invalid ends fail; from == to is a zero-cost trip.
-//   G*  the generated world: counts, reachability, determinism; and it PRINTS
-//       each body's climb so the masses generation actually carries are read.
+//   P*  BL-1638: the generated physique — bands, variety, determinism.
+//   G*  the generated world: counts, reachability, determinism, the generated
+//       mass carried onto every body; and it PRINTS each body's climb.
 //
 // Headless: world/* logic only, no SDL and no Lua.
 // ---------------------------------------------------------------------------
@@ -73,7 +74,8 @@ test_world make_test_world()
     test_world t;
     t.star   = add_body(t.w, body_type::star, null_entity, 0.0f, 0.0f, 0.0f, 1.0f, atmosphere_class::none);
     t.w.star_body = t.star;
-    // Masses from planetology.cpp's prototype set; atmospheres as generation reads them.
+    // Sol-analogue masses (Mercury / Earth / Luna / a Pallas-scale fragment) — fixed
+    // here so O4-O7 test the RULE; generation now rolls them (BL-1638, the G rows).
     t.cinder = add_body(t.w, body_type::planet, null_entity, 0.39f, 0.40f, 0.07f, 0.055f, atmosphere_class::none);
     t.kepler = add_body(t.w, body_type::planet, null_entity, 1.00f, 1.05f, 0.017f, 1.0f, atmosphere_class::moderate);
     t.selene = add_body(t.w, body_type::moon, t.kepler, 0.30f, 0.7f, 0.30f, 0.0123f, atmosphere_class::none);
@@ -259,6 +261,63 @@ void run_test_world()
     check(self.ok && self.dv == 0.0 && self.days == 0.0 && self.nodes.size() == 1, "O8c  from == to is a zero-cost trip");
 }
 
+// P*  BL-1638 (generated body mass): the physique roll itself, over many seeds.
+//   P1  every non-home body's radius / cmf / density / mass sits inside its band;
+//   P2  the masses differ across bodies, and a body's mass differs across seeds;
+//   P3  the same seed gives the bit-identical body;
+//   P4  the homeworld is returned untouched (its mass is the corridor's).
+void run_physique()
+{
+    const body_mass_bands& bands = k_body_mass_bands;
+    bool in_band = true, deterministic = true, home_untouched = true, bodies_differ = true;
+    float lo[4] = { 1e9f, 1e9f, 1e9f, 1e9f }, hi[4] = { 0, 0, 0, 0 };
+    for (uint32_t seed = 0; seed < 256; ++seed)
+    {
+        float m[4] = {};
+        for (int i = 0; i < prototype_body_count(); ++i)
+        {
+            const body_inputs a = generated_prototype_body(i, seed);
+            const body_inputs b = generated_prototype_body(i, seed);
+            deterministic = deterministic && std::memcmp(&a.mass_earths, &b.mass_earths, sizeof(float)) == 0
+                         && a.radius_earths == b.radius_earths && a.density_gcc == b.density_gcc;
+            m[i] = a.mass_earths;
+            if (a.is_homeworld)
+            {
+                const body_inputs& proto = prototype_body(i);
+                home_untouched = home_untouched && a.mass_earths == proto.mass_earths && a.radius_earths == 0.0f;
+                continue;
+            }
+            const body_mass_band& k = bands.of(a.mass_kind);
+            const float rho_lo = 1.0f / (k.cmf_min / bands.core_density_gcc + (1.0f - k.cmf_min) / k.mantle_min_gcc);
+            const float rho_hi = 1.0f / (k.cmf_max / bands.core_density_gcc + (1.0f - k.cmf_max) / k.mantle_max_gcc);
+            in_band = in_band
+                && a.radius_earths >= k.radius_min_earths && a.radius_earths <= k.radius_max_earths
+                && a.core_mass_fraction >= k.cmf_min && a.core_mass_fraction <= k.cmf_max
+                && a.density_gcc >= rho_lo * 0.9999f && a.density_gcc <= rho_hi * 1.0001f
+                && a.mass_earths > 0.0f;
+            lo[i] = std::fmin(lo[i], a.mass_earths);
+            hi[i] = std::fmax(hi[i], a.mass_earths);
+        }
+        bodies_differ = bodies_differ && m[0] != m[2] && m[2] != m[3] && m[0] != m[3];
+    }
+    check(in_band, "P1  256 seeds: every non-home radius / cmf / density inside its kind's band");
+    check(bodies_differ && hi[0] > lo[0] && hi[2] > lo[2] && hi[3] > lo[3],
+          "P2  masses differ across bodies, and each body's mass varies with the seed");
+    check(deterministic, "P3  the same seed gives the bit-identical physique");
+    check(home_untouched, "P4  the homeworld's physique is never rolled");
+    std::printf("      mass spread over 256 seeds: planet %.5f-%.5f  moon %.5f-%.5f  fragment %.7f-%.7f\n",
+                lo[0], hi[0], lo[2], hi[2], lo[3], hi[3]);
+    for (uint32_t seed : { 0u, 46u })
+        for (int i = 0; i < prototype_body_count(); ++i)
+        {
+            const body_inputs a = generated_prototype_body(i, seed);
+            if (a.is_homeworld) continue;
+            std::printf("      seed %2u body %d  R=%.4f R_E  cmf=%.3f  rho=%.3f g/cm3  M=%.7f M_E  low-orbit slots=%d\n",
+                        seed, i, a.radius_earths, a.core_mass_fraction, a.density_gcc, a.mass_earths,
+                        8 + static_cast<int>(std::floor(4.0 * static_cast<double>(a.mass_earths))));
+        }
+}
+
 void run_generated_world()
 {
     using K = orbital_node_kind;
@@ -284,23 +343,42 @@ void run_generated_world()
 
     check(same_links(orbital_links(g, p), orbital_links(g2, p)), "G3  links bit-identical across two generations of one seed");
 
-    // Small airless bodies climb cheaper than home on the generated world too.
-    // NOTE: generation leaves mass_earths at its 1.0 default on every body but
-    // the homeworld (hard_coded_world.cpp sets only the homeworld's), so this
-    // row holds on the ATMOSPHERE term alone; the printout below shows masses.
-    bool small_cheaper = true;
-    int  defaulted     = 0;
+    // Small airless bodies climb cheaper than home on the generated world, and
+    // now for MASS as well as air (BL-1638): every non-home body carries its
+    // generated mass, so the mass term alone is below the homeworld's.
+    bool small_cheaper = true, mass_cheaper = true, carried = true, home_mass = true;
     const double home_climb = orbital_climb_dv(g, p, g.home_body);
+    const double home_mass_term =
+        p.climb_mass_coeff * std::pow(static_cast<double>(g.bodies.at(g.home_body).mass_earths), p.climb_mass_exponent);
+    home_mass = g.bodies.at(g.home_body).mass_earths
+             == resolve_preferences(wp.preferences, wp.seed).params.home_mass; // the corridor's value, as before
     for (const auto& [id, b] : g.bodies)
     {
+        if (b.type == body_type::star || id == g.home_body) continue;
+        const int proto = b.type == body_type::moon ? 2 : b.type == body_type::asteroid ? 3 : 0;
+        const body_inputs gen = generated_prototype_body(proto, wp.seed);
+        carried = carried && b.mass_earths == gen.mass_earths && b.mass_earths != 1.0f;
         if (b.type == body_type::moon || b.type == body_type::asteroid)
+        {
             small_cheaper = small_cheaper && orbital_climb_dv(g, p, id) < home_climb;
-        if (b.type != body_type::star && id != g.home_body && b.mass_earths == 1.0f) ++defaulted;
+            const double mass_term =
+                p.climb_mass_coeff * std::pow(static_cast<double>(b.mass_earths), p.climb_mass_exponent);
+            mass_cheaper = mass_cheaper && mass_term < home_mass_term;
+        }
     }
     check(small_cheaper, "G4  generated moons/asteroids climb cheaper than the homeworld");
-    if (defaulted > 0)
-        std::printf("WARN  %d non-home bodies carry the default mass_earths 1.0 "
-                    "(generation does not copy planetology's mass)\n", defaulted);
+    check(carried, "G5  every non-home body carries its generated mass (generated_prototype_body), not 1.0");
+    check(mass_cheaper, "G6  the moon and asteroid climb cheaper on the MASS term alone, not just air");
+    check(home_mass, "G7  the homeworld carries its corridor mass");
+    {
+        bool same_mass = true;
+        for (const auto& [id, b] : g.bodies)
+        {
+            const auto it = g2.bodies.find(id);
+            same_mass = same_mass && it != g2.bodies.end() && it->second.mass_earths == b.mass_earths;
+        }
+        check(same_mass, "G8  masses identical across two generations of one seed");
+    }
 
     for (const orbital_node& n : nodes)
         if (n.kind == K::surface)
@@ -319,6 +397,7 @@ int main()
 {
     std::printf("== orbital_graph_harness (BL-1580) ==\n");
     run_test_world();
+    run_physique();
     run_generated_world();
     std::printf("== %d passed, %d failed ==\n", g_pass, g_fail);
     return g_fail == 0 ? 0 : 1;

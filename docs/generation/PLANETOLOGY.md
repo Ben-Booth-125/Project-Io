@@ -110,8 +110,9 @@ Ni 5–25 wt%, Ir spanning 0.01–38 ppm.)*
 
 > **Implementation trap.** The rocky mass-radius relation R ≈ M^0.27 is **invalid below ~0.05 M⊕** —
 > it returns 0.451 R⊕ for Mercury against a true 0.383, an 18% error that enters the next stage as
-> v_esc⁴, i.e. ~40%. All three of Io's non-homeworld bodies sit in that regime. Switch to constant
-> density from core mass fraction below the threshold.
+> v_esc⁴, i.e. ~40%. Io's non-homeworld bodies sit in or near that regime. Switch to constant
+> density from core mass fraction below the threshold — which is how they are generated: each rolls
+> its radius and takes its density from its core mass fraction (§ The prototype body set).
 
 ### S2 — Air *(the cheapest and most predictive gate in the model)*
 
@@ -793,7 +794,29 @@ other than the homeworld rolls a radius and a bulk density from its own seed, in
 (planet, moon, asteroid, core fragment), and its mass is density × volume. The homeworld keeps its
 own corridor (`home_mass`, § The homeworld rule). Below ~0.05 M⊕ the density comes from the core mass
 fraction, per the implementation trap in S1. Every reader of a body's mass, the orbital graph's
-climb included, reads this one generated mass. The **names are not** authored either — see
+climb included, reads this one generated mass.
+
+**The band table.** Each kind rolls three numbers from its seed, uniformly inside the band: a
+radius, a core mass fraction, and a mantle density. Bulk density is the two-layer mix
+ρ = 1 / (cmf / ρ_core + (1 − cmf) / ρ_mantle), with ρ_core = 7.9 g/cm³ (uncompressed Fe-Ni, the
+iron meteorites' 7.8–7.9). Mass is then M = (ρ / 5.514) · R³ in Earth units. Every band sits at
+Mercury scale or below, where self-compression is a few percent, so the core-mass-fraction rule
+covers every kind. A larger non-home kind would need the compressed relation instead.
+
+| Kind | Radius (R⊕) | Core mass fraction | Mantle ρ (g/cm³) | Bulk ρ (g/cm³) | Anchors |
+|---|---|---|---|---|---|
+| Planet | 0.30–0.50 | 0.30–0.65 | 3.30–3.50 | ~4.0–5.5 | Mercury 0.383 R⊕, 5.43 |
+| Moon | 0.20–0.34 | 0.00–0.20 | 2.70–3.40 | ~2.7–3.8 | Luna 0.273 R⊕, 3.34; Io 3.53; Europa 3.01 |
+| Asteroid | 0.010–0.075 | 0.00–0.10 | 1.30–3.30 | ~1.3–3.5 | Ceres 0.074 R⊕, 2.16 (porosity and ice sit in the mantle figure) |
+| Core fragment | 0.015–0.045 | 0.65–1.00 | 3.00–3.40 | ~5.0–7.9 | Iron meteorites 7.8; a stripped core with a silicate rind |
+
+The table is generation data, held beside the chain's other ranges (`body_mass_bands`,
+`planetology.hpp`). The low-orbit slot count (SPACE_ASSETS.md § Orbital slots) follows the
+generated mass, and every band keeps a non-home body under 0.25 M⊕, so each holds the floor of 8.
+The ground distance scale (`body_km_per_tile`) is held at its Earth-mass read for non-home bodies
+on a generated world; it does not follow this mass.
+
+The **names are not** authored either — see
 § Body naming below. The literals still sitting in the
 `prototype_entry` table are placeholders that never reach the world; `make_hard_coded_world`
 overwrites `body_inputs::name` with the coined name before the chain runs.
