@@ -5628,6 +5628,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         pm.mark(canvas_pass_meter::stat, dl);
     }
 
+    // Unit counters, standing and marching, are collected where they are resolved and
+    // drawn after the capital star, so the star sits UNDER them (Ben, 2026-11-09:
+    // "render the capital icon below units"). Their hit zones are pushed in place.
+    struct deferred_counter
+    {
+        ImVec2 pos; float r; ImU32 fill; int count; float hp, ready; bool bars, hovered;
+    };
+    std::vector<deferred_counter> unit_counters_drawn;
+
     // The two provinces the outline can light (BL-511): selected and hovered.
     const province* sel_prov = state.selected_province != 0
                              ? w.provinces.find(state.selected_province) : nullptr;
@@ -6291,8 +6300,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             // hovered entity is then never a unit.
                             const bool hovered = state.overlay == overlay_mode::none
                                               && state.hovered_entity == grp.sample_unit;
-                            icons::unit_counter(dl, mpos, ur, fill, grp.count, hp, ready,
-                                                /*show_bars=*/grp.owner == player_owner, hovered);
+                            unit_counters_drawn.push_back({ mpos, ur, fill, grp.count, hp, ready,
+                                                            /*bars=*/grp.owner == player_owner, hovered });
 
                             // Hit zone (BL-031/BL-059/BL-575): the group's LOWEST-id
                             // unit is the click/hover target — same "lowest id wins"
@@ -6751,9 +6760,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             for (int k = k_min; k <= k_max; ++k)
             {
                 const ImVec2 mpos{ sc.x + static_cast<float>(k) * period_px, uy };
-                icons::unit_counter(dl, mpos, ur, corp_identity(g.owner),
-                                    static_cast<int>(g.ids.size()), hp, rd,
-                                    /*show_bars=*/g.owner == player_owner, hovered);
+                unit_counters_drawn.push_back({ mpos, ur, corp_identity(g.owner),
+                                                static_cast<int>(g.ids.size()), hp, rd,
+                                                /*bars=*/g.owner == player_owner, hovered });
                 marker_hit_zone hz;
                 hz.id     = g.ids.front();
                 hz.kind   = marker_hit_zone::kind::unit;
@@ -7344,6 +7353,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
     }
+
+    // The unit counters, standing then marching, over the capital star.
+    for (const deferred_counter& uc : unit_counters_drawn)
+        icons::unit_counter(dl, uc.pos, uc.r, uc.fill, uc.count, uc.hp, uc.ready, uc.bars, uc.hovered);
 
     // Trade-flow lens (BL-1222; LENSES.md § Trade-flow lens). Reads only the
     // player's own dispatcher record (`w.player_trade_flow`, written by
