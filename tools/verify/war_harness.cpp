@@ -483,14 +483,12 @@ int main()
         world old;
         check(from_bytes(b67, old) && old.wars.empty() && old.truces.empty() && old.peace_offers.empty()
                   && old.war_history.empty() && old.province_cessions.empty()
-                  && b67.size() == b.size() - world_save_war_section_bytes(w)
-                                              - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75), last */ // BL-1418 (v70)
+                  && b67.size() == b.size() - world_save_tail_bytes_after(k_world_save_version_pre_war, w) // BL-1632: v69's wars and every later section
                                               - world_save_kit_goods_bytes(w), // BL-1422: arrays 49 wide before v74
-              "R4l a v68 stream (today's less the war and embargo sections) loads with no wars");
+              "R4l a v68 stream (today's less the war section and every later one) loads with no wars");
         // Untrusted: an answered byte of 2 is refused whole.
         std::string bad = b;
-        const std::size_t war0 = b.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75), last */ // BL-1418 (v70), last
-                               - world_save_war_section_bytes(w) + 4; // past the war count
+        const std::size_t war0 = b.size() - world_save_tail_bytes_after(k_world_save_version_pre_war, w) + 4; // BL-1632: past the war count
         bad[war0 + 8] = 2;
         world untouched;
         check(!from_bytes(bad, untouched) && untouched.nations.empty(),
@@ -1004,7 +1002,7 @@ int main()
         std::string bad2 = b2;
         // The offer sits after the war count + one war record + the truce table.
         const war_record& wr = w.wars.begin()->second;
-        const std::size_t off = b2.size() - world_save_embargo_section_bytes(w) - world_save_gen_capital_section_bytes(w) - world_save_recruits_section_bytes(w) - world_save_sea_recruits_section_bytes(w) - world_save_refusals_section_bytes(w) /* BL-1480 (v75), last */ - world_save_war_section_bytes(w) + 4
+        const std::size_t off = b2.size() - world_save_tail_bytes_after(k_world_save_version_pre_war, w) + 4 // BL-1632: the war section's start
                               + (4 + 4 + 1 + 4 + 4 + 8 + 8 + 4 + 4 + 4 + 4 + 4 + 4 * wr.declarer_goals.size() + 4 + 4 * wr.defender_goals.size())
                               + 4 + 12 * w.truces.size() + 4 + 4 + 4 + 4 + 4; // to the kind byte
         bad2[off] = 7;
@@ -1548,23 +1546,27 @@ int main()
         world back;
         // BL-1436 (Ben, 2026-11-03, ruling 6): v76 widens the resource arrays for airframes;
         // the refusals section rides on unchanged.
-        check(ver == 76 && ver == world_save_version && from_bytes(b, back) && to_bytes(back) == b
+        // BL-1632: the stream is today's version, v76 or later (was pinned `== 76`, which every
+        // later section broke); the refusals section rides on unchanged.
+        check(ver >= k_world_save_version_airframes && ver == world_save_version && from_bytes(b, back) && to_bytes(back) == b
                   && back.peace_refusals == w.peace_refusals && back.state_hash(0) == w.state_hash(0),
-              "RF1 the stream is v76 and the refusal round-trips byte for byte, its hash equal");
+              "RF1 the stream is v76 or later and the refusal round-trips byte for byte, its hash equal");
         check(w.state_hash(0) != [&] { world z = w; z.peace_refusals.clear(); return z.state_hash(0); }(),
               "RF2 the refusal is in the state hash");
         std::ostringstream o74(std::ios::binary);
         write_world_snapshot_pre_refusals(w, o74);
         const std::string b74 = o74.str();
         world old;
-        check(world_save_refusals_section_bytes(w) == 4 + 12 && b74.size() + 16 + world_save_airframes_bytes(w) /* BL-1436: v74 is 54 wide */ == b.size()
+        check(world_save_refusals_section_bytes(w) == 4 + 12
+                  && b74.size() + world_save_tail_bytes_after(k_world_save_version_pre_refusals, w) /* BL-1632: the refusals and every later section */
+                         + world_save_airframes_bytes(w) /* BL-1436: v74 is 54 wide */ == b.size()
                   && from_bytes(b74, old) && old.peace_refusals.empty() && old.wars.size() == 1,
-              "RF3 a v74 stream (today's less the 16-byte refusals section) reads as a world with no refusals");
+              "RF3 a v74 stream (today's less the 16-byte refusals section and every later one) reads as a world with no refusals");
         const auto refused = [&](std::string bad, const char* what) {
             world untouched;
             check(!from_bytes(bad, untouched) && untouched.nations.empty(), what);
         };
-        const std::size_t sec = b.size() - world_save_refusals_section_bytes(w);
+        const std::size_t sec = b.size() - world_save_tail_bytes_after(k_world_save_version_pre_refusals, w); // BL-1632
         {
             std::string bad = b;
             std::memcpy(&bad[sec + 8], &bad[sec + 4], 4); // (A, A)

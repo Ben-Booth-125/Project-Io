@@ -411,7 +411,7 @@ void rows_save()
                     x.w.space_firsts.size(), ok ? 1 : 0));
 
     const std::size_t sec = world_save_space_firsts_section_bytes(x.w);
-    const std::size_t after = world_save_transit_origin_section_bytes(x.w); // BL-1614 (v92) follows
+    const std::size_t after = world_save_tail_bytes_after(k_world_save_version_space_firsts, x.w); // BL-1632: BL-1614 (v92) and every later section follow
     std::ostringstream o90(std::ios::binary);
     write_world_snapshot_pre_space_firsts(x.w, o90);
     check(o90.str().size() + sec + after == b.size() && sec == 4 + 9 * 3, "S1b",
