@@ -122,6 +122,11 @@ See § What must not happen.
 hydrology and deposits, all generated. Effects land on `extraction_rate`, the modifier subject
 `extraction_nominal` reads. *Cheapest family by machinery.*
 
+**Solar storms (Ben, 2026-11-10)** are the environmental family's space event. A storm is scheduled
+from the world seed and the tick, so it is seeded and replayable. It strikes every station and
+satellite outside a planet's shelter — at a Lagrange point, or at an asteroid's nodes — and stops their modules and roles for one quarter. A station Observatory sees a storm a
+quarter ahead, and its owner is told.
+
 **2. Economic** — a glut, a shortage, a supplier's failure. Reads market state and procurement.
 Effects land on price, or on a contract's terms. Riskiest to balance, because the economy is
 already the most tuned part of the game.

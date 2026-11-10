@@ -701,9 +701,15 @@ arsenal is held, seen and deterring, and no verb fires it.
 
 ### Space
 
-Pre-space military in orbit is **intelligence satellites** and **missiles**. A reconnaissance
-satellite lifts fog over enemy ground and reveals unit stacks; the satellite classes are
-`../economy/SPACE_ASSETS.md`'s. There is no combat between orbital units.
+Military in orbit begins as **observation satellites** and **missiles**: an observation satellite
+lifts fog over the body it orbits (`../economy/SPACE_ASSETS.md` § Satellites). Space units, fleets,
+battles in space, blockade and bombardment are `SPACE_FLEETS.md`'s.
+
+**A war spans every body (Ben, 2026-11-10).** A war is fought wherever its parties hold anything:
+every body where one side holds ground and the other can reach it is a **front**, and every node
+where their fleets meet is a battle (`SPACE_FLEETS.md`). Nothing confines a war to the body it was
+declared on. The fronts on other bodies are reached through the pinned-items panel's front pins
+(`../ui/LAYOUT.md` § Pinned items — right column, middle).
 
 *Owners: BL-1421 (soft hard resolver), BL-1422 (land classes and kit), BL-1423 (refit and
 retreat), BL-1424 (soldiers from labour), BL-1425 (unit counter render), BL-1426 (bunkers),

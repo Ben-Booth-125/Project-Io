@@ -223,6 +223,23 @@ coverage the asset still works, and its upkeep is still paid, but what it learns
 **Why.** Coverage is what makes the Comms satellite and the relay worth their slots, and it makes
 the first relay at a moon the step that turns a flag-planting into a working presence.
 
+## Debris (Ben, 2026-11-10)
+
+**Debris is its own hazard**, held per orbital node as a debris level. It is not part of the climate
+commons (`../CLIMATE.md`), though it behaves like one: every nation's wreckage fouls the same node.
+
+**What makes debris.** A destroyed space unit, a lost satellite or a lost station leaves debris at
+its node, in proportion to its mass.
+
+**What debris does.** Each quarter, every satellite and station core at a node gains **wear** in
+proportion to the node's debris level; at full wear it is lost — and leaves debris of its own, which
+is how a crowded orbit can cascade. A space unit that passes through or sits at a node takes hull
+damage in proportion to the debris there. All of it is arithmetic on the level: no roll.
+
+**How debris clears.** Low orbit clears slowly by itself, as drag pulls fragments down; high orbit
+and the Lagrange points never clear by themselves. A **Tug** with a debris arm at a node removes a
+fixed amount each quarter (`../military/SPACE_FLEETS.md`).
+
 ## Open
 
 **The Market module's trade link** waits on space convoys (`../military/SPACE_FLEETS.md`). Until

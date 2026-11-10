@@ -115,6 +115,37 @@
     "BL-1593 (SPACE_SPECTATOR_CHECK)"
    ],
    "notes": []
+  },
+  {
+   "id": 66,
+   "theme": "Far space (v0.5.0)",
+   "state": "planned",
+   "status_line": "planned; opens when sprint 65 closes",
+   "opened_date": null,
+   "closed_date": null,
+   "author": "Claude (Ben, 2026-11-10: deliver v0.4.0 and v0.5.0 in lanes)",
+   "goal": "The whole solar system with the next age's technology: designed space units and fleets, convoys as Haulers, battles, debris, bases that run like the home world, prospecting, and wars across every body. Cuts v0.5.0.",
+   "planned": [
+    "BL-1594 (SPACE_UNIT_DESIGNS)",
+    "BL-1595 (SPACE_UNIT_MOVEMENT)",
+    "BL-1596 (SPACE_CONVOYS_AS_HAULERS)",
+    "BL-1597 (SPACE_BATTLES)",
+    "BL-1598 (DEBRIS)",
+    "BL-1599 (BLOCKADE_AND_BOMBARDMENT)",
+    "BL-1600 (MAPPING_THEN_PROSPECTING)",
+    "BL-1601 (OFFWORLD_BASES)",
+    "BL-1602 (WAR_SPANS_BODIES)",
+    "BL-1603 (FRONT_PINS)",
+    "BL-1604 (PROPELLANT_LOOP)",
+    "BL-1605 (SOLAR_STORMS)",
+    "BL-1606 (SPACE_FIRSTS)",
+    "BL-1607 (EARLY_SPACE_TREE)",
+    "BL-1608 (RIVAL_FAR_SPACE_AI)",
+    "BL-1609 (FLEET_UI)",
+    "BL-1610 (BASE_AND_PROSPECT_UI)",
+    "BL-1611 (FAR_SPACE_SPECTATOR_CHECK)"
+   ],
+   "notes": []
   }
  ],
  "next_up": "SPRINT 61 CLOSED 2026-11-05 (no version cut). v0.3.0 needs the naval system and a playtest with a few wars. BL-1470 (sentiment contributors) passed its live click 2026-11-05; BL-1490 (province resource clip) waits on BL-1495 (UI scale down); BL-1494 (new-library tick-50 stall) leads the economy work. SPRINT 63 (UI, QOL and the opening) OPEN 2026-11-05: Ben's playtest list is filed; the payback census has read: research is the missing money and the door quotes mirages on scarce goods.",

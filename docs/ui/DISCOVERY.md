@@ -64,6 +64,22 @@ moderate / sparse); exact amounts confirm once an extraction site is placed.
 The exploration loop: spot a promising body by orbital position and type → spend to survey → decide
 whether the deposit profile justifies building.
 
+### Mapping, then prospecting (Ben, 2026-11-10)
+
+**Off the home world, a survey reveals in two steps, in this order.** Each region is first **mapped**
+— its tiles and terrain become readable — and only then **prospected** — its deposit bands become
+readable.
+
+- **Mapping is done from orbit**: by a Survey satellite at one of the body's nodes, or by a station
+  Observatory with the body in its owner's comms coverage (`../economy/SPACE_ASSETS.md` § Satellites,
+  § Signal delay). It runs region by region, in the same raster order as a scan.
+- **Prospecting is done on the ground**: by a **rover** or a **Lander** at the body's surface
+  (`../military/SPACE_FLEETS.md`). It prospects mapped regions only, one at a time, nearest the
+  landing first.
+
+A body is **surveyed** when every region is both mapped and prospected. A region that is mapped but
+not prospected draws its terrain with its deposits hidden. The home world begins surveyed, as before.
+
 ---
 
 ## Competitor visibility

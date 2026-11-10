@@ -281,6 +281,30 @@ Water (from icy bodies), iron-nickel ore (from metallic asteroids), platinum gro
 
 Ice Extractor, Surface Extractor, Assembly Plant, Orbital Port.
 
+### The propellant loop (Ben, 2026-11-10)
+
+**Propellant made off-world is the loop that pays.** An **Ice Extractor** on an icy body yields water;
+an **Electrolysis Plant** beside it turns water and power into `propellant` on that body's market.
+A space unit refuels off the shelf of the body it orbits, and a station's Fuel depot is stocked from
+the market of its node's body (`../military/SPACE_FLEETS.md` § Thrust — the Δv budget). A nation that makes
+propellant at a moon stops paying the home world's climb for every tank it burns.
+
+### Firsts (Ben, 2026-11-10)
+
+**The first nation to do a thing in space is told so, and so is everyone else.** Each **first** is a
+deed read from state the game already carries (`../META_LAYER.md`): the first satellite in orbit, the
+first crew in orbit, the first station core, the first crew landed on a moon, the first off-world
+base, the first space convoy between two bodies. The first nation to meet each earns a one-time
+research grant and a history-log entry every nation reads; a first is never taken twice. Firsts are
+the space race's successes made visible (§ The point of an Era: *"we want to encourage successes"*).
+
+### Far-space technology (Ben, 2026-11-10)
+
+**Far space is researched in the next age's tree** (`RESEARCH.md` § Quests key the next age): its
+hull classes and drives, landers and tugs, prospecting, base founding, the propellant loop's
+buildings, the orbital defence battery, and the station's last grid upgrade. A nation reaches it
+through the Digitisation tree's space quests, as every age's tree is reached.
+
 ### Era 2's pressure is climate (Ben, 2026-08-31)
 
 *"I am not against climate change being a large problem for Era 2, but our prototype works solely on

@@ -325,6 +325,13 @@ visible while the player works elsewhere.
 
 The panel, its pin toggle and the pin glyph are BL-216's pinned-items slice.
 
+**Front pins (Ben, 2026-11-10).** While the player's nation is at war, the panel carries one **front
+pin** for every body where the war has a front (`../military/MILITARY.md` § Space, "A war spans
+every body"). A front pin is placed and removed by the war itself, not by the player: it appears when
+a front opens and goes when it closes. It shows the body, the enemy and the front's state; a
+double-click takes the canvas to that body's front, so a war on a moon is one click from a war at
+home. Front pins sit above the player's own pins.
+
 ---
 
 ## Ledger windows — all fold-out
