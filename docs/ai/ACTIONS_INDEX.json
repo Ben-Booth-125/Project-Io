@@ -1028,6 +1028,14 @@
   [
    "canvas.tech_tree_age_tab",
    "The research canvas's age switch: two tabs top-right, 'Digitisation' and 'Early Space' (read 'Early Space (locked)' while the gate into space is unmet)."
+  ],
+  [
+   "gameplay.space_embark_colonists",
+   "In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
+  ],
+  [
+   "gameplay.space_found_base",
+   "In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed)."
   ]
  ]
 }

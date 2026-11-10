@@ -606,7 +606,7 @@ int main()
         std::ostringstream oe(std::ios::binary);
         write_world_snapshot_pre_space_bombard(e.w, oe);
         world we;
-        check(o87.str().size() + sec == b.size() && sec == 4 + 9 * 2 && from_bytes(oe.str(), we)
+        check(o87.str().size() + sec + world_save_offworld_base_section_bytes(w) == b.size() && sec == 4 + 9 * 2 && from_bytes(oe.str(), we)
                   && we.space_bombard_orders.empty() && we.state_hash(0) == e.w.state_hash(0),
               "B6b", fmt("the section is the tail: v87 prefix %zu + %zu == %zu; an order-free v87 stream reads with none",
                          o87.str().size(), sec, b.size()));
@@ -617,7 +617,7 @@ int main()
         check(w2.state_hash(0) == w3.state_hash(0) && to_bytes(w2) == to_bytes(w3), "B6c",
               "the loaded world strikes and fires the next day exactly as the original");
 
-        const std::size_t s0 = b.size() - sec;
+        const std::size_t s0 = b.size() - sec - world_save_offworld_base_section_bytes(w); // the v90 base section (BL-1601) follows
         const auto refused = [&](const std::string& bad) {
             world t;
             t.nations.emplace(999, nation_component{});

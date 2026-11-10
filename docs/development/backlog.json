@@ -1835,8 +1835,8 @@
    "design": "DISCOVERY.md § Mapping, then prospecting. Survey satellite or Observatory maps; rover or Lander prospects mapped regions. Region masks in the Planetary canvas draw mapped-but-unprospected terrain with deposits hidden."
   },
   {
-   "status": "designed",
-   "glyph": "○",
+   "status": "complete",
+   "glyph": "●",
    "sprint": 66,
    "version_goal": "v0.5.0",
    "written": "2026-11-10",
@@ -2013,7 +2013,7 @@
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "files": [],
    "title": "Rivals design hulls, fly fleets and convoys, found bases and fight in space",
-   "design": "AI_OPPONENT.md § 11, the 2026-11-10 grant. One live design per class; one space action at a time; never a plan. Also (BL-1599 lane): rivals should issue bombard orders and build the orbital defence battery."
+   "design": "AI_OPPONENT.md § 11, the 2026-11-10 grant. One live design per class; one space action at a time; never a plan. Also (BL-1599 lane): rivals should issue bombard orders and build the orbital defence battery. Also (BL-1601 lane): rivals found bases (the grant names off-world bases); the verbs are found_base and embark_colonists."
   },
   {
    "status": "designed",

@@ -24,7 +24,7 @@ seam by design, and the order book's buy side has a save format but no verb yet.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*257 entries — 70 gameplay · 42 canvas · 15 lens · 87 ledger · 43 chrome.*
+*259 entries — 72 gameplay · 42 canvas · 15 lens · 87 ledger · 43 chrome.*
 
 ---
 
@@ -1309,7 +1309,7 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 - The unit carries the orbital-missile armament (rejected_not_armed), is not in transit (rejected_busy), and stands in the LOW ORBIT of the body the target lies on (rejected_wrong_node).
 - There is something there it may strike (rejected_target): the building, or for a province the building in best condition there (ties to the lowest id), must be standing, completed, of a type whose condition bites (condition_bites - the strategic mission's targets: producers, the marketplace, ports, hubs, stations, research houses, bunkers, orbital defence batteries; NOT a Launchpad or a base) and owned by a nation the acting nation is hostile to, either direction.
 
-**Expected output.** ok: a STANDING order (world::space_bombard_orders, keyed by unit; saved, world_save_version 88). Each day, after the battle day, it fires once: the unit's firepower x bombard_condition_per_firepower (1.0) comes off the struck building's condition per-mille (its throughput scales with condition; the daily repair pass mends it), and the building's owner observes force_used toward the bomber, magnitude bombard_force_per_permille (0.1) x the condition lost - the Trust and Alarm a battle's force carries (RELATIONS.md § 6). A province order re-picks its building each day. The order is DROPPED the first day its unit, target or hostility is gone, or the unit has left that low orbit; peace drops it. The munition is not consumed (first cut). An enemy Orbital Defence Battery on the body fires back each day.
+**Expected output.** ok: a STANDING order (world::space_bombard_orders, keyed by unit; saved, world_save_version 89). Each day, after the battle day, it fires once: the unit's firepower x bombard_condition_per_firepower (1.0) comes off the struck building's condition per-mille (its throughput scales with condition; the daily repair pass mends it), and the building's owner observes force_used toward the bomber, magnitude bombard_force_per_permille (0.1) x the condition lost - the Trust and Alarm a battle's force carries (RELATIONS.md § 6). A province order re-picks its building each day. The order is DROPPED the first day its unit, target or hostility is gone, or the unit has left that low orbit; peace drops it. The munition is not consumed (first cut). An enemy Orbital Defence Battery on the body fires back each day.
 
 **Reason to select.** Wear down a hostile nation's industry, trade or defences on a body your fleet holds the orbit of - at the price of Trust and Alarm in the nation struck.
 
@@ -1350,6 +1350,45 @@ NOTE (BL-389): through `ProjectIo --serve` the world is generated WITHOUT script
 **Expected output.** The node comes off the Early Space tail together with every LATER tail entry that needs it (a press on Cryogenics II also takes off Remote Prospecting behind it, and keeps Cryogenics I). The rest of the queue keeps its order; RP in hand stay.
 
 **Reason to select.** Undo part of an Early Space plan without touching the Digitisation queue ahead of it.
+
+### `gameplay.space_embark_colonists` — In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=12 embark_colonists, subject=lander, slot=colonists}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (space unit)` | The nation's own Lander with a passenger bay. |
+| `slot` | `int32` | Colonists to board, in thousands of heads (one passenger berth each); 1 .. 65536 at the seam, and no more than the free berths. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands - each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own - and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing. A refusal by the verb itself is rejected_refused, with `base` naming the reason; it too mutates nothing.
+- The unit is a Lander with passenger berths (rejected_not_lander), idle in its nation's home body's low orbit or landed on its surface (rejected_wrong_node), and the nation holds a completed, staffed Launchpad on that body (rejected_no_pad).
+- The colonists fit the berths left free (rejected_no_berths), and one of the nation's centres on its home body can spare them and keep a thousand (rejected_no_people); the most populous is drawn from, ties to the lower id.
+- Never delayed.
+
+**Expected output.** applied: the heads leave that home population centre and ride aboard the Lander (world::space_colonists, saved at world_save_version 88). A unit lost with colonists aboard loses them.
+
+**Reason to select.** Carry the people a base is founded with (NATIONS.md § Off-world bases).
+
+### `gameplay.space_found_base` — In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).
+
+**Press.** In-process: apply_space_command({nation, verb=11 found_base, subject=tile}).
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `subject` | `entity_id (tile)` | The tile the base stands on: land on another body's surface. |
+
+**Valid when:**
+- The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands - each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own - and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing. A refusal by the verb itself is rejected_refused, with `base` naming the reason; it too mutates nothing.
+- The nation holds base_founding (the Early Space tree's Off-World Bases) - rejected_tech_locked.
+- The tile is land on a gridded body other than the star and the nation's home body (rejected_invalid), and the nation has MAPPED it (rejected_unmapped; DISCOVERY.md § Mapping, then prospecting).
+- Nobody owns the tile, no centre or building stands on it, and no nation holds its province (rejected_claimed).
+- The nation's Landers landed on that body's surface carry, between them, at least 2 colonists (thousands; rejected_no_colonists) and 20 machinery held as cargo, the base kit (rejected_no_kit). Both are first-cut stand-ins, not yet authored by a doc.
+- Never delayed.
+
+**Expected output.** applied: a body with no provinces is partitioned; the base's province becomes the nation's (every unowned tile, and the holder); a population centre with every landed colonist stands on the tile; the body's market is founded there if it had none; a Track is laid from the tile; the colonists and the kit are spent. From then on the base buys its life support (water and food rations per thousand, by the habitability its tile lacks) off its own market each quarter, or shrinks. Saved (world_save_version 88).
+
+**Reason to select.** Open ground on another body: build, extract and trade there as at home.
 
 ---
 

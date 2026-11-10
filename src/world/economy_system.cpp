@@ -2271,7 +2271,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             pop_supply_by_body_nation[{tc_it->second.body, tn->second}] += labour_by_scale[sc];
         const entity_id body = tc_it->second.body;
         const float weight = static_cast<float>(sc);
-        hab_weighted_sum[body]  += pcc.habitability * weight;
+        // BL-1601: a fed base's life support makes up its body's shortfall.
+        hab_weighted_sum[body]  += offworld_base_habitability(w, cid, pcc.habitability) * weight;
         hab_weight_total[body]  += weight;
     }
     // Derive hab_cap_by_body: min(1, mean_hab / 0.6). Bodies with no centres get cap 1.0.
@@ -3072,7 +3073,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
             if (tc_it == w.tiles.end())
                 continue;
             const float w_scale = static_cast<float>(std::max(1, pcc.scale));
-            hab_sum[tc_it->second.body].first  += pcc.habitability * w_scale;
+            // BL-1601: a fed base's life support makes up its body's shortfall.
+            hab_sum[tc_it->second.body].first  += offworld_base_habitability(w, cid, pcc.habitability) * w_scale;
             hab_sum[tc_it->second.body].second += w_scale;
         }
         for (const auto& [body, acc] : hab_sum)

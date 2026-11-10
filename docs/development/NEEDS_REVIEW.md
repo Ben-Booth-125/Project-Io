@@ -24,7 +24,7 @@ This queue is **transient**: resolved entries are pruned promptly rather than ke
 posterity — the reasoning lands in code, an authority doc, or a backlog item at the moment
 the work happens, and that is the durable record. What stays here is what is still open.
 
-*63 entries — 60 open, 3 resolved.*
+*67 entries — 64 open, 3 resolved.*
 
 ---
 
@@ -765,6 +765,63 @@ The research canvas has Digitisation and Early Space tabs. Per the toggle rule, 
 > **Recommendation:** Keep; it matches every other sub-view tab.
 
 *Files: `src/ui/tech_tree_panel.cpp`*
+
+### NR-1201 — Off-world bases: colonists, the base kit and life support are stand-ins no doc defined
+*novel-work · raised 2026-11-10 · from BL-1601 lane report*
+
+Colonists are counted in thousands, one Lander passenger berth per thousand; a base needs 2. The base kit is 20 machinery carried as cargo on a landed Lander. Life support is 1 water and 1 food ration per thousand per quarter, scaled by the habitability the tile lacks (oxygen folded into water). An unfed quarter costs max(1, ceil(25%)) of the people; the base is razed at 0. Colonists come from the most populous home centre that keeps at least a thousand. All are dials in offworld_base_params. Founding lays one Track to a dry neighbour so the base can build at all. Save v90.
+
+**Why it matters.** These numbers set how hard a base is to keep alive.
+
+- Accept as first cut
+- Retune any of them
+
+> **Recommendation:** Accept for v0.5.0; tune in the v0.6.0 playtest.
+
+*Files: `src/world/offworld_base.cpp`, `docs/politics/NATIONS.md`*
+
+### NR-1202 — A fed base reads its province at habitability 1 (the building ceiling, labour and the hub source)
+*decision taken on your behalf · raised 2026-11-10 · from BL-1601 lane report*
+
+Five home-body assumptions were widened to a base: labour and workforce read the base habitability (1 when fed); the logistics chain anchor and the capital free source fall back to the base capital on that body; and measure_province_sustain, which capped an airless province at one building, reads a fed base province at habitability 1. The last is a design reading, not a bug fix.
+
+**Why it matters.** It decides how much a base can grow.
+
+- Accept: a fed base is habitable ground
+- Keep the airless cap and let bases stay small
+
+> **Recommendation:** Accept.
+
+*Files: `src/world/province.cpp`, `src/world/economy_system.cpp`, `src/world/logistic_points.cpp`*
+
+### NR-1203 — Launch goods sit on the wrong shelves: a short market's silenced bid cannot pull imports
+*question · raised 2026-11-10 · from BL-1630 lane report*
+
+With a staffed pad now bidding for its launch lot, components and propellant plants appear (seed 0: 5 and 10 by 2000), but by 2015 market 47582 holds 1,468 components and 21 propellant while 47599 and 47665 hold 1,542 and 788 propellant and no components. Every padded rival is refused at the shelf; 0 launches through 2015. Trade moves none of it: a market short of a good prices it at the fair-price ceiling, the ceiling silences its bid, and auto trade sizes a delivery off posted demand (dispatch_absorbable), so it reads 0. Pad construction stalls the same way (refined fuel over its 31.2 ceiling; one pad sat at 360 days left). No doc owns movement under the ceiling. SPACE_ASSETS.md says a launch reads the home market's shelf.
+
+**Why it matters.** This is the wall between rivals and space, and it also slows pad construction. It is a trade rule, not a space rule.
+
+- A) Auto trade sizes a delivery off the silenced (hauler-only) want too
+- B) A launch may draw its lot from every market on the home body the nation reaches
+- C) Both
+
+> **Recommendation:** A, measured first: it fixes pads and launches alike, by an in-world force. An experiment lane measures it on its own branch; nothing merges without your call.
+
+*Files: `src/world/trade.cpp`, `src/world/supply_system.cpp`, `docs/economy/TRADE.md`, `docs/economy/MARKETS.md`*
+
+### NR-1204 — The BL-644 space-programme lumps are retired by data (authored at zero)
+*decision taken on your behalf · raised 2026-11-10 · from BL-1630 lane report*
+
+The lumps bought a whole launch lot off any shelf and consumed it with nothing launched; seed 0 1983-2000 bought 80 lumps and starved every launch. The real launch now buys the goods, so components_lump and propellant_lump are 0 in economy.lua and NATIONS.md says so. A staffed pad instead posts a standing bid (standing_lots = 1) on its home market, including the player's pad: a demand on the market, nothing bought or built for you. The state hash moves after 1980; no digest re-pinned.
+
+**Why it matters.** Post-1960 pins will move at the next re-bless.
+
+- Accept
+- Limit the standing bid to rivals
+
+> **Recommendation:** Accept.
+
+*Files: `scripts/economy.lua`, `src/world/economy_system.cpp`, `docs/politics/NATIONS.md`*
 
 ---
 

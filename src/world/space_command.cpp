@@ -147,6 +147,25 @@ space_command_outcome execute(world& w, const recipe_registry& reg, const space_
                                   c.subject);
         case space_verb::move_satellite:
             return from_satellite(move_satellite(w, sp, c.nation, c.subject, node_of(c)), c.subject);
+        case space_verb::found_base:
+        {
+            const offworld_base_op op = found_offworld_base(w, reg, offworld_base_params{}, c.nation, c.subject);
+            space_command_outcome o;
+            o.base        = op.result;
+            o.base_centre = op.centre;
+            o.result      = op.result == offworld_base_result::ok ? space_command_result::applied
+                                                                  : space_command_result::rejected_refused;
+            return o;
+        }
+        case space_verb::embark_colonists:
+        {
+            space_command_outcome o;
+            o.base   = embark_colonists(w, c.nation, c.subject, c.slot);
+            o.asset  = c.subject;
+            o.result = o.base == offworld_base_result::ok ? space_command_result::applied
+                                                          : space_command_result::rejected_refused;
+            return o;
+        }
     }
     return {}; // unreachable: validated
 }
@@ -244,6 +263,21 @@ space_command_result validate_space_command(const world& w, const space_command&
             if (r != space_command_result::applied)
                 return r;
             return node_ok(w, c) ? space_command_result::applied : space_command_result::rejected_invalid;
+        }
+        case space_verb::found_base:
+            // BL-1601: the subject is a tile that exists; the founding's own rules decide the rest.
+            return c.subject != null_entity && w.tiles.count(c.subject) != 0 ? space_command_result::applied
+                                                                             : space_command_result::rejected_invalid;
+        case space_verb::embark_colonists:
+        {
+            // BL-1601: the subject is a space unit of the nation's; the count a real head count.
+            const auto it = w.space_units.find(c.subject);
+            if (c.subject == null_entity || it == w.space_units.end())
+                return space_command_result::rejected_invalid;
+            if (it->second.owner != c.nation)
+                return space_command_result::rejected_not_owner;
+            return c.slot >= 1 && c.slot <= k_space_colonists_max ? space_command_result::applied
+                                                                   : space_command_result::rejected_invalid;
         }
     }
     return space_command_result::rejected_invalid;

@@ -911,7 +911,6 @@ inline constexpr uint32_t k_world_save_version_pre_debris = k_world_save_version
 /// it; the BL-1426 precedent). MERGE NOTE: a parallel lane's bump renumbers this block (this
 /// paragraph, the three constants below, the accepted-version line in
 /// `read_world_snapshot`, and the one section at the end of the writer and reader).
-inline constexpr uint32_t world_save_version = 89;
 
 /// BL-1599: the first version carrying the bombard-order section (see above).
 inline constexpr uint32_t k_world_save_version_space_bombard = 89;
@@ -919,6 +918,29 @@ inline constexpr uint32_t k_world_save_version_space_bombard = 89;
 /// BL-1599: v88, a strict prefix of v89.
 inline constexpr uint32_t k_world_save_version_pre_space_bombard = k_world_save_version_space_bombard - 1;
 /// ===== END BL-1599 VERSION BUMP =================================================
+/// ===== BEGIN BL-1601 VERSION BUMP (off-world bases) — ONE BLOCK =================
+/// **90 (BL-1601; NATIONS.md § Off-world bases) — BASES AND COLONISTS.** Appended
+/// last: a u32 count, then every `world::offworld_bases` record ascending centre id
+/// as (centre, i32 founded_tick, i32 unfed_quarters) — 12 bytes; then a u32 count,
+/// then every `world::space_colonists` entry of a LIVE unit ascending unit id as
+/// (unit, i32 colonists) — 8 bytes. A base names a live population centre on a
+/// tile of a non-star body other than the home world; founded_tick >= 0;
+/// unfed_quarters in [0, k_offworld_unfed_max]. A colonist entry names a live
+/// Lander, carrying 1 .. its design's passenger berths. Refused whole otherwise.
+/// Everything else a base is — its ground, its centre, its market, its provinces —
+/// rides the stores that already carry them. v89 is a STRICT PREFIX of v90 and is
+/// read too (`k_world_save_version_pre_offworld_bases`), as a world with no base and
+/// nobody aboard. MERGE NOTE: a parallel lane's bump renumbers this block (this
+/// paragraph, the three constants below, the accepted-version line in
+/// `read_world_snapshot`, and the one section at the end of the writer and reader).
+inline constexpr uint32_t world_save_version = 90;
+
+/// BL-1601: the first version carrying the off-world base section (see above).
+inline constexpr uint32_t k_world_save_version_offworld_bases = 90;
+
+/// BL-1601: v89, a strict prefix of v90.
+inline constexpr uint32_t k_world_save_version_pre_offworld_bases = k_world_save_version_offworld_bases - 1;
+/// ===== END BL-1601 VERSION BUMP =================================================
 
 /// BL-1612: the first version carrying the Early Space tree section (see above).
 inline constexpr uint32_t k_world_save_version_early_space = 82;
@@ -1185,6 +1207,9 @@ std::size_t world_save_prospecting_section_bytes(const world& w);
 /// BL-1596: the byte length of the v87 space-convoy section `w` writes - 4 + 32 per
 /// record. The LAST section of a v87 stream.
 std::size_t world_save_space_convoy_section_bytes(const world& w);
+/// BL-1601: the byte length of the v88 off-world base section `w` writes - 4 + 12 per
+/// base, 4 + 8 per colonist entry of a live unit. The LAST section of a v88 stream.
+std::size_t world_save_offworld_base_section_bytes(const world& w);
 
 /// BL-1599: VERIFICATION ONLY - the v87 stream shape (no bombard-order section).
 void write_world_snapshot_pre_space_bombard(const world& w, std::ostream& out);
@@ -1347,6 +1372,8 @@ void write_world_snapshot_pre_debris(const world& w, std::ostream& out);
 /// BL-1598: the byte length of the v88 debris section `w` writes - 12, plus 9 per
 /// debris node, 8 per worn asset, 8 per battle with quiet days. The last section.
 std::size_t world_save_debris_section_bytes(const world& w);
+/// VERIFICATION ONLY (BL-1601): the v89 stream shape - no off-world base section.
+void write_world_snapshot_pre_offworld_bases(const world& w, std::ostream& out);
 
 /// BL-1453: the recon stock a battle loaded from a pre-v67 stream is given — enough to
 /// see every defending unit in full (twice the stealthiest defender's kit stealth, in

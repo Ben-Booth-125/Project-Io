@@ -4670,10 +4670,10 @@
     "The unit carries the orbital-missile armament (rejected_not_armed), is not in transit (rejected_busy), and stands in the LOW ORBIT of the body the target lies on (rejected_wrong_node).",
     "There is something there it may strike (rejected_target): the building, or for a province the building in best condition there (ties to the lowest id), must be standing, completed, of a type whose condition bites (condition_bites - the strategic mission's targets: producers, the marketplace, ports, hubs, stations, research houses, bunkers, orbital defence batteries; NOT a Launchpad or a base) and owned by a nation the acting nation is hostile to, either direction."
    ],
-   "expected_output": "ok: a STANDING order (world::space_bombard_orders, keyed by unit; saved, world_save_version 88). Each day, after the battle day, it fires once: the unit's firepower x bombard_condition_per_firepower (1.0) comes off the struck building's condition per-mille (its throughput scales with condition; the daily repair pass mends it), and the building's owner observes force_used toward the bomber, magnitude bombard_force_per_permille (0.1) x the condition lost - the Trust and Alarm a battle's force carries (RELATIONS.md § 6). A province order re-picks its building each day. The order is DROPPED the first day its unit, target or hostility is gone, or the unit has left that low orbit; peace drops it. The munition is not consumed (first cut). An enemy Orbital Defence Battery on the body fires back each day.",
+   "expected_output": "ok: a STANDING order (world::space_bombard_orders, keyed by unit; saved, world_save_version 89). Each day, after the battle day, it fires once: the unit's firepower x bombard_condition_per_firepower (1.0) comes off the struck building's condition per-mille (its throughput scales with condition; the daily repair pass mends it), and the building's owner observes force_used toward the bomber, magnitude bombard_force_per_permille (0.1) x the condition lost - the Trust and Alarm a battle's force carries (RELATIONS.md § 6). A province order re-picks its building each day. The order is DROPPED the first day its unit, target or hostility is gone, or the unit has left that low orbit; peace drops it. The munition is not consumed (first cut). An enemy Orbital Defence Battery on the body fires back each day.",
    "reason_to_select": "Wear down a hostile nation's industry, trade or defences on a body your fleet holds the orbit of - at the price of Trust and Alarm in the nation struck."
-   },
-   {
+  },
+  {
    "id": "gameplay.queue_space_research",
    "family": "gameplay",
    "surface": "The research panel's Early Space tree (the 'Early Space' tab, top-right of the research canvas): SHIFT + left click on a node. A corp_verb (55, `queue_space_research`), so an agent issues it through the same seam.",
@@ -4734,6 +4734,55 @@
    ],
    "expected_output": "Digitisation: the ring (as canvas.tech_tree_key describes). Early Space: the next age's tree, three branch columns (In-Situ Propellant, Interplanetary Convoys, Space Force) flowing top to bottom, the same glyphs, links and press idiom as the ring; each column's header names its branch and what keys it ('Keyed: <node> held' in green, or 'Needs <node>' in red). Before the gate into space is met every node draws locked and the caption reads 'Locked: the gate into space needs ...' naming the missing conditions (Rocketry; a staffed Launchpad on the home body; propellant on a home-body market's shelf); the tree stays readable by hover. The camera resets on a switch. Sim untouched.",
    "reason_to_select": "Read the next age: what reaching space opens, what keys each branch, and whether the gate is met."
+  },
+  {
+   "id": "gameplay.space_embark_colonists",
+   "family": "gameplay",
+   "surface": "In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "press": "In-process: apply_space_command({nation, verb=12 embark_colonists, subject=lander, slot=colonists}).",
+   "args": [
+    {
+     "name": "subject",
+     "type": "entity_id (space unit)",
+     "meaning": "The nation's own Lander with a passenger bay."
+    },
+    {
+     "name": "slot",
+     "type": "int32",
+     "meaning": "Colonists to board, in thousands of heads (one passenger berth each); 1 .. 65536 at the seam, and no more than the free berths."
+    }
+   ],
+   "preconditions": [
+    "The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands - each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own - and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing. A refusal by the verb itself is rejected_refused, with `base` naming the reason; it too mutates nothing.",
+    "The unit is a Lander with passenger berths (rejected_not_lander), idle in its nation's home body's low orbit or landed on its surface (rejected_wrong_node), and the nation holds a completed, staffed Launchpad on that body (rejected_no_pad).",
+    "The colonists fit the berths left free (rejected_no_berths), and one of the nation's centres on its home body can spare them and keep a thousand (rejected_no_people); the most populous is drawn from, ties to the lower id.",
+    "Never delayed."
+   ],
+   "expected_output": "applied: the heads leave that home population centre and ride aboard the Lander (world::space_colonists, saved at world_save_version 88). A unit lost with colonists aboard loses them.",
+   "reason_to_select": "Carry the people a base is founded with (NATIONS.md § Off-world bases)."
+  },
+  {
+   "id": "gameplay.space_found_base",
+   "family": "gameplay",
+   "surface": "In-process: apply_space_command (src/world/space_command.hpp), the near-space command seam; the verb is offworld_base.hpp's. No UI surface yet. Not yet on the --serve / MCP transport (a SPACE line beside COMMAND is owed).",
+   "press": "In-process: apply_space_command({nation, verb=11 found_base, subject=tile}).",
+   "args": [
+    {
+     "name": "subject",
+     "type": "entity_id (tile)",
+     "meaning": "The tile the base stands on: land on another body's surface."
+    }
+   ],
+   "preconditions": [
+    "The actor is a nation (rejected_unknown_nation otherwise). The seam validates every field as the value that lands - each enum range-checked as a raw byte, each entity id checked to exist and to be the nation's own - and rejects the whole command on any violation (rejected_invalid / rejected_not_owner), mutating nothing. A refusal by the verb itself is rejected_refused, with `base` naming the reason; it too mutates nothing.",
+    "The nation holds base_founding (the Early Space tree's Off-World Bases) - rejected_tech_locked.",
+    "The tile is land on a gridded body other than the star and the nation's home body (rejected_invalid), and the nation has MAPPED it (rejected_unmapped; DISCOVERY.md § Mapping, then prospecting).",
+    "Nobody owns the tile, no centre or building stands on it, and no nation holds its province (rejected_claimed).",
+    "The nation's Landers landed on that body's surface carry, between them, at least 2 colonists (thousands; rejected_no_colonists) and 20 machinery held as cargo, the base kit (rejected_no_kit). Both are first-cut stand-ins, not yet authored by a doc.",
+    "Never delayed."
+   ],
+   "expected_output": "applied: a body with no provinces is partitioned; the base's province becomes the nation's (every unowned tile, and the holder); a population centre with every landed colonist stands on the tile; the body's market is founded there if it had none; a Track is laid from the tile; the colonists and the kit are spent. From then on the base buys its life support (water and food rations per thousand, by the habitability its tile lacks) off its own market each quarter, or shrinks. Saved (world_save_version 88).",
+   "reason_to_select": "Open ground on another body: build, extract and trade there as at home."
   }
  ]
 }
