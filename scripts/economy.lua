@@ -1293,8 +1293,25 @@ economy = {
     -- value by key; an absent key (or table) keeps the zero default, which
     -- derives no purchase at all.
     space_programme = {
-        components_lump = 25.0, -- spacecraft_components per purchase
-        propellant_lump = 50.0, -- propellant per purchase
+        -- BL-1630: THE LUMPS ARE OFF (0). A launch is real now (BL-1582): it buys
+        -- its lot off the home shelf and puts an asset in orbit. The lump bought
+        -- the same goods off ANY shelf holding a whole one and consumed them with
+        -- nothing launched, in the nation step BEFORE the space pick - so every
+        -- lot a shelf gathered was eaten first (seed 0 with the standing bid on:
+        -- 80 lumps bought 1983-2000 - 59 of propellant, 21 of components - and 0
+        -- launches). The space programme buys its goods through its launches.
+        -- Was 25 / 50.
+        components_lump = 0.0, -- spacecraft_components per purchase
+        propellant_lump = 0.0, -- propellant per purchase
+        -- BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its
+        -- launch"): launch lots a nation holding Rocketry with a staffed pad
+        -- bids for on its home market each quarter, as POSTED demand (one lot
+        -- = one satellite to home low orbit: 25 components, 50 propellant).
+        -- Without it the launch's want was off the book, the goods had no price,
+        -- and no plant was built for them (seed 0: 4 staffed pads, 0 launches by
+        -- 1995). 1.0 = one launch a quarter, the rate a rival's pick can take.
+        -- 0 switches the bid off. Loader bounds [0, 4].
+        standing_lots = 1.0,
     },
 
     -- BL-1335: taxes and Discontent (docs/politics/NATIONS.md § Taxes and

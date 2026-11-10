@@ -41,6 +41,16 @@
 //       each builds nothing and leaves the hash alone.
 //   G7  DETERMINISM: two groundwork runs end byte-identical.
 //
+// BL-1630 (launch goods supply), on the first fixture (post_space_launch_wants):
+//   B1  LOT: a keyed nation with a staffed pad has a standing lot - one satellite's
+//       components and its propellant to home low orbit - at its home market.
+//   B2  POSTED: every padded nation posts that lot into report.wants; the world
+//       is not touched.
+//   B3  LOTS: standing_lots 2 bids two lots.
+//   B4  CEILING: a good over the fair-price ceiling does not bid; its want goes
+//       to report.hauler_wants.
+//   B5  WALLS: no Rocketry, an unstaffed pad, the settle, standing_lots 0 - no bid.
+//
 // Build: node tools/verify/build_harness.js space_ai_harness --run
 // ---------------------------------------------------------------------------
 
@@ -48,6 +58,7 @@
 #include "world/corp_ai.hpp"
 #include "world/placement_rules.hpp"
 #include "world/economy_system.hpp"
+#include "world/orbital_graph.hpp"
 #include "world/nation_ai.hpp"
 #include "world/nation_step.hpp"
 #include "world/recipe_registry.hpp"
@@ -633,6 +644,83 @@ int main()
                   && g1.w.buildings.size() == 4,
               "G7", fmt("two groundwork runs end equal: %zu buildings, snapshots byte-identical",
                         g1.w.buildings.size()));
+    }
+
+    // ---- B1..B5 BL-1630 the standing bid: a staffed pad bids for its launch -----------------
+    {
+        const space_asset_params& sp = reg.space_assets();
+        const float res_mult = 2.0f; // the authored fair-price ceiling (economy.lua price_band)
+        const std::size_t ci = static_cast<std::size_t>(resource_type::spacecraft_components);
+        const std::size_t pi = static_cast<std::size_t>(resource_type::propellant);
+        const auto want_of = [](const std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>>& m,
+                                entity_id n, entity_id mid, std::size_t r) {
+            const auto it = m.find(std::make_pair(n, mid));
+            return it == m.end() ? 0.0f : it->second[r];
+        };
+
+        fixture f;
+        build(f);
+        world& w = f.w;
+        const orbital_path_result path = orbital_path(w, orbital_graph_params{},
+                                                      orbital_node{f.home, orbital_node_kind::surface},
+                                                      orbital_node{f.home, orbital_node_kind::low_orbit});
+        const float want_c = sp.components_lot[0];
+        const float want_p = sp.propellant_per_dv[0] * static_cast<float>(path.dv);
+        entity_id mid = null_entity;
+        float lc = 0.0f, lp = 0.0f;
+        const bool has_lot = space_standing_lot(w, sp, f.a, mid, lc, lp);
+        check(has_lot && mid == f.market && lc == want_c && lp == want_p && lp > 0.0f, "B1",
+              fmt("a padded, keyed nation's standing lot: %.1f components + %.1f propellant at its home market",
+                  lc, lp));
+
+        const unsigned long long h0 = w.state_hash(0);
+        economy_report rep;
+        post_space_launch_wants(w, sp, res_mult, 1.0f, rep);
+        bool all = true;
+        for (const entity_id n : {f.a, f.b, f.player})
+            all = all && want_of(rep.wants, n, f.market, ci) == want_c && want_of(rep.wants, n, f.market, pi) == want_p;
+        check(all && rep.hauler_wants.empty() && w.state_hash(0) == h0, "B2",
+              "every padded nation posts its lot as a want on its home market; the world is not touched");
+
+        economy_report rep2;
+        post_space_launch_wants(w, sp, res_mult, 2.0f, rep2);
+        check(want_of(rep2.wants, f.a, f.market, ci) == 2.0f * want_c
+                  && want_of(rep2.wants, f.a, f.market, pi) == 2.0f * want_p,
+              "B3", "standing_lots 2 bids two lots");
+
+        // Over the fair-price ceiling the components do not bid; their want is silenced.
+        w.markets.at(f.market).price[ci] = space_fixture::k_components_price * 2.5f;
+        economy_report rep3;
+        post_space_launch_wants(w, sp, res_mult, 1.0f, rep3);
+        check(want_of(rep3.wants, f.a, f.market, ci) == 0.0f
+                  && want_of(rep3.hauler_wants, f.a, f.market, ci) == want_c
+                  && want_of(rep3.wants, f.a, f.market, pi) == want_p,
+              "B4", "a good over the ceiling does not bid: its want goes to the hauler-only register");
+        w.markets.at(f.market).price[ci] = space_fixture::k_components_price;
+
+        // Walls: no keys, an unstaffed pad, the settle, the dial off.
+        fixture nk;
+        build(nk, /*keys=*/false);
+        economy_report r_nk;
+        post_space_launch_wants(nk.w, sp, res_mult, 1.0f, r_nk);
+        fixture us;
+        build(us);
+        for (auto& [bid, b] : us.w.buildings)
+            if (b.type == building_type::launchpad)
+                b.workforce_assigned = 0.0f;
+        economy_report r_us;
+        post_space_launch_wants(us.w, sp, res_mult, 1.0f, r_us);
+        fixture st;
+        build(st);
+        st.w.current_econ_tick = k_campaign_settle_ticks - 1;
+        economy_report r_st;
+        post_space_launch_wants(st.w, sp, res_mult, 1.0f, r_st);
+        economy_report r_off;
+        post_space_launch_wants(w, sp, res_mult, 0.0f, r_off);
+        check(r_nk.wants.empty() && r_us.wants.empty() && r_st.wants.empty() && r_off.wants.empty()
+                  && r_nk.hauler_wants.empty() && r_us.hauler_wants.empty() && r_st.hauler_wants.empty()
+                  && r_off.hauler_wants.empty() && reg.space_programme().standing_lots == 0.0f,
+              "B5", "no Rocketry, an unstaffed pad, the settle, standing_lots 0 (the C++ default): no bid");
     }
 
     std::printf("\nspace_ai_harness: %d passed, %d failed\n", g_pass, g_fail);

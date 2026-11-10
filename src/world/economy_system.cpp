@@ -22,6 +22,8 @@
 #include "sentiment_emitters.hpp" // BL-1458/BL-1432: the emitters and the once-a-tick fold
 #include "stance.hpp"          // is_hostile (BL-470's NR-344 march queue; BL-617 migration gate)
 #include "nation_tech.hpp"     // recipe_unlocked, nation_scalar (BL-1273; BL-588 before it)
+#include "space_assets.hpp"    // BL-1630: space_standing_lot, the pad's standing bid
+#include "space_programme.hpp" // BL-1630: space_programme_params::standing_lots
 #include "state_industry.hpp"  // BL-1296: plan_state_funding, the state ledger
 #include "unit_roster.hpp"     // resolve_unit_upkeep (BL-454 unit pass), unit_roster_table (BL-470)
 #include "workforce.hpp"
@@ -2088,6 +2090,53 @@ void advance_refits(world& w)
     }
 }
 
+// BL-1630 (SPACE_ASSETS.md § Launching, "A staffed pad bids for its launch";
+// MARKETS.md § Demand channels, property 3): a nation holding Rocketry with a
+// staffed Launchpad on its home body BIDS for its next launch's goods on its home
+// market — `standing_lots` x one satellite's lot (`space_standing_lot`), posted
+// into `report.wants` so the clear raises it into `demand` and a price answers
+// it. Before this the launch's want was off the book (an unposted bid lifts the
+// build veto and nothing more), so the goods had no price signal: no plant
+// was built for a buyer the market could not see, and the dial idled the plants
+// that were. Under the fair-price ceiling as every draw is: a good priced over
+// it does not bid; its want goes to the hauler-only register instead. Every
+// nation, the player's included: this is the pad's want on the market, not a
+// decision — nothing is bought, built or launched here. Ascending nation id;
+// nothing in the campaign settle.
+void post_space_launch_wants(const world& w, const space_asset_params& sp, float res_mult,
+                             float lots, economy_report& report)
+{
+    if (!(lots > 0.0f) || !std::isfinite(lots) || !research_age_open(w))
+        return;
+    std::vector<entity_id> ids;
+    ids.reserve(w.nations.size());
+    for (const auto& kv : w.nations)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    for (const entity_id n : ids)
+    {
+        entity_id mid = null_entity;
+        float comps = 0.0f, prop = 0.0f;
+        if (!space_standing_lot(w, sp, n, mid, comps, prop))
+            continue;
+        const market_component& m = w.markets.at(mid);
+        const std::pair<resource_type, float> lot[] = {
+            { resource_type::spacecraft_components, comps * lots },
+            { resource_type::propellant,            prop * lots },
+        };
+        for (const auto& [good, q] : lot)
+        {
+            if (!(q > 0.0f))
+                continue;
+            const std::size_t r = static_cast<std::size_t>(good);
+            auto& reg_row = shelf_admits(m, r, res_mult, /*off_buys=*/true)
+                ? report.wants[std::make_pair(n, mid)]
+                : report.hauler_wants[std::make_pair(n, mid)];
+            reg_row[r] += q;
+        }
+    }
+}
+
 economy_report run_economy_step(world& w, const recipe_registry& reg, bool spectating)
 {
     // BL-1117: the phase clock, WRITE-ONLY (economy_system.hpp). Null
@@ -3563,6 +3612,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg, bool spect
     // the shelf only at the clear, so upkeep draws what earlier ticks left there.)
     run_building_upkeep(w, reg, report);
     phase_stamp(13); // building_upkeep
+
+    // BL-1630: the launch-ready pads' standing bid, posted for this tick's clear.
+    post_space_launch_wants(w, reg.space_assets(), reg.price_band().reservation_mult,
+                            reg.space_programme().standing_lots, report);
 
     // BL-1427 (fronts): re-anchor once more at the tick's end, after everything
     // that can move a border or kill a unit, so a save taken between ticks holds

@@ -126,6 +126,18 @@ build's cost. Never for the player's nation.
 lot refuses the launch whole; nothing is half-bought. The lot scales with the payload's class and
 the path's thrust cost: a further node burns more propellant.
 
+**A staffed pad bids for its launch (BL-1630, launch goods supply).** Every nation that holds
+Rocketry and has a staffed pad on its home body bids each quarter for one launch lot on its home
+market: one satellite's components and the propellant to its home low orbit. The bid is **posted
+demand**, so the market prices it and the goods find makers (`MARKETS.md` § Demand channels,
+property 3). A buyer the market cannot see calls forth no plant. Over the fair-price ceiling a good
+does not bid, as every draw obeys. This is the pad's want on the market, not a decision: nothing is
+bought, built or launched by it, so it stands for the player's nation as for any other. The lot
+count a quarter is data (`economy.space_programme.standing_lots`).
+
+**The launch is the space programme's goods buyer.** No lump of space goods is bought and consumed
+besides it: a lump consumed with nothing launched would empty the shelf the launch is waiting on.
+
 **A launch is refused whole** — the world is not touched — when the nation has no staffed pad, lacks
 the technology, cannot pay, the shelf cannot fill the lot, the class may not go to that node, or
 the node has no free slot.

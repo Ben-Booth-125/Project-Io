@@ -215,6 +215,38 @@ float space_heliocentric_au(const world& w, entity_id body)
     return heliocentric_au(w, body);
 }
 
+bool space_standing_lot(const world& w, const space_asset_params& p, entity_id nation,
+                        entity_id& market, float& components, float& propellant)
+{
+    market     = null_entity;
+    components = 0.0f;
+    propellant = 0.0f;
+    if (nation == null_entity || w.nations.count(nation) == 0
+        || !nation_has_mechanic(w, nation, space_keys::dispatch))
+        return false;
+    const entity_id home = space_home_body_of(w, nation);
+    if (home == null_entity || !space_has_staffed_pad(w, nation, home))
+        return false;
+    const entity_id mid = space_home_market(w, nation);
+    if (mid == null_entity || w.markets.count(mid) == 0)
+        return false;
+    // The launch the quote would price first: a satellite, surface to low orbit.
+    const orbital_path_result path = orbital_path(w, orbital_graph_params{},
+                                                  orbital_node{home, orbital_node_kind::surface},
+                                                  orbital_node{home, orbital_node_kind::low_orbit});
+    if (!path.ok || !std::isfinite(path.dv) || path.dv < 0.0)
+        return false;
+    const std::size_t ci = static_cast<std::size_t>(space_asset_class::satellite);
+    const float c  = p.components_lot[ci];
+    const float pr = p.propellant_per_dv[ci] * static_cast<float>(path.dv);
+    if (!std::isfinite(c) || c < 0.0f || !std::isfinite(pr) || pr < 0.0f || !(c + pr > 0.0f))
+        return false;
+    market     = mid;
+    components = c;
+    propellant = pr;
+    return true;
+}
+
 space_launch_quote quote_space_launch(const world& w, const space_asset_params& p,
                                       entity_id nation, space_asset_class cls,
                                       orbital_node node, space_satellite_role role)
